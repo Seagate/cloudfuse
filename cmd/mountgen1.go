@@ -41,12 +41,12 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/config"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/component/azstorage"
-	"github.com/Azure/azure-storage-fuse/v2/component/file_cache"
-	"github.com/Azure/azure-storage-fuse/v2/component/libfuse"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/config"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/component/azstorage"
+	"lyvecloudfuse/component/file_cache"
+	"lyvecloudfuse/component/libfuse"
 
 	"github.com/spf13/cobra"
 )

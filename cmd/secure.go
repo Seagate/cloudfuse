@@ -40,7 +40,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
+	"lyvecloudfuse/common"
 
 	"github.com/spf13/cobra"
 )
@@ -59,7 +59,7 @@ const SecureConfigExtension string = ".azsec"
 
 var secOpts secureOptions
 
-//     Section defining all the command that we have in secure feature
+// Section defining all the command that we have in secure feature
 var secureCmd = &cobra.Command{
 	Use:               "secure",
 	Short:             "Encrypt / Decrypt your config file",

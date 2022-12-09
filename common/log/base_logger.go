@@ -43,7 +43,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
+	"lyvecloudfuse/common"
 )
 
 // LogConfig : Configuration to be provided to logging infra

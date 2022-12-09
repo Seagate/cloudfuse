@@ -36,9 +36,9 @@ package network_monitor
 import (
 	"fmt"
 
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	hmcommon "github.com/Azure/azure-storage-fuse/v2/tools/health-monitor/common"
-	hminternal "github.com/Azure/azure-storage-fuse/v2/tools/health-monitor/internal"
+	"lyvecloudfuse/common/log"
+	hmcommon "lyvecloudfuse/tools/health-monitor/common"
+	hminternal "lyvecloudfuse/tools/health-monitor/internal"
 )
 
 type NetworkProfiler struct {

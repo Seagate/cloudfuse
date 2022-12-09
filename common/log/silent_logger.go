@@ -36,7 +36,7 @@ package log
 import (
 	"log"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
+	"lyvecloudfuse/common"
 )
 
 type SilentLogger struct {

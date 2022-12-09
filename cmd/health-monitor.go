@@ -38,11 +38,12 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/config"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/component/file_cache"
-	hmcommon "github.com/Azure/azure-storage-fuse/v2/tools/health-monitor/common"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/config"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/component/file_cache"
+	hmcommon "lyvecloudfuse/tools/health-monitor/common"
+
 	"github.com/spf13/cobra"
 )
 

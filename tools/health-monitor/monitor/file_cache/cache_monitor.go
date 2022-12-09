@@ -40,10 +40,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	hmcommon "github.com/Azure/azure-storage-fuse/v2/tools/health-monitor/common"
-	hminternal "github.com/Azure/azure-storage-fuse/v2/tools/health-monitor/internal"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
+	hmcommon "lyvecloudfuse/tools/health-monitor/common"
+	hminternal "lyvecloudfuse/tools/health-monitor/internal"
 
 	"github.com/radovskyb/watcher"
 )

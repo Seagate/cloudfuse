@@ -37,8 +37,8 @@ import (
 	"context"
 	"syscall"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/internal/handlemap"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/internal/handlemap"
 )
 
 type ComponentPriority int

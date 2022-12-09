@@ -50,10 +50,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/config"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/internal"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/config"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal"
 
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"

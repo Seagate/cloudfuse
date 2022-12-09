@@ -40,8 +40,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"

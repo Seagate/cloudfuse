@@ -46,12 +46,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/config"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/internal"
-	"github.com/Azure/azure-storage-fuse/v2/internal/handlemap"
-	"github.com/Azure/azure-storage-fuse/v2/internal/stats_manager"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/config"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/handlemap"
+	"lyvecloudfuse/internal/stats_manager"
 
 	"github.com/spf13/cobra"
 )
@@ -113,7 +113,7 @@ const (
 	MB                      = 1024 * 1024
 )
 
-//  Verification to check satisfaction criteria with Component Interface
+// Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &FileCache{}
 
 var fileCacheStatsCollector *stats_manager.StatsCollector
@@ -135,7 +135,8 @@ func (c *FileCache) Priority() internal.ComponentPriority {
 }
 
 // Start : Pipeline calls this method to start the component functionality
-//  this shall not block the call otherwise pipeline will not start
+//
+//	this shall not block the call otherwise pipeline will not start
 func (c *FileCache) Start(ctx context.Context) error {
 	log.Trace("Starting component : %s", c.Name())
 
@@ -192,7 +193,8 @@ func (c *FileCache) TempCacheCleanup() error {
 }
 
 // Configure : Pipeline will call this method after constructor so that you can read config and initialize yourself
-//  Return failure if any config is not valid to exit the process
+//
+//	Return failure if any config is not valid to exit the process
 func (c *FileCache) Configure(_ bool) error {
 	log.Trace("FileCache::Configure : %s", c.Name())
 

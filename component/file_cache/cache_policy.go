@@ -41,9 +41,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/internal/stats_manager"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal/stats_manager"
 )
 
 const DefaultEvictTime = 10

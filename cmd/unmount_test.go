@@ -41,8 +41,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )

@@ -1,3 +1,4 @@
+//go:build !authtest
 // +build !authtest
 
 /*
@@ -54,11 +55,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/config"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/internal"
-	"github.com/Azure/azure-storage-fuse/v2/internal/handlemap"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/config"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/handlemap"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-storage-blob-go/azblob"
@@ -402,11 +403,15 @@ func (s *blockBlobTestSuite) TestDeleteDir() {
 
 // Directory structure
 // a/
-//  a/c1/
-//   a/c1/gc1
-//	a/c2
+//
+//	 a/c1/
+//	  a/c1/gc1
+//		a/c2
+//
 // ab/
-//  ab/c1
+//
+//	ab/c1
+//
 // ac
 func generateNestedDirectory(path string) (*list.List, *list.List, *list.List) {
 	aPaths := list.New()

@@ -43,11 +43,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/config"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/config"
+	"lyvecloudfuse/common/log"
 
-	"github.com/Azure/azure-storage-fuse/v2/component/azstorage"
+	"lyvecloudfuse/component/azstorage"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

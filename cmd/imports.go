@@ -34,10 +34,10 @@
 package cmd
 
 import (
-	_ "github.com/Azure/azure-storage-fuse/v2/component/attr_cache"
-	_ "github.com/Azure/azure-storage-fuse/v2/component/azstorage"
-	_ "github.com/Azure/azure-storage-fuse/v2/component/file_cache"
-	_ "github.com/Azure/azure-storage-fuse/v2/component/libfuse"
-	_ "github.com/Azure/azure-storage-fuse/v2/component/loopback"
-	_ "github.com/Azure/azure-storage-fuse/v2/component/stream"
+	_ "lyvecloudfuse/component/attr_cache"
+	_ "lyvecloudfuse/component/azstorage"
+	_ "lyvecloudfuse/component/file_cache"
+	_ "lyvecloudfuse/component/libfuse"
+	_ "lyvecloudfuse/component/loopback"
+	_ "lyvecloudfuse/component/stream"
 )

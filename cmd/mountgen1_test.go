@@ -39,9 +39,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/config"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/config"
+	"lyvecloudfuse/common/log"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"

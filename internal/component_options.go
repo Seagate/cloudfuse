@@ -36,7 +36,7 @@ package internal
 import (
 	"os"
 
-	"github.com/Azure/azure-storage-fuse/v2/internal/handlemap"
+	"lyvecloudfuse/internal/handlemap"
 )
 
 type CreateDirOptions struct {

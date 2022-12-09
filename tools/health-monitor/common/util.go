@@ -39,7 +39,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common/log"
 )
 
 // check whether blobfuse2 process is running for the given pid

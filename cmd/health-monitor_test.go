@@ -39,10 +39,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/component/file_cache"
-	hmcommon "github.com/Azure/azure-storage-fuse/v2/tools/health-monitor/common"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/component/file_cache"
+	hmcommon "lyvecloudfuse/tools/health-monitor/common"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )

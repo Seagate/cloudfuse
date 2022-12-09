@@ -43,8 +43,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 )
@@ -194,9 +194,10 @@ func ignoreCommand(cmdArgs []string) bool {
 }
 
 // parseArgs : Depending upon inputs are coming from /etc/fstab or CLI, parameter style may vary.
-//   /etc/fstab example : blobfuse2 mount <dir> -o suid,nodev,--config-file=config.yaml,--use-adls=true,allow_other
-//   cli command        : blobfuse2 mount <dir> -o suid,nodev --config-file=config.yaml --use-adls=true -o allow_other
-//   As we need to support both the ways, here we convert the /etc/fstab style (comma separated list) to standard cli ways
+//
+//	/etc/fstab example : blobfuse2 mount <dir> -o suid,nodev,--config-file=config.yaml,--use-adls=true,allow_other
+//	cli command        : blobfuse2 mount <dir> -o suid,nodev --config-file=config.yaml --use-adls=true -o allow_other
+//	As we need to support both the ways, here we convert the /etc/fstab style (comma separated list) to standard cli ways
 func parseArgs(cmdArgs []string) []string {
 	// Ignore binary name, rest all are arguments to blobfuse2
 	cmdArgs = cmdArgs[1:]

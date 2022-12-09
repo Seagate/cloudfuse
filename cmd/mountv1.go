@@ -44,12 +44,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/component/attr_cache"
-	"github.com/Azure/azure-storage-fuse/v2/component/azstorage"
-	"github.com/Azure/azure-storage-fuse/v2/component/file_cache"
-	"github.com/Azure/azure-storage-fuse/v2/component/libfuse"
-	"github.com/Azure/azure-storage-fuse/v2/component/stream"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/component/attr_cache"
+	"lyvecloudfuse/component/azstorage"
+	"lyvecloudfuse/component/file_cache"
+	"lyvecloudfuse/component/libfuse"
+	"lyvecloudfuse/component/stream"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"

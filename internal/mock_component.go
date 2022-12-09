@@ -39,8 +39,8 @@ package internal
 
 import (
 	context "context"
-	common "github.com/Azure/azure-storage-fuse/v2/common"
-	handlemap "github.com/Azure/azure-storage-fuse/v2/internal/handlemap"
+	common "lyvecloudfuse/common"
+	handlemap "lyvecloudfuse/internal/handlemap"
 	reflect "reflect"
 	"syscall"
 

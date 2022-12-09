@@ -49,9 +49,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/internal"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal"
 
 	"github.com/Azure/azure-storage-azcopy/v10/azbfs"
 	"github.com/Azure/azure-storage-azcopy/v10/ste"
@@ -273,7 +273,7 @@ func getLogOptions(sdkLogging bool) pipeline.LogOptions {
 	}
 }
 
-//    ----------- Store error code handling ---------------
+// ----------- Store error code handling ---------------
 const (
 	ErrNoErr uint16 = iota
 	ErrUnknown
@@ -334,7 +334,8 @@ func storeDatalakeErrToErr(err error) uint16 {
 	return ErrNoErr
 }
 
-//    ----------- Metadata handling  ---------------
+//	----------- Metadata handling  ---------------
+//
 // Converts datalake properties to a metadata map
 func newMetadata(properties string) map[string]string {
 	metadata := make(map[string]string)
@@ -461,7 +462,8 @@ func populateContentType(newSet string) error { //nolint
 	return nil
 }
 
-//    ----------- Blob access tier type conversion  ---------------
+//	----------- Blob access tier type conversion  ---------------
+//
 // AccessTierMap : Store config to access tier mapping
 var AccessTiers = map[string]azblob.AccessTierType{
 	"none":    azblob.AccessTierNone,

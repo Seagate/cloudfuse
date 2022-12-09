@@ -39,14 +39,14 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/Azure/azure-storage-fuse/v2/common/config"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common/config"
+	"lyvecloudfuse/common/log"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/JeffreyRichter/enum/enum"
 )
 
-//  AuthType Enum
+// AuthType Enum
 type AuthType int
 
 var EAuthType = AuthType(0).INVALID_AUTH()
@@ -83,7 +83,7 @@ func (a *AuthType) Parse(s string) error {
 	return err
 }
 
-//  AccountType Enum
+// AccountType Enum
 type AccountType int
 
 var EAccountType = AccountType(0).INVALID_ACC()
@@ -176,7 +176,7 @@ type AzStorageOptions struct {
 	CaCertFile     string `config:"ca-cert-file" yaml:"-"`
 }
 
-//  RegisterEnvVariables : Register environment varilables
+// RegisterEnvVariables : Register environment varilables
 func RegisterEnvVariables() {
 	config.BindEnv("azstorage.account-name", EnvAzStorageAccount)
 	config.BindEnv("azstorage.type", EnvAzStorageAccountType)
