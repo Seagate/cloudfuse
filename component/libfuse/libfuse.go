@@ -42,6 +42,8 @@ import (
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
 	"lyvecloudfuse/internal/stats_manager"
+
+	"github.com/winfsp/cgofuse/fuse"
 )
 
 /* NOTES:
@@ -54,6 +56,7 @@ import (
 // Common structure for Component
 type Libfuse struct {
 	internal.BaseComponent
+	host                  *fuse.FileSystemHost
 	mountPath             string
 	dirPermission         uint
 	filePermission        uint
