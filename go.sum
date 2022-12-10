@@ -342,6 +342,8 @@ github.com/wastore/keychain v0.0.0-20180920053336-f2c902a3d807 h1:Uzh85j0tl46Sf2
 github.com/wastore/keychain v0.0.0-20180920053336-f2c902a3d807/go.mod h1:zI8umr7xnBSyT9ZJ8wn48RiQ0EWXo4xmYLNw9FQvC9w=
 github.com/wastore/keyctl v0.3.1 h1:wMkYW9y9jGbQ1ARBLGLwnDdbgrkbuSeuIQeHy+BZOU0=
 github.com/wastore/keyctl v0.3.1/go.mod h1:1359RfMRDlblBSa2vaPC+kkmIxxt+rgl/FxLG38h9xM=
+github.com/winfsp/cgofuse v1.5.0 h1:MsBP7Mi/LiJf/7/F3O/7HjjR009ds6KCdqXzKpZSWxI=
+github.com/winfsp/cgofuse v1.5.0/go.mod h1:h3awhoUOcn2VYVKCwDaYxSLlZwnyK+A8KaDoLUp2lbU=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
