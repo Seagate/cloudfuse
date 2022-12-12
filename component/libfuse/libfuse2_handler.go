@@ -164,13 +164,7 @@ func NewcgofuseFS() *cgofuseFS {
 	return cf
 }
 
-// The init function in blobfuse checks for different fuse connections which I beleive is
-// already done at a lower level in cgofuse. We also need to set a readahead size but that
-// is done when mounting like rclone did https://github.com/rclone/rclone/blob/555def2da7f425225b9f8657593733b5d71f901e/cmd/cmount/mount.go#L169
-// We also need to set uid and gid which is also done when mounting.
-//
-// However, we won't mount in the init like blobfuse does since cgofuse has a separate mount
-// function we need to call.
+// Does nothing here, as init is handled elsewhere
 func (cf *cgofuseFS) Init() {
 	log.Trace("Libfuse::Init : Initializing FUSE")
 }
