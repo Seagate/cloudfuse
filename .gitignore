@@ -6,6 +6,7 @@ testcnf.yaml
 lyvecloudfuse.log
 lyvecloudfuse.test
 azuretest.json
+blobfuse2
 lyvecloudfuse
 adlsgen1fuse
 venv/
