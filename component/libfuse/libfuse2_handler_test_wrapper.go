@@ -206,7 +206,7 @@ func testOpen(suite *libfuseTestSuite) {
 	name := "path"
 	path := "/" + name
 	mode := fs.FileMode(fuseFS.filePermission)
-	flags := fuse.O_RDWR & 0xffffffff
+	flags := fuse.O_RDWR
 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, nil)
 
@@ -221,7 +221,7 @@ func testOpen(suite *libfuseTestSuite) {
 // 	path := C.CString("/" + name)
 // 	defer C.free(unsafe.Pointer(path))
 // 	mode := fs.FileMode(fuseFS.filePermission)
-// 	flags := C.O_RDWR & 0xffffffff
+// 	flags := C.O_RDWR
 // 	info := &C.fuse_file_info_t{}
 // 	info.flags = C.O_RDWR | C.O_SYNC | C.__O_DIRECT
 // 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
@@ -304,7 +304,7 @@ func testOpenAppendFlagIgnoreAppendFlag(suite *libfuseTestSuite) {
 	err, _ = cfuseFS.Open(path, flags)
 	suite.assert.Equal(0, err)
 
-	flags = fuse.O_WRONLY & 0xffffffff
+	flags = fuse.O_WRONLY
 	options = internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, nil)
 
@@ -317,7 +317,7 @@ func testOpenNotExists(suite *libfuseTestSuite) {
 	name := "path"
 	path := "/" + name
 	mode := fs.FileMode(fuseFS.filePermission)
-	flags := fuse.O_RDWR & 0xffffffff
+	flags := fuse.O_RDWR
 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, syscall.ENOENT)
 
@@ -330,7 +330,7 @@ func testOpenError(suite *libfuseTestSuite) {
 	name := "path"
 	path := "/" + name
 	mode := fs.FileMode(fuseFS.filePermission)
-	flags := fuse.O_RDWR & 0xffffffff
+	flags := fuse.O_RDWR
 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, errors.New("failed to open a file"))
 
@@ -465,7 +465,7 @@ func testFsync(suite *libfuseTestSuite) {
 	name := "path"
 	path := "/" + name
 	mode := fs.FileMode(fuseFS.filePermission)
-	flags := fuse.O_RDWR & 0xffffffff
+	flags := fuse.O_RDWR
 	handle := &handlemap.Handle{}
 	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(openOptions).Return(handle, nil)
@@ -497,7 +497,7 @@ func testFsyncError(suite *libfuseTestSuite) {
 	name := "path"
 	path := "/" + name
 	mode := fs.FileMode(fuseFS.filePermission)
-	flags := fuse.O_RDWR & 0xffffffff
+	flags := fuse.O_RDWR
 	handle := &handlemap.Handle{}
 
 	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
