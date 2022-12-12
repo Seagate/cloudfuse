@@ -460,91 +460,82 @@ func testReadLinkError(suite *libfuseTestSuite) {
 }
 
 // TODO: Fix tests to work with cgofuse
-// func testFsync(suite *libfuseTestSuite) {
-// 	defer suite.cleanupTest()
-// 	name := "path"
-// 	path := "/" + name
-// 	mode := fs.FileMode(fuseFS.filePermission)
-// 	flags := fuse.O_RDWR & 0xffffffff
-// 	info := &fuse.FileInfo_t{}
-// 	info.Flags = fuse.O_RDWR
-// 	handle := &handlemap.Handle{}
-// 	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
-// 	suite.mock.EXPECT().OpenFile(openOptions).Return(handle, nil)
-// 	cfuseFS.Open(path, info)
-// 	suite.assert.NotEqual(0, info.fh)
+func testFsync(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	name := "path"
+	path := "/" + name
+	mode := fs.FileMode(fuseFS.filePermission)
+	flags := fuse.O_RDWR & 0xffffffff
+	handle := &handlemap.Handle{}
+	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
+	suite.mock.EXPECT().OpenFile(openOptions).Return(handle, nil)
+	_, fh := cfuseFS.Open(path, flags)
+	suite.assert.NotEqual(0, fh)
 
-// 	// libfuse component will return back handle in form of an integer value
-// 	// that needs to be converted back to a pointer to a handle object
-// 	fobj := (*fileHandle)(unsafe.Pointer(uintptr(info.fh)))
-// 	handle = (*handlemap.Handle)(unsafe.Pointer(uintptr(fobj.obj)))
+	// Need to convert the ID to the correct filehandle for mocking
+	handle.ID = (handlemap.HandleID)(fh)
 
-// 	options := internal.SyncFileOptions{Handle: handle}
-// 	suite.mock.EXPECT().SyncFile(options).Return(nil)
+	options := internal.SyncFileOptions{Handle: handle}
+	suite.mock.EXPECT().SyncFile(options).Return(nil)
 
-// 	err := cfuseFS.Fsync(path, 0, info)
-// 	suite.assert.Equal(0, err)
-// }
+	err := cfuseFS.Fsync(path, false, fh)
+	suite.assert.Equal(0, err)
+}
 
-// func testFsyncHandleError(suite *libfuseTestSuite) {
-// 	defer suite.cleanupTest()
-// 	name := "path"
-// 	path := "/" + name
-// 	info := &fuse.FileInfo_t{}
-// 	info.Flags = fuse.O_RDWR
+func testFsyncHandleError(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	name := "path"
+	path := "/" + name
+	fh := uint64(0)
 
-// 	err := cfuseFS.Fsync(path, 0, info)
-// 	suite.assert.Equal(-fuse.EIO, err)
-// }
+	err := cfuseFS.Fsync(path, false, fh)
+	suite.assert.Equal(-fuse.EIO, err)
+}
 
-// func testFsyncError(suite *libfuseTestSuite) {
-// 	defer suite.cleanupTest()
-// 	name := "path"
-// 	path := "/" + name
-// 	mode := fs.FileMode(fuseFS.filePermission)
-// 	flags := fuse.O_RDWR & 0xffffffff
-// 	info := &fuse.FileInfo_t{}
-// 	info.Flags = fuse.O_RDWR
-// 	handle := &handlemap.Handle{}
+func testFsyncError(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	name := "path"
+	path := "/" + name
+	mode := fs.FileMode(fuseFS.filePermission)
+	flags := fuse.O_RDWR & 0xffffffff
+	handle := &handlemap.Handle{}
 
-// 	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
-// 	suite.mock.EXPECT().OpenFile(openOptions).Return(handle, nil)
-// 	cfuseFS.Open(path, flags)
-// 	suite.assert.NotEqual(0, info.fh)
+	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
+	suite.mock.EXPECT().OpenFile(openOptions).Return(handle, nil)
+	_, fh := cfuseFS.Open(path, flags)
+	suite.assert.NotEqual(0, fh)
 
-// 	// libfuse component will return back handle in form of an integer value
-// 	// that needs to be converted back to a pointer to a handle object
-// 	fobj := (*fileHandle)(unsafe.Pointer(uintptr(info.fh)))
-// 	handle = (*handlemap.Handle)(unsafe.Pointer(uintptr(fobj.obj)))
+	// Need to convert the ID to the correct filehandle for mocking
+	handle.ID = (handlemap.HandleID)(fh)
 
-// 	options := internal.SyncFileOptions{Handle: handle}
-// 	suite.mock.EXPECT().SyncFile(options).Return(errors.New("failed to sync file"))
+	options := internal.SyncFileOptions{Handle: handle}
+	suite.mock.EXPECT().SyncFile(options).Return(errors.New("failed to sync file"))
 
-// 	err := cfuseFS.Fsync(path, 0, info)
-// 	suite.assert.Equal(-fuse.EIO, err)
-// }
+	err := cfuseFS.Fsync(path, false, fh)
+	suite.assert.Equal(-fuse.EIO, err)
+}
 
-// func testFsyncDir(suite *libfuseTestSuite) {
-// 	defer suite.cleanupTest()
-// 	name := "path"
-// 	path := "/" + name
-// 	options := internal.SyncDirOptions{Name: name}
-// 	suite.mock.EXPECT().SyncDir(options).Return(nil)
+func testFsyncDir(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	name := "path"
+	path := "/" + name
+	options := internal.SyncDirOptions{Name: name}
+	suite.mock.EXPECT().SyncDir(options).Return(nil)
 
-// 	err := cfuseFS.Fsyncdir(path, 0, nil)
-// 	suite.assert.Equal(0, err)
-// }
+	err := cfuseFS.Fsyncdir(path, false, 0)
+	suite.assert.Equal(0, err)
+}
 
-// func testFsyncDirError(suite *libfuseTestSuite) {
-// 	defer suite.cleanupTest()
-// 	name := "path"
-// 	path := "/" + name
-// 	options := internal.SyncDirOptions{Name: name}
-// 	suite.mock.EXPECT().SyncDir(options).Return(errors.New("failed to sync dir"))
+func testFsyncDirError(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	name := "path"
+	path := "/" + name
+	options := internal.SyncDirOptions{Name: name}
+	suite.mock.EXPECT().SyncDir(options).Return(errors.New("failed to sync dir"))
 
-// 	err := cfuseFS.Fsyncdir(path, 0, nil)
-// 	suite.assert.Equal(-fuse.EIO, err)
-// }
+	err := cfuseFS.Fsyncdir(path, false, 0)
+	suite.assert.Equal(-fuse.EIO, err)
+}
 
 func testChmod(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()

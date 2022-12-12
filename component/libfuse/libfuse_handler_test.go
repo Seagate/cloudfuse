@@ -255,25 +255,25 @@ func (suite *libfuseTestSuite) TestReadLinkError() {
 	testReadLinkError(suite)
 }
 
-// func (suite *libfuseTestSuite) TestFsync() {
-// 	testFsync(suite)
-// }
+func (suite *libfuseTestSuite) TestFsync() {
+	testFsync(suite)
+}
 
-// func (suite *libfuseTestSuite) TestFsyncHandleError() {
-// 	testFsyncHandleError(suite)
-// }
+func (suite *libfuseTestSuite) TestFsyncHandleError() {
+	testFsyncHandleError(suite)
+}
 
-// func (suite *libfuseTestSuite) TestFsyncError() {
-// 	testFsyncError(suite)
-// }
+func (suite *libfuseTestSuite) TestFsyncError() {
+	testFsyncError(suite)
+}
 
-// func (suite *libfuseTestSuite) TestFsyncDir() {
-// 	testFsyncDir(suite)
-// }
+func (suite *libfuseTestSuite) TestFsyncDir() {
+	testFsyncDir(suite)
+}
 
-// func (suite *libfuseTestSuite) TestFsyncDirError() {
-// 	testFsyncDirError(suite)
-// }
+func (suite *libfuseTestSuite) TestFsyncDirError() {
+	testFsyncDirError(suite)
+}
 
 func (suite *libfuseTestSuite) TestChmod() {
 	testChmod(suite)
