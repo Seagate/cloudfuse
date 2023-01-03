@@ -39,7 +39,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"syscall"
 	"time"
 
 	"lyvecloudfuse/common"
@@ -496,8 +495,9 @@ func (cf *cgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 	var bytesRead int
 
 	if handle.Cached() {
-		bytesRead, err = syscall.Pread(handle.FD(), buff, int64(offset))
-		//bytesRead, err = handle.FObj.ReadAt(buff, int64(offset))
+		// Remove Pread as not supported on Windows
+		//bytesRead, err = syscall.Pread(handle.FD(), buff, int64(offset))
+		bytesRead, err = handle.FObj.ReadAt(buff, int64(offset))
 	} else {
 		bytesRead, err = fuseFS.NextComponent().ReadInBuffer(
 			internal.ReadInBufferOptions{
