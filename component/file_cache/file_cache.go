@@ -44,7 +44,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/config"
@@ -431,28 +430,6 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	return err
 }
 
-// Creates a new object attribute
-func newObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
-	stat := info.Sys().(*syscall.Stat_t)
-	attrs := &internal.ObjAttr{
-		Path:  path,
-		Name:  info.Name(),
-		Size:  info.Size(),
-		Mode:  info.Mode(),
-		Mtime: time.Unix(stat.Mtim.Sec, stat.Mtim.Nsec),
-		Atime: time.Unix(stat.Atim.Sec, stat.Atim.Nsec),
-		Ctime: time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec),
-	}
-
-	if info.Mode()&os.ModeSymlink != 0 {
-		attrs.Flags.Set(internal.PropFlagSymlink)
-	} else if info.IsDir() {
-		attrs.Flags.Set(internal.PropFlagIsDir)
-	}
-
-	return attrs
-}
-
 // ReadDir: Consolidate entries in storage and local cache to return the children under this path.
 func (fc *FileCache) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
 	log.Trace("FileCache::ReadDir : %s", options.Name)
@@ -730,49 +707,6 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	fc.policy.CachePurge(localPath)
 
 	return nil
-}
-
-// isDownloadRequired: Whether or not the file needs to be downloaded to local cache.
-func (fc *FileCache) isDownloadRequired(localPath string) (bool, bool) {
-	fileExists := false
-	downloadRequired := false
-
-	// The file is not cached
-	if !fc.policy.IsCached(localPath) {
-		log.Debug("FileCache::isDownloadRequired : %s not present in local cache policy", localPath)
-		downloadRequired = true
-	}
-
-	finfo, err := os.Stat(localPath)
-	if err == nil {
-		// The file exists in local cache
-		// The file needs to be downloaded if the cacheTimeout elapsed (check last change time and last modified time)
-		fileExists = true
-		stat := finfo.Sys().(*syscall.Stat_t)
-
-		// Deciding based on last modified time is not correct. Last modified time is based on the file was last written
-		// so if file was last written back to container 2 days back then even downloading it now shall represent the same date
-		// hence immediately after download it will become invalid. It shall be based on when the file was last downloaded.
-		// We can rely on last change time because once file is downloaded we reset its last mod time (represent same time as
-		// container on the local disk by resetting last mod time of local disk with utimens)
-		// and hence last change time on local disk will then represent the download time.
-
-		if time.Since(finfo.ModTime()).Seconds() > fc.cacheTimeout &&
-			time.Since(time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)).Seconds() > fc.cacheTimeout {
-			log.Debug("FileCache::isDownloadRequired : %s not valid as per time checks", localPath)
-			downloadRequired = true
-		}
-	} else if os.IsNotExist(err) {
-		// The file does not exist in the local cache so it needs to be downloaded
-		log.Debug("FileCache::isDownloadRequired : %s not present in local cache", localPath)
-		downloadRequired = true
-	} else {
-		// Catch all, the file needs to be downloaded
-		log.Debug("FileCache::isDownloadRequired : error calling stat %s [%s]", localPath, err.Error())
-		downloadRequired = true
-	}
-
-	return downloadRequired, fileExists
 }
 
 // OpenFile: Makes the file available in the local cache for further file operations.
