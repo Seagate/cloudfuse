@@ -162,6 +162,18 @@ type Block struct {
 	Data       []byte
 }
 
+// Statfs type used by component in replace of syscall.Statfs_t
+type Statfs_t struct {
+	Bsize  int64
+	Blocks uint64
+	Bfree  uint64
+	Bavail uint64
+	Files  uint64
+	Ffree  uint64
+	Frsize int64
+	Flags  int64
+}
+
 // Dirty : Handle is dirty or not
 func (block *Block) Dirty() bool {
 	return block.Flags.IsSet(DirtyBlock)
