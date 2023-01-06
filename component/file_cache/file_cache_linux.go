@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"math"
 	"os"
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -17,7 +18,7 @@ import (
 
 // Creates a new object attribute
 func newObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
-	stat := info.Sys().(*unix.Stat_t)
+	stat := info.Sys().(*syscall.Stat_t)
 	attrs := &internal.ObjAttr{
 		Path:  path,
 		Name:  info.Name(),
@@ -53,7 +54,7 @@ func (fc *FileCache) isDownloadRequired(localPath string) (bool, bool) {
 		// The file exists in local cache
 		// The file needs to be downloaded if the cacheTimeout elapsed (check last change time and last modified time)
 		fileExists = true
-		stat := finfo.Sys().(*unix.Stat_t)
+		stat := finfo.Sys().(*syscall.Stat_t)
 
 		// Deciding based on last modified time is not correct. Last modified time is based on the file was last written
 		// so if file was last written back to container 2 days back then even downloading it now shall represent the same date
