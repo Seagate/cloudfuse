@@ -4,8 +4,9 @@ package file_cache
 
 import (
 	"os"
-	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 
 	"lyvecloudfuse/internal"
 )
@@ -36,7 +37,7 @@ func (suite *fileCacheTestSuite) TestChownNotInCache() {
 
 	// Path in fake storage should be updated
 	info, err := os.Stat(suite.fake_storage_path + "/" + path)
-	stat := info.Sys().(*syscall.Stat_t)
+	stat := info.Sys().(*unix.Stat_t)
 	suite.assert.True(err == nil || os.IsExist(err))
 	suite.assert.EqualValues(owner, stat.Uid)
 	suite.assert.EqualValues(group, stat.Gid)
@@ -64,12 +65,12 @@ func (suite *fileCacheTestSuite) TestChownInCache() {
 	suite.assert.Nil(err)
 	// Path in fake storage and file cache should be updated
 	info, err := os.Stat(suite.cache_path + "/" + path)
-	stat := info.Sys().(*syscall.Stat_t)
+	stat := info.Sys().(*unix.Stat_t)
 	suite.assert.True(err == nil || os.IsExist(err))
 	suite.assert.EqualValues(owner, stat.Uid)
 	suite.assert.EqualValues(group, stat.Gid)
 	info, err = os.Stat(suite.fake_storage_path + "/" + path)
-	stat = info.Sys().(*syscall.Stat_t)
+	stat = info.Sys().(*unix.Stat_t)
 	suite.assert.True(err == nil || os.IsExist(err))
 	suite.assert.EqualValues(owner, stat.Uid)
 	suite.assert.EqualValues(group, stat.Gid)
@@ -84,7 +85,7 @@ func (suite *fileCacheTestSuite) TestChownCase2() {
 	oldMode := os.FileMode(0511)
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
 	info, _ := os.Stat(suite.cache_path + "/" + path)
-	stat := info.Sys().(*syscall.Stat_t)
+	stat := info.Sys().(*unix.Stat_t)
 	oldOwner := stat.Uid
 	oldGroup := stat.Gid
 
@@ -92,11 +93,11 @@ func (suite *fileCacheTestSuite) TestChownCase2() {
 	group := os.Getgid()
 	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
 	suite.assert.NotNil(err)
-	suite.assert.Equal(err, syscall.EIO)
+	suite.assert.Equal(err, unix.EIO)
 
 	// Path should be in the file cache with old group and owner (since we failed the operation)
 	info, err = os.Stat(suite.cache_path + "/" + path)
-	stat = info.Sys().(*syscall.Stat_t)
+	stat = info.Sys().(*unix.Stat_t)
 	suite.assert.True(err == nil || os.IsExist(err))
 	suite.assert.EqualValues(oldOwner, stat.Uid)
 	suite.assert.EqualValues(oldGroup, stat.Gid)
