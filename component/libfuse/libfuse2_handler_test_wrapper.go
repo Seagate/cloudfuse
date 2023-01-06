@@ -115,7 +115,7 @@ func testMkDir(suite *libfuseTestSuite) {
 func testStatFs(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	path := "/"
-	suite.mock.EXPECT().StatFs().Return(&syscall.Statfs_t{Frsize: 1,
+	suite.mock.EXPECT().StatFs().Return(&common.Statfs_t{Frsize: 1,
 		Blocks: 2, Bavail: 3, Bfree: 4}, true, nil)
 	buf := &fuse.Statfs_t{}
 	cfuseFS.Statfs(path, buf)

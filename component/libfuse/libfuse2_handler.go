@@ -217,10 +217,9 @@ func (cf *cgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 
 	// TODO: Need to look into handling case where this is empty directory
 	// given by just  "/"
-	// blobfuse does this via the commented out code below
+	// blobfuse does this via the commented out C code below
 
 	// errno := 0
-	// res := os.statvfs("/")
 	// res = os.statvfs("/", stat)
 	// if res == -1 {
 	// 	return -errno
