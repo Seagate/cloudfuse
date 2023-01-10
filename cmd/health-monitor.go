@@ -65,8 +65,8 @@ func resetMonitorOptions() {
 
 var healthMonCmd = &cobra.Command{
 	Use:               "health-monitor",
-	Short:             "Monitor blobfuse2 mount",
-	Long:              "Monitor blobfuse2 mount",
+	Short:             "Monitor lyvecloudfuse mount",
+	Long:              "Monitor lyvecloudfuse mount",
 	SuggestFor:        []string{"bfusemon", "monitor health"},
 	Args:              cobra.ExactArgs(0),
 	Hidden:            true,
@@ -101,7 +101,7 @@ var healthMonCmd = &cobra.Command{
 
 		cliParams := buildCliParamForMonitor()
 		log.Debug("health-monitor : Options = %v", cliParams)
-		log.Debug("health-monitor : Starting health-monitor for blobfuse2 pid = %s", pid)
+		log.Debug("health-monitor : Starting health-monitor for lyvecloudfuse pid = %s", pid)
 
 		hmcmd := exec.Command(hmcommon.BfuseMon, cliParams...)
 		cliOut, err := hmcmd.Output()
@@ -125,7 +125,7 @@ func validateHMonOptions() error {
 	errMsg := ""
 
 	if len(pid) == 0 {
-		errMsg = "pid of blobfuse2 process not given. "
+		errMsg = "pid of lyvecloudfuse process not given. "
 	}
 
 	if len(configFile) == 0 {
@@ -160,7 +160,7 @@ func buildCliParamForMonitor() []string {
 	for _, v := range options.MonitorOpt.DisableList {
 		switch v {
 		case hmcommon.BlobfuseStats:
-			cliParams = append(cliParams, "--no-blobfuse2-stats")
+			cliParams = append(cliParams, "--no-lyvecloudfuse-stats")
 		case hmcommon.CpuProfiler:
 			cliParams = append(cliParams, "--no-cpu-profiler")
 		case hmcommon.MemoryProfiler:
@@ -180,7 +180,7 @@ func buildCliParamForMonitor() []string {
 func init() {
 	rootCmd.AddCommand(healthMonCmd)
 
-	healthMonCmd.Flags().StringVar(&pid, "pid", "", "Pid of blobfuse2 process")
+	healthMonCmd.Flags().StringVar(&pid, "pid", "", "Pid of lyvecloudfuse process")
 	_ = healthMonCmd.MarkFlagRequired("pid")
 
 	healthMonCmd.Flags().StringVar(&configFile, "config-file", "config.yaml",

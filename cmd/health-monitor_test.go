@@ -92,7 +92,7 @@ func (suite *hmonTestSuite) TestValidateHmonOptions() {
 
 	err := validateHMonOptions()
 	suite.assert.NotNil(err)
-	suite.assert.Contains(err.Error(), "pid of blobfuse2 process not given")
+	suite.assert.Contains(err.Error(), "pid of lyvecloudfuse process not given")
 	suite.assert.Contains(err.Error(), "config file not given")
 
 	pid = "12345"
@@ -126,7 +126,7 @@ func (suite *hmonTestSuite) TestHmonInvalidOptions() {
 
 	op, err := executeCommandC(rootCmd, "health-monitor", "--pid=", "--config-file=")
 	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "pid of blobfuse2 process not given")
+	suite.assert.Contains(op, "pid of lyvecloudfuse process not given")
 	suite.assert.Contains(op, "config file not given")
 }
 
@@ -165,7 +165,7 @@ func (suite *hmonTestSuite) TestHmonStopAllFailure() {
 func (suite *hmonTestSuite) TestHmonStopPidEmpty() {
 	op, err := executeCommandC(rootCmd, "health-monitor", "stop", "--pid=")
 	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "pid of blobfuse2 process not given")
+	suite.assert.Contains(op, "pid of lyvecloudfuse process not given")
 }
 
 func (suite *hmonTestSuite) TestHmonStopPidInvalid() {

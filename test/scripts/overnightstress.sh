@@ -24,10 +24,10 @@ mount_blobfuse()
     rm -rf $mntPath/*
 }
 
-mount_blobfuse2()
+mount_lyvecloudfuse()
 {
     rm -rf $tmpPath/*
-    ./blobfuse2 mount $mntPath --config-file=$1 &
+    ./lyvecloudfuse mount $mntPath --config-file=$1 &
     sleep 3
     rm -rf $mntPath/*
 }
@@ -59,11 +59,11 @@ done
 for i in {1,2,3}
 do
     echo ":: Fuse No Empty : $i" >> $logFile
-    mount_blobfuse2 ./config_fuse_noemp.yaml
+    mount_lyvecloudfuse ./config_fuse_noemp.yaml
     stress_test
 
     echo ":: Fuse Empty : $i" >> $logFile
-    mount_blobfuse2 ./config_fuse_emp.yaml
+    mount_lyvecloudfuse ./config_fuse_emp.yaml
     stress_test
 
 done

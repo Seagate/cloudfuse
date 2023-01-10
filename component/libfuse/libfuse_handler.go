@@ -212,10 +212,10 @@ func populateFuseArgs(opts *C.fuse_options_t, args *C.fuse_args_t) (*C.fuse_opti
 	// Why we pass -f
 	// CGo is not very good with handling forks - so if the user wants to run blobfuse in the
 	// background we fork on mount in GO (mount.go) and we just always force libfuse to mount in foreground
-	arguments = append(arguments, "blobfuse2",
+	arguments = append(arguments, "lyvecloudfuse",
 		C.GoString(opts.mount_path),
 		"-o", options,
-		"-f", "-ofsname=blobfuse2", "-okernel_cache") // "-omax_read=4194304"
+		"-f", "-ofsname=lyvecloudfuse", "-okernel_cache") // "-omax_read=4194304"
 
 	if opts.trace_enable {
 		arguments = append(arguments, "-d")
@@ -625,7 +625,7 @@ func libfuse_open(path *C.char, fi *C.fuse_file_info_t) C.int {
 	// Mask out SYNC and DIRECT flags since write operation will fail
 	if fi.flags&C.O_SYNC != 0 || fi.flags&C.__O_DIRECT != 0 {
 		log.Err("Libfuse::libfuse_open : Reset flags for open %s, fi.flags %X", name, fi.flags)
-		// Blobfuse2 does not support the SYNC or DIRECT flag. If a user application passes this flag on to blobfuse2
+		// Lyvecloudfuse does not support the SYNC or DIRECT flag. If a user application passes this flag on to lyvecloudfuse
 		// and we open the file with this flag, subsequent write operations will fail with "Invalid argument" error.
 		// Mask them out here in the open call so that write works.
 		// Oracle RMAN is one such application that sends these flags during backup

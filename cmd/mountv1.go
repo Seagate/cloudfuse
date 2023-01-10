@@ -144,8 +144,8 @@ func resetOptions() {
 
 var generateConfigCmd = &cobra.Command{
 	Use:               "mountv1",
-	Short:             "Generate a configuration file for Blobfuse2 from Blobfuse configuration file/flags",
-	Long:              "Generate a configuration file for Blobfuse2 from Blobfuse configuration file/flags",
+	Short:             "Generate a configuration file for Lyvecloudfuse from Blobfuse configuration file/flags",
+	Long:              "Generate a configuration file for Lyvecloudfuse from Blobfuse configuration file/flags",
 	SuggestFor:        []string{"conv config", "convert config"},
 	Args:              cobra.MaximumNArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
@@ -178,7 +178,7 @@ var generateConfigCmd = &cobra.Command{
 					return fmt.Errorf("failed to read configuration file. Configuration %s is incorrect. Make sure your configuration file parameters are of the format `key value`", configParam)
 				}
 
-				// get corresponding Blobfuse2 configurations from the config file parameters
+				// get corresponding Lyvecloudfuse configurations from the config file parameters
 				err := convertBfConfigParameter(cmd.Flags(), configParam[0], configParam[1])
 				if err != nil {
 					return fmt.Errorf("failed to convert configuration parameters [%s]", err.Error())
@@ -188,7 +188,7 @@ var generateConfigCmd = &cobra.Command{
 		}
 
 		bfv2ComponentsConfigOptions = append(bfv2ComponentsConfigOptions, "libfuse")
-		// get corresponding Blobfuse2 configurations from the cli parameters - these supersede the config options
+		// get corresponding Lyvecloudfuse configurations from the cli parameters - these supersede the config options
 		err = convertBfCliParameters(cmd.Flags())
 		if err != nil {
 			return fmt.Errorf("failed to convert CLI parameters [%s]", err.Error())
@@ -387,7 +387,7 @@ func convertBfConfigParameter(flags *pflag.FlagSet, configParameterKey string, c
 		return nil
 
 	default:
-		return fmt.Errorf("failed to parse configuration file. Configuration parameter `%s` is not supported in Blobfuse2", configParameterKey)
+		return fmt.Errorf("failed to parse configuration file. Configuration parameter `%s` is not supported in Lyvecloudfuse", configParameterKey)
 	}
 
 	return nil
@@ -537,7 +537,7 @@ func init() {
 	//invalidate-on-sync is always on - accept it as an arg and just ignore it
 	generateConfigCmd.Flags().Bool("invalidate-on-sync", true, "Invalidate file/dir on sync/fsync")
 	//pre-mount-validate is always on - accept it as an arg and just ignore it
-	generateConfigCmd.Flags().Bool("pre-mount-validate", true, "Validate blobfuse2 is mounted")
+	generateConfigCmd.Flags().Bool("pre-mount-validate", true, "Validate lyvecloudfuse is mounted")
 	generateConfigCmd.Flags().BoolVar(&bfConfCliOptions.useStreaming, "streaming", false, "Enable Streaming.")
 	generateConfigCmd.Flags().Uint64Var(&bfConfCliOptions.streamCacheSize, "stream-cache-mb", 0, "Limit total amount of data being cached in memory to conserve memory footprint of blobfuse.")
 	generateConfigCmd.Flags().IntVar(&bfConfCliOptions.maxBlocksPerFile, "max-blocks-per-file", 0, "Maximum number of blocks to be cached in memory for streaming.")

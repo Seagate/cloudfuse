@@ -1,3 +1,4 @@
+//go:build !unittest
 // +build !unittest
 
 /*
@@ -49,10 +50,10 @@ func TestMain(t *testing.T) {
 		}
 	}
 	os.Args = args
-	if strings.Contains(os.Args[0], "blobfuse2.test") {
+	if strings.Contains(os.Args[0], "lyvecloudfuse.test") {
 		t.Log("Starting coverage test")
 		main()
 	} else {
-		t.Error("Failed to start blobfuse2 binary")
+		t.Error("Failed to start lyvecloudfuse binary")
 	}
 }

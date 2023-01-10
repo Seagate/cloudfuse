@@ -44,8 +44,8 @@ import (
 
 var umntAllCmd = &cobra.Command{
 	Use:               "all",
-	Short:             "Unmount all instances of Blobfuse2",
-	Long:              "Unmount all instances of Blobfuse2",
+	Short:             "Unmount all instances of Lyvecloudfuse",
+	Long:              "Unmount all instances of Lyvecloudfuse",
 	SuggestFor:        []string{"al", "all"},
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, _ []string) error {
@@ -60,7 +60,7 @@ var umntAllCmd = &cobra.Command{
 
 		for _, mntPath := range lstMnt {
 			mountfound += 1
-			err := unmountBlobfuse2(mntPath)
+			err := unmountLyvecloudfuse(mntPath)
 			if err == nil {
 				unmounted += 1
 			} else {

@@ -101,7 +101,7 @@ allow-other: true
 logging:  
   type: base
   level: log_debug
-  file-path: /home/blobfuse2.log
+  file-path: /home/lyvecloudfuse.log
   max-file-size: 100
   file-count: 300
   track-time: true

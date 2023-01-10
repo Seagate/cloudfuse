@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Blobfuse2 Component Generator..." 
+echo "Lyvecloudfuse Component Generator..." 
 
 # Create component folder and file
 comp_name=`echo ${1}`
@@ -21,7 +21,7 @@ cat ./internal/component.template > $comp_file
 sed -i "s|<component>|$comp_name|g" $comp_file 
 sed -i "s|<component_C>|$comp_name_C|g" $comp_file 
 
-echo "Blobfuse2 Component Generated : " $comp_file
+echo "Lyvecloudfuse Component Generated : " $comp_file
 
 ./cmd/importGenerator.sh
 echo "Component generated successfully"

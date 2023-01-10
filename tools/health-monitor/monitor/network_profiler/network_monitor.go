@@ -77,7 +77,7 @@ func (nw *NetworkProfiler) ExportStats(timestamp string, st interface{}) {
 
 func (nw *NetworkProfiler) Validate() error {
 	if len(nw.pid) == 0 {
-		return fmt.Errorf("pid of blobfuse2 is not given")
+		return fmt.Errorf("pid of lyvecloudfuse is not given")
 	}
 
 	if nw.pollInterval == 0 {

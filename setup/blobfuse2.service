@@ -12,7 +12,7 @@ Environment=BlobMountingPoint=/home/AzureUser/mntblobfuse
 # Configures the tmp location for the cache. Always configure the fastest disk (SSD or ramdisk) for best performance.
 Environment=BlobTmp=/home/AzureUser/tmpblobfuse
 # Config file path
-Environment=BlobConfigFile=/home/AzureUser/azure-storage-fuse/blobfuse2.yaml
+Environment=BlobConfigFile=/home/AzureUser/azure-storage-fuse/lyvecloudfuse.yaml
 
 # Specifies the storage account blobfuse targets.
 Environment=AZURE_STORAGE_ACCOUNT=<account.name>
@@ -47,7 +47,7 @@ Environment=attr_timeout=240
 Environment=entry_timeout=240
 Environment=negative_timeout=120
 Type=simple
-ExecStart=/usr/local/bin/blobfuse2 mount ${BlobMountingPoint} --tmp-path=${BlobTmp} --config-file=${BlobConfigFile} --log-level=${BlobLogLevel}  
+ExecStart=/usr/local/bin/lyvecloudfuse mount ${BlobMountingPoint} --tmp-path=${BlobTmp} --config-file=${BlobConfigFile} --log-level=${BlobLogLevel}  
 ExecStop=/usr/bin/fusermount -u ${BlobMountingPoint}
 
 [Install]

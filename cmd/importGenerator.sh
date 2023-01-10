@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Blobfuse2 Regenerating component imports..." 
+echo "Lyvecloudfuse Regenerating component imports..." 
 
 # Regenrate the loadcomponent.go to include all components present in folder
 loader_file="./cmd/imports.go"

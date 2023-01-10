@@ -111,7 +111,7 @@ func DirectoryExists(path string) bool {
 	return true
 }
 
-// GetCurrentUser is a utility function that returns the UID and GID of the user that invokes the blobfuse2 command.
+// GetCurrentUser is a utility function that returns the UID and GID of the user that invokes the lyvecloudfuse command.
 func GetCurrentUser() (uint32, uint32, error) {
 	var (
 		currentUser      *user.User
@@ -147,7 +147,7 @@ func NormalizeObjectName(name string) string {
 	return strings.ReplaceAll(name, "\\", "/")
 }
 
-// List all mount points which were mounted using blobfuse2
+// List all mount points which were mounted using lyvecloudfuse
 func ListMountPoints() ([]string, error) {
 	file, err := os.Open("/etc/mtab")
 	if err != nil {

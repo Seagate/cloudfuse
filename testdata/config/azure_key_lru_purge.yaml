@@ -1,6 +1,6 @@
 logging:
   level: log_debug
-  file-path: "blobfuse2-logs.txt"
+  file-path: "lyvecloudfuse-logs.txt"
   type: base
 
 components:

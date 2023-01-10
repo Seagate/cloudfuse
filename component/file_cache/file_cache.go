@@ -281,13 +281,13 @@ func (c *FileCache) Configure(_ bool) error {
 	}
 
 	if config.IsSet(compName + ".background-download") {
-		log.Warn("unsupported v1 CLI parameter: background-download is not supported in blobfuse2. Consider using the streaming component.")
+		log.Warn("unsupported v1 CLI parameter: background-download is not supported in lyvecloudfuse. Consider using the streaming component.")
 	}
 	if config.IsSet(compName + ".cache-poll-timeout-msec") {
-		log.Warn("unsupported v1 CLI parameter: cache-poll-timeout-msec is not supported in blobfuse2. Polling occurs every timeout interval.")
+		log.Warn("unsupported v1 CLI parameter: cache-poll-timeout-msec is not supported in lyvecloudfuse. Polling occurs every timeout interval.")
 	}
 	if config.IsSet(compName + ".upload-modified-only") {
-		log.Warn("unsupported v1 CLI parameter: upload-modified-only is always true in blobfuse2.")
+		log.Warn("unsupported v1 CLI parameter: upload-modified-only is always true in lyvecloudfuse.")
 	}
 
 	log.Info("FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d",

@@ -190,7 +190,7 @@ static int read_ahead_handler(char *path, char *buf, size_t size, off_t offset, 
     if (new_read) {
         // We need to refresh the data from file
         int read = native_pread(path, handle_obj->buff, RA_BLOCK_SIZE, offset, handle_obj);
-        FILE *fp = fopen("blobfuse2_nat.log", "a");
+        FILE *fp = fopen("lyvecloudfuse_nat.log", "a");
         if (fp) {
             fprintf(fp, "File %s, Offset %ld, size %ld, new read %d\n",
                 path, offset, size, read);
@@ -211,7 +211,7 @@ static int read_ahead_handler(char *path, char *buf, size_t size, off_t offset, 
     int left = (handle_obj->buff_end - offset);
     int copy = (size > left) ? left : size;
     
-    FILE *fp = fopen("blobfuse2_nat.log", "a");
+    FILE *fp = fopen("lyvecloudfuse_nat.log", "a");
     if (fp) {
         fprintf(fp, "File %s, Offset %ld, size %ld, buff start %ld, buff end %ld, start %d, left %d, copy %d\n",
            path, offset, size, handle_obj->buff_start, handle_obj->buff_end, start, left, copy);

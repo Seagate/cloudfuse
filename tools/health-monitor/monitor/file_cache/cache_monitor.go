@@ -94,7 +94,7 @@ func (fc *FileCache) ExportStats(timestamp string, st interface{}) {
 
 func (fc *FileCache) Validate() error {
 	if len(fc.pid) == 0 {
-		return fmt.Errorf("pid of blobfuse2 is not given")
+		return fmt.Errorf("pid of lyvecloudfuse is not given")
 	}
 
 	if len(fc.tmpPath) == 0 {

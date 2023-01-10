@@ -63,7 +63,7 @@ import (
 //    ----------- Helper to create pipeline options ---------------
 
 var UserAgent = func() string {
-	return "Azure-Storage-Fuse/" + common.Blobfuse2Version
+	return "Azure-Storage-Fuse/" + common.LyvecloudfuseVersion
 }
 
 const (
@@ -110,13 +110,13 @@ func getAzBlobPipelineOptions(conf AzStorageConfig) (azblob.PipelineOptions, ste
 			retryOptions
 	} else {
 		// Else create custom HTTPClient to pass to the factory in order to set our proxy
-		var pipelineHTTPClient = newBlobfuse2HttpClient(conf)
+		var pipelineHTTPClient = newLyvecloudfuseHttpClient(conf)
 		// While creating new pipeline we need to provide the retry policy
 		return azblob.PipelineOptions{
 				Log:        logOptions,
 				RequestLog: requestLogOptions,
 				Telemetry:  telemetryOptions,
-				HTTPSender: newBlobfuse2HTTPClientFactory(pipelineHTTPClient),
+				HTTPSender: newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient),
 			},
 			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
 			retryOptions
@@ -152,13 +152,13 @@ func getAzBfsPipelineOptions(conf AzStorageConfig) (azbfs.PipelineOptions, ste.X
 			retryOptions
 	} else {
 		// Else create custom HTTPClient to pass to the factory in order to set our proxy
-		var pipelineHTTPClient = newBlobfuse2HttpClient(conf)
+		var pipelineHTTPClient = newLyvecloudfuseHttpClient(conf)
 		// While creating new pipeline we need to provide the retry policy
 		return azbfs.PipelineOptions{
 				Log:        logOptions,
 				RequestLog: requestLogOptions,
 				Telemetry:  telemetryOptions,
-				HTTPSender: newBlobfuse2HTTPClientFactory(pipelineHTTPClient),
+				HTTPSender: newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient),
 			},
 			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
 			retryOptions
@@ -167,7 +167,7 @@ func getAzBfsPipelineOptions(conf AzStorageConfig) (azbfs.PipelineOptions, ste.X
 
 // Create an HTTP Client with configured proxy
 // TODO: More configurations for other http client parameters?
-func newBlobfuse2HttpClient(conf AzStorageConfig) *http.Client {
+func newLyvecloudfuseHttpClient(conf AzStorageConfig) *http.Client {
 	var ProxyURL func(req *http.Request) (*url.URL, error) = func(req *http.Request) (*url.URL, error) {
 		// If a proxy address is passed return
 		var proxyURL url.URL = url.URL{
@@ -198,14 +198,14 @@ func newBlobfuse2HttpClient(conf AzStorageConfig) *http.Client {
 	}
 }
 
-// newBlobfuse2HTTPClientFactory creates a custom HTTPClientPolicyFactory object that sends HTTP requests to the http client.
-func newBlobfuse2HTTPClientFactory(pipelineHTTPClient *http.Client) pipeline.Factory {
+// newLyvecloudfuseHTTPClientFactory creates a custom HTTPClientPolicyFactory object that sends HTTP requests to the http client.
+func newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient *http.Client) pipeline.Factory {
 	return pipeline.FactoryFunc(func(next pipeline.Policy, po *pipeline.PolicyOptions) pipeline.PolicyFunc {
 		return func(ctx context.Context, request pipeline.Request) (pipeline.Response, error) {
 			r, err := pipelineHTTPClient.Do(request.WithContext(ctx))
 			if err != nil {
 				err = pipeline.NewError(err, "HTTP request failed")
-				log.Err("BlockBlob::newBlobfuse2HTTPClientFactory : HTTP request failed")
+				log.Err("BlockBlob::newLyvecloudfuseHTTPClientFactory : HTTP request failed")
 			}
 			return pipeline.NewHTTPResponse(r), err
 		}

@@ -46,7 +46,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-const testPath = "/tmp/blobfuse2lfstests"
+const testPath = "/tmp/lyvecloudfuselfstests"
 const dirOne = "one"
 const dirTwo = "two"
 const dirEmpty = "empty"

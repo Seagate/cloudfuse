@@ -53,7 +53,7 @@ const (
 	HandleFlagUnknown uint16 = iota
 	HandleFlagDirty          // File has been modified with write operation or is a new file
 	HandleFlagFSynced        // User has called fsync on the file explicitly
-	HandleFlagCached         // File is cached in the local system by blobfuse2
+	HandleFlagCached         // File is cached in the local system by lyvecloudfuse
 )
 
 // Structure to hold in memory cache for streaming layer

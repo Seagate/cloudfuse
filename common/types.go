@@ -47,11 +47,11 @@ import (
 
 // Standard config default values
 const (
-	blobfuse2Version_ = "2.0.1"
+	lyvecloudfuseVersion_ = "2.0.1"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
-	FileSystemName        = "blobfuse2"
+	FileSystemName        = "lyvecloudfuse"
 
 	DefaultConfigFilePath = "config.yaml"
 
@@ -73,14 +73,14 @@ func FuseIgnoredFlags() []string {
 	return []string{"default_permissions", "rw", "dev", "nodev", "suid", "nosuid", "delay_connect", "uid", "gid", "auto", "noauto", "user", "nouser", "exec", "noexec"}
 }
 
-var Blobfuse2Version = Blobfuse2Version_()
+var LyvecloudfuseVersion = LyvecloudfuseVersion_()
 
-func Blobfuse2Version_() string {
-	return blobfuse2Version_
+func LyvecloudfuseVersion_() string {
+	return lyvecloudfuseVersion_
 }
 
-var DefaultWorkDir = "$HOME/.blobfuse2"
-var DefaultLogFilePath = filepath.Join(DefaultWorkDir, "blobfuse2.log")
+var DefaultWorkDir = "$HOME/.lyvecloudfuse"
+var DefaultLogFilePath = filepath.Join(DefaultWorkDir, "lyvecloudfuse.log")
 var StatsConfigFilePath = filepath.Join(DefaultWorkDir, "stats_monitor.cfg")
 
 var EnableMonitoring = false
@@ -88,7 +88,7 @@ var BfsDisabled = false
 var TransferPipe = "/tmp/transferPipe"
 var PollingPipe = "/tmp/pollPipe"
 
-//LogLevel enum
+// LogLevel enum
 type LogLevel int
 
 var ELogLevel = LogLevel(0).INVALID()
@@ -143,7 +143,7 @@ type LogConfig struct {
 	FileCount   uint64
 	FilePath    string
 	TimeTracker bool
-	Tag         string // logging tag which can be either blobfuse2 or bfusemon
+	Tag         string // logging tag which can be either lyvecloudfuse or bfusemon
 }
 
 // Flags for blocks

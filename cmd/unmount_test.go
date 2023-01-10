@@ -53,7 +53,7 @@ var configUnMountLoopback string = `
 logging:
   type: syslog
   level: log_debug
-  #file-path: blobfuse2.log
+  #file-path: lyvecloudfuse.log
 default-working-dir: ./
 components:
   - libfuse
@@ -97,7 +97,7 @@ func (suite *unmountTestSuite) TestUnmountCmd() {
 	os.MkdirAll(mountDirectory1, 0777)
 	defer os.RemoveAll(mountDirectory1)
 
-	cmd := exec.Command("../blobfuse2", "mount", mountDirectory1, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command("../lyvecloudfuse", "mount", mountDirectory1, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
 	_, err := cmd.Output()
 	suite.assert.Nil(err)
 
@@ -114,7 +114,7 @@ func (suite *unmountTestSuite) TestUnmountCmdFail() {
 	os.MkdirAll(mountDirectory2, 0777)
 	defer os.RemoveAll(mountDirectory2)
 
-	cmd := exec.Command("../blobfuse2", "mount", mountDirectory2, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command("../lyvecloudfuse", "mount", mountDirectory2, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
 	_, err := cmd.Output()
 	suite.assert.Nil(err)
 
@@ -138,7 +138,7 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
 	os.MkdirAll(mountDirectory3, 0777)
 	defer os.RemoveAll(mountDirectory3)
 
-	cmd := exec.Command("../blobfuse2", "mount", mountDirectory3, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command("../lyvecloudfuse", "mount", mountDirectory3, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
 	_, err := cmd.Output()
 	suite.assert.Nil(err)
 
@@ -154,7 +154,7 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
 	os.MkdirAll(mountDirectory4, 0777)
 	defer os.RemoveAll(mountDirectory4)
 
-	cmd := exec.Command("../blobfuse2", "mount", mountDirectory4, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command("../lyvecloudfuse", "mount", mountDirectory4, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
 	_, err := cmd.Output()
 	suite.assert.Nil(err)
 
@@ -182,7 +182,7 @@ func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
 	os.MkdirAll(mountDirectory5, 0777)
 	defer os.RemoveAll(mountDirectory5)
 
-	cmd := exec.Command("../blobfuse2", "mount", mountDirectory5, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command("../lyvecloudfuse", "mount", mountDirectory5, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
 	_, err := cmd.Output()
 	suite.assert.Nil(err)
 

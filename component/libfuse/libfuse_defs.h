@@ -144,7 +144,7 @@ static int native_flush_file(char *path, fuse_file_info_t *fi);
 
 
 // -------------------------------------------------------------------------------------------------------------
-// Methods not implemented by blobfuse2
+// Methods not implemented by lyvecloudfuse
 
 // extern int libfuse_mknod(char *path, mode_t mode, dev_t dev);
 // extern int libfuse_link(char *from, char *to);
