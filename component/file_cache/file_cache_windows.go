@@ -3,9 +3,9 @@
 package file_cache
 
 import (
+	"golang.org/x/sys/windows"
 	"io/fs"
 	"os"
-	"syscall"
 	"time"
 
 	"lyvecloudfuse/common/log"
@@ -14,7 +14,7 @@ import (
 
 // Creates a new object attribute
 func newObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
-	stat := info.Sys().(*syscall.Win32FileAttributeData)
+	stat := info.Sys().(*windows.Win32FileAttributeData)
 	attrs := &internal.ObjAttr{
 		Path:  path,
 		Name:  info.Name(),
@@ -50,7 +50,7 @@ func (fc *FileCache) isDownloadRequired(localPath string) (bool, bool) {
 		// The file exists in local cache
 		// The file needs to be downloaded if the cacheTimeout elapsed (check last change time and last modified time)
 		fileExists = true
-		stat := finfo.Sys().(*syscall.Win32FileAttributeData)
+		stat := finfo.Sys().(*windows.Win32FileAttributeData)
 
 		// Deciding based on last modified time is not correct. Last modified time is based on the file was last written
 		// so if file was last written back to container 2 days back then even downloading it now shall represent the same date
@@ -75,4 +75,45 @@ func (fc *FileCache) isDownloadRequired(localPath string) (bool, bool) {
 	}
 
 	return downloadRequired, fileExists
+}
+
+func (c *FileCache) StatFs() (*common.Statfs_t, bool, error) {
+	// cache_size = f_blocks * f_frsize/1024
+	// cache_size - used = f_frsize * f_bavail/1024
+	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
+	// if cache size is set to 0 then we have the root mount usage
+	maxCacheSize := c.maxCacheSize * MB
+	if maxCacheSize == 0 {
+		return nil, false, nil
+	}
+	usage := getDirSize(c.tmpPath)
+	available := maxCacheSize - usage
+
+	var free, total, avail uint64
+	
+	// Get path to the cache
+	pathPtr, err := windows.UTF16PtrFromString(c.tmpPath)
+	if err != nil {
+		panic(err)
+	}
+	err = windows.GetDiskFreeSpaceEx(pathPtr, &free, &total, &avail)
+	if err != nil {
+		log.Debug("FileCache::StatFs : statfs err [%s].", err.Error())
+		return nil, false, err
+	}
+
+	const blockSize = 4096
+
+	stat := common.Statfs_t{
+		Blocks: uint64(maxCacheSize) / uint64(blockSize),
+		Bavail: uint64(math.Max(0, available)) / uint64(blockSize),
+		Bfree:  free,
+		Bsize:  blockSize,
+		Ffree:  1e9
+		Files:  1e9
+		Flags:  0, // Remove this since not used
+		Frsize: blockSize,
+	}
+
+	return &stat, true, nil
 }
