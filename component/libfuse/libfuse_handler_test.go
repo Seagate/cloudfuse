@@ -181,9 +181,9 @@ func (suite *libfuseTestSuite) TestOpen() {
 	testOpen(suite)
 }
 
-// func (suite *libfuseTestSuite) TestOpenSyncDirectFlag() {
-// 	testOpenSyncDirectFlag(suite)
-// }
+func (suite *libfuseTestSuite) TestOpenSyncDirectFlag() {
+	testOpenSyncDirectFlag(suite)
+}
 
 func (suite *libfuseTestSuite) TestOpenAppendFlagDefault() {
 	testOpenAppendFlagDefault(suite)

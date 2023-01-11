@@ -439,15 +439,18 @@ func (cf *cgofuseFS) Open(path string, flags int) (int, uint64) {
 	// Mask out SYNC and DIRECT flags since write operation will fail
 	//
 	// Don't think we need to handle this as these flags aren't available in cgofuse
-	// if fi.flags&fuse.O_SYNC != 0 || fi.flags&fuse.__O_DIRECT != 0 {
-	// 	log.Err("Libfuse::libfuse_open : Reset flags for open %s, fi.flags %X", name, fi.flags)
-	// 	// Blobfuse2 does not support the SYNC or DIRECT flag. If a user application passes this flag on to blobfuse2
-	// 	// and we open the file with this flag, subsequent write operations wlil fail with "Invalid argument" error.
-	// 	// Mask them out here in the open call so that write works.
-	// 	// Oracle RMAN is one such application that sends these flags during backup
-	// 	fi.flags = fi.flags &^ C.O_SYNC
-	// 	fi.flags = fi.flags &^ C.__O_DIRECT
-	// }
+	// but let's try to anyway. The flag for C.O_SYNC is 04010000 and C.__O_DIRECT is 040000
+	O_SYNC := 04010000
+	O_DIRECT := 040000
+	if flags&O_SYNC != 0 || flags&O_DIRECT != 0 {
+		log.Err("Libfuse::libfuse_open : Reset flags for open %s, fi.flags %X", name, flags)
+		// Blobfuse2 does not support the SYNC or DIRECT flag. If a user application passes this flag on to blobfuse2
+		// and we open the file with this flag, subsequent write operations wlil fail with "Invalid argument" error.
+		// Mask them out here in the open call so that write works.
+		// Oracle RMAN is one such application that sends these flags during backup
+		flags = flags &^ O_SYNC
+		flags = flags &^ O_DIRECT
+	}
 
 	handle, err := fuseFS.NextComponent().OpenFile(
 		internal.OpenFileOptions{
