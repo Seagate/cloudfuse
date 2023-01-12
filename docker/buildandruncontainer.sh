@@ -1,7 +1,7 @@
 
-# Build blobfuse2 binary
-ver=`../blobfuse2 --version | cut -d " " -f 3`
-tag="azure-blobfuse2.$ver"
+# Build lyvecloudfuse binary
+ver=`../lyvecloudfuse --version | cut -d " " -f 3`
+tag="azure-lyvecloudfuse.$ver"
 
 ./buildcontainer.sh
 

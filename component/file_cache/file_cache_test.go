@@ -44,12 +44,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/config"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/component/loopback"
-	"github.com/Azure/azure-storage-fuse/v2/internal"
-	"github.com/Azure/azure-storage-fuse/v2/internal/handlemap"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/config"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/component/loopback"
+	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/handlemap"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -418,7 +418,7 @@ func (suite *fileCacheTestSuite) TestStreamDirCase1() {
 	suite.assert.EqualValues(subdir, dir[3].Path)
 }
 
-//TODO: case3 requires more thought due to the way loopback fs is designed, specifically getAttr and streamDir
+// TODO: case3 requires more thought due to the way loopback fs is designed, specifically getAttr and streamDir
 func (suite *fileCacheTestSuite) TestStreamDirCase2() {
 	defer suite.cleanupTest()
 	// Setup

@@ -39,14 +39,14 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/Azure/azure-storage-fuse/v2/common/config"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common/config"
+	"lyvecloudfuse/common/log"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/JeffreyRichter/enum/enum"
 )
 
-//  AuthType Enum
+// AuthType Enum
 type AuthType int
 
 var EAuthType = AuthType(0).INVALID_AUTH()
@@ -83,7 +83,7 @@ func (a *AuthType) Parse(s string) error {
 	return err
 }
 
-//  AccountType Enum
+// AccountType Enum
 type AccountType int
 
 var EAccountType = AccountType(0).INVALID_ACC()
@@ -176,7 +176,7 @@ type AzStorageOptions struct {
 	CaCertFile     string `config:"ca-cert-file" yaml:"-"`
 }
 
-//  RegisterEnvVariables : Register environment varilables
+// RegisterEnvVariables : Register environment varilables
 func RegisterEnvVariables() {
 	config.BindEnv("azstorage.account-name", EnvAzStorageAccount)
 	config.BindEnv("azstorage.type", EnvAzStorageAccountType)
@@ -455,13 +455,13 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	}
 
 	if config.IsSet(compName + ".set-content-type") {
-		log.Warn("unsupported v1 CLI parameter: set-content-type is always true in blobfuse2.")
+		log.Warn("unsupported v1 CLI parameter: set-content-type is always true in lyvecloudfuse.")
 	}
 	if config.IsSet(compName + ".ca-cert-file") {
-		log.Warn("unsupported v1 CLI parameter: ca-cert-file is not supported in blobfuse2. Use the default ca cert path for your environment.")
+		log.Warn("unsupported v1 CLI parameter: ca-cert-file is not supported in lyvecloudfuse. Use the default ca cert path for your environment.")
 	}
 	if config.IsSet(compName + ".debug-libcurl") {
-		log.Warn("unsupported v1 CLI parameter: debug-libcurl is not applicable in blobfuse2.")
+		log.Warn("unsupported v1 CLI parameter: debug-libcurl is not applicable in lyvecloudfuse.")
 	}
 
 	log.Info("ParseAndValidateConfig : Account: %s, Container: %s, AccountType: %s, Auth: %s, Prefix: %s, Endpoint: %s, ListBlock: %d, MD5 : %v %v, Virtual Directory: %v",

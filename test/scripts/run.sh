@@ -49,7 +49,7 @@ count=0
 sed_line=3
 
 while IFS=\| read -r casenum case v2write v2read v1write v1read; do
-	# Swapping order of blobfuse and blobfuse2 so that blobfuse2 taking less time reflects it being better than blobfuse. 
+	# Swapping order of blobfuse and lyvecloudfuse so that lyvecloudfuse taking less time reflects it being better than blobfuse. 
 	writeDiff=$(( $v1write - $v2write ))
 	readDiff=$(( $v1read - $v2read ))
 

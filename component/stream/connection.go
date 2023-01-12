@@ -34,8 +34,8 @@
 package stream
 
 import (
-	"github.com/Azure/azure-storage-fuse/v2/internal"
-	"github.com/Azure/azure-storage-fuse/v2/internal/handlemap"
+	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/handlemap"
 )
 
 type StreamConnection interface {

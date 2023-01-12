@@ -40,7 +40,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
+	"lyvecloudfuse/common"
 )
 
 // Logger : Interface to define a generic Logger. Implement this to create your new logging lib
@@ -230,7 +230,7 @@ func init() {
 	workDir := os.ExpandEnv(common.DefaultWorkDir)
 	err := os.MkdirAll(workDir, os.ModeDir|os.FileMode(0777))
 	if err != nil {
-		panic("Unable to create blobfuse2 temp directory for logs")
+		panic("Unable to create lyvecloudfuse temp directory for logs")
 	}
 
 	logObj, _ = NewLogger("syslog", common.LogConfig{

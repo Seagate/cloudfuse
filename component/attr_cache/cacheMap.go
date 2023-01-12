@@ -37,8 +37,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/internal"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/internal"
 )
 
 // Flags represented in BitMap for various flags in the attr cache item

@@ -43,8 +43,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 )
@@ -62,10 +62,10 @@ type Blob struct {
 var disableVersionCheck bool
 
 var rootCmd = &cobra.Command{
-	Use:               "blobfuse2",
-	Short:             "Blobfuse2 is an open source project developed to provide a virtual filesystem backed by the Azure Storage.",
-	Long:              "Blobfuse2 is an open source project developed to provide a virtual filesystem backed by the Azure Storage. It uses the fuse protocol to communicate with the Linux FUSE kernel module, and implements the filesystem operations using the Azure Storage REST APIs.",
-	Version:           common.Blobfuse2Version,
+	Use:               "lyvecloudfuse",
+	Short:             "Lyvecloudfuse is an open source project developed to provide a virtual filesystem backed by the Azure Storage.",
+	Long:              "Lyvecloudfuse is an open source project developed to provide a virtual filesystem backed by the Azure Storage. It uses the fuse protocol to communicate with the Linux FUSE kernel module, and implements the filesystem operations using the Azure Storage REST APIs.",
+	Version:           common.LyvecloudfuseVersion,
 	FlagErrorHandling: cobra.ExitOnError,
 	SilenceUsage:      true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -75,7 +75,7 @@ var rootCmd = &cobra.Command{
 				return err
 			}
 		}
-		return errors.New("missing command options\n\nDid you mean this?\n\tblobfuse2 mount\n\nRun 'blobfuse2 --help' for usage")
+		return errors.New("missing command options\n\nDid you mean this?\n\tlyvecloudfuse mount\n\nRun 'lyvecloudfuse --help' for usage")
 	},
 }
 
@@ -126,7 +126,7 @@ func beginDetectNewVersion() chan interface{} {
 	go func() {
 		defer close(completed)
 
-		latestVersionUrl := common.Blobfuse2ListContainerURL + "?restype=container&comp=list&prefix=latest/"
+		latestVersionUrl := common.LyvecloudfuseListContainerURL + "?restype=container&comp=list&prefix=latest/"
 		remoteVersion, err := getRemoteVersion(latestVersionUrl)
 		if err != nil {
 			log.Err("beginDetectNewVersion: error getting latest version [%s]", err.Error())
@@ -134,9 +134,9 @@ func beginDetectNewVersion() chan interface{} {
 			return
 		}
 
-		local, err := common.ParseVersion(common.Blobfuse2Version)
+		local, err := common.ParseVersion(common.LyvecloudfuseVersion)
 		if err != nil {
-			log.Err("beginDetectNewVersion: error parsing Blobfuse2Version [%s]", err.Error())
+			log.Err("beginDetectNewVersion: error parsing LyvecloudfuseVersion [%s]", err.Error())
 			completed <- err.Error()
 			return
 		}
@@ -151,19 +151,19 @@ func beginDetectNewVersion() chan interface{} {
 		if local.OlderThan(*remote) {
 			executablePathSegments := strings.Split(strings.Replace(os.Args[0], "\\", "/", -1), "/")
 			executableName := executablePathSegments[len(executablePathSegments)-1]
-			log.Info("beginDetectNewVersion: A new version of Blobfuse2 is available. Current Version=%s, Latest Version=%s", common.Blobfuse2Version, remoteVersion)
+			log.Info("beginDetectNewVersion: A new version of Lyvecloudfuse is available. Current Version=%s, Latest Version=%s", common.LyvecloudfuseVersion, remoteVersion)
 			fmt.Fprintf(stderr, "*** "+executableName+": A new version [%s] is available. Consider upgrading to latest version for bug-fixes & new features. ***\n", remoteVersion)
 			log.Info("*** "+executableName+": A new version [%s] is available. Consider upgrading to latest version for bug-fixes & new features. ***\n", remoteVersion)
 
-			warningsUrl := common.Blobfuse2ListContainerURL + "/securitywarnings/" + common.Blobfuse2Version
+			warningsUrl := common.LyvecloudfuseListContainerURL + "/securitywarnings/" + common.LyvecloudfuseVersion
 			hasWarnings := checkVersionExists(warningsUrl)
 
 			if hasWarnings {
-				warningsPage := common.BlobFuse2WarningsURL + "#" + strings.ReplaceAll(common.Blobfuse2Version, ".", "")
-				fmt.Fprintf(stderr, "Visit %s to see the list of vulnerabilities associated with your current version [%s]\n", warningsPage, common.Blobfuse2Version)
-				log.Warn("Vist %s to see the list of vulnerabilities associated with your current version [%s]\n", warningsPage, common.Blobfuse2Version)
+				warningsPage := common.LyvecloudfuseWarningsURL + "#" + strings.ReplaceAll(common.LyvecloudfuseVersion, ".", "")
+				fmt.Fprintf(stderr, "Visit %s to see the list of vulnerabilities associated with your current version [%s]\n", warningsPage, common.LyvecloudfuseVersion)
+				log.Warn("Vist %s to see the list of vulnerabilities associated with your current version [%s]\n", warningsPage, common.LyvecloudfuseVersion)
 			}
-			completed <- "A new version of Blobfuse2 is available"
+			completed <- "A new version of Lyvecloudfuse is available"
 		}
 	}()
 	return completed
@@ -194,17 +194,18 @@ func ignoreCommand(cmdArgs []string) bool {
 }
 
 // parseArgs : Depending upon inputs are coming from /etc/fstab or CLI, parameter style may vary.
-//   /etc/fstab example : blobfuse2 mount <dir> -o suid,nodev,--config-file=config.yaml,--use-adls=true,allow_other
-//   cli command        : blobfuse2 mount <dir> -o suid,nodev --config-file=config.yaml --use-adls=true -o allow_other
-//   As we need to support both the ways, here we convert the /etc/fstab style (comma separated list) to standard cli ways
+//
+//	/etc/fstab example : lyvecloudfuse mount <dir> -o suid,nodev,--config-file=config.yaml,--use-adls=true,allow_other
+//	cli command        : lyvecloudfuse mount <dir> -o suid,nodev --config-file=config.yaml --use-adls=true -o allow_other
+//	As we need to support both the ways, here we convert the /etc/fstab style (comma separated list) to standard cli ways
 func parseArgs(cmdArgs []string) []string {
-	// Ignore binary name, rest all are arguments to blobfuse2
+	// Ignore binary name, rest all are arguments to lyvecloudfuse
 	cmdArgs = cmdArgs[1:]
 
 	cmd, _, err := rootCmd.Find(cmdArgs)
 	if err != nil && cmd == rootCmd && !ignoreCommand(cmdArgs) {
 		/* /etc/fstab has a standard format and it goes like "<binary> <mount point> <type> <options>"
-		 * as here we can not give any subcommand like "blobfuse2 mount" (giving this will assume mount is mount point)
+		 * as here we can not give any subcommand like "lyvecloudfuse mount" (giving this will assume mount is mount point)
 		 * we need to assume 'mount' being default sub command.
 		 * To do so, we just ignore the implicit commands handled by cobra and then try to check if input matches any of
 		 * our subcommands or not. If not, we assume user has executed mount command without specifying mount subcommand

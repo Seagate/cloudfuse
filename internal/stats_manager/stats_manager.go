@@ -43,8 +43,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
 )
 
 type StatsCollector struct {

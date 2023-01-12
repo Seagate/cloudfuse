@@ -2,18 +2,18 @@
 
 if [ "$1" == "fuse2" ]
 then
-    # Build blobfuse2 with fuse2
-    rm -rf blobfuse2
+    # Build lyvecloudfuse with fuse2
+    rm -rf lyvecloudfuse
     rm -rf azure-storage-fuse
-    go build -tags fuse2 -o blobfuse2
+    go build -tags fuse2 -o lyvecloudfuse
 elif [ "$1" == "health" ]
 then
     # Build Health Monitor binary
     rm -rf bfusemon
     go build -o bfusemon ./tools/health-monitor/
 else
-    # Build blobfuse2 with fuse3
-    rm -rf blobfuse2
+    # Build lyvecloudfuse with fuse3
+    rm -rf lyvecloudfuse
     rm -rf azure-storage-fuse
-    go build -o blobfuse2
+    go build -o lyvecloudfuse
 fi

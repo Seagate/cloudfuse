@@ -73,7 +73,7 @@ var (
 
 const BfuseMonitorVersion = "1.0.0-preview.1"
 
-var DefaultWorkDir = "$HOME/.blobfuse2"
+var DefaultWorkDir = "$HOME/.lyvecloudfuse"
 var DefaultLogFile = filepath.Join(DefaultWorkDir, "bfuseMonitor.log")
 
 type CacheEvent struct {

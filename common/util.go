@@ -53,7 +53,7 @@ import (
 
 var RootMount bool
 
-//IsDirectoryMounted is a utility function that returns true if the directory is already mounted using fuse
+// IsDirectoryMounted is a utility function that returns true if the directory is already mounted using fuse
 func IsDirectoryMounted(path string) bool {
 	mntList, err := ioutil.ReadFile("/etc/mtab")
 	if err != nil {
@@ -82,7 +82,7 @@ func IsDirectoryMounted(path string) bool {
 	return false
 }
 
-//IsDirectoryEmpty is a utility function that returns true if the directory at that path is empty or not
+// IsDirectoryEmpty is a utility function that returns true if the directory at that path is empty or not
 func IsDirectoryEmpty(path string) bool {
 	f, _ := os.Open(path)
 	defer f.Close()
@@ -99,7 +99,7 @@ func IsDirectoryEmpty(path string) bool {
 	return false
 }
 
-//DirectoryExists is a utility function that returns true if the directory at that path exists and returns false if it does not exist.
+// DirectoryExists is a utility function that returns true if the directory at that path exists and returns false if it does not exist.
 func DirectoryExists(path string) bool {
 	_, err := os.Stat(path)
 
@@ -111,7 +111,7 @@ func DirectoryExists(path string) bool {
 	return true
 }
 
-//GetCurrentUser is a utility function that returns the UID and GID of the user that invokes the blobfuse2 command.
+// GetCurrentUser is a utility function that returns the UID and GID of the user that invokes the lyvecloudfuse command.
 func GetCurrentUser() (uint32, uint32, error) {
 	var (
 		currentUser      *user.User
@@ -147,7 +147,7 @@ func NormalizeObjectName(name string) string {
 	return strings.ReplaceAll(name, "\\", "/")
 }
 
-// List all mount points which were mounted using blobfuse2
+// List all mount points which were mounted using lyvecloudfuse
 func ListMountPoints() ([]string, error) {
 	file, err := os.Open("/etc/mtab")
 	if err != nil {
@@ -162,8 +162,8 @@ func ListMountPoints() ([]string, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// If there is any directory mounted using blobfuse2 its of our interest
-		if strings.HasPrefix(line, "blobfuse2") {
+		// If there is any directory mounted using lyvecloudfuse its of our interest
+		if strings.HasPrefix(line, "lyvecloudfuse") {
 			// Extract the mount path from this line
 			mntPath := strings.Split(line, " ")[1]
 			mntList = append(mntList, mntPath)

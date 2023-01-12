@@ -5,11 +5,11 @@ FROM ubuntu:latest
 ARG FUSE2
 
 # Create directory to hold samples
-RUN mkdir -p /usr/share/blobfuse2
+RUN mkdir -p /usr/share/lyvecloudfuse
 
-# Copy blobfuse2 binary to executable path
-COPY ./blobfuse2 /usr/local/bin/
-COPY ./config.yaml /usr/share/blobfuse2/
+# Copy lyvecloudfuse binary to executable path
+COPY ./lyvecloudfuse /usr/local/bin/
+COPY ./config.yaml /usr/share/lyvecloudfuse/
 
 # Install fuse library
 RUN \
@@ -21,8 +21,8 @@ RUN if [ "$FUSE2" = "TRUE" ] ; then apt-get install -y fuse ; else apt-get insta
 RUN echo "user_allow_other" >> /etc/fuse.conf
 
 # Create syslog filter files
-COPY ./11-blobfuse2.conf /etc/rsyslog.d
-COPY ./blobfuse2-logrotate /etc/logrotate.d/blobfuse2
+COPY ./11-lyvecloudfuse.conf /etc/rsyslog.d
+COPY ./lyvecloudfuse-logrotate /etc/logrotate.d/lyvecloudfuse
 
 
 # Create mount directory structure
@@ -35,13 +35,13 @@ RUN \
 
 # Create the mount script and set it to entry point once container start
 RUN \
-	echo "/sbin/rsyslogd" > /usr/share/blobfuse2/blobfuse2-mount.sh && \
-	echo "blobfuse2 mount /mnt/blobfuse_mnt --config-file=/usr/share/blobfuse2/config.yaml  --ignore-open-flags --foreground=true" >> /usr/share/blobfuse2/blobfuse2-mount.sh && \
-	echo "blobfuse2 unmount all" > /usr/share/blobfuse2/blobfuse2-umount.sh && \
-	chmod 777 /usr/share/blobfuse2/blobfuse2-mount.sh && \
-	chmod 777 /usr/share/blobfuse2/blobfuse2-umount.sh && \
-	ln -s  /usr/share/blobfuse2/blobfuse2-mount.sh /usr/local/bin/fuse && \
-	ln -s  /usr/share/blobfuse2/blobfuse2-umount.sh /usr/local/bin/unfuse 
+	echo "/sbin/rsyslogd" > /usr/share/lyvecloudfuse/lyvecloudfuse-mount.sh && \
+	echo "lyvecloudfuse mount /mnt/blobfuse_mnt --config-file=/usr/share/lyvecloudfuse/config.yaml  --ignore-open-flags --foreground=true" >> /usr/share/lyvecloudfuse/lyvecloudfuse-mount.sh && \
+	echo "lyvecloudfuse unmount all" > /usr/share/lyvecloudfuse/lyvecloudfuse-umount.sh && \
+	chmod 777 /usr/share/lyvecloudfuse/lyvecloudfuse-mount.sh && \
+	chmod 777 /usr/share/lyvecloudfuse/lyvecloudfuse-umount.sh && \
+	ln -s  /usr/share/lyvecloudfuse/lyvecloudfuse-mount.sh /usr/local/bin/fuse && \
+	ln -s  /usr/share/lyvecloudfuse/lyvecloudfuse-umount.sh /usr/local/bin/unfuse 
 
 
 ENTRYPOINT ["bash", "fuse"]

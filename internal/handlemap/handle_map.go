@@ -38,8 +38,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/cache_policy"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/cache_policy"
 
 	"go.uber.org/atomic"
 )
@@ -53,7 +53,7 @@ const (
 	HandleFlagUnknown uint16 = iota
 	HandleFlagDirty          // File has been modified with write operation or is a new file
 	HandleFlagFSynced        // User has called fsync on the file explicitly
-	HandleFlagCached         // File is cached in the local system by blobfuse2
+	HandleFlagCached         // File is cached in the local system by lyvecloudfuse
 )
 
 // Structure to hold in memory cache for streaming layer
@@ -153,7 +153,7 @@ func (handle *Handle) Cleanup() {
 	handle.Unlock()
 }
 
-//defaultHandleMap holds a synchronized map[ HandleID ]*Handle
+// defaultHandleMap holds a synchronized map[ HandleID ]*Handle
 var defaultHandleMap sync.Map
 var nextHandleID = *atomic.NewUint64(uint64(0))
 
@@ -199,8 +199,8 @@ func Load(key HandleID) (*Handle, bool) {
 	return handle, true
 }
 
-//Store function must not be used in production application.
-//This is a utility function present only for test scenarios.
+// Store function must not be used in production application.
+// This is a utility function present only for test scenarios.
 func Store(key HandleID, path string, _ uintptr) *Handle {
 	handle := &Handle{
 		ID:   key,

@@ -27,8 +27,8 @@ sudo service docker start
 # List docker container images
 docker images ls
 
-# Delete old blobfuse2 image
-docker images rm azure-blobfuse2 -f
+# Delete old lyvecloudfuse image
+docker images rm azure-lyvecloudfuse -f
 
 # List docker instances running
 docker container ls

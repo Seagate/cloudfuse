@@ -42,22 +42,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var blobfuse2Pid string
+var lyvecloudfusePid string
 
 var healthMonStop = &cobra.Command{
 	Use:               "stop",
-	Short:             "Stops the health monitor binary associated with a given Blobfuse2 pid",
-	Long:              "Stops the health monitor binary associated with a given Blobfuse2 pid",
+	Short:             "Stops the health monitor binary associated with a given Lyvecloudfuse pid",
+	Long:              "Stops the health monitor binary associated with a given Lyvecloudfuse pid",
 	SuggestFor:        []string{"stp", "st"},
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		blobfuse2Pid = strings.TrimSpace(blobfuse2Pid)
+		lyvecloudfusePid = strings.TrimSpace(lyvecloudfusePid)
 
-		if len(blobfuse2Pid) == 0 {
-			return fmt.Errorf("pid of blobfuse2 process not given")
+		if len(lyvecloudfusePid) == 0 {
+			return fmt.Errorf("pid of lyvecloudfuse process not given")
 		}
 
-		pid, err := getPid(blobfuse2Pid)
+		pid, err := getPid(lyvecloudfusePid)
 		if err != nil {
 			return fmt.Errorf("failed to get health monitor pid")
 		}
@@ -72,7 +72,7 @@ var healthMonStop = &cobra.Command{
 }
 
 // Attempts to get pid of the health monitor
-func getPid(blobfuse2Pid string) (string, error) {
+func getPid(lyvecloudfusePid string) (string, error) {
 	psAux := exec.Command("ps", "aux")
 	out, err := psAux.Output()
 	if err != nil {
@@ -80,7 +80,7 @@ func getPid(blobfuse2Pid string) (string, error) {
 	}
 	processes := strings.Split(string(out), "\n")
 	for _, process := range processes {
-		if strings.Contains(process, "bfusemon") && strings.Contains(process, fmt.Sprintf("--pid=%s", blobfuse2Pid)) {
+		if strings.Contains(process, "bfusemon") && strings.Contains(process, fmt.Sprintf("--pid=%s", lyvecloudfusePid)) {
 			re := regexp.MustCompile(`[-]?\d[\d,]*[\.]?[\d{2}]*`)
 			pids := re.FindAllString(process, 1)
 			if pids == nil {
@@ -111,6 +111,6 @@ func init() {
 	healthMonCmd.AddCommand(healthMonStop)
 	healthMonStop.AddCommand(healthMonStopAll)
 
-	healthMonStop.Flags().StringVar(&blobfuse2Pid, "pid", "", "Blobfuse2 PID associated with the health monitor that should be stopped")
+	healthMonStop.Flags().StringVar(&lyvecloudfusePid, "pid", "", "Lyvecloudfuse PID associated with the health monitor that should be stopped")
 	_ = healthMonStop.MarkFlagRequired("pid")
 }

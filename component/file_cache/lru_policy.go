@@ -39,7 +39,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common/log"
 )
 
 type lruNode struct {
@@ -200,7 +200,7 @@ func (p *lruPolicy) Name() string {
 	return "lru"
 }
 
-//  On validate name of the file was pushed on this channel so now update the LRU list
+// On validate name of the file was pushed on this channel so now update the LRU list
 func (p *lruPolicy) asyncCacheValid() {
 	for {
 		select {

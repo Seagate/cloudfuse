@@ -44,10 +44,11 @@ import (
 	"syscall"
 	"time"
 
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal"
+
 	"github.com/Azure/azure-pipeline-go/pipeline"
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/internal"
 
 	"github.com/Azure/azure-storage-azcopy/v10/azbfs"
 	"github.com/Azure/azure-storage-azcopy/v10/ste"
