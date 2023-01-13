@@ -1,5 +1,3 @@
-//go:build linux
-
 /*
     _____           _____   _____   ____          ______  _____  ------
    |     |  |      |     | |     | |     |     | |       |            |
@@ -1419,6 +1417,12 @@ func (suite *fileCacheTestSuite) TestStatFS() {
 	suite.assert.Equal(ret, true)
 	suite.assert.Equal(err, nil)
 	suite.assert.NotEqual(stat, &common.Statfs_t{})
+
+	// Added additional checks for StatFS
+	suite.assert.Equal(stat.Bsize, int64(4096))
+	suite.assert.Equal(stat.Frsize, int64(4096))
+	suite.assert.Equal(stat.Blocks, uint64(512))
+	suite.assert.Equal(stat.Namemax, uint64(255))
 }
 
 // In order for 'go test' to run this suite, we need to create

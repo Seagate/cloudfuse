@@ -3,18 +3,22 @@
 package file_cache
 
 import (
-	"golang.org/x/sys/windows"
 	"io/fs"
+	"math"
 	"os"
+	"syscall"
 	"time"
 
+	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
+
+	"golang.org/x/sys/windows"
 )
 
 // Creates a new object attribute
 func newObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
-	stat := info.Sys().(*windows.Win32FileAttributeData)
+	stat := info.Sys().(*syscall.Win32FileAttributeData)
 	attrs := &internal.ObjAttr{
 		Path:  path,
 		Name:  info.Name(),
@@ -50,7 +54,7 @@ func (fc *FileCache) isDownloadRequired(localPath string) (bool, bool) {
 		// The file exists in local cache
 		// The file needs to be downloaded if the cacheTimeout elapsed (check last change time and last modified time)
 		fileExists = true
-		stat := finfo.Sys().(*windows.Win32FileAttributeData)
+		stat := finfo.Sys().(*syscall.Win32FileAttributeData)
 
 		// Deciding based on last modified time is not correct. Last modified time is based on the file was last written
 		// so if file was last written back to container 2 days back then even downloading it now shall represent the same date
@@ -86,11 +90,11 @@ func (c *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	if maxCacheSize == 0 {
 		return nil, false, nil
 	}
-	usage := getDirSize(c.tmpPath)
+	usage := getUsage(c.tmpPath)
 	available := maxCacheSize - usage
 
 	var free, total, avail uint64
-	
+
 	// Get path to the cache
 	pathPtr, err := windows.UTF16PtrFromString(c.tmpPath)
 	if err != nil {
@@ -105,14 +109,14 @@ func (c *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	const blockSize = 4096
 
 	stat := common.Statfs_t{
-		Blocks: uint64(maxCacheSize) / uint64(blockSize),
-		Bavail: uint64(math.Max(0, available)) / uint64(blockSize),
-		Bfree:  free,
-		Bsize:  blockSize,
-		Ffree:  1e9
-		Files:  1e9
-		Flags:  0, // Remove this since not used
-		Frsize: blockSize,
+		Blocks:  uint64(maxCacheSize) / uint64(blockSize),
+		Bavail:  uint64(math.Max(0, available)) / uint64(blockSize),
+		Bfree:   free,
+		Bsize:   blockSize,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  blockSize,
+		Namemax: 255,
 	}
 
 	return &stat, true, nil

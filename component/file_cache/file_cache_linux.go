@@ -101,14 +101,14 @@ func (c *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	}
 
 	stat := common.Statfs_t{
-		Blocks: uint64(maxCacheSize) / uint64(statfs.Frsize),
-		Bavail: uint64(math.Max(0, available)) / uint64(statfs.Frsize),
-		Bfree:  statfs.Bavail,
-		Bsize:  statfs.Bsize,
-		Ffree:  statfs.Ffree,
-		Files:  statfs.Files,
-		Flags:  statfs.Flags,
-		Frsize: statfs.Frsize,
+		Blocks:  uint64(maxCacheSize) / uint64(statfs.Frsize),
+		Bavail:  uint64(math.Max(0, available)) / uint64(statfs.Frsize),
+		Bfree:   statfs.Bavail,
+		Bsize:   statfs.Bsize,
+		Ffree:   statfs.Ffree,
+		Files:   statfs.Files,
+		Frsize:  statfs.Frsize,
+		Namemax: 255,
 	}
 
 	return &stat, true, nil
