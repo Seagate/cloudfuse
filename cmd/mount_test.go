@@ -39,6 +39,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"lyvecloudfuse/common"
@@ -50,7 +51,7 @@ import (
 
 var configMountTest string = `
 logging:
-  type: syslog
+  type: silent
 default-working-dir: /tmp/lyvecloudfuse
 file_cache:
   path: /tmp/fileCachePath
@@ -76,7 +77,7 @@ health_monitor:
 
 var configMountLoopback string = `
 logging:
-  type: syslog
+  type: silent
 default-working-dir: /tmp/lyvecloudfuse
 components:
   - libfuse
@@ -182,12 +183,22 @@ func (suite *mountTestSuite) TestConfigFileNotFound() {
 	op, err := executeCommandC(rootCmd, "mount", mntDir, "--config-file=cfgNotFound.yaml")
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "invalid config file")
-	suite.assert.Contains(op, "no such file or directory")
+	// The error message is different on Windows, so need to test with cases
+	if runtime.GOOS == "windows" {
+		suite.assert.Contains(op, "cannot find the file specified")
+	} else {
+		suite.assert.Contains(op, "no such file or directory")
+	}
 
 	op, err = executeCommandC(rootCmd, "mount", "all", mntDir, "--config-file=cfgNotFound.yaml")
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "invalid config file")
-	suite.assert.Contains(op, "no such file or directory")
+	// The error message is different on Windows, so need to test with cases
+	if runtime.GOOS == "windows" {
+		suite.assert.Contains(op, "cannot find the file specified")
+	} else {
+		suite.assert.Contains(op, "no such file or directory")
+	}
 }
 
 // mount failure test where config file is not provided
