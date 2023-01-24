@@ -662,9 +662,7 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	defer flock.Unlock()
 
 	err := fc.NextComponent().DeleteFile(options)
-	fmt.Println(err)
 	err = fc.validateStorageError(options.Name, err, "DeleteFile", false)
-	fmt.Println(err)
 	if err != nil {
 		log.Err("FileCache::DeleteFile : error  %s [%s]", options.Name, err.Error())
 		return err
@@ -672,7 +670,6 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	err = deleteFile(localPath)
-	fmt.Println(err)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("FileCache::DeleteFile : failed to delete local file %s [%s]", localPath, err.Error())
 	}
@@ -1138,9 +1135,7 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	defer dflock.Unlock()
 
 	err := fc.NextComponent().RenameFile(options)
-	fmt.Println(err)
 	err = fc.validateStorageError(options.Src, err, "RenameFile", false)
-	fmt.Println(err)
 	if err != nil {
 		log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
 		return err
@@ -1154,7 +1149,6 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	// we will be serving the wrong content (as we did not rename locally, we still be having older destination files with
 	// stale content). We either need to remove dest file as well from cache or just run rename to replace the content.
 	err = os.Rename(localSrcPath, localDstPath)
-	fmt.Println(err)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("FileCache::RenameFile : %s failed to rename local file %s [%s]", localSrcPath, err.Error())
 	}

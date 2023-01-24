@@ -1275,7 +1275,8 @@ func (suite *fileCacheTestSuite) TestZZMountPathConflict() {
 	suite.assert.Contains(err.Error(), "[tmp-path is same as mount path]")
 }
 
-// This test does not run on Windows unless you have admin rights
+// This test does not run on Windows unless you have admin rights since
+// creating symlinks is only allowed as an admin
 func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 	defer suite.cleanupTest()
 	// Setup
