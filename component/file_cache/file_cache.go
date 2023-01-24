@@ -40,6 +40,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -566,11 +567,12 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		// We tried moving CreateFile to a separate thread for better perf.
 		// However, before it is created in storage, if GetAttr is called, the call will fail since the file
 		// does not exist in storage yet, failing the whole CreateFile sequence in FUSE.
-		_, err := fc.NextComponent().CreateFile(options)
+		newF, err := fc.NextComponent().CreateFile(options)
 		if err != nil {
 			log.Err("FileCache::CreateFile : Failed to create file %s", options.Name)
 			return nil, err
 		}
+		newF.GetFileObject().Close()
 	}
 
 	// Create the file in local cache
@@ -660,7 +662,9 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	defer flock.Unlock()
 
 	err := fc.NextComponent().DeleteFile(options)
+	fmt.Println(err)
 	err = fc.validateStorageError(options.Name, err, "DeleteFile", false)
+	fmt.Println(err)
 	if err != nil {
 		log.Err("FileCache::DeleteFile : error  %s [%s]", options.Name, err.Error())
 		return err
@@ -668,6 +672,7 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	err = deleteFile(localPath)
+	fmt.Println(err)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("FileCache::DeleteFile : failed to delete local file %s [%s]", localPath, err.Error())
 	}
@@ -1007,7 +1012,11 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 		// }
 
 		// Replace above with Sync since Dup is not supported on Windows
-		f.Sync()
+		err := f.Sync()
+		if err != nil {
+			log.Err("FileCache::FlushFile : error [unable to sync file] %s", options.Handle.Path)
+			return syscall.EIO
+		}
 
 		// Write to storage
 		// Create a new handle for the SDK to use to upload (read local file)
@@ -1129,7 +1138,9 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	defer dflock.Unlock()
 
 	err := fc.NextComponent().RenameFile(options)
+	fmt.Println(err)
 	err = fc.validateStorageError(options.Src, err, "RenameFile", false)
+	fmt.Println(err)
 	if err != nil {
 		log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
 		return err
@@ -1143,6 +1154,7 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	// we will be serving the wrong content (as we did not rename locally, we still be having older destination files with
 	// stale content). We either need to remove dest file as well from cache or just run rename to replace the content.
 	err = os.Rename(localSrcPath, localDstPath)
+	fmt.Println(err)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("FileCache::RenameFile : %s failed to rename local file %s [%s]", localSrcPath, err.Error())
 	}
@@ -1253,10 +1265,12 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	if err == nil || os.IsExist(err) {
 		fc.policy.CacheValid(localPath)
 
-		err = os.Chown(localPath, options.Owner, options.Group)
-		if err != nil {
-			log.Err("FileCache::Chown : error changing owner on the cached path %s [%s]", localPath, err.Error())
-			return err
+		if runtime.GOOS != "windows" {
+			err = os.Chown(localPath, options.Owner, options.Group)
+			if err != nil {
+				log.Err("FileCache::Chown : error changing owner on the cached path %s [%s]", localPath, err.Error())
+				return err
+			}
 		}
 	}
 

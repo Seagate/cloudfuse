@@ -146,7 +146,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownCase2() {
 	path := "file"
 	oldMode := os.FileMode(0511)
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
-	_, _ = os.Stat(suite.cache_path + "/" + path)
+	_, _ = os.Stat(filepath.Join(suite.cache_path, path))
 	//stat := info.Sys().(*syscall.Win32FileAttributeData)
 	//oldOwner := stat.Uid
 	//oldGroup := stat.Gid
@@ -158,13 +158,13 @@ func (suite *fileCacheWindowsTestSuite) TestChownCase2() {
 	suite.assert.Equal(err, syscall.EIO)
 
 	// Path should be in the file cache with old group and owner (since we failed the operation)
-	_, err = os.Stat(suite.cache_path + "/" + path)
+	_, err = os.Stat(filepath.Join(suite.cache_path, path))
 	//stat = info.Sys().(*syscall.Win32FileAttributeData)
 	suite.assert.True(err == nil || os.IsExist(err))
 	//suite.assert.EqualValues(oldOwner, stat.Uid)
 	//suite.assert.EqualValues(oldGroup, stat.Gid)
 	// Path should not be in fake storage
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
+	_, err = os.Stat(filepath.Join(suite.fake_storage_path, path))
 	suite.assert.True(os.IsNotExist(err))
 }
 
