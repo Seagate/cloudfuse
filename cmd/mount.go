@@ -48,7 +48,6 @@ import (
 	"runtime/pprof"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/config"
@@ -99,12 +98,24 @@ func (opt *mountOptions) validate(skipEmptyMount bool) error {
 		return fmt.Errorf("mount path not provided")
 	}
 
-	if _, err := os.Stat(opt.MountPath); os.IsNotExist(err) {
-		return fmt.Errorf("mount directory does not exists")
-	} else if common.IsDirectoryMounted(opt.MountPath) {
+	// Windows requires that the mount directory does not exist while
+	// linux requires that the directory does exist. So we skip these
+	// checks if
+	if runtime.GOOS == "windows" {
+		_, err := os.Stat(opt.MountPath)
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("mount directory already exists")
+		}
+	} else {
+		if _, err := os.Stat(opt.MountPath); os.IsNotExist(err) {
+			return fmt.Errorf("mount directory does not exists")
+		} else if !skipEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
+			return fmt.Errorf("mount directory is not empty")
+		}
+	}
+
+	if common.IsDirectoryMounted(opt.MountPath) {
 		return fmt.Errorf("directory is already mounted")
-	} else if !skipEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
-		return fmt.Errorf("mount directory is not empty")
 	}
 
 	if err := common.ELogLevel.Parse(opt.Logging.LogLevel); err != nil {
@@ -363,24 +374,28 @@ var mountCmd = &cobra.Command{
 
 		log.Crit("Starting Lyvecloudfuse Mount : %s on [%s]", common.LyvecloudfuseVersion, common.GetCurrentDistro())
 		log.Crit("Logging level set to : %s", logLevel.String())
-		pipeline, err = internal.NewPipeline(options.Components, !daemon.WasReborn())
+
+		// If on linux start with the go deamon
+		// If on Windows, don't use the daemon since not supported
+		if runtime.GOOS == "windows" {
+			pipeline, err = internal.NewPipeline(options.Components, true)
+		} else {
+			pipeline, err = internal.NewPipeline(options.Components, !daemon.WasReborn())
+		}
 		if err != nil {
 			log.Err("mount : failed to initialize new pipeline [%v]", err)
 			return Destroy(fmt.Sprintf("failed to initialize new pipeline [%s]", err.Error()))
 		}
 
 		log.Info("mount: Mounting lyvecloudfuse on %s", options.MountPath)
-		if !options.Foreground {
+		// Prevent mounting in background on Windows
+		// TODO: Enable background support using windows services
+		if !options.Foreground && runtime.GOOS != "windows" {
 			pidFile := strings.Replace(options.MountPath, "/", "_", -1) + ".pid"
 			pidFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), pidFile)
-			dmnCtx := &daemon.Context{
-				PidFileName: pidFileName,
-				PidFilePerm: 0644,
-				Umask:       027,
-			}
-
 			ctx, _ := context.WithCancel(context.Background()) //nolint
-			daemon.SetSigHandler(sigusrHandler(pipeline, ctx), syscall.SIGUSR1, syscall.SIGUSR2)
+
+			dmnCtx := createDaemon(pipeline, ctx, pidFileName, 0644, 027)
 			child, err := dmnCtx.Reborn()
 			if err != nil {
 				log.Err("mount : failed to daemonize application [%v]", err)
@@ -488,20 +503,6 @@ func startMonitor(pid int) {
 	}
 }
 
-func sigusrHandler(pipeline *internal.Pipeline, ctx context.Context) daemon.SignalHandlerFunc {
-	return func(sig os.Signal) error {
-		log.Crit("Mount::sigusrHandler : Signal %d received", sig)
-
-		var err error
-		if sig == syscall.SIGUSR1 {
-			log.Crit("Mount::sigusrHandler : SIGUSR1 received")
-			config.OnConfigChange()
-		}
-
-		return err
-	}
-}
-
 func setGOConfig() {
 	// Ensure we always have more than 1 OS thread running goroutines, since there are issues with having just 1.
 	isOnlyOne := runtime.GOMAXPROCS(0) == 1
@@ -581,7 +582,7 @@ func init() {
 	config.BindPFlag("logging.file-path", mountCmd.PersistentFlags().Lookup("log-file-path"))
 	_ = mountCmd.MarkPersistentFlagDirname("log-file-path")
 
-	mountCmd.PersistentFlags().Bool("foreground", false, "Mount the system in foreground mode. Default value false.")
+	mountCmd.PersistentFlags().Bool("foreground", false, "Mount the system in foreground mode. Default value false. (Ignored on Windows)")
 	config.BindPFlag("foreground", mountCmd.PersistentFlags().Lookup("foreground"))
 
 	mountCmd.PersistentFlags().Bool("read-only", false, "Mount the system in read only mode. Default value false.")
