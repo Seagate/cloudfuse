@@ -5,17 +5,19 @@ set -o nounset
 
 # Cleanup
 source ./helper/cleanup.sh
-if $?; then
-    echo $?
+exit_code=$?
+if [ $exit_code -ne 0 ]; then
+    echo "command failed with exit code ${exit_code}"
     echo "Stopping script"
-    exit $?
+    exit $exit_code
 fi
 
-source ./helper/env_variatbles.sh
-if $?; then
-    echo $?
+source ./helper/env_variables.sh
+exit_code=$?
+if [ $exit_code -ne 0 ]; then
+    echo "command failed with exit code ${exit_code}"
     echo "Stopping script"
-    exit $?
+    exit $exit_code
 fi
 
 # Mount step
