@@ -40,6 +40,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -123,6 +124,7 @@ func (lfs *LoopbackFS) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 		return false
 	}
 	_, err = f.Readdirnames(1)
+	f.Close()
 	return err == io.EOF
 }
 
@@ -384,6 +386,11 @@ func (lfs *LoopbackFS) CopyToFile(options internal.CopyToFileOptions) error {
 		log.Err("LoopbackFS::CopyToFile : error copying [%s]", err)
 		return err
 	}
+	err = fsrc.Close()
+	if err != nil {
+		log.Err("LoopbackFS::CopyToFile : error closing [%s]", err)
+		return err
+	}
 	return nil
 }
 
@@ -398,6 +405,11 @@ func (lfs *LoopbackFS) CopyFromFile(options internal.CopyFromFileOptions) error 
 	_, err = io.Copy(fdst, options.File)
 	if err != nil {
 		log.Err("LoopbackFS::CopyFromFile : error copying [%s]", err)
+		return err
+	}
+	err = fdst.Close()
+	if err != nil {
+		log.Err("LoopbackFS::CopyFromFile : error closing [%s]", err)
 		return err
 	}
 	return nil
@@ -443,6 +455,9 @@ func (lfs *LoopbackFS) Chmod(options internal.ChmodOptions) error {
 func (lfs *LoopbackFS) Chown(options internal.ChownOptions) error {
 	log.Trace("LoopbackFS::Chown : name=%s", options.Name)
 	path := filepath.Join(lfs.path, options.Name)
+	if runtime.GOOS == "windows" {
+		return nil
+	}
 	return os.Chown(path, options.Owner, options.Group)
 }
 
