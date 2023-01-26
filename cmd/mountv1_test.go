@@ -940,6 +940,7 @@ func (suite *generateConfigTestSuite) TestEnvVarAccountName() {
 
 	_, err := executeCommandC(rootCmd, "mountv1", tempDir, "--convert-config-only=true", outputFile)
 	suite.assert.Nil(err)
+	os.Unsetenv("AZURE_STORAGE_ACCOUNT")
 }
 
 func (suite *generateConfigTestSuite) TestEnvVarAccountNameError() {

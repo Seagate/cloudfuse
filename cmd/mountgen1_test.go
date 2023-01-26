@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"runtime"
 	"testing"
 
 	"lyvecloudfuse/common"
@@ -114,15 +115,19 @@ func (suite *genOneConfigTestSuite) TestConfigCreation() {
 	defer suite.cleanupTest()
 	confFile, _ := ioutil.TempFile("", "conf*.yaml")
 	outFile, _ := ioutil.TempFile("", "adlsgen1fuse*.json")
-	mntDir, err := ioutil.TempDir("", "mntdir")
 
-	suite.assert.Nil(err)
+	// On Windows the mount directory must not exist, so only create it on Linux
+	mntDir := "mntdir"
+	if runtime.GOOS != "windows" {
+		_, err := ioutil.TempDir("", "mntdir")
+		suite.assert.Nil(err)
+	}
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
 	defer os.Remove(mntDir)
 
-	_, err = confFile.WriteString(configGenOne)
+	_, err := confFile.WriteString(configGenOne)
 	suite.assert.Nil(err)
 
 	_, err = executeCommandC(rootCmd, "mountgen1", mntDir, "--generate-json-only=true", "--required-free-space-mb=500", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--output-file=%s", outFile.Name()))
@@ -147,15 +152,19 @@ func (suite *genOneConfigTestSuite) TestInvalidConfig() {
 	defer suite.cleanupTest()
 	confFile, _ := ioutil.TempFile("", "conf*.yaml")
 	outFile, _ := ioutil.TempFile("", "adlsgen1fuse*.json")
-	mntDir, err := ioutil.TempDir("", "mntdir")
 
-	suite.assert.Nil(err)
+	// On Windows the mount directory must not exist, so only create it on Linux
+	mntDir := "mntdir"
+	if runtime.GOOS != "windows" {
+		_, err := ioutil.TempDir("", "mntdir")
+		suite.assert.Nil(err)
+	}
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
 	defer os.Remove(mntDir)
 
-	_, err = confFile.WriteString(invalidConfig)
+	_, err := confFile.WriteString(invalidConfig)
 	suite.assert.Nil(err)
 
 	_, err = executeCommandC(rootCmd, "mountgen1", mntDir, "--generate-json-only=true", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--output-file=%s", outFile.Name()))
@@ -166,15 +175,19 @@ func (suite *genOneConfigTestSuite) TestInvalidAuthMode() {
 	defer suite.cleanupTest()
 	confFile, _ := ioutil.TempFile("", "conf*.yaml")
 	outFile, _ := ioutil.TempFile("", "adlsgen1fuse*.json")
-	mntDir, err := ioutil.TempDir("", "mntdir")
 
-	suite.assert.Nil(err)
+	// On Windows the mount directory must not exist, so only create it on Linux
+	mntDir := "mntdir"
+	if runtime.GOOS != "windows" {
+		_, err := ioutil.TempDir("", "mntdir")
+		suite.assert.Nil(err)
+	}
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
 	defer os.Remove(mntDir)
 
-	_, err = confFile.WriteString(invalidAuthMode)
+	_, err := confFile.WriteString(invalidAuthMode)
 	suite.assert.Nil(err)
 
 	_, err = executeCommandC(rootCmd, "mountgen1", mntDir, "--generate-json-only=true", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--output-file=%s", outFile.Name()))
@@ -185,15 +198,19 @@ func (suite *genOneConfigTestSuite) TestGen1FuseMount() {
 	defer suite.cleanupTest()
 	confFile, _ := ioutil.TempFile("", "conf*.yaml")
 	outFile, _ := ioutil.TempFile("", "adlsgen1fuse*.json")
-	mntDir, err := ioutil.TempDir("", "mntdir")
 
-	suite.assert.Nil(err)
+	// On Windows the mount directory must not exist, so only create it on Linux
+	mntDir := "mntdir"
+	if runtime.GOOS != "windows" {
+		_, err := ioutil.TempDir("", "mntdir")
+		suite.assert.Nil(err)
+	}
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
 	defer os.Remove(mntDir)
 
-	_, err = confFile.WriteString(configGenOne)
+	_, err := confFile.WriteString(configGenOne)
 	suite.assert.Nil(err)
 
 	_, err = executeCommandC(rootCmd, "mountgen1", mntDir, "--required-free-space-mb=500", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--output-file=%s", outFile.Name()))
