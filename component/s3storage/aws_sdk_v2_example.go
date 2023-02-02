@@ -1,5 +1,4 @@
 /*
-
  the following code below was copied and pasted from the following sources:
 
 https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/endpoints/
