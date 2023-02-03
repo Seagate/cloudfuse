@@ -34,21 +34,7 @@
    SOFTWARE
 */
 
-package azstorage
-
-import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"os"
-	"testing"
-
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
-)
+package s3storage
 
 type storageTestConfiguration struct {
 	// Get the mount path from command line argument
@@ -75,10 +61,17 @@ type storageTestConfiguration struct {
 	SpnClientSecret string `json:"spn-secret"`
 	SkipMsi         bool   `json:"skip-msi"`
 	ProxyAddress    string `json:"proxy-address"`
+	// Added for S3
+	BucketName string `json:"bucket-name"`
+	AccessKey  string `json:"access-key"`
+	SecretKey  string `json:"secret-key"`
+	Endpoint   string `json:"endpoint"`
+	Region     string `json:"region"`
 }
 
 var storageTestConfigurationParameters storageTestConfiguration
 
+/*
 type authTestSuite struct {
 	suite.Suite
 }
@@ -775,3 +768,5 @@ func (suite *authTestSuite) cleanupTest() {
 func TestAuthTestSuite(t *testing.T) {
 	suite.Run(t, new(authTestSuite))
 }
+
+*/

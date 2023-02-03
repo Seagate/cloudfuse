@@ -31,65 +31,33 @@
    SOFTWARE
 */
 
-package azstorage
+package s3storage
 
 import (
 	"net/url"
 	"os"
 
 	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
-
-	"github.com/Azure/azure-pipeline-go/pipeline"
-	"github.com/Azure/azure-storage-blob-go/azblob"
 )
 
 // Example for azblob usage : https://godoc.org/github.com/Azure/azure-storage-blob-go/azblob#pkg-examples
 // For methods help refer : https://godoc.org/github.com/Azure/azure-storage-blob-go/azblob#ContainerURL
-type AzStorageConfig struct {
+type S3StorageConfig struct {
 	authConfig azAuthConfig
 
-	container      string
-	prefixPath     string
-	blockSize      int64
-	maxConcurrency uint16
-
-	// tier to be set on every upload
-	defaultTier azblob.AccessTierType
-
-	// Return back readDir on mount for given amount of time
-	cancelListForSeconds uint16
-
-	// Retry policy config
-	maxRetries            int32
-	maxTimeout            int32
-	backoffTime           int32
-	maxRetryDelay         int32
-	proxyAddress          string
-	sdkTrace              bool
-	ignoreAccessModifiers bool
-	mountAllContainers    bool
-
-	updateMD5        bool
-	validateMD5      bool
-	virtualDirectory bool
+	bucketName string
 }
 
-type AzStorageConnection struct {
-	Config AzStorageConfig
-
-	Pipeline pipeline.Pipeline
+type S3StorageConnection struct {
+	Config S3StorageConfig
 
 	Endpoint *url.URL
 }
 
-type AzConnection interface {
-	Configure(cfg AzStorageConfig) error
-	UpdateConfig(cfg AzStorageConfig) error
-
-	SetupPipeline() error
-	TestPipeline() error
+type S3Connection interface {
+	Configure(cfg S3StorageConfig) error
+	UpdateConfig(cfg S3StorageConfig) error
 
 	ListContainers() ([]string, error)
 
@@ -128,19 +96,9 @@ type AzConnection interface {
 	NewCredentialKey(_, _ string) error
 }
 
-// NewAzStorageConnection : Based on account type create respective AzConnection Object
-func NewAzStorageConnection(cfg AzStorageConfig) AzConnection {
-	if cfg.authConfig.AccountType == EAccountType.INVALID_ACC() {
-		log.Err("NewAzStorageConnection : Invalid account type")
-	} else if cfg.authConfig.AccountType == EAccountType.BLOCK() {
-		stg := &BlockBlob{}
-		_ = stg.Configure(cfg)
-		return stg
-	} else if cfg.authConfig.AccountType == EAccountType.ADLS() {
-		stg := &Datalake{}
-		_ = stg.Configure(cfg)
-		return stg
-	}
-
-	return nil
+// NewS3StorageConnection : Based on account type create respective S3Connection Object
+func NewS3StorageConnection(cfg S3StorageConfig) S3Connection {
+	stg := &S3Object{}
+	_ = stg.Configure(cfg)
+	return stg
 }

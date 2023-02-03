@@ -31,7 +31,7 @@
    SOFTWARE
 */
 
-package azstorage
+package s3storage
 
 import (
 	"errors"
@@ -42,7 +42,6 @@ import (
 	"lyvecloudfuse/common/config"
 	"lyvecloudfuse/common/log"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/JeffreyRichter/enum/enum"
 )
 
@@ -136,44 +135,11 @@ const (
 )
 
 type AzStorageOptions struct {
-	AccountType             string `config:"type" yaml:"type,omitempty"`
-	UseHTTP                 bool   `config:"use-http" yaml:"use-http,omitempty"`
-	AccountName             string `config:"account-name" yaml:"account-name,omitempty"`
-	AccountKey              string `config:"account-key" yaml:"account-key,omitempty"`
-	SaSKey                  string `config:"sas" yaml:"sas,omitempty"`
-	ApplicationID           string `config:"appid" yaml:"appid,omitempty"`
-	ResourceID              string `config:"resid" yaml:"resid,omitempty"`
-	ObjectID                string `config:"objid" yaml:"objid,omitempty"`
-	TenantID                string `config:"tenantid" yaml:"tenantid,omitempty"`
-	ClientID                string `config:"clientid" yaml:"clientid,omitempty"`
-	ClientSecret            string `config:"clientsecret" yaml:"clientsecret,omitempty"`
-	ActiveDirectoryEndpoint string `config:"aadendpoint" yaml:"aadendpoint,omitempty"`
-	Endpoint                string `config:"endpoint" yaml:"endpoint,omitempty"`
-	AuthMode                string `config:"mode" yaml:"mode,omitempty"`
-	Container               string `config:"container" yaml:"container,omitempty"`
-	PrefixPath              string `config:"subdirectory" yaml:"subdirectory,omitempty"`
-	BlockSize               int64  `config:"block-size-mb" yaml:"block-size-mb,omitempty"`
-	MaxConcurrency          uint16 `config:"max-concurrency" yaml:"max-concurrency,omitempty"`
-	DefaultTier             string `config:"tier" yaml:"tier,omitempty"`
-	CancelListForSeconds    uint16 `config:"block-list-on-mount-sec" yaml:"block-list-on-mount-sec,omitempty"`
-	MaxRetries              int32  `config:"max-retries" yaml:"max-retries,omitempty"`
-	MaxTimeout              int32  `config:"max-retry-timeout-sec" yaml:"max-retry-timeout-sec,omitempty"`
-	BackoffTime             int32  `config:"retry-backoff-sec" yaml:"retry-backoff-sec,omitempty"`
-	MaxRetryDelay           int32  `config:"max-retry-delay-sec" yaml:"max-retry-delay-sec,omitempty"`
-	HttpProxyAddress        string `config:"http-proxy" yaml:"http-proxy,omitempty"`
-	HttpsProxyAddress       string `config:"https-proxy" yaml:"https-proxy,omitempty"`
-	SdkTrace                bool   `config:"sdk-trace" yaml:"sdk-trace,omitempty"`
-	FailUnsupportedOp       bool   `config:"fail-unsupported-op" yaml:"fail-unsupported-op,omitempty"`
-	AuthResourceString      string `config:"auth-resource" yaml:"auth-resource,omitempty"`
-	UpdateMD5               bool   `config:"update-md5" yaml:"update-md5"`
-	ValidateMD5             bool   `config:"validate-md5" yaml:"validate-md5"`
-	VirtualDirectory        bool   `config:"virtual-directory" yaml:"virtual-directory"`
-
-	// v1 support
-	UseAdls        bool   `config:"use-adls" yaml:"-"`
-	UseHTTPS       bool   `config:"use-https" yaml:"-"`
-	SetContentType bool   `config:"set-content-type" yaml:"-"`
-	CaCertFile     string `config:"ca-cert-file" yaml:"-"`
+	BucketName string `config:"bucket-name" yaml:"bucket-name,omitempty"`
+	AccessKey  string `config:"access-key" yaml:"access-key,omitempty"`
+	SecretKey  string `config:"secret-key" yaml:"secret-key,omitempty"`
+	Region     string `config:"region" yaml:"region,omitempty"`
+	Endpoint   string `config:"endpoint" yaml:"endpoint,omitempty"`
 }
 
 // RegisterEnvVariables : Register environment varilables
@@ -248,211 +214,67 @@ func formatEndpointAccountType(endpoint string, account AccountType) string {
 	return correctedEndpoint
 }
 
-func validateMsiConfig(opt AzStorageOptions) error {
-	v := make(map[string]bool, 3)
-	if opt.ApplicationID != "" {
-		v[opt.ApplicationID] = true
-	}
-	if opt.ObjectID != "" {
-		v[opt.ObjectID] = true
-	}
-	if opt.ResourceID != "" {
-		v[opt.ResourceID] = true
-	}
-	if len(v) > 1 {
-		return errors.New("client ID, object ID and MSI resource ID are mutually exclusive and zero or one of the inputs need to be provided")
-	}
-	return nil
-}
-
 // ParseAndValidateConfig : Parse and validate config
-func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
+func ParseAndValidateConfig(az *S3Storage, opt AzStorageOptions) error {
 	log.Trace("ParseAndValidateConfig : Parsing config")
 
 	// Validate account name is present or not
-	if opt.AccountName == "" {
-		return errors.New("account name not provided")
+	if opt.BucketName == "" {
+		return errors.New("bucket name not provided")
 	}
-	az.stConfig.authConfig.AccountName = opt.AccountName
-
-	// Validate account type property
-	if opt.AccountType == "" {
-		opt.AccountType = "block"
-	}
-
-	if config.IsSet(compName + ".use-adls") {
-		if opt.UseAdls {
-			az.stConfig.authConfig.AccountType = az.stConfig.authConfig.AccountType.ADLS()
-		} else {
-			az.stConfig.authConfig.AccountType = az.stConfig.authConfig.AccountType.BLOCK()
-		}
-	} else {
-		var accountType AccountType
-		err := accountType.Parse(opt.AccountType)
-		if err != nil {
-			log.Err("ParseAndValidateConfig : Failed to parse account type %s", opt.AccountType)
-			return errors.New("invalid account type")
-		}
-
-		if accountType == EAccountType.INVALID_ACC() {
-			log.Err("ParseAndValidateConfig : Invalid account type %s", opt.AccountType)
-			return errors.New("invalid account type")
-		}
-
-		az.stConfig.authConfig.AccountType = accountType
-	}
-
-	if opt.BlockSize != 0 {
-		if opt.BlockSize > azblob.BlockBlobMaxStageBlockBytes {
-			log.Err("block size is too large. Block size has to be smaller than %s Bytes", azblob.BlockBlobMaxStageBlockBytes)
-			return errors.New("block size is too large")
-		}
-		az.stConfig.blockSize = opt.BlockSize * 1024 * 1024
-	}
+	az.stConfig.authConfig.BucketName = opt.BucketName
+	az.stConfig.authConfig.AccessKey = opt.AccessKey
+	az.stConfig.authConfig.SecretKey = opt.SecretKey
+	az.stConfig.authConfig.Region = opt.Region
 
 	// Validate container name is present or not
-	err := config.UnmarshalKey("mount-all-containers", &az.stConfig.mountAllContainers)
-	if err != nil {
-		log.Err("ParseAndValidateConfig : Failed to detect mount-all-container")
-	}
-
-	if !az.stConfig.mountAllContainers && opt.Container == "" {
-		return errors.New("container name not provided")
-	}
-
-	az.stConfig.container = opt.Container
-
-	if config.IsSet(compName + ".use-https") {
-		opt.UseHTTP = !opt.UseHTTPS
-	}
+	// TODO: Need to fix for buckets
+	// err := config.UnmarshalKey("mount-all-containers", &az.stConfig.mountAllContainers)
+	// if err != nil {
+	// 	log.Err("ParseAndValidateConfig : Failed to detect mount-all-container")
+	// }
 
 	// Validate endpoint
 	if opt.Endpoint == "" {
-		log.Warn("ParseAndValidateConfig : account endpoint not provided, assuming the default .core.windows.net style endpoint")
-		if az.stConfig.authConfig.AccountType == EAccountType.BLOCK() {
-			opt.Endpoint = fmt.Sprintf("%s.blob.core.windows.net", opt.AccountName)
-		} else if az.stConfig.authConfig.AccountType == EAccountType.ADLS() {
-			opt.Endpoint = fmt.Sprintf("%s.dfs.core.windows.net", opt.AccountName)
-		}
+		log.Warn("ParseAndValidateConfig : account endpoint not provided, assuming the default .lyvecloud.seagate.com style endpoint")
+		opt.Endpoint = fmt.Sprintf("s3.%s.lyvecloud.seagate.com", opt.Region)
 	}
 	az.stConfig.authConfig.Endpoint = opt.Endpoint
-	az.stConfig.authConfig.Endpoint = formatEndpointProtocol(az.stConfig.authConfig.Endpoint, opt.UseHTTP)
-	az.stConfig.authConfig.Endpoint = formatEndpointAccountType(az.stConfig.authConfig.Endpoint, az.stConfig.authConfig.AccountType)
-
-	az.stConfig.authConfig.ActiveDirectoryEndpoint = opt.ActiveDirectoryEndpoint
-	az.stConfig.authConfig.ActiveDirectoryEndpoint = formatEndpointProtocol(az.stConfig.authConfig.ActiveDirectoryEndpoint, false)
-
-	// If subdirectory is mounted, take the prefix path
-	az.stConfig.prefixPath = opt.PrefixPath
 
 	// Block list call on mount for given amount of time
-	az.stConfig.cancelListForSeconds = opt.CancelListForSeconds
+	// TODO: Add cancellation timeout
+	// az.stConfig.cancelListForSeconds = opt.CancelListForSeconds
 
-	httpProxyProvided := opt.HttpProxyAddress != ""
-	httpsProxyProvided := opt.HttpsProxyAddress != ""
+	// TODO: Enable sdk trace in aws-sdk-go-v2
+	// az.stConfig.sdkTrace = opt.SdkTrace
+	// log.Info("ParseAndValidateConfig : sdk logging from the config file: %t", az.stConfig.sdkTrace)
 
-	// Set whether to use http or https and proxy
-	if opt.UseHTTP {
-		az.stConfig.authConfig.UseHTTP = true
-		if httpProxyProvided {
-			az.stConfig.proxyAddress = opt.HttpProxyAddress
-		} else if httpsProxyProvided {
-			az.stConfig.proxyAddress = opt.HttpsProxyAddress
-		}
-	} else {
-		if httpsProxyProvided {
-			az.stConfig.proxyAddress = opt.HttpsProxyAddress
-		} else {
-			if httpProxyProvided {
-				log.Err("ParseAndValidateConfig : `http-proxy` Invalid : must set `use-http: true` in your config file")
-				return errors.New("`http-proxy` Invalid : must set `use-http: true` in your config file")
-			}
-		}
-	}
-	log.Info("ParseAndValidateConfig : using the following proxy address from the config file: %s", az.stConfig.proxyAddress)
-
-	az.stConfig.sdkTrace = opt.SdkTrace
-
-	log.Info("ParseAndValidateConfig : sdk logging from the config file: %t", az.stConfig.sdkTrace)
-
-	err = ParseAndReadDynamicConfig(az, opt, false)
-	if err != nil {
-		return err
-	}
-
-	log.Debug("ParseAndValidateConfig : Getting auth type")
-	if opt.AuthMode == "" {
-		// Based on other config decide the auth mode
-		// for e.g. if sas token is set then mode shall be set to sas and if key is set then authmode shall be key
-		opt.AuthMode = autoDetectAuthMode(opt)
-		log.Debug("ParseAndValidateConfig : Auth type %s", opt.AuthMode)
-	}
-
-	var authType AuthType
-	err = authType.Parse(opt.AuthMode)
-	if err != nil {
-		log.Err("ParseAndValidateConfig : Invalid auth type %s", opt.AccountType)
-		return errors.New("invalid auth type")
-	}
-
-	switch authType {
-	case EAuthType.KEY():
-		az.stConfig.authConfig.AuthMode = EAuthType.KEY()
-		if opt.AccountKey == "" {
-			return errors.New("storage key not provided")
-		}
-		az.stConfig.authConfig.AccountKey = opt.AccountKey
-	case EAuthType.SAS():
-		az.stConfig.authConfig.AuthMode = EAuthType.SAS()
-		if opt.SaSKey == "" {
-			return errors.New("SAS key not provided")
-		}
-		az.stConfig.authConfig.SASKey = sanitizeSASKey(opt.SaSKey)
-	case EAuthType.MSI():
-		az.stConfig.authConfig.AuthMode = EAuthType.MSI()
-		err := validateMsiConfig(opt)
-		if err != nil {
-			return err
-		}
-		az.stConfig.authConfig.ApplicationID = opt.ApplicationID
-		az.stConfig.authConfig.ResourceID = opt.ResourceID
-		az.stConfig.authConfig.ObjectID = opt.ObjectID
-	case EAuthType.SPN():
-		az.stConfig.authConfig.AuthMode = EAuthType.SPN()
-		if opt.ClientID == "" || opt.ClientSecret == "" || opt.TenantID == "" {
-			//lint:ignore ST1005 ignore
-			return errors.New("Client ID, Tenant ID or Client Secret not provided")
-		}
-		az.stConfig.authConfig.ClientID = opt.ClientID
-		az.stConfig.authConfig.ClientSecret = opt.ClientSecret
-		az.stConfig.authConfig.TenantID = opt.TenantID
-
-	default:
-		log.Err("ParseAndValidateConfig : Invalid auth mode %s", opt.AuthMode)
-		return errors.New("invalid auth mode")
-	}
-	az.stConfig.authConfig.AuthResource = opt.AuthResourceString
+	// err = ParseAndReadDynamicConfig(az, opt, false)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// Retry policy configuration
 	// A user provided value of 0 doesn't make sense for MaxRetries, MaxTimeout, BackoffTime, or MaxRetryDelay.
 
-	az.stConfig.maxRetries = 5     // Max number of retry to be done  (default 4) (v1 : 0)
-	az.stConfig.maxTimeout = 900   // Max timeout for any single retry (default 1 min) (v1 : 60)
-	az.stConfig.backoffTime = 4    // Delay before any retry (exponential increase) (default 4 sec)
-	az.stConfig.maxRetryDelay = 60 // Maximum allowed delay before retry (default 120 sec) (v1 : 1.2)
+	// az.stConfig.maxRetries = 5     // Max number of retry to be done  (default 4) (v1 : 0)
+	// az.stConfig.maxTimeout = 900   // Max timeout for any single retry (default 1 min) (v1 : 60)
+	// az.stConfig.backoffTime = 4    // Delay before any retry (exponential increase) (default 4 sec)
+	// az.stConfig.maxRetryDelay = 60 // Maximum allowed delay before retry (default 120 sec) (v1 : 1.2)
 
-	if opt.MaxRetries != 0 {
-		az.stConfig.maxRetries = opt.MaxRetries
-	}
-	if opt.MaxTimeout != 0 {
-		az.stConfig.maxTimeout = opt.MaxTimeout
-	}
-	if opt.BackoffTime != 0 {
-		az.stConfig.backoffTime = opt.BackoffTime
-	}
-	if opt.MaxRetryDelay != 0 {
-		az.stConfig.maxRetryDelay = opt.MaxRetryDelay
-	}
+	// TODO: Add this
+	// if opt.MaxRetries != 0 {
+	// 	az.stConfig.maxRetries = opt.MaxRetries
+	// }
+	// if opt.MaxTimeout != 0 {
+	// 	az.stConfig.maxTimeout = opt.MaxTimeout
+	// }
+	// if opt.BackoffTime != 0 {
+	// 	az.stConfig.backoffTime = opt.BackoffTime
+	// }
+	// if opt.MaxRetryDelay != 0 {
+	// 	az.stConfig.maxRetryDelay = opt.MaxRetryDelay
+	// }
 
 	if config.IsSet(compName + ".set-content-type") {
 		log.Warn("unsupported v1 CLI parameter: set-content-type is always true in lyvecloudfuse.")
@@ -464,62 +286,62 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		log.Warn("unsupported v1 CLI parameter: debug-libcurl is not applicable in lyvecloudfuse.")
 	}
 
-	log.Info("ParseAndValidateConfig : Account: %s, Container: %s, AccountType: %s, Auth: %s, Prefix: %s, Endpoint: %s, ListBlock: %d, MD5 : %v %v, Virtual Directory: %v",
-		az.stConfig.authConfig.AccountName, az.stConfig.container, az.stConfig.authConfig.AccountType, az.stConfig.authConfig.AuthMode,
-		az.stConfig.prefixPath, az.stConfig.authConfig.Endpoint, az.stConfig.cancelListForSeconds, az.stConfig.validateMD5, az.stConfig.updateMD5, az.stConfig.virtualDirectory)
+	// log.Info("ParseAndValidateConfig : Bucket: %s, Container: %s, Prefix: %s, Endpoint: %s, ListBlock: %d, MD5 : %v %v, Virtual Directory: %v",
+	// 	az.stConfig.authConfig.BucketName, az.stConfig.container,
+	// 	az.stConfig.prefixPath, az.stConfig.authConfig.Endpoint, az.stConfig.cancelListForSeconds, az.stConfig.validateMD5, az.stConfig.updateMD5, az.stConfig.virtualDirectory)
 
-	log.Info("ParseAndValidateConfig : Retry Config: Retry count %d, Max Timeout %d, BackOff Time %d, Max Delay %d",
-		az.stConfig.maxRetries, az.stConfig.maxTimeout, az.stConfig.backoffTime, az.stConfig.maxRetryDelay)
+	// log.Info("ParseAndValidateConfig : Retry Config: Retry count %d, Max Timeout %d, BackOff Time %d, Max Delay %d",
+	// 	az.stConfig.maxRetries, az.stConfig.maxTimeout, az.stConfig.backoffTime, az.stConfig.maxRetryDelay)
 
 	return nil
 }
 
 // ParseAndReadDynamicConfig : On config change read only the required config
-func ParseAndReadDynamicConfig(az *AzStorage, opt AzStorageOptions, reload bool) error {
-	log.Trace("ParseAndReadDynamicConfig : Reparsing config")
+// func ParseAndReadDynamicConfig(az *AzStorage, opt AzStorageOptions, reload bool) error {
+// 	log.Trace("ParseAndReadDynamicConfig : Reparsing config")
 
-	// If block size and max concurrency is configured use those
-	// A user provided value of 0 doesn't make sense for BlockSize, or MaxConcurrency.
-	if opt.BlockSize != 0 {
-		az.stConfig.blockSize = opt.BlockSize * 1024 * 1024
-	}
+// 	// If block size and max concurrency is configured use those
+// 	// A user provided value of 0 doesn't make sense for BlockSize, or MaxConcurrency.
+// 	if opt.BlockSize != 0 {
+// 		az.stConfig.blockSize = opt.BlockSize * 1024 * 1024
+// 	}
 
-	if opt.MaxConcurrency != 0 {
-		az.stConfig.maxConcurrency = opt.MaxConcurrency
-	}
+// 	if opt.MaxConcurrency != 0 {
+// 		az.stConfig.maxConcurrency = opt.MaxConcurrency
+// 	}
 
-	// Populate default tier
-	if opt.DefaultTier != "" {
-		az.stConfig.defaultTier = getAccessTierType(opt.DefaultTier)
-	}
+// 	// Populate default tier
+// 	if opt.DefaultTier != "" {
+// 		az.stConfig.defaultTier = getAccessTierType(opt.DefaultTier)
+// 	}
 
-	az.stConfig.ignoreAccessModifiers = !opt.FailUnsupportedOp
-	az.stConfig.validateMD5 = opt.ValidateMD5
-	az.stConfig.updateMD5 = opt.UpdateMD5
+// 	az.stConfig.ignoreAccessModifiers = !opt.FailUnsupportedOp
+// 	az.stConfig.validateMD5 = opt.ValidateMD5
+// 	az.stConfig.updateMD5 = opt.UpdateMD5
 
-	az.stConfig.virtualDirectory = opt.VirtualDirectory
+// 	az.stConfig.virtualDirectory = opt.VirtualDirectory
 
-	// Auth related reconfig
-	switch opt.AuthMode {
-	case "sas":
-		az.stConfig.authConfig.AuthMode = EAuthType.SAS()
-		if opt.SaSKey == "" {
-			return errors.New("SAS key not provided")
-		}
+// 	// Auth related reconfig
+// 	switch opt.AuthMode {
+// 	case "sas":
+// 		az.stConfig.authConfig.AuthMode = EAuthType.SAS()
+// 		if opt.SaSKey == "" {
+// 			return errors.New("SAS key not provided")
+// 		}
 
-		oldSas := az.stConfig.authConfig.SASKey
-		az.stConfig.authConfig.SASKey = sanitizeSASKey(opt.SaSKey)
+// 		oldSas := az.stConfig.authConfig.SASKey
+// 		az.stConfig.authConfig.SASKey = sanitizeSASKey(opt.SaSKey)
 
-		if reload {
-			log.Info("ParseAndReadDynamicConfig : SAS Key updated")
+// 		if reload {
+// 			log.Info("ParseAndReadDynamicConfig : SAS Key updated")
 
-			if err := az.storage.NewCredentialKey("saskey", az.stConfig.authConfig.SASKey); err != nil {
-				az.stConfig.authConfig.SASKey = oldSas
-				_ = az.storage.NewCredentialKey("saskey", az.stConfig.authConfig.SASKey)
-				return errors.New("SAS key update failure")
-			}
-		}
-	}
+// 			if err := az.storage.NewCredentialKey("saskey", az.stConfig.authConfig.SASKey); err != nil {
+// 				az.stConfig.authConfig.SASKey = oldSas
+// 				_ = az.storage.NewCredentialKey("saskey", az.stConfig.authConfig.SASKey)
+// 				return errors.New("SAS key update failure")
+// 			}
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }

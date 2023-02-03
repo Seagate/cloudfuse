@@ -31,11 +31,9 @@
    SOFTWARE
 */
 
-package azstorage
+package s3storage
 
 import (
-	"fmt"
-
 	"lyvecloudfuse/common/log"
 
 	"github.com/Azure/azure-storage-azcopy/v10/azbfs"
@@ -43,51 +41,49 @@ import (
 )
 
 // Verify that the Auth implement the correct AzAuth interfaces
-var _ azAuth = &azAuthBlobSAS{}
-var _ azAuth = &azAuthBfsSAS{}
+var _ azAuth = &azAuthBlobKey{}
+var _ azAuth = &azAuthBfsKey{}
 
-type azAuthSAS struct {
+type azAuthKey struct {
 	azAuthBase
 }
 
-// GetEndpoint : Gets the SAS endpoint
-func (azsas *azAuthSAS) getEndpoint() string {
-	return fmt.Sprintf("%s%s",
-		azsas.config.Endpoint,
-		azsas.config.SASKey)
+type azAuthBlobKey struct {
+	azAuthKey
 }
 
-// SetOption : Sets the sas key information for the SAS auth.
-func (azsas *azAuthSAS) setOption(key, value string) {
-	if key == "saskey" {
-		azsas.config.SASKey = value
-	}
-}
-
-type azAuthBlobSAS struct {
-	azAuthSAS
-}
-
-// GetCredential : Gets SAS based credentials for blob
-func (azsas *azAuthBlobSAS) getCredential() interface{} {
-	if azsas.config.SASKey == "" {
-		log.Err("azAuthBlobSAS::getCredential : SAS key for account is empty, cannot authenticate user")
+// GetCredential : Gets shared key based storage credentials for blob
+func (azkey *azAuthBlobKey) getCredential() interface{} {
+	if azkey.config.AccountKey == "" {
+		log.Err("azAuthBlobKey::getCredential : Shared key for account is empty, cannot authenticate user")
 		return nil
 	}
 
-	return azblob.NewAnonymousCredential()
-}
-
-type azAuthBfsSAS struct {
-	azAuthSAS
-}
-
-// GetCredential : Gets SAS based credentials for datralake
-func (azsas *azAuthBfsSAS) getCredential() interface{} {
-	if azsas.config.SASKey == "" {
-		log.Err("azAuthBfsSAS::getCredential : SAS key for account is empty, cannot authenticate user")
+	credential, err := azblob.NewSharedKeyCredential(
+		azkey.config.AccountName,
+		azkey.config.AccountKey)
+	if err != nil {
+		log.Err("azAuthBlobKey::getCredential : Failed to create shared key credentials")
 		return nil
 	}
 
-	return azbfs.NewAnonymousCredential()
+	return credential
+}
+
+type azAuthBfsKey struct {
+	azAuthKey
+}
+
+// GetCredential : Gets shared key based storage credentials for datalake
+func (azkey *azAuthBfsKey) getCredential() interface{} {
+	if azkey.config.AccountKey == "" {
+		log.Err("azAuthBfsKey::getCredential : Shared key for account is empty, cannot authenticate user")
+		return nil
+	}
+
+	credential := azbfs.NewSharedKeyCredential(
+		azkey.config.AccountName,
+		azkey.config.AccountKey)
+
+	return credential
 }

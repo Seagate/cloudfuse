@@ -31,41 +31,18 @@
    SOFTWARE
 */
 
-package azstorage
-
-import (
-	"lyvecloudfuse/common/log"
-)
+package s3storage
 
 // AzAuthConfig : Config to authenticate to storage
 type azAuthConfig struct {
-	// Account
-	AccountName string
-	UseHTTP     bool
-	AccountType AccountType
-	AuthMode    AuthType
-
-	// Key config
-	AccountKey string
-
-	// SAS config
-	SASKey string
-
-	// MSI config
-	ApplicationID string
-	ResourceID    string
-	ObjectID      string
-
-	// SPN config
-	TenantID                string
-	ClientID                string
-	ClientSecret            string
-	ActiveDirectoryEndpoint string
-
-	Endpoint     string
-	AuthResource string
+	BucketName string
+	AccessKey  string
+	SecretKey  string
+	Endpoint   string
+	Region     string
 }
 
+/*
 // azAuth : Interface to define a generic authentication type
 type azAuth interface {
 	getEndpoint() string
@@ -170,3 +147,4 @@ func (base *azAuthBase) setOption(_, _ string) {}
 func (base *azAuthBase) getEndpoint() string {
 	return base.config.Endpoint
 }
+*/

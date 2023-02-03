@@ -31,7 +31,7 @@
    SOFTWARE
 */
 
-package azstorage
+package s3storage
 
 import (
 	"os"
@@ -239,28 +239,28 @@ func (s *utilsTestSuite) TestSanitizeSASKey() {
 
 func (s *utilsTestSuite) TestBlockNonProxyOptions() {
 	assert := assert.New(s.T())
-	po, ro := getAzBlobPipelineOptions(AzStorageConfig{})
+	po, ro := getAzBlobPipelineOptions(S3StorageConfig{})
 	assert.EqualValues(ro.MaxTries, int(0))
 	assert.NotEqual(po.RequestLog.SyslogDisabled, true)
 }
 
 func (s *utilsTestSuite) TestBlockProxyOptions() {
 	assert := assert.New(s.T())
-	po, ro := getAzBlobPipelineOptions(AzStorageConfig{proxyAddress: "127.0.0.1", maxRetries: 3})
+	po, ro := getAzBlobPipelineOptions(S3StorageConfig{proxyAddress: "127.0.0.1", maxRetries: 3})
 	assert.EqualValues(ro.MaxTries, 3)
 	assert.NotEqual(po.RequestLog.SyslogDisabled, true)
 }
 
 func (s *utilsTestSuite) TestBfsNonProxyOptions() {
 	assert := assert.New(s.T())
-	po, ro := getAzBfsPipelineOptions(AzStorageConfig{})
+	po, ro := getAzBfsPipelineOptions(S3StorageConfig{})
 	assert.EqualValues(ro.MaxTries, int(0))
 	assert.NotEqual(po.RequestLog.SyslogDisabled, true)
 }
 
 func (s *utilsTestSuite) TestBfsProxyOptions() {
 	assert := assert.New(s.T())
-	po, ro := getAzBfsPipelineOptions(AzStorageConfig{proxyAddress: "127.0.0.1", maxRetries: 3})
+	po, ro := getAzBfsPipelineOptions(S3StorageConfig{proxyAddress: "127.0.0.1", maxRetries: 3})
 	assert.EqualValues(ro.MaxTries, 3)
 	assert.NotEqual(po.RequestLog.SyslogDisabled, true)
 }

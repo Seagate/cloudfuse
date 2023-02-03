@@ -31,7 +31,7 @@
    SOFTWARE
 */
 
-package azstorage
+package s3storage
 
 import (
 	"context"
@@ -50,118 +50,98 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// AzStorage Wrapper type around azure go-sdk (track-1)
-type AzStorage struct {
+// S3Storage Wrapper type around azure go-sdk (track-1)
+type S3Storage struct {
 	internal.BaseComponent
-	storage     AzConnection
-	stConfig    AzStorageConfig
+	storage     S3Connection
+	stConfig    S3StorageConfig
 	startTime   time.Time
 	listBlocked bool
 }
 
-const compName = "azstorage"
+const compName = "s3storage"
 
 // Verification to check satisfaction criteria with Component Interface
-var _ internal.Component = &AzStorage{}
+var _ internal.Component = &S3Storage{}
 
 var azStatsCollector *stats_manager.StatsCollector
 
-func (az *AzStorage) Name() string {
+func (az *S3Storage) Name() string {
 	return az.BaseComponent.Name()
 }
 
-func (az *AzStorage) SetName(name string) {
+func (az *S3Storage) SetName(name string) {
 	az.BaseComponent.SetName(name)
 }
 
-func (az *AzStorage) SetNextComponent(c internal.Component) {
+func (az *S3Storage) SetNextComponent(c internal.Component) {
 	az.BaseComponent.SetNextComponent(c)
 }
 
 // Configure : Pipeline will call this method after constructor so that you can read config and initialize yourself
-func (az *AzStorage) Configure(isParent bool) error {
-	log.Trace("AzStorage::Configure : %s", az.Name())
+func (az *S3Storage) Configure(isParent bool) error {
+	log.Trace("S3Storage::Configure : %s", az.Name())
 
 	conf := AzStorageOptions{}
 	err := config.UnmarshalKey(az.Name(), &conf)
 	if err != nil {
-		log.Err("AzStorage::Configure : config error [invalid config attributes]")
+		fmt.Println("Unable to unmarshal")
+		log.Err("S3Storage::Configure : config error [invalid config attributes]")
 		return fmt.Errorf("config error in %s [%s]", az.Name(), err.Error())
 	}
 
 	err = ParseAndValidateConfig(az, conf)
 	if err != nil {
-		log.Err("AzStorage::Configure : Config validation failed [%s]", err.Error())
+		fmt.Println("Unable to parse and validate")
+		log.Err("S3Storage::Configure : Config validation failed [%s]", err.Error())
 		return fmt.Errorf("config error in %s [%s]", az.Name(), err.Error())
 	}
 
 	err = az.configureAndTest(isParent)
 	if err != nil {
-		log.Err("AzStorage::Configure : Failed to validate storage account [%s]", err.Error())
+		log.Err("S3Storage::Configure : Failed to validate storage account [%s]", err.Error())
 		return err
 	}
 
 	return nil
 }
 
-func (az *AzStorage) Priority() internal.ComponentPriority {
+func (az *S3Storage) Priority() internal.ComponentPriority {
 	return internal.EComponentPriority.Consumer()
 }
 
 // OnConfigChange : When config file is changed, this will be called by pipeline. Refresh required config here
-func (az *AzStorage) OnConfigChange() {
-	log.Trace("AzStorage::OnConfigChange : %s", az.Name())
+func (az *S3Storage) OnConfigChange() {
+	log.Trace("S3Storage::OnConfigChange : %s", az.Name())
 
 	conf := AzStorageOptions{}
 	err := config.UnmarshalKey(az.Name(), &conf)
 	if err != nil {
-		log.Err("AzStorage::OnConfigChange : Config error [invalid config attributes]")
+		log.Err("S3Storage::OnConfigChange : Config error [invalid config attributes]")
 		return
 	}
 
-	err = ParseAndReadDynamicConfig(az, conf, true)
-	if err != nil {
-		log.Err("AzStorage::OnConfigChange : failed to reparse config", err.Error())
-		return
-	}
+	// err = ParseAndReadDynamicConfig(az, conf, true)
+	// if err != nil {
+	// 	log.Err("S3Storage::OnConfigChange : failed to reparse config", err.Error())
+	// 	return
+	// }
 
 	err = az.storage.UpdateConfig(az.stConfig)
 	if err != nil {
-		log.Err("AzStorage::OnConfigChange : failed to UpdateConfig", err.Error())
+		log.Err("S3Storage::OnConfigChange : failed to UpdateConfig", err.Error())
 		return
 	}
 }
 
-func (az *AzStorage) configureAndTest(isParent bool) error {
-	az.storage = NewAzStorageConnection(az.stConfig)
-
-	err := az.storage.SetupPipeline()
-	if err != nil {
-		log.Err("AzStorage::configureAndTest : Failed to create container URL [%s]", err.Error())
-		return err
-	}
-
-	err = az.storage.SetPrefixPath(az.stConfig.prefixPath)
-	if err != nil {
-		log.Err("AzStorage::configureAndTest : Failed to set prefix path [%s]", err.Error())
-		return err
-	}
-
-	// The daemon runs all pipeline Configure code twice. isParent allows us to only validate credentials in parent mode, preventing a second unnecessary REST call.
-	if isParent {
-		err = az.storage.TestPipeline()
-		if err != nil {
-			log.Err("AzStorage::configureAndTest : Failed to validate credentials [%s]", err.Error())
-			return fmt.Errorf("failed to authenticate credentials for %s", az.Name())
-		}
-	}
-
+func (az *S3Storage) configureAndTest(isParent bool) error {
+	az.storage = NewS3StorageConnection(az.stConfig)
 	return nil
 }
 
 // Start : Initialize the go-sdk pipeline here and test auth is working fine
-func (az *AzStorage) Start(ctx context.Context) error {
-	log.Trace("AzStorage::Start : Starting component %s", az.Name())
+func (az *S3Storage) Start(ctx context.Context) error {
+	log.Trace("S3Storage::Start : Starting component %s", az.Name())
 	// On mount block the ListBlob call for certain amount of time
 	az.startTime = time.Now()
 	az.listBlocked = true
@@ -173,22 +153,22 @@ func (az *AzStorage) Start(ctx context.Context) error {
 }
 
 // Stop : Disconnect all running operations here
-func (az *AzStorage) Stop() error {
-	log.Trace("AzStorage::Stop : Stopping component %s", az.Name())
+func (az *S3Storage) Stop() error {
+	log.Trace("S3Storage::Stop : Stopping component %s", az.Name())
 	azStatsCollector.Destroy()
 	return nil
 }
 
 // ------------------------- Container listing -------------------------------------------
-func (az *AzStorage) ListContainers() ([]string, error) {
+func (az *S3Storage) ListContainers() ([]string, error) {
 	return az.storage.ListContainers()
 }
 
 // ------------------------- Core Operations -------------------------------------------
 
 // Directory operations
-func (az *AzStorage) CreateDir(options internal.CreateDirOptions) error {
-	log.Trace("AzStorage::CreateDir : %s", options.Name)
+func (az *S3Storage) CreateDir(options internal.CreateDirOptions) error {
+	log.Trace("S3Storage::CreateDir : %s", options.Name)
 
 	err := az.storage.CreateDirectory(internal.TruncateDirName(options.Name))
 
@@ -200,8 +180,8 @@ func (az *AzStorage) CreateDir(options internal.CreateDirOptions) error {
 	return err
 }
 
-func (az *AzStorage) DeleteDir(options internal.DeleteDirOptions) error {
-	log.Trace("AzStorage::DeleteDir : %s", options.Name)
+func (az *S3Storage) DeleteDir(options internal.DeleteDirOptions) error {
+	log.Trace("S3Storage::DeleteDir : %s", options.Name)
 
 	err := az.storage.DeleteDirectory(internal.TruncateDirName(options.Name))
 
@@ -224,11 +204,11 @@ func formatListDirName(path string) string {
 	return path
 }
 
-func (az *AzStorage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
-	log.Trace("AzStorage::IsDirEmpty : %s", options.Name)
+func (az *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
+	log.Trace("S3Storage::IsDirEmpty : %s", options.Name)
 	list, _, err := az.storage.List(formatListDirName(options.Name), nil, 1)
 	if err != nil {
-		log.Err("AzStorage::IsDirEmpty : error listing [%s]", err)
+		log.Err("S3Storage::IsDirEmpty : error listing [%s]", err)
 		return false
 	}
 	if len(list) == 0 {
@@ -237,20 +217,20 @@ func (az *AzStorage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	return false
 }
 
-func (az *AzStorage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
-	log.Trace("AzStorage::ReadDir : %s", options.Name)
+func (az *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
+	log.Trace("S3Storage::ReadDir : %s", options.Name)
 	blobList := make([]*internal.ObjAttr, 0)
 
-	if az.listBlocked {
-		diff := time.Since(az.startTime)
-		if diff.Seconds() > float64(az.stConfig.cancelListForSeconds) {
-			az.listBlocked = false
-			log.Info("AzStorage::ReadDir : Unblocked List API")
-		} else {
-			log.Info("AzStorage::ReadDir : Blocked List API for %d more seconds", int(az.stConfig.cancelListForSeconds)-int(diff.Seconds()))
-			return blobList, nil
-		}
-	}
+	// if az.listBlocked {
+	// 	diff := time.Since(az.startTime)
+	// 	if diff.Seconds() > float64(az.stConfig.cancelListForSeconds) {
+	// 		az.listBlocked = false
+	// 		log.Info("S3Storage::ReadDir : Unblocked List API")
+	// 	} else {
+	// 		log.Info("S3Storage::ReadDir : Blocked List API for %d more seconds", int(az.stConfig.cancelListForSeconds)-int(diff.Seconds()))
+	// 		return blobList, nil
+	// 	}
+	// }
 
 	path := formatListDirName(options.Name)
 	var iteration int = 0
@@ -258,14 +238,14 @@ func (az *AzStorage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 	for {
 		new_list, new_marker, err := az.storage.List(path, marker, common.MaxDirListCount)
 		if err != nil {
-			log.Err("AzStorage::ReadDir : Failed to read dir [%s]", err)
+			log.Err("S3Storage::ReadDir : Failed to read dir [%s]", err)
 			return blobList, err
 		}
 		blobList = append(blobList, new_list...)
 		marker = new_marker
 		iteration++
 
-		log.Debug("AzStorage::ReadDir : So far retrieved %d objects in %d iterations", len(blobList), iteration)
+		log.Debug("S3Storage::ReadDir : So far retrieved %d objects in %d iterations", len(blobList), iteration)
 		if new_marker == nil || *new_marker == "" {
 			break
 		}
@@ -274,32 +254,32 @@ func (az *AzStorage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 	return blobList, nil
 }
 
-func (az *AzStorage) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
-	log.Trace("AzStorage::StreamDir : Path %s, offset %d, count %d", options.Name, options.Offset, options.Count)
+func (az *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
+	log.Trace("S3Storage::StreamDir : Path %s, offset %d, count %d", options.Name, options.Offset, options.Count)
 
-	if az.listBlocked {
-		diff := time.Since(az.startTime)
-		if diff.Seconds() > float64(az.stConfig.cancelListForSeconds) {
-			az.listBlocked = false
-			log.Info("AzStorage::StreamDir : Unblocked List API")
-		} else {
-			log.Info("AzStorage::StreamDir : Blocked List API for %d more seconds", int(az.stConfig.cancelListForSeconds)-int(diff.Seconds()))
-			return make([]*internal.ObjAttr, 0), "", nil
-		}
-	}
+	// if az.listBlocked {
+	// 	diff := time.Since(az.startTime)
+	// 	if diff.Seconds() > float64(az.stConfig.cancelListForSeconds) {
+	// 		az.listBlocked = false
+	// 		log.Info("S3Storage::StreamDir : Unblocked List API")
+	// 	} else {
+	// 		log.Info("S3Storage::StreamDir : Blocked List API for %d more seconds", int(az.stConfig.cancelListForSeconds)-int(diff.Seconds()))
+	// 		return make([]*internal.ObjAttr, 0), "", nil
+	// 	}
+	// }
 
 	path := formatListDirName(options.Name)
 
 	new_list, new_marker, err := az.storage.List(path, &options.Token, options.Count)
 	if err != nil {
-		log.Err("AzStorage::StreamDir : Failed to read dir [%s]", err)
+		log.Err("S3Storage::StreamDir : Failed to read dir [%s]", err)
 		return new_list, "", err
 	}
 
-	log.Debug("AzStorage::StreamDir : Retrieved %d objects with %s marker for Path %s", len(new_list), options.Token, path)
+	log.Debug("S3Storage::StreamDir : Retrieved %d objects with %s marker for Path %s", len(new_list), options.Token, path)
 
 	if new_marker != nil && *new_marker != "" {
-		log.Debug("AzStorage::StreamDir : next-marker %s for Path %s", *new_marker, path)
+		log.Debug("S3Storage::StreamDir : next-marker %s for Path %s", *new_marker, path)
 		if len(new_list) == 0 {
 			/* In some customer scenario we have seen that new_list is empty but marker is not empty
 			   which means backend has not returned any items this time but there are more left.
@@ -307,7 +287,7 @@ func (az *AzStorage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			   and will terminate the readdir call. As there are more items left on the server side we
 			   need to retry getting a list here.
 			*/
-			log.Warn("AzStorage::StreamDir : next-marker %s but current list is empty. Need to retry listing", *new_marker)
+			log.Warn("S3Storage::StreamDir : next-marker %s but current list is empty. Need to retry listing", *new_marker)
 			options.Token = *new_marker
 			return az.StreamDir(options)
 		}
@@ -325,8 +305,8 @@ func (az *AzStorage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	return new_list, *new_marker, nil
 }
 
-func (az *AzStorage) RenameDir(options internal.RenameDirOptions) error {
-	log.Trace("AzStorage::RenameDir : %s to %s", options.Src, options.Dst)
+func (az *S3Storage) RenameDir(options internal.RenameDirOptions) error {
+	log.Trace("S3Storage::RenameDir : %s to %s", options.Src, options.Dst)
 	options.Src = internal.TruncateDirName(options.Src)
 	options.Dst = internal.TruncateDirName(options.Dst)
 
@@ -340,14 +320,14 @@ func (az *AzStorage) RenameDir(options internal.RenameDirOptions) error {
 }
 
 // File operations
-func (az *AzStorage) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
-	log.Trace("AzStorage::CreateFile : %s", options.Name)
+func (az *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
+	log.Trace("S3Storage::CreateFile : %s", options.Name)
 
 	// Create a handle object for the file being created
 	// This handle will be added to handlemap by the first component in pipeline
 	handle := handlemap.NewHandle(options.Name)
 	if handle == nil {
-		log.Err("AzStorage::CreateFile : Failed to create handle for %s", options.Name)
+		log.Err("S3Storage::CreateFile : Failed to create handle for %s", options.Name)
 		return nil, syscall.EFAULT
 	}
 
@@ -365,8 +345,8 @@ func (az *AzStorage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	return handle, nil
 }
 
-func (az *AzStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
-	log.Trace("AzStorage::OpenFile : %s", options.Name)
+func (az *S3Storage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
+	log.Trace("S3Storage::OpenFile : %s", options.Name)
 
 	attr, err := az.storage.GetAttr(options.Name)
 	if err != nil {
@@ -377,7 +357,7 @@ func (az *AzStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	// This handle will be added to handlemap by the first component in pipeline
 	handle := handlemap.NewHandle(options.Name)
 	if handle == nil {
-		log.Err("AzStorage::OpenFile : Failed to create handle for %s", options.Name)
+		log.Err("S3Storage::OpenFile : Failed to create handle for %s", options.Name)
 		return nil, syscall.EFAULT
 	}
 	handle.Size = int64(attr.Size)
@@ -389,8 +369,8 @@ func (az *AzStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	return handle, nil
 }
 
-func (az *AzStorage) CloseFile(options internal.CloseFileOptions) error {
-	log.Trace("AzStorage::CloseFile : %s", options.Handle.Path)
+func (az *S3Storage) CloseFile(options internal.CloseFileOptions) error {
+	log.Trace("S3Storage::CloseFile : %s", options.Handle.Path)
 
 	// decrement open file handles count
 	azStatsCollector.UpdateStats(stats_manager.Decrement, openHandles, (int64)(1))
@@ -398,8 +378,8 @@ func (az *AzStorage) CloseFile(options internal.CloseFileOptions) error {
 	return nil
 }
 
-func (az *AzStorage) DeleteFile(options internal.DeleteFileOptions) error {
-	log.Trace("AzStorage::DeleteFile : %s", options.Name)
+func (az *S3Storage) DeleteFile(options internal.DeleteFileOptions) error {
+	log.Trace("S3Storage::DeleteFile : %s", options.Name)
 
 	err := az.storage.DeleteFile(options.Name)
 
@@ -411,8 +391,8 @@ func (az *AzStorage) DeleteFile(options internal.DeleteFileOptions) error {
 	return err
 }
 
-func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
-	log.Trace("AzStorage::RenameFile : %s to %s", options.Src, options.Dst)
+func (az *S3Storage) RenameFile(options internal.RenameFileOptions) error {
+	log.Trace("S3Storage::RenameFile : %s to %s", options.Src, options.Dst)
 
 	err := az.storage.RenameFile(options.Src, options.Dst)
 
@@ -423,13 +403,13 @@ func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
 	return err
 }
 
-func (az *AzStorage) ReadFile(options internal.ReadFileOptions) (data []byte, err error) {
-	//log.Trace("AzStorage::ReadFile : Read %s", h.Path)
+func (az *S3Storage) ReadFile(options internal.ReadFileOptions) (data []byte, err error) {
+	//log.Trace("S3Storage::ReadFile : Read %s", h.Path)
 	return az.storage.ReadBuffer(options.Handle.Path, 0, 0)
 }
 
-func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length int, err error) {
-	//log.Trace("AzStorage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
+func (az *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (length int, err error) {
+	//log.Trace("S3Storage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 
 	if options.Offset > atomic.LoadInt64(&options.Handle.Size) {
 		return 0, syscall.ERANGE
@@ -446,25 +426,25 @@ func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length 
 
 	err = az.storage.ReadInBuffer(options.Handle.Path, options.Offset, dataLen, options.Data)
 	if err != nil {
-		log.Err("AzStorage::ReadInBuffer : Failed to read %s [%s]", options.Handle.Path, err.Error())
+		log.Err("S3Storage::ReadInBuffer : Failed to read %s [%s]", options.Handle.Path, err.Error())
 	}
 
 	length = int(dataLen)
 	return
 }
 
-func (az *AzStorage) WriteFile(options internal.WriteFileOptions) (int, error) {
+func (az *S3Storage) WriteFile(options internal.WriteFileOptions) (int, error) {
 	err := az.storage.Write(options)
 	return len(options.Data), err
 }
 
-func (az *AzStorage) GetFileBlockOffsets(options internal.GetFileBlockOffsetsOptions) (*common.BlockOffsetList, error) {
+func (az *S3Storage) GetFileBlockOffsets(options internal.GetFileBlockOffsetsOptions) (*common.BlockOffsetList, error) {
 	return az.storage.GetFileBlockOffsets(options.Name)
 
 }
 
-func (az *AzStorage) TruncateFile(options internal.TruncateFileOptions) error {
-	log.Trace("AzStorage::TruncateFile : %s to %d bytes", options.Name, options.Size)
+func (az *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
+	log.Trace("S3Storage::TruncateFile : %s to %d bytes", options.Name, options.Size)
 	err := az.storage.TruncateFile(options.Name, options.Size)
 
 	if err == nil {
@@ -474,19 +454,19 @@ func (az *AzStorage) TruncateFile(options internal.TruncateFileOptions) error {
 	return err
 }
 
-func (az *AzStorage) CopyToFile(options internal.CopyToFileOptions) error {
-	log.Trace("AzStorage::CopyToFile : Read file %s", options.Name)
+func (az *S3Storage) CopyToFile(options internal.CopyToFileOptions) error {
+	log.Trace("S3Storage::CopyToFile : Read file %s", options.Name)
 	return az.storage.ReadToFile(options.Name, options.Offset, options.Count, options.File)
 }
 
-func (az *AzStorage) CopyFromFile(options internal.CopyFromFileOptions) error {
-	log.Trace("AzStorage::CopyFromFile : Upload file %s", options.Name)
+func (az *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
+	log.Trace("S3Storage::CopyFromFile : Upload file %s", options.Name)
 	return az.storage.WriteFromFile(options.Name, options.Metadata, options.File)
 }
 
 // Symlink operations
-func (az *AzStorage) CreateLink(options internal.CreateLinkOptions) error {
-	log.Trace("AzStorage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
+func (az *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
+	log.Trace("S3Storage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
 	err := az.storage.CreateLink(options.Name, options.Target)
 
 	if err == nil {
@@ -497,8 +477,8 @@ func (az *AzStorage) CreateLink(options internal.CreateLinkOptions) error {
 	return err
 }
 
-func (az *AzStorage) ReadLink(options internal.ReadLinkOptions) (string, error) {
-	log.Trace("AzStorage::ReadLink : Read symlink %s", options.Name)
+func (az *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) {
+	log.Trace("S3Storage::ReadLink : Read symlink %s", options.Name)
 	data, err := az.storage.ReadBuffer(options.Name, 0, 0)
 
 	if err != nil {
@@ -510,13 +490,13 @@ func (az *AzStorage) ReadLink(options internal.ReadLinkOptions) (string, error) 
 }
 
 // Attribute operations
-func (az *AzStorage) GetAttr(options internal.GetAttrOptions) (attr *internal.ObjAttr, err error) {
-	//log.Trace("AzStorage::GetAttr : Get attributes of file %s", name)
+func (az *S3Storage) GetAttr(options internal.GetAttrOptions) (attr *internal.ObjAttr, err error) {
+	//log.Trace("S3Storage::GetAttr : Get attributes of file %s", name)
 	return az.storage.GetAttr(options.Name)
 }
 
-func (az *AzStorage) Chmod(options internal.ChmodOptions) error {
-	log.Trace("AzStorage::Chmod : Change mod of file %s", options.Name)
+func (az *S3Storage) Chmod(options internal.ChmodOptions) error {
+	log.Trace("S3Storage::Chmod : Change mod of file %s", options.Name)
 	err := az.storage.ChangeMod(options.Name, options.Mode)
 
 	if err == nil {
@@ -527,13 +507,13 @@ func (az *AzStorage) Chmod(options internal.ChmodOptions) error {
 	return err
 }
 
-func (az *AzStorage) Chown(options internal.ChownOptions) error {
-	log.Trace("AzStorage::Chown : Change ownership of file %s to %d-%d", options.Name, options.Owner, options.Group)
+func (az *S3Storage) Chown(options internal.ChownOptions) error {
+	log.Trace("S3Storage::Chown : Change ownership of file %s to %d-%d", options.Name, options.Owner, options.Group)
 	return az.storage.ChangeOwner(options.Name, options.Owner, options.Group)
 }
 
-func (az *AzStorage) FlushFile(options internal.FlushFileOptions) error {
-	log.Trace("AzStorage::FlushFile : Flush file %s", options.Handle.Path)
+func (az *S3Storage) FlushFile(options internal.FlushFileOptions) error {
+	log.Trace("S3Storage::FlushFile : Flush file %s", options.Handle.Path)
 	return az.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
 }
 
@@ -548,15 +528,15 @@ func (az *AzStorage) FlushFile(options internal.FlushFileOptions) error {
 // Constructor to create object of this component
 func NewazstorageComponent() internal.Component {
 	// Init the component with default config
-	az := &AzStorage{
-		stConfig: AzStorageConfig{
-			blockSize:      0,
-			maxConcurrency: 32,
-			defaultTier:    getAccessTierType("none"),
-			authConfig: azAuthConfig{
-				AuthMode: EAuthType.KEY(),
-				UseHTTP:  false,
-			},
+	az := &S3Storage{
+		stConfig: S3StorageConfig{
+			// blockSize:      0,
+			// maxConcurrency: 32,
+			// defaultTier:    getAccessTierType("none"),
+			// authConfig: azAuthConfig{
+			// 	AuthMode: EAuthType.KEY(),
+			// 	UseHTTP:  false,
+			// },
 		},
 	}
 
