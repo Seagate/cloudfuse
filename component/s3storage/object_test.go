@@ -232,6 +232,33 @@ func (s *blockBlobTestSuite) TestCreateFile() {
 	s.assert.NotNil(result)
 }
 
+func (s *blockBlobTestSuite) TestCopyFromFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data"
+	data := []byte(testData)
+	homeDir, _ := os.UserHomeDir()
+	f, _ := ioutil.TempFile(homeDir, name+".tmp")
+	defer os.Remove(f.Name())
+	f.Write(data)
+
+	err := s.az.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
+
+	s.assert.Nil(err)
+
+	// Object will be updated with new data
+	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, _ := ioutil.ReadAll(result.Body)
+	s.assert.EqualValues(testData, output)
+}
+
 func TestBlockBlob(t *testing.T) {
 	suite.Run(t, new(blockBlobTestSuite))
 }

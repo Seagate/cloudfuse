@@ -38,10 +38,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/stats_manager"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -239,6 +241,80 @@ func trackUpload(name string, bytesTransferred int64, count int64, uploadPtr *in
 
 // WriteFromFile : Upload local file to blob
 func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *os.File) (err error) {
+	log.Trace("Object::WriteFromFile : name %s", name)
+	//defer exectime.StatTimeCurrentBlock("WriteFromFile::WriteFromFile")()
+
+	defer log.TimeTrack(time.Now(), "BlockBlob::WriteFromFile", name)
+
+	var uploadPtr *int64 = new(int64)
+	*uploadPtr = 1
+
+	// TODO: Move this variable into the config file
+	var partMiBs int64 = 16
+
+	// get the size of the file
+	stat, err := fi.Stat()
+	if err != nil {
+		log.Err("Object::WriteFromFile : Failed to get file size %s [%s]", name, err.Error())
+		return err
+	}
+
+	// if the block size is not set then we configure it based on file size
+	// if blockSize == 0 {
+	// 	// based on file-size calculate block size
+	// 	blockSize, err = bb.calculateBlockSize(name, stat.Size())
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	// TODO: Add md5 hash support in S3
+	// Compute md5 of this file is requested by user
+	// If file is uploaded in one shot (no blocks created) then server is populating md5 on upload automatically.
+	// hence we take cost of calculating md5 only for files which are bigger in size and which will be converted to blocks.
+	// md5sum := []byte{}
+	// if bb.Config.updateMD5 && stat.Size() >= azblob.BlockBlobMaxUploadBlobBytes {
+	// 	md5sum, err = getMD5(fi)
+	// 	if err != nil {
+	// 		// Md5 sum generation failed so set nil while uploading
+	// 		log.Warn("Object::WriteFromFile : Failed to generate md5 of %s", name)
+	// 		md5sum = []byte{0}
+	// 	}
+	// }
+
+	// TODO: Is there a more elegant way to do this?
+	// The aws-sdk-go does not seem to see to the end of the file
+	// so let's seek to the start before uploading
+	fi.Seek(0, 0)
+
+	uploader := manager.NewUploader(bb.Client, func(u *manager.Uploader) {
+		u.PartSize = partMiBs * 1024 * 1024
+	})
+	_, err = uploader.Upload(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(bb.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   fi,
+	})
+
+	// TODO: Add monitor tracking
+	// if common.MonitorBfs() && stat.Size() > 0 {
+	// 	uploadOptions.Progress = func(bytesTransferred int64) {
+	// 		trackUpload(name, bytesTransferred, stat.Size(), uploadPtr)
+	// 	}
+	// }
+
+	if err != nil {
+		log.Err("Object::WriteFromFile : Failed to upload blob %s [%s]", name, err.Error())
+		return err
+	} else {
+		log.Debug("Object::WriteFromFile : Upload complete of object %v", name)
+
+		// store total bytes uploaded so far
+		if stat.Size() > 0 {
+			azStatsCollector.UpdateStats(stats_manager.Increment, bytesUploaded, stat.Size())
+		}
+	}
+
 	return nil
 }
 
