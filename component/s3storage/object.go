@@ -34,6 +34,7 @@
 package s3storage
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -46,6 +47,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
@@ -154,11 +156,9 @@ func (bb *S3Object) CreateFile(name string, mode os.FileMode) error {
 func (bb *S3Object) CreateDirectory(name string) error {
 	log.Trace("S3Object::CreateDirectory : name %s", name)
 
-	var data []byte
-	metadata := make(azblob.Metadata)
-	metadata[folderKey] = "true"
-
-	return bb.WriteFromBuffer(name, metadata, data)
+	// Lyve Cloud does not support creating an empty file to indicate a directory
+	// so do nothing
+	return nil
 }
 
 // CreateLink : Create a symlink in the container/virtual directory
@@ -244,7 +244,23 @@ func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *o
 
 // WriteFromBuffer : Upload from a buffer to a blob
 func (bb *S3Object) WriteFromBuffer(name string, metadata map[string]string, data []byte) error {
-	return nil
+	largeBuffer := bytes.NewReader(data)
+	// TODO: Move this variable into the config file
+	var partMiBs int64 = 16
+	uploader := manager.NewUploader(bb.Client, func(u *manager.Uploader) {
+		u.PartSize = partMiBs * 1024 * 1024
+	})
+	_, err := uploader.Upload(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(bb.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   largeBuffer,
+	})
+	if err != nil {
+		fmt.Printf("Couldn't upload object to %v:%v. Here's why: %v\n",
+			bb.Config.authConfig.BucketName, name, err)
+	}
+
+	return err
 }
 
 // GetFileBlockOffsets: store blocks ids and corresponding offsets

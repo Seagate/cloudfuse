@@ -50,7 +50,10 @@ import (
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/config"
 	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -103,6 +106,7 @@ type blockBlobTestSuite struct {
 	suite.Suite
 	assert *assert.Assertions
 	az     *S3Storage
+	client *s3.Client
 	// serviceUrl   azblob.ServiceURL
 	// containerUrl azblob.ContainerURL
 	config    string
@@ -127,8 +131,6 @@ func (s *blockBlobTestSuite) SetupTest() {
 	}
 	_ = log.SetDefaultLogger("base", cfg)
 
-	fmt.Println("In Setup Test")
-
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Println("Unable to get home directory")
@@ -142,7 +144,6 @@ func (s *blockBlobTestSuite) SetupTest() {
 
 	cfgData, _ := ioutil.ReadAll(cfgFile)
 	err = json.Unmarshal(cfgData, &storageTestConfigurationParameters)
-	fmt.Println(storageTestConfigurationParameters)
 	if err != nil {
 		fmt.Println("Failed to parse the config file")
 		os.Exit(1)
@@ -170,6 +171,8 @@ func (s *blockBlobTestSuite) setupTestHelper(configuration string, container str
 	_ = s.az.Start(ctx) // Note: Start->TestValidation will fail but it doesn't matter. We are creating the container a few lines below anyway.
 	// We could create the container before but that requires rewriting the code to new up a service client.
 
+	s.client = s.az.storage.(*S3Object).Client
+
 	//s.serviceUrl = s.az.storage.(*BlockBlob).Service // Grab the service client to do some validation
 	//s.containerUrl = s.serviceUrl.NewContainerURL(s.container)
 	// if create {
@@ -192,9 +195,41 @@ func (s *blockBlobTestSuite) cleanupTest() {
 func (s *blockBlobTestSuite) TestListContainers() {
 	defer s.cleanupTest()
 
+	// TODO: Fix this so we can create buckets
+	// _, err := s.client.CreateBucket(context.TODO(), &s3.CreateBucketInput{
+	// 	Bucket: aws.String("lens-lab-test-create"),
+	// 	CreateBucketConfiguration: &types.CreateBucketConfiguration{
+	// 		LocationConstraint: types.BucketLocationConstraint("us-east-1"),
+	// 	},
+	// })
+	// if err != nil {
+	// 	fmt.Printf("Couldn't create bucket %v in Region %v. Here's why: %v\n",
+	// 		"lens-lab-test-create", "us-east-1", err)
+	// }
+
 	containers, err := s.az.ListContainers()
-	fmt.Println(containers)
-	fmt.Println(err)
+	s.assert.Nil(err)
+	s.assert.Equal(containers, []string{"stxe1-srg-lens-lab1"})
+}
+
+func (s *blockBlobTestSuite) TestCreateFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+
+	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+
+	s.assert.Nil(err)
+	s.assert.NotNil(h)
+	s.assert.EqualValues(name, h.Path)
+	s.assert.EqualValues(0, h.Size)
+	// File should be in the account
+	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
+	s.assert.NotNil(result)
 }
 
 func TestBlockBlob(t *testing.T) {
