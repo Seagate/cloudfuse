@@ -364,6 +364,166 @@ func (s *blockBlobTestSuite) TestReadInBufferError() {
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
+func (s *blockBlobTestSuite) TestWriteSmallFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data"
+	data := []byte(testData)
+	dataLen := len(data)
+	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	f, _ := ioutil.TempFile("", name+".tmp")
+	defer os.Remove(f.Name())
+
+	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	s.assert.Nil(err)
+
+	output := make([]byte, len(data))
+	f, _ = os.Open(f.Name())
+	len, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(dataLen, len)
+	s.assert.EqualValues(testData, output)
+	f.Close()
+}
+
+func (s *blockBlobTestSuite) TestOverwriteSmallFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test-replace-data"
+	data := []byte(testData)
+	dataLen := len(data)
+	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	f, _ := ioutil.TempFile("", name+".tmp")
+	defer os.Remove(f.Name())
+	newTestData := []byte("newdata")
+	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
+	s.assert.Nil(err)
+
+	currentData := []byte("test-newdata-data")
+	output := make([]byte, len(currentData))
+
+	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	s.assert.Nil(err)
+
+	f, _ = os.Open(f.Name())
+	len, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(dataLen, len)
+	s.assert.EqualValues(currentData, output)
+	f.Close()
+}
+
+func (s *blockBlobTestSuite) TestOverwriteAndAppendToSmallFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test-data"
+	data := []byte(testData)
+
+	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	f, _ := ioutil.TempFile("", name+".tmp")
+	defer os.Remove(f.Name())
+	newTestData := []byte("newdata")
+	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
+	s.assert.Nil(err)
+
+	currentData := []byte("test-newdata")
+	dataLen := len(currentData)
+	output := make([]byte, dataLen)
+
+	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	s.assert.Nil(err)
+
+	f, _ = os.Open(f.Name())
+	len, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(dataLen, len)
+	s.assert.EqualValues(currentData, output)
+	f.Close()
+}
+
+func (s *blockBlobTestSuite) TestAppendToSmallFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test-data"
+	data := []byte(testData)
+
+	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	f, _ := ioutil.TempFile("", name+".tmp")
+	defer os.Remove(f.Name())
+	newTestData := []byte("-newdata")
+	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 9, Data: newTestData})
+	s.assert.Nil(err)
+
+	currentData := []byte("test-data-newdata")
+	dataLen := len(currentData)
+	output := make([]byte, dataLen)
+
+	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	s.assert.Nil(err)
+
+	f, _ = os.Open(f.Name())
+	len, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(dataLen, len)
+	s.assert.EqualValues(currentData, output)
+	f.Close()
+}
+
+func (s *blockBlobTestSuite) TestAppendOffsetLargerThanSmallFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test-data"
+	data := []byte(testData)
+
+	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	f, _ := ioutil.TempFile("", name+".tmp")
+	defer os.Remove(f.Name())
+	newTestData := []byte("newdata")
+	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 12, Data: newTestData})
+	s.assert.Nil(err)
+
+	currentData := []byte("test-data\x00\x00\x00newdata")
+	dataLen := len(currentData)
+	output := make([]byte, dataLen)
+
+	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	s.assert.Nil(err)
+
+	f, _ = os.Open(f.Name())
+	len, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(dataLen, len)
+	s.assert.EqualValues(currentData, output)
+	f.Close()
+}
+
+func (s *blockBlobTestSuite) TestCopyToFileError() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	f, _ := ioutil.TempFile("", name+".tmp")
+	defer os.Remove(f.Name())
+
+	err := s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
+}
+
 func TestBlockBlob(t *testing.T) {
 	suite.Run(t, new(blockBlobTestSuite))
 }

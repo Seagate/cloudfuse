@@ -245,12 +245,20 @@ func (bb *S3Object) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 		Key:    aws.String(name),
 	})
 	if err != nil {
+		// No such key found so object is not in S3
+		var nsk *types.NoSuchKey
+		if errors.As(err, &nsk) {
+			log.Err("Object::ReadToFile : Failed to download object %s [%s]", name, err.Error())
+			return syscall.ENOENT
+		}
 		log.Err("Couldn't get object %v:%v. Here's why: %v\n", bucketName, name, err)
+		return err
 	}
 	defer result.Body.Close()
 	body, err := io.ReadAll(result.Body)
 	if err != nil {
 		log.Err("Couldn't read object body from %v. Here's why: %v\n", name, err)
+		return err
 	}
 	_, err = fi.Write(body)
 
