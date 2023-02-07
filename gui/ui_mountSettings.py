@@ -16,41 +16,20 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QSizePolicy, QVBoxLayout, QWidget)
+    QHBoxLayout, QLabel, QLineEdit, QSizePolicy,
+    QVBoxLayout, QWidget)
 
 class Ui_mountSettingsWidget(object):
     def setupUi(self, mountSettingsWidget):
         if not mountSettingsWidget.objectName():
             mountSettingsWidget.setObjectName(u"mountSettingsWidget")
         mountSettingsWidget.resize(1137, 733)
-        self.mount_button = QPushButton(mountSettingsWidget)
-        self.mount_button.setObjectName(u"mount_button")
-        self.mount_button.setGeometry(QRect(1040, 690, 89, 25))
         self.previousSettings_checkbox = QCheckBox(mountSettingsWidget)
         self.previousSettings_checkbox.setObjectName(u"previousSettings_checkbox")
-        self.previousSettings_checkbox.setGeometry(QRect(860, 690, 171, 23))
-        self.horizontalLayoutWidget = QWidget(mountSettingsWidget)
-        self.horizontalLayoutWidget.setObjectName(u"horizontalLayoutWidget")
-        self.horizontalLayoutWidget.setGeometry(QRect(10, 130, 313, 41))
-        self.horizontalLayout = QHBoxLayout(self.horizontalLayoutWidget)
-        self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
-        self.label_2 = QLabel(self.horizontalLayoutWidget)
-        self.label_2.setObjectName(u"label_2")
-
-        self.horizontalLayout.addWidget(self.label_2)
-
-        self.pipeline_select = QComboBox(self.horizontalLayoutWidget)
-        self.pipeline_select.addItem("")
-        self.pipeline_select.addItem("")
-        self.pipeline_select.setObjectName(u"pipeline_select")
-
-        self.horizontalLayout.addWidget(self.pipeline_select)
-
+        self.previousSettings_checkbox.setGeometry(QRect(960, 690, 171, 23))
         self.libfuse_groupBox = QGroupBox(mountSettingsWidget)
         self.libfuse_groupBox.setObjectName(u"libfuse_groupBox")
-        self.libfuse_groupBox.setGeometry(QRect(10, 190, 401, 291))
+        self.libfuse_groupBox.setGeometry(QRect(10, 140, 401, 291))
         self.libfuse_groupBox.setLayoutDirection(Qt.LeftToRight)
         self.libfuse_groupBox.setAlignment(Qt.AlignCenter)
         self.libfuse_groupBox.setFlat(False)
@@ -141,11 +120,11 @@ class Ui_mountSettingsWidget(object):
 
         self.resetDefaultSettings_checkbox = QCheckBox(mountSettingsWidget)
         self.resetDefaultSettings_checkbox.setObjectName(u"resetDefaultSettings_checkbox")
-        self.resetDefaultSettings_checkbox.setGeometry(QRect(660, 690, 191, 23))
+        self.resetDefaultSettings_checkbox.setGeometry(QRect(760, 690, 191, 23))
         self.streaming_groupBox = QGroupBox(mountSettingsWidget)
         self.streaming_groupBox.setObjectName(u"streaming_groupBox")
         self.streaming_groupBox.setEnabled(True)
-        self.streaming_groupBox.setGeometry(QRect(10, 490, 351, 221))
+        self.streaming_groupBox.setGeometry(QRect(10, 440, 351, 221))
         font = QFont()
         font.setPointSize(11)
         self.streaming_groupBox.setFont(font)
@@ -227,7 +206,7 @@ class Ui_mountSettingsWidget(object):
 
         self.fileCache_groupBox = QGroupBox(mountSettingsWidget)
         self.fileCache_groupBox.setObjectName(u"fileCache_groupBox")
-        self.fileCache_groupBox.setGeometry(QRect(680, 10, 441, 441))
+        self.fileCache_groupBox.setGeometry(QRect(430, 10, 441, 441))
         self.fileCache_groupBox.setAlignment(Qt.AlignCenter)
         self.fileCacheAdvancedSettings_groupBox = QGroupBox(self.fileCache_groupBox)
         self.fileCacheAdvancedSettings_groupBox.setObjectName(u"fileCacheAdvancedSettings_groupBox")
@@ -404,18 +383,10 @@ class Ui_mountSettingsWidget(object):
 
     def retranslateUi(self, mountSettingsWidget):
         mountSettingsWidget.setWindowTitle(QCoreApplication.translate("mountSettingsWidget", u"Form", None))
-        self.mount_button.setText(QCoreApplication.translate("mountSettingsWidget", u"Mount", None))
 #if QT_CONFIG(tooltip)
         self.previousSettings_checkbox.setToolTip(QCoreApplication.translate("mountSettingsWidget", u"<html><head/><body><p>Use previously saved settings</p></body></html>", None))
 #endif // QT_CONFIG(tooltip)
         self.previousSettings_checkbox.setText(QCoreApplication.translate("mountSettingsWidget", u"Use previous settings", None))
-        self.label_2.setText(QCoreApplication.translate("mountSettingsWidget", u"Pipeline Selection", None))
-        self.pipeline_select.setItemText(0, QCoreApplication.translate("mountSettingsWidget", u"Streaming", None))
-        self.pipeline_select.setItemText(1, QCoreApplication.translate("mountSettingsWidget", u"File Caching", None))
-
-#if QT_CONFIG(tooltip)
-        self.pipeline_select.setToolTip(QCoreApplication.translate("mountSettingsWidget", u"<html><head/><body><p>Set up the pipeline for LyveFuse. </p><p>Choose streaming or file caching</p></body></html>", None))
-#endif // QT_CONFIG(tooltip)
         self.libfuse_groupBox.setTitle(QCoreApplication.translate("mountSettingsWidget", u"Libfuse settings", None))
         self.label_3.setText(QCoreApplication.translate("mountSettingsWidget", u"Permissions", None))
         self.libfuse_permissions_select.setItemText(0, QCoreApplication.translate("mountSettingsWidget", u"0777", None))

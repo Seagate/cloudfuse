@@ -167,20 +167,19 @@
      <height>22</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menuSettings">
-    <property name="title">
-     <string>Settings</string>
-    </property>
-    <addaction name="actionReset_Default_Settings"/>
-    <addaction name="actionAdvanced"/>
-   </widget>
    <widget class="QMenu" name="menuDebug">
     <property name="title">
      <string>Debug</string>
     </property>
-    <addaction name="actionLogging"/>
-    <addaction name="actionHealth_Monitor"/>
-    <addaction name="actionTesting"/>
+    <addaction name="debugLogging_action"/>
+    <addaction name="debugHealthMonitor_action"/>
+    <addaction name="debugTesting_action"/>
+   </widget>
+   <widget class="QMenu" name="menuSettings">
+    <property name="title">
+     <string>Settings</string>
+    </property>
+    <addaction name="advancedSettings_action"/>
    </widget>
    <addaction name="menuSettings"/>
    <addaction name="menuDebug"/>
@@ -191,22 +190,22 @@
     <string>Reset Default Settings</string>
    </property>
   </action>
-  <action name="actionAdvanced">
+  <action name="advancedSettings_action">
    <property name="text">
     <string>Advanced</string>
    </property>
   </action>
-  <action name="actionLogging">
+  <action name="debugLogging_action">
    <property name="text">
     <string>Logging</string>
    </property>
   </action>
-  <action name="actionHealth_Monitor">
+  <action name="debugHealthMonitor_action">
    <property name="text">
     <string>Health Monitor</string>
    </property>
   </action>
-  <action name="actionTesting">
+  <action name="debugTesting_action">
    <property name="text">
     <string>Testing</string>
    </property>

@@ -13,23 +13,10 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <widget class="QPushButton" name="mount_button">
-   <property name="geometry">
-    <rect>
-     <x>1040</x>
-     <y>690</y>
-     <width>89</width>
-     <height>25</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Mount</string>
-   </property>
-  </widget>
   <widget class="QCheckBox" name="previousSettings_checkbox">
    <property name="geometry">
     <rect>
-     <x>860</x>
+     <x>960</x>
      <y>690</y>
      <width>171</width>
      <height>23</height>
@@ -42,47 +29,11 @@
     <string>Use previous settings</string>
    </property>
   </widget>
-  <widget class="QWidget" name="horizontalLayoutWidget">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>130</y>
-     <width>313</width>
-     <height>41</height>
-    </rect>
-   </property>
-   <layout class="QHBoxLayout" name="horizontalLayout">
-    <item>
-     <widget class="QLabel" name="label_2">
-      <property name="text">
-       <string>Pipeline Selection</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QComboBox" name="pipeline_select">
-      <property name="toolTip">
-       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Set up the pipeline for LyveFuse. &lt;/p&gt;&lt;p&gt;Choose streaming or file caching&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-      </property>
-      <item>
-       <property name="text">
-        <string>Streaming</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>File Caching</string>
-       </property>
-      </item>
-     </widget>
-    </item>
-   </layout>
-  </widget>
   <widget class="QGroupBox" name="libfuse_groupBox">
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>190</y>
+     <y>140</y>
      <width>401</width>
      <height>291</height>
     </rect>
@@ -245,7 +196,7 @@
   <widget class="QCheckBox" name="resetDefaultSettings_checkbox">
    <property name="geometry">
     <rect>
-     <x>660</x>
+     <x>760</x>
      <y>690</y>
      <width>191</width>
      <height>23</height>
@@ -262,7 +213,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>490</y>
+     <y>440</y>
      <width>351</width>
      <height>221</height>
     </rect>
@@ -394,7 +345,7 @@
   <widget class="QGroupBox" name="fileCache_groupBox">
    <property name="geometry">
     <rect>
-     <x>680</x>
+     <x>430</x>
      <y>10</y>
      <width>441</width>
      <height>441</height>
