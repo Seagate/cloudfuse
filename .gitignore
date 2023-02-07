@@ -21,3 +21,4 @@ lint.log
 azure-storage-fuse
 bfusemon
 gui/__pycache__/
+gui/pyside6/__pycache__/

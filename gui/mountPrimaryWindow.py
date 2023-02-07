@@ -18,7 +18,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         
         # self.mount_button.clicked.connect(self.show_settings_widget) 
         self.advancedSettings_action.triggered.connect(self.show_settings_widget)
-
+        self.browse_button.clicked.connect(self.getFileDirectoryInput)
     
     # Define the slots that will be triggered when the signals in Qt are activated
     def show_settings_widget(self):
@@ -26,10 +26,6 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.settingsWindow.show()
 
 
-
-
-
-        #Browse button code
-    #def openFileDialog(self):
-    #directory = str(QtWidgets.QFileDialog.getExistingDirectory())
-    #self.lineEdit.setText('{}'.format(directory))
+    def getFileDirectoryInput(self):
+        directory = str(QtWidgets.QFileDialog.getExistingDirectory())
+        self.mountPoint_input.setText('{}'.format(directory))

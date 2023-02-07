@@ -86,6 +86,9 @@ class Ui_primaryFUSEwindow(object):
         font.setPointSize(48)
         font.setBold(True)
         self.label_3.setFont(font)
+        self.unmount_button = QPushButton(self.centralwidget)
+        self.unmount_button.setObjectName(u"unmount_button")
+        self.unmount_button.setGeometry(QRect(150, 100, 89, 25))
         primaryFUSEwindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(primaryFUSEwindow)
         self.menubar.setObjectName(u"menubar")
@@ -130,6 +133,7 @@ class Ui_primaryFUSEwindow(object):
         self.label.setText(QCoreApplication.translate("primaryFUSEwindow", u"Mount Point", None))
         self.mount_button.setText(QCoreApplication.translate("primaryFUSEwindow", u"Mount", None))
         self.label_3.setText(QCoreApplication.translate("primaryFUSEwindow", u"ALPHA DESIGN", None))
+        self.unmount_button.setText(QCoreApplication.translate("primaryFUSEwindow", u"Unmount", None))
         self.menuDebug.setTitle(QCoreApplication.translate("primaryFUSEwindow", u"Debug", None))
         self.menuSettings.setTitle(QCoreApplication.translate("primaryFUSEwindow", u"Settings", None))
     # retranslateUi

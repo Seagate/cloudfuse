@@ -157,6 +157,19 @@
      <string>ALPHA DESIGN</string>
     </property>
    </widget>
+   <widget class="QPushButton" name="unmount_button">
+    <property name="geometry">
+     <rect>
+      <x>150</x>
+      <y>100</y>
+      <width>89</width>
+      <height>25</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Unmount</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">

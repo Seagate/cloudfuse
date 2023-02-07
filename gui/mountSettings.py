@@ -23,9 +23,11 @@ class mountSettingsWidget(QWidget, Ui_mountSettingsWidget):
         self.fileCache_path_input.editingFinished.connect(self.fileCache_input)
     
     # Set up slots
+
+    # Placeholder for an actual slot to be used
     def do_something(self):
         print('Default changed')
 
-
+    # At the moment, prints the user input to show 'hello world' level of QlineEdit
     def fileCache_input(self):
         print(self.fileCache_path_input.text())
