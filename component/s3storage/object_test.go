@@ -44,6 +44,7 @@ import (
 	"math/rand"
 	"os"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -51,6 +52,7 @@ import (
 	"lyvecloudfuse/common/config"
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/handlemap"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -257,6 +259,109 @@ func (s *blockBlobTestSuite) TestCopyFromFile() {
 	defer result.Body.Close()
 	output, _ := ioutil.ReadAll(result.Body)
 	s.assert.EqualValues(testData, output)
+}
+
+// func (s *blockBlobTestSuite) TestReadFile() {
+// 	defer s.cleanupTest()
+// 	// Setup
+// 	name := generateFileName()
+// 	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+// 	s.assert.Nil(err)
+// 	testData := "test data"
+// 	data := []byte(testData)
+// 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+// 	s.assert.Nil(err)
+// 	h, err = s.az.OpenFile(internal.OpenFileOptions{Name: name})
+// 	s.assert.Nil(err)
+
+// 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+// 	s.assert.Nil(err)
+// 	s.assert.EqualValues(testData, output)
+// }
+
+func (s *blockBlobTestSuite) TestReadFileError() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h := handlemap.NewHandle(name)
+
+	_, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	fmt.Println(err)
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
+}
+
+// func (s *blockBlobTestSuite) TestReadInBuffer() {
+// 	defer s.cleanupTest()
+// 	// Setup
+// 	name := generateFileName()
+// 	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+// 	s.assert.Nil(err)
+// 	testData := "test data"
+// 	data := []byte(testData)
+// 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+// 	s.assert.Nil(err)
+// 	h, err = s.az.OpenFile(internal.OpenFileOptions{Name: name})
+// 	s.assert.Nil(err)
+
+// 	output := make([]byte, 5)
+// 	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+// 	s.assert.Nil(err)
+// 	s.assert.EqualValues(5, len)
+// 	s.assert.EqualValues(testData[:5], output)
+// }
+
+// func (s *blockBlobTestSuite) TestReadInBufferLargeBuffer() {
+// 	defer s.cleanupTest()
+// 	// Setup
+// 	name := generateFileName()
+// 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+// 	testData := "test data"
+// 	data := []byte(testData)
+// 	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+// 	h, _ = s.az.OpenFile(internal.OpenFileOptions{Name: name})
+
+// 	output := make([]byte, 1000) // Testing that passing in a super large buffer will still work
+// 	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+// 	s.assert.Nil(err)
+// 	s.assert.EqualValues(h.Size, len)
+// 	s.assert.EqualValues(testData, output[:h.Size])
+// }
+
+func (s *blockBlobTestSuite) TestReadInBufferEmpty() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+
+	output := make([]byte, 10)
+	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+	s.assert.Nil(err)
+	s.assert.EqualValues(0, len)
+}
+
+func (s *blockBlobTestSuite) TestReadInBufferBadRange() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h := handlemap.NewHandle(name)
+	h.Size = 10
+
+	_, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 20, Data: make([]byte, 2)})
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ERANGE, err)
+}
+
+func (s *blockBlobTestSuite) TestReadInBufferError() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h := handlemap.NewHandle(name)
+	h.Size = 10
+
+	_, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: make([]byte, 2)})
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
 func TestBlockBlob(t *testing.T) {
