@@ -36,9 +36,11 @@ package s3storage
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"syscall"
 	"time"
 
 	"lyvecloudfuse/common"
@@ -52,6 +54,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 const (
@@ -219,10 +223,8 @@ func trackDownload(name string, bytesTransferred int64, count int64, downloadPtr
 
 // ReadToFile : Download a blob to a local file
 
-
 /*
 what dis do?
-
 */
 func (bb *S3Object) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
 
@@ -257,12 +259,81 @@ func (bb *S3Object) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 }
 
 // ReadBuffer : Download a specific range from a blob to a buffer
-func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
-	return nil, nil
+func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) (buff []byte, err error) {
+	log.Trace("BlockBlob::ReadBuffer : name %s", name)
+
+	result, err := bb.Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(bb.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		//Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-"),
+	})
+
+	if err != nil {
+		// No such key found so object is not in S3
+		var nsk *types.NoSuchKey
+		if errors.As(err, &nsk) {
+			log.Err("Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+			return buff, syscall.ENOENT
+		}
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			// Range is incorrect
+			code := apiErr.ErrorCode()
+			if code == "InvalidRange" {
+				log.Err("Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+				return buff, syscall.ERANGE
+			}
+		}
+		log.Err("Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+		return buff, err
+	}
+
+	defer result.Body.Close()
+	buff, _ = io.ReadAll(result.Body)
+
+	return buff, nil
 }
 
 // ReadInBuffer : Download specific range from a file to a user provided buffer
 func (bb *S3Object) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
+	log.Trace("Object::ReadInBuffer : name %s", name)
+	result, err := bb.Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(bb.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(len)),
+	})
+
+	if err != nil {
+		// No such key found so object is not in S3
+		var nsk *types.NoSuchKey
+		if errors.As(err, &nsk) {
+			log.Err("Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+			return syscall.ENOENT
+		}
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			// Range is incorrect
+			code := apiErr.ErrorCode()
+			if code == "InvalidRange" {
+				log.Err("Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+				return syscall.ERANGE
+			}
+		}
+		log.Err("Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+		return err
+	}
+
+	defer result.Body.Close()
+	_, err = result.Body.Read(data)
+
+	// If we reached the EOF then all the data was correctly read so return
+	if err == io.EOF {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -398,6 +469,48 @@ func (bb *S3Object) TruncateFile(name string, size int64) error {
 
 // Write : write data at given offset to a blob
 func (bb *S3Object) Write(options internal.WriteFileOptions) error {
+	name := options.Handle.Path
+	offset := options.Offset
+	defer log.TimeTrack(time.Now(), "BlockBlob::Write", options.Handle.Path)
+	log.Trace("BlockBlob::Write : name %s offset %v", name, offset)
+	// tracks the case where our offset is great than our current file size (appending only - not modifying pre-existing data)
+	var dataBuffer *[]byte
+
+	length := int64(len(options.Data))
+	data := options.Data
+
+	// get all the data
+	oldData, _ := bb.ReadBuffer(name, 0, 0)
+	// update the data with the new data
+	// if we're only overwriting existing data
+	if int64(len(oldData)) >= offset+length {
+		copy(oldData[offset:], data)
+		dataBuffer = &oldData
+		// else appending and/or overwriting
+	} else {
+		// if the file is not empty then we need to combine the data
+		if len(oldData) > 0 {
+			// new data buffer with the size of old and new data
+			newDataBuffer := make([]byte, offset+length)
+			// copy the old data into it
+			// TODO: better way to do this?
+			if offset != 0 {
+				copy(newDataBuffer, oldData)
+				oldData = nil
+			}
+			// overwrite with the new data we want to add
+			copy(newDataBuffer[offset:], data)
+			dataBuffer = &newDataBuffer
+		} else {
+			dataBuffer = &data
+		}
+	}
+	// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple blocks
+	err := bb.WriteFromBuffer(name, options.Metadata, *dataBuffer)
+	if err != nil {
+		log.Err("BlockBlob::Write : Failed to upload to blob %s ", name, err.Error())
+		return err
+	}
 	return nil
 }
 
