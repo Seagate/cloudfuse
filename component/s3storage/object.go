@@ -37,6 +37,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"time"
 
@@ -218,7 +220,42 @@ func trackDownload(name string, bytesTransferred int64, count int64, downloadPtr
 
 // ReadToFile : Download a blob to a local file
 func (bb *S3Object) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
-	return nil
+
+	mountPath := cmd.mountOptions.MountPath
+
+	log.Trace("BlockBlob::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
+	//defer exectime.StatTimeCurrentBlock("BlockBlob::ReadToFile")()
+	//blobURL := bb.Container.NewBlobURL(filepath.Join(bb.Config.prefixPath, name))
+
+	//what is this?
+	var downloadPtr *int64 = new(int64)
+	*downloadPtr = 1
+
+	//defer log.TimeTrack(time.Now(), "BlockBlob::ReadToFile", name)
+	//err = azblob.DownloadBlobToFile(context.Background(), blobURL, offset, count, fi, bb.downloadOptions)
+
+	bucketName := aws.String(bb.Config.authConfig.BucketName)
+	result, err := bb.Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: bucketName,
+		Key:    aws.String(name),
+	})
+	if err != nil {
+		log.Printf("Couldn't get object %v:%v. Here's why: %v\n", bucketName, name, err)
+	}
+	defer result.Body.Close()
+	file, err := os.Create(fileName)
+	if err != nil {
+		log.Printf("Couldn't create file %v. Here's why: %v\n", fileName, err)
+	}
+	defer file.Close()
+	body, err := io.ReadAll(result.Body)
+	if err != nil {
+		log.Printf("Couldn't read object body from %v. Here's why: %v\n", objectKey, err)
+	}
+	_, err = file.Write(body)
+
+	return err
+
 }
 
 // ReadBuffer : Download a specific range from a blob to a buffer
