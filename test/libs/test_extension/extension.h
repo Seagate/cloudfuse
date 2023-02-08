@@ -22,7 +22,7 @@ extern "C" {
 
 /*  
     ---------------------------------------------------------
-        Blobfuse / Blobfuse2 supports only below operations
+        Blobfuse / Lyvecloudfuse supports only below operations
     ---------------------------------------------------------
 
     // System level operations
@@ -77,7 +77,7 @@ int init_extension(const char* conf_file);
 // Call this method to populate callbacks to be registered to fuse
 int register_fuse_callbacks(struct fuse_operations *opts);
 
-// Call this method to populate callbacks to communicate with blobfuse / blobfuse2
+// Call this method to populate callbacks to communicate with blobfuse / lyvecloudfuse
 int register_storage_callbacks(struct fuse_operations *opts);
 
 #ifdef __cplusplus

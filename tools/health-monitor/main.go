@@ -40,11 +40,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	hmcommon "github.com/Azure/azure-storage-fuse/v2/tools/health-monitor/common"
-	hminternal "github.com/Azure/azure-storage-fuse/v2/tools/health-monitor/internal"
-	_ "github.com/Azure/azure-storage-fuse/v2/tools/health-monitor/monitor"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
+	hmcommon "lyvecloudfuse/tools/health-monitor/common"
+	hminternal "lyvecloudfuse/tools/health-monitor/internal"
+	_ "lyvecloudfuse/tools/health-monitor/monitor"
 )
 
 func getMonitors() []hminternal.Monitor {
@@ -94,8 +94,8 @@ func main() {
 	}
 
 	if len(strings.TrimSpace(hmcommon.Pid)) == 0 {
-		fmt.Printf("pid of blobfuse2 process not provided\n")
-		log.Err("main::main : pid of blobfuse2 process not provided")
+		fmt.Printf("pid of lyvecloudfuse process not provided\n")
+		log.Err("main::main : pid of lyvecloudfuse process not provided")
 		time.Sleep(1 * time.Second) // adding 1 second wait for adding to log(base type) before exiting
 		os.Exit(1)
 	}
@@ -113,10 +113,10 @@ func main() {
 	common.TransferPipe += "_" + hmcommon.Pid
 	common.PollingPipe += "_" + hmcommon.Pid
 
-	log.Debug("Blobfuse2 Pid: %v \n"+
+	log.Debug("Lyvecloudfuse Pid: %v \n"+
 		"Transfer Pipe: %v \n"+
 		"Polling Pipe: %v \n"+
-		"Blobfuse2 Stats poll interval: %v \n"+
+		"Lyvecloudfuse Stats poll interval: %v \n"+
 		"Health Stats poll interval: %v \n"+
 		"Cache Path: %v \n"+
 		"Max cache size in MB: %v \n",
@@ -130,7 +130,7 @@ func main() {
 		go obj.Monitor() // nolint
 	}
 
-	// check if the pid of blobfuse2 is active
+	// check if the pid of lyvecloudfuse is active
 	if len(comps) > 0 {
 		hmcommon.MonitorPid()
 	}
@@ -144,15 +144,15 @@ func main() {
 }
 
 func init() {
-	flag.StringVar(&hmcommon.Pid, "pid", "", "Pid of blobfuse2 process")
-	flag.IntVar(&hmcommon.BfsPollInterval, "stats-poll-interval-sec", 10, "Blobfuse2 stats polling interval in seconds")
+	flag.StringVar(&hmcommon.Pid, "pid", "", "Pid of lyvecloudfuse process")
+	flag.IntVar(&hmcommon.BfsPollInterval, "stats-poll-interval-sec", 10, "Lyvecloudfuse stats polling interval in seconds")
 	flag.IntVar(&hmcommon.ProcMonInterval, "process-monitor-interval-sec", 30, "CPU, memory and network usage polling interval in seconds")
 	flag.StringVar(&hmcommon.OutputPath, "output-path", "", "Path where output files will be created")
 
-	flag.BoolVar(&hmcommon.NoBfsMon, "no-blobfuse2-stats", false, "Disable blobfuse2 stats polling")
-	flag.BoolVar(&hmcommon.NoCpuProf, "no-cpu-profiler", false, "Disable CPU monitoring on blobfuse2 process")
-	flag.BoolVar(&hmcommon.NoMemProf, "no-memory-profiler", false, "Disable memory monitoring on blobfuse2 process")
-	flag.BoolVar(&hmcommon.NoNetProf, "no-network-profiler", false, "Disable network monitoring on blobfuse2 process")
+	flag.BoolVar(&hmcommon.NoBfsMon, "no-lyvecloudfuse-stats", false, "Disable lyvecloudfuse stats polling")
+	flag.BoolVar(&hmcommon.NoCpuProf, "no-cpu-profiler", false, "Disable CPU monitoring on lyvecloudfuse process")
+	flag.BoolVar(&hmcommon.NoMemProf, "no-memory-profiler", false, "Disable memory monitoring on lyvecloudfuse process")
+	flag.BoolVar(&hmcommon.NoNetProf, "no-network-profiler", false, "Disable network monitoring on lyvecloudfuse process")
 	flag.BoolVar(&hmcommon.NoFileCacheMon, "no-file-cache-monitor", false, "Disable file cache directory monitor")
 
 	flag.StringVar(&hmcommon.TempCachePath, "cache-path", "", "path to local disk cache")

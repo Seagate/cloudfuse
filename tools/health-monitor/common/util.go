@@ -39,10 +39,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common/log"
 )
 
-// check whether blobfuse2 process is running for the given pid
+// check whether lyvecloudfuse process is running for the given pid
 func CheckProcessStatus(pid string) error {
 	cmd := "ps -ef | grep " + pid
 	cliOut, err := exec.Command("bash", "-c", cmd).Output()
@@ -58,10 +58,10 @@ func CheckProcessStatus(pid string) error {
 		}
 	}
 
-	return fmt.Errorf("blobfuse2 is not running on pid %v", pid)
+	return fmt.Errorf("lyvecloudfuse is not running on pid %v", pid)
 }
 
-// check blobfuse2 pid status at every second
+// check lyvecloudfuse pid status at every second
 func MonitorPid() {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()

@@ -39,15 +39,15 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
+	"lyvecloudfuse/common"
 
 	"github.com/spf13/cobra"
 )
 
 var unmountCmd = &cobra.Command{
 	Use:               "unmount <mount path>",
-	Short:             "Unmount Blobfuse2",
-	Long:              "Unmount Blobfuse2",
+	Short:             "Unmount Lyvecloudfuse",
+	Long:              "Unmount Lyvecloudfuse",
 	SuggestFor:        []string{"unmount", "unmnt"},
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
@@ -59,14 +59,14 @@ var unmountCmd = &cobra.Command{
 			for _, mntPath := range lstMnt {
 				match, _ := regexp.MatchString(mntPathPrefix, mntPath)
 				if match {
-					err := unmountBlobfuse2(mntPath)
+					err := unmountLyvecloudfuse(mntPath)
 					if err != nil {
 						return fmt.Errorf("failed to unmount %s [%s]", mntPath, err.Error())
 					}
 				}
 			}
 		} else {
-			err := unmountBlobfuse2(args[0])
+			err := unmountLyvecloudfuse(args[0])
 			if err != nil {
 				return fmt.Errorf("failed to unmount %s [%s]", args[0], err.Error())
 			}
@@ -84,7 +84,7 @@ var unmountCmd = &cobra.Command{
 }
 
 // Attempts to unmount the directory and returns true if the operation succeeded
-func unmountBlobfuse2(mntPath string) error {
+func unmountLyvecloudfuse(mntPath string) error {
 	cliOut := exec.Command("fusermount", "-u", mntPath)
 	_, err := cliOut.Output()
 	if err != nil {

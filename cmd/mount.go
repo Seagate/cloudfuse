@@ -50,10 +50,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/config"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/internal"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/config"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal"
 
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"
@@ -129,7 +129,7 @@ func (opt *mountOptions) validate(skipEmptyMount bool) error {
 
 	if opt.DefaultWorkingDir != "" {
 		common.DefaultWorkDir = opt.DefaultWorkingDir
-		common.DefaultLogFilePath = filepath.Join(common.DefaultWorkDir, "blobfuse2.log")
+		common.DefaultLogFilePath = filepath.Join(common.DefaultWorkDir, "lyvecloudfuse.log")
 	}
 
 	return nil
@@ -175,7 +175,7 @@ func parseConfig() error {
 		}
 
 		if options.PassPhrase == "" {
-			return fmt.Errorf("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in BLOBFUSE2_SECURE_CONFIG_PASSPHRASE environment variable")
+			return fmt.Errorf("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in LYVECLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
 		}
 
 		cipherText, err := ioutil.ReadFile(options.ConfigFile)
@@ -225,7 +225,7 @@ var mountCmd = &cobra.Command{
 
 		if options.ConfigFile == "" {
 			// Config file is not set in cli parameters
-			// Blobfuse2 defaults to config.yaml in current directory
+			// Lyvecloudfuse defaults to config.yaml in current directory
 			// If the file does not exists then user might have configured required things in env variables
 			// Fall back to defaults and let components fail if all required env variables are not set.
 			_, err := os.Stat(common.DefaultConfigFilePath)
@@ -338,13 +338,13 @@ var mountCmd = &cobra.Command{
 		}
 
 		if config.IsSet("invalidate-on-sync") {
-			log.Warn("mount: unsupported v1 CLI parameter: invalidate-on-sync is always true in blobfuse2.")
+			log.Warn("mount: unsupported v1 CLI parameter: invalidate-on-sync is always true in lyvecloudfuse.")
 		}
 		if config.IsSet("pre-mount-validate") {
-			log.Warn("mount: unsupported v1 CLI parameter: pre-mount-validate is always true in blobfuse2.")
+			log.Warn("mount: unsupported v1 CLI parameter: pre-mount-validate is always true in lyvecloudfuse.")
 		}
 		if config.IsSet("basic-remount-check") {
-			log.Warn("mount: unsupported v1 CLI parameter: basic-remount-check is always true in blobfuse2.")
+			log.Warn("mount: unsupported v1 CLI parameter: basic-remount-check is always true in lyvecloudfuse.")
 		}
 
 		common.EnableMonitoring = options.MonitorOpt.EnableMon
@@ -361,7 +361,7 @@ var mountCmd = &cobra.Command{
 
 		var pipeline *internal.Pipeline
 
-		log.Crit("Starting Blobfuse2 Mount : %s on [%s]", common.Blobfuse2Version, common.GetCurrentDistro())
+		log.Crit("Starting Lyvecloudfuse Mount : %s on [%s]", common.LyvecloudfuseVersion, common.GetCurrentDistro())
 		log.Crit("Logging level set to : %s", logLevel.String())
 		pipeline, err = internal.NewPipeline(options.Components, !daemon.WasReborn())
 		if err != nil {
@@ -369,7 +369,7 @@ var mountCmd = &cobra.Command{
 			return Destroy(fmt.Sprintf("failed to initialize new pipeline [%s]", err.Error()))
 		}
 
-		log.Info("mount: Mounting blobfuse2 on %s", options.MountPath)
+		log.Info("mount: Mounting lyvecloudfuse on %s", options.MountPath)
 		if !options.Foreground {
 			pidFile := strings.Replace(options.MountPath, "/", "_", -1) + ".pid"
 			pidFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), pidFile)
@@ -453,7 +453,7 @@ func runPipeline(pipeline *internal.Pipeline, ctx context.Context) error {
 	pid := fmt.Sprintf("%v", os.Getpid())
 	common.TransferPipe += "_" + pid
 	common.PollingPipe += "_" + pid
-	log.Debug("Mount::runPipeline : blobfuse2 pid = %v, transfer pipe = %v, polling pipe = %v", pid, common.TransferPipe, common.PollingPipe)
+	log.Debug("Mount::runPipeline : lyvecloudfuse pid = %v, transfer pipe = %v, polling pipe = %v", pid, common.TransferPipe, common.PollingPipe)
 
 	go startMonitor(os.Getpid())
 
@@ -561,7 +561,7 @@ func init() {
 		"Encrypt auto generated config file for each container")
 
 	mountCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
-		"Key to decrypt config file. Can also be specified by env-variable BLOBFUSE2_SECURE_CONFIG_PASSPHRASE.\nKey length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+		"Key to decrypt config file. Can also be specified by env-variable LYVECLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\nKey length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 
 	mountCmd.PersistentFlags().String("log-type", "syslog", "Type of logger to be used by the system. Set to syslog by default. Allowed values are silent|syslog|base.")
 	config.BindPFlag("logging.type", mountCmd.PersistentFlags().Lookup("log-type"))
@@ -587,7 +587,7 @@ func init() {
 	mountCmd.PersistentFlags().Bool("read-only", false, "Mount the system in read only mode. Default value false.")
 	config.BindPFlag("read-only", mountCmd.PersistentFlags().Lookup("read-only"))
 
-	mountCmd.PersistentFlags().String("default-working-dir", "", "Default working directory for storing log files and other blobfuse2 information")
+	mountCmd.PersistentFlags().String("default-working-dir", "", "Default working directory for storing log files and other lyvecloudfuse information")
 	mountCmd.PersistentFlags().Lookup("default-working-dir").Hidden = true
 	config.BindPFlag("default-working-dir", mountCmd.PersistentFlags().Lookup("default-working-dir"))
 	_ = mountCmd.MarkPersistentFlagDirname("default-working-dir")
@@ -604,11 +604,11 @@ func init() {
 	config.BindPFlag("invalidate-on-sync", mountCmd.Flags().Lookup("invalidate-on-sync"))
 	mountCmd.Flags().Lookup("invalidate-on-sync").Hidden = true
 
-	mountCmd.Flags().Bool("pre-mount-validate", true, "Validate blobfuse2 is mounted.")
+	mountCmd.Flags().Bool("pre-mount-validate", true, "Validate lyvecloudfuse is mounted.")
 	config.BindPFlag("pre-mount-validate", mountCmd.Flags().Lookup("pre-mount-validate"))
 	mountCmd.Flags().Lookup("pre-mount-validate").Hidden = true
 
-	mountCmd.Flags().Bool("basic-remount-check", true, "Validate blobfuse2 is mounted by reading /etc/mtab.")
+	mountCmd.Flags().Bool("basic-remount-check", true, "Validate lyvecloudfuse is mounted by reading /etc/mtab.")
 	config.BindPFlag("basic-remount-check", mountCmd.Flags().Lookup("basic-remount-check"))
 	mountCmd.Flags().Lookup("basic-remount-check").Hidden = true
 

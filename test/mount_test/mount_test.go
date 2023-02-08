@@ -1,3 +1,4 @@
+//go:build !unittest
 // +build !unittest
 
 /*
@@ -49,7 +50,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-var blobfuseBinary string = "blobfuse2"
+var blobfuseBinary string = "lyvecloudfuse"
 var mntDir string = "mntdir"
 var configFile string
 

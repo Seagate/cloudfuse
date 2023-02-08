@@ -1,3 +1,4 @@
+//go:build !fuse2
 // +build !fuse2
 
 /*
@@ -53,11 +54,11 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/internal"
-	"github.com/Azure/azure-storage-fuse/v2/internal/handlemap"
-	"github.com/Azure/azure-storage-fuse/v2/internal/stats_manager"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/handlemap"
+	"lyvecloudfuse/internal/stats_manager"
 )
 
 /* --- IMPORTANT NOTE ---
@@ -211,10 +212,10 @@ func populateFuseArgs(opts *C.fuse_options_t, args *C.fuse_args_t) (*C.fuse_opti
 	// Why we pass -f
 	// CGo is not very good with handling forks - so if the user wants to run blobfuse in the
 	// background we fork on mount in GO (mount.go) and we just always force libfuse to mount in foreground
-	arguments = append(arguments, "blobfuse2",
+	arguments = append(arguments, "lyvecloudfuse",
 		C.GoString(opts.mount_path),
 		"-o", options,
-		"-f", "-ofsname=blobfuse2", "-okernel_cache") // "-omax_read=4194304"
+		"-f", "-ofsname=lyvecloudfuse", "-okernel_cache") // "-omax_read=4194304"
 
 	if opts.trace_enable {
 		arguments = append(arguments, "-d")
@@ -353,6 +354,7 @@ func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *C.stat_t) {
 // otherwise, perform necessary permission checking
 
 // libfuse_getattr gets file attributes
+//
 //export libfuse_getattr
 func libfuse_getattr(path *C.char, stbuf *C.stat_t, fi *C.fuse_file_info_t) C.int {
 	name := trimFusePath(path)
@@ -385,6 +387,7 @@ func libfuse_getattr(path *C.char, stbuf *C.stat_t, fi *C.fuse_file_info_t) C.in
 // Directory Operations
 
 // libfuse_mkdir creates a directory
+//
 //export libfuse_mkdir
 func libfuse_mkdir(path *C.char, mode C.mode_t) C.int {
 	name := trimFusePath(path)
@@ -404,6 +407,7 @@ func libfuse_mkdir(path *C.char, mode C.mode_t) C.int {
 }
 
 // libfuse_opendir opens handle to given directory
+//
 //export libfuse_opendir
 func libfuse_opendir(path *C.char, fi *C.fuse_file_info_t) C.int {
 	name := trimFusePath(path)
@@ -433,6 +437,7 @@ func libfuse_opendir(path *C.char, fi *C.fuse_file_info_t) C.int {
 }
 
 // libfuse_releasedir opens handle to given directory
+//
 //export libfuse_releasedir
 func libfuse_releasedir(path *C.char, fi *C.fuse_file_info_t) C.int {
 	handle := (*handlemap.Handle)(unsafe.Pointer(uintptr(fi.fh)))
@@ -445,6 +450,7 @@ func libfuse_releasedir(path *C.char, fi *C.fuse_file_info_t) C.int {
 }
 
 // libfuse_readdir reads a directory
+//
 //export libfuse_readdir
 func libfuse_readdir(_ *C.char, buf unsafe.Pointer, filler C.fuse_fill_dir_t, off C.off_t, fi *C.fuse_file_info_t, flag C.fuse_readdir_flags_t) C.int {
 	handle := (*handlemap.Handle)(unsafe.Pointer(uintptr(fi.fh)))
@@ -513,6 +519,7 @@ func libfuse_readdir(_ *C.char, buf unsafe.Pointer, filler C.fuse_fill_dir_t, of
 }
 
 // libfuse_rmdir deletes a directory, which must be empty.
+//
 //export libfuse_rmdir
 func libfuse_rmdir(path *C.char) C.int {
 	name := trimFusePath(path)
@@ -541,6 +548,7 @@ func libfuse_rmdir(path *C.char) C.int {
 }
 
 // File Operations
+//
 //export libfuse_statfs
 func libfuse_statfs(path *C.char, buf *C.statvfs_t) C.int {
 	name := trimFusePath(path)
@@ -572,6 +580,7 @@ func libfuse_statfs(path *C.char, buf *C.statvfs_t) C.int {
 }
 
 // libfuse_create creates a file with the specified mode and then opens it.
+//
 //export libfuse_create
 func libfuse_create(path *C.char, mode C.mode_t, fi *C.fuse_file_info_t) C.int {
 	name := trimFusePath(path)
@@ -606,6 +615,7 @@ func libfuse_create(path *C.char, mode C.mode_t, fi *C.fuse_file_info_t) C.int {
 }
 
 // libfuse_open opens a file
+//
 //export libfuse_open
 func libfuse_open(path *C.char, fi *C.fuse_file_info_t) C.int {
 	name := trimFusePath(path)
@@ -615,7 +625,7 @@ func libfuse_open(path *C.char, fi *C.fuse_file_info_t) C.int {
 	// Mask out SYNC and DIRECT flags since write operation will fail
 	if fi.flags&C.O_SYNC != 0 || fi.flags&C.__O_DIRECT != 0 {
 		log.Err("Libfuse::libfuse_open : Reset flags for open %s, fi.flags %X", name, fi.flags)
-		// Blobfuse2 does not support the SYNC or DIRECT flag. If a user application passes this flag on to blobfuse2
+		// Lyvecloudfuse does not support the SYNC or DIRECT flag. If a user application passes this flag on to lyvecloudfuse
 		// and we open the file with this flag, subsequent write operations will fail with "Invalid argument" error.
 		// Mask them out here in the open call so that write works.
 		// Oracle RMAN is one such application that sends these flags during backup
@@ -668,6 +678,7 @@ func libfuse_open(path *C.char, fi *C.fuse_file_info_t) C.int {
 }
 
 // libfuse_read reads data from an open file
+//
 //export libfuse_read
 func libfuse_read(path *C.char, buf *C.char, size C.size_t, off C.off_t, fi *C.fuse_file_info_t) C.int {
 	fileHandle := (*C.file_handle_t)(unsafe.Pointer(uintptr(fi.fh)))
@@ -703,6 +714,7 @@ func libfuse_read(path *C.char, buf *C.char, size C.size_t, off C.off_t, fi *C.f
 }
 
 // libfuse_write writes data to an open file
+//
 //export libfuse_write
 func libfuse_write(path *C.char, buf *C.char, size C.size_t, off C.off_t, fi *C.fuse_file_info_t) C.int {
 	fileHandle := (*C.file_handle_t)(unsafe.Pointer(uintptr(fi.fh)))
@@ -727,6 +739,7 @@ func libfuse_write(path *C.char, buf *C.char, size C.size_t, off C.off_t, fi *C.
 }
 
 // libfuse_flush possibly flushes cached data
+//
 //export libfuse_flush
 func libfuse_flush(path *C.char, fi *C.fuse_file_info_t) C.int {
 	fileHandle := (*C.file_handle_t)(unsafe.Pointer(uintptr(fi.fh)))
@@ -753,6 +766,7 @@ func libfuse_flush(path *C.char, fi *C.fuse_file_info_t) C.int {
 }
 
 // libfuse_truncate changes the size of a file
+//
 //export libfuse_truncate
 func libfuse_truncate(path *C.char, off C.off_t, fi *C.fuse_file_info_t) C.int {
 	name := trimFusePath(path)
@@ -775,6 +789,7 @@ func libfuse_truncate(path *C.char, off C.off_t, fi *C.fuse_file_info_t) C.int {
 }
 
 // libfuse_release releases an open file
+//
 //export libfuse_release
 func libfuse_release(path *C.char, fi *C.fuse_file_info_t) C.int {
 	fileHandle := (*C.file_handle_t)(unsafe.Pointer(uintptr(fi.fh)))
@@ -803,6 +818,7 @@ func libfuse_release(path *C.char, fi *C.fuse_file_info_t) C.int {
 }
 
 // libfuse_unlink removes a file
+//
 //export libfuse_unlink
 func libfuse_unlink(path *C.char) C.int {
 	name := trimFusePath(path)
@@ -828,6 +844,7 @@ func libfuse_unlink(path *C.char) C.int {
 // https://man7.org/linux/man-pages/man2/rename.2.html
 // errors handled: EISDIR, ENOENT, ENOTDIR, ENOTEMPTY, EEXIST
 // TODO: handle EACCESS, EINVAL?
+//
 //export libfuse_rename
 func libfuse_rename(src *C.char, dst *C.char, flags C.uint) C.int {
 	srcPath := trimFusePath(src)
@@ -909,6 +926,7 @@ func libfuse_rename(src *C.char, dst *C.char, flags C.uint) C.int {
 // Symlink Operations
 
 // libfuse_symlink creates a symbolic link
+//
 //export libfuse_symlink
 func libfuse_symlink(target *C.char, link *C.char) C.int {
 	name := trimFusePath(link)
@@ -930,6 +948,7 @@ func libfuse_symlink(target *C.char, link *C.char) C.int {
 }
 
 // libfuse_readlink reads the target of a symbolic link
+//
 //export libfuse_readlink
 func libfuse_readlink(path *C.char, buf *C.char, size C.size_t) C.int {
 	name := trimFusePath(path)
@@ -955,6 +974,7 @@ func libfuse_readlink(path *C.char, buf *C.char, size C.size_t) C.int {
 }
 
 // libfuse_fsync synchronizes file contents
+//
 //export libfuse_fsync
 func libfuse_fsync(path *C.char, datasync C.int, fi *C.fuse_file_info_t) C.int {
 	if fi.fh == 0 {
@@ -982,6 +1002,7 @@ func libfuse_fsync(path *C.char, datasync C.int, fi *C.fuse_file_info_t) C.int {
 }
 
 // libfuse_fsyncdir synchronizes directory contents
+//
 //export libfuse_fsyncdir
 func libfuse_fsyncdir(path *C.char, datasync C.int, fi *C.fuse_file_info_t) C.int {
 	name := trimFusePath(path)
@@ -1005,6 +1026,7 @@ func libfuse_fsyncdir(path *C.char, datasync C.int, fi *C.fuse_file_info_t) C.in
 }
 
 // libfuse_chmod changes permission bits of a file
+//
 //export libfuse_chmod
 func libfuse_chmod(path *C.char, mode C.mode_t, fi *C.fuse_file_info_t) C.int {
 	name := trimFusePath(path)
@@ -1031,6 +1053,7 @@ func libfuse_chmod(path *C.char, mode C.mode_t, fi *C.fuse_file_info_t) C.int {
 }
 
 // libfuse_chown changes the owner and group of a file
+//
 //export libfuse_chown
 func libfuse_chown(path *C.char, uid C.uid_t, gid C.gid_t, fi *C.fuse_file_info_t) C.int {
 	name := trimFusePath(path)
@@ -1041,6 +1064,7 @@ func libfuse_chown(path *C.char, uid C.uid_t, gid C.gid_t, fi *C.fuse_file_info_
 }
 
 // libfuse_utimens changes the access and modification times of a file
+//
 //export libfuse_utimens
 func libfuse_utimens(path *C.char, tv *C.timespec_t, fi *C.fuse_file_info_t) C.int {
 	name := trimFusePath(path)
@@ -1053,6 +1077,7 @@ func libfuse_utimens(path *C.char, tv *C.timespec_t, fi *C.fuse_file_info_t) C.i
 }
 
 // blobfuse_cache_update refresh the file-cache policy for this file
+//
 //export blobfuse_cache_update
 func blobfuse_cache_update(path *C.char) C.int {
 	name := trimFusePath(path)

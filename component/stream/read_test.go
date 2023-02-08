@@ -42,11 +42,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/config"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/internal"
-	"github.com/Azure/azure-storage-fuse/v2/internal/handlemap"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/config"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/handlemap"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -148,13 +148,13 @@ func asyncCloseFile(suite *streamTestSuite, closeFileOptions internal.CloseFileO
 
 // Assertion helpers  ========================================================================
 
-//assert that the block is cached
+// assert that the block is cached
 func assertBlockCached(suite *streamTestSuite, offset int64, handle *handlemap.Handle) {
 	_, found := handle.CacheObj.Get(offset)
 	suite.assert.Equal(found, true)
 }
 
-//assert the block is not cached and KeyNotFoundError is thrown
+// assert the block is not cached and KeyNotFoundError is thrown
 func assertBlockNotCached(suite *streamTestSuite, offset int64, handle *handlemap.Handle) {
 	_, found := handle.CacheObj.Get(offset)
 	suite.assert.Equal(found, false)

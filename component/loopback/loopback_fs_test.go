@@ -40,13 +40,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Azure/azure-storage-fuse/v2/internal"
+	"lyvecloudfuse/internal"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
-const testPath = "/tmp/blobfuse2lfstests"
+const testPath = "/tmp/lyvecloudfuselfstests"
 const dirOne = "one"
 const dirTwo = "two"
 const dirEmpty = "empty"

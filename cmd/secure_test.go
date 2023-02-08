@@ -40,8 +40,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -101,7 +101,7 @@ allow-other: true
 logging:  
   type: base
   level: log_debug
-  file-path: /home/blobfuse2.log
+  file-path: /home/lyvecloudfuse.log
   max-file-size: 100
   file-count: 300
   track-time: true

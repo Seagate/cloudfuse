@@ -40,17 +40,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/config"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/internal"
-	"github.com/Azure/azure-storage-fuse/v2/internal/handlemap"
-	"github.com/Azure/azure-storage-fuse/v2/internal/stats_manager"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/config"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/handlemap"
+	"lyvecloudfuse/internal/stats_manager"
 
 	"github.com/spf13/cobra"
 )
 
-//AzStorage Wrapper type around azure go-sdk (track-1)
+// AzStorage Wrapper type around azure go-sdk (track-1)
 type AzStorage struct {
 	internal.BaseComponent
 	storage     AzConnection
@@ -61,7 +61,7 @@ type AzStorage struct {
 
 const compName = "azstorage"
 
-//Verification to check satisfaction criteria with Component Interface
+// Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &AzStorage{}
 
 var azStatsCollector *stats_manager.StatsCollector

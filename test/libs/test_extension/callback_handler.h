@@ -2,7 +2,7 @@
 #ifndef __CALLBACK_HANDLERS_H__
 #define __CALLBACK_HANDLERS_H__
 
-// BLOBFUSE2 : This is the extension contract to be implemented to create and extension
+// lyvecloudfuse : This is the extension contract to be implemented to create and extension
 // callback_handlers.c is a sample code for the same
 
 // Use this command to build callback_handlers.c : "gcc -shared -o libextension.so -D_FILE_OFFSET_BITS=64 -fPIC extension.c callback_handlers.c "

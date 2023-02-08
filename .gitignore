@@ -3,10 +3,10 @@
 *.out
 config.yaml
 testcnf.yaml
-blobfuse2.log
-blobfuse2.test
+lyvecloudfuse.log
+lyvecloudfuse.test
 azuretest.json
-blobfuse2
+lyvecloudfuse
 adlsgen1fuse
 venv/
 *.backup

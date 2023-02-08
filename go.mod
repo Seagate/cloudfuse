@@ -1,4 +1,4 @@
-module github.com/Azure/azure-storage-fuse/v2
+module lyvecloudfuse
 
 go 1.16
 

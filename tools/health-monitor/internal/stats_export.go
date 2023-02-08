@@ -41,10 +41,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
-	"github.com/Azure/azure-storage-fuse/v2/internal/stats_manager"
-	hmcommon "github.com/Azure/azure-storage-fuse/v2/tools/health-monitor/common"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal/stats_manager"
+	hmcommon "lyvecloudfuse/tools/health-monitor/common"
 )
 
 type ExportedStat struct {

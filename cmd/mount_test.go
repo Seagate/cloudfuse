@@ -41,8 +41,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Azure/azure-storage-fuse/v2/common"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -50,7 +51,7 @@ import (
 var configMountTest string = `
 logging:
   type: syslog
-default-working-dir: /tmp/blobfuse2
+default-working-dir: /tmp/lyvecloudfuse
 file_cache:
   path: /tmp/fileCachePath
 libfuse:
@@ -76,7 +77,7 @@ health_monitor:
 var configMountLoopback string = `
 logging:
   type: syslog
-default-working-dir: /tmp/blobfuse2
+default-working-dir: /tmp/lyvecloudfuse
 components:
   - libfuse
   - loopbackfs
@@ -258,7 +259,7 @@ func (suite *mountTestSuite) TestCliParamsV1() {
 	defer os.RemoveAll(tempLogDir)
 
 	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest),
-		fmt.Sprintf("--log-file-path=%s", tempLogDir+"/blobfuse2.log"), "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check")
+		fmt.Sprintf("--log-file-path=%s", tempLogDir+"/lyvecloudfuse.log"), "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check")
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "failed to initialize new pipeline")
 }
@@ -273,7 +274,7 @@ func (suite *mountTestSuite) TestStreamAttrCacheOptionsV1() {
 	tempLogDir := "/tmp/templogs_" + randomString(6)
 	defer os.RemoveAll(tempLogDir)
 
-	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--log-file-path=%s", tempLogDir+"/blobfuse2.log"),
+	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--log-file-path=%s", tempLogDir+"/lyvecloudfuse.log"),
 		"--streaming", "--use-attr-cache", "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check")
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "failed to initialize new pipeline")
@@ -291,7 +292,7 @@ func (suite *mountTestSuite) TestLibfuseOptions() {
 	defer os.RemoveAll(tempLogDir)
 
 	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest),
-		fmt.Sprintf("--log-file-path=%s", tempLogDir+"/blobfuse2.log"), "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check",
+		fmt.Sprintf("--log-file-path=%s", tempLogDir+"/lyvecloudfuse.log"), "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check",
 		"-o allow_other", "-o attr_timeout=120", "-o entry_timeout=120", "-o negative_timeout=120",
 		"-o ro", "-o allow_root", "-o default_permissions", "-o umask=755")
 	suite.assert.NotNil(err)
