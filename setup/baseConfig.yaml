@@ -147,6 +147,7 @@ s3storage:
   secret-key:
   region:
   endpoint:
+  subdirectory: <name of subdirectory to be mounted instead of whole container>
 
 # Mount all configuration
 mountall:

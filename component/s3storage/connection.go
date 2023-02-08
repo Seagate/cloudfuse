@@ -46,7 +46,7 @@ import (
 type S3StorageConfig struct {
 	authConfig azAuthConfig
 
-	bucketName string
+	prefixPath string
 }
 
 type S3StorageConnection struct {

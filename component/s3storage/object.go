@@ -149,6 +149,8 @@ func exitErrorf(msg string, args ...interface{}) {
 }
 
 func (bb *S3Object) SetPrefixPath(path string) error {
+	log.Trace("BlockBlob::SetPrefixPath : path %s", path)
+	bb.Config.prefixPath = path
 	return nil
 }
 
@@ -207,7 +209,7 @@ func (bb *S3Object) getAttrUsingList(name string) (attr *internal.ObjAttr, err e
 
 // GetAttr : Retrieve attributes of the blob
 func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
-	return nil, err
+	return attr, err
 }
 
 // List : Get a list of blobs matching the given prefix
@@ -267,13 +269,26 @@ func (bb *S3Object) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 }
 
 // ReadBuffer : Download a specific range from a blob to a buffer
-func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) (buff []byte, err error) {
+func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
 	log.Trace("BlockBlob::ReadBuffer : name %s", name)
+	var buff []byte
+
+	// If the len is 0, that means we need to read till the end of the object
+	if len == 0 {
+		attr, err := bb.GetAttr(name)
+		if err != nil {
+			return buff, err
+		}
+		buff = make([]byte, attr.Size)
+		len = attr.Size
+	} else {
+		buff = make([]byte, len)
+	}
 
 	result, err := bb.Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(bb.Config.authConfig.BucketName),
 		Key:    aws.String(name),
-		//Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-"),
+		Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(len)),
 	})
 
 	if err != nil {
@@ -296,6 +311,7 @@ func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) (buff []byt
 		return buff, err
 	}
 
+	// Read the object into the buffer
 	defer result.Body.Close()
 	buff, _ = io.ReadAll(result.Body)
 

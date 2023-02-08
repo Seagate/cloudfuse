@@ -140,6 +140,7 @@ type AzStorageOptions struct {
 	SecretKey  string `config:"secret-key" yaml:"secret-key,omitempty"`
 	Region     string `config:"region" yaml:"region,omitempty"`
 	Endpoint   string `config:"endpoint" yaml:"endpoint,omitempty"`
+	PrefixPath string `config:"subdirectory" yaml:"subdirectory,omitempty"`
 }
 
 // RegisterEnvVariables : Register environment varilables
@@ -240,6 +241,9 @@ func ParseAndValidateConfig(az *S3Storage, opt AzStorageOptions) error {
 		opt.Endpoint = fmt.Sprintf("s3.%s.lyvecloud.seagate.com", opt.Region)
 	}
 	az.stConfig.authConfig.Endpoint = opt.Endpoint
+
+	// If subdirectory is mounted, take the prefix path
+	az.stConfig.prefixPath = opt.PrefixPath
 
 	// Block list call on mount for given amount of time
 	// TODO: Add cancellation timeout
