@@ -48,7 +48,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             return
         try:
             directory = str(self.mountPoint_input.text())
-            mount = subprocess.run(["./azure-storage-fuse", "mount", directory, "--config-file=./config.yaml"])
+            mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"])
 
             if mount.returncode == 0:
                 # Print to the text edit window on success.  
