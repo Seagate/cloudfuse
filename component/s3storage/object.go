@@ -209,7 +209,7 @@ func (bb *S3Object) getAttrUsingList(name string) (attr *internal.ObjAttr, err e
 
 // GetAttr : Retrieve attributes of the blob
 func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
-	return attr, err
+	return nil, err
 }
 
 // List : Get a list of blobs matching the given prefix

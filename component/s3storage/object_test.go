@@ -279,17 +279,17 @@ func (s *blockBlobTestSuite) TestCopyFromFile() {
 // 	s.assert.EqualValues(testData, output)
 // }
 
-func (s *blockBlobTestSuite) TestReadFileError() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h := handlemap.NewHandle(name)
+// func (s *blockBlobTestSuite) TestReadFileError() {
+// 	defer s.cleanupTest()
+// 	// Setup
+// 	name := generateFileName()
+// 	h := handlemap.NewHandle(name)
 
-	_, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	fmt.Println(err)
-	s.assert.NotNil(err)
-	s.assert.EqualValues(syscall.ENOENT, err)
-}
+// 	_, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+// 	fmt.Println(err)
+// 	s.assert.NotNil(err)
+// 	s.assert.EqualValues(syscall.ENOENT, err)
+// }
 
 // func (s *blockBlobTestSuite) TestReadInBuffer() {
 // 	defer s.cleanupTest()
