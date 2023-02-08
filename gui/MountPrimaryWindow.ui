@@ -6,9 +6,15 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>803</width>
-    <height>319</height>
+    <width>756</width>
+    <height>315</height>
    </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Ignored" vsizetype="Ignored">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
   </property>
   <property name="windowTitle">
    <string>MainWindow</string>
@@ -23,34 +29,11 @@
    <set>QMainWindow::AllowTabbedDocks</set>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QLineEdit" name="mountPoint_input">
-    <property name="geometry">
-     <rect>
-      <x>150</x>
-      <y>20</y>
-      <width>351</width>
-      <height>25</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="browse_button">
-    <property name="geometry">
-     <rect>
-      <x>510</x>
-      <y>20</y>
-      <width>89</width>
-      <height>25</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Browse</string>
-    </property>
-   </widget>
    <widget class="QWidget" name="horizontalLayoutWidget">
     <property name="geometry">
      <rect>
-      <x>50</x>
-      <y>50</y>
+      <x>10</x>
+      <y>60</y>
       <width>240</width>
       <height>41</height>
      </rect>
@@ -85,8 +68,8 @@
    <widget class="QToolButton" name="toolButton">
     <property name="geometry">
      <rect>
-      <x>50</x>
-      <y>130</y>
+      <x>10</x>
+      <y>150</y>
       <width>101</width>
       <height>24</height>
      </rect>
@@ -101,34 +84,27 @@
      <bool>true</bool>
     </property>
    </widget>
-   <widget class="QLabel" name="label">
-    <property name="geometry">
-     <rect>
-      <x>50</x>
-      <y>20</y>
-      <width>91</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Mount Point</string>
-    </property>
-   </widget>
    <widget class="QTextEdit" name="output_textEdit">
     <property name="geometry">
      <rect>
-      <x>50</x>
-      <y>160</y>
+      <x>10</x>
+      <y>180</y>
       <width>731</width>
       <height>91</height>
      </rect>
+    </property>
+    <property name="sizePolicy">
+     <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
+      <horstretch>0</horstretch>
+      <verstretch>0</verstretch>
+     </sizepolicy>
     </property>
    </widget>
    <widget class="QPushButton" name="mount_button">
     <property name="geometry">
      <rect>
-      <x>50</x>
-      <y>100</y>
+      <x>10</x>
+      <y>110</y>
       <width>89</width>
       <height>25</height>
      </rect>
@@ -140,8 +116,8 @@
    <widget class="QLabel" name="label_3">
     <property name="geometry">
      <rect>
-      <x>180</x>
-      <y>100</y>
+      <x>140</x>
+      <y>120</y>
       <width>481</width>
       <height>111</height>
      </rect>
@@ -160,8 +136,8 @@
    <widget class="QPushButton" name="unmount_button">
     <property name="geometry">
      <rect>
-      <x>150</x>
-      <y>100</y>
+      <x>110</x>
+      <y>110</y>
       <width>89</width>
       <height>25</height>
      </rect>
@@ -170,13 +146,81 @@
      <string>Unmount</string>
     </property>
    </widget>
+   <widget class="QWidget" name="horizontalLayoutWidget_2">
+    <property name="geometry">
+     <rect>
+      <x>260</x>
+      <y>60</y>
+      <width>212</width>
+      <height>41</height>
+     </rect>
+    </property>
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <widget class="QLabel" name="label_4">
+       <property name="text">
+        <string>Mount Target</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="bucket_select">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Set up the pipeline for LyveFuse. &lt;/p&gt;&lt;p&gt;Choose streaming or file caching&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="currentText">
+        <string>Azure</string>
+       </property>
+       <item>
+        <property name="text">
+         <string>Azure</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>S3</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+   <widget class="QWidget" name="horizontalLayoutWidget_3">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>10</y>
+      <width>421</width>
+      <height>51</height>
+     </rect>
+    </property>
+    <layout class="QHBoxLayout" name="horizontalLayout_3">
+     <item>
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>Mount Point</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="mountPoint_input"/>
+     </item>
+     <item>
+      <widget class="QPushButton" name="browse_button">
+       <property name="text">
+        <string>Browse</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>803</width>
+     <width>756</width>
      <height>22</height>
     </rect>
    </property>
@@ -192,6 +236,7 @@
     <property name="title">
      <string>Settings</string>
     </property>
+    <addaction name="basicSettings_action"/>
     <addaction name="advancedSettings_action"/>
    </widget>
    <addaction name="menuSettings"/>
@@ -221,6 +266,11 @@
   <action name="debugTesting_action">
    <property name="text">
     <string>Testing</string>
+   </property>
+  </action>
+  <action name="basicSettings_action">
+   <property name="text">
+    <string>Basic</string>
    </property>
   </action>
  </widget>

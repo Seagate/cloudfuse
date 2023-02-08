@@ -6,6 +6,16 @@ from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
 from mountSettings import mountSettingsWidget
 import subprocess
 
+pipeline = {
+    "streaming" : 0,
+    "filecaching" : 1
+}
+
+butcketOptions = {
+    "Azure" : 0,
+    "S3" : 1
+}
+
 class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def __init__(self):
         super().__init__()
@@ -16,43 +26,40 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
         # Set up the signals for this window
         
-        # self.mount_button.clicked.connect(self.show_settings_widget) 
         self.advancedSettings_action.triggered.connect(self.show_settings_widget)
         self.browse_button.clicked.connect(self.get_File_Directory_Input)
         self.mount_button.clicked.connect(self.mount_Bucket)
+    
     # Define the slots that will be triggered when the signals in Qt are activated
     def show_settings_widget(self):
         self.settingsWindow = mountSettingsWidget()
         self.settingsWindow.show()
-
 
     def get_File_Directory_Input(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
         self.mountPoint_input.setText('{}'.format(directory))
 
     def mount_Bucket(self):
+        msg = QtWidgets.QMessageBox()
+        if self.bucket_select.currentIndex() != butcketOptions["Azure"]:
+            msg.setWindowTitle("Error")
+            msg.setText("S3 bucket not enabled yet, use an Azure bucket for now")
+            x = msg.exec()  # Show the message box
+            return
         try:
             directory = str(self.mountPoint_input.text())
-            print(directory)
-            mount = subprocess.run(["blobfuse2", "mount", "all", directory, "--config-file=./config.yaml"])
-            
-            # for some reason, the blobfuse2 aliased to azure-storage-fuse won't work
-            # mount = subprocess.run(["azure-storage-fuse"])
-            if mount.returncode == 0:
-                # TextEdit kind of sucks, use Qmessage 
-                self.output_textEdit.setText("Success")#QtWidgets.QMessageBox()
-                msg.setWindowTitle("Success")
-                msg.setText("Successfully mounted container")
-                x = msg.exec()  # this will show our messagebox
+            mount = subprocess.run(["./azure-storage-fuse", "mount", directory, "--config-file=./config.yaml"])
 
+            if mount.returncode == 0:
+                # Print to the text edit window on success.  
+                self.output_textEdit.setText("Successfully mounted container")
             else:
-                # TextEdit kind of sucks, use Qmessage
-                self.output_textEdit.setText('error mountint container' + str(mount.returncode))
-               
-                msg = QtWidgets.QMessageBox()
+                self.output_textEdit.setText('Error mounting container')
+                
+                # Get the users attention by popping open a new window on an error
                 msg.setWindowTitle("Error")
-                msg.setText("Error mounting container")
-                x = msg.exec()  # this will show our messagebox
+                msg.setText("Error mounting container - check the settings and try again")
+                x = msg.exec()  # Show the message box
 
         except ValueError:
             pass
