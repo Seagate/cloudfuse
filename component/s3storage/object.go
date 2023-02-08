@@ -130,12 +130,13 @@ func (bb *S3Object) getCredential() azblob.Credential {
 func (bb *S3Object) ListContainers() ([]string, error) {
 	log.Trace("S3Object::ListContainers : Listing containers")
 
+	cntList := make([]string, 0)
 	result, err := bb.Client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
 	if err != nil {
 		fmt.Printf("Couldn't list buckets for your account. Here's why: %v\n", err)
+		return cntList, err
 	}
 
-	cntList := make([]string, 0)
 	for _, bucket := range result.Buckets {
 		cntList = append(cntList, *bucket.Name)
 	}
@@ -350,11 +351,11 @@ func (bb *S3Object) ReadInBuffer(name string, offset int64, len int64, data []by
 	defer result.Body.Close()
 	_, err = result.Body.Read(data)
 
-	// If we reached the EOF then all the data was correctly read so return
-	if err == io.EOF {
-		return nil
-	}
 	if err != nil {
+		// If we reached the EOF then all the data was correctly read so return
+		if err == io.EOF {
+			return nil
+		}
 		return err
 	}
 
@@ -464,9 +465,10 @@ func (bb *S3Object) WriteFromBuffer(name string, metadata map[string]string, dat
 	if err != nil {
 		fmt.Printf("Couldn't upload object to %v:%v. Here's why: %v\n",
 			bb.Config.authConfig.BucketName, name, err)
+		return err
 	}
 
-	return err
+	return nil
 }
 
 // GetFileBlockOffsets: store blocks ids and corresponding offsets
