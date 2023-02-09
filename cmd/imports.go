@@ -39,5 +39,6 @@ import (
 	_ "lyvecloudfuse/component/file_cache"
 	_ "lyvecloudfuse/component/libfuse"
 	_ "lyvecloudfuse/component/loopback"
+	_ "lyvecloudfuse/component/s3storage"
 	_ "lyvecloudfuse/component/stream"
 )
