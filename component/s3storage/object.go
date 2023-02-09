@@ -36,7 +36,6 @@ package s3storage
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -350,11 +349,11 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
 		for _, value := range output.Contents {
 			// parse the ETag, on the chance that it is MD5
-			md5, err := hex.DecodeString(*value.ETag)
-			if err != nil {
-				log.Warn("Failed to parse ETag %v of object %v as an MD5 hash. Here's why: %v", value.ETag, value.Key, err)
-				md5 = nil
-			}
+			// md5, err := hex.DecodeString(*value.ETag)
+			// if err != nil {
+			// 	log.Warn("Failed to parse ETag %v of object %v as an MD5 hash. Here's why: %v", value.ETag, value.Key, err)
+			// 	md5 = nil
+			// }
 			// push object info into the list
 			attr := &internal.ObjAttr{
 				Path:   split(bb.Config.prefixPath, *value.Key),
@@ -366,7 +365,7 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 				Ctime:  *value.LastModified,
 				Crtime: *value.LastModified,
 				Flags:  internal.NewFileBitMap(),
-				MD5:    md5,
+				// MD5:    md5,
 			}
 
 			// this is cargo code from block_blob
