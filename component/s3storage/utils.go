@@ -34,27 +34,21 @@
 package s3storage
 
 import (
-	"context"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
 
 	"github.com/Azure/azure-storage-azcopy/v10/azbfs"
-	"github.com/Azure/azure-storage-azcopy/v10/ste"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-storage-blob-go/azblob"
@@ -62,155 +56,155 @@ import (
 
 //    ----------- Helper to create pipeline options ---------------
 
-var UserAgent = func() string {
-	return "Azure-Storage-Fuse/" + common.LyvecloudfuseVersion
-}
+// var UserAgent = func() string {
+// 	return "Azure-Storage-Fuse/" + common.LyvecloudfuseVersion
+// }
 
-const (
-	Timeout                time.Duration = 30 * time.Second
-	KeepAlive              time.Duration = 30 * time.Second
-	DualStack              bool          = true
-	MaxIdleConns           int           = 0 // No limit
-	MaxIdleConnsPerHost    int           = 100
-	IdleConnTimeout        time.Duration = 90 * time.Second
-	TLSHandshakeTimeout    time.Duration = 10 * time.Second
-	ExpectContinueTimeout  time.Duration = 1 * time.Second
-	DisableKeepAlives      bool          = false
-	DisableCompression     bool          = false
-	MaxResponseHeaderBytes int64         = 0
-)
+// const (
+// 	Timeout                time.Duration = 30 * time.Second
+// 	KeepAlive              time.Duration = 30 * time.Second
+// 	DualStack              bool          = true
+// 	MaxIdleConns           int           = 0 // No limit
+// 	MaxIdleConnsPerHost    int           = 100
+// 	IdleConnTimeout        time.Duration = 90 * time.Second
+// 	TLSHandshakeTimeout    time.Duration = 10 * time.Second
+// 	ExpectContinueTimeout  time.Duration = 1 * time.Second
+// 	DisableKeepAlives      bool          = false
+// 	DisableCompression     bool          = false
+// 	MaxResponseHeaderBytes int64         = 0
+// )
 
-// getAzBlobPipelineOptions : Create pipeline options based on the config
-func getAzBlobPipelineOptions(conf AzStorageConfig) (azblob.PipelineOptions, ste.XferRetryOptions) {
-	retryOptions := ste.XferRetryOptions{
-		Policy:        ste.RetryPolicyExponential,                      // Use exponential backoff as opposed to linear
-		MaxTries:      conf.maxRetries,                                 // Try at most 3 times to perform the operation (set to 1 to disable retries)
-		TryTimeout:    time.Second * time.Duration(conf.maxTimeout),    // Maximum time allowed for any single try
-		RetryDelay:    time.Second * time.Duration(conf.backoffTime),   // Backoff amount for each retry (exponential or linear)
-		MaxRetryDelay: time.Second * time.Duration(conf.maxRetryDelay), // Max delay between retries
-	}
-	telemetryOptions := azblob.TelemetryOptions{
-		Value: UserAgent() + " (" + common.GetCurrentDistro() + ")",
-	}
+// // getAzBlobPipelineOptions : Create pipeline options based on the config
+// func getAzBlobPipelineOptions(conf AzStorageConfig) (azblob.PipelineOptions, ste.XferRetryOptions) {
+// 	retryOptions := ste.XferRetryOptions{
+// 		Policy:        ste.RetryPolicyExponential,                      // Use exponential backoff as opposed to linear
+// 		MaxTries:      conf.maxRetries,                                 // Try at most 3 times to perform the operation (set to 1 to disable retries)
+// 		TryTimeout:    time.Second * time.Duration(conf.maxTimeout),    // Maximum time allowed for any single try
+// 		RetryDelay:    time.Second * time.Duration(conf.backoffTime),   // Backoff amount for each retry (exponential or linear)
+// 		MaxRetryDelay: time.Second * time.Duration(conf.maxRetryDelay), // Max delay between retries
+// 	}
+// 	telemetryOptions := azblob.TelemetryOptions{
+// 		Value: UserAgent() + " (" + common.GetCurrentDistro() + ")",
+// 	}
 
-	sysLogDisabled := log.GetType() == "silent" // If logging is enabled, allow the SDK to log retries to syslog.
-	requestLogOptions := azblob.RequestLogOptions{
-		// TODO: We can potentially consider making LogWarningIfTryOverThreshold a user settable option. For now lets use the default
-		SyslogDisabled: sysLogDisabled,
-	}
-	logOptions := getLogOptions(conf.sdkTrace)
-	if conf.proxyAddress == "" {
-		// If we did not set a proxy address in our config then use default settings
-		return azblob.PipelineOptions{
-				Log:        logOptions,
-				RequestLog: requestLogOptions,
-				Telemetry:  telemetryOptions,
-			},
-			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
-			retryOptions
-	} else {
-		// Else create custom HTTPClient to pass to the factory in order to set our proxy
-		var pipelineHTTPClient = newLyvecloudfuseHttpClient(conf)
-		// While creating new pipeline we need to provide the retry policy
-		return azblob.PipelineOptions{
-				Log:        logOptions,
-				RequestLog: requestLogOptions,
-				Telemetry:  telemetryOptions,
-				HTTPSender: newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient),
-			},
-			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
-			retryOptions
-	}
-}
+// 	sysLogDisabled := log.GetType() == "silent" // If logging is enabled, allow the SDK to log retries to syslog.
+// 	requestLogOptions := azblob.RequestLogOptions{
+// 		// TODO: We can potentially consider making LogWarningIfTryOverThreshold a user settable option. For now lets use the default
+// 		SyslogDisabled: sysLogDisabled,
+// 	}
+// 	logOptions := getLogOptions(conf.sdkTrace)
+// 	if conf.proxyAddress == "" {
+// 		// If we did not set a proxy address in our config then use default settings
+// 		return azblob.PipelineOptions{
+// 				Log:        logOptions,
+// 				RequestLog: requestLogOptions,
+// 				Telemetry:  telemetryOptions,
+// 			},
+// 			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
+// 			retryOptions
+// 	} else {
+// 		// Else create custom HTTPClient to pass to the factory in order to set our proxy
+// 		var pipelineHTTPClient = newLyvecloudfuseHttpClient(conf)
+// 		// While creating new pipeline we need to provide the retry policy
+// 		return azblob.PipelineOptions{
+// 				Log:        logOptions,
+// 				RequestLog: requestLogOptions,
+// 				Telemetry:  telemetryOptions,
+// 				HTTPSender: newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient),
+// 			},
+// 			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
+// 			retryOptions
+// 	}
+// }
 
-// getAzBfsPipelineOptions : Create pipeline options based on the config
-func getAzBfsPipelineOptions(conf AzStorageConfig) (azbfs.PipelineOptions, ste.XferRetryOptions) {
-	retryOptions := ste.XferRetryOptions{
-		Policy:        ste.RetryPolicyExponential,                      // Use exponential backoff as opposed to linear
-		MaxTries:      conf.maxRetries,                                 // Try at most 3 times to perform the operation (set to 1 to disable retries)
-		TryTimeout:    time.Second * time.Duration(conf.maxTimeout),    // Maximum time allowed for any single try
-		RetryDelay:    time.Second * time.Duration(conf.backoffTime),   // Backoff amount for each retry (exponential or linear)
-		MaxRetryDelay: time.Second * time.Duration(conf.maxRetryDelay), // Max delay between retries
-	}
-	telemetryOptions := azbfs.TelemetryOptions{
-		Value: UserAgent() + " (" + common.GetCurrentDistro() + ")",
-	}
-	sysLogDisabled := log.GetType() == "silent" // If logging is enabled, allow the SDK to log retries to syslog.
-	requestLogOptions := azbfs.RequestLogOptions{
-		// TODO: We can potentially consider making LogWarningIfTryOverThreshold a user settable option. For now lets use the default
-		SyslogDisabled: sysLogDisabled,
-	}
-	logOptions := getLogOptions(conf.sdkTrace)
-	if conf.proxyAddress == "" {
-		// If we did not set a proxy address in our config then use default settings
-		return azbfs.PipelineOptions{
-				Log:        logOptions,
-				RequestLog: requestLogOptions,
-				Telemetry:  telemetryOptions,
-			},
-			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
-			retryOptions
-	} else {
-		// Else create custom HTTPClient to pass to the factory in order to set our proxy
-		var pipelineHTTPClient = newLyvecloudfuseHttpClient(conf)
-		// While creating new pipeline we need to provide the retry policy
-		return azbfs.PipelineOptions{
-				Log:        logOptions,
-				RequestLog: requestLogOptions,
-				Telemetry:  telemetryOptions,
-				HTTPSender: newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient),
-			},
-			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
-			retryOptions
-	}
-}
+// // getAzBfsPipelineOptions : Create pipeline options based on the config
+// func getAzBfsPipelineOptions(conf AzStorageConfig) (azbfs.PipelineOptions, ste.XferRetryOptions) {
+// 	retryOptions := ste.XferRetryOptions{
+// 		Policy:        ste.RetryPolicyExponential,                      // Use exponential backoff as opposed to linear
+// 		MaxTries:      conf.maxRetries,                                 // Try at most 3 times to perform the operation (set to 1 to disable retries)
+// 		TryTimeout:    time.Second * time.Duration(conf.maxTimeout),    // Maximum time allowed for any single try
+// 		RetryDelay:    time.Second * time.Duration(conf.backoffTime),   // Backoff amount for each retry (exponential or linear)
+// 		MaxRetryDelay: time.Second * time.Duration(conf.maxRetryDelay), // Max delay between retries
+// 	}
+// 	telemetryOptions := azbfs.TelemetryOptions{
+// 		Value: UserAgent() + " (" + common.GetCurrentDistro() + ")",
+// 	}
+// 	sysLogDisabled := log.GetType() == "silent" // If logging is enabled, allow the SDK to log retries to syslog.
+// 	requestLogOptions := azbfs.RequestLogOptions{
+// 		// TODO: We can potentially consider making LogWarningIfTryOverThreshold a user settable option. For now lets use the default
+// 		SyslogDisabled: sysLogDisabled,
+// 	}
+// 	logOptions := getLogOptions(conf.sdkTrace)
+// 	if conf.proxyAddress == "" {
+// 		// If we did not set a proxy address in our config then use default settings
+// 		return azbfs.PipelineOptions{
+// 				Log:        logOptions,
+// 				RequestLog: requestLogOptions,
+// 				Telemetry:  telemetryOptions,
+// 			},
+// 			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
+// 			retryOptions
+// 	} else {
+// 		// Else create custom HTTPClient to pass to the factory in order to set our proxy
+// 		var pipelineHTTPClient = newLyvecloudfuseHttpClient(conf)
+// 		// While creating new pipeline we need to provide the retry policy
+// 		return azbfs.PipelineOptions{
+// 				Log:        logOptions,
+// 				RequestLog: requestLogOptions,
+// 				Telemetry:  telemetryOptions,
+// 				HTTPSender: newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient),
+// 			},
+// 			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
+// 			retryOptions
+// 	}
+// }
 
-// Create an HTTP Client with configured proxy
-// TODO: More configurations for other http client parameters?
-func newLyvecloudfuseHttpClient(conf AzStorageConfig) *http.Client {
-	var ProxyURL func(req *http.Request) (*url.URL, error) = func(req *http.Request) (*url.URL, error) {
-		// If a proxy address is passed return
-		var proxyURL url.URL = url.URL{
-			Host: conf.proxyAddress,
-		}
-		return &proxyURL, nil
-	}
-	return &http.Client{
-		Transport: &http.Transport{
-			Proxy: ProxyURL,
-			// We use Dial instead of DialContext as DialContext has been reported to cause slower performance.
-			Dial /*Context*/ : (&net.Dialer{
-				Timeout:   Timeout,
-				KeepAlive: KeepAlive,
-				DualStack: DualStack,
-			}).Dial, /*Context*/
-			MaxIdleConns:           MaxIdleConns, // No limit
-			MaxIdleConnsPerHost:    MaxIdleConnsPerHost,
-			IdleConnTimeout:        IdleConnTimeout,
-			TLSHandshakeTimeout:    TLSHandshakeTimeout,
-			ExpectContinueTimeout:  ExpectContinueTimeout,
-			DisableKeepAlives:      DisableKeepAlives,
-			DisableCompression:     DisableCompression,
-			MaxResponseHeaderBytes: MaxResponseHeaderBytes,
-			//ResponseHeaderTimeout:  time.Duration{},
-			//ExpectContinueTimeout:  time.Duration{},
-		},
-	}
-}
+// // Create an HTTP Client with configured proxy
+// // TODO: More configurations for other http client parameters?
+// func newLyvecloudfuseHttpClient(conf AzStorageConfig) *http.Client {
+// 	var ProxyURL func(req *http.Request) (*url.URL, error) = func(req *http.Request) (*url.URL, error) {
+// 		// If a proxy address is passed return
+// 		var proxyURL url.URL = url.URL{
+// 			Host: conf.proxyAddress,
+// 		}
+// 		return &proxyURL, nil
+// 	}
+// 	return &http.Client{
+// 		Transport: &http.Transport{
+// 			Proxy: ProxyURL,
+// 			// We use Dial instead of DialContext as DialContext has been reported to cause slower performance.
+// 			Dial /*Context*/ : (&net.Dialer{
+// 				Timeout:   Timeout,
+// 				KeepAlive: KeepAlive,
+// 				DualStack: DualStack,
+// 			}).Dial, /*Context*/
+// 			MaxIdleConns:           MaxIdleConns, // No limit
+// 			MaxIdleConnsPerHost:    MaxIdleConnsPerHost,
+// 			IdleConnTimeout:        IdleConnTimeout,
+// 			TLSHandshakeTimeout:    TLSHandshakeTimeout,
+// 			ExpectContinueTimeout:  ExpectContinueTimeout,
+// 			DisableKeepAlives:      DisableKeepAlives,
+// 			DisableCompression:     DisableCompression,
+// 			MaxResponseHeaderBytes: MaxResponseHeaderBytes,
+// 			//ResponseHeaderTimeout:  time.Duration{},
+// 			//ExpectContinueTimeout:  time.Duration{},
+// 		},
+// 	}
+// }
 
-// newLyvecloudfuseHTTPClientFactory creates a custom HTTPClientPolicyFactory object that sends HTTP requests to the http client.
-func newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient *http.Client) pipeline.Factory {
-	return pipeline.FactoryFunc(func(next pipeline.Policy, po *pipeline.PolicyOptions) pipeline.PolicyFunc {
-		return func(ctx context.Context, request pipeline.Request) (pipeline.Response, error) {
-			r, err := pipelineHTTPClient.Do(request.WithContext(ctx))
-			if err != nil {
-				err = pipeline.NewError(err, "HTTP request failed")
-				log.Err("BlockBlob::newLyvecloudfuseHTTPClientFactory : HTTP request failed")
-			}
-			return pipeline.NewHTTPResponse(r), err
-		}
-	})
-}
+// // newLyvecloudfuseHTTPClientFactory creates a custom HTTPClientPolicyFactory object that sends HTTP requests to the http client.
+// func newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient *http.Client) pipeline.Factory {
+// 	return pipeline.FactoryFunc(func(next pipeline.Policy, po *pipeline.PolicyOptions) pipeline.PolicyFunc {
+// 		return func(ctx context.Context, request pipeline.Request) (pipeline.Response, error) {
+// 			r, err := pipelineHTTPClient.Do(request.WithContext(ctx))
+// 			if err != nil {
+// 				err = pipeline.NewError(err, "HTTP request failed")
+// 				log.Err("BlockBlob::newLyvecloudfuseHTTPClientFactory : HTTP request failed")
+// 			}
+// 			return pipeline.NewHTTPResponse(r), err
+// 		}
+// 	})
+// }
 
 func getLogOptions(sdkLogging bool) pipeline.LogOptions {
 	return pipeline.LogOptions{
@@ -584,16 +578,16 @@ func getMD5(fi *os.File) ([]byte, error) {
 	return hasher.Sum(nil), nil
 }
 
-func autoDetectAuthMode(opt AzStorageOptions) string {
-	if opt.ApplicationID != "" || opt.ResourceID != "" || opt.ObjectID != "" {
-		return "msi"
-	} else if opt.AccountKey != "" {
-		return "key"
-	} else if opt.SaSKey != "" {
-		return "sas"
-	} else if opt.ClientID != "" || opt.ClientSecret != "" || opt.TenantID != "" {
-		return "spn"
-	}
+// func autoDetectAuthMode(opt AzStorageOptions) string {
+// 	if opt.ApplicationID != "" || opt.ResourceID != "" || opt.ObjectID != "" {
+// 		return "msi"
+// 	} else if opt.AccountKey != "" {
+// 		return "key"
+// 	} else if opt.SaSKey != "" {
+// 		return "sas"
+// 	} else if opt.ClientID != "" || opt.ClientSecret != "" || opt.TenantID != "" {
+// 		return "spn"
+// 	}
 
-	return "msi"
-}
+// 	return "msi"
+// }

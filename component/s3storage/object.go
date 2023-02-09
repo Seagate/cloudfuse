@@ -36,10 +36,13 @@ package s3storage
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -266,7 +269,136 @@ func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 // This fetches the list using a marker so the caller code should handle marker logic
 // If count=0 - fetch max entries
 func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
-	return nil, nil, nil
+	log.Trace("BlockBlob::List : prefix %s, marker %s", prefix, func(marker *string) string {
+		if marker != nil {
+			return *marker
+		} else {
+			return ""
+		}
+	}(marker))
+
+	// prepare parameters
+	bucketName := bb.Config.authConfig.BucketName
+	if count == 0 {
+		count = common.MaxDirListCount
+	}
+	// combine the configured prefix and the prefix being given to List to get a full listPath
+	listPath := filepath.Join(bb.Config.prefixPath, prefix)
+	// make sure the listPath ends with a forward slash
+	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && bb.Config.prefixPath != "") {
+		listPath += "/"
+	}
+
+	// create a map to keep track of all directories
+	var dirList = make(map[string]bool)
+	dirList[listPath] = true
+
+	// using paginator from here: https://aws.github.io/aws-sdk-go-v2/docs/making-requests/#using-paginators
+	params := &s3.ListObjectsV2Input{
+		Bucket:    aws.String(bucketName),
+		MaxKeys:   count,
+		Prefix:    aws.String(listPath),
+		Delimiter: aws.String("/"), // delimeter is needed to get CommonPrefixes
+	}
+
+	paginator := s3.NewListObjectsV2Paginator(bb.Client, params)
+
+	// initialize list to be returned
+	objectAttrList := make([]*internal.ObjAttr, 0)
+	// fetch and process result pages
+	for paginator.HasMorePages() {
+		output, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			log.Err("Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
+			return objectAttrList, nil, err
+		}
+		// documentation for this S3 data structure:
+		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
+		for _, value := range output.Contents {
+			// parse the ETag, on the chance that it is MD5
+			md5, err := hex.DecodeString(*value.ETag)
+			if err != nil {
+				log.Warn("Failed to parse ETag %v of object %v as an MD5 hash. Here's why: %v", value.ETag, value.Key, err)
+				md5 = nil
+			}
+			// push object info into the list
+			attr := &internal.ObjAttr{
+				Path:   split(bb.Config.prefixPath, *value.Key),
+				Name:   filepath.Base(*value.Key),
+				Size:   value.Size,
+				Mode:   0,
+				Mtime:  *value.LastModified,
+				Atime:  *value.LastModified,
+				Ctime:  *value.LastModified,
+				Crtime: *value.LastModified,
+				Flags:  internal.NewFileBitMap(),
+				MD5:    md5,
+			}
+
+			// this is cargo code from block_blob
+			// not sure if we need this
+			attr.Flags.Set(internal.PropFlagMetadataRetrieved)
+			attr.Flags.Set(internal.PropFlagModeDefault)
+			objectAttrList = append(objectAttrList, attr)
+		}
+		// documentation for CommonPrefixes:
+		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2/types#CommonPrefix
+		for _, value := range output.CommonPrefixes {
+			dir := *value.Prefix
+			dirList[dir] = true
+			// let's extract and add intermediate directories
+			// first cut the listPath (the full prefix path) off of the directory path
+			_, intermediatePath, listPathFound := strings.Cut(dir, listPath)
+			// if the listPath isn't here, that's weird
+			if !listPathFound {
+				log.Warn("Prefix mismatch with path %v when listing objects in %v.", dir, listPath)
+			}
+			// get an array of intermediate directories
+			intermediatDirectories := strings.Split(intermediatePath, "/")
+			// walk up the tree and add each one until we find an already existing parent
+			// we have to iterate in descending order
+			suffixToTrim := ""
+			for i := len(intermediatDirectories) - 1; i >= 0; i-- {
+				// add to the suffix we're trimming off
+				suffixToTrim = intermediatDirectories[i] + "/" + suffixToTrim
+				// get the trimmed (parent) directory
+				parentDir := strings.TrimSuffix(dir, suffixToTrim)
+				// have we seen this one already?
+				if dirList[parentDir] {
+					break
+				}
+				dirList[parentDir] = true
+			}
+		}
+	}
+	// now let's add attributes for all the directories in dirList
+	for dir, _ := range dirList {
+		if dir == listPath {
+			continue
+		}
+		name := strings.TrimSuffix(dir, "/")
+		attr := &internal.ObjAttr{
+			Path:  split(bb.Config.prefixPath, name),
+			Name:  filepath.Base(name),
+			Size:  4096,
+			Mode:  os.ModeDir,
+			Mtime: time.Now(),
+			Flags: internal.NewDirBitMap(),
+		}
+		attr.Atime = attr.Mtime
+		attr.Crtime = attr.Mtime
+		attr.Ctime = attr.Mtime
+		attr.Flags.Set(internal.PropFlagMetadataRetrieved)
+		attr.Flags.Set(internal.PropFlagModeDefault)
+		objectAttrList = append(objectAttrList, attr)
+	}
+
+	// Clean up the temp map as its no more needed
+	for k := range dirList {
+		delete(dirList, k)
+	}
+
+	return objectAttrList, nil, nil
 }
 
 // track the progress of download of blobs where every 100MB of data downloaded is being tracked. It also tracks the completion of download

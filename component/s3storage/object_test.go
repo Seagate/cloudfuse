@@ -524,6 +524,59 @@ func (s *blockBlobTestSuite) TestCopyToFileError() {
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
+func (s *blockBlobTestSuite) TestReadDir() {
+	defer s.cleanupTest()
+	// This tests the default listBlocked = 0. It should return the expected paths.
+	// Setup
+	name := generateDirectoryName()
+	s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	childName := name + "/" + generateFileName()
+	s.az.CreateFile(internal.CreateFileOptions{Name: childName})
+
+	// Testing dir and dir/
+	var paths = []string{name, name + "/"}
+	for _, path := range paths {
+		log.Debug(path)
+		s.Run(path, func() {
+			entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: path})
+			s.assert.Nil(err)
+			s.assert.EqualValues(1, len(entries))
+		})
+	}
+}
+
+func (s *blockBlobTestSuite) TestStreamDirSmallCountNoDuplicates() {
+	defer s.cleanupTest()
+	// Setup
+	s.az.CreateFile(internal.CreateFileOptions{Name: "blob1.txt"})
+	s.az.CreateFile(internal.CreateFileOptions{Name: "blob2.txt"})
+	s.az.CreateFile(internal.CreateFileOptions{Name: "newblob1.txt"})
+	s.az.CreateFile(internal.CreateFileOptions{Name: "newblob2.txt"})
+	s.az.CreateDir(internal.CreateDirOptions{Name: "myfolder"})
+	s.az.CreateFile(internal.CreateFileOptions{Name: "myfolder/newblobA.txt"})
+	s.az.CreateFile(internal.CreateFileOptions{Name: "myfolder/newblobB.txt"})
+
+	var iteration int = 0
+	var marker string = ""
+	blobList := make([]*internal.ObjAttr, 0)
+
+	for {
+		new_list, new_marker, err := s.az.StreamDir(internal.StreamDirOptions{Name: "/", Token: marker, Count: 1})
+		fmt.Println(err)
+		s.assert.Nil(err)
+		blobList = append(blobList, new_list...)
+		marker = new_marker
+		iteration++
+
+		log.Debug("AzStorage::ReadDir : So far retrieved %d objects in %d iterations", len(blobList), iteration)
+		if new_marker == "" {
+			break
+		}
+	}
+
+	s.assert.EqualValues(5, len(blobList))
+}
+
 // func (s *blockBlobTestSuite) TestRenameFile() {
 // 	defer s.cleanupTest()
 // 	// Setup
