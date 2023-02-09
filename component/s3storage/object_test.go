@@ -524,6 +524,53 @@ func (s *blockBlobTestSuite) TestCopyToFileError() {
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
+// func (s *blockBlobTestSuite) TestRenameFile() {
+// 	defer s.cleanupTest()
+// 	// Setup
+// 	src := generateFileName()
+// 	s.az.CreateFile(internal.CreateFileOptions{Name: src})
+// 	dst := generateFileName()
+
+// 	err := s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+// 	s.assert.Nil(err)
+
+// 	// Src should not be in the account
+// 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+// 		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+// 		Key:    aws.String(src),
+// 	})
+// 	s.assert.NotNil(err)
+// 	// Dst should be in the account
+// 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+// 		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+// 		Key:    aws.String(dst),
+// 	})
+// 	s.assert.Nil(err)
+// }
+
+// func (s *blockBlobTestSuite) TestRenameFileError() {
+// 	defer s.cleanupTest()
+// 	// Setup
+// 	src := generateFileName()
+// 	dst := generateFileName()
+
+// 	err := s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+// 	s.assert.NotNil(err)
+// 	s.assert.EqualValues(syscall.ENOENT, err)
+
+// 	// Src and destination should not be in the account
+// 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+// 		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+// 		Key:    aws.String(src),
+// 	})
+// 	s.assert.NotNil(err)
+// 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+// 		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+// 		Key:    aws.String(dst),
+// 	})
+// 	s.assert.NotNil(err)
+// }
+
 func TestBlockBlob(t *testing.T) {
 	suite.Run(t, new(blockBlobTestSuite))
 }

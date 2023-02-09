@@ -191,8 +191,57 @@ func (bb *S3Object) DeleteDirectory(name string) (err error) {
 }
 
 // RenameFile : Rename the file
-func (bb *S3Object) RenameFile(source string, target string) error {
-	return nil
+func (bb *S3Object) RenameFile(source string, target string) (err error) {
+	log.Trace("Object::RenameFile : %s -> %s", source, target)
+
+	_, err = bb.Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
+		Bucket:     aws.String(bb.Config.authConfig.BucketName),
+		CopySource: aws.String(fmt.Sprintf("%v/%v", bb.Config.authConfig.BucketName, source)),
+		Key:        aws.String(target),
+	})
+
+	if err != nil {
+		// No such key found so object is not in S3
+		var nsk *types.NoSuchKey
+		if errors.As(err, &nsk) {
+			log.Err("Object::RenameFile : %s does not exist", source)
+			return syscall.ENOENT
+		}
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			// No Such Key
+			// TODO: Fix this error. For some reason, CopyObject gives a no such key error, but as a Smithy error
+			// so need a different case to catch this. Understand why this does not give a no such key error type
+			code := apiErr.ErrorCode()
+			if code == "NoSuchKey" {
+				log.Err("Object::RenameFile : %s does not exist", source)
+				return syscall.ENOENT
+			}
+		}
+		log.Err("Object::RenameFile : Failed to start copy of file %s [%s]", source, err.Error())
+		return err
+	}
+
+	log.Trace("BlockBlob::RenameFile : %s -> %s done", source, target)
+
+	// Copy of the file is done so now delete the older file
+	err = bb.DeleteFile(source)
+	for retry := 0; retry < 3 && err == syscall.ENOENT; retry++ {
+		// Sometimes backend is able to copy source file to destination but when we try to delete the
+		// source files it returns back with ENOENT. If file was just created on backend it might happen
+		// that it has not been synced yet at all layers and hence delete is not able to find the source file
+		log.Trace("BlockBlob::RenameFile : %s -> %s, unable to find source. Retrying %d", source, target, retry)
+		time.Sleep(1 * time.Second)
+		err = bb.DeleteFile(source)
+	}
+
+	if err == syscall.ENOENT {
+		// Even after 3 retries, 1 second apart if server returns 404 then source file no longer
+		// exists on the backend and its safe to assume rename was successful
+		err = nil
+	}
+
+	return err
 }
 
 // RenameDirectory : Rename the directory
