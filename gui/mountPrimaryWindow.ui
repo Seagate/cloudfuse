@@ -105,13 +105,22 @@
     </property>
     <property name="font">
      <font>
-      <pointsize>40</pointsize>
+      <family>Ubuntu</family>
+      <pointsize>28</pointsize>
       <weight>75</weight>
       <bold>true</bold>
+      <strikeout>false</strikeout>
+      <kerning>true</kerning>
      </font>
     </property>
     <property name="text">
      <string>ALPHA DESIGN</string>
+    </property>
+    <property name="textFormat">
+     <enum>Qt::RichText</enum>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
     </property>
    </widget>
    <widget class="QPushButton" name="unmount_button">
@@ -150,8 +159,13 @@
         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Set up the pipeline for LyveFuse. &lt;/p&gt;&lt;p&gt;Choose streaming or file caching&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
        <property name="currentText">
-        <string>Azure</string>
+        <string>Lyve</string>
        </property>
+       <item>
+        <property name="text">
+         <string>Lyve</string>
+        </property>
+       </item>
        <item>
         <property name="text">
          <string>Azure</string>
