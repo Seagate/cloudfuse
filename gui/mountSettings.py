@@ -19,7 +19,7 @@ class mountSettingsWidget(QWidget, Ui_mountSettingsWidget):
         #           clicked = one of the actions available to trigger the signal
         #           connect = activate the signal for slots to be triggered
 
-        self.resetDefaultSettings_checkbox.stateChanged.connect(self.do_something)
+        #self.resetDefaultSettings_checkbox.stateChanged.connect(self.do_something)
         self.fileCache_path_input.editingFinished.connect(self.fileCache_input)
     
     # Set up slots

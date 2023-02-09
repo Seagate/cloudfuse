@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'MountSettings.ui'
+## Form generated from reading UI file 'mountSettings.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.4.2
 ##
@@ -15,18 +15,15 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QSizePolicy,
-    QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout,
+    QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+    QPushButton, QSizePolicy, QVBoxLayout, QWidget)
 
 class Ui_mountSettingsWidget(object):
     def setupUi(self, mountSettingsWidget):
         if not mountSettingsWidget.objectName():
             mountSettingsWidget.setObjectName(u"mountSettingsWidget")
-        mountSettingsWidget.resize(1137, 733)
-        self.previousSettings_checkbox = QCheckBox(mountSettingsWidget)
-        self.previousSettings_checkbox.setObjectName(u"previousSettings_checkbox")
-        self.previousSettings_checkbox.setGeometry(QRect(960, 690, 171, 23))
+        mountSettingsWidget.resize(1770, 701)
         self.libfuse_groupBox = QGroupBox(mountSettingsWidget)
         self.libfuse_groupBox.setObjectName(u"libfuse_groupBox")
         self.libfuse_groupBox.setGeometry(QRect(10, 140, 401, 291))
@@ -118,9 +115,6 @@ class Ui_mountSettingsWidget(object):
 
         self.verticalLayout_3.addWidget(self.libfuse_ignoreAppend_checkbox)
 
-        self.resetDefaultSettings_checkbox = QCheckBox(mountSettingsWidget)
-        self.resetDefaultSettings_checkbox.setObjectName(u"resetDefaultSettings_checkbox")
-        self.resetDefaultSettings_checkbox.setGeometry(QRect(760, 690, 191, 23))
         self.streaming_groupBox = QGroupBox(mountSettingsWidget)
         self.streaming_groupBox.setObjectName(u"streaming_groupBox")
         self.streaming_groupBox.setEnabled(True)
@@ -166,18 +160,21 @@ class Ui_mountSettingsWidget(object):
         self.streaming_blksz_input = QLineEdit(self.verticalLayoutWidget_6)
         self.streaming_blksz_input.setObjectName(u"streaming_blksz_input")
         self.streaming_blksz_input.setMaximumSize(QSize(75, 16777215))
+        self.streaming_blksz_input.setAlignment(Qt.AlignCenter)
 
         self.verticalLayout_5.addWidget(self.streaming_blksz_input)
 
         self.streaming_mxbuff_input = QLineEdit(self.verticalLayoutWidget_6)
         self.streaming_mxbuff_input.setObjectName(u"streaming_mxbuff_input")
         self.streaming_mxbuff_input.setMaximumSize(QSize(75, 16777215))
+        self.streaming_mxbuff_input.setAlignment(Qt.AlignCenter)
 
         self.verticalLayout_5.addWidget(self.streaming_mxbuff_input)
 
         self.streaming_buffsz_input = QLineEdit(self.verticalLayoutWidget_6)
         self.streaming_buffsz_input.setObjectName(u"streaming_buffsz_input")
         self.streaming_buffsz_input.setMaximumSize(QSize(75, 16777215))
+        self.streaming_buffsz_input.setAlignment(Qt.AlignCenter)
 
         self.verticalLayout_5.addWidget(self.streaming_buffsz_input)
 
@@ -268,30 +265,35 @@ class Ui_mountSettingsWidget(object):
         self.fileCache_timeout_input = QLineEdit(self.verticalLayoutWidget_2)
         self.fileCache_timeout_input.setObjectName(u"fileCache_timeout_input")
         self.fileCache_timeout_input.setMaximumSize(QSize(30, 16777215))
+        self.fileCache_timeout_input.setAlignment(Qt.AlignCenter)
 
         self.verticalLayout_7.addWidget(self.fileCache_timeout_input)
 
         self.fileCache_maxEviction_input = QLineEdit(self.verticalLayoutWidget_2)
         self.fileCache_maxEviction_input.setObjectName(u"fileCache_maxEviction_input")
         self.fileCache_maxEviction_input.setMaximumSize(QSize(75, 16777215))
+        self.fileCache_maxEviction_input.setAlignment(Qt.AlignCenter)
 
         self.verticalLayout_7.addWidget(self.fileCache_maxEviction_input)
 
         self.fileCache_maxCacheSize_input = QLineEdit(self.verticalLayoutWidget_2)
         self.fileCache_maxCacheSize_input.setObjectName(u"fileCache_maxCacheSize_input")
         self.fileCache_maxCacheSize_input.setMaximumSize(QSize(75, 16777215))
+        self.fileCache_maxCacheSize_input.setAlignment(Qt.AlignCenter)
 
         self.verticalLayout_7.addWidget(self.fileCache_maxCacheSize_input)
 
         self.fileCache_evictMaxThresh_input = QLineEdit(self.verticalLayoutWidget_2)
         self.fileCache_evictMaxThresh_input.setObjectName(u"fileCache_evictMaxThresh_input")
         self.fileCache_evictMaxThresh_input.setMaximumSize(QSize(30, 16777215))
+        self.fileCache_evictMaxThresh_input.setAlignment(Qt.AlignCenter)
 
         self.verticalLayout_7.addWidget(self.fileCache_evictMaxThresh_input)
 
         self.fileCache_evictMinThresh_input = QLineEdit(self.verticalLayoutWidget_2)
         self.fileCache_evictMinThresh_input.setObjectName(u"fileCache_evictMinThresh_input")
         self.fileCache_evictMinThresh_input.setMaximumSize(QSize(30, 16777215))
+        self.fileCache_evictMinThresh_input.setAlignment(Qt.AlignCenter)
 
         self.verticalLayout_7.addWidget(self.fileCache_evictMinThresh_input)
 
@@ -375,6 +377,438 @@ class Ui_mountSettingsWidget(object):
         font1.setPointSize(48)
         font1.setBold(True)
         self.label.setFont(font1)
+        self.pushButton = QPushButton(mountSettingsWidget)
+        self.pushButton.setObjectName(u"pushButton")
+        self.pushButton.setGeometry(QRect(10, 670, 161, 25))
+        self.AzureBucket_groupbox = QGroupBox(mountSettingsWidget)
+        self.AzureBucket_groupbox.setObjectName(u"AzureBucket_groupbox")
+        self.AzureBucket_groupbox.setGeometry(QRect(880, 10, 881, 471))
+        self.AzureBucket_groupbox.setAlignment(Qt.AlignCenter)
+        self.verticalLayoutWidget_8 = QWidget(self.AzureBucket_groupbox)
+        self.verticalLayoutWidget_8.setObjectName(u"verticalLayoutWidget_8")
+        self.verticalLayoutWidget_8.setGeometry(QRect(10, 30, 318, 367))
+        self.verticalLayout_14 = QVBoxLayout(self.verticalLayoutWidget_8)
+        self.verticalLayout_14.setObjectName(u"verticalLayout_14")
+        self.verticalLayout_14.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayout_11 = QVBoxLayout()
+        self.verticalLayout_11.setObjectName(u"verticalLayout_11")
+        self.horizontalLayout_9 = QHBoxLayout()
+        self.horizontalLayout_9.setObjectName(u"horizontalLayout_9")
+        self.label_2 = QLabel(self.verticalLayoutWidget_8)
+        self.label_2.setObjectName(u"label_2")
+
+        self.horizontalLayout_9.addWidget(self.label_2)
+
+        self.AzTypesettings_select = QComboBox(self.verticalLayoutWidget_8)
+        self.AzTypesettings_select.addItem("")
+        self.AzTypesettings_select.addItem("")
+        self.AzTypesettings_select.setObjectName(u"AzTypesettings_select")
+
+        self.horizontalLayout_9.addWidget(self.AzTypesettings_select)
+
+
+        self.verticalLayout_11.addLayout(self.horizontalLayout_9)
+
+        self.horizontalLayout = QHBoxLayout()
+        self.horizontalLayout.setObjectName(u"horizontalLayout")
+        self.label_7 = QLabel(self.verticalLayoutWidget_8)
+        self.label_7.setObjectName(u"label_7")
+
+        self.horizontalLayout.addWidget(self.label_7)
+
+        self.azAccountName_input = QLineEdit(self.verticalLayoutWidget_8)
+        self.azAccountName_input.setObjectName(u"azAccountName_input")
+
+        self.horizontalLayout.addWidget(self.azAccountName_input)
+
+
+        self.verticalLayout_11.addLayout(self.horizontalLayout)
+
+        self.horizontalLayout_8 = QHBoxLayout()
+        self.horizontalLayout_8.setObjectName(u"horizontalLayout_8")
+        self.label_12 = QLabel(self.verticalLayoutWidget_8)
+        self.label_12.setObjectName(u"label_12")
+
+        self.horizontalLayout_8.addWidget(self.label_12)
+
+        self.azContainer_input = QLineEdit(self.verticalLayoutWidget_8)
+        self.azContainer_input.setObjectName(u"azContainer_input")
+
+        self.horizontalLayout_8.addWidget(self.azContainer_input)
+
+
+        self.verticalLayout_11.addLayout(self.horizontalLayout_8)
+
+        self.horizontalLayout_10 = QHBoxLayout()
+        self.horizontalLayout_10.setObjectName(u"horizontalLayout_10")
+        self.label_20 = QLabel(self.verticalLayoutWidget_8)
+        self.label_20.setObjectName(u"label_20")
+
+        self.horizontalLayout_10.addWidget(self.label_20)
+
+        self.azEndpoint_input = QLineEdit(self.verticalLayoutWidget_8)
+        self.azEndpoint_input.setObjectName(u"azEndpoint_input")
+
+        self.horizontalLayout_10.addWidget(self.azEndpoint_input)
+
+
+        self.verticalLayout_11.addLayout(self.horizontalLayout_10)
+
+        self.horizontalLayout_11 = QHBoxLayout()
+        self.horizontalLayout_11.setObjectName(u"horizontalLayout_11")
+        self.label_21 = QLabel(self.verticalLayoutWidget_8)
+        self.label_21.setObjectName(u"label_21")
+
+        self.horizontalLayout_11.addWidget(self.label_21)
+
+        self.azModesettings_select = QComboBox(self.verticalLayoutWidget_8)
+        self.azModesettings_select.addItem("")
+        self.azModesettings_select.addItem("")
+        self.azModesettings_select.addItem("")
+        self.azModesettings_select.addItem("")
+        self.azModesettings_select.setObjectName(u"azModesettings_select")
+
+        self.horizontalLayout_11.addWidget(self.azModesettings_select)
+
+
+        self.verticalLayout_11.addLayout(self.horizontalLayout_11)
+
+
+        self.verticalLayout_14.addLayout(self.verticalLayout_11)
+
+        self.gridLayout = QGridLayout()
+        self.gridLayout.setObjectName(u"gridLayout")
+        self.horizontalLayout_12 = QHBoxLayout()
+        self.horizontalLayout_12.setObjectName(u"horizontalLayout_12")
+        self.label_22 = QLabel(self.verticalLayoutWidget_8)
+        self.label_22.setObjectName(u"label_22")
+
+        self.horizontalLayout_12.addWidget(self.label_22)
+
+        self.azAccountKey_input = QLineEdit(self.verticalLayoutWidget_8)
+        self.azAccountKey_input.setObjectName(u"azAccountKey_input")
+
+        self.horizontalLayout_12.addWidget(self.azAccountKey_input)
+
+
+        self.gridLayout.addLayout(self.horizontalLayout_12, 0, 0, 1, 1)
+
+        self.horizontalLayout_13 = QHBoxLayout()
+        self.horizontalLayout_13.setObjectName(u"horizontalLayout_13")
+        self.label_23 = QLabel(self.verticalLayoutWidget_8)
+        self.label_23.setObjectName(u"label_23")
+
+        self.horizontalLayout_13.addWidget(self.label_23)
+
+        self.azSasStorage_input = QLineEdit(self.verticalLayoutWidget_8)
+        self.azSasStorage_input.setObjectName(u"azSasStorage_input")
+        self.azSasStorage_input.setEnabled(False)
+
+        self.horizontalLayout_13.addWidget(self.azSasStorage_input)
+
+
+        self.gridLayout.addLayout(self.horizontalLayout_13, 1, 0, 1, 1)
+
+        self.verticalLayout_12 = QVBoxLayout()
+        self.verticalLayout_12.setObjectName(u"verticalLayout_12")
+        self.horizontalLayout_14 = QHBoxLayout()
+        self.horizontalLayout_14.setObjectName(u"horizontalLayout_14")
+        self.label_24 = QLabel(self.verticalLayoutWidget_8)
+        self.label_24.setObjectName(u"label_24")
+
+        self.horizontalLayout_14.addWidget(self.label_24)
+
+        self.azMsiAppid_input = QLineEdit(self.verticalLayoutWidget_8)
+        self.azMsiAppid_input.setObjectName(u"azMsiAppid_input")
+        self.azMsiAppid_input.setEnabled(False)
+
+        self.horizontalLayout_14.addWidget(self.azMsiAppid_input)
+
+
+        self.verticalLayout_12.addLayout(self.horizontalLayout_14)
+
+        self.horizontalLayout_15 = QHBoxLayout()
+        self.horizontalLayout_15.setObjectName(u"horizontalLayout_15")
+        self.label_25 = QLabel(self.verticalLayoutWidget_8)
+        self.label_25.setObjectName(u"label_25")
+
+        self.horizontalLayout_15.addWidget(self.label_25)
+
+        self.azMsiResourceid_input = QLineEdit(self.verticalLayoutWidget_8)
+        self.azMsiResourceid_input.setObjectName(u"azMsiResourceid_input")
+        self.azMsiResourceid_input.setEnabled(False)
+
+        self.horizontalLayout_15.addWidget(self.azMsiResourceid_input)
+
+
+        self.verticalLayout_12.addLayout(self.horizontalLayout_15)
+
+        self.horizontalLayout_16 = QHBoxLayout()
+        self.horizontalLayout_16.setObjectName(u"horizontalLayout_16")
+        self.label_26 = QLabel(self.verticalLayoutWidget_8)
+        self.label_26.setObjectName(u"label_26")
+
+        self.horizontalLayout_16.addWidget(self.label_26)
+
+        self.azMsiObjectid_input = QLineEdit(self.verticalLayoutWidget_8)
+        self.azMsiObjectid_input.setObjectName(u"azMsiObjectid_input")
+        self.azMsiObjectid_input.setEnabled(False)
+
+        self.horizontalLayout_16.addWidget(self.azMsiObjectid_input)
+
+
+        self.verticalLayout_12.addLayout(self.horizontalLayout_16)
+
+
+        self.gridLayout.addLayout(self.verticalLayout_12, 1, 1, 1, 1)
+
+        self.verticalLayout_13 = QVBoxLayout()
+        self.verticalLayout_13.setObjectName(u"verticalLayout_13")
+        self.horizontalLayout_17 = QHBoxLayout()
+        self.horizontalLayout_17.setObjectName(u"horizontalLayout_17")
+        self.label_27 = QLabel(self.verticalLayoutWidget_8)
+        self.label_27.setObjectName(u"label_27")
+
+        self.horizontalLayout_17.addWidget(self.label_27)
+
+        self.azSpnTenantid_input = QLineEdit(self.verticalLayoutWidget_8)
+        self.azSpnTenantid_input.setObjectName(u"azSpnTenantid_input")
+        self.azSpnTenantid_input.setEnabled(False)
+
+        self.horizontalLayout_17.addWidget(self.azSpnTenantid_input)
+
+
+        self.verticalLayout_13.addLayout(self.horizontalLayout_17)
+
+        self.horizontalLayout_18 = QHBoxLayout()
+        self.horizontalLayout_18.setObjectName(u"horizontalLayout_18")
+        self.label_28 = QLabel(self.verticalLayoutWidget_8)
+        self.label_28.setObjectName(u"label_28")
+
+        self.horizontalLayout_18.addWidget(self.label_28)
+
+        self.azSpnclientid_input = QLineEdit(self.verticalLayoutWidget_8)
+        self.azSpnclientid_input.setObjectName(u"azSpnclientid_input")
+        self.azSpnclientid_input.setEnabled(False)
+
+        self.horizontalLayout_18.addWidget(self.azSpnclientid_input)
+
+
+        self.verticalLayout_13.addLayout(self.horizontalLayout_18)
+
+        self.horizontalLayout_19 = QHBoxLayout()
+        self.horizontalLayout_19.setObjectName(u"horizontalLayout_19")
+        self.label_29 = QLabel(self.verticalLayoutWidget_8)
+        self.label_29.setObjectName(u"label_29")
+
+        self.horizontalLayout_19.addWidget(self.label_29)
+
+        self.azSpnClientSecret_input = QLineEdit(self.verticalLayoutWidget_8)
+        self.azSpnClientSecret_input.setObjectName(u"azSpnClientSecret_input")
+        self.azSpnClientSecret_input.setEnabled(False)
+
+        self.horizontalLayout_19.addWidget(self.azSpnClientSecret_input)
+
+
+        self.verticalLayout_13.addLayout(self.horizontalLayout_19)
+
+
+        self.gridLayout.addLayout(self.verticalLayout_13, 0, 1, 1, 1)
+
+
+        self.verticalLayout_14.addLayout(self.gridLayout)
+
+        self.AzureOptional_groupbox = QGroupBox(self.AzureBucket_groupbox)
+        self.AzureOptional_groupbox.setObjectName(u"AzureOptional_groupbox")
+        self.AzureOptional_groupbox.setGeometry(QRect(330, 30, 541, 431))
+        self.AzureOptional_groupbox.setCheckable(True)
+        self.AzureOptional_groupbox.setChecked(False)
+        self.horizontalLayoutWidget_12 = QWidget(self.AzureOptional_groupbox)
+        self.horizontalLayoutWidget_12.setObjectName(u"horizontalLayoutWidget_12")
+        self.horizontalLayoutWidget_12.setGeometry(QRect(10, 20, 301, 401))
+        self.horizontalLayout_20 = QHBoxLayout(self.horizontalLayoutWidget_12)
+        self.horizontalLayout_20.setObjectName(u"horizontalLayout_20")
+        self.horizontalLayout_20.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayout_15 = QVBoxLayout()
+        self.verticalLayout_15.setObjectName(u"verticalLayout_15")
+        self.label_30 = QLabel(self.horizontalLayoutWidget_12)
+        self.label_30.setObjectName(u"label_30")
+
+        self.verticalLayout_15.addWidget(self.label_30)
+
+        self.label_31 = QLabel(self.horizontalLayoutWidget_12)
+        self.label_31.setObjectName(u"label_31")
+
+        self.verticalLayout_15.addWidget(self.label_31)
+
+        self.label_32 = QLabel(self.horizontalLayoutWidget_12)
+        self.label_32.setObjectName(u"label_32")
+
+        self.verticalLayout_15.addWidget(self.label_32)
+
+        self.label_33 = QLabel(self.horizontalLayoutWidget_12)
+        self.label_33.setObjectName(u"label_33")
+
+        self.verticalLayout_15.addWidget(self.label_33)
+
+        self.label_34 = QLabel(self.horizontalLayoutWidget_12)
+        self.label_34.setObjectName(u"label_34")
+
+        self.verticalLayout_15.addWidget(self.label_34)
+
+        self.label_35 = QLabel(self.horizontalLayoutWidget_12)
+        self.label_35.setObjectName(u"label_35")
+
+        self.verticalLayout_15.addWidget(self.label_35)
+
+        self.label_36 = QLabel(self.horizontalLayoutWidget_12)
+        self.label_36.setObjectName(u"label_36")
+
+        self.verticalLayout_15.addWidget(self.label_36)
+
+        self.label_37 = QLabel(self.horizontalLayoutWidget_12)
+        self.label_37.setObjectName(u"label_37")
+
+        self.verticalLayout_15.addWidget(self.label_37)
+
+        self.label_38 = QLabel(self.horizontalLayoutWidget_12)
+        self.label_38.setObjectName(u"label_38")
+
+        self.verticalLayout_15.addWidget(self.label_38)
+
+        self.label_39 = QLabel(self.horizontalLayoutWidget_12)
+        self.label_39.setObjectName(u"label_39")
+
+        self.verticalLayout_15.addWidget(self.label_39)
+
+        self.label_40 = QLabel(self.horizontalLayoutWidget_12)
+        self.label_40.setObjectName(u"label_40")
+
+        self.verticalLayout_15.addWidget(self.label_40)
+
+        self.label_41 = QLabel(self.horizontalLayoutWidget_12)
+        self.label_41.setObjectName(u"label_41")
+
+        self.verticalLayout_15.addWidget(self.label_41)
+
+        self.label_42 = QLabel(self.horizontalLayoutWidget_12)
+        self.label_42.setObjectName(u"label_42")
+
+        self.verticalLayout_15.addWidget(self.label_42)
+
+
+        self.horizontalLayout_20.addLayout(self.verticalLayout_15)
+
+        self.verticalLayout_16 = QVBoxLayout()
+        self.verticalLayout_16.setObjectName(u"verticalLayout_16")
+        self.azAadEndpoint_input = QLineEdit(self.horizontalLayoutWidget_12)
+        self.azAadEndpoint_input.setObjectName(u"azAadEndpoint_input")
+
+        self.verticalLayout_16.addWidget(self.azAadEndpoint_input)
+
+        self.azSubdirectory_input = QLineEdit(self.horizontalLayoutWidget_12)
+        self.azSubdirectory_input.setObjectName(u"azSubdirectory_input")
+
+        self.verticalLayout_16.addWidget(self.azSubdirectory_input)
+
+        self.azblocksize_input = QLineEdit(self.horizontalLayoutWidget_12)
+        self.azblocksize_input.setObjectName(u"azblocksize_input")
+
+        self.verticalLayout_16.addWidget(self.azblocksize_input)
+
+        self.azMaxconcurrency_input = QLineEdit(self.horizontalLayoutWidget_12)
+        self.azMaxconcurrency_input.setObjectName(u"azMaxconcurrency_input")
+
+        self.verticalLayout_16.addWidget(self.azMaxconcurrency_input)
+
+        self.azblobtier_input = QComboBox(self.horizontalLayoutWidget_12)
+        self.azblobtier_input.addItem("")
+        self.azblobtier_input.addItem("")
+        self.azblobtier_input.addItem("")
+        self.azblobtier_input.addItem("")
+        self.azblobtier_input.setObjectName(u"azblobtier_input")
+
+        self.verticalLayout_16.addWidget(self.azblobtier_input)
+
+        self.azBlocklistOnmount_input = QLineEdit(self.horizontalLayoutWidget_12)
+        self.azBlocklistOnmount_input.setObjectName(u"azBlocklistOnmount_input")
+
+        self.verticalLayout_16.addWidget(self.azBlocklistOnmount_input)
+
+        self.azMaxretries_input = QLineEdit(self.horizontalLayoutWidget_12)
+        self.azMaxretries_input.setObjectName(u"azMaxretries_input")
+
+        self.verticalLayout_16.addWidget(self.azMaxretries_input)
+
+        self.azMaxretrytimeout_input = QLineEdit(self.horizontalLayoutWidget_12)
+        self.azMaxretrytimeout_input.setObjectName(u"azMaxretrytimeout_input")
+
+        self.verticalLayout_16.addWidget(self.azMaxretrytimeout_input)
+
+        self.azRetrybackoffs = QLineEdit(self.horizontalLayoutWidget_12)
+        self.azRetrybackoffs.setObjectName(u"azRetrybackoffs")
+
+        self.verticalLayout_16.addWidget(self.azRetrybackoffs)
+
+        self.azMaxretrydelay_input = QLineEdit(self.horizontalLayoutWidget_12)
+        self.azMaxretrydelay_input.setObjectName(u"azMaxretrydelay_input")
+
+        self.verticalLayout_16.addWidget(self.azMaxretrydelay_input)
+
+        self.azHttpproxy_input = QLineEdit(self.horizontalLayoutWidget_12)
+        self.azHttpproxy_input.setObjectName(u"azHttpproxy_input")
+
+        self.verticalLayout_16.addWidget(self.azHttpproxy_input)
+
+        self.azHttpsproxy_input = QLineEdit(self.horizontalLayoutWidget_12)
+        self.azHttpsproxy_input.setObjectName(u"azHttpsproxy_input")
+
+        self.verticalLayout_16.addWidget(self.azHttpsproxy_input)
+
+        self.azAuthresource_input = QLineEdit(self.horizontalLayoutWidget_12)
+        self.azAuthresource_input.setObjectName(u"azAuthresource_input")
+
+        self.verticalLayout_16.addWidget(self.azAuthresource_input)
+
+
+        self.horizontalLayout_20.addLayout(self.verticalLayout_16)
+
+        self.verticalLayoutWidget_11 = QWidget(self.AzureOptional_groupbox)
+        self.verticalLayoutWidget_11.setObjectName(u"verticalLayoutWidget_11")
+        self.verticalLayoutWidget_11.setGeometry(QRect(320, 20, 227, 170))
+        self.verticalLayout_18 = QVBoxLayout(self.verticalLayoutWidget_11)
+        self.verticalLayout_18.setObjectName(u"verticalLayout_18")
+        self.verticalLayout_18.setContentsMargins(0, 0, 0, 0)
+        self.azUseHttp = QCheckBox(self.verticalLayoutWidget_11)
+        self.azUseHttp.setObjectName(u"azUseHttp")
+
+        self.verticalLayout_18.addWidget(self.azUseHttp)
+
+        self.azValidatemd5_checkbox = QCheckBox(self.verticalLayoutWidget_11)
+        self.azValidatemd5_checkbox.setObjectName(u"azValidatemd5_checkbox")
+
+        self.verticalLayout_18.addWidget(self.azValidatemd5_checkbox)
+
+        self.azUpdatemd5_checkbox = QCheckBox(self.verticalLayoutWidget_11)
+        self.azUpdatemd5_checkbox.setObjectName(u"azUpdatemd5_checkbox")
+
+        self.verticalLayout_18.addWidget(self.azUpdatemd5_checkbox)
+
+        self.azFailUnsupportedops_checkbox = QCheckBox(self.verticalLayoutWidget_11)
+        self.azFailUnsupportedops_checkbox.setObjectName(u"azFailUnsupportedops_checkbox")
+
+        self.verticalLayout_18.addWidget(self.azFailUnsupportedops_checkbox)
+
+        self.azSdktrace_checkbox = QCheckBox(self.verticalLayoutWidget_11)
+        self.azSdktrace_checkbox.setObjectName(u"azSdktrace_checkbox")
+
+        self.verticalLayout_18.addWidget(self.azSdktrace_checkbox)
+
+        self.azVirtualdirectory_checkbox = QCheckBox(self.verticalLayoutWidget_11)
+        self.azVirtualdirectory_checkbox.setObjectName(u"azVirtualdirectory_checkbox")
+
+        self.verticalLayout_18.addWidget(self.azVirtualdirectory_checkbox)
+
 
         self.retranslateUi(mountSettingsWidget)
 
@@ -383,10 +817,6 @@ class Ui_mountSettingsWidget(object):
 
     def retranslateUi(self, mountSettingsWidget):
         mountSettingsWidget.setWindowTitle(QCoreApplication.translate("mountSettingsWidget", u"Form", None))
-#if QT_CONFIG(tooltip)
-        self.previousSettings_checkbox.setToolTip(QCoreApplication.translate("mountSettingsWidget", u"<html><head/><body><p>Use previously saved settings</p></body></html>", None))
-#endif // QT_CONFIG(tooltip)
-        self.previousSettings_checkbox.setText(QCoreApplication.translate("mountSettingsWidget", u"Use previous settings", None))
         self.libfuse_groupBox.setTitle(QCoreApplication.translate("mountSettingsWidget", u"Libfuse settings", None))
         self.label_3.setText(QCoreApplication.translate("mountSettingsWidget", u"Permissions", None))
         self.libfuse_permissions_select.setItemText(0, QCoreApplication.translate("mountSettingsWidget", u"0777", None))
@@ -405,11 +835,13 @@ class Ui_mountSettingsWidget(object):
         self.libfuse_pathExp_input.setText(QCoreApplication.translate("mountSettingsWidget", u"120", None))
         self.libfuse_disableWriteback_checkbox.setText(QCoreApplication.translate("mountSettingsWidget", u"Disable write-back cache", None))
         self.libfuse_ignoreAppend_checkbox.setText(QCoreApplication.translate("mountSettingsWidget", u"Ignore append/write only flags", None))
-        self.resetDefaultSettings_checkbox.setText(QCoreApplication.translate("mountSettingsWidget", u"Reset settings to default", None))
         self.streaming_groupBox.setTitle(QCoreApplication.translate("mountSettingsWidget", u"Streaming Settings", None))
         self.label_8.setText(QCoreApplication.translate("mountSettingsWidget", u"Block size (MB)", None))
         self.label_9.setText(QCoreApplication.translate("mountSettingsWidget", u"Max buffer (MB)", None))
         self.label_10.setText(QCoreApplication.translate("mountSettingsWidget", u"Buffer size (MB)", None))
+        self.streaming_blksz_input.setText(QCoreApplication.translate("mountSettingsWidget", u"0", None))
+        self.streaming_mxbuff_input.setText(QCoreApplication.translate("mountSettingsWidget", u"0", None))
+        self.streaming_buffsz_input.setText(QCoreApplication.translate("mountSettingsWidget", u"0", None))
         self.label_11.setText(QCoreApplication.translate("mountSettingsWidget", u"File level caching", None))
         self.streaming_fileCachingLevel_select.setItemText(0, QCoreApplication.translate("mountSettingsWidget", u"Handle level", None))
         self.streaming_fileCachingLevel_select.setItemText(1, QCoreApplication.translate("mountSettingsWidget", u"File level", None))
@@ -447,5 +879,67 @@ class Ui_mountSettingsWidget(object):
         self.commonConfig_readOnly_checkbox.setText(QCoreApplication.translate("mountSettingsWidget", u"Read-only mount", None))
         self.daemonForeground_checkbox.setText(QCoreApplication.translate("mountSettingsWidget", u"Run in foreground", None))
         self.label.setText(QCoreApplication.translate("mountSettingsWidget", u"ALPHA DESIGN", None))
+        self.pushButton.setText(QCoreApplication.translate("mountSettingsWidget", u"Reset Default Settings", None))
+        self.AzureBucket_groupbox.setTitle(QCoreApplication.translate("mountSettingsWidget", u"Azure Bucket Settings", None))
+        self.label_2.setText(QCoreApplication.translate("mountSettingsWidget", u"Type", None))
+        self.AzTypesettings_select.setItemText(0, QCoreApplication.translate("mountSettingsWidget", u"block", None))
+        self.AzTypesettings_select.setItemText(1, QCoreApplication.translate("mountSettingsWidget", u"adls", None))
+
+        self.label_7.setText(QCoreApplication.translate("mountSettingsWidget", u"Account name", None))
+        self.label_12.setText(QCoreApplication.translate("mountSettingsWidget", u"Container", None))
+        self.label_20.setText(QCoreApplication.translate("mountSettingsWidget", u"Endpoint", None))
+        self.label_21.setText(QCoreApplication.translate("mountSettingsWidget", u"Mode", None))
+        self.azModesettings_select.setItemText(0, QCoreApplication.translate("mountSettingsWidget", u"key", None))
+        self.azModesettings_select.setItemText(1, QCoreApplication.translate("mountSettingsWidget", u"sas", None))
+        self.azModesettings_select.setItemText(2, QCoreApplication.translate("mountSettingsWidget", u"spn", None))
+        self.azModesettings_select.setItemText(3, QCoreApplication.translate("mountSettingsWidget", u"msi", None))
+
+        self.label_22.setText(QCoreApplication.translate("mountSettingsWidget", u"Account key", None))
+        self.label_23.setText(QCoreApplication.translate("mountSettingsWidget", u"Sas storage", None))
+        self.label_24.setText(QCoreApplication.translate("mountSettingsWidget", u"App ID", None))
+        self.label_25.setText(QCoreApplication.translate("mountSettingsWidget", u"Resource ID", None))
+        self.azMsiResourceid_input.setText("")
+        self.label_26.setText(QCoreApplication.translate("mountSettingsWidget", u"Object ID", None))
+        self.azMsiObjectid_input.setText("")
+        self.label_27.setText(QCoreApplication.translate("mountSettingsWidget", u"Tenant ID", None))
+        self.label_28.setText(QCoreApplication.translate("mountSettingsWidget", u"Client ID", None))
+        self.azSpnclientid_input.setText("")
+        self.label_29.setText(QCoreApplication.translate("mountSettingsWidget", u"Client Secret", None))
+        self.azSpnClientSecret_input.setText("")
+        self.AzureOptional_groupbox.setTitle(QCoreApplication.translate("mountSettingsWidget", u"Optional", None))
+        self.label_30.setText(QCoreApplication.translate("mountSettingsWidget", u"Aad endpoint", None))
+        self.label_31.setText(QCoreApplication.translate("mountSettingsWidget", u"Subdirectory", None))
+        self.label_32.setText(QCoreApplication.translate("mountSettingsWidget", u"Block-size (MB)", None))
+        self.label_33.setText(QCoreApplication.translate("mountSettingsWidget", u"Max concurrency", None))
+        self.label_34.setText(QCoreApplication.translate("mountSettingsWidget", u"Blob tier", None))
+        self.label_35.setText(QCoreApplication.translate("mountSettingsWidget", u"Block on mount (s)", None))
+        self.label_36.setText(QCoreApplication.translate("mountSettingsWidget", u"Max retries", None))
+        self.label_37.setText(QCoreApplication.translate("mountSettingsWidget", u"Max retry timeout (s)", None))
+        self.label_38.setText(QCoreApplication.translate("mountSettingsWidget", u"Retry backoff (s)", None))
+        self.label_39.setText(QCoreApplication.translate("mountSettingsWidget", u"Max Retry Delay (s)", None))
+        self.label_40.setText(QCoreApplication.translate("mountSettingsWidget", u"http proxy", None))
+        self.label_41.setText(QCoreApplication.translate("mountSettingsWidget", u"Https proxy", None))
+        self.label_42.setText(QCoreApplication.translate("mountSettingsWidget", u"Auth resource", None))
+        self.azblocksize_input.setText(QCoreApplication.translate("mountSettingsWidget", u"16", None))
+        self.azMaxconcurrency_input.setText(QCoreApplication.translate("mountSettingsWidget", u"32", None))
+        self.azblobtier_input.setItemText(0, QCoreApplication.translate("mountSettingsWidget", u"none", None))
+        self.azblobtier_input.setItemText(1, QCoreApplication.translate("mountSettingsWidget", u"hot", None))
+        self.azblobtier_input.setItemText(2, QCoreApplication.translate("mountSettingsWidget", u"cool", None))
+        self.azblobtier_input.setItemText(3, QCoreApplication.translate("mountSettingsWidget", u"archive", None))
+
+        self.azBlocklistOnmount_input.setText(QCoreApplication.translate("mountSettingsWidget", u"0", None))
+        self.azMaxretries_input.setText(QCoreApplication.translate("mountSettingsWidget", u"5", None))
+        self.azMaxretrytimeout_input.setText(QCoreApplication.translate("mountSettingsWidget", u"900", None))
+        self.azRetrybackoffs.setText(QCoreApplication.translate("mountSettingsWidget", u"4", None))
+        self.azMaxretrydelay_input.setText(QCoreApplication.translate("mountSettingsWidget", u"60", None))
+#if QT_CONFIG(tooltip)
+        self.azUseHttp.setToolTip(QCoreApplication.translate("mountSettingsWidget", u"<html><head/><body><p>Use http instead of https</p></body></html>", None))
+#endif // QT_CONFIG(tooltip)
+        self.azUseHttp.setText(QCoreApplication.translate("mountSettingsWidget", u"Use http", None))
+        self.azValidatemd5_checkbox.setText(QCoreApplication.translate("mountSettingsWidget", u"Validate md5 (file cache only)", None))
+        self.azUpdatemd5_checkbox.setText(QCoreApplication.translate("mountSettingsWidget", u"Update md5 (file cache only)", None))
+        self.azFailUnsupportedops_checkbox.setText(QCoreApplication.translate("mountSettingsWidget", u"Fail Unsupported Ops", None))
+        self.azSdktrace_checkbox.setText(QCoreApplication.translate("mountSettingsWidget", u"Sdk trace", None))
+        self.azVirtualdirectory_checkbox.setText(QCoreApplication.translate("mountSettingsWidget", u"Virtual directory", None))
     # retranslateUi
 

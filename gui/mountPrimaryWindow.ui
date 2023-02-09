@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>756</width>
-    <height>315</height>
+    <width>755</width>
+    <height>331</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -65,25 +65,6 @@
      </item>
     </layout>
    </widget>
-   <widget class="QToolButton" name="toolButton">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>150</y>
-      <width>101</width>
-      <height>24</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Show Progress</string>
-    </property>
-    <property name="checkable">
-     <bool>true</bool>
-    </property>
-    <property name="autoRaise">
-     <bool>true</bool>
-    </property>
-   </widget>
    <widget class="QTextEdit" name="output_textEdit">
     <property name="geometry">
      <rect>
@@ -116,15 +97,15 @@
    <widget class="QLabel" name="label_3">
     <property name="geometry">
      <rect>
-      <x>140</x>
-      <y>120</y>
-      <width>481</width>
-      <height>111</height>
+      <x>180</x>
+      <y>130</y>
+      <width>391</width>
+      <height>61</height>
      </rect>
     </property>
     <property name="font">
      <font>
-      <pointsize>48</pointsize>
+      <pointsize>40</pointsize>
       <weight>75</weight>
       <bold>true</bold>
      </font>
@@ -220,7 +201,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>756</width>
+     <width>755</width>
      <height>22</height>
     </rect>
    </property>
@@ -236,7 +217,7 @@
     <property name="title">
      <string>Settings</string>
     </property>
-    <addaction name="basicSettings_action"/>
+    <addaction name="setup_action"/>
     <addaction name="advancedSettings_action"/>
    </widget>
    <addaction name="menuSettings"/>
@@ -268,9 +249,9 @@
     <string>Testing</string>
    </property>
   </action>
-  <action name="basicSettings_action">
+  <action name="setup_action">
    <property name="text">
-    <string>Basic</string>
+    <string>Setup</string>
    </property>
   </action>
  </widget>

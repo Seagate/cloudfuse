@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'MountPrimaryWindow.ui'
+## Form generated from reading UI file 'mountPrimaryWindow.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.4.2
 ##
@@ -19,13 +19,13 @@ from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
 from PySide6.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QLabel,
     QLineEdit, QMainWindow, QMenu, QMenuBar,
     QPushButton, QSizePolicy, QStatusBar, QTextEdit,
-    QToolButton, QWidget)
+    QWidget)
 
 class Ui_primaryFUSEwindow(object):
     def setupUi(self, primaryFUSEwindow):
         if not primaryFUSEwindow.objectName():
             primaryFUSEwindow.setObjectName(u"primaryFUSEwindow")
-        primaryFUSEwindow.resize(756, 315)
+        primaryFUSEwindow.resize(755, 331)
         sizePolicy = QSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -44,8 +44,8 @@ class Ui_primaryFUSEwindow(object):
         self.debugHealthMonitor_action.setObjectName(u"debugHealthMonitor_action")
         self.debugTesting_action = QAction(primaryFUSEwindow)
         self.debugTesting_action.setObjectName(u"debugTesting_action")
-        self.basicSettings_action = QAction(primaryFUSEwindow)
-        self.basicSettings_action.setObjectName(u"basicSettings_action")
+        self.setup_action = QAction(primaryFUSEwindow)
+        self.setup_action.setObjectName(u"setup_action")
         self.centralwidget = QWidget(primaryFUSEwindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.horizontalLayoutWidget = QWidget(self.centralwidget)
@@ -66,11 +66,6 @@ class Ui_primaryFUSEwindow(object):
 
         self.horizontalLayout.addWidget(self.pipeline_select)
 
-        self.toolButton = QToolButton(self.centralwidget)
-        self.toolButton.setObjectName(u"toolButton")
-        self.toolButton.setGeometry(QRect(10, 150, 101, 24))
-        self.toolButton.setCheckable(True)
-        self.toolButton.setAutoRaise(True)
         self.output_textEdit = QTextEdit(self.centralwidget)
         self.output_textEdit.setObjectName(u"output_textEdit")
         self.output_textEdit.setGeometry(QRect(10, 180, 731, 91))
@@ -84,9 +79,9 @@ class Ui_primaryFUSEwindow(object):
         self.mount_button.setGeometry(QRect(10, 110, 89, 25))
         self.label_3 = QLabel(self.centralwidget)
         self.label_3.setObjectName(u"label_3")
-        self.label_3.setGeometry(QRect(140, 120, 481, 111))
+        self.label_3.setGeometry(QRect(180, 130, 391, 61))
         font = QFont()
-        font.setPointSize(48)
+        font.setPointSize(40)
         font.setBold(True)
         self.label_3.setFont(font)
         self.unmount_button = QPushButton(self.centralwidget)
@@ -134,7 +129,7 @@ class Ui_primaryFUSEwindow(object):
         primaryFUSEwindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(primaryFUSEwindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 756, 22))
+        self.menubar.setGeometry(QRect(0, 0, 755, 22))
         self.menuDebug = QMenu(self.menubar)
         self.menuDebug.setObjectName(u"menuDebug")
         self.menuSettings = QMenu(self.menubar)
@@ -149,7 +144,7 @@ class Ui_primaryFUSEwindow(object):
         self.menuDebug.addAction(self.debugLogging_action)
         self.menuDebug.addAction(self.debugHealthMonitor_action)
         self.menuDebug.addAction(self.debugTesting_action)
-        self.menuSettings.addAction(self.basicSettings_action)
+        self.menuSettings.addAction(self.setup_action)
         self.menuSettings.addAction(self.advancedSettings_action)
 
         self.retranslateUi(primaryFUSEwindow)
@@ -164,7 +159,7 @@ class Ui_primaryFUSEwindow(object):
         self.debugLogging_action.setText(QCoreApplication.translate("primaryFUSEwindow", u"Logging", None))
         self.debugHealthMonitor_action.setText(QCoreApplication.translate("primaryFUSEwindow", u"Health Monitor", None))
         self.debugTesting_action.setText(QCoreApplication.translate("primaryFUSEwindow", u"Testing", None))
-        self.basicSettings_action.setText(QCoreApplication.translate("primaryFUSEwindow", u"Basic", None))
+        self.setup_action.setText(QCoreApplication.translate("primaryFUSEwindow", u"Setup", None))
         self.label_2.setText(QCoreApplication.translate("primaryFUSEwindow", u"Pipeline Selection", None))
         self.pipeline_select.setItemText(0, QCoreApplication.translate("primaryFUSEwindow", u"Streaming", None))
         self.pipeline_select.setItemText(1, QCoreApplication.translate("primaryFUSEwindow", u"File Caching", None))
@@ -172,7 +167,6 @@ class Ui_primaryFUSEwindow(object):
 #if QT_CONFIG(tooltip)
         self.pipeline_select.setToolTip(QCoreApplication.translate("primaryFUSEwindow", u"<html><head/><body><p>Set up the pipeline for LyveFuse. </p><p>Choose streaming or file caching</p></body></html>", None))
 #endif // QT_CONFIG(tooltip)
-        self.toolButton.setText(QCoreApplication.translate("primaryFUSEwindow", u"Show Progress", None))
         self.mount_button.setText(QCoreApplication.translate("primaryFUSEwindow", u"Mount", None))
         self.label_3.setText(QCoreApplication.translate("primaryFUSEwindow", u"ALPHA DESIGN", None))
         self.unmount_button.setText(QCoreApplication.translate("primaryFUSEwindow", u"Unmount", None))

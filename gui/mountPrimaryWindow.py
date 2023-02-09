@@ -26,20 +26,21 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
         # Set up the signals for this window
         
-        self.advancedSettings_action.triggered.connect(self.show_settings_widget)
-        self.browse_button.clicked.connect(self.get_File_Directory_Input)
-        self.mount_button.clicked.connect(self.mount_Bucket)
-    
+        self.advancedSettings_action.triggered.connect(self.showSettingsWidget)
+        self.browse_button.clicked.connect(self.getFileDirInput)
+        self.mount_button.clicked.connect(self.mountBucket)
+        self.unmount_button.clicked.connect(self.unmountBucket)
+
     # Define the slots that will be triggered when the signals in Qt are activated
-    def show_settings_widget(self):
+    def showSettingsWidget(self):
         self.settingsWindow = mountSettingsWidget()
         self.settingsWindow.show()
 
-    def get_File_Directory_Input(self):
+    def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
         self.mountPoint_input.setText('{}'.format(directory))
 
-    def mount_Bucket(self):
+    def mountBucket(self):
         msg = QtWidgets.QMessageBox()
         if self.bucket_select.currentIndex() != butcketOptions["Azure"]:
             msg.setWindowTitle("Error")
@@ -48,18 +49,33 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             return
         try:
             directory = str(self.mountPoint_input.text())
-            mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"])
-
+            mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"],capture_output=True)
             if mount.returncode == 0:
                 # Print to the text edit window on success.  
-                self.output_textEdit.setText("Successfully mounted container")
+                self.output_textEdit.setText("Successfully mounted container\n")
             else:
-                self.output_textEdit.setText('Error mounting container')
+                print(mount.stdout.decode())
+                self.output_textEdit.setText("!!Error mounting container!!\n" + mount.stdout.decode())
                 
                 # Get the users attention by popping open a new window on an error
                 msg.setWindowTitle("Error")
                 msg.setText("Error mounting container - check the settings and try again")
                 x = msg.exec()  # Show the message box
 
+        except ValueError:
+            pass
+
+    def unmountBucket(self):
+        msg = QtWidgets.QMessageBox()
+        try:
+            unmount = subprocess.run(["./lyvecloudfuse", "unmount", "all"],capture_output=True)
+            #print(unmount.stdout)
+            if unmount.returncode == 0:
+                self.output_textEdit.setText("Successfully unmounted container\n" + unmount.stdout.decode())
+            else:
+                self.output_textEdit.setText("!!Error unmounting container!!\n" + unmount.stdout.decode())
+                msg.setWindowTitle("Error")
+                msg.setText("Error unmounting container - check the logs")
+                x = msg.exec()  # Show the message box
         except ValueError:
             pass
