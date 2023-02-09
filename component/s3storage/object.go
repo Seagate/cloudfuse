@@ -307,7 +307,15 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 	objectAttrList := make([]*internal.ObjAttr, 0)
 	// fetch and process result pages
 	for paginator.HasMorePages() {
-		output, err := paginator.NextPage(context.TODO())
+		retryCount := 5
+		var err error
+		var output *s3.ListObjectsV2Output
+		for i := 0; i < retryCount; i++ {
+			output, err = paginator.NextPage(context.TODO())
+			if err == nil {
+				break
+			}
+		}
 		if err != nil {
 			log.Err("Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
 			return objectAttrList, nil, err
@@ -359,6 +367,10 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 			// we have to iterate in descending order
 			suffixToTrim := ""
 			for i := len(intermediatDirectories) - 1; i >= 0; i-- {
+				// ignore empty strings (split does not ommit them)
+				if intermediatDirectories[i] == "" {
+					continue
+				}
 				// add to the suffix we're trimming off
 				suffixToTrim = intermediatDirectories[i] + "/" + suffixToTrim
 				// get the trimmed (parent) directory
@@ -371,6 +383,11 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 			}
 		}
 	}
+
+	for _, objAttr := range objectAttrList {
+		fmt.Println(objAttr.Path)
+	}
+
 	// now let's add attributes for all the directories in dirList
 	for dir, _ := range dirList {
 		if dir == listPath {
@@ -393,12 +410,18 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 		objectAttrList = append(objectAttrList, attr)
 	}
 
+	fmt.Println("Printing again with directories")
+	for _, objAttr := range objectAttrList {
+		fmt.Println(objAttr.Path)
+	}
+
 	// Clean up the temp map as its no more needed
 	for k := range dirList {
 		delete(dirList, k)
 	}
+	newMarker := ""
 
-	return objectAttrList, nil, nil
+	return objectAttrList, &newMarker, nil
 }
 
 // track the progress of download of blobs where every 100MB of data downloaded is being tracked. It also tracks the completion of download
@@ -631,24 +654,29 @@ func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *o
 }
 
 // WriteFromBuffer : Upload from a buffer to a blob
-func (bb *S3Object) WriteFromBuffer(name string, metadata map[string]string, data []byte) error {
+func (bb *S3Object) WriteFromBuffer(name string, metadata map[string]string, data []byte) (err error) {
 	largeBuffer := bytes.NewReader(data)
 	// TODO: Move this variable into the config file
 	var partMiBs int64 = 16
 	uploader := manager.NewUploader(bb.Client, func(u *manager.Uploader) {
 		u.PartSize = partMiBs * 1024 * 1024
 	})
-	_, err := uploader.Upload(context.TODO(), &s3.PutObjectInput{
-		Bucket: aws.String(bb.Config.authConfig.BucketName),
-		Key:    aws.String(name),
-		Body:   largeBuffer,
-	})
+	retryCount := 5
+	for i := 0; i < retryCount; i++ {
+		_, err := uploader.Upload(context.TODO(), &s3.PutObjectInput{
+			Bucket: aws.String(bb.Config.authConfig.BucketName),
+			Key:    aws.String(name),
+			Body:   largeBuffer,
+		})
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
-		fmt.Printf("Couldn't upload object to %v:%v. Here's why: %v\n",
+		log.Err("Couldn't upload object to %v:%v. Here's why: %v\n",
 			bb.Config.authConfig.BucketName, name, err)
 		return err
 	}
-
 	return nil
 }
 

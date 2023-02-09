@@ -548,20 +548,20 @@ func (s *blockBlobTestSuite) TestReadDir() {
 func (s *blockBlobTestSuite) TestStreamDirSmallCountNoDuplicates() {
 	defer s.cleanupTest()
 	// Setup
-	s.az.CreateFile(internal.CreateFileOptions{Name: "blob1.txt"})
-	s.az.CreateFile(internal.CreateFileOptions{Name: "blob2.txt"})
-	s.az.CreateFile(internal.CreateFileOptions{Name: "newblob1.txt"})
-	s.az.CreateFile(internal.CreateFileOptions{Name: "newblob2.txt"})
-	s.az.CreateDir(internal.CreateDirOptions{Name: "myfolder"})
-	s.az.CreateFile(internal.CreateFileOptions{Name: "myfolder/newblobA.txt"})
-	s.az.CreateFile(internal.CreateFileOptions{Name: "myfolder/newblobB.txt"})
+	s.az.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/blob1.txt"})
+	s.az.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/blob2.txt"})
+	s.az.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newblob1.txt"})
+	s.az.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newblob2.txt"})
+	s.az.CreateDir(internal.CreateDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder"})
+	s.az.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder/newblobA.txt"})
+	s.az.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder/newblobB.txt"})
 
 	var iteration int = 0
 	var marker string = ""
 	blobList := make([]*internal.ObjAttr, 0)
 
 	for {
-		new_list, new_marker, err := s.az.StreamDir(internal.StreamDirOptions{Name: "/", Token: marker, Count: 1})
+		new_list, new_marker, err := s.az.StreamDir(internal.StreamDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/", Token: marker, Count: 1})
 		fmt.Println(err)
 		s.assert.Nil(err)
 		blobList = append(blobList, new_list...)
