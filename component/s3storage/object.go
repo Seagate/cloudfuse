@@ -268,7 +268,7 @@ func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 
 	// TODO: Call bb.List with a limit of 1 to reduce wasted resources
 	// TODO: Handle markers
-	blobs, _, err := bb.List(name, marker, common.MaxDirListCount)
+	blobs, _, err := bb.List(name, marker, 1)
 	if err != nil {
 		e := storeBlobErrToErr(err)
 		if e == ErrFileNotFound {
@@ -410,9 +410,9 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 		}
 	}
 
-	for _, objAttr := range objectAttrList {
-		fmt.Println(objAttr.Path)
-	}
+	// for _, objAttr := range objectAttrList {
+	// 	fmt.Println(objAttr.Path)
+	// }
 
 	// now let's add attributes for all the directories in dirList
 	for dir, _ := range dirList {
@@ -436,10 +436,10 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 		objectAttrList = append(objectAttrList, attr)
 	}
 
-	fmt.Println("Printing again with directories")
-	for _, objAttr := range objectAttrList {
-		fmt.Println(objAttr.Path)
-	}
+	// fmt.Println("Printing again with directories")
+	// for _, objAttr := range objectAttrList {
+	// 	fmt.Println(objAttr.Path)
+	// }
 
 	// Clean up the temp map as its no more needed
 	for k := range dirList {
