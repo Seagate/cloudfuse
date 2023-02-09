@@ -262,6 +262,32 @@ func (bb *S3Object) getAttrUsingList(name string) (attr *internal.ObjAttr, err e
 
 // GetAttr : Retrieve attributes of the blob
 func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
+	log.Trace("BlockBlob::GetAttr : name %s", name)
+
+	var marker *string = nil
+
+	// TODO: Call bb.List with a limit of 1 to reduce wasted resources
+	// TODO: Handle markers
+	blobs, _, err := bb.List(name, marker, common.MaxDirListCount)
+	if err != nil {
+		e := storeBlobErrToErr(err)
+		if e == ErrFileNotFound {
+			return attr, syscall.ENOENT
+		} else if e == InvalidPermission {
+			return attr, syscall.EPERM
+		} else {
+			log.Warn("BlockBlob::getAttrUsingList : Failed to list blob properties for %s [%s]", name, err.Error())
+		}
+	}
+
+	blobsRead := len(blobs)
+	for i, blob := range blobs {
+		log.Trace("BlockBlob::GetAttr : Item %d Blob %s", i+blobsRead, blob.Name)
+		if blob.Path == name {
+			return blob, nil
+		}
+	}
+
 	return nil, err
 }
 

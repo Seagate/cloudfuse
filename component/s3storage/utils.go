@@ -290,6 +290,7 @@ var ErrStr = map[uint16]string{
 // https://godoc.org/github.com/Azure/azure-storage-blob-go/azblob#ListBlobsSegmentOptions
 // Convert blob storage error to common errors
 func storeBlobErrToErr(err error) uint16 {
+	// TODO: we need our own S3-specific error parser to type errors being returned
 	if serr, ok := err.(azblob.StorageError); ok {
 		switch serr.ServiceCode() {
 		case azblob.ServiceCodeBlobAlreadyExists:

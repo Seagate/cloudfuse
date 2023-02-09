@@ -261,23 +261,23 @@ func (s *blockBlobTestSuite) TestCopyFromFile() {
 	s.assert.EqualValues(testData, output)
 }
 
-// func (s *blockBlobTestSuite) TestReadFile() {
-// 	defer s.cleanupTest()
-// 	// Setup
-// 	name := generateFileName()
-// 	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
-// 	s.assert.Nil(err)
-// 	testData := "test data"
-// 	data := []byte(testData)
-// 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-// 	s.assert.Nil(err)
-// 	h, err = s.az.OpenFile(internal.OpenFileOptions{Name: name})
-// 	s.assert.Nil(err)
+func (s *blockBlobTestSuite) TestReadFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.Nil(err)
+	testData := "test data"
+	data := []byte(testData)
+	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	h, err = s.az.OpenFile(internal.OpenFileOptions{Name: name})
+	s.assert.Nil(err)
 
-// 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-// 	s.assert.Nil(err)
-// 	s.assert.EqualValues(testData, output)
-// }
+	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	s.assert.Nil(err)
+	s.assert.EqualValues(testData, output)
+}
 
 // func (s *blockBlobTestSuite) TestReadFileError() {
 // 	defer s.cleanupTest()
