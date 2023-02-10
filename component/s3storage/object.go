@@ -340,11 +340,13 @@ func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	for i, blob := range blobs {
 		log.Trace("BlockBlob::GetAttr : Item %d Blob %s", i+numObjects, blob.Name)
 		if blob.Path == name {
+			// we found it!
 			return blob, nil
 		}
 	}
 
-	fmt.Printf("GetAttr was asked for %s, but found no match (amont %d results).\n", name, numObjects)
+	// not found
+	log.Err("GetAttr was asked for %s, but found no match (amont %d results).\n", name, numObjects)
 	return nil, syscall.ENOENT
 }
 
@@ -374,7 +376,6 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 
 	// create a map to keep track of all directories
 	var dirList = make(map[string]bool)
-	dirList[listPath] = true
 
 	// using paginator from here: https://aws.github.io/aws-sdk-go-v2/docs/making-requests/#using-paginators
 	params := &s3.ListObjectsV2Input{
@@ -438,6 +439,7 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 			// not sure if we need this
 			attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 			attr.Flags.Set(internal.PropFlagModeDefault)
+			attr.Metadata = make(map[string]string)
 			objectAttrList = append(objectAttrList, attr)
 		}
 		// documentation for CommonPrefixes:
@@ -498,6 +500,8 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 		attr.Ctime = attr.Mtime
 		attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 		attr.Flags.Set(internal.PropFlagModeDefault)
+		attr.Metadata = make(map[string]string)
+		attr.Metadata[folderKey] = "true"
 		objectAttrList = append(objectAttrList, attr)
 	}
 
@@ -510,8 +514,8 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 	for k := range dirList {
 		delete(dirList, k)
 	}
-	newMarker := ""
 
+	newMarker := ""
 	return objectAttrList, &newMarker, nil
 }
 
