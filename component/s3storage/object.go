@@ -202,7 +202,31 @@ func (bb *S3Object) CreateLink(source string, target string) error {
 
 // DeleteFile : Delete a blob in the container/virtual directory
 func (bb *S3Object) DeleteFile(name string) (err error) {
-	return err
+
+	log.Trace("Object::DeleteFile : name %s", name)
+
+	_, err = bb.Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+		Bucket: aws.String(bb.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+
+	// TODO: If the object doesn't exist, the command will return success because there's nothing to delete.
+	// 		figure out how to force an error
+	if err != nil {
+
+		serr := storeBlobErrToErr(err)
+		if serr == ErrFileNotFound {
+			log.Err("BlockBlob::DeleteFile : %s does not exist", name)
+			return syscall.ENOENT
+		} else if serr == BlobIsUnderLease {
+			log.Err("BlockBlob::DeleteFile : %s is under lease [%s]", name, err.Error())
+			return syscall.EIO
+		} else {
+			log.Err("BlockBlob::DeleteFile : Failed to delete blob %s [%s]", name, err.Error())
+			return err
+		}
+	}
+	return nil
 }
 
 // DeleteDirectory : Delete a virtual directory in the container/virtual directory

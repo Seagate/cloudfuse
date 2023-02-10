@@ -234,6 +234,43 @@ func (s *blockBlobTestSuite) TestCreateFile() {
 	s.assert.NotNil(result)
 }
 
+func (s *blockBlobTestSuite) TestDeleteFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+
+	err := s.az.DeleteFile(internal.DeleteFileOptions{Name: name})
+	s.assert.Nil(err)
+
+	// This is similar to the az bucket command, use getobject for now
+	//_, err = s.az.GetAttr(internal.GetAttrOptions{name, false})
+	// File should not be in the account
+	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+
+	s.assert.NotNil(err)
+}
+
+// func (s *blockBlobTestSuite) TestDeleteFileError() {
+// 	defer s.cleanupTest()
+// 	// Setup
+// 	name := generateFileName()
+
+// 	err := s.az.DeleteFile(internal.DeleteFileOptions{Name: name})
+// 	s.assert.NotNil(err)
+// 	s.assert.EqualValues(syscall.ENOENT, err)
+
+// 	// File should not be in the account
+// 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+// 		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+// 		Key:    aws.String(name),
+// 	})
+// 	s.assert.NotNil(err)
+// }
+
 func (s *blockBlobTestSuite) TestCopyFromFile() {
 	defer s.cleanupTest()
 	// Setup
