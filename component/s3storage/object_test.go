@@ -214,6 +214,37 @@ func (s *blockBlobTestSuite) TestListContainers() {
 	s.assert.Equal(containers, []string{"stxe1-srg-lens-lab1"})
 }
 
+func (s *blockBlobTestSuite) TestIsDirEmpty() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateDirectoryName()
+	s.az.CreateDir(internal.CreateDirOptions{Name: name})
+
+	// Testing dir and dir/
+	var paths = []string{name, name + "/"}
+	for _, path := range paths {
+		log.Debug(path)
+		s.Run(path, func() {
+			empty := s.az.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
+
+			s.assert.True(empty)
+		})
+	}
+}
+
+func (s *blockBlobTestSuite) TestIsDirEmptyFalse() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateDirectoryName()
+	s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	file := name + "/" + generateFileName()
+	s.az.CreateFile(internal.CreateFileOptions{Name: file})
+
+	empty := s.az.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
+
+	s.assert.False(empty)
+}
+
 func (s *blockBlobTestSuite) TestCreateFile() {
 	defer s.cleanupTest()
 	// Setup
@@ -232,6 +263,52 @@ func (s *blockBlobTestSuite) TestCreateFile() {
 	})
 	s.assert.Nil(err)
 	s.assert.NotNil(result)
+}
+
+func (s *blockBlobTestSuite) TestOpenFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+
+	h, err := s.az.OpenFile(internal.OpenFileOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.NotNil(h)
+	s.assert.EqualValues(name, h.Path)
+	s.assert.EqualValues(0, h.Size)
+}
+
+func (s *blockBlobTestSuite) TestOpenFileError() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+
+	h, err := s.az.OpenFile(internal.OpenFileOptions{Name: name})
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
+	s.assert.Nil(h)
+}
+
+func (s *blockBlobTestSuite) TestCloseFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+
+	// This method does nothing.
+	err := s.az.CloseFile(internal.CloseFileOptions{Handle: h})
+	s.assert.Nil(err)
+}
+
+func (s *blockBlobTestSuite) TestCloseFileFakeHandle() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h := handlemap.NewHandle(name)
+
+	// This method does nothing.
+	err := s.az.CloseFile(internal.CloseFileOptions{Handle: h})
+	s.assert.Nil(err)
 }
 
 func (s *blockBlobTestSuite) TestDeleteFile() {
@@ -399,6 +476,29 @@ func (s *blockBlobTestSuite) TestReadInBufferError() {
 	_, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: make([]byte, 2)})
 	s.assert.NotNil(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
+}
+
+func (s *blockBlobTestSuite) TestWriteFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+
+	testData := "test data"
+	data := []byte(testData)
+	count, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	s.assert.EqualValues(len(data), count)
+
+	// Blob should have updated data
+	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, _ := ioutil.ReadAll(result.Body)
+	s.assert.EqualValues(testData, output)
 }
 
 func (s *blockBlobTestSuite) TestWriteSmallFile() {
@@ -614,52 +714,52 @@ func (s *blockBlobTestSuite) TestStreamDirSmallCountNoDuplicates() {
 	s.assert.EqualValues(5, len(blobList))
 }
 
-// func (s *blockBlobTestSuite) TestRenameFile() {
-// 	defer s.cleanupTest()
-// 	// Setup
-// 	src := generateFileName()
-// 	s.az.CreateFile(internal.CreateFileOptions{Name: src})
-// 	dst := generateFileName()
+func (s *blockBlobTestSuite) TestRenameFile() {
+	defer s.cleanupTest()
+	// Setup
+	src := generateFileName()
+	s.az.CreateFile(internal.CreateFileOptions{Name: src})
+	dst := generateFileName()
 
-// 	err := s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
-// 	s.assert.Nil(err)
+	err := s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+	s.assert.Nil(err)
 
-// 	// Src should not be in the account
-// 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-// 		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
-// 		Key:    aws.String(src),
-// 	})
-// 	s.assert.NotNil(err)
-// 	// Dst should be in the account
-// 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-// 		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
-// 		Key:    aws.String(dst),
-// 	})
-// 	s.assert.Nil(err)
-// }
+	// Src should not be in the account
+	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Key:    aws.String(src),
+	})
+	s.assert.NotNil(err)
+	// Dst should be in the account
+	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Key:    aws.String(dst),
+	})
+	s.assert.Nil(err)
+}
 
-// func (s *blockBlobTestSuite) TestRenameFileError() {
-// 	defer s.cleanupTest()
-// 	// Setup
-// 	src := generateFileName()
-// 	dst := generateFileName()
+func (s *blockBlobTestSuite) TestRenameFileError() {
+	defer s.cleanupTest()
+	// Setup
+	src := generateFileName()
+	dst := generateFileName()
 
-// 	err := s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
-// 	s.assert.NotNil(err)
-// 	s.assert.EqualValues(syscall.ENOENT, err)
+	err := s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
 
-// 	// Src and destination should not be in the account
-// 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-// 		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
-// 		Key:    aws.String(src),
-// 	})
-// 	s.assert.NotNil(err)
-// 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-// 		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
-// 		Key:    aws.String(dst),
-// 	})
-// 	s.assert.NotNil(err)
-// }
+	// Src and destination should not be in the account
+	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Key:    aws.String(src),
+	})
+	s.assert.NotNil(err)
+	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Key:    aws.String(dst),
+	})
+	s.assert.NotNil(err)
+}
 
 // func (s *blockBlobTestSuite) TestGetAttrDir() {
 // 	defer s.cleanupTest()
