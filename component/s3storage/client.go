@@ -528,33 +528,60 @@ func (cl *S3Client) List(prefix string, marker *string, count int32) ([]*interna
 func trackDownload(name string, bytesTransferred int64, count int64, downloadPtr *int64) {
 }
 
-// ReadToFile : Download an object to a local file
-
 /*
-what dis do?
+description:
+
+	Download object to a local file
+
+input:
+ 1. string representing name of object in S3 bucket
+ 2. int64 representing a where in the object to start reading data
+ 3. int64 representing how much data to read from the offset
+ 4. os.file for the file being created and written to as data is being read from the object.
+
+output:
+
+	error
 */
 func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
 
 	log.Trace("S3Client::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
-	//defer exectime.StatTimeCurrentBlock("S3Client::ReadToFile")()
-	//blobURL := cl.Container.NewBlobURL(filepath.Join(cl.Config.prefixPath, name))
-
-	//what is this?
-	var downloadPtr *int64 = new(int64)
-	*downloadPtr = 1
-
-	//defer log.TimeTrack(time.Now(), "S3Client::ReadToFile", name)
-	//err = azblob.DownloadBlobToFile(context.Background(), blobURL, offset, count, fi, cl.downloadOptions)
+	// var downloadPtr *int64 = new(int64)
+	// *downloadPtr = 1
 
 	bucketName := aws.String(cl.Config.authConfig.BucketName)
 
 	var apiErr smithy.APIError
 	var result *s3.GetObjectOutput
 	for i := 0; i < retryCount; i++ {
-		result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
-			Bucket: bucketName,
-			Key:    aws.String(name),
-		})
+		if offset == 0 && count == 0 {
+			result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
+				Bucket: aws.String(cl.Config.authConfig.BucketName),
+				Key:    aws.String(name),
+			})
+		} else if offset != 0 && count == 0 {
+			var attributeTypes []types.ObjectAttributes
+			objAttr, objAttrErr := cl.Client.GetObjectAttributes(context.TODO(), &s3.GetObjectAttributesInput{
+				Bucket:           aws.String(cl.Config.authConfig.BucketName),
+				Key:              aws.String(name),
+				ObjectAttributes: attributeTypes,
+			})
+			if objAttrErr != nil {
+				log.Err("can't get attribute of object. Here's why: ", objAttrErr)
+				return objAttrErr
+			}
+			result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
+				Bucket: aws.String(cl.Config.authConfig.BucketName),
+				Key:    aws.String(name),
+				Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(objAttr.ObjectSize-offset)),
+			})
+		} else {
+			result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
+				Bucket: aws.String(cl.Config.authConfig.BucketName),
+				Key:    aws.String(name),
+				Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(offset+count)),
+			})
+		}
 		if err == nil {
 			break
 		}
@@ -568,7 +595,6 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 			log.Warn("S3Client::ReadToFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
-
 	if err != nil {
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
