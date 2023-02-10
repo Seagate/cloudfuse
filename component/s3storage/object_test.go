@@ -761,35 +761,40 @@ func (s *blockBlobTestSuite) TestRenameFileError() {
 	s.assert.NotNil(err)
 }
 
-// func (s *blockBlobTestSuite) TestGetAttrDir() {
-// 	defer s.cleanupTest()
-// 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-// 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-// 		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
-// 	configs := []string{"", vdConfig}
-// 	for _, c := range configs {
-// 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-// 		s.tearDownTestHelper(false)
-// 		s.setupTestHelper(c, s.container, true)
-// 		testName := ""
-// 		if c != "" {
-// 			testName = "virtual-directory"
-// 		}
-// 		s.Run(testName, func() {
-// 			// Setup
-// 			name := generateDirectoryName()
-// 			s.az.CreateDir(internal.CreateDirOptions{Name: name})
-
-// 			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-// 			s.assert.Nil(err)
-// 			s.assert.NotNil(props)
-// 			s.assert.True(props.IsDir())
-// 			s.assert.NotEmpty(props.Metadata)
-// 			s.assert.Contains(props.Metadata, folderKey)
-// 			s.assert.EqualValues("true", props.Metadata[folderKey])
-// 		})
-// 	}
-// }
+func (s *blockBlobTestSuite) TestGetAttrDir() {
+	defer s.cleanupTest()
+	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
+		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	configs := []string{"", vdConfig}
+	for _, c := range configs {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		s.tearDownTestHelper(false)
+		s.setupTestHelper(c, s.container, true)
+		testName := ""
+		if c != "" {
+			testName = "virtual-directory"
+		}
+		s.Run(testName, func() {
+			// Setup
+			dirName := generateDirectoryName()
+			s.az.CreateDir(internal.CreateDirOptions{Name: dirName})
+			// since CreateDir doesn't do anything, let's put an object with that prefix
+			filename := dirName + "/" + generateFileName()
+			s.az.CreateFile(internal.CreateFileOptions{Name: filename})
+			// Now we should be able to see the directory
+			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: dirName})
+			deleteError := s.az.DeleteFile(internal.DeleteFileOptions{Name: filename})
+			s.assert.Nil(err)
+			s.assert.NotNil(props)
+			s.assert.True(props.IsDir())
+			s.assert.NotEmpty(props.Metadata)
+			s.assert.Contains(props.Metadata, folderKey)
+			s.assert.EqualValues("true", props.Metadata[folderKey])
+			s.assert.Nil(deleteError)
+		})
+	}
+}
 
 func (s *blockBlobTestSuite) TestGetAttrVirtualDir() {
 	defer s.cleanupTest()
