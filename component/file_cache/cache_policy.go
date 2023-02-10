@@ -43,6 +43,7 @@ import (
 )
 
 const DefaultEvictTime = 10
+const sectorSize = 4096
 
 type cachePolicyConfig struct {
 	tmpPath      string
