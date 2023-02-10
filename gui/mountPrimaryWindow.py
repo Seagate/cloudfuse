@@ -49,13 +49,13 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             return
         try:
             directory = str(self.mountPoint_input.text())
-            mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"],capture_output=True)
+            mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"])#,capture_output=True)
             if mount.returncode == 0:
                 # Print to the text edit window on success.  
                 self.output_textEdit.setText("Successfully mounted container\n")
             else:
-                print(mount.stdout.decode())
-                self.output_textEdit.setText("!!Error mounting container!!\n" + mount.stdout.decode())
+                #print(mount.stdout.decode())
+                self.output_textEdit.setText("!!Error mounting container!!\n")# + mount.stdout.decode())
                 
                 # Get the users attention by popping open a new window on an error
                 msg.setWindowTitle("Error")
