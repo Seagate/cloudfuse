@@ -279,15 +279,16 @@ func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 		}
 	}
 
-	blobsRead := len(blobs)
+	numObjects := len(blobs)
 	for i, blob := range blobs {
-		log.Trace("BlockBlob::GetAttr : Item %d Blob %s", i+blobsRead, blob.Name)
+		log.Trace("BlockBlob::GetAttr : Item %d Blob %s", i+numObjects, blob.Name)
 		if blob.Path == name {
 			return blob, nil
 		}
 	}
 
-	return nil, err
+	fmt.Printf("GetAttr was asked for %s, but found no match (amont %d results).\n", name, numObjects)
+	return nil, syscall.ENOENT
 }
 
 // List : Get a list of blobs matching the given prefix

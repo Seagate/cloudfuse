@@ -624,6 +624,254 @@ func (s *blockBlobTestSuite) TestStreamDirSmallCountNoDuplicates() {
 // 	s.assert.NotNil(err)
 // }
 
+func (s *blockBlobTestSuite) TestGetAttrDir() {
+	defer s.cleanupTest()
+	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
+		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	configs := []string{"", vdConfig}
+	for _, c := range configs {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		s.tearDownTestHelper(false)
+		s.setupTestHelper(c, s.container, true)
+		testName := ""
+		if c != "" {
+			testName = "virtual-directory"
+		}
+		s.Run(testName, func() {
+			// Setup
+			name := generateDirectoryName()
+			s.az.CreateDir(internal.CreateDirOptions{Name: name})
+
+			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+			s.assert.Nil(err)
+			s.assert.NotNil(props)
+			s.assert.True(props.IsDir())
+			s.assert.NotEmpty(props.Metadata)
+			s.assert.Contains(props.Metadata, folderKey)
+			s.assert.EqualValues("true", props.Metadata[folderKey])
+		})
+	}
+}
+
+func (s *blockBlobTestSuite) TestGetAttrVirtualDir() {
+	defer s.cleanupTest()
+	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
+		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+	s.tearDownTestHelper(false)
+	s.setupTestHelper(vdConfig, s.container, true)
+	// Setup
+	dirName := generateFileName()
+	name := dirName + "/" + generateFileName()
+	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+
+	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: dirName})
+	s.assert.Nil(err)
+	s.assert.NotNil(props)
+	s.assert.True(props.IsDir())
+	s.assert.False(props.IsSymlink())
+
+	// Check file in dir too
+	props, err = s.az.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.NotNil(props)
+	s.assert.False(props.IsDir())
+	s.assert.False(props.IsSymlink())
+}
+
+func (s *blockBlobTestSuite) TestGetAttrVirtualDirSubDir() {
+	defer s.cleanupTest()
+	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
+		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+	s.tearDownTestHelper(false)
+	s.setupTestHelper(vdConfig, s.container, true)
+	// Setup
+	dirName := generateFileName()
+	subDirName := dirName + "/" + generateFileName()
+	name := subDirName + "/" + generateFileName()
+	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+
+	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: dirName})
+	s.assert.Nil(err)
+	s.assert.NotNil(props)
+	s.assert.True(props.IsDir())
+	s.assert.False(props.IsSymlink())
+
+	// Check subdir in dir too
+	props, err = s.az.GetAttr(internal.GetAttrOptions{Name: subDirName})
+	s.assert.Nil(err)
+	s.assert.NotNil(props)
+	s.assert.True(props.IsDir())
+	s.assert.False(props.IsSymlink())
+
+	// Check file in subdir too
+	props, err = s.az.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.NotNil(props)
+	s.assert.False(props.IsDir())
+	s.assert.False(props.IsSymlink())
+}
+
+func (s *blockBlobTestSuite) TestGetAttrFile() {
+	defer s.cleanupTest()
+	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
+		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	configs := []string{"", vdConfig}
+	for _, c := range configs {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		s.tearDownTestHelper(false)
+		s.setupTestHelper(c, s.container, true)
+		testName := ""
+		if c != "" {
+			testName = "virtual-directory"
+		}
+		s.Run(testName, func() {
+			// Setup
+			name := generateFileName()
+			s.az.CreateFile(internal.CreateFileOptions{Name: name})
+
+			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+			s.assert.Nil(err)
+			s.assert.NotNil(props)
+			s.assert.False(props.IsDir())
+			s.assert.False(props.IsSymlink())
+		})
+	}
+}
+
+func (s *blockBlobTestSuite) TestGetAttrLink() {
+	defer s.cleanupTest()
+	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
+		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	configs := []string{"", vdConfig}
+	for _, c := range configs {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		s.tearDownTestHelper(false)
+		s.setupTestHelper(c, s.container, true)
+		testName := ""
+		if c != "" {
+			testName = "virtual-directory"
+		}
+		s.Run(testName, func() {
+			// Setup
+			target := generateFileName()
+			s.az.CreateFile(internal.CreateFileOptions{Name: target})
+			name := generateFileName()
+			s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+
+			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+			s.assert.Nil(err)
+			s.assert.NotNil(props)
+			s.assert.True(props.IsSymlink())
+			s.assert.NotEmpty(props.Metadata)
+			s.assert.Contains(props.Metadata, symlinkKey)
+			s.assert.EqualValues("true", props.Metadata[symlinkKey])
+		})
+	}
+}
+
+func (s *blockBlobTestSuite) TestGetAttrFileSize() {
+	defer s.cleanupTest()
+	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
+		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	configs := []string{"", vdConfig}
+	for _, c := range configs {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		s.tearDownTestHelper(false)
+		s.setupTestHelper(c, s.container, true)
+		testName := ""
+		if c != "" {
+			testName = "virtual-directory"
+		}
+		s.Run(testName, func() {
+			// Setup
+			name := generateFileName()
+			h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+			testData := "test data"
+			data := []byte(testData)
+			s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+
+			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+			s.assert.Nil(err)
+			s.assert.NotNil(props)
+			s.assert.False(props.IsDir())
+			s.assert.False(props.IsSymlink())
+			s.assert.EqualValues(len(testData), props.Size)
+		})
+	}
+}
+
+func (s *blockBlobTestSuite) TestGetAttrFileTime() {
+	defer s.cleanupTest()
+	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
+		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	configs := []string{"", vdConfig}
+	for _, c := range configs {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		s.tearDownTestHelper(false)
+		s.setupTestHelper(c, s.container, true)
+		testName := ""
+		if c != "" {
+			testName = "virtual-directory"
+		}
+		s.Run(testName, func() {
+			// Setup
+			name := generateFileName()
+			h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+			testData := "test data"
+			data := []byte(testData)
+			s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+
+			before, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+			s.assert.Nil(err)
+			s.assert.NotNil(before.Mtime)
+
+			time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
+
+			s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+
+			after, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+			s.assert.Nil(err)
+			s.assert.NotNil(after.Mtime)
+
+			s.assert.True(after.Mtime.After(before.Mtime))
+		})
+	}
+}
+
+func (s *blockBlobTestSuite) TestGetAttrError() {
+	defer s.cleanupTest()
+	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
+		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	configs := []string{"", vdConfig}
+	for _, c := range configs {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		s.tearDownTestHelper(false)
+		s.setupTestHelper(c, s.container, true)
+		testName := ""
+		if c != "" {
+			testName = "virtual-directory"
+		}
+		s.Run(testName, func() {
+			// Setup
+			name := generateFileName()
+
+			_, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+			s.assert.NotNil(err)
+			s.assert.EqualValues(syscall.ENOENT, err)
+		})
+	}
+}
+
 func TestBlockBlob(t *testing.T) {
 	suite.Run(t, new(blockBlobTestSuite))
 }
