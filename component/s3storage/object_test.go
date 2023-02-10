@@ -279,54 +279,54 @@ func (s *blockBlobTestSuite) TestReadFile() {
 	s.assert.EqualValues(testData, output)
 }
 
-// func (s *blockBlobTestSuite) TestReadFileError() {
-// 	defer s.cleanupTest()
-// 	// Setup
-// 	name := generateFileName()
-// 	h := handlemap.NewHandle(name)
+func (s *blockBlobTestSuite) TestReadFileError() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h := handlemap.NewHandle(name)
 
-// 	_, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-// 	fmt.Println(err)
-// 	s.assert.NotNil(err)
-// 	s.assert.EqualValues(syscall.ENOENT, err)
-// }
+	_, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	fmt.Println(err)
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
+}
 
-// func (s *blockBlobTestSuite) TestReadInBuffer() {
-// 	defer s.cleanupTest()
-// 	// Setup
-// 	name := generateFileName()
-// 	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
-// 	s.assert.Nil(err)
-// 	testData := "test data"
-// 	data := []byte(testData)
-// 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-// 	s.assert.Nil(err)
-// 	h, err = s.az.OpenFile(internal.OpenFileOptions{Name: name})
-// 	s.assert.Nil(err)
+func (s *blockBlobTestSuite) TestReadInBuffer() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.Nil(err)
+	testData := "test data"
+	data := []byte(testData)
+	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	h, err = s.az.OpenFile(internal.OpenFileOptions{Name: name})
+	s.assert.Nil(err)
 
-// 	output := make([]byte, 5)
-// 	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
-// 	s.assert.Nil(err)
-// 	s.assert.EqualValues(5, len)
-// 	s.assert.EqualValues(testData[:5], output)
-// }
+	output := make([]byte, 5)
+	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+	s.assert.Nil(err)
+	s.assert.EqualValues(5, len)
+	s.assert.EqualValues(testData[:5], output)
+}
 
-// func (s *blockBlobTestSuite) TestReadInBufferLargeBuffer() {
-// 	defer s.cleanupTest()
-// 	// Setup
-// 	name := generateFileName()
-// 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
-// 	testData := "test data"
-// 	data := []byte(testData)
-// 	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-// 	h, _ = s.az.OpenFile(internal.OpenFileOptions{Name: name})
+func (s *blockBlobTestSuite) TestReadInBufferLargeBuffer() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data"
+	data := []byte(testData)
+	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	h, _ = s.az.OpenFile(internal.OpenFileOptions{Name: name})
 
-// 	output := make([]byte, 1000) // Testing that passing in a super large buffer will still work
-// 	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
-// 	s.assert.Nil(err)
-// 	s.assert.EqualValues(h.Size, len)
-// 	s.assert.EqualValues(testData, output[:h.Size])
-// }
+	output := make([]byte, 1000) // Testing that passing in a super large buffer will still work
+	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+	s.assert.Nil(err)
+	s.assert.EqualValues(h.Size, len)
+	s.assert.EqualValues(testData, output[:h.Size])
+}
 
 func (s *blockBlobTestSuite) TestReadInBufferEmpty() {
 	defer s.cleanupTest()
@@ -624,35 +624,35 @@ func (s *blockBlobTestSuite) TestStreamDirSmallCountNoDuplicates() {
 // 	s.assert.NotNil(err)
 // }
 
-func (s *blockBlobTestSuite) TestGetAttrDir() {
-	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
-	configs := []string{"", vdConfig}
-	for _, c := range configs {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.container, true)
-		testName := ""
-		if c != "" {
-			testName = "virtual-directory"
-		}
-		s.Run(testName, func() {
-			// Setup
-			name := generateDirectoryName()
-			s.az.CreateDir(internal.CreateDirOptions{Name: name})
+// func (s *blockBlobTestSuite) TestGetAttrDir() {
+// 	defer s.cleanupTest()
+// 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+// 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
+// 		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+// 	configs := []string{"", vdConfig}
+// 	for _, c := range configs {
+// 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+// 		s.tearDownTestHelper(false)
+// 		s.setupTestHelper(c, s.container, true)
+// 		testName := ""
+// 		if c != "" {
+// 			testName = "virtual-directory"
+// 		}
+// 		s.Run(testName, func() {
+// 			// Setup
+// 			name := generateDirectoryName()
+// 			s.az.CreateDir(internal.CreateDirOptions{Name: name})
 
-			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
-			s.assert.NotNil(props)
-			s.assert.True(props.IsDir())
-			s.assert.NotEmpty(props.Metadata)
-			s.assert.Contains(props.Metadata, folderKey)
-			s.assert.EqualValues("true", props.Metadata[folderKey])
-		})
-	}
-}
+// 			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+// 			s.assert.Nil(err)
+// 			s.assert.NotNil(props)
+// 			s.assert.True(props.IsDir())
+// 			s.assert.NotEmpty(props.Metadata)
+// 			s.assert.Contains(props.Metadata, folderKey)
+// 			s.assert.EqualValues("true", props.Metadata[folderKey])
+// 		})
+// 	}
+// }
 
 func (s *blockBlobTestSuite) TestGetAttrVirtualDir() {
 	defer s.cleanupTest()
@@ -744,37 +744,37 @@ func (s *blockBlobTestSuite) TestGetAttrFile() {
 	}
 }
 
-func (s *blockBlobTestSuite) TestGetAttrLink() {
-	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
-	configs := []string{"", vdConfig}
-	for _, c := range configs {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.container, true)
-		testName := ""
-		if c != "" {
-			testName = "virtual-directory"
-		}
-		s.Run(testName, func() {
-			// Setup
-			target := generateFileName()
-			s.az.CreateFile(internal.CreateFileOptions{Name: target})
-			name := generateFileName()
-			s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+// func (s *blockBlobTestSuite) TestGetAttrLink() {
+// 	defer s.cleanupTest()
+// 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+// 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
+// 		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+// 	configs := []string{"", vdConfig}
+// 	for _, c := range configs {
+// 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+// 		s.tearDownTestHelper(false)
+// 		s.setupTestHelper(c, s.container, true)
+// 		testName := ""
+// 		if c != "" {
+// 			testName = "virtual-directory"
+// 		}
+// 		s.Run(testName, func() {
+// 			// Setup
+// 			target := generateFileName()
+// 			s.az.CreateFile(internal.CreateFileOptions{Name: target})
+// 			name := generateFileName()
+// 			s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
 
-			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
-			s.assert.NotNil(props)
-			s.assert.True(props.IsSymlink())
-			s.assert.NotEmpty(props.Metadata)
-			s.assert.Contains(props.Metadata, symlinkKey)
-			s.assert.EqualValues("true", props.Metadata[symlinkKey])
-		})
-	}
-}
+// 			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+// 			s.assert.Nil(err)
+// 			s.assert.NotNil(props)
+// 			s.assert.True(props.IsSymlink())
+// 			s.assert.NotEmpty(props.Metadata)
+// 			s.assert.Contains(props.Metadata, symlinkKey)
+// 			s.assert.EqualValues("true", props.Metadata[symlinkKey])
+// 		})
+// 	}
+// }
 
 func (s *blockBlobTestSuite) TestGetAttrFileSize() {
 	defer s.cleanupTest()
