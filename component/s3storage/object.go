@@ -149,6 +149,7 @@ func (bb *S3Object) ListContainers() ([]string, error) {
 			if code != "InvalidAccessKeyId" {
 				break
 			}
+			log.Warn("S3Object::ListContainers Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -170,7 +171,7 @@ func exitErrorf(msg string, args ...interface{}) {
 }
 
 func (bb *S3Object) SetPrefixPath(path string) error {
-	log.Trace("BlockBlob::SetPrefixPath : path %s", path)
+	log.Trace("S3Object::SetPrefixPath : path %s", path)
 	bb.Config.prefixPath = path
 	return nil
 }
@@ -203,7 +204,7 @@ func (bb *S3Object) CreateLink(source string, target string) error {
 // DeleteFile : Delete a blob in the container/virtual directory
 func (bb *S3Object) DeleteFile(name string) (err error) {
 
-	log.Trace("Object::DeleteFile : name %s", name)
+	log.Trace("S3Object::DeleteFile : name %s", name)
 
 	_, err = bb.Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
 		Bucket: aws.String(bb.Config.authConfig.BucketName),
@@ -216,13 +217,13 @@ func (bb *S3Object) DeleteFile(name string) (err error) {
 
 		serr := storeBlobErrToErr(err)
 		if serr == ErrFileNotFound {
-			log.Err("BlockBlob::DeleteFile : %s does not exist", name)
+			log.Err("S3Object::DeleteFile : %s does not exist", name)
 			return syscall.ENOENT
 		} else if serr == BlobIsUnderLease {
-			log.Err("BlockBlob::DeleteFile : %s is under lease [%s]", name, err.Error())
+			log.Err("S3Object::DeleteFile : %s is under lease [%s]", name, err.Error())
 			return syscall.EIO
 		} else {
-			log.Err("BlockBlob::DeleteFile : Failed to delete blob %s [%s]", name, err.Error())
+			log.Err("S3Object::DeleteFile : Failed to delete blob %s [%s]", name, err.Error())
 			return err
 		}
 	}
@@ -236,7 +237,7 @@ func (bb *S3Object) DeleteDirectory(name string) (err error) {
 
 // RenameFile : Rename the file
 func (bb *S3Object) RenameFile(source string, target string) (err error) {
-	log.Trace("Object::RenameFile : %s -> %s", source, target)
+	log.Trace("S3Object::RenameFile : %s -> %s", source, target)
 
 	var apiErr smithy.APIError
 	for i := 0; i < retryCount; i++ {
@@ -255,6 +256,7 @@ func (bb *S3Object) RenameFile(source string, target string) (err error) {
 			if code != "InvalidAccessKeyId" {
 				break
 			}
+			log.Warn("S3Object::RenameFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -262,7 +264,7 @@ func (bb *S3Object) RenameFile(source string, target string) (err error) {
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			log.Err("Object::RenameFile : %s does not exist", source)
+			log.Err("S3Object::RenameFile : %s does not exist", source)
 			return syscall.ENOENT
 		}
 		var apiErr smithy.APIError
@@ -272,15 +274,15 @@ func (bb *S3Object) RenameFile(source string, target string) (err error) {
 			// so need a different case to catch this. Understand why this does not give a no such key error type
 			code := apiErr.ErrorCode()
 			if code == "NoSuchKey" {
-				log.Err("Object::RenameFile : %s does not exist", source)
+				log.Err("S3Object::RenameFile : %s does not exist", source)
 				return syscall.ENOENT
 			}
 		}
-		log.Err("Object::RenameFile : Failed to start copy of file %s [%s]", source, err.Error())
+		log.Err("S3Object::RenameFile : Failed to start copy of file %s [%s]", source, err.Error())
 		return err
 	}
 
-	log.Trace("BlockBlob::RenameFile : %s -> %s done", source, target)
+	log.Trace("S3Object::RenameFile : %s -> %s done", source, target)
 
 	// Copy of the file is done so now delete the older file
 	err = bb.DeleteFile(source)
@@ -288,7 +290,7 @@ func (bb *S3Object) RenameFile(source string, target string) (err error) {
 		// Sometimes backend is able to copy source file to destination but when we try to delete the
 		// source files it returns back with ENOENT. If file was just created on backend it might happen
 		// that it has not been synced yet at all layers and hence delete is not able to find the source file
-		log.Trace("BlockBlob::RenameFile : %s -> %s, unable to find source. Retrying %d", source, target, retry)
+		log.Trace("S3Object::RenameFile : %s -> %s, unable to find source. Retrying %d", source, target, retry)
 		time.Sleep(1 * time.Second)
 		err = bb.DeleteFile(source)
 	}
@@ -317,7 +319,7 @@ func (bb *S3Object) getAttrUsingList(name string) (attr *internal.ObjAttr, err e
 
 // GetAttr : Retrieve attributes of the blob
 func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
-	log.Trace("BlockBlob::GetAttr : name %s", name)
+	log.Trace("S3Object::GetAttr : name %s", name)
 
 	var marker *string = nil
 
@@ -331,14 +333,14 @@ func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 		} else if e == InvalidPermission {
 			return attr, syscall.EPERM
 		} else {
-			log.Warn("BlockBlob::getAttrUsingList : Failed to list blob properties for %s [%s]", name, err.Error())
+			log.Warn("S3Object::getAttrUsingList : Failed to list blob properties for %s [%s]", name, err.Error())
 		}
 		return nil, err
 	}
 
 	numObjects := len(blobs)
 	for i, blob := range blobs {
-		log.Trace("BlockBlob::GetAttr : Item %d Blob %s", i+numObjects, blob.Name)
+		log.Trace("S3Object::GetAttr : Item %d Blob %s", i+numObjects, blob.Name)
 		if blob.Path == name {
 			// we found it!
 			return blob, nil
@@ -354,7 +356,7 @@ func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 // This fetches the list using a marker so the caller code should handle marker logic
 // If count=0 - fetch max entries
 func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
-	log.Trace("BlockBlob::List : prefix %s, marker %s", prefix, func(marker *string) string {
+	log.Trace("S3Object::List : prefix %s, marker %s", prefix, func(marker *string) string {
 		if marker != nil {
 			return *marker
 		} else {
@@ -406,6 +408,7 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 				if code != "InvalidAccessKeyId" {
 					break
 				}
+				log.Warn("S3Object::List Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 			}
 		}
 		if err != nil {
@@ -530,8 +533,8 @@ what dis do?
 */
 func (bb *S3Object) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
 
-	log.Trace("Object::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
-	//defer exectime.StatTimeCurrentBlock("BlockBlob::ReadToFile")()
+	log.Trace("S3Object::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
+	//defer exectime.StatTimeCurrentBlock("S3Object::ReadToFile")()
 	//blobURL := bb.Container.NewBlobURL(filepath.Join(bb.Config.prefixPath, name))
 
 	//what is this?
@@ -560,6 +563,7 @@ func (bb *S3Object) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 			if code != "InvalidAccessKeyId" {
 				break
 			}
+			log.Warn("S3Object::ReadToFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -567,7 +571,7 @@ func (bb *S3Object) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			log.Err("Object::ReadToFile : Failed to download object %s [%s]", name, err.Error())
+			log.Err("S3Object::ReadToFile : Failed to download object %s [%s]", name, err.Error())
 			return syscall.ENOENT
 		}
 		log.Err("Couldn't get object %v:%v. Here's why: %v\n", bucketName, name, err)
@@ -587,7 +591,7 @@ func (bb *S3Object) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 
 // ReadBuffer : Download a specific range from a blob to a buffer
 func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
-	log.Trace("BlockBlob::ReadBuffer : name %s", name)
+	log.Trace("S3Object::ReadBuffer : name %s", name)
 	var buff []byte
 
 	// If the len is 0, that means we need to read till the end of the object
@@ -621,6 +625,7 @@ func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) ([]byte, er
 			if code != "InvalidAccessKeyId" {
 				break
 			}
+			log.Warn("S3Object::ReadBuffer Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -628,7 +633,7 @@ func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) ([]byte, er
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			log.Err("Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+			log.Err("S3Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
 			return buff, syscall.ENOENT
 		}
 		var apiErr smithy.APIError
@@ -636,11 +641,11 @@ func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) ([]byte, er
 			// Range is incorrect
 			code := apiErr.ErrorCode()
 			if code == "InvalidRange" {
-				log.Err("Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+				log.Err("S3Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
 				return buff, syscall.ERANGE
 			}
 		}
-		log.Err("Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+		log.Err("S3Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
 		return buff, err
 	}
 
@@ -653,7 +658,7 @@ func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) ([]byte, er
 
 // ReadInBuffer : Download specific range from a file to a user provided buffer
 func (bb *S3Object) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
-	log.Trace("Object::ReadInBuffer : name %s", name)
+	log.Trace("S3Object::ReadInBuffer : name %s", name)
 
 	var err error
 	var apiErr smithy.APIError
@@ -675,6 +680,7 @@ func (bb *S3Object) ReadInBuffer(name string, offset int64, len int64, data []by
 			if code != "InvalidAccessKeyId" {
 				break
 			}
+			log.Warn("S3Object::ReadInBuffer Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -682,7 +688,7 @@ func (bb *S3Object) ReadInBuffer(name string, offset int64, len int64, data []by
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			log.Err("Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+			log.Err("S3Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
 			return syscall.ENOENT
 		}
 		var apiErr smithy.APIError
@@ -690,11 +696,11 @@ func (bb *S3Object) ReadInBuffer(name string, offset int64, len int64, data []by
 			// Range is incorrect
 			code := apiErr.ErrorCode()
 			if code == "InvalidRange" {
-				log.Err("Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+				log.Err("S3Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
 				return syscall.ERANGE
 			}
 		}
-		log.Err("Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+		log.Err("S3Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
 		return err
 	}
 
@@ -722,7 +728,7 @@ func trackUpload(name string, bytesTransferred int64, count int64, uploadPtr *in
 
 // WriteFromFile : Upload local file to blob
 func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *os.File) (err error) {
-	log.Trace("Object::WriteFromFile : name %s", name)
+	log.Trace("S3Object::WriteFromFile : name %s", name)
 	//defer exectime.StatTimeCurrentBlock("WriteFromFile::WriteFromFile")()
 
 	defer log.TimeTrack(time.Now(), "BlockBlob::WriteFromFile", name)
@@ -736,7 +742,7 @@ func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *o
 	// get the size of the file
 	stat, err := fi.Stat()
 	if err != nil {
-		log.Err("Object::WriteFromFile : Failed to get file size %s [%s]", name, err.Error())
+		log.Err("S3Object::WriteFromFile : Failed to get file size %s [%s]", name, err.Error())
 		return err
 	}
 
@@ -758,7 +764,7 @@ func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *o
 	// 	md5sum, err = getMD5(fi)
 	// 	if err != nil {
 	// 		// Md5 sum generation failed so set nil while uploading
-	// 		log.Warn("Object::WriteFromFile : Failed to generate md5 of %s", name)
+	// 		log.Warn("S3Object::WriteFromFile : Failed to generate md5 of %s", name)
 	// 		md5sum = []byte{0}
 	// 	}
 	// }
@@ -789,6 +795,7 @@ func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *o
 			if code != "InvalidAccessKeyId" {
 				break
 			}
+			log.Warn("S3Object::WriteFromFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -800,10 +807,10 @@ func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *o
 	// }
 
 	if err != nil {
-		log.Err("Object::WriteFromFile : Failed to upload blob %s [%s]", name, err.Error())
+		log.Err("S3Object::WriteFromFile : Failed to upload blob %s [%s]", name, err.Error())
 		return err
 	} else {
-		log.Debug("Object::WriteFromFile : Upload complete of object %v", name)
+		log.Debug("S3Object::WriteFromFile : Upload complete of object %v", name)
 
 		// store total bytes uploaded so far
 		if stat.Size() > 0 {
@@ -840,6 +847,7 @@ func (bb *S3Object) WriteFromBuffer(name string, metadata map[string]string, dat
 			if code != "InvalidAccessKeyId" {
 				break
 			}
+			log.Warn("S3Object::WriteFromBuffer Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -878,7 +886,7 @@ func (bb *S3Object) Write(options internal.WriteFileOptions) error {
 	name := options.Handle.Path
 	offset := options.Offset
 	defer log.TimeTrack(time.Now(), "BlockBlob::Write", options.Handle.Path)
-	log.Trace("BlockBlob::Write : name %s offset %v", name, offset)
+	log.Trace("S3Object::Write : name %s offset %v", name, offset)
 	// tracks the case where our offset is great than our current file size (appending only - not modifying pre-existing data)
 	var dataBuffer *[]byte
 
@@ -914,7 +922,7 @@ func (bb *S3Object) Write(options internal.WriteFileOptions) error {
 	// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple blocks
 	err := bb.WriteFromBuffer(name, options.Metadata, *dataBuffer)
 	if err != nil {
-		log.Err("BlockBlob::Write : Failed to upload to blob %s ", name, err.Error())
+		log.Err("S3Object::Write : Failed to upload to blob %s ", name, err.Error())
 		return err
 	}
 	return nil
