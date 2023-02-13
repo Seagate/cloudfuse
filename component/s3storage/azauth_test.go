@@ -37,31 +37,6 @@
 package s3storage
 
 type storageTestConfiguration struct {
-	// Get the mount path from command line argument
-	BlockAccount   string `json:"block-acct"`
-	AdlsAccount    string `json:"adls-acct"`
-	BlockContainer string `json:"block-cont"`
-	AdlsContainer  string `json:"adls-cont"`
-	// AdlsDirectory      string `json:"adls-dir"`
-	BlockContainerHuge string `json:"block-cont-huge"`
-	AdlsContainerHuge  string `json:"adls-cont-huge"`
-	BlockKey           string `json:"block-key"`
-	AdlsKey            string `json:"adls-key"`
-	BlockSas           string `json:"block-sas"`
-	BlockContSasUbn18  string `json:"block-cont-sas-ubn-18"`
-	BlockContSasUbn20  string `json:"block-cont-sas-ubn-20"`
-	AdlsSas            string `json:"adls-sas"`
-	// AdlsDirSasUbn18    string `json:"adls-dir-sas-ubn-18"`
-	// AdlsDirSasUbn20    string `json:"adls-dir-sas-ubn-20"`
-	MsiAppId        string `json:"msi-appid"`
-	MsiResId        string `json:"msi-resid"`
-	MsiObjId        string `json:"msi-objid"`
-	SpnClientId     string `json:"spn-client"`
-	SpnTenantId     string `json:"spn-tenant"`
-	SpnClientSecret string `json:"spn-secret"`
-	SkipMsi         bool   `json:"skip-msi"`
-	ProxyAddress    string `json:"proxy-address"`
-	// Added for S3
 	BucketName string `json:"bucket-name"`
 	AccessKey  string `json:"access-key"`
 	SecretKey  string `json:"secret-key"`

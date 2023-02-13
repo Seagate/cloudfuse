@@ -50,7 +50,6 @@ import (
 	"lyvecloudfuse/internal"
 	"lyvecloudfuse/internal/stats_manager"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -67,17 +66,11 @@ const (
 
 type S3Object struct {
 	S3StorageConnection
-	//Auth      azAuth
-	Client    *s3.Client
-	Container azblob.ContainerURL
+	Client *s3.Client
 }
 
 // Verify that S3Object implements AzConnection interface
 var _ S3Connection = &S3Object{}
-
-const (
-	MaxBlocksSize = azblob.BlockBlobMaxStageBlockBytes * azblob.BlockBlobMaxBlocks
-)
 
 func (bb *S3Object) Configure(cfg S3StorageConfig) error {
 	bb.Config = cfg
@@ -121,11 +114,6 @@ func (bb *S3Object) UpdateConfig(cfg S3StorageConfig) error {
 
 // NewCredentialKey : Update the credential key specified by the user
 func (bb *S3Object) NewCredentialKey(key, value string) (err error) {
-	return nil
-}
-
-// getCredential : Create the credential object
-func (bb *S3Object) getCredential() azblob.Credential {
 	return nil
 }
 
@@ -196,12 +184,12 @@ func (bb *S3Object) CreateDirectory(name string) error {
 func (bb *S3Object) CreateLink(source string, target string) error {
 	log.Trace("S3Object::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
-	metadata := make(azblob.Metadata)
+	metadata := make(map[string]string)
 	metadata[symlinkKey] = "true"
 	return bb.WriteFromBuffer(source, metadata, data)
 }
 
-// DeleteFile : Delete a blob in the container/virtual directory
+// DeleteFile : Delete an object
 func (bb *S3Object) DeleteFile(name string) (err error) {
 
 	log.Trace("S3Object::DeleteFile : name %s", name)
@@ -317,7 +305,7 @@ func (bb *S3Object) getAttrUsingList(name string) (attr *internal.ObjAttr, err e
 	return nil, err
 }
 
-// GetAttr : Retrieve attributes of the blob
+// GetAttr : Retrieve attributes of the object
 func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	log.Trace("S3Object::GetAttr : name %s", name)
 
@@ -352,7 +340,7 @@ func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	return nil, syscall.ENOENT
 }
 
-// List : Get a list of blobs matching the given prefix
+// List : Get a list of objects matching the given prefix
 // This fetches the list using a marker so the caller code should handle marker logic
 // If count=0 - fetch max entries
 func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
@@ -438,8 +426,7 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 				// MD5:    md5,
 			}
 
-			// this is cargo code from block_blob
-			// not sure if we need this
+			// set flags
 			attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 			attr.Flags.Set(internal.PropFlagModeDefault)
 			attr.Metadata = make(map[string]string)
