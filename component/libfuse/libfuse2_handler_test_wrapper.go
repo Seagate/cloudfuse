@@ -55,7 +55,7 @@ type libfuseTestSuite struct {
 	suite.Suite
 	assert   *assert.Assertions
 	libfuse  *Libfuse
-	cgofuse  *cgofuseFS
+	cgofuse  *CgofuseFS
 	mockCtrl *gomock.Controller
 	mock     *internal.MockComponent
 }
@@ -64,13 +64,19 @@ type libfuseTestSuite struct {
 var emptyConfig = ""
 
 // For fuse calls
-var cfuseFS *cgofuseFS
+var cfuseFS *CgofuseFS
 
 func newTestLibfuse(next internal.Component, configuration string) *Libfuse {
-	config.ReadConfigFromReader(strings.NewReader(configuration))
+	err := config.ReadConfigFromReader(strings.NewReader(configuration))
+	if err != nil {
+		panic("Unable to read config from reader.")
+	}
 	libfuse := NewLibfuseComponent()
 	libfuse.SetNextComponent(next)
-	libfuse.Configure(true)
+	err = libfuse.Configure(true)
+	if err != nil {
+		panic("Unable to configure for testing.")
+	}
 
 	return libfuse.(*Libfuse)
 }
@@ -89,7 +95,7 @@ func (suite *libfuseTestSuite) setupTestHelper(config string) {
 	suite.mockCtrl = gomock.NewController(suite.T())
 	suite.mock = internal.NewMockComponent(suite.mockCtrl)
 	suite.libfuse = newTestLibfuse(suite.mock, config)
-	suite.cgofuse = &cgofuseFS{}
+	suite.cgofuse = &CgofuseFS{}
 	cfuseFS = suite.cgofuse
 	fuseFS = suite.libfuse
 	// suite.libfuse.Start(context.Background())
@@ -221,8 +227,6 @@ func testOpenSyncDirectFlag(suite *libfuseTestSuite) {
 	path := "/" + name
 	mode := fs.FileMode(fuseFS.filePermission)
 	flags := fuse.O_RDWR
-	O_SYNC := 04010000
-	O_DIRECT := 040000
 	infoFlags := fuse.O_RDWR | O_SYNC | O_DIRECT
 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, nil)
