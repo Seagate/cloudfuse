@@ -50,11 +50,17 @@ import (
 	"github.com/winfsp/cgofuse/fuse"
 )
 
-type cgofuseFS struct {
+type CgofuseFS struct {
 	fuse.FileSystemBase
 	uid uint32
 	gid uint32
 }
+
+// The flag for C.O_SYNC is 04010000 and C.__O_DIRECT is 040000
+const (
+	O_SYNC   = 04010000
+	O_DIRECT = 040000
+)
 
 // Note: libfuse prepends "/" to the path.
 // TODO: Not sure if this is needed for cgofuse, will need to check
@@ -70,9 +76,9 @@ func trimFusePath(path string) string {
 	return path
 }
 
-func (cf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
-	stbuf.Uid = cf.ownerUID
-	stbuf.Gid = cf.ownerGID
+func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
+	stbuf.Uid = lf.ownerUID
+	stbuf.Gid = lf.ownerGID
 	stbuf.Nlink = 1
 	stbuf.Size = attr.Size
 
@@ -82,9 +88,9 @@ func (cf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
 		stbuf.Mode = uint32(attr.Mode) & 0xffffffff
 	} else {
 		if attr.IsDir() {
-			stbuf.Mode = uint32(cf.dirPermission) & 0xffffffff
+			stbuf.Mode = uint32(lf.dirPermission) & 0xffffffff
 		} else {
-			stbuf.Mode = uint32(cf.filePermission) & 0xffffffff
+			stbuf.Mode = uint32(lf.filePermission) & 0xffffffff
 		}
 	}
 
@@ -158,22 +164,22 @@ func (lf *Libfuse) destroyFuse() error {
 	return nil
 }
 
-func NewcgofuseFS() *cgofuseFS {
-	cf := &cgofuseFS{}
+func NewcgofuseFS() *CgofuseFS {
+	cf := &CgofuseFS{}
 	return cf
 }
 
 // Does nothing here, as init is handled elsewhere
-func (cf *cgofuseFS) Init() {
+func (cf *CgofuseFS) Init() {
 	log.Trace("Libfuse::Init : Initializing FUSE")
 }
 
 // Destory does nothing in blobfuse, so same here.
-func (cf *cgofuseFS) Destroy() {
+func (cf *CgofuseFS) Destroy() {
 	log.Trace("Libfuse::Destroy : Destroy")
 }
 
-func (cf *cgofuseFS) Mkdir(path string, mode uint32) int {
+func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::libfuse_mkdir : %s", name)
@@ -191,7 +197,7 @@ func (cf *cgofuseFS) Mkdir(path string, mode uint32) int {
 	return 0
 }
 
-func (cf *cgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
+func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::libfuse_statfs : %s", name)
@@ -228,7 +234,7 @@ func (cf *cgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 	return 0
 }
 
-func (cf *cgofuseFS) Opendir(path string) (int, uint64) {
+func (cf *CgofuseFS) Opendir(path string) (int, uint64) {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	if name != "" {
@@ -257,7 +263,7 @@ func (cf *cgofuseFS) Opendir(path string) (int, uint64) {
 	return 0, uint64(fh)
 }
 
-func (cf *cgofuseFS) Releasedir(path string, fh uint64) int {
+func (cf *CgofuseFS) Releasedir(path string, fh uint64) int {
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
@@ -272,7 +278,7 @@ func (cf *cgofuseFS) Releasedir(path string, fh uint64) int {
 	return 0
 }
 
-func (cf *cgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat_t, ofst int64) bool,
+func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat_t, ofst int64) bool,
 	ofst int64, fh uint64) int {
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
@@ -285,39 +291,39 @@ func (cf *cgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 		return fuse.EIO
 	}
 
-	off_64 := uint64(ofst)
+	ofst64 := uint64(ofst)
 	cacheInfo := val.(*dirChildCache)
-	if off_64 == 0 ||
-		(off_64 >= cacheInfo.eIndex && cacheInfo.token != "") {
+	if ofst64 == 0 ||
+		(ofst64 >= cacheInfo.eIndex && cacheInfo.token != "") {
 		attrs, token, err := fuseFS.NextComponent().StreamDir(internal.StreamDirOptions{
 			Name:   handle.Path,
-			Offset: off_64,
+			Offset: ofst64,
 			Token:  cacheInfo.token,
 			Count:  common.MaxDirListCount,
 		})
 
 		if err != nil {
-			log.Err("Libfuse::Readdir : Path %s, handle: %d, offset %d. Error in retrieval", handle.Path, handle.ID, off_64)
+			log.Err("Libfuse::Readdir : Path %s, handle: %d, offset %d. Error in retrieval", handle.Path, handle.ID, ofst64)
 			if os.IsNotExist(err) {
 				return fuse.ENOENT
-			} else {
-				return fuse.EIO
 			}
+
+			return fuse.EIO
 		}
 
-		if off_64 == 0 {
+		if ofst64 == 0 {
 			attrs = append([]*internal.ObjAttr{{Flags: fuseFS.lsFlags, Name: "."}, {Flags: fuseFS.lsFlags, Name: ".."}}, attrs...)
 		}
 
-		cacheInfo.sIndex = off_64
-		cacheInfo.eIndex = off_64 + uint64(len(attrs))
+		cacheInfo.sIndex = ofst64
+		cacheInfo.eIndex = ofst64 + uint64(len(attrs))
 		cacheInfo.length = uint64(len(attrs))
 		cacheInfo.token = token
 		cacheInfo.children = cacheInfo.children[:0]
 		cacheInfo.children = attrs
 	}
 
-	if off_64 >= cacheInfo.eIndex {
+	if ofst64 >= cacheInfo.eIndex {
 		// If offset is still beyond the end index limit then we are done iterating
 		return 0
 	}
@@ -325,7 +331,7 @@ func (cf *cgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 	stbuf := fuse.Stat_t{}
 
 	// Populate the stat by calling filler
-	for segmentIdx := off_64 - cacheInfo.sIndex; segmentIdx < cacheInfo.length; segmentIdx++ {
+	for segmentIdx := ofst64 - cacheInfo.sIndex; segmentIdx < cacheInfo.length; segmentIdx++ {
 		fuseFS.fillStat(cacheInfo.children[segmentIdx], &stbuf)
 
 		name := cacheInfo.children[segmentIdx].Name
@@ -336,7 +342,7 @@ func (cf *cgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 }
 
 // TODO: Currently not using filehandle
-func (cf *cgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
+func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Getattr : %s", name)
@@ -373,7 +379,7 @@ func (cf *cgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 	return 0
 }
 
-func (cf *cgofuseFS) Rmdir(path string) int {
+func (cf *CgofuseFS) Rmdir(path string) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Rmdir : %s", name)
@@ -388,9 +394,9 @@ func (cf *cgofuseFS) Rmdir(path string) int {
 		log.Err("Libfuse::Rmdir : Failed to delete %s [%s]", name, err.Error())
 		if os.IsNotExist(err) {
 			return -fuse.ENOENT
-		} else {
-			return -fuse.EIO
 		}
+
+		return -fuse.EIO
 	}
 
 	libfuseStatsCollector.PushEvents(deleteDir, name, nil)
@@ -399,7 +405,7 @@ func (cf *cgofuseFS) Rmdir(path string) int {
 	return 0
 }
 
-func (cf *cgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
+func (cf *CgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::libfuse_create : %s", name)
@@ -409,9 +415,9 @@ func (cf *cgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
 		log.Err("Libfuse::libfuse_create : Failed to create %s [%s]", name, err.Error())
 		if os.IsExist(err) {
 			return -fuse.EEXIST, 0
-		} else {
-			return -fuse.EIO, 0
 		}
+
+		return -fuse.EIO, 0
 	}
 
 	fh := handlemap.Add(handle)
@@ -431,17 +437,15 @@ func (cf *cgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
 	return 0, uint64(fh)
 }
 
-func (cf *cgofuseFS) Open(path string, flags int) (int, uint64) {
+func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse:: Open : %s", name)
 	// TODO: Should this sit behind a user option? What if we change something to support these in the future?
 	// Mask out SYNC and DIRECT flags since write operation will fail
-	//
+
 	// Don't think we need to handle this as these flags aren't available in cgofuse
-	// but let's try to anyway. The flag for C.O_SYNC is 04010000 and C.__O_DIRECT is 040000
-	O_SYNC := 04010000
-	O_DIRECT := 040000
+	// but let's try to anyway.
 	if flags&O_SYNC != 0 || flags&O_DIRECT != 0 {
 		log.Err("Libfuse::libfuse_open : Reset flags for open %s, fi.flags %X", name, flags)
 		// Blobfuse2 does not support the SYNC or DIRECT flag. If a user application passes this flag on to blobfuse2
@@ -463,9 +467,9 @@ func (cf *cgofuseFS) Open(path string, flags int) (int, uint64) {
 		log.Err("Libfuse::libfuse_open : Failed to open %s [%s]", name, err.Error())
 		if os.IsNotExist(err) {
 			return -fuse.ENOENT, 0
-		} else {
-			return -fuse.EIO, 0
 		}
+
+		return -fuse.EIO, 0
 	}
 
 	fh := handlemap.Add(handle)
@@ -483,7 +487,7 @@ func (cf *cgofuseFS) Open(path string, flags int) (int, uint64) {
 	return 0, uint64(fh)
 }
 
-func (cf *cgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
+func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
@@ -520,7 +524,7 @@ func (cf *cgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 	return bytesRead
 }
 
-func (cf *cgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int {
+func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int {
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
@@ -528,11 +532,10 @@ func (cf *cgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int 
 		return -fuse.EBADF
 	}
 
-	offset := uint64(ofst)
 	bytesWritten, err := fuseFS.NextComponent().WriteFile(
 		internal.WriteFileOptions{
 			Handle:   handle,
-			Offset:   int64(offset),
+			Offset:   ofst,
 			Data:     buff,
 			Metadata: nil,
 		})
@@ -545,7 +548,7 @@ func (cf *cgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int 
 	return bytesWritten
 }
 
-func (cf *cgofuseFS) Flush(path string, fh uint64) int {
+func (cf *CgofuseFS) Flush(path string, fh uint64) int {
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
@@ -573,7 +576,7 @@ func (cf *cgofuseFS) Flush(path string, fh uint64) int {
 	return 0
 }
 
-func (cf *cgofuseFS) Truncate(path string, size int64, fh uint64) int {
+func (cf *CgofuseFS) Truncate(path string, size int64, fh uint64) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 
@@ -594,7 +597,7 @@ func (cf *cgofuseFS) Truncate(path string, size int64, fh uint64) int {
 	return 0
 }
 
-func (cf *cgofuseFS) Release(path string, fh uint64) int {
+func (cf *CgofuseFS) Release(path string, fh uint64) int {
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
@@ -622,7 +625,7 @@ func (cf *cgofuseFS) Release(path string, fh uint64) int {
 	return 0
 }
 
-func (cf *cgofuseFS) Unlink(path string) int {
+func (cf *CgofuseFS) Unlink(path string) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Unlink : %s", name)
@@ -645,7 +648,7 @@ func (cf *cgofuseFS) Unlink(path string) int {
 // https://man7.org/linux/man-pages/man2/rename.2.html
 // errors handled: EISDIR, ENOENT, ENOTDIR, ENOTEMPTY, EEXIST
 // TODO: handle EACCESS, EINVAL?
-func (cf *cgofuseFS) Rename(oldpath string, newpath string) int {
+func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 	srcPath := trimFusePath(oldpath)
 	srcPath = common.NormalizeObjectName(srcPath)
 	dstPath := trimFusePath(newpath)
@@ -714,7 +717,7 @@ func (cf *cgofuseFS) Rename(oldpath string, newpath string) int {
 
 // Symlink Operations
 
-func (cf *cgofuseFS) Symlink(target string, newpath string) int {
+func (cf *CgofuseFS) Symlink(target string, newpath string) int {
 	name := trimFusePath(newpath)
 	name = common.NormalizeObjectName(name)
 	targetPath := common.NormalizeObjectName(target)
@@ -732,7 +735,7 @@ func (cf *cgofuseFS) Symlink(target string, newpath string) int {
 	return 0
 }
 
-func (cf *cgofuseFS) Readlink(path string) (int, string) {
+func (cf *CgofuseFS) Readlink(path string) (int, string) {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Readlink : Received for %s", name)
@@ -757,7 +760,7 @@ func (cf *cgofuseFS) Readlink(path string) (int, string) {
 	return 0, targetPath
 }
 
-func (cf *cgofuseFS) Fsync(path string, datasync bool, fh uint64) int {
+func (cf *CgofuseFS) Fsync(path string, datasync bool, fh uint64) int {
 	if fh == 0 {
 		return -fuse.EIO
 	}
@@ -786,7 +789,7 @@ func (cf *cgofuseFS) Fsync(path string, datasync bool, fh uint64) int {
 	return 0
 }
 
-func (cf *cgofuseFS) Fsyncdir(path string, datasync bool, fh uint64) int {
+func (cf *CgofuseFS) Fsyncdir(path string, datasync bool, fh uint64) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Fsyncdir : %s", name)
@@ -807,7 +810,7 @@ func (cf *cgofuseFS) Fsyncdir(path string, datasync bool, fh uint64) int {
 	return 0
 }
 
-func (cf *cgofuseFS) Chmod(path string, mode uint32) int {
+func (cf *CgofuseFS) Chmod(path string, mode uint32) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Chmod : %s", name)
@@ -831,7 +834,7 @@ func (cf *cgofuseFS) Chmod(path string, mode uint32) int {
 	return 0
 }
 
-func (cf *cgofuseFS) Chown(path string, uid uint32, gid uint32) int {
+func (cf *CgofuseFS) Chown(path string, uid uint32, gid uint32) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Chown : %s", name)
@@ -839,7 +842,7 @@ func (cf *cgofuseFS) Chown(path string, uid uint32, gid uint32) int {
 	return 0
 }
 
-func (cf *cgofuseFS) Utimens(path string, tmsp []fuse.Timespec) int {
+func (cf *CgofuseFS) Utimens(path string, tmsp []fuse.Timespec) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Utimens : %s", name)
@@ -850,37 +853,37 @@ func (cf *cgofuseFS) Utimens(path string, tmsp []fuse.Timespec) int {
 }
 
 // Not implemented
-func (cf *cgofuseFS) Access(path string, mask uint32) int {
+func (cf *CgofuseFS) Access(path string, mask uint32) int {
 	return -fuse.ENOSYS
 }
 
 // Not implemented
-func (cf *cgofuseFS) Getxattr(path string, name string) (int, []byte) {
+func (cf *CgofuseFS) Getxattr(path string, name string) (int, []byte) {
 	return -fuse.ENOSYS, nil
 }
 
 // Not implemented
-func (cf *cgofuseFS) Link(oldpath string, newpath string) int {
+func (cf *CgofuseFS) Link(oldpath string, newpath string) int {
 	return -fuse.ENOSYS
 }
 
 // Not implemented
-func (cf *cgofuseFS) Listxattr(path string, fill func(name string) bool) int {
+func (cf *CgofuseFS) Listxattr(path string, fill func(name string) bool) int {
 	return -fuse.ENOSYS
 }
 
 // Not implemented
-func (cf *cgofuseFS) Mknod(path string, mode uint32, dev uint64) int {
+func (cf *CgofuseFS) Mknod(path string, mode uint32, dev uint64) int {
 	return -fuse.ENOSYS
 }
 
 // Not implemented
-func (cf *cgofuseFS) Removexattr(path string, name string) int {
+func (cf *CgofuseFS) Removexattr(path string, name string) int {
 	return -fuse.ENOSYS
 }
 
 // Not implemented
-func (cf *cgofuseFS) Setxattr(path string, name string, value []byte, flags int) int {
+func (cf *CgofuseFS) Setxattr(path string, name string, value []byte, flags int) int {
 	return -fuse.ENOSYS
 }
 
@@ -895,5 +898,5 @@ func (cf *cgofuseFS) Setxattr(path string, name string, value []byte, flags int)
 
 // Verify that we follow the interface
 var (
-	_ fuse.FileSystemInterface = (*cgofuseFS)(nil)
+	_ fuse.FileSystemInterface = (*CgofuseFS)(nil)
 )
