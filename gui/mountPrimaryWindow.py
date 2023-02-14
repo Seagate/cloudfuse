@@ -52,6 +52,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             directory = str(self.mountPoint_input.text())
             
             if platform == "win32":
+                directory=directory+'/lyveCloudFuse'
                 mount = subprocess.Popen([".\lyvecloudfuse.exe", "mount", directory, "--config-file=.\config.yaml"], stdout=subprocess.PIPE)
                 # For future use to get output on Popen
                 # for line in mount.stdout.readlines():    
