@@ -193,11 +193,25 @@ func (bb *S3Object) CreateLink(source string, target string) error {
 func (bb *S3Object) DeleteFile(name string) (err error) {
 
 	log.Trace("S3Object::DeleteFile : name %s", name)
-
-	_, err = bb.Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
-		Bucket: aws.String(bb.Config.authConfig.BucketName),
-		Key:    aws.String(name),
-	})
+	var apiErr smithy.APIError
+	for i := 0; i < retryCount; i++ {
+		_, err = bb.Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+			Bucket: aws.String(bb.Config.authConfig.BucketName),
+			Key:    aws.String(name),
+		})
+		if err == nil {
+			break
+		}
+		// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
+		// So if we get this error we want to try again, and if not then we got a legitimate error so break
+		if errors.As(err, &apiErr) {
+			code := apiErr.ErrorCode()
+			if code != "InvalidAccessKeyId" {
+				break
+			}
+			log.Warn("S3Object::DeleteFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+		}
+	}
 
 	// TODO: If the object doesn't exist, the command will return success because there's nothing to delete.
 	// 		figure out how to force an error
