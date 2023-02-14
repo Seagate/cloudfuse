@@ -372,9 +372,9 @@ class Ui_mountSettingsWidget(object):
 
         self.label = QLabel(mountSettingsWidget)
         self.label.setObjectName(u"label")
-        self.label.setGeometry(QRect(310, 250, 481, 181))
+        self.label.setGeometry(QRect(760, 650, 151, 41))
         font1 = QFont()
-        font1.setPointSize(48)
+        font1.setPointSize(15)
         font1.setBold(True)
         self.label.setFont(font1)
         self.pushButton = QPushButton(mountSettingsWidget)
