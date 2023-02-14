@@ -632,15 +632,15 @@
   <widget class="QLabel" name="label">
    <property name="geometry">
     <rect>
-     <x>310</x>
-     <y>250</y>
-     <width>481</width>
-     <height>181</height>
+     <x>760</x>
+     <y>650</y>
+     <width>151</width>
+     <height>41</height>
     </rect>
    </property>
    <property name="font">
     <font>
-     <pointsize>48</pointsize>
+     <pointsize>15</pointsize>
      <weight>75</weight>
      <bold>true</bold>
     </font>

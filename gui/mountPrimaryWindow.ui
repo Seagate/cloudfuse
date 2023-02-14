@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>755</width>
-    <height>331</height>
+    <width>753</width>
+    <height>308</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -69,7 +69,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>180</y>
+      <y>140</y>
       <width>731</width>
       <height>91</height>
      </rect>
@@ -97,16 +97,16 @@
    <widget class="QLabel" name="label_3">
     <property name="geometry">
      <rect>
-      <x>180</x>
-      <y>130</y>
-      <width>391</width>
-      <height>61</height>
+      <x>290</x>
+      <y>230</y>
+      <width>171</width>
+      <height>31</height>
      </rect>
     </property>
     <property name="font">
      <font>
       <family>Ubuntu</family>
-      <pointsize>28</pointsize>
+      <pointsize>15</pointsize>
       <weight>75</weight>
       <bold>true</bold>
       <strikeout>false</strikeout>
@@ -215,7 +215,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>755</width>
+     <width>753</width>
      <height>22</height>
     </rect>
    </property>
