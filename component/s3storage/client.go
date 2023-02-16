@@ -590,6 +590,7 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 			log.Warn("S3Client::ReadToFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
+
 	if err != nil {
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
@@ -607,9 +608,11 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 		return err
 	}
 	_, err = fi.Write(body)
-
+	if err != nil {
+		log.Err("Couldn't write to file %v. Here's why: %v\n", name, err)
+		return err
+	}
 	return err
-
 }
 
 // ReadBuffer : Download a specific range from an object to a buffer
