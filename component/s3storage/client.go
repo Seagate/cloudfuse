@@ -562,18 +562,32 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 				Bucket: aws.String(cl.Config.authConfig.BucketName),
 				Key:    aws.String(name),
 			})
+
 		} else if offset != 0 && count == 0 {
 			result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
 				Bucket: aws.String(cl.Config.authConfig.BucketName),
 				Key:    aws.String(name),
 				Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-"),
 			})
-		} else {
+		} else if offset != 0 && count != 0 {
 			result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
 				Bucket: aws.String(cl.Config.authConfig.BucketName),
 				Key:    aws.String(name),
-				Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange) + ""),
+				Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)),
 			})
+		}
+
+		defer result.Body.Close()
+		body, err := io.ReadAll(result.Body)
+		if err != nil {
+			log.Err("Couldn't read object body from %v. Here's why: %v\n", name, err)
+			return err
+		}
+
+		_, err = fi.Write(body)
+		if err != nil {
+			log.Err("Couldn't write to file %v. Here's why: %v\n", name, err)
+			return err
 		}
 
 		if err == nil {
@@ -588,28 +602,18 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 			}
 			log.Warn("S3Client::ReadToFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
-	}
 
-	if err != nil {
-		// No such key found so object is not in S3
-		var nsk *types.NoSuchKey
-		if errors.As(err, &nsk) {
-			log.Err("S3Client::ReadToFile : Failed to download object %s [%s]", name, err.Error())
-			return syscall.ENOENT
+		if err != nil {
+			// No such key found so object is not in S3
+			var nsk *types.NoSuchKey
+			if errors.As(err, &nsk) {
+				log.Err("S3Object::ReadToFile : Failed to download object %s [%s]", name, err.Error())
+				return syscall.ENOENT
+			}
+			log.Err("Couldn't get object %v:%v. Here's why: %v\n", bucketName, name, err)
+			return err
 		}
-		log.Err("Couldn't get object %v:%v. Here's why: %v\n", bucketName, name, err)
-		return err
-	}
-	defer result.Body.Close()
-	body, err := io.ReadAll(result.Body)
-	if err != nil {
-		log.Err("Couldn't read object body from %v. Here's why: %v\n", name, err)
-		return err
-	}
-	_, err = fi.Write(body)
-	if err != nil {
-		log.Err("Couldn't write to file %v. Here's why: %v\n", name, err)
-		return err
+
 	}
 	return err
 }

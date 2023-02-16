@@ -1075,8 +1075,7 @@ func (s *s3StorageTestSuite) TestFullRangedDownload() {
 	dat, err := os.ReadFile(file.Name())
 	s.assert.Nil(err)
 	dataString := string(data)
-	dataSlice := dataString[2:8]
-	s.assert.EqualValues(string(dat), dataSlice)
+	s.assert.EqualValues(string(dat), dataString)
 }
 
 /*
