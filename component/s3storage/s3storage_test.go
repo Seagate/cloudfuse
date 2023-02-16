@@ -337,7 +337,7 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 // 	s.assert.NotNil(err)
 // }
 
-func (s *s3StorageTestSuite) TestCopyFromFile() {
+func (s *s3StorageTestSuite) TestCopyFromFile() *os.File {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -362,6 +362,8 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 	defer result.Body.Close()
 	output, _ := ioutil.ReadAll(result.Body)
 	s.assert.EqualValues(testData, output)
+
+	return f
 }
 
 func (s *s3StorageTestSuite) TestReadFile() {
@@ -1005,4 +1007,165 @@ func (s *s3StorageTestSuite) TestGetAttrError() {
 
 func TestS3Storage(t *testing.T) {
 	suite.Run(t, new(s3StorageTestSuite))
+}
+
+/*
+description:
+
+	creates a file with bytes and uploads it to S3 and deletes it from local machine afgter upload.
+	to be called from other test functions. Hense why there is no cleanupTest() call
+
+input:
+
+	N/A
+
+output:
+ 1. string of file name that was uploaded
+ 2. []byte of the data that was written to the file.
+*/
+func (s *s3StorageTestSuite) UploadFile() (string, []byte) {
+
+	// Setup
+	name := generateFileName()
+	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data"
+	data := []byte(testData)
+	homeDir, _ := os.UserHomeDir()
+	file, _ := ioutil.TempFile(homeDir, name+".tmp")
+	defer os.Remove(file.Name())
+	file.Write(data)
+
+	err := s.s3.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: file})
+	s.assert.Nil(err)
+
+	return name, data
+
+}
+
+/*
+description:
+
+	tests downloading full object from S3 bucket
+	does an assertion of two equal values between the follwoing:
+			1. A string of the data written to file before it was uploaded to the S3 Bucket
+			2. The data contained in the file downloaded of the object
+
+input:
+
+	N/A
+
+output:
+
+	N/A
+*/
+func (s *s3StorageTestSuite) TestFullRangedDownload() {
+	defer s.cleanupTest()
+
+	//create and upload file to S3 for download testing
+	name, data := s.UploadFile()
+
+	//create empty file for object download to write into
+	file, err := os.Create("testDownload")
+	s.assert.Nil(err)
+
+	//download to testDownload file
+	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 0, Count: 0, File: file})
+	s.assert.Nil(err)
+
+	//reading downloaded file to compare with original data string slice.
+	dat, err := os.ReadFile(file.Name())
+	s.assert.Nil(err)
+	dataString := string(data)
+	dataSlice := dataString[2:8]
+	s.assert.EqualValues(string(dat), dataSlice)
+}
+
+/*
+description:
+
+	tests handling of non zero values provided for offset and count parameters to ReadToFile()
+	does an assertion of two equal values between the follwoing:
+		1. A sub string of the data written to file before it was uploaded to the S3 Bucket
+		2. The data contained in the file downloaded from a specified range of the object
+
+	example:
+		-file uploaded with data "test data".
+		-substring of "st da" taken from the file that was uploaded
+		-download the range of data from the object into a file
+		-compare "st da" from file upload with "st da" from downloaded file.
+
+input:
+
+	N/A
+
+output:
+
+	N/A
+*/
+func (s *s3StorageTestSuite) TestRangedDownload() {
+	defer s.cleanupTest()
+
+	//create and upload file to S3 for download testing
+	name, data := s.UploadFile()
+
+	//create empty file for object download to write into
+	file, err := os.Create("testDownload")
+	s.assert.Nil(err)
+
+	//download to testDownload file
+	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 2, Count: 5, File: file})
+	s.assert.Nil(err)
+
+	//reading downloaded file to compare with original data string slice.
+	dat, err := os.ReadFile(file.Name())
+	s.assert.Nil(err)
+	dataString := string(data)
+	dataSlice := dataString[2:8]
+	s.assert.EqualValues(string(dat), dataSlice)
+}
+
+/*
+description:
+
+	tests handling of parameters, offset set to non zero value and count set to zero, for ReadToFile().
+	count set to zero means to read to end of object from offset.
+
+	does an assertion of two equal values between the follwoing:
+		1. A sub string of the data written to file before it was uploaded to the S3 Bucket
+		2. The data contained in the file downloaded from a specified range of the object
+
+	example:
+		-file uploaded with data "test data".
+		-substring of "st data" taken from the file that was uploaded
+		-download the range (offset to end) of data from the object into a file
+		-compare "st data" from file upload with "st data" from downloaded file.
+
+input:
+
+	N/A
+
+output:
+
+	N/A
+*/
+func (s *s3StorageTestSuite) TestOffsetToEndDownload() {
+	defer s.cleanupTest()
+
+	//create and upload file to S3 for download testing
+	name, data := s.UploadFile()
+
+	//create empty file for object download to write into
+	file, err := os.Create("testDownload")
+	s.assert.Nil(err)
+
+	//download to testDownload file
+	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 3, Count: 0, File: file})
+	s.assert.Nil(err)
+
+	//reading downloaded file to compare with original data string slice.
+	dat, err := os.ReadFile(file.Name())
+	s.assert.Nil(err)
+	dataString := string(data)
+	dataSlice := dataString[3:]
+	s.assert.EqualValues(string(dat), dataSlice)
 }

@@ -553,6 +553,9 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 
 	var apiErr smithy.APIError
 	var result *s3.GetObjectOutput
+	endRange := offset + count
+
+	//TODO: add handle if the offset+count is greater than the end of Object.
 	for i := 0; i < retryCount; i++ {
 		if offset == 0 && count == 0 {
 			result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
@@ -560,26 +563,16 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 				Key:    aws.String(name),
 			})
 		} else if offset != 0 && count == 0 {
-			var attributeTypes []types.ObjectAttributes
-			objAttr, objAttrErr := cl.Client.GetObjectAttributes(context.TODO(), &s3.GetObjectAttributesInput{
-				Bucket:           aws.String(cl.Config.authConfig.BucketName),
-				Key:              aws.String(name),
-				ObjectAttributes: attributeTypes,
-			})
-			if objAttrErr != nil {
-				log.Err("can't get attribute of object. Here's why: ", objAttrErr)
-				return objAttrErr
-			}
 			result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
 				Bucket: aws.String(cl.Config.authConfig.BucketName),
 				Key:    aws.String(name),
-				Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(objAttr.ObjectSize-offset)),
+				Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-"),
 			})
 		} else {
 			result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
 				Bucket: aws.String(cl.Config.authConfig.BucketName),
 				Key:    aws.String(name),
-				Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(offset+count)),
+				Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange) + ""),
 			})
 		}
 		if err == nil {
