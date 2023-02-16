@@ -337,7 +337,7 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 // 	s.assert.NotNil(err)
 // }
 
-func (s *s3StorageTestSuite) TestCopyFromFile() *os.File {
+func (s *s3StorageTestSuite) TestCopyFromFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -363,7 +363,6 @@ func (s *s3StorageTestSuite) TestCopyFromFile() *os.File {
 	output, _ := ioutil.ReadAll(result.Body)
 	s.assert.EqualValues(testData, output)
 
-	return f
 }
 
 func (s *s3StorageTestSuite) TestReadFile() {

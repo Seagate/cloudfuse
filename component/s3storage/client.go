@@ -554,7 +554,6 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 	var apiErr smithy.APIError
 	var result *s3.GetObjectOutput
 	endRange := offset + count
-
 	for i := 0; i < retryCount; i++ {
 
 		//TODO: add handle if the offset+count is greater than the end of Object.
