@@ -555,8 +555,9 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 	var result *s3.GetObjectOutput
 	endRange := offset + count
 
-	//TODO: add handle if the offset+count is greater than the end of Object.
 	for i := 0; i < retryCount; i++ {
+
+		//TODO: add handle if the offset+count is greater than the end of Object.
 		if offset == 0 && count == 0 {
 			result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
 				Bucket: aws.String(cl.Config.authConfig.BucketName),
@@ -575,6 +576,7 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 				Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange) + ""),
 			})
 		}
+
 		if err == nil {
 			break
 		}
