@@ -33,8 +33,8 @@
 
 package s3storage
 
-// AzAuthConfig : Config to authenticate to storage
-type azAuthConfig struct {
+// s3AuthConfig : Config to authenticate to storage
+type s3AuthConfig struct {
 	BucketName string
 	AccessKey  string
 	SecretKey  string

@@ -48,7 +48,7 @@ import (
 	"lyvecloudfuse/internal/stats_manager"
 )
 
-// S3Storage Wrapper type around azure go-sdk (track-1)
+// S3Storage Wrapper type around aws-sdk-go-v2/service/s3
 type S3Storage struct {
 	internal.BaseComponent
 	storage     S3Connection
@@ -62,40 +62,40 @@ const compName = "s3storage"
 // Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &S3Storage{}
 
-var azStatsCollector *stats_manager.StatsCollector
+var s3StatsCollector *stats_manager.StatsCollector
 
-func (az *S3Storage) Name() string {
-	return az.BaseComponent.Name()
+func (s3 *S3Storage) Name() string {
+	return s3.BaseComponent.Name()
 }
 
-func (az *S3Storage) SetName(name string) {
-	az.BaseComponent.SetName(name)
+func (s3 *S3Storage) SetName(name string) {
+	s3.BaseComponent.SetName(name)
 }
 
-func (az *S3Storage) SetNextComponent(c internal.Component) {
-	az.BaseComponent.SetNextComponent(c)
+func (s3 *S3Storage) SetNextComponent(c internal.Component) {
+	s3.BaseComponent.SetNextComponent(c)
 }
 
 // Configure : Pipeline will call this method after constructor so that you can read config and initialize yourself
-func (az *S3Storage) Configure(isParent bool) error {
-	log.Trace("S3Storage::Configure : %s", az.Name())
+func (s3 *S3Storage) Configure(isParent bool) error {
+	log.Trace("S3Storage::Configure : %s", s3.Name())
 
 	conf := AzStorageOptions{}
-	err := config.UnmarshalKey(az.Name(), &conf)
+	err := config.UnmarshalKey(s3.Name(), &conf)
 	if err != nil {
 		fmt.Println("Unable to unmarshal")
 		log.Err("S3Storage::Configure : config error [invalid config attributes]")
-		return fmt.Errorf("config error in %s [%s]", az.Name(), err.Error())
+		return fmt.Errorf("config error in %s [%s]", s3.Name(), err.Error())
 	}
 
-	err = ParseAndValidateConfig(az, conf)
+	err = ParseAndValidateConfig(s3, conf)
 	if err != nil {
 		fmt.Println("Unable to parse and validate")
 		log.Err("S3Storage::Configure : Config validation failed [%s]", err.Error())
-		return fmt.Errorf("config error in %s [%s]", az.Name(), err.Error())
+		return fmt.Errorf("config error in %s [%s]", s3.Name(), err.Error())
 	}
 
-	err = az.configureAndTest(isParent)
+	err = s3.configureAndTest(isParent)
 	if err != nil {
 		log.Err("S3Storage::Configure : Failed to validate storage account [%s]", err.Error())
 		return err
@@ -104,88 +104,88 @@ func (az *S3Storage) Configure(isParent bool) error {
 	return nil
 }
 
-func (az *S3Storage) Priority() internal.ComponentPriority {
+func (s3 *S3Storage) Priority() internal.ComponentPriority {
 	return internal.EComponentPriority.Consumer()
 }
 
 // OnConfigChange : When config file is changed, this will be called by pipeline. Refresh required config here
-func (az *S3Storage) OnConfigChange() {
-	log.Trace("S3Storage::OnConfigChange : %s", az.Name())
+func (s3 *S3Storage) OnConfigChange() {
+	log.Trace("S3Storage::OnConfigChange : %s", s3.Name())
 
 	conf := AzStorageOptions{}
-	err := config.UnmarshalKey(az.Name(), &conf)
+	err := config.UnmarshalKey(s3.Name(), &conf)
 	if err != nil {
 		log.Err("S3Storage::OnConfigChange : Config error [invalid config attributes]")
 		return
 	}
 
-	// err = ParseAndReadDynamicConfig(az, conf, true)
+	// err = ParseAndReadDynamicConfig(s3, conf, true)
 	// if err != nil {
 	// 	log.Err("S3Storage::OnConfigChange : failed to reparse config", err.Error())
 	// 	return
 	// }
 
-	err = az.storage.UpdateConfig(az.stConfig)
+	err = s3.storage.UpdateConfig(s3.stConfig)
 	if err != nil {
 		log.Err("S3Storage::OnConfigChange : failed to UpdateConfig", err.Error())
 		return
 	}
 }
 
-func (az *S3Storage) configureAndTest(isParent bool) error {
-	az.storage = NewS3StorageConnection(az.stConfig)
+func (s3 *S3Storage) configureAndTest(isParent bool) error {
+	s3.storage = NewS3StorageConnection(s3.stConfig)
 	return nil
 }
 
 // Start : Initialize the go-sdk pipeline here and test auth is working fine
-func (az *S3Storage) Start(ctx context.Context) error {
-	log.Trace("S3Storage::Start : Starting component %s", az.Name())
+func (s3 *S3Storage) Start(ctx context.Context) error {
+	log.Trace("S3Storage::Start : Starting component %s", s3.Name())
 	// On mount block the ListBlob call for certain amount of time
-	az.startTime = time.Now()
-	az.listBlocked = true
+	s3.startTime = time.Now()
+	s3.listBlocked = true
 
 	// create stats collector for azstorage
-	azStatsCollector = stats_manager.NewStatsCollector(az.Name())
+	s3StatsCollector = stats_manager.NewStatsCollector(s3.Name())
 
 	return nil
 }
 
 // Stop : Disconnect all running operations here
-func (az *S3Storage) Stop() error {
-	log.Trace("S3Storage::Stop : Stopping component %s", az.Name())
-	azStatsCollector.Destroy()
+func (s3 *S3Storage) Stop() error {
+	log.Trace("S3Storage::Stop : Stopping component %s", s3.Name())
+	s3StatsCollector.Destroy()
 	return nil
 }
 
 // ------------------------- Container listing -------------------------------------------
-func (az *S3Storage) ListContainers() ([]string, error) {
-	return az.storage.ListContainers()
+func (s3 *S3Storage) ListContainers() ([]string, error) {
+	return s3.storage.ListContainers()
 }
 
 // ------------------------- Core Operations -------------------------------------------
 
 // Directory operations
-func (az *S3Storage) CreateDir(options internal.CreateDirOptions) error {
+func (s3 *S3Storage) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("S3Storage::CreateDir : %s", options.Name)
 
-	err := az.storage.CreateDirectory(internal.TruncateDirName(options.Name))
+	err := s3.storage.CreateDirectory(internal.TruncateDirName(options.Name))
 
 	if err == nil {
-		azStatsCollector.PushEvents(createDir, options.Name, map[string]interface{}{mode: options.Mode.String()})
-		azStatsCollector.UpdateStats(stats_manager.Increment, createDir, (int64)(1))
+		s3StatsCollector.PushEvents(createDir, options.Name, map[string]interface{}{mode: options.Mode.String()})
+		s3StatsCollector.UpdateStats(stats_manager.Increment, createDir, (int64)(1))
 	}
 
 	return err
 }
 
-func (az *S3Storage) DeleteDir(options internal.DeleteDirOptions) error {
+func (s3 *S3Storage) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("S3Storage::DeleteDir : %s", options.Name)
 
-	err := az.storage.DeleteDirectory(internal.TruncateDirName(options.Name))
+	err := s3.storage.DeleteDirectory(internal.TruncateDirName(options.Name))
 
 	if err == nil {
-		azStatsCollector.PushEvents(deleteDir, options.Name, nil)
-		azStatsCollector.UpdateStats(stats_manager.Increment, deleteDir, (int64)(1))
+		s3StatsCollector.PushEvents(deleteDir, options.Name, nil)
+		s3StatsCollector.UpdateStats(stats_manager.Increment, deleteDir, (int64)(1))
 	}
 
 	return err
@@ -202,9 +202,9 @@ func formatListDirName(path string) string {
 	return path
 }
 
-func (az *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
+func (s3 *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	log.Trace("S3Storage::IsDirEmpty : %s", options.Name)
-	list, _, err := az.storage.List(formatListDirName(options.Name), nil, 1)
+	list, _, err := s3.storage.List(formatListDirName(options.Name), nil, 1)
 	if err != nil {
 		log.Err("S3Storage::IsDirEmpty : error listing [%s]", err)
 		return false
@@ -215,17 +215,17 @@ func (az *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	return false
 }
 
-func (az *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
+func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
 	log.Trace("S3Storage::ReadDir : %s", options.Name)
 	blobList := make([]*internal.ObjAttr, 0)
 
-	// if az.listBlocked {
-	// 	diff := time.Since(az.startTime)
-	// 	if diff.Seconds() > float64(az.stConfig.cancelListForSeconds) {
-	// 		az.listBlocked = false
+	// if s3.listBlocked {
+	// 	diff := time.Since(s3.startTime)
+	// 	if diff.Seconds() > float64(s3.stConfig.cancelListForSeconds) {
+	// 		s3.listBlocked = false
 	// 		log.Info("S3Storage::ReadDir : Unblocked List API")
 	// 	} else {
-	// 		log.Info("S3Storage::ReadDir : Blocked List API for %d more seconds", int(az.stConfig.cancelListForSeconds)-int(diff.Seconds()))
+	// 		log.Info("S3Storage::ReadDir : Blocked List API for %d more seconds", int(s3.stConfig.cancelListForSeconds)-int(diff.Seconds()))
 	// 		return blobList, nil
 	// 	}
 	// }
@@ -234,7 +234,7 @@ func (az *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 	var iteration int = 0
 	var marker *string = nil
 	for {
-		new_list, new_marker, err := az.storage.List(path, marker, common.MaxDirListCount)
+		new_list, new_marker, err := s3.storage.List(path, marker, common.MaxDirListCount)
 		if err != nil {
 			log.Err("S3Storage::ReadDir : Failed to read dir [%s]", err)
 			return blobList, err
@@ -252,23 +252,23 @@ func (az *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 	return blobList, nil
 }
 
-func (az *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
+func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
 	log.Trace("S3Storage::StreamDir : Path %s, offset %d, count %d", options.Name, options.Offset, options.Count)
 
-	// if az.listBlocked {
-	// 	diff := time.Since(az.startTime)
-	// 	if diff.Seconds() > float64(az.stConfig.cancelListForSeconds) {
-	// 		az.listBlocked = false
+	// if s3.listBlocked {
+	// 	diff := time.Since(s3.startTime)
+	// 	if diff.Seconds() > float64(s3.stConfig.cancelListForSeconds) {
+	// 		s3.listBlocked = false
 	// 		log.Info("S3Storage::StreamDir : Unblocked List API")
 	// 	} else {
-	// 		log.Info("S3Storage::StreamDir : Blocked List API for %d more seconds", int(az.stConfig.cancelListForSeconds)-int(diff.Seconds()))
+	// 		log.Info("S3Storage::StreamDir : Blocked List API for %d more seconds", int(s3.stConfig.cancelListForSeconds)-int(diff.Seconds()))
 	// 		return make([]*internal.ObjAttr, 0), "", nil
 	// 	}
 	// }
 
 	path := formatListDirName(options.Name)
 
-	new_list, new_marker, err := az.storage.List(path, &options.Token, options.Count)
+	new_list, new_marker, err := s3.storage.List(path, &options.Token, options.Count)
 	if err != nil {
 		log.Err("S3Storage::StreamDir : Failed to read dir [%s]", err)
 		return new_list, "", err
@@ -287,7 +287,7 @@ func (az *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			*/
 			log.Warn("S3Storage::StreamDir : next-marker %s but current list is empty. Need to retry listing", *new_marker)
 			options.Token = *new_marker
-			return az.StreamDir(options)
+			return s3.StreamDir(options)
 		}
 	}
 
@@ -295,30 +295,30 @@ func (az *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	if len(path) == 0 {
 		path = "/"
 	}
-	azStatsCollector.PushEvents(streamDir, path, map[string]interface{}{count: len(new_list)})
+	s3StatsCollector.PushEvents(streamDir, path, map[string]interface{}{count: len(new_list)})
 
 	// increment streamdir call count
-	azStatsCollector.UpdateStats(stats_manager.Increment, streamDir, (int64)(1))
+	s3StatsCollector.UpdateStats(stats_manager.Increment, streamDir, (int64)(1))
 
 	return new_list, *new_marker, nil
 }
 
-func (az *S3Storage) RenameDir(options internal.RenameDirOptions) error {
+func (s3 *S3Storage) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("S3Storage::RenameDir : %s to %s", options.Src, options.Dst)
 	options.Src = internal.TruncateDirName(options.Src)
 	options.Dst = internal.TruncateDirName(options.Dst)
 
-	err := az.storage.RenameDirectory(options.Src, options.Dst)
+	err := s3.storage.RenameDirectory(options.Src, options.Dst)
 
 	if err == nil {
-		azStatsCollector.PushEvents(renameDir, options.Src, map[string]interface{}{src: options.Src, dest: options.Dst})
-		azStatsCollector.UpdateStats(stats_manager.Increment, renameDir, (int64)(1))
+		s3StatsCollector.PushEvents(renameDir, options.Src, map[string]interface{}{src: options.Src, dest: options.Dst})
+		s3StatsCollector.UpdateStats(stats_manager.Increment, renameDir, (int64)(1))
 	}
 	return err
 }
 
 // File operations
-func (az *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
+func (s3 *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	log.Trace("S3Storage::CreateFile : %s", options.Name)
 
 	// Create a handle object for the file being created
@@ -329,24 +329,24 @@ func (az *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		return nil, syscall.EFAULT
 	}
 
-	err := az.storage.CreateFile(options.Name, options.Mode)
+	err := s3.storage.CreateFile(options.Name, options.Mode)
 	if err != nil {
 		return nil, err
 	}
 	handle.Mtime = time.Now()
 
-	azStatsCollector.PushEvents(createFile, options.Name, map[string]interface{}{mode: options.Mode.String()})
+	s3StatsCollector.PushEvents(createFile, options.Name, map[string]interface{}{mode: options.Mode.String()})
 
 	// increment open file handles count
-	azStatsCollector.UpdateStats(stats_manager.Increment, openHandles, (int64)(1))
+	s3StatsCollector.UpdateStats(stats_manager.Increment, openHandles, (int64)(1))
 
 	return handle, nil
 }
 
-func (az *S3Storage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
+func (s3 *S3Storage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
 	log.Trace("S3Storage::OpenFile : %s", options.Name)
 
-	attr, err := az.storage.GetAttr(options.Name)
+	attr, err := s3.storage.GetAttr(options.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -362,51 +362,51 @@ func (az *S3Storage) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	handle.Mtime = attr.Mtime
 
 	// increment open file handles count
-	azStatsCollector.UpdateStats(stats_manager.Increment, openHandles, (int64)(1))
+	s3StatsCollector.UpdateStats(stats_manager.Increment, openHandles, (int64)(1))
 
 	return handle, nil
 }
 
-func (az *S3Storage) CloseFile(options internal.CloseFileOptions) error {
+func (s3 *S3Storage) CloseFile(options internal.CloseFileOptions) error {
 	log.Trace("S3Storage::CloseFile : %s", options.Handle.Path)
 
 	// decrement open file handles count
-	azStatsCollector.UpdateStats(stats_manager.Decrement, openHandles, (int64)(1))
+	s3StatsCollector.UpdateStats(stats_manager.Decrement, openHandles, (int64)(1))
 
 	return nil
 }
 
-func (az *S3Storage) DeleteFile(options internal.DeleteFileOptions) error {
+func (s3 *S3Storage) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("S3Storage::DeleteFile : %s", options.Name)
 
-	err := az.storage.DeleteFile(options.Name)
+	err := s3.storage.DeleteFile(options.Name)
 
 	if err == nil {
-		azStatsCollector.PushEvents(deleteFile, options.Name, nil)
-		azStatsCollector.UpdateStats(stats_manager.Increment, deleteFile, (int64)(1))
+		s3StatsCollector.PushEvents(deleteFile, options.Name, nil)
+		s3StatsCollector.UpdateStats(stats_manager.Increment, deleteFile, (int64)(1))
 	}
 
 	return err
 }
 
-func (az *S3Storage) RenameFile(options internal.RenameFileOptions) error {
+func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("S3Storage::RenameFile : %s to %s", options.Src, options.Dst)
 
-	err := az.storage.RenameFile(options.Src, options.Dst)
+	err := s3.storage.RenameFile(options.Src, options.Dst)
 
 	if err == nil {
-		azStatsCollector.PushEvents(renameFile, options.Src, map[string]interface{}{src: options.Src, dest: options.Dst})
-		azStatsCollector.UpdateStats(stats_manager.Increment, renameFile, (int64)(1))
+		s3StatsCollector.PushEvents(renameFile, options.Src, map[string]interface{}{src: options.Src, dest: options.Dst})
+		s3StatsCollector.UpdateStats(stats_manager.Increment, renameFile, (int64)(1))
 	}
 	return err
 }
 
-func (az *S3Storage) ReadFile(options internal.ReadFileOptions) (data []byte, err error) {
+func (s3 *S3Storage) ReadFile(options internal.ReadFileOptions) (data []byte, err error) {
 	//log.Trace("S3Storage::ReadFile : Read %s", h.Path)
-	return az.storage.ReadBuffer(options.Handle.Path, 0, 0)
+	return s3.storage.ReadBuffer(options.Handle.Path, 0, 0)
 }
 
-func (az *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (length int, err error) {
+func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (length int, err error) {
 	//log.Trace("S3Storage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 
 	if options.Offset > atomic.LoadInt64(&options.Handle.Size) {
@@ -422,7 +422,7 @@ func (az *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (length 
 		return 0, nil
 	}
 
-	err = az.storage.ReadInBuffer(options.Handle.Path, options.Offset, dataLen, options.Data)
+	err = s3.storage.ReadInBuffer(options.Handle.Path, options.Offset, dataLen, options.Data)
 	if err != nil {
 		log.Err("S3Storage::ReadInBuffer : Failed to read %s [%s]", options.Handle.Path, err.Error())
 	}
@@ -431,88 +431,88 @@ func (az *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (length 
 	return
 }
 
-func (az *S3Storage) WriteFile(options internal.WriteFileOptions) (int, error) {
-	err := az.storage.Write(options)
+func (s3 *S3Storage) WriteFile(options internal.WriteFileOptions) (int, error) {
+	err := s3.storage.Write(options)
 	return len(options.Data), err
 }
 
-func (az *S3Storage) GetFileBlockOffsets(options internal.GetFileBlockOffsetsOptions) (*common.BlockOffsetList, error) {
-	return az.storage.GetFileBlockOffsets(options.Name)
+func (s3 *S3Storage) GetFileBlockOffsets(options internal.GetFileBlockOffsetsOptions) (*common.BlockOffsetList, error) {
+	return s3.storage.GetFileBlockOffsets(options.Name)
 
 }
 
-func (az *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
+func (s3 *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("S3Storage::TruncateFile : %s to %d bytes", options.Name, options.Size)
-	err := az.storage.TruncateFile(options.Name, options.Size)
+	err := s3.storage.TruncateFile(options.Name, options.Size)
 
 	if err == nil {
-		azStatsCollector.PushEvents(truncateFile, options.Name, map[string]interface{}{size: options.Size})
-		azStatsCollector.UpdateStats(stats_manager.Increment, truncateFile, (int64)(1))
+		s3StatsCollector.PushEvents(truncateFile, options.Name, map[string]interface{}{size: options.Size})
+		s3StatsCollector.UpdateStats(stats_manager.Increment, truncateFile, (int64)(1))
 	}
 	return err
 }
 
-func (az *S3Storage) CopyToFile(options internal.CopyToFileOptions) error {
+func (s3 *S3Storage) CopyToFile(options internal.CopyToFileOptions) error {
 	log.Trace("S3Storage::CopyToFile : Read file %s", options.Name)
-	return az.storage.ReadToFile(options.Name, options.Offset, options.Count, options.File)
+	return s3.storage.ReadToFile(options.Name, options.Offset, options.Count, options.File)
 }
 
-func (az *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
+func (s3 *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("S3Storage::CopyFromFile : Upload file %s", options.Name)
-	return az.storage.WriteFromFile(options.Name, options.Metadata, options.File)
+	return s3.storage.WriteFromFile(options.Name, options.Metadata, options.File)
 }
 
 // Symlink operations
-func (az *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
+func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 	log.Trace("S3Storage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
-	err := az.storage.CreateLink(options.Name, options.Target)
+	err := s3.storage.CreateLink(options.Name, options.Target)
 
 	if err == nil {
-		azStatsCollector.PushEvents(createLink, options.Name, map[string]interface{}{target: options.Target})
-		azStatsCollector.UpdateStats(stats_manager.Increment, createLink, (int64)(1))
+		s3StatsCollector.PushEvents(createLink, options.Name, map[string]interface{}{target: options.Target})
+		s3StatsCollector.UpdateStats(stats_manager.Increment, createLink, (int64)(1))
 	}
 
 	return err
 }
 
-func (az *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) {
+func (s3 *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) {
 	log.Trace("S3Storage::ReadLink : Read symlink %s", options.Name)
-	data, err := az.storage.ReadBuffer(options.Name, 0, 0)
+	data, err := s3.storage.ReadBuffer(options.Name, 0, 0)
 
 	if err != nil {
-		azStatsCollector.PushEvents(readLink, options.Name, nil)
-		azStatsCollector.UpdateStats(stats_manager.Increment, readLink, (int64)(1))
+		s3StatsCollector.PushEvents(readLink, options.Name, nil)
+		s3StatsCollector.UpdateStats(stats_manager.Increment, readLink, (int64)(1))
 	}
 
 	return string(data), err
 }
 
 // Attribute operations
-func (az *S3Storage) GetAttr(options internal.GetAttrOptions) (attr *internal.ObjAttr, err error) {
+func (s3 *S3Storage) GetAttr(options internal.GetAttrOptions) (attr *internal.ObjAttr, err error) {
 	//log.Trace("S3Storage::GetAttr : Get attributes of file %s", name)
-	return az.storage.GetAttr(options.Name)
+	return s3.storage.GetAttr(options.Name)
 }
 
-func (az *S3Storage) Chmod(options internal.ChmodOptions) error {
+func (s3 *S3Storage) Chmod(options internal.ChmodOptions) error {
 	log.Trace("S3Storage::Chmod : Change mod of file %s", options.Name)
-	err := az.storage.ChangeMod(options.Name, options.Mode)
+	err := s3.storage.ChangeMod(options.Name, options.Mode)
 
 	if err == nil {
-		azStatsCollector.PushEvents(chmod, options.Name, map[string]interface{}{mode: options.Mode.String()})
-		azStatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))
+		s3StatsCollector.PushEvents(chmod, options.Name, map[string]interface{}{mode: options.Mode.String()})
+		s3StatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))
 	}
 
 	return err
 }
 
-func (az *S3Storage) Chown(options internal.ChownOptions) error {
+func (s3 *S3Storage) Chown(options internal.ChownOptions) error {
 	log.Trace("S3Storage::Chown : Change ownership of file %s to %d-%d", options.Name, options.Owner, options.Group)
-	return az.storage.ChangeOwner(options.Name, options.Owner, options.Group)
+	return s3.storage.ChangeOwner(options.Name, options.Owner, options.Group)
 }
 
-func (az *S3Storage) FlushFile(options internal.FlushFileOptions) error {
+func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("S3Storage::FlushFile : Flush file %s", options.Handle.Path)
-	return az.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
+	return s3.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
 }
 
 // TODO : Below methods are pending to be implemented
@@ -524,28 +524,28 @@ func (az *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 // ------------------------- Factory methods to create objects -------------------------------------------
 
 // Constructor to create object of this component
-func NewazstorageComponent() internal.Component {
+func News3storageComponent() internal.Component {
 	// Init the component with default config
-	az := &S3Storage{
+	s3 := &S3Storage{
 		stConfig: S3StorageConfig{
 			// blockSize:      0,
 			// maxConcurrency: 32,
 			// defaultTier:    getAccessTierType("none"),
-			// authConfig: azAuthConfig{
+			// authConfig: s3AuthConfig{
 			// 	AuthMode: EAuthType.KEY(),
 			// 	UseHTTP:  false,
 			// },
 		},
 	}
 
-	az.SetName(compName)
-	config.AddConfigChangeEventListener(az)
-	return az
+	s3.SetName(compName)
+	config.AddConfigChangeEventListener(s3)
+	return s3
 }
 
 // On init register this component to pipeline and supply your constructor
 func init() {
-	internal.AddComponent(compName, NewazstorageComponent)
+	internal.AddComponent(compName, News3storageComponent)
 	RegisterEnvVariables()
 
 	// TODO: Fix these flags so we enable ones that work with S3

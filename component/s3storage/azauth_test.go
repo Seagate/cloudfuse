@@ -69,7 +69,7 @@ func (suite *authTestSuite) SetupTest() {
 		fmt.Println("Unable to get home directory")
 		os.Exit(1)
 	}
-	cfgFile, err := os.Open(homeDir + "/azuretest.json")
+	cfgFile, err := os.Open(homeDir + "/s3test.json")
 	if err != nil {
 		fmt.Println("Unable to open config file")
 		os.Exit(1)

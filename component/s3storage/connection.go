@@ -44,7 +44,7 @@ import (
 // Example for azblob usage : https://godoc.org/github.com/Azure/azure-storage-blob-go/azblob#pkg-examples
 // For methods help refer : https://godoc.org/github.com/Azure/azure-storage-blob-go/azblob#ContainerURL
 type S3StorageConfig struct {
-	authConfig azAuthConfig
+	authConfig s3AuthConfig
 
 	prefixPath string
 }
@@ -98,7 +98,7 @@ type S3Connection interface {
 
 // NewS3StorageConnection : Based on account type create respective S3Connection Object
 func NewS3StorageConnection(cfg S3StorageConfig) S3Connection {
-	stg := &S3Object{}
+	stg := &S3Client{}
 	_ = stg.Configure(cfg)
 	return stg
 }

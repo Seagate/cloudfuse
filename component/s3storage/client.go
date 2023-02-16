@@ -64,32 +64,32 @@ const (
 	retryCount = 5
 )
 
-type S3Object struct {
+type S3Client struct {
 	S3StorageConnection
 	Client *s3.Client
 }
 
-// Verify that S3Object implements AzConnection interface
-var _ S3Connection = &S3Object{}
+// Verify that S3Client implements S3Connection interface
+var _ S3Connection = &S3Client{}
 
-func (bb *S3Object) Configure(cfg S3StorageConfig) error {
-	bb.Config = cfg
+func (cl *S3Client) Configure(cfg S3StorageConfig) error {
+	cl.Config = cfg
 
 	endpointResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		//if service == s3.ServiceID && region == "us-east-1" {
 		if service == s3.ServiceID {
 			return aws.Endpoint{
 				PartitionID:   "aws",
-				URL:           bb.Config.authConfig.Endpoint,
-				SigningRegion: bb.Config.authConfig.Region,
+				URL:           cl.Config.authConfig.Endpoint,
+				SigningRegion: cl.Config.authConfig.Region,
 			}, nil
 		}
 		return aws.Endpoint{}, fmt.Errorf("unknown endpoint requested")
 	})
 
 	staticProvider := credentials.NewStaticCredentialsProvider(
-		bb.Config.authConfig.AccessKey,
-		bb.Config.authConfig.SecretKey,
+		cl.Config.authConfig.AccessKey,
+		cl.Config.authConfig.SecretKey,
 		"",
 	)
 	defaultConfig, err := config.LoadDefaultConfig(
@@ -102,23 +102,23 @@ func (bb *S3Object) Configure(cfg S3StorageConfig) error {
 	}
 
 	// Create an Amazon S3 service client
-	bb.Client = s3.NewFromConfig(defaultConfig)
+	cl.Client = s3.NewFromConfig(defaultConfig)
 
 	return nil
 }
 
 // For dynamic config update the config here
-func (bb *S3Object) UpdateConfig(cfg S3StorageConfig) error {
+func (cl *S3Client) UpdateConfig(cfg S3StorageConfig) error {
 	return nil
 }
 
 // NewCredentialKey : Update the credential key specified by the user
-func (bb *S3Object) NewCredentialKey(key, value string) (err error) {
+func (cl *S3Client) NewCredentialKey(key, value string) (err error) {
 	return nil
 }
 
-func (bb *S3Object) ListContainers() ([]string, error) {
-	log.Trace("S3Object::ListContainers : Listing containers")
+func (cl *S3Client) ListContainers() ([]string, error) {
+	log.Trace("S3Client::ListContainers : Listing containers")
 
 	cntList := make([]string, 0)
 
@@ -126,7 +126,7 @@ func (bb *S3Object) ListContainers() ([]string, error) {
 	var apiErr smithy.APIError
 	var result *s3.ListBucketsOutput
 	for i := 0; i < retryCount; i++ {
-		result, err = bb.Client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
+		result, err = cl.Client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
 		if err == nil {
 			break
 		}
@@ -137,7 +137,7 @@ func (bb *S3Object) ListContainers() ([]string, error) {
 			if code != "InvalidAccessKeyId" {
 				break
 			}
-			log.Warn("S3Object::ListContainers Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			log.Warn("S3Client::ListContainers Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -158,22 +158,22 @@ func exitErrorf(msg string, args ...interface{}) {
 	os.Exit(1)
 }
 
-func (bb *S3Object) SetPrefixPath(path string) error {
-	log.Trace("S3Object::SetPrefixPath : path %s", path)
-	bb.Config.prefixPath = path
+func (cl *S3Client) SetPrefixPath(path string) error {
+	log.Trace("S3Client::SetPrefixPath : path %s", path)
+	cl.Config.prefixPath = path
 	return nil
 }
 
 // CreateFile : Create a new file in the container/virtual directory
-func (bb *S3Object) CreateFile(name string, mode os.FileMode) error {
-	log.Trace("S3Object::CreateFile : name %s", name)
+func (cl *S3Client) CreateFile(name string, mode os.FileMode) error {
+	log.Trace("S3Client::CreateFile : name %s", name)
 	var data []byte
-	return bb.WriteFromBuffer(name, nil, data)
+	return cl.WriteFromBuffer(name, nil, data)
 }
 
 // CreateDirectory : Create a new directory in the container/virtual directory
-func (bb *S3Object) CreateDirectory(name string) error {
-	log.Trace("S3Object::CreateDirectory : name %s", name)
+func (cl *S3Client) CreateDirectory(name string) error {
+	log.Trace("S3Client::CreateDirectory : name %s", name)
 
 	// Lyve Cloud does not support creating an empty file to indicate a directory
 	// so do nothing
@@ -181,22 +181,22 @@ func (bb *S3Object) CreateDirectory(name string) error {
 }
 
 // CreateLink : Create a symlink in the container/virtual directory
-func (bb *S3Object) CreateLink(source string, target string) error {
-	log.Trace("S3Object::CreateLink : %s -> %s", source, target)
+func (cl *S3Client) CreateLink(source string, target string) error {
+	log.Trace("S3Client::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
 	metadata := make(map[string]string)
 	metadata[symlinkKey] = "true"
-	return bb.WriteFromBuffer(source, metadata, data)
+	return cl.WriteFromBuffer(source, metadata, data)
 }
 
 // DeleteFile : Delete an object
-func (bb *S3Object) DeleteFile(name string) (err error) {
+func (cl *S3Client) DeleteFile(name string) (err error) {
 
-	log.Trace("S3Object::DeleteFile : name %s", name)
+	log.Trace("S3Client::DeleteFile : name %s", name)
 	var apiErr smithy.APIError
 	for i := 0; i < retryCount; i++ {
-		_, err = bb.Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
-			Bucket: aws.String(bb.Config.authConfig.BucketName),
+		_, err = cl.Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+			Bucket: aws.String(cl.Config.authConfig.BucketName),
 			Key:    aws.String(name),
 		})
 		if err == nil {
@@ -209,7 +209,7 @@ func (bb *S3Object) DeleteFile(name string) (err error) {
 			if code != "InvalidAccessKeyId" {
 				break
 			}
-			log.Warn("S3Object::DeleteFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			log.Warn("S3Client::DeleteFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -219,13 +219,13 @@ func (bb *S3Object) DeleteFile(name string) (err error) {
 
 		serr := storeBlobErrToErr(err)
 		if serr == ErrFileNotFound {
-			log.Err("S3Object::DeleteFile : %s does not exist", name)
+			log.Err("S3Client::DeleteFile : %s does not exist", name)
 			return syscall.ENOENT
 		} else if serr == BlobIsUnderLease {
-			log.Err("S3Object::DeleteFile : %s is under lease [%s]", name, err.Error())
+			log.Err("S3Client::DeleteFile : %s is under lease [%s]", name, err.Error())
 			return syscall.EIO
 		} else {
-			log.Err("S3Object::DeleteFile : Failed to delete blob %s [%s]", name, err.Error())
+			log.Err("S3Client::DeleteFile : Failed to delete object %s [%s]", name, err.Error())
 			return err
 		}
 	}
@@ -233,19 +233,19 @@ func (bb *S3Object) DeleteFile(name string) (err error) {
 }
 
 // DeleteDirectory : Delete a virtual directory in the container/virtual directory
-func (bb *S3Object) DeleteDirectory(name string) (err error) {
+func (cl *S3Client) DeleteDirectory(name string) (err error) {
 	return err
 }
 
 // RenameFile : Rename the file
-func (bb *S3Object) RenameFile(source string, target string) (err error) {
-	log.Trace("S3Object::RenameFile : %s -> %s", source, target)
+func (cl *S3Client) RenameFile(source string, target string) (err error) {
+	log.Trace("S3Client::RenameFile : %s -> %s", source, target)
 
 	var apiErr smithy.APIError
 	for i := 0; i < retryCount; i++ {
-		_, err = bb.Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
-			Bucket:     aws.String(bb.Config.authConfig.BucketName),
-			CopySource: aws.String(fmt.Sprintf("%v/%v", bb.Config.authConfig.BucketName, source)),
+		_, err = cl.Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
+			Bucket:     aws.String(cl.Config.authConfig.BucketName),
+			CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, source)),
 			Key:        aws.String(target),
 		})
 		if err == nil {
@@ -258,7 +258,7 @@ func (bb *S3Object) RenameFile(source string, target string) (err error) {
 			if code != "InvalidAccessKeyId" {
 				break
 			}
-			log.Warn("S3Object::RenameFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			log.Warn("S3Client::RenameFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -266,7 +266,7 @@ func (bb *S3Object) RenameFile(source string, target string) (err error) {
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			log.Err("S3Object::RenameFile : %s does not exist", source)
+			log.Err("S3Client::RenameFile : %s does not exist", source)
 			return syscall.ENOENT
 		}
 		var apiErr smithy.APIError
@@ -276,25 +276,25 @@ func (bb *S3Object) RenameFile(source string, target string) (err error) {
 			// so need a different case to catch this. Understand why this does not give a no such key error type
 			code := apiErr.ErrorCode()
 			if code == "NoSuchKey" {
-				log.Err("S3Object::RenameFile : %s does not exist", source)
+				log.Err("S3Client::RenameFile : %s does not exist", source)
 				return syscall.ENOENT
 			}
 		}
-		log.Err("S3Object::RenameFile : Failed to start copy of file %s [%s]", source, err.Error())
+		log.Err("S3Client::RenameFile : Failed to start copy of file %s [%s]", source, err.Error())
 		return err
 	}
 
-	log.Trace("S3Object::RenameFile : %s -> %s done", source, target)
+	log.Trace("S3Client::RenameFile : %s -> %s done", source, target)
 
 	// Copy of the file is done so now delete the older file
-	err = bb.DeleteFile(source)
+	err = cl.DeleteFile(source)
 	for retry := 0; retry < 3 && err == syscall.ENOENT; retry++ {
 		// Sometimes backend is able to copy source file to destination but when we try to delete the
 		// source files it returns back with ENOENT. If file was just created on backend it might happen
 		// that it has not been synced yet at all layers and hence delete is not able to find the source file
-		log.Trace("S3Object::RenameFile : %s -> %s, unable to find source. Retrying %d", source, target, retry)
+		log.Trace("S3Client::RenameFile : %s -> %s, unable to find source. Retrying %d", source, target, retry)
 		time.Sleep(1 * time.Second)
-		err = bb.DeleteFile(source)
+		err = cl.DeleteFile(source)
 	}
 
 	if err == syscall.ENOENT {
@@ -307,27 +307,27 @@ func (bb *S3Object) RenameFile(source string, target string) (err error) {
 }
 
 // RenameDirectory : Rename the directory
-func (bb *S3Object) RenameDirectory(source string, target string) error {
+func (cl *S3Client) RenameDirectory(source string, target string) error {
 	return nil
 }
 
-func (bb *S3Object) getAttrUsingRest(name string) (attr *internal.ObjAttr, err error) {
+func (cl *S3Client) getAttrUsingRest(name string) (attr *internal.ObjAttr, err error) {
 	return nil, err
 }
 
-func (bb *S3Object) getAttrUsingList(name string) (attr *internal.ObjAttr, err error) {
+func (cl *S3Client) getAttrUsingList(name string) (attr *internal.ObjAttr, err error) {
 	return nil, err
 }
 
 // GetAttr : Retrieve attributes of the object
-func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
-	log.Trace("S3Object::GetAttr : name %s", name)
+func (cl *S3Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
+	log.Trace("S3Client::GetAttr : name %s", name)
 
 	var marker *string = nil
 
-	// TODO: Call bb.List with a limit of 1 to reduce wasted resources
+	// TODO: Call cl.List with a limit of 1 to reduce wasted resources
 	// TODO: Handle markers
-	blobs, _, err := bb.List(name, marker, 1)
+	objects, _, err := cl.List(name, marker, 1)
 	if err != nil {
 		e := storeBlobErrToErr(err)
 		if e == ErrFileNotFound {
@@ -335,17 +335,17 @@ func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 		} else if e == InvalidPermission {
 			return attr, syscall.EPERM
 		} else {
-			log.Warn("S3Object::getAttrUsingList : Failed to list blob properties for %s [%s]", name, err.Error())
+			log.Warn("S3Client::getAttrUsingList : Failed to list object properties for %s [%s]", name, err.Error())
 		}
 		return nil, err
 	}
 
-	numObjects := len(blobs)
-	for i, blob := range blobs {
-		log.Trace("S3Object::GetAttr : Item %d Blob %s", i+numObjects, blob.Name)
-		if blob.Path == name {
+	numObjects := len(objects)
+	for i, object := range objects {
+		log.Trace("S3Client::GetAttr : Item %d Object %s", i+numObjects, object.Name)
+		if object.Path == name {
 			// we found it!
-			return blob, nil
+			return object, nil
 		}
 	}
 
@@ -357,8 +357,8 @@ func (bb *S3Object) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 // List : Get a list of objects matching the given prefix
 // This fetches the list using a marker so the caller code should handle marker logic
 // If count=0 - fetch max entries
-func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
-	log.Trace("S3Object::List : prefix %s, marker %s", prefix, func(marker *string) string {
+func (cl *S3Client) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
+	log.Trace("S3Client::List : prefix %s, marker %s", prefix, func(marker *string) string {
 		if marker != nil {
 			return *marker
 		} else {
@@ -367,14 +367,14 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 	}(marker))
 
 	// prepare parameters
-	bucketName := bb.Config.authConfig.BucketName
+	bucketName := cl.Config.authConfig.BucketName
 	if count == 0 {
 		count = common.MaxDirListCount
 	}
 	// combine the configured prefix and the prefix being given to List to get a full listPath
-	listPath := filepath.Join(bb.Config.prefixPath, prefix)
+	listPath := filepath.Join(cl.Config.prefixPath, prefix)
 	// make sure the listPath ends with a forward slash
-	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && bb.Config.prefixPath != "") {
+	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
 		listPath += "/"
 	}
 
@@ -389,7 +389,7 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 		Delimiter: aws.String("/"), // delimeter is needed to get CommonPrefixes
 	}
 
-	paginator := s3.NewListObjectsV2Paginator(bb.Client, params)
+	paginator := s3.NewListObjectsV2Paginator(cl.Client, params)
 
 	// initialize list to be returned
 	objectAttrList := make([]*internal.ObjAttr, 0)
@@ -410,7 +410,7 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 				if code != "InvalidAccessKeyId" {
 					break
 				}
-				log.Warn("S3Object::List Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+				log.Warn("S3Client::List Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 			}
 		}
 		if err != nil {
@@ -428,7 +428,7 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 			// }
 			// push object info into the list
 			attr := &internal.ObjAttr{
-				Path:   split(bb.Config.prefixPath, *value.Key),
+				Path:   split(cl.Config.prefixPath, *value.Key),
 				Name:   filepath.Base(*value.Key),
 				Size:   value.Size,
 				Mode:   0,
@@ -492,7 +492,7 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 		}
 		name := strings.TrimSuffix(dir, "/")
 		attr := &internal.ObjAttr{
-			Path:  split(bb.Config.prefixPath, name),
+			Path:  split(cl.Config.prefixPath, name),
 			Name:  filepath.Base(name),
 			Size:  4096,
 			Mode:  os.ModeDir,
@@ -523,34 +523,34 @@ func (bb *S3Object) List(prefix string, marker *string, count int32) ([]*interna
 	return objectAttrList, &newMarker, nil
 }
 
-// track the progress of download of blobs where every 100MB of data downloaded is being tracked. It also tracks the completion of download
+// track the progress of download of objects where every 100MB of data downloaded is being tracked. It also tracks the completion of download
 func trackDownload(name string, bytesTransferred int64, count int64, downloadPtr *int64) {
 }
 
-// ReadToFile : Download a blob to a local file
+// ReadToFile : Download an object to a local file
 
 /*
 what dis do?
 */
-func (bb *S3Object) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
+func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
 
-	log.Trace("S3Object::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
-	//defer exectime.StatTimeCurrentBlock("S3Object::ReadToFile")()
-	//blobURL := bb.Container.NewBlobURL(filepath.Join(bb.Config.prefixPath, name))
+	log.Trace("S3Client::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
+	//defer exectime.StatTimeCurrentBlock("S3Client::ReadToFile")()
+	//blobURL := cl.Container.NewBlobURL(filepath.Join(cl.Config.prefixPath, name))
 
 	//what is this?
 	var downloadPtr *int64 = new(int64)
 	*downloadPtr = 1
 
-	//defer log.TimeTrack(time.Now(), "BlockBlob::ReadToFile", name)
-	//err = azblob.DownloadBlobToFile(context.Background(), blobURL, offset, count, fi, bb.downloadOptions)
+	//defer log.TimeTrack(time.Now(), "S3Client::ReadToFile", name)
+	//err = azblob.DownloadBlobToFile(context.Background(), blobURL, offset, count, fi, cl.downloadOptions)
 
-	bucketName := aws.String(bb.Config.authConfig.BucketName)
+	bucketName := aws.String(cl.Config.authConfig.BucketName)
 
 	var apiErr smithy.APIError
 	var result *s3.GetObjectOutput
 	for i := 0; i < retryCount; i++ {
-		result, err = bb.Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
 			Bucket: bucketName,
 			Key:    aws.String(name),
 		})
@@ -564,7 +564,7 @@ func (bb *S3Object) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 			if code != "InvalidAccessKeyId" {
 				break
 			}
-			log.Warn("S3Object::ReadToFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			log.Warn("S3Client::ReadToFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -572,7 +572,7 @@ func (bb *S3Object) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			log.Err("S3Object::ReadToFile : Failed to download object %s [%s]", name, err.Error())
+			log.Err("S3Client::ReadToFile : Failed to download object %s [%s]", name, err.Error())
 			return syscall.ENOENT
 		}
 		log.Err("Couldn't get object %v:%v. Here's why: %v\n", bucketName, name, err)
@@ -590,14 +590,14 @@ func (bb *S3Object) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 
 }
 
-// ReadBuffer : Download a specific range from a blob to a buffer
-func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
-	log.Trace("S3Object::ReadBuffer : name %s", name)
+// ReadBuffer : Download a specific range from an object to a buffer
+func (cl *S3Client) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
+	log.Trace("S3Client::ReadBuffer : name %s", name)
 	var buff []byte
 
 	// If the len is 0, that means we need to read till the end of the object
 	if len == 0 {
-		attr, err := bb.GetAttr(name)
+		attr, err := cl.GetAttr(name)
 		if err != nil {
 			return buff, err
 		}
@@ -611,8 +611,8 @@ func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) ([]byte, er
 	var apiErr smithy.APIError
 	var result *s3.GetObjectOutput
 	for i := 0; i < retryCount; i++ {
-		result, err = bb.Client.GetObject(context.TODO(), &s3.GetObjectInput{
-			Bucket: aws.String(bb.Config.authConfig.BucketName),
+		result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
+			Bucket: aws.String(cl.Config.authConfig.BucketName),
 			Key:    aws.String(name),
 			Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(len)),
 		})
@@ -626,7 +626,7 @@ func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) ([]byte, er
 			if code != "InvalidAccessKeyId" {
 				break
 			}
-			log.Warn("S3Object::ReadBuffer Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			log.Warn("S3Client::ReadBuffer Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -634,7 +634,7 @@ func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) ([]byte, er
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			log.Err("S3Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+			log.Err("S3Client::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
 			return buff, syscall.ENOENT
 		}
 		var apiErr smithy.APIError
@@ -642,11 +642,11 @@ func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) ([]byte, er
 			// Range is incorrect
 			code := apiErr.ErrorCode()
 			if code == "InvalidRange" {
-				log.Err("S3Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+				log.Err("S3Client::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
 				return buff, syscall.ERANGE
 			}
 		}
-		log.Err("S3Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+		log.Err("S3Client::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
 		return buff, err
 	}
 
@@ -658,16 +658,16 @@ func (bb *S3Object) ReadBuffer(name string, offset int64, len int64) ([]byte, er
 }
 
 // ReadInBuffer : Download specific range from a file to a user provided buffer
-func (bb *S3Object) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
-	log.Trace("S3Object::ReadInBuffer : name %s", name)
+func (cl *S3Client) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
+	log.Trace("S3Client::ReadInBuffer : name %s", name)
 
 	var err error
 	var apiErr smithy.APIError
 	var result *s3.GetObjectOutput
 	for i := 0; i < retryCount; i++ {
 		log.Trace("Offset is: ", offset, "  Length is: ", len)
-		result, err = bb.Client.GetObject(context.TODO(), &s3.GetObjectInput{
-			Bucket: aws.String(bb.Config.authConfig.BucketName),
+		result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
+			Bucket: aws.String(cl.Config.authConfig.BucketName),
 			Key:    aws.String(name),
 			Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(len+offset)),
 		})
@@ -681,7 +681,7 @@ func (bb *S3Object) ReadInBuffer(name string, offset int64, len int64, data []by
 			if code != "InvalidAccessKeyId" {
 				break
 			}
-			log.Warn("S3Object::ReadInBuffer Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			log.Warn("S3Client::ReadInBuffer Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -689,7 +689,7 @@ func (bb *S3Object) ReadInBuffer(name string, offset int64, len int64, data []by
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			log.Err("S3Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+			log.Err("S3Client::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
 			return syscall.ENOENT
 		}
 		var apiErr smithy.APIError
@@ -697,11 +697,11 @@ func (bb *S3Object) ReadInBuffer(name string, offset int64, len int64, data []by
 			// Range is incorrect
 			code := apiErr.ErrorCode()
 			if code == "InvalidRange" {
-				log.Err("S3Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+				log.Err("S3Client::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
 				return syscall.ERANGE
 			}
 		}
-		log.Err("S3Object::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+		log.Err("S3Client::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
 		return err
 	}
 
@@ -719,20 +719,20 @@ func (bb *S3Object) ReadInBuffer(name string, offset int64, len int64, data []by
 	return nil
 }
 
-func (bb *S3Object) calculateBlockSize(name string, fileSize int64) (blockSize int64, err error) {
+func (cl *S3Client) calculateBlockSize(name string, fileSize int64) (blockSize int64, err error) {
 	return 0, nil
 }
 
-// track the progress of upload of blobs where every 100MB of data uploaded is being tracked. It also tracks the completion of upload
+// track the progress of upload of objects where every 100MB of data uploaded is being tracked. It also tracks the completion of upload
 func trackUpload(name string, bytesTransferred int64, count int64, uploadPtr *int64) {
 }
 
-// WriteFromFile : Upload local file to blob
-func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *os.File) (err error) {
-	log.Trace("S3Object::WriteFromFile : name %s", name)
+// WriteFromFile : Upload local file to object
+func (cl *S3Client) WriteFromFile(name string, metadata map[string]string, fi *os.File) (err error) {
+	log.Trace("S3Client::WriteFromFile : name %s", name)
 	//defer exectime.StatTimeCurrentBlock("WriteFromFile::WriteFromFile")()
 
-	defer log.TimeTrack(time.Now(), "BlockBlob::WriteFromFile", name)
+	defer log.TimeTrack(time.Now(), "S3Client::WriteFromFile", name)
 
 	var uploadPtr *int64 = new(int64)
 	*uploadPtr = 1
@@ -743,14 +743,14 @@ func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *o
 	// get the size of the file
 	stat, err := fi.Stat()
 	if err != nil {
-		log.Err("S3Object::WriteFromFile : Failed to get file size %s [%s]", name, err.Error())
+		log.Err("S3Client::WriteFromFile : Failed to get file size %s [%s]", name, err.Error())
 		return err
 	}
 
 	// if the block size is not set then we configure it based on file size
 	// if blockSize == 0 {
 	// 	// based on file-size calculate block size
-	// 	blockSize, err = bb.calculateBlockSize(name, stat.Size())
+	// 	blockSize, err = cl.calculateBlockSize(name, stat.Size())
 	// 	if err != nil {
 	// 		return err
 	// 	}
@@ -761,11 +761,11 @@ func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *o
 	// If file is uploaded in one shot (no blocks created) then server is populating md5 on upload automatically.
 	// hence we take cost of calculating md5 only for files which are bigger in size and which will be converted to blocks.
 	// md5sum := []byte{}
-	// if bb.Config.updateMD5 && stat.Size() >= azblob.BlockBlobMaxUploadBlobBytes {
+	// if cl.Config.updateMD5 && stat.Size() >= azblob.BlockBlobMaxUploadBlobBytes {
 	// 	md5sum, err = getMD5(fi)
 	// 	if err != nil {
 	// 		// Md5 sum generation failed so set nil while uploading
-	// 		log.Warn("S3Object::WriteFromFile : Failed to generate md5 of %s", name)
+	// 		log.Warn("S3Client::WriteFromFile : Failed to generate md5 of %s", name)
 	// 		md5sum = []byte{0}
 	// 	}
 	// }
@@ -775,14 +775,14 @@ func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *o
 	// so let's seek to the start before uploading
 	fi.Seek(0, 0)
 
-	// uploader := manager.NewUploader(bb.Client, func(u *manager.Uploader) {
+	// uploader := manager.NewUploader(cl.Client, func(u *manager.Uploader) {
 	// 	u.PartSize = partMiBs * 1024 * 1024
 	// })
 
 	var apiErr smithy.APIError
 	for i := 0; i < retryCount; i++ {
-		_, err = bb.Client.PutObject(context.TODO(), &s3.PutObjectInput{
-			Bucket: aws.String(bb.Config.authConfig.BucketName),
+		_, err = cl.Client.PutObject(context.TODO(), &s3.PutObjectInput{
+			Bucket: aws.String(cl.Config.authConfig.BucketName),
 			Key:    aws.String(name),
 			Body:   fi,
 		})
@@ -796,7 +796,7 @@ func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *o
 			if code != "InvalidAccessKeyId" {
 				break
 			}
-			log.Warn("S3Object::WriteFromFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			log.Warn("S3Client::WriteFromFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
@@ -808,14 +808,14 @@ func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *o
 	// }
 
 	if err != nil {
-		log.Err("S3Object::WriteFromFile : Failed to upload blob %s [%s]", name, err.Error())
+		log.Err("S3Client::WriteFromFile : Failed to upload blob %s [%s]", name, err.Error())
 		return err
 	} else {
-		log.Debug("S3Object::WriteFromFile : Upload complete of object %v", name)
+		log.Debug("S3Client::WriteFromFile : Upload complete of object %v", name)
 
 		// store total bytes uploaded so far
 		if stat.Size() > 0 {
-			azStatsCollector.UpdateStats(stats_manager.Increment, bytesUploaded, stat.Size())
+			s3StatsCollector.UpdateStats(stats_manager.Increment, bytesUploaded, stat.Size())
 		}
 	}
 
@@ -823,18 +823,18 @@ func (bb *S3Object) WriteFromFile(name string, metadata map[string]string, fi *o
 }
 
 // WriteFromBuffer : Upload from a buffer to a blob
-func (bb *S3Object) WriteFromBuffer(name string, metadata map[string]string, data []byte) (err error) {
+func (cl *S3Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) (err error) {
 	largeBuffer := bytes.NewReader(data)
 	// TODO: Move this variable into the config file
 	// var partMiBs int64 = 16
-	// uploader := manager.NewUploader(bb.Client, func(u *manager.Uploader) {
+	// uploader := manager.NewUploader(cl.Client, func(u *manager.Uploader) {
 	// 	u.PartSize = partMiBs * 1024 * 1024
 	// })
 
 	var apiErr smithy.APIError
 	for i := 0; i < retryCount; i++ {
-		_, err = bb.Client.PutObject(context.TODO(), &s3.PutObjectInput{
-			Bucket: aws.String(bb.Config.authConfig.BucketName),
+		_, err = cl.Client.PutObject(context.TODO(), &s3.PutObjectInput{
+			Bucket: aws.String(cl.Config.authConfig.BucketName),
 			Key:    aws.String(name),
 			Body:   largeBuffer,
 		})
@@ -848,46 +848,46 @@ func (bb *S3Object) WriteFromBuffer(name string, metadata map[string]string, dat
 			if code != "InvalidAccessKeyId" {
 				break
 			}
-			log.Warn("S3Object::WriteFromBuffer Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			log.Warn("S3Client::WriteFromBuffer Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 	}
 
 	if err != nil {
 		log.Err("Couldn't upload object to %v:%v. Here's why: %v\n",
-			bb.Config.authConfig.BucketName, name, err)
+			cl.Config.authConfig.BucketName, name, err)
 		return err
 	}
 	return nil
 }
 
 // GetFileBlockOffsets: store blocks ids and corresponding offsets
-func (bb *S3Object) GetFileBlockOffsets(name string) (*common.BlockOffsetList, error) {
+func (cl *S3Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, error) {
 	return nil, nil
 }
 
-func (bb *S3Object) createBlock(blockIdLength, startIndex, size int64) *common.Block {
+func (cl *S3Client) createBlock(blockIdLength, startIndex, size int64) *common.Block {
 	return nil
 }
 
 // create new blocks based on the offset and total length we're adding to the file
-func (bb *S3Object) createNewBlocks(blockList *common.BlockOffsetList, offset, length int64) int64 {
+func (cl *S3Client) createNewBlocks(blockList *common.BlockOffsetList, offset, length int64) int64 {
 	return 0
 }
 
-func (bb *S3Object) removeBlocks(blockList *common.BlockOffsetList, size int64, name string) *common.BlockOffsetList {
+func (cl *S3Client) removeBlocks(blockList *common.BlockOffsetList, size int64, name string) *common.BlockOffsetList {
 	return nil
 }
 
-func (bb *S3Object) TruncateFile(name string, size int64) error {
+func (cl *S3Client) TruncateFile(name string, size int64) error {
 	return nil
 }
 
 // Write : write data at given offset to a blob
-func (bb *S3Object) Write(options internal.WriteFileOptions) error {
+func (cl *S3Client) Write(options internal.WriteFileOptions) error {
 	name := options.Handle.Path
 	offset := options.Offset
-	defer log.TimeTrack(time.Now(), "BlockBlob::Write", options.Handle.Path)
-	log.Trace("S3Object::Write : name %s offset %v", name, offset)
+	defer log.TimeTrack(time.Now(), "S3Client::Write", options.Handle.Path)
+	log.Trace("S3Client::Write : name %s offset %v", name, offset)
 	// tracks the case where our offset is great than our current file size (appending only - not modifying pre-existing data)
 	var dataBuffer *[]byte
 
@@ -895,7 +895,7 @@ func (bb *S3Object) Write(options internal.WriteFileOptions) error {
 	data := options.Data
 
 	// get all the data
-	oldData, _ := bb.ReadBuffer(name, 0, 0)
+	oldData, _ := cl.ReadBuffer(name, 0, 0)
 	// update the data with the new data
 	// if we're only overwriting existing data
 	if int64(len(oldData)) >= offset+length {
@@ -921,29 +921,29 @@ func (bb *S3Object) Write(options internal.WriteFileOptions) error {
 		}
 	}
 	// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple blocks
-	err := bb.WriteFromBuffer(name, options.Metadata, *dataBuffer)
+	err := cl.WriteFromBuffer(name, options.Metadata, *dataBuffer)
 	if err != nil {
-		log.Err("S3Object::Write : Failed to upload to blob %s ", name, err.Error())
+		log.Err("S3Client::Write : Failed to upload to blob %s ", name, err.Error())
 		return err
 	}
 	return nil
 }
 
 // TODO: make a similar method facing stream that would enable us to write to cached blocks then stage and commit
-func (bb *S3Object) stageAndCommitModifiedBlocks(name string, data []byte, offsetList *common.BlockOffsetList) error {
+func (cl *S3Client) stageAndCommitModifiedBlocks(name string, data []byte, offsetList *common.BlockOffsetList) error {
 	return nil
 }
 
-func (bb *S3Object) StageAndCommit(name string, bol *common.BlockOffsetList) error {
+func (cl *S3Client) StageAndCommit(name string, bol *common.BlockOffsetList) error {
 	return nil
 }
 
 // ChangeMod : Change mode of a blob
-func (bb *S3Object) ChangeMod(name string, _ os.FileMode) error {
+func (cl *S3Client) ChangeMod(name string, _ os.FileMode) error {
 	return nil
 }
 
 // ChangeOwner : Change owner of a blob
-func (bb *S3Object) ChangeOwner(name string, _ int, _ int) error {
+func (cl *S3Client) ChangeOwner(name string, _ int, _ int) error {
 	return nil
 }

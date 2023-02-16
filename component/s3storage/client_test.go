@@ -104,26 +104,24 @@ func generateFileName() string {
 	return "file" + randomString(8)
 }
 
-type blockBlobTestSuite struct {
+type clientTestSuite struct {
 	suite.Suite
-	assert *assert.Assertions
-	az     *S3Storage
-	client *s3.Client
-	// serviceUrl   azblob.ServiceURL
-	// containerUrl azblob.ContainerURL
+	assert    *assert.Assertions
+	s3        *S3Storage
+	client    *s3.Client
 	config    string
 	container string
 }
 
-func newTestAzStorage(configuration string) (*S3Storage, error) {
+func newTestS3Storage(configuration string) (*S3Storage, error) {
 	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
-	az := NewazstorageComponent()
-	err := az.Configure(true)
+	s3 := News3storageComponent()
+	err := s3.Configure(true)
 
-	return az.(*S3Storage), err
+	return s3.(*S3Storage), err
 }
 
-func (s *blockBlobTestSuite) SetupTest() {
+func (s *clientTestSuite) SetupTest() {
 	// Logging config
 	cfg := common.LogConfig{
 		FilePath:    "./logfile.txt",
@@ -155,7 +153,7 @@ func (s *blockBlobTestSuite) SetupTest() {
 	s.setupTestHelper("", "", true)
 }
 
-func (s *blockBlobTestSuite) setupTestHelper(configuration string, container string, create bool) {
+func (s *clientTestSuite) setupTestHelper(configuration string, container string, create bool) {
 	if container == "" {
 		container = generateContainerName()
 	}
@@ -169,32 +167,23 @@ func (s *blockBlobTestSuite) setupTestHelper(configuration string, container str
 
 	s.assert = assert.New(s.T())
 
-	s.az, _ = newTestAzStorage(configuration)
-	_ = s.az.Start(ctx) // Note: Start->TestValidation will fail but it doesn't matter. We are creating the container a few lines below anyway.
+	s.s3, _ = newTestS3Storage(configuration)
+	_ = s.s3.Start(ctx) // Note: Start->TestValidation will fail but it doesn't matter. We are creating the container a few lines below anyway.
 	// We could create the container before but that requires rewriting the code to new up a service client.
 
-	s.client = s.az.storage.(*S3Object).Client
-
-	//s.serviceUrl = s.az.storage.(*BlockBlob).Service // Grab the service client to do some validation
-	//s.containerUrl = s.serviceUrl.NewContainerURL(s.container)
-	// if create {
-	// 	_, _ = s.containerUrl.Create(ctx, azblob.Metadata{}, azblob.PublicAccessNone)
-	// }
+	s.client = s.s3.storage.(*S3Client).Client
 }
 
-func (s *blockBlobTestSuite) tearDownTestHelper(delete bool) {
-	_ = s.az.Stop()
-	// if delete {
-	// 	_, _ = s.containerUrl.Delete(ctx, azblob.ContainerAccessConditions{})
-	// }
+func (s *clientTestSuite) tearDownTestHelper(delete bool) {
+	_ = s.s3.Stop()
 }
 
-func (s *blockBlobTestSuite) cleanupTest() {
+func (s *clientTestSuite) cleanupTest() {
 	s.tearDownTestHelper(true)
 	_ = log.Destroy()
 }
 
-func (s *blockBlobTestSuite) TestListContainers() {
+func (s *clientTestSuite) TestListContainers() {
 	defer s.cleanupTest()
 
 	// TODO: Fix this so we can create buckets
@@ -209,48 +198,48 @@ func (s *blockBlobTestSuite) TestListContainers() {
 	// 		"lens-lab-test-create", "us-east-1", err)
 	// }
 
-	containers, err := s.az.ListContainers()
+	containers, err := s.s3.ListContainers()
 	s.assert.Nil(err)
 	s.assert.Equal(containers, []string{"stxe1-srg-lens-lab1"})
 }
 
-func (s *blockBlobTestSuite) TestIsDirEmpty() {
+func (s *clientTestSuite) TestIsDirEmpty() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateDirectoryName()
-	s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	s.s3.CreateDir(internal.CreateDirOptions{Name: name})
 
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
 	for _, path := range paths {
 		log.Debug(path)
 		s.Run(path, func() {
-			empty := s.az.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
+			empty := s.s3.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 
 			s.assert.True(empty)
 		})
 	}
 }
 
-func (s *blockBlobTestSuite) TestIsDirEmptyFalse() {
+func (s *clientTestSuite) TestIsDirEmptyFalse() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateDirectoryName()
-	s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	s.s3.CreateDir(internal.CreateDirOptions{Name: name})
 	file := name + "/" + generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: file})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: file})
 
-	empty := s.az.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
+	empty := s.s3.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 
 	s.assert.False(empty)
 }
 
-func (s *blockBlobTestSuite) TestCreateFile() {
+func (s *clientTestSuite) TestCreateFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
 
-	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	h, err := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 
 	s.assert.Nil(err)
 	s.assert.NotNil(h)
@@ -258,101 +247,101 @@ func (s *blockBlobTestSuite) TestCreateFile() {
 	s.assert.EqualValues(0, h.Size)
 	// File should be in the account
 	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
 	s.assert.Nil(err)
 	s.assert.NotNil(result)
 }
 
-func (s *blockBlobTestSuite) TestOpenFile() {
+func (s *clientTestSuite) TestOpenFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 
-	h, err := s.az.OpenFile(internal.OpenFileOptions{Name: name})
+	h, err := s.s3.OpenFile(internal.OpenFileOptions{Name: name})
 	s.assert.Nil(err)
 	s.assert.NotNil(h)
 	s.assert.EqualValues(name, h.Path)
 	s.assert.EqualValues(0, h.Size)
 }
 
-func (s *blockBlobTestSuite) TestOpenFileError() {
+func (s *clientTestSuite) TestOpenFileError() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
 
-	h, err := s.az.OpenFile(internal.OpenFileOptions{Name: name})
+	h, err := s.s3.OpenFile(internal.OpenFileOptions{Name: name})
 	s.assert.NotNil(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 	s.assert.Nil(h)
 }
 
-func (s *blockBlobTestSuite) TestCloseFile() {
+func (s *clientTestSuite) TestCloseFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 
 	// This method does nothing.
-	err := s.az.CloseFile(internal.CloseFileOptions{Handle: h})
+	err := s.s3.CloseFile(internal.CloseFileOptions{Handle: h})
 	s.assert.Nil(err)
 }
 
-func (s *blockBlobTestSuite) TestCloseFileFakeHandle() {
+func (s *clientTestSuite) TestCloseFileFakeHandle() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
 	h := handlemap.NewHandle(name)
 
 	// This method does nothing.
-	err := s.az.CloseFile(internal.CloseFileOptions{Handle: h})
+	err := s.s3.CloseFile(internal.CloseFileOptions{Handle: h})
 	s.assert.Nil(err)
 }
 
-func (s *blockBlobTestSuite) TestDeleteFile() {
+func (s *clientTestSuite) TestDeleteFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 
-	err := s.az.DeleteFile(internal.DeleteFileOptions{Name: name})
+	err := s.s3.DeleteFile(internal.DeleteFileOptions{Name: name})
 	s.assert.Nil(err)
 
-	// This is similar to the az bucket command, use getobject for now
-	//_, err = s.az.GetAttr(internal.GetAttrOptions{name, false})
+	// This is similar to the s3 bucket command, use getobject for now
+	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
 	// File should not be in the account
 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
 
 	s.assert.NotNil(err)
 }
 
-// func (s *blockBlobTestSuite) TestDeleteFileError() {
+// func (s *clientTestSuite) TestDeleteFileError() {
 // 	defer s.cleanupTest()
 // 	// Setup
 // 	name := generateFileName()
 
-// 	err := s.az.DeleteFile(internal.DeleteFileOptions{Name: name})
+// 	err := s.s3.DeleteFile(internal.DeleteFileOptions{Name: name})
 // 	s.assert.NotNil(err)
 // 	s.assert.EqualValues(syscall.ENOENT, err)
 
 // 	// File should not be in the account
 // 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-// 		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+// 		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 // 		Key:    aws.String(name),
 // 	})
 // 	s.assert.NotNil(err)
 // }
 
-func (s *blockBlobTestSuite) TestCopyFromFile() {
+func (s *clientTestSuite) TestCopyFromFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 	testData := "test data"
 	data := []byte(testData)
 	homeDir, _ := os.UserHomeDir()
@@ -360,13 +349,13 @@ func (s *blockBlobTestSuite) TestCopyFromFile() {
 	defer os.Remove(f.Name())
 	f.Write(data)
 
-	err := s.az.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
+	err := s.s3.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
 
 	s.assert.Nil(err)
 
 	// Object will be updated with new data
 	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
 	s.assert.Nil(err)
@@ -375,124 +364,124 @@ func (s *blockBlobTestSuite) TestCopyFromFile() {
 	s.assert.EqualValues(testData, output)
 }
 
-func (s *blockBlobTestSuite) TestReadFile() {
+func (s *clientTestSuite) TestReadFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	h, err := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 	s.assert.Nil(err)
 	testData := "test data"
 	data := []byte(testData)
-	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	h, err = s.az.OpenFile(internal.OpenFileOptions{Name: name})
+	h, err = s.s3.OpenFile(internal.OpenFileOptions{Name: name})
 	s.assert.Nil(err)
 
-	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	output, err := s.s3.ReadFile(internal.ReadFileOptions{Handle: h})
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output)
 }
 
-func (s *blockBlobTestSuite) TestReadFileError() {
+func (s *clientTestSuite) TestReadFileError() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
 	h := handlemap.NewHandle(name)
 
-	_, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	_, err := s.s3.ReadFile(internal.ReadFileOptions{Handle: h})
 	fmt.Println(err)
 	s.assert.NotNil(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
-func (s *blockBlobTestSuite) TestReadInBuffer() {
+func (s *clientTestSuite) TestReadInBuffer() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	h, err := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 	s.assert.Nil(err)
 	testData := "test data"
 	data := []byte(testData)
-	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err = s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	h, err = s.az.OpenFile(internal.OpenFileOptions{Name: name})
+	h, err = s.s3.OpenFile(internal.OpenFileOptions{Name: name})
 	s.assert.Nil(err)
 
 	output := make([]byte, 5)
-	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+	len, err := s.s3.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.Nil(err)
 	s.assert.EqualValues(5, len)
 	s.assert.EqualValues(testData[:5], output)
 }
 
-func (s *blockBlobTestSuite) TestReadInBufferLargeBuffer() {
+func (s *clientTestSuite) TestReadInBufferLargeBuffer() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 	testData := "test data"
 	data := []byte(testData)
-	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	h, _ = s.az.OpenFile(internal.OpenFileOptions{Name: name})
+	s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	h, _ = s.s3.OpenFile(internal.OpenFileOptions{Name: name})
 
 	output := make([]byte, 1000) // Testing that passing in a super large buffer will still work
-	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+	len, err := s.s3.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.Nil(err)
 	s.assert.EqualValues(h.Size, len)
 	s.assert.EqualValues(testData, output[:h.Size])
 }
 
-func (s *blockBlobTestSuite) TestReadInBufferEmpty() {
+func (s *clientTestSuite) TestReadInBufferEmpty() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 
 	output := make([]byte, 10)
-	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+	len, err := s.s3.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.Nil(err)
 	s.assert.EqualValues(0, len)
 }
 
-func (s *blockBlobTestSuite) TestReadInBufferBadRange() {
+func (s *clientTestSuite) TestReadInBufferBadRange() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
 	h := handlemap.NewHandle(name)
 	h.Size = 10
 
-	_, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 20, Data: make([]byte, 2)})
+	_, err := s.s3.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 20, Data: make([]byte, 2)})
 	s.assert.NotNil(err)
 	s.assert.EqualValues(syscall.ERANGE, err)
 }
 
-func (s *blockBlobTestSuite) TestReadInBufferError() {
+func (s *clientTestSuite) TestReadInBufferError() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
 	h := handlemap.NewHandle(name)
 	h.Size = 10
 
-	_, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: make([]byte, 2)})
+	_, err := s.s3.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: make([]byte, 2)})
 	s.assert.NotNil(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
-func (s *blockBlobTestSuite) TestWriteFile() {
+func (s *clientTestSuite) TestWriteFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 
 	testData := "test data"
 	data := []byte(testData)
-	count, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	count, err := s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
 	s.assert.EqualValues(len(data), count)
 
 	// Blob should have updated data
 	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
 	s.assert.Nil(err)
@@ -501,20 +490,20 @@ func (s *blockBlobTestSuite) TestWriteFile() {
 	s.assert.EqualValues(testData, output)
 }
 
-func (s *blockBlobTestSuite) TestWriteSmallFile() {
+func (s *clientTestSuite) TestWriteSmallFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 	testData := "test data"
 	data := []byte(testData)
 	dataLen := len(data)
-	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err := s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
 	f, _ := ioutil.TempFile("", name+".tmp")
 	defer os.Remove(f.Name())
 
-	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.Nil(err)
 
 	output := make([]byte, len(data))
@@ -526,26 +515,26 @@ func (s *blockBlobTestSuite) TestWriteSmallFile() {
 	f.Close()
 }
 
-func (s *blockBlobTestSuite) TestOverwriteSmallFile() {
+func (s *clientTestSuite) TestOverwriteSmallFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 	testData := "test-replace-data"
 	data := []byte(testData)
 	dataLen := len(data)
-	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err := s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
 	f, _ := ioutil.TempFile("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
-	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
+	_, err = s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
 	s.assert.Nil(err)
 
 	currentData := []byte("test-newdata-data")
 	output := make([]byte, len(currentData))
 
-	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.Nil(err)
 
 	f, _ = os.Open(f.Name())
@@ -556,27 +545,27 @@ func (s *blockBlobTestSuite) TestOverwriteSmallFile() {
 	f.Close()
 }
 
-func (s *blockBlobTestSuite) TestOverwriteAndAppendToSmallFile() {
+func (s *clientTestSuite) TestOverwriteAndAppendToSmallFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 	testData := "test-data"
 	data := []byte(testData)
 
-	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err := s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
 	f, _ := ioutil.TempFile("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
-	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
+	_, err = s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
 	s.assert.Nil(err)
 
 	currentData := []byte("test-newdata")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
-	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.Nil(err)
 
 	f, _ = os.Open(f.Name())
@@ -587,27 +576,27 @@ func (s *blockBlobTestSuite) TestOverwriteAndAppendToSmallFile() {
 	f.Close()
 }
 
-func (s *blockBlobTestSuite) TestAppendToSmallFile() {
+func (s *clientTestSuite) TestAppendToSmallFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 	testData := "test-data"
 	data := []byte(testData)
 
-	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err := s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
 	f, _ := ioutil.TempFile("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("-newdata")
-	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 9, Data: newTestData})
+	_, err = s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 9, Data: newTestData})
 	s.assert.Nil(err)
 
 	currentData := []byte("test-data-newdata")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
-	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.Nil(err)
 
 	f, _ = os.Open(f.Name())
@@ -618,27 +607,27 @@ func (s *blockBlobTestSuite) TestAppendToSmallFile() {
 	f.Close()
 }
 
-func (s *blockBlobTestSuite) TestAppendOffsetLargerThanSmallFile() {
+func (s *clientTestSuite) TestAppendOffsetLargerThanSmallFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 	testData := "test-data"
 	data := []byte(testData)
 
-	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	_, err := s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
 	f, _ := ioutil.TempFile("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
-	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 12, Data: newTestData})
+	_, err = s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 12, Data: newTestData})
 	s.assert.Nil(err)
 
 	currentData := []byte("test-data\x00\x00\x00newdata")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
-	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.Nil(err)
 
 	f, _ = os.Open(f.Name())
@@ -649,56 +638,56 @@ func (s *blockBlobTestSuite) TestAppendOffsetLargerThanSmallFile() {
 	f.Close()
 }
 
-func (s *blockBlobTestSuite) TestCopyToFileError() {
+func (s *clientTestSuite) TestCopyToFileError() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
 	f, _ := ioutil.TempFile("", name+".tmp")
 	defer os.Remove(f.Name())
 
-	err := s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	err := s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.NotNil(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
-func (s *blockBlobTestSuite) TestReadDir() {
+func (s *clientTestSuite) TestReadDir() {
 	defer s.cleanupTest()
 	// This tests the default listBlocked = 0. It should return the expected paths.
 	// Setup
 	name := generateDirectoryName()
-	s.az.CreateDir(internal.CreateDirOptions{Name: name})
+	s.s3.CreateDir(internal.CreateDirOptions{Name: name})
 	childName := name + "/" + generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: childName})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: childName})
 
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
 	for _, path := range paths {
 		log.Debug(path)
 		s.Run(path, func() {
-			entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: path})
+			entries, err := s.s3.ReadDir(internal.ReadDirOptions{Name: path})
 			s.assert.Nil(err)
 			s.assert.EqualValues(1, len(entries))
 		})
 	}
 }
 
-func (s *blockBlobTestSuite) TestStreamDirSmallCountNoDuplicates() {
+func (s *clientTestSuite) TestStreamDirSmallCountNoDuplicates() {
 	defer s.cleanupTest()
 	// Setup
-	s.az.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/blob1.txt"})
-	s.az.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/blob2.txt"})
-	s.az.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newblob1.txt"})
-	s.az.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newblob2.txt"})
-	s.az.CreateDir(internal.CreateDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder"})
-	s.az.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder/newblobA.txt"})
-	s.az.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder/newblobB.txt"})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/blob1.txt"})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/blob2.txt"})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newblob1.txt"})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newblob2.txt"})
+	s.s3.CreateDir(internal.CreateDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder"})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder/newblobA.txt"})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder/newblobB.txt"})
 
 	var iteration int = 0
 	var marker string = ""
 	blobList := make([]*internal.ObjAttr, 0)
 
 	for {
-		new_list, new_marker, err := s.az.StreamDir(internal.StreamDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/", Token: marker, Count: 1})
+		new_list, new_marker, err := s.s3.StreamDir(internal.StreamDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/", Token: marker, Count: 1})
 		fmt.Println(err)
 		s.assert.Nil(err)
 		blobList = append(blobList, new_list...)
@@ -714,54 +703,54 @@ func (s *blockBlobTestSuite) TestStreamDirSmallCountNoDuplicates() {
 	s.assert.EqualValues(5, len(blobList))
 }
 
-func (s *blockBlobTestSuite) TestRenameFile() {
+func (s *clientTestSuite) TestRenameFile() {
 	defer s.cleanupTest()
 	// Setup
 	src := generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: src})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: src})
 	dst := generateFileName()
 
-	err := s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+	err := s.s3.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
 	s.assert.Nil(err)
 
 	// Src should not be in the account
 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(src),
 	})
 	s.assert.NotNil(err)
 	// Dst should be in the account
 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(dst),
 	})
 	s.assert.Nil(err)
 }
 
-func (s *blockBlobTestSuite) TestRenameFileError() {
+func (s *clientTestSuite) TestRenameFileError() {
 	defer s.cleanupTest()
 	// Setup
 	src := generateFileName()
 	dst := generateFileName()
 
-	err := s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+	err := s.s3.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
 	s.assert.NotNil(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 
 	// Src and destination should not be in the account
 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(src),
 	})
 	s.assert.NotNil(err)
 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.az.storage.(*S3Object).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(dst),
 	})
 	s.assert.NotNil(err)
 }
 
-func (s *blockBlobTestSuite) TestGetAttrDir() {
+func (s *clientTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -778,13 +767,13 @@ func (s *blockBlobTestSuite) TestGetAttrDir() {
 		s.Run(testName, func() {
 			// Setup
 			dirName := generateDirectoryName()
-			s.az.CreateDir(internal.CreateDirOptions{Name: dirName})
+			s.s3.CreateDir(internal.CreateDirOptions{Name: dirName})
 			// since CreateDir doesn't do anything, let's put an object with that prefix
 			filename := dirName + "/" + generateFileName()
-			s.az.CreateFile(internal.CreateFileOptions{Name: filename})
+			s.s3.CreateFile(internal.CreateFileOptions{Name: filename})
 			// Now we should be able to see the directory
-			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: dirName})
-			deleteError := s.az.DeleteFile(internal.DeleteFileOptions{Name: filename})
+			props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: dirName})
+			deleteError := s.s3.DeleteFile(internal.DeleteFileOptions{Name: filename})
 			s.assert.Nil(err)
 			s.assert.NotNil(props)
 			s.assert.True(props.IsDir())
@@ -796,7 +785,7 @@ func (s *blockBlobTestSuite) TestGetAttrDir() {
 	}
 }
 
-func (s *blockBlobTestSuite) TestGetAttrVirtualDir() {
+func (s *clientTestSuite) TestGetAttrVirtualDir() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -807,23 +796,23 @@ func (s *blockBlobTestSuite) TestGetAttrVirtualDir() {
 	// Setup
 	dirName := generateFileName()
 	name := dirName + "/" + generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 
-	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: dirName})
+	props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: dirName})
 	s.assert.Nil(err)
 	s.assert.NotNil(props)
 	s.assert.True(props.IsDir())
 	s.assert.False(props.IsSymlink())
 
 	// Check file in dir too
-	props, err = s.az.GetAttr(internal.GetAttrOptions{Name: name})
+	props, err = s.s3.GetAttr(internal.GetAttrOptions{Name: name})
 	s.assert.Nil(err)
 	s.assert.NotNil(props)
 	s.assert.False(props.IsDir())
 	s.assert.False(props.IsSymlink())
 }
 
-func (s *blockBlobTestSuite) TestGetAttrVirtualDirSubDir() {
+func (s *clientTestSuite) TestGetAttrVirtualDirSubDir() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -835,30 +824,30 @@ func (s *blockBlobTestSuite) TestGetAttrVirtualDirSubDir() {
 	dirName := generateFileName()
 	subDirName := dirName + "/" + generateFileName()
 	name := subDirName + "/" + generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 
-	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: dirName})
+	props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: dirName})
 	s.assert.Nil(err)
 	s.assert.NotNil(props)
 	s.assert.True(props.IsDir())
 	s.assert.False(props.IsSymlink())
 
 	// Check subdir in dir too
-	props, err = s.az.GetAttr(internal.GetAttrOptions{Name: subDirName})
+	props, err = s.s3.GetAttr(internal.GetAttrOptions{Name: subDirName})
 	s.assert.Nil(err)
 	s.assert.NotNil(props)
 	s.assert.True(props.IsDir())
 	s.assert.False(props.IsSymlink())
 
 	// Check file in subdir too
-	props, err = s.az.GetAttr(internal.GetAttrOptions{Name: name})
+	props, err = s.s3.GetAttr(internal.GetAttrOptions{Name: name})
 	s.assert.Nil(err)
 	s.assert.NotNil(props)
 	s.assert.False(props.IsDir())
 	s.assert.False(props.IsSymlink())
 }
 
-func (s *blockBlobTestSuite) TestGetAttrFile() {
+func (s *clientTestSuite) TestGetAttrFile() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -875,9 +864,9 @@ func (s *blockBlobTestSuite) TestGetAttrFile() {
 		s.Run(testName, func() {
 			// Setup
 			name := generateFileName()
-			s.az.CreateFile(internal.CreateFileOptions{Name: name})
+			s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 
-			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+			props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
 			s.assert.Nil(err)
 			s.assert.NotNil(props)
 			s.assert.False(props.IsDir())
@@ -886,7 +875,7 @@ func (s *blockBlobTestSuite) TestGetAttrFile() {
 	}
 }
 
-// func (s *blockBlobTestSuite) TestGetAttrLink() {
+// func (s *clientTestSuite) TestGetAttrLink() {
 // 	defer s.cleanupTest()
 // 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 // 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -903,11 +892,11 @@ func (s *blockBlobTestSuite) TestGetAttrFile() {
 // 		s.Run(testName, func() {
 // 			// Setup
 // 			target := generateFileName()
-// 			s.az.CreateFile(internal.CreateFileOptions{Name: target})
+// 			s.s3.CreateFile(internal.CreateFileOptions{Name: target})
 // 			name := generateFileName()
-// 			s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+// 			s.s3.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
 
-// 			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+// 			props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
 // 			s.assert.Nil(err)
 // 			s.assert.NotNil(props)
 // 			s.assert.True(props.IsSymlink())
@@ -918,7 +907,7 @@ func (s *blockBlobTestSuite) TestGetAttrFile() {
 // 	}
 // }
 
-func (s *blockBlobTestSuite) TestGetAttrFileSize() {
+func (s *clientTestSuite) TestGetAttrFileSize() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -935,12 +924,12 @@ func (s *blockBlobTestSuite) TestGetAttrFileSize() {
 		s.Run(testName, func() {
 			// Setup
 			name := generateFileName()
-			h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+			h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 			testData := "test data"
 			data := []byte(testData)
-			s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+			s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
-			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+			props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
 			s.assert.Nil(err)
 			s.assert.NotNil(props)
 			s.assert.False(props.IsDir())
@@ -950,7 +939,7 @@ func (s *blockBlobTestSuite) TestGetAttrFileSize() {
 	}
 }
 
-func (s *blockBlobTestSuite) TestGetAttrFileTime() {
+func (s *clientTestSuite) TestGetAttrFileTime() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -967,20 +956,20 @@ func (s *blockBlobTestSuite) TestGetAttrFileTime() {
 		s.Run(testName, func() {
 			// Setup
 			name := generateFileName()
-			h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+			h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
 			testData := "test data"
 			data := []byte(testData)
-			s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+			s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
-			before, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+			before, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
 			s.assert.Nil(err)
 			s.assert.NotNil(before.Mtime)
 
 			time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
 
-			s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+			s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
-			after, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+			after, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
 			s.assert.Nil(err)
 			s.assert.NotNil(after.Mtime)
 
@@ -989,7 +978,7 @@ func (s *blockBlobTestSuite) TestGetAttrFileTime() {
 	}
 }
 
-func (s *blockBlobTestSuite) TestGetAttrError() {
+func (s *clientTestSuite) TestGetAttrError() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -1007,7 +996,7 @@ func (s *blockBlobTestSuite) TestGetAttrError() {
 			// Setup
 			name := generateFileName()
 
-			_, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+			_, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
 			s.assert.NotNil(err)
 			s.assert.EqualValues(syscall.ENOENT, err)
 		})
@@ -1015,5 +1004,5 @@ func (s *blockBlobTestSuite) TestGetAttrError() {
 }
 
 func TestBlockBlob(t *testing.T) {
-	suite.Run(t, new(blockBlobTestSuite))
+	suite.Run(t, new(clientTestSuite))
 }
