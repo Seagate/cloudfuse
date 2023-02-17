@@ -122,14 +122,49 @@ func testStatFs(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	path := "/"
 	suite.mock.EXPECT().StatFs().Return(&common.Statfs_t{Frsize: 1,
-		Blocks: 2, Bavail: 3, Bfree: 4}, true, nil)
+		Blocks: 2, Bavail: 3, Bfree: 4, Bsize: 5, Files: 6, Ffree: 7, Namemax: 8}, true, nil)
 	buf := &fuse.Statfs_t{}
-	cfuseFS.Statfs(path, buf)
+	ret := cfuseFS.Statfs(path, buf)
 
+	suite.assert.Equal(ret, 0)
 	suite.assert.Equal(int(buf.Frsize), 1)
 	suite.assert.Equal(int(buf.Blocks), 2)
 	suite.assert.Equal(int(buf.Bavail), 3)
 	suite.assert.Equal(int(buf.Bfree), 4)
+	suite.assert.Equal(int(buf.Bsize), 5)
+	suite.assert.Equal(int(buf.Files), 6)
+	suite.assert.Equal(int(buf.Ffree), 7)
+	suite.assert.Equal(int(buf.Namemax), 8)
+}
+
+func testStatFsNotPopulated(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	path := "/"
+	suite.mock.EXPECT().StatFs().Return(nil, false, nil)
+	buf := &fuse.Statfs_t{}
+	ret := cfuseFS.Statfs(path, buf)
+
+	suite.assert.Equal(ret, 0)
+
+	// By default these are all 0, so they should be populated by the system
+	// and thus each larger than 0
+	suite.assert.Greater(int(buf.Frsize), 0)
+	suite.assert.Greater(int(buf.Blocks), 0)
+	suite.assert.Greater(int(buf.Bavail), 0)
+	suite.assert.Greater(int(buf.Bfree), 0)
+	suite.assert.Greater(int(buf.Bsize), 0)
+	suite.assert.Greater(int(buf.Files), 0)
+	suite.assert.Greater(int(buf.Ffree), 0)
+	suite.assert.Greater(int(buf.Namemax), 0)
+}
+
+func testStatFsError(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	path := "/"
+	suite.mock.EXPECT().StatFs().Return(nil, false, errors.New("Error"))
+	buf := &fuse.Statfs_t{}
+	ret := cfuseFS.Statfs(path, buf)
+	suite.assert.Equal(ret, -fuse.EIO)
 }
 
 func testMkDirError(suite *libfuseTestSuite) {
