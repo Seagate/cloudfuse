@@ -287,6 +287,14 @@ func (suite *libfuseTestSuite) TestStatFs() {
 	testStatFs(suite)
 }
 
+func (suite *libfuseTestSuite) TestStatFsNotPopulated() {
+	testStatFsNotPopulated(suite)
+}
+
+func (suite *libfuseTestSuite) TestStatFsError() {
+	testStatFsError(suite)
+}
+
 func (suite *libfuseTestSuite) TestChmodError() {
 	testChmodError(suite)
 }
