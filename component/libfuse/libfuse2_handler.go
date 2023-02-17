@@ -104,14 +104,10 @@ func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
 		stbuf.Mode |= fuse.S_IFREG
 	}
 
-	stbuf.Atim.Sec = attr.Atime.Unix()
-	stbuf.Atim.Nsec = attr.Atime.UnixNano()
-
-	stbuf.Ctim.Sec = attr.Ctime.Unix()
-	stbuf.Ctim.Nsec = attr.Ctime.UnixNano()
-
-	stbuf.Mtim.Sec = attr.Mtime.Unix()
-	stbuf.Mtim.Nsec = attr.Mtime.UnixNano()
+	stbuf.Atim = fuse.NewTimespec(attr.Atime)
+	stbuf.Ctim = fuse.NewTimespec(attr.Ctime)
+	stbuf.Mtim = fuse.NewTimespec(attr.Mtime)
+	stbuf.Birthtim = fuse.NewTimespec(attr.Mtime)
 }
 
 func (lf *Libfuse) initFuse() error {
@@ -193,43 +189,6 @@ func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 
 	libfuseStatsCollector.PushEvents(createDir, name, map[string]interface{}{md: fs.FileMode(mode)})
 	libfuseStatsCollector.UpdateStats(stats_manager.Increment, createDir, (int64)(1))
-
-	return 0
-}
-
-func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
-	name := trimFusePath(path)
-	name = common.NormalizeObjectName(name)
-	log.Trace("Libfuse::libfuse_statfs : %s", name)
-
-	attr, populated, err := fuseFS.NextComponent().StatFs()
-	if err != nil {
-		log.Err("Libfuse::libfuse_statfs: Failed to get stats %s [%s]", name, err.Error())
-		return -fuse.EIO
-	}
-
-	// if populated then we need to overwrite root attributes
-	if populated {
-		stat.Bsize = uint64(attr.Bsize)
-		stat.Frsize = uint64(attr.Frsize)
-		stat.Blocks = attr.Blocks
-		stat.Bavail = attr.Bavail
-		stat.Bfree = attr.Bfree
-		stat.Files = attr.Files
-		stat.Ffree = attr.Ffree
-		stat.Flag = uint64(attr.Flags)
-		return 0
-	}
-
-	// TODO: Need to look into handling case where this is empty directory
-	// given by just  "/"
-	// blobfuse does this via the commented out C code below
-
-	// errno := 0
-	// res = os.statvfs("/", stat)
-	// if res == -1 {
-	// 	return -errno
-	// }
 
 	return 0
 }
@@ -354,8 +313,7 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 		stat.Gid = cf.gid
 		stat.Nlink = 2
 		stat.Size = 4096
-		stat.Mtim.Sec = time.Now().Unix()
-		stat.Mtim.Nsec = time.Now().UnixNano()
+		stat.Mtim = fuse.NewTimespec(time.Now())
 		stat.Atim = stat.Mtim
 		stat.Ctim = stat.Mtim
 		return 0
