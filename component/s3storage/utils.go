@@ -579,7 +579,7 @@ func getMD5(fi *os.File) ([]byte, error) {
 	return hasher.Sum(nil), nil
 }
 
-// func autoDetectAuthMode(opt AzStorageOptions) string {
+// func autoDetectAuthMode(opt S3StorageOptions) string {
 // 	if opt.ApplicationID != "" || opt.ResourceID != "" || opt.ObjectID != "" {
 // 		return "msi"
 // 	} else if opt.AccountKey != "" {

@@ -80,7 +80,7 @@ func (s3 *S3Storage) SetNextComponent(c internal.Component) {
 func (s3 *S3Storage) Configure(isParent bool) error {
 	log.Trace("S3Storage::Configure : %s", s3.Name())
 
-	conf := AzStorageOptions{}
+	conf := S3StorageOptions{}
 	err := config.UnmarshalKey(s3.Name(), &conf)
 	if err != nil {
 		fmt.Println("Unable to unmarshal")
@@ -112,7 +112,7 @@ func (s3 *S3Storage) Priority() internal.ComponentPriority {
 func (s3 *S3Storage) OnConfigChange() {
 	log.Trace("S3Storage::OnConfigChange : %s", s3.Name())
 
-	conf := AzStorageOptions{}
+	conf := S3StorageOptions{}
 	err := config.UnmarshalKey(s3.Name(), &conf)
 	if err != nil {
 		log.Err("S3Storage::OnConfigChange : Config error [invalid config attributes]")

@@ -60,7 +60,7 @@ func (s *configTestSuite) TestEmptyAccountName() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 
 	err := ParseAndValidateConfig(az, opt)
 	assert.NotNil(err)
@@ -72,7 +72,7 @@ func (s *configTestSuite) TestEmptyAccountType() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 	opt.AccountName = "abcd"
 
 	err := ParseAndValidateConfig(az, opt)
@@ -83,7 +83,7 @@ func (s *configTestSuite) TestInvalidAccountType() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 	opt.AccountName = "abcd"
 	opt.AccountType = "abcd"
 
@@ -101,7 +101,7 @@ func (s *configTestSuite) TestUseADLSFlag() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 	opt.AccountName = "abcd"
 	opt.AccountType = "abcd"
 
@@ -122,7 +122,7 @@ func (s *configTestSuite) TestBlockSize() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 	opt.AccountName = "abcd"
 	opt.BlockSize = 10
 
@@ -140,7 +140,7 @@ func (s *configTestSuite) TestProtoType() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 	opt.AccountName = "abcd"
 	opt.Container = "abcd"
 
@@ -163,7 +163,7 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert := assert.New(s.T())
 
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 	opt.AccountName = "abcd"
 	opt.Container = "abcd"
 
@@ -199,7 +199,7 @@ func (s *configTestSuite) TestAuthModeNotSet() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 	opt.AccountName = "abcd"
 	opt.Container = "abcd"
 
@@ -212,7 +212,7 @@ func (s *configTestSuite) TestAuthModeKey() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 	opt.AccountName = "abcd"
 	opt.Container = "abcd"
 	opt.AuthMode = "key"
@@ -232,7 +232,7 @@ func (s *configTestSuite) TestAuthModeSAS() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 	opt.AccountName = "abcd"
 	opt.Container = "abcd"
 	opt.AuthMode = "sas"
@@ -251,7 +251,7 @@ func (s *configTestSuite) TestAuthModeMSI() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 	opt.AccountName = "abcd"
 	opt.Container = "abcd"
 	opt.AuthMode = "msi"
@@ -289,7 +289,7 @@ func (s *configTestSuite) TestAuthModeSPN() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 	opt.AccountName = "abcd"
 	opt.Container = "abcd"
 	opt.AuthMode = "spn"
@@ -318,7 +318,7 @@ func (s *configTestSuite) TestOtherFlags() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 	opt.AccountName = "abcd"
 	opt.Container = "abcd"
 	opt.AuthMode = "sas"
@@ -345,7 +345,7 @@ func (s *configTestSuite) TestInvalidSASRefresh() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
-	opt := AzStorageOptions{}
+	opt := S3StorageOptions{}
 	opt.AccountName = "abcd"
 	opt.Container = "abcd"
 	opt.AuthMode = "sas"

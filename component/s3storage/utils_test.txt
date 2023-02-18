@@ -370,7 +370,7 @@ func (s *utilsTestSuite) TestAutoDetectAuthMode() {
 	assert := assert.New(s.T())
 
 	var authType string
-	authType = autoDetectAuthMode(AzStorageOptions{})
+	authType = autoDetectAuthMode(S3StorageOptions{})
 	assert.Equal(authType, "msi")
 
 	var authType_ AuthType
@@ -378,34 +378,34 @@ func (s *utilsTestSuite) TestAutoDetectAuthMode() {
 	assert.Nil(err)
 	assert.Equal(authType_, EAuthType.MSI())
 
-	authType = autoDetectAuthMode(AzStorageOptions{AccountKey: "abc"})
+	authType = autoDetectAuthMode(S3StorageOptions{AccountKey: "abc"})
 	assert.Equal(authType, "key")
 
-	authType = autoDetectAuthMode(AzStorageOptions{SaSKey: "abc"})
+	authType = autoDetectAuthMode(S3StorageOptions{SaSKey: "abc"})
 	assert.Equal(authType, "sas")
 
-	authType = autoDetectAuthMode(AzStorageOptions{ApplicationID: "abc"})
+	authType = autoDetectAuthMode(S3StorageOptions{ApplicationID: "abc"})
 	assert.Equal(authType, "msi")
 
-	authType = autoDetectAuthMode(AzStorageOptions{ResourceID: "abc"})
+	authType = autoDetectAuthMode(S3StorageOptions{ResourceID: "abc"})
 	assert.Equal(authType, "msi")
 
-	authType = autoDetectAuthMode(AzStorageOptions{ClientID: "abc"})
+	authType = autoDetectAuthMode(S3StorageOptions{ClientID: "abc"})
 	assert.Equal(authType, "spn")
 
-	authType = autoDetectAuthMode(AzStorageOptions{ClientSecret: "abc"})
+	authType = autoDetectAuthMode(S3StorageOptions{ClientSecret: "abc"})
 	assert.Equal(authType, "spn")
 
-	authType = autoDetectAuthMode(AzStorageOptions{TenantID: "abc"})
+	authType = autoDetectAuthMode(S3StorageOptions{TenantID: "abc"})
 	assert.Equal(authType, "spn")
 
-	authType = autoDetectAuthMode(AzStorageOptions{ApplicationID: "abc", AccountKey: "abc", SaSKey: "abc", ClientID: "abc"})
+	authType = autoDetectAuthMode(S3StorageOptions{ApplicationID: "abc", AccountKey: "abc", SaSKey: "abc", ClientID: "abc"})
 	assert.Equal(authType, "msi")
 
-	authType = autoDetectAuthMode(AzStorageOptions{AccountKey: "abc", SaSKey: "abc", ClientID: "abc"})
+	authType = autoDetectAuthMode(S3StorageOptions{AccountKey: "abc", SaSKey: "abc", ClientID: "abc"})
 	assert.Equal(authType, "key")
 
-	authType = autoDetectAuthMode(AzStorageOptions{SaSKey: "abc", ClientID: "abc"})
+	authType = autoDetectAuthMode(S3StorageOptions{SaSKey: "abc", ClientID: "abc"})
 	assert.Equal(authType, "sas")
 }
 
