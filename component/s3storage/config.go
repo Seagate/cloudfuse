@@ -216,21 +216,21 @@ func formatEndpointAccountType(endpoint string, account AccountType) string {
 }
 
 // ParseAndValidateConfig : Parse and validate config
-func ParseAndValidateConfig(az *S3Storage, opt S3StorageOptions) error {
+func ParseAndValidateConfig(s3 *S3Storage, opt S3StorageOptions) error {
 	log.Trace("ParseAndValidateConfig : Parsing config")
 
 	// Validate account name is present or not
 	if opt.BucketName == "" {
 		return errors.New("bucket name not provided")
 	}
-	az.stConfig.authConfig.BucketName = opt.BucketName
-	az.stConfig.authConfig.AccessKey = opt.AccessKey
-	az.stConfig.authConfig.SecretKey = opt.SecretKey
-	az.stConfig.authConfig.Region = opt.Region
+	s3.stConfig.authConfig.BucketName = opt.BucketName
+	s3.stConfig.authConfig.AccessKey = opt.AccessKey
+	s3.stConfig.authConfig.SecretKey = opt.SecretKey
+	s3.stConfig.authConfig.Region = opt.Region
 
 	// Validate container name is present or not
 	// TODO: Need to fix for buckets
-	// err := config.UnmarshalKey("mount-all-containers", &az.stConfig.mountAllContainers)
+	// err := config.UnmarshalKey("mount-all-containers", &s3.stConfig.mountAllContainers)
 	// if err != nil {
 	// 	log.Err("ParseAndValidateConfig : Failed to detect mount-all-container")
 	// }
@@ -240,20 +240,20 @@ func ParseAndValidateConfig(az *S3Storage, opt S3StorageOptions) error {
 		log.Warn("ParseAndValidateConfig : account endpoint not provided, assuming the default .lyvecloud.seagate.com style endpoint")
 		opt.Endpoint = fmt.Sprintf("s3.%s.lyvecloud.seagate.com", opt.Region)
 	}
-	az.stConfig.authConfig.Endpoint = opt.Endpoint
+	s3.stConfig.authConfig.Endpoint = opt.Endpoint
 
 	// If subdirectory is mounted, take the prefix path
-	az.stConfig.prefixPath = opt.PrefixPath
+	s3.stConfig.prefixPath = opt.PrefixPath
 
 	// Block list call on mount for given amount of time
 	// TODO: Add cancellation timeout
-	// az.stConfig.cancelListForSeconds = opt.CancelListForSeconds
+	// s3.stConfig.cancelListForSeconds = opt.CancelListForSeconds
 
 	// TODO: Enable sdk trace in aws-sdk-go-v2
-	// az.stConfig.sdkTrace = opt.SdkTrace
-	// log.Info("ParseAndValidateConfig : sdk logging from the config file: %t", az.stConfig.sdkTrace)
+	// s3.stConfig.sdkTrace = opt.SdkTrace
+	// log.Info("ParseAndValidateConfig : sdk logging from the config file: %t", s3.stConfig.sdkTrace)
 
-	// err = ParseAndReadDynamicConfig(az, opt, false)
+	// err = ParseAndReadDynamicConfig(s3, opt, false)
 	// if err != nil {
 	// 	return err
 	// }
@@ -261,23 +261,23 @@ func ParseAndValidateConfig(az *S3Storage, opt S3StorageOptions) error {
 	// Retry policy configuration
 	// A user provided value of 0 doesn't make sense for MaxRetries, MaxTimeout, BackoffTime, or MaxRetryDelay.
 
-	// az.stConfig.maxRetries = 5     // Max number of retry to be done  (default 4) (v1 : 0)
-	// az.stConfig.maxTimeout = 900   // Max timeout for any single retry (default 1 min) (v1 : 60)
-	// az.stConfig.backoffTime = 4    // Delay before any retry (exponential increase) (default 4 sec)
-	// az.stConfig.maxRetryDelay = 60 // Maximum allowed delay before retry (default 120 sec) (v1 : 1.2)
+	// s3.stConfig.maxRetries = 5     // Max number of retry to be done  (default 4) (v1 : 0)
+	// s3.stConfig.maxTimeout = 900   // Max timeout for any single retry (default 1 min) (v1 : 60)
+	// s3.stConfig.backoffTime = 4    // Delay before any retry (exponential increase) (default 4 sec)
+	// s3.stConfig.maxRetryDelay = 60 // Maximum allowed delay before retry (default 120 sec) (v1 : 1.2)
 
 	// TODO: Add this
 	// if opt.MaxRetries != 0 {
-	// 	az.stConfig.maxRetries = opt.MaxRetries
+	// 	s3.stConfig.maxRetries = opt.MaxRetries
 	// }
 	// if opt.MaxTimeout != 0 {
-	// 	az.stConfig.maxTimeout = opt.MaxTimeout
+	// 	s3.stConfig.maxTimeout = opt.MaxTimeout
 	// }
 	// if opt.BackoffTime != 0 {
-	// 	az.stConfig.backoffTime = opt.BackoffTime
+	// 	s3.stConfig.backoffTime = opt.BackoffTime
 	// }
 	// if opt.MaxRetryDelay != 0 {
-	// 	az.stConfig.maxRetryDelay = opt.MaxRetryDelay
+	// 	s3.stConfig.maxRetryDelay = opt.MaxRetryDelay
 	// }
 
 	if config.IsSet(compName + ".set-content-type") {
@@ -291,57 +291,57 @@ func ParseAndValidateConfig(az *S3Storage, opt S3StorageOptions) error {
 	}
 
 	// log.Info("ParseAndValidateConfig : Bucket: %s, Container: %s, Prefix: %s, Endpoint: %s, ListBlock: %d, MD5 : %v %v, Virtual Directory: %v",
-	// 	az.stConfig.authConfig.BucketName, az.stConfig.container,
-	// 	az.stConfig.prefixPath, az.stConfig.authConfig.Endpoint, az.stConfig.cancelListForSeconds, az.stConfig.validateMD5, az.stConfig.updateMD5, az.stConfig.virtualDirectory)
+	// 	s3.stConfig.authConfig.BucketName, s3.stConfig.container,
+	// 	s3.stConfig.prefixPath, s3.stConfig.authConfig.Endpoint, s3.stConfig.cancelListForSeconds, s3.stConfig.validateMD5, s3.stConfig.updateMD5, s3.stConfig.virtualDirectory)
 
 	// log.Info("ParseAndValidateConfig : Retry Config: Retry count %d, Max Timeout %d, BackOff Time %d, Max Delay %d",
-	// 	az.stConfig.maxRetries, az.stConfig.maxTimeout, az.stConfig.backoffTime, az.stConfig.maxRetryDelay)
+	// 	s3.stConfig.maxRetries, s3.stConfig.maxTimeout, s3.stConfig.backoffTime, s3.stConfig.maxRetryDelay)
 
 	return nil
 }
 
 // ParseAndReadDynamicConfig : On config change read only the required config
-// func ParseAndReadDynamicConfig(az *AzStorage, opt S3StorageOptions, reload bool) error {
+// func ParseAndReadDynamicConfig(s3 *AzStorage, opt S3StorageOptions, reload bool) error {
 // 	log.Trace("ParseAndReadDynamicConfig : Reparsing config")
 
 // 	// If block size and max concurrency is configured use those
 // 	// A user provided value of 0 doesn't make sense for BlockSize, or MaxConcurrency.
 // 	if opt.BlockSize != 0 {
-// 		az.stConfig.blockSize = opt.BlockSize * 1024 * 1024
+// 		s3.stConfig.blockSize = opt.BlockSize * 1024 * 1024
 // 	}
 
 // 	if opt.MaxConcurrency != 0 {
-// 		az.stConfig.maxConcurrency = opt.MaxConcurrency
+// 		s3.stConfig.maxConcurrency = opt.MaxConcurrency
 // 	}
 
 // 	// Populate default tier
 // 	if opt.DefaultTier != "" {
-// 		az.stConfig.defaultTier = getAccessTierType(opt.DefaultTier)
+// 		s3.stConfig.defaultTier = getAccessTierType(opt.DefaultTier)
 // 	}
 
-// 	az.stConfig.ignoreAccessModifiers = !opt.FailUnsupportedOp
-// 	az.stConfig.validateMD5 = opt.ValidateMD5
-// 	az.stConfig.updateMD5 = opt.UpdateMD5
+// 	s3.stConfig.ignoreAccessModifiers = !opt.FailUnsupportedOp
+// 	s3.stConfig.validateMD5 = opt.ValidateMD5
+// 	s3.stConfig.updateMD5 = opt.UpdateMD5
 
-// 	az.stConfig.virtualDirectory = opt.VirtualDirectory
+// 	s3.stConfig.virtualDirectory = opt.VirtualDirectory
 
 // 	// Auth related reconfig
 // 	switch opt.AuthMode {
 // 	case "sas":
-// 		az.stConfig.authConfig.AuthMode = EAuthType.SAS()
+// 		s3.stConfig.authConfig.AuthMode = EAuthType.SAS()
 // 		if opt.SaSKey == "" {
 // 			return errors.New("SAS key not provided")
 // 		}
 
-// 		oldSas := az.stConfig.authConfig.SASKey
-// 		az.stConfig.authConfig.SASKey = sanitizeSASKey(opt.SaSKey)
+// 		oldSas := s3.stConfig.authConfig.SASKey
+// 		s3.stConfig.authConfig.SASKey = sanitizeSASKey(opt.SaSKey)
 
 // 		if reload {
 // 			log.Info("ParseAndReadDynamicConfig : SAS Key updated")
 
-// 			if err := az.storage.NewCredentialKey("saskey", az.stConfig.authConfig.SASKey); err != nil {
-// 				az.stConfig.authConfig.SASKey = oldSas
-// 				_ = az.storage.NewCredentialKey("saskey", az.stConfig.authConfig.SASKey)
+// 			if err := s3.storage.NewCredentialKey("saskey", s3.stConfig.authConfig.SASKey); err != nil {
+// 				s3.stConfig.authConfig.SASKey = oldSas
+// 				_ = s3.storage.NewCredentialKey("saskey", s3.stConfig.authConfig.SASKey)
 // 				return errors.New("SAS key update failure")
 // 			}
 // 		}
