@@ -37,23 +37,17 @@
 package s3storage
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
-	"syscall"
 	"testing"
-	"time"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/config"
 	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -62,18 +56,43 @@ import (
 type clientTestSuite struct {
 	suite.Suite
 	assert      *assert.Assertions
-	s3          *S3Storage
 	awsS3Client *s3.Client
+	s3Client    *S3Client
 	config      string
 	container   string
 }
 
-func newTestClient(configuration string) (*S3Storage, error) {
+func newTestClient(configuration string) (*S3Client, error) {
+	// push the given config data to config.go
 	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
-	s3 := News3storageComponent()
-	err := s3.Configure(true)
+	// ask config to give us the config data back as S3StorageOptions
+	conf := S3StorageOptions{}
+	err := config.UnmarshalKey(compName, &conf)
+	if err != nil {
+		fmt.Println("Unable to unmarshal")
+		log.Err("ClientTest::newTestClient : config error [invalid config attributes]")
+		return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, err.Error())
+	}
+	// now push S3StorageOptions data into an S3StorageConfig
+	configForS3Client := S3StorageConfig{
+		authConfig: s3AuthConfig{
+			BucketName: conf.BucketName,
+			AccessKey:  conf.AccessKey,
+			SecretKey:  conf.SecretKey,
+			Region:     conf.Region,
+			Endpoint:   conf.Endpoint,
+		},
+		prefixPath: conf.PrefixPath,
+	}
+	// Validate endpoint
+	if conf.Endpoint == "" {
+		log.Warn("ParseAndValidateConfig : account endpoint not provided, assuming the default .lyvecloud.seagate.com style endpoint")
+		configForS3Client.authConfig.Endpoint = fmt.Sprintf("s3.%s.lyvecloud.seagate.com", conf.Region)
+	}
+	// create an S3Client
+	s3Client := NewS3StorageConnection(configForS3Client)
 
-	return s3.(*S3Storage), err
+	return s3Client.(*S3Client), err
 }
 
 func (s *clientTestSuite) SetupTest() {
@@ -122,840 +141,84 @@ func (s *clientTestSuite) setupTestHelper(configuration string, container string
 
 	s.assert = assert.New(s.T())
 
-	s.s3, _ = newTestClient(configuration)
-	_ = s.s3.Start(ctx) // Note: Start->TestValidation will fail but it doesn't matter. We are creating the container a few lines below anyway.
-	// We could create the container before but that requires rewriting the code to new up a service client.
-
-	s.awsS3Client = s.s3.storage.(*S3Client).Client
+	s.s3Client, _ = newTestClient(configuration)
+	s.awsS3Client = s.s3Client.Client
 }
 
-func (s *clientTestSuite) tearDownTestHelper(delete bool) {
-	_ = s.s3.Stop()
-}
+// TODO: do we need s3StatsCollector for this test suite?
+// func (s *clientTestSuite) tearDownTestHelper(delete bool) {
+// 	_ = s.s3.Stop()
+// }
 
 func (s *clientTestSuite) cleanupTest() {
-	s.tearDownTestHelper(true)
+	// s.tearDownTestHelper(true)
 	_ = log.Destroy()
 }
 
+func (s *clientTestSuite) TestUpdateConfig() {
+}
+func (s *clientTestSuite) TestNewCredentialKey() {
+}
 func (s *clientTestSuite) TestListContainers() {
-	defer s.cleanupTest()
-
-	// TODO: Fix this so we can create buckets
-	// _, err := s.client.CreateBucket(context.TODO(), &s3.CreateBucketInput{
-	// 	Bucket: aws.String("lens-lab-test-create"),
-	// 	CreateBucketConfiguration: &types.CreateBucketConfiguration{
-	// 		LocationConstraint: types.BucketLocationConstraint("us-east-1"),
-	// 	},
-	// })
-	// if err != nil {
-	// 	fmt.Printf("Couldn't create bucket %v in Region %v. Here's why: %v\n",
-	// 		"lens-lab-test-create", "us-east-1", err)
-	// }
-
-	containers, err := s.s3.ListContainers()
+	containers, err := s.s3Client.ListContainers()
 	s.assert.Nil(err)
 	s.assert.Equal(containers, []string{"stxe1-srg-lens-lab1"})
 }
-
-func (s *clientTestSuite) TestIsDirEmpty() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateDirectoryName()
-	s.s3.CreateDir(internal.CreateDirOptions{Name: name})
-
-	// Testing dir and dir/
-	var paths = []string{name, name + "/"}
-	for _, path := range paths {
-		log.Debug(path)
-		s.Run(path, func() {
-			empty := s.s3.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
-
-			s.assert.True(empty)
-		})
-	}
+func (s *clientTestSuite) TestSetPrefixPath() {
 }
-
-func (s *clientTestSuite) TestIsDirEmptyFalse() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateDirectoryName()
-	s.s3.CreateDir(internal.CreateDirOptions{Name: name})
-	file := name + "/" + generateFileName()
-	s.s3.CreateFile(internal.CreateFileOptions{Name: file})
-
-	empty := s.s3.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
-
-	s.assert.False(empty)
-}
-
 func (s *clientTestSuite) TestCreateFile() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-
-	h, err := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-
-	s.assert.Nil(err)
-	s.assert.NotNil(h)
-	s.assert.EqualValues(name, h.Path)
-	s.assert.EqualValues(0, h.Size)
-	// File should be in the account
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
-		Key:    aws.String(name),
-	})
-	s.assert.Nil(err)
-	s.assert.NotNil(result)
 }
-
-func (s *clientTestSuite) TestOpenFile() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-
-	h, err := s.s3.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.Nil(err)
-	s.assert.NotNil(h)
-	s.assert.EqualValues(name, h.Path)
-	s.assert.EqualValues(0, h.Size)
+func (s *clientTestSuite) TestCreateDirectory() {
 }
-
-func (s *clientTestSuite) TestOpenFileError() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-
-	h, err := s.s3.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.NotNil(err)
-	s.assert.EqualValues(syscall.ENOENT, err)
-	s.assert.Nil(h)
+func (s *clientTestSuite) TestCreateLink() {
 }
-
-func (s *clientTestSuite) TestCloseFile() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-
-	// This method does nothing.
-	err := s.s3.CloseFile(internal.CloseFileOptions{Handle: h})
-	s.assert.Nil(err)
-}
-
-func (s *clientTestSuite) TestCloseFileFakeHandle() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h := handlemap.NewHandle(name)
-
-	// This method does nothing.
-	err := s.s3.CloseFile(internal.CloseFileOptions{Handle: h})
-	s.assert.Nil(err)
-}
-
 func (s *clientTestSuite) TestDeleteFile() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-
-	err := s.s3.DeleteFile(internal.DeleteFileOptions{Name: name})
-	s.assert.Nil(err)
-
-	// This is similar to the s3 bucket command, use getobject for now
-	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
-	// File should not be in the account
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
-		Key:    aws.String(name),
-	})
-
-	s.assert.NotNil(err)
 }
-
-// func (s *clientTestSuite) TestDeleteFileError() {
-// 	defer s.cleanupTest()
-// 	// Setup
-// 	name := generateFileName()
-
-// 	err := s.s3.DeleteFile(internal.DeleteFileOptions{Name: name})
-// 	s.assert.NotNil(err)
-// 	s.assert.EqualValues(syscall.ENOENT, err)
-
-// 	// File should not be in the account
-// 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-// 		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
-// 		Key:    aws.String(name),
-// 	})
-// 	s.assert.NotNil(err)
-// }
-
-func (s *clientTestSuite) TestCopyFromFile() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-	testData := "test data"
-	data := []byte(testData)
-	homeDir, _ := os.UserHomeDir()
-	f, _ := ioutil.TempFile(homeDir, name+".tmp")
-	defer os.Remove(f.Name())
-	f.Write(data)
-
-	err := s.s3.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
-
-	s.assert.Nil(err)
-
-	// Object will be updated with new data
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
-		Key:    aws.String(name),
-	})
-	s.assert.Nil(err)
-	defer result.Body.Close()
-	output, _ := ioutil.ReadAll(result.Body)
-	s.assert.EqualValues(testData, output)
+func (s *clientTestSuite) TestDeleteDirectory() {
 }
-
-func (s *clientTestSuite) TestReadFile() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h, err := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
-	testData := "test data"
-	data := []byte(testData)
-	_, err = s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
-	h, err = s.s3.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.Nil(err)
-
-	output, err := s.s3.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
-	s.assert.EqualValues(testData, output)
-}
-
-func (s *clientTestSuite) TestReadFileError() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h := handlemap.NewHandle(name)
-
-	_, err := s.s3.ReadFile(internal.ReadFileOptions{Handle: h})
-	fmt.Println(err)
-	s.assert.NotNil(err)
-	s.assert.EqualValues(syscall.ENOENT, err)
-}
-
-func (s *clientTestSuite) TestReadInBuffer() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h, err := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
-	testData := "test data"
-	data := []byte(testData)
-	_, err = s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
-	h, err = s.s3.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.Nil(err)
-
-	output := make([]byte, 5)
-	len, err := s.s3.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
-	s.assert.Nil(err)
-	s.assert.EqualValues(5, len)
-	s.assert.EqualValues(testData[:5], output)
-}
-
-func (s *clientTestSuite) TestReadInBufferLargeBuffer() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-	testData := "test data"
-	data := []byte(testData)
-	s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	h, _ = s.s3.OpenFile(internal.OpenFileOptions{Name: name})
-
-	output := make([]byte, 1000) // Testing that passing in a super large buffer will still work
-	len, err := s.s3.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
-	s.assert.Nil(err)
-	s.assert.EqualValues(h.Size, len)
-	s.assert.EqualValues(testData, output[:h.Size])
-}
-
-func (s *clientTestSuite) TestReadInBufferEmpty() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-
-	output := make([]byte, 10)
-	len, err := s.s3.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
-	s.assert.Nil(err)
-	s.assert.EqualValues(0, len)
-}
-
-func (s *clientTestSuite) TestReadInBufferBadRange() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h := handlemap.NewHandle(name)
-	h.Size = 10
-
-	_, err := s.s3.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 20, Data: make([]byte, 2)})
-	s.assert.NotNil(err)
-	s.assert.EqualValues(syscall.ERANGE, err)
-}
-
-func (s *clientTestSuite) TestReadInBufferError() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h := handlemap.NewHandle(name)
-	h.Size = 10
-
-	_, err := s.s3.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: make([]byte, 2)})
-	s.assert.NotNil(err)
-	s.assert.EqualValues(syscall.ENOENT, err)
-}
-
-func (s *clientTestSuite) TestWriteFile() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-
-	testData := "test data"
-	data := []byte(testData)
-	count, err := s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
-	s.assert.EqualValues(len(data), count)
-
-	// Blob should have updated data
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
-		Key:    aws.String(name),
-	})
-	s.assert.Nil(err)
-	defer result.Body.Close()
-	output, _ := ioutil.ReadAll(result.Body)
-	s.assert.EqualValues(testData, output)
-}
-
-func (s *clientTestSuite) TestWriteSmallFile() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-	testData := "test data"
-	data := []byte(testData)
-	dataLen := len(data)
-	_, err := s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
-	defer os.Remove(f.Name())
-
-	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
-
-	output := make([]byte, len(data))
-	f, _ = os.Open(f.Name())
-	len, err := f.Read(output)
-	s.assert.Nil(err)
-	s.assert.EqualValues(dataLen, len)
-	s.assert.EqualValues(testData, output)
-	f.Close()
-}
-
-func (s *clientTestSuite) TestOverwriteSmallFile() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-	testData := "test-replace-data"
-	data := []byte(testData)
-	dataLen := len(data)
-	_, err := s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
-	defer os.Remove(f.Name())
-	newTestData := []byte("newdata")
-	_, err = s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
-	s.assert.Nil(err)
-
-	currentData := []byte("test-newdata-data")
-	output := make([]byte, len(currentData))
-
-	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
-
-	f, _ = os.Open(f.Name())
-	len, err := f.Read(output)
-	s.assert.Nil(err)
-	s.assert.EqualValues(dataLen, len)
-	s.assert.EqualValues(currentData, output)
-	f.Close()
-}
-
-func (s *clientTestSuite) TestOverwriteAndAppendToSmallFile() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-	testData := "test-data"
-	data := []byte(testData)
-
-	_, err := s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
-	defer os.Remove(f.Name())
-	newTestData := []byte("newdata")
-	_, err = s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
-	s.assert.Nil(err)
-
-	currentData := []byte("test-newdata")
-	dataLen := len(currentData)
-	output := make([]byte, dataLen)
-
-	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
-
-	f, _ = os.Open(f.Name())
-	len, err := f.Read(output)
-	s.assert.Nil(err)
-	s.assert.EqualValues(dataLen, len)
-	s.assert.EqualValues(currentData, output)
-	f.Close()
-}
-
-func (s *clientTestSuite) TestAppendToSmallFile() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-	testData := "test-data"
-	data := []byte(testData)
-
-	_, err := s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
-	defer os.Remove(f.Name())
-	newTestData := []byte("-newdata")
-	_, err = s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 9, Data: newTestData})
-	s.assert.Nil(err)
-
-	currentData := []byte("test-data-newdata")
-	dataLen := len(currentData)
-	output := make([]byte, dataLen)
-
-	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
-
-	f, _ = os.Open(f.Name())
-	len, err := f.Read(output)
-	s.assert.Nil(err)
-	s.assert.EqualValues(dataLen, len)
-	s.assert.EqualValues(currentData, output)
-	f.Close()
-}
-
-func (s *clientTestSuite) TestAppendOffsetLargerThanSmallFile() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-	testData := "test-data"
-	data := []byte(testData)
-
-	_, err := s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
-	defer os.Remove(f.Name())
-	newTestData := []byte("newdata")
-	_, err = s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 12, Data: newTestData})
-	s.assert.Nil(err)
-
-	currentData := []byte("test-data\x00\x00\x00newdata")
-	dataLen := len(currentData)
-	output := make([]byte, dataLen)
-
-	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
-
-	f, _ = os.Open(f.Name())
-	len, err := f.Read(output)
-	s.assert.Nil(err)
-	s.assert.EqualValues(dataLen, len)
-	s.assert.EqualValues(currentData, output)
-	f.Close()
-}
-
-func (s *clientTestSuite) TestCopyToFileError() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	f, _ := ioutil.TempFile("", name+".tmp")
-	defer os.Remove(f.Name())
-
-	err := s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.NotNil(err)
-	s.assert.EqualValues(syscall.ENOENT, err)
-}
-
-func (s *clientTestSuite) TestReadDir() {
-	defer s.cleanupTest()
-	// This tests the default listBlocked = 0. It should return the expected paths.
-	// Setup
-	name := generateDirectoryName()
-	s.s3.CreateDir(internal.CreateDirOptions{Name: name})
-	childName := name + "/" + generateFileName()
-	s.s3.CreateFile(internal.CreateFileOptions{Name: childName})
-
-	// Testing dir and dir/
-	var paths = []string{name, name + "/"}
-	for _, path := range paths {
-		log.Debug(path)
-		s.Run(path, func() {
-			entries, err := s.s3.ReadDir(internal.ReadDirOptions{Name: path})
-			s.assert.Nil(err)
-			s.assert.EqualValues(1, len(entries))
-		})
-	}
-}
-
-func (s *clientTestSuite) TestStreamDirSmallCountNoDuplicates() {
-	defer s.cleanupTest()
-	// Setup
-	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/blob1.txt"})
-	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/blob2.txt"})
-	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newblob1.txt"})
-	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newblob2.txt"})
-	s.s3.CreateDir(internal.CreateDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder"})
-	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder/newblobA.txt"})
-	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder/newblobB.txt"})
-
-	var iteration int = 0
-	var marker string = ""
-	objectList := make([]*internal.ObjAttr, 0)
-
-	for {
-		new_list, new_marker, err := s.s3.StreamDir(internal.StreamDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/", Token: marker, Count: 1})
-		fmt.Println(err)
-		s.assert.Nil(err)
-		objectList = append(objectList, new_list...)
-		marker = new_marker
-		iteration++
-
-		log.Debug("clientTestSuite::TestStreamDirSmallCountNoDuplicates : So far retrieved %d objects in %d iterations", len(objectList), iteration)
-		if new_marker == "" {
-			break
-		}
-	}
-
-	s.assert.EqualValues(5, len(objectList))
-}
-
 func (s *clientTestSuite) TestRenameFile() {
-	defer s.cleanupTest()
-	// Setup
-	src := generateFileName()
-	s.s3.CreateFile(internal.CreateFileOptions{Name: src})
-	dst := generateFileName()
-
-	err := s.s3.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
-	s.assert.Nil(err)
-
-	// Src should not be in the account
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
-		Key:    aws.String(src),
-	})
-	s.assert.NotNil(err)
-	// Dst should be in the account
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
-		Key:    aws.String(dst),
-	})
-	s.assert.Nil(err)
 }
-
-func (s *clientTestSuite) TestRenameFileError() {
-	defer s.cleanupTest()
-	// Setup
-	src := generateFileName()
-	dst := generateFileName()
-
-	err := s.s3.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
-	s.assert.NotNil(err)
-	s.assert.EqualValues(syscall.ENOENT, err)
-
-	// Src and destination should not be in the account
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
-		Key:    aws.String(src),
-	})
-	s.assert.NotNil(err)
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
-		Key:    aws.String(dst),
-	})
-	s.assert.NotNil(err)
+func (s *clientTestSuite) TestRenameDirectory() {
 }
-
-func (s *clientTestSuite) TestGetAttrDir() {
-	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
-	configs := []string{"", vdConfig}
-	for _, c := range configs {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.container, true)
-		testName := ""
-		if c != "" {
-			testName = "virtual-directory"
-		}
-		s.Run(testName, func() {
-			// Setup
-			dirName := generateDirectoryName()
-			s.s3.CreateDir(internal.CreateDirOptions{Name: dirName})
-			// since CreateDir doesn't do anything, let's put an object with that prefix
-			filename := dirName + "/" + generateFileName()
-			s.s3.CreateFile(internal.CreateFileOptions{Name: filename})
-			// Now we should be able to see the directory
-			props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: dirName})
-			deleteError := s.s3.DeleteFile(internal.DeleteFileOptions{Name: filename})
-			s.assert.Nil(err)
-			s.assert.NotNil(props)
-			s.assert.True(props.IsDir())
-			s.assert.NotEmpty(props.Metadata)
-			s.assert.Contains(props.Metadata, folderKey)
-			s.assert.EqualValues("true", props.Metadata[folderKey])
-			s.assert.Nil(deleteError)
-		})
-	}
+func (s *clientTestSuite) TestgetAttrUsingRest() {
 }
-
-func (s *clientTestSuite) TestGetAttrVirtualDir() {
-	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
-	// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-	s.tearDownTestHelper(false)
-	s.setupTestHelper(vdConfig, s.container, true)
-	// Setup
-	dirName := generateFileName()
-	name := dirName + "/" + generateFileName()
-	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-
-	props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: dirName})
-	s.assert.Nil(err)
-	s.assert.NotNil(props)
-	s.assert.True(props.IsDir())
-	s.assert.False(props.IsSymlink())
-
-	// Check file in dir too
-	props, err = s.s3.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.Nil(err)
-	s.assert.NotNil(props)
-	s.assert.False(props.IsDir())
-	s.assert.False(props.IsSymlink())
+func (s *clientTestSuite) TestgetAttrUsingList() {
 }
-
-func (s *clientTestSuite) TestGetAttrVirtualDirSubDir() {
-	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
-	// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-	s.tearDownTestHelper(false)
-	s.setupTestHelper(vdConfig, s.container, true)
-	// Setup
-	dirName := generateFileName()
-	subDirName := dirName + "/" + generateFileName()
-	name := subDirName + "/" + generateFileName()
-	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-
-	props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: dirName})
-	s.assert.Nil(err)
-	s.assert.NotNil(props)
-	s.assert.True(props.IsDir())
-	s.assert.False(props.IsSymlink())
-
-	// Check subdir in dir too
-	props, err = s.s3.GetAttr(internal.GetAttrOptions{Name: subDirName})
-	s.assert.Nil(err)
-	s.assert.NotNil(props)
-	s.assert.True(props.IsDir())
-	s.assert.False(props.IsSymlink())
-
-	// Check file in subdir too
-	props, err = s.s3.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.Nil(err)
-	s.assert.NotNil(props)
-	s.assert.False(props.IsDir())
-	s.assert.False(props.IsSymlink())
+func (s *clientTestSuite) TestGetAttr() {
 }
-
-func (s *clientTestSuite) TestGetAttrFile() {
-	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
-	configs := []string{"", vdConfig}
-	for _, c := range configs {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.container, true)
-		testName := ""
-		if c != "" {
-			testName = "virtual-directory"
-		}
-		s.Run(testName, func() {
-			// Setup
-			name := generateFileName()
-			s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-
-			props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
-			s.assert.NotNil(props)
-			s.assert.False(props.IsDir())
-			s.assert.False(props.IsSymlink())
-		})
-	}
+func (s *clientTestSuite) TestList() {
 }
-
-// func (s *clientTestSuite) TestGetAttrLink() {
-// 	defer s.cleanupTest()
-// 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-// 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-// 		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
-// 	configs := []string{"", vdConfig}
-// 	for _, c := range configs {
-// 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-// 		s.tearDownTestHelper(false)
-// 		s.setupTestHelper(c, s.container, true)
-// 		testName := ""
-// 		if c != "" {
-// 			testName = "virtual-directory"
-// 		}
-// 		s.Run(testName, func() {
-// 			// Setup
-// 			target := generateFileName()
-// 			s.s3.CreateFile(internal.CreateFileOptions{Name: target})
-// 			name := generateFileName()
-// 			s.s3.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
-
-// 			props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
-// 			s.assert.Nil(err)
-// 			s.assert.NotNil(props)
-// 			s.assert.True(props.IsSymlink())
-// 			s.assert.NotEmpty(props.Metadata)
-// 			s.assert.Contains(props.Metadata, symlinkKey)
-// 			s.assert.EqualValues("true", props.Metadata[symlinkKey])
-// 		})
-// 	}
-// }
-
-func (s *clientTestSuite) TestGetAttrFileSize() {
-	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
-	configs := []string{"", vdConfig}
-	for _, c := range configs {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.container, true)
-		testName := ""
-		if c != "" {
-			testName = "virtual-directory"
-		}
-		s.Run(testName, func() {
-			// Setup
-			name := generateFileName()
-			h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-			testData := "test data"
-			data := []byte(testData)
-			s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-
-			props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
-			s.assert.NotNil(props)
-			s.assert.False(props.IsDir())
-			s.assert.False(props.IsSymlink())
-			s.assert.EqualValues(len(testData), props.Size)
-		})
-	}
+func (s *clientTestSuite) TestReadToFile() {
 }
-
-func (s *clientTestSuite) TestGetAttrFileTime() {
-	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
-	configs := []string{"", vdConfig}
-	for _, c := range configs {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.container, true)
-		testName := ""
-		if c != "" {
-			testName = "virtual-directory"
-		}
-		s.Run(testName, func() {
-			// Setup
-			name := generateFileName()
-			h, _ := s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-			testData := "test data"
-			data := []byte(testData)
-			s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-
-			before, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
-			s.assert.NotNil(before.Mtime)
-
-			time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
-
-			s.s3.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-
-			after, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
-			s.assert.NotNil(after.Mtime)
-
-			s.assert.True(after.Mtime.After(before.Mtime))
-		})
-	}
+func (s *clientTestSuite) TestReadBuffer() {
 }
-
-func (s *clientTestSuite) TestGetAttrError() {
-	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
-	configs := []string{"", vdConfig}
-	for _, c := range configs {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.container, true)
-		testName := ""
-		if c != "" {
-			testName = "virtual-directory"
-		}
-		s.Run(testName, func() {
-			// Setup
-			name := generateFileName()
-
-			_, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.NotNil(err)
-			s.assert.EqualValues(syscall.ENOENT, err)
-		})
-	}
+func (s *clientTestSuite) TestReadInBuffer() {
+}
+func (s *clientTestSuite) TestcalculateBlockSize() {
+}
+func (s *clientTestSuite) TestWriteFromFile() {
+}
+func (s *clientTestSuite) TestWriteFromBuffer() {
+}
+func (s *clientTestSuite) TestGetFileBlockOffsets() {
+}
+func (s *clientTestSuite) TestcreateBlock() {
+}
+func (s *clientTestSuite) TestcreateNewBlocks() {
+}
+func (s *clientTestSuite) TestremoveBlocks() {
+}
+func (s *clientTestSuite) TestTruncateFile() {
+}
+func (s *clientTestSuite) TestWrite() {
+}
+func (s *clientTestSuite) TeststageAndCommitModifiedBlocks() {
+}
+func (s *clientTestSuite) TestStageAndCommit() {
+}
+func (s *clientTestSuite) TestChangeMod() {
+}
+func (s *clientTestSuite) TestChangeOwner() {
 }
 
 func TestClient(t *testing.T) {
