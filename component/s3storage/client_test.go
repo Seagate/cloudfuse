@@ -41,7 +41,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"strings"
 	"syscall"
@@ -60,60 +59,16 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-var ctx = context.Background()
-
-const MB = 1024 * 1024
-
-// A UUID representation compliant with specification in RFC 4122 document.
-type uuid [16]byte
-
-const reservedRFC4122 byte = 0x40
-
-func (u uuid) bytes() []byte {
-	return u[:]
-}
-
-// NewUUID returns a new uuid using RFC 4122 algorithm.
-func newUUID() (u uuid) {
-	u = uuid{}
-	// Set all bits to randomly (or pseudo-randomly) chosen values.
-	rand.Read(u[:])
-	u[8] = (u[8] | reservedRFC4122) & 0x7F // u.setVariant(ReservedRFC4122)
-
-	var version byte = 4
-	u[6] = (u[6] & 0xF) | (version << 4) // u.setVersion(4)
-	return
-}
-
-func randomString(length int) string {
-	rand.Seed(time.Now().UnixNano())
-	b := make([]byte, length)
-	rand.Read(b)
-	return fmt.Sprintf("%x", b)[:length]
-}
-
-func generateContainerName() string {
-	return "fuseutc" + randomString(8)
-}
-
-func generateDirectoryName() string {
-	return "dir" + randomString(8)
-}
-
-func generateFileName() string {
-	return "file" + randomString(8)
-}
-
 type clientTestSuite struct {
 	suite.Suite
-	assert    *assert.Assertions
-	s3        *S3Storage
-	client    *s3.Client
-	config    string
-	container string
+	assert      *assert.Assertions
+	s3          *S3Storage
+	awsS3Client *s3.Client
+	config      string
+	container   string
 }
 
-func newTestS3Storage(configuration string) (*S3Storage, error) {
+func newTestClient(configuration string) (*S3Storage, error) {
 	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
 	s3 := News3storageComponent()
 	err := s3.Configure(true)
@@ -167,11 +122,11 @@ func (s *clientTestSuite) setupTestHelper(configuration string, container string
 
 	s.assert = assert.New(s.T())
 
-	s.s3, _ = newTestS3Storage(configuration)
+	s.s3, _ = newTestClient(configuration)
 	_ = s.s3.Start(ctx) // Note: Start->TestValidation will fail but it doesn't matter. We are creating the container a few lines below anyway.
 	// We could create the container before but that requires rewriting the code to new up a service client.
 
-	s.client = s.s3.storage.(*S3Client).Client
+	s.awsS3Client = s.s3.storage.(*S3Client).Client
 }
 
 func (s *clientTestSuite) tearDownTestHelper(delete bool) {
@@ -246,7 +201,7 @@ func (s *clientTestSuite) TestCreateFile() {
 	s.assert.EqualValues(name, h.Path)
 	s.assert.EqualValues(0, h.Size)
 	// File should be in the account
-	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
@@ -312,7 +267,7 @@ func (s *clientTestSuite) TestDeleteFile() {
 	// This is similar to the s3 bucket command, use getobject for now
 	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
 	// File should not be in the account
-	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
@@ -354,7 +309,7 @@ func (s *clientTestSuite) TestCopyFromFile() {
 	s.assert.Nil(err)
 
 	// Object will be updated with new data
-	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
@@ -480,7 +435,7 @@ func (s *clientTestSuite) TestWriteFile() {
 	s.assert.EqualValues(len(data), count)
 
 	// Blob should have updated data
-	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
@@ -684,23 +639,23 @@ func (s *clientTestSuite) TestStreamDirSmallCountNoDuplicates() {
 
 	var iteration int = 0
 	var marker string = ""
-	blobList := make([]*internal.ObjAttr, 0)
+	objectList := make([]*internal.ObjAttr, 0)
 
 	for {
 		new_list, new_marker, err := s.s3.StreamDir(internal.StreamDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/", Token: marker, Count: 1})
 		fmt.Println(err)
 		s.assert.Nil(err)
-		blobList = append(blobList, new_list...)
+		objectList = append(objectList, new_list...)
 		marker = new_marker
 		iteration++
 
-		log.Debug("AzStorage::ReadDir : So far retrieved %d objects in %d iterations", len(blobList), iteration)
+		log.Debug("clientTestSuite::TestStreamDirSmallCountNoDuplicates : So far retrieved %d objects in %d iterations", len(objectList), iteration)
 		if new_marker == "" {
 			break
 		}
 	}
 
-	s.assert.EqualValues(5, len(blobList))
+	s.assert.EqualValues(5, len(objectList))
 }
 
 func (s *clientTestSuite) TestRenameFile() {
@@ -714,13 +669,13 @@ func (s *clientTestSuite) TestRenameFile() {
 	s.assert.Nil(err)
 
 	// Src should not be in the account
-	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(src),
 	})
 	s.assert.NotNil(err)
 	// Dst should be in the account
-	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(dst),
 	})
@@ -738,12 +693,12 @@ func (s *clientTestSuite) TestRenameFileError() {
 	s.assert.EqualValues(syscall.ENOENT, err)
 
 	// Src and destination should not be in the account
-	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(src),
 	})
 	s.assert.NotNil(err)
-	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(dst),
 	})
@@ -1003,6 +958,6 @@ func (s *clientTestSuite) TestGetAttrError() {
 	}
 }
 
-func TestBlockBlob(t *testing.T) {
+func TestClient(t *testing.T) {
 	suite.Run(t, new(clientTestSuite))
 }

@@ -104,7 +104,7 @@ func generateFileName() string {
 	return "file" + randomString(8)
 }
 
-type clientTestSuite struct {
+type s3StorageTestSuite struct {
 	suite.Suite
 	assert    *assert.Assertions
 	s3        *S3Storage
@@ -121,7 +121,7 @@ func newTestS3Storage(configuration string) (*S3Storage, error) {
 	return s3.(*S3Storage), err
 }
 
-func (s *clientTestSuite) SetupTest() {
+func (s *s3StorageTestSuite) SetupTest() {
 	// Logging config
 	cfg := common.LogConfig{
 		FilePath:    "./logfile.txt",
@@ -153,7 +153,7 @@ func (s *clientTestSuite) SetupTest() {
 	s.setupTestHelper("", "", true)
 }
 
-func (s *clientTestSuite) setupTestHelper(configuration string, container string, create bool) {
+func (s *s3StorageTestSuite) setupTestHelper(configuration string, container string, create bool) {
 	if container == "" {
 		container = generateContainerName()
 	}
@@ -174,16 +174,16 @@ func (s *clientTestSuite) setupTestHelper(configuration string, container string
 	s.client = s.s3.storage.(*S3Client).Client
 }
 
-func (s *clientTestSuite) tearDownTestHelper(delete bool) {
+func (s *s3StorageTestSuite) tearDownTestHelper(delete bool) {
 	_ = s.s3.Stop()
 }
 
-func (s *clientTestSuite) cleanupTest() {
+func (s *s3StorageTestSuite) cleanupTest() {
 	s.tearDownTestHelper(true)
 	_ = log.Destroy()
 }
 
-func (s *clientTestSuite) TestListContainers() {
+func (s *s3StorageTestSuite) TestListContainers() {
 	defer s.cleanupTest()
 
 	// TODO: Fix this so we can create buckets
@@ -203,7 +203,7 @@ func (s *clientTestSuite) TestListContainers() {
 	s.assert.Equal(containers, []string{"stxe1-srg-lens-lab1"})
 }
 
-func (s *clientTestSuite) TestIsDirEmpty() {
+func (s *s3StorageTestSuite) TestIsDirEmpty() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateDirectoryName()
@@ -221,7 +221,7 @@ func (s *clientTestSuite) TestIsDirEmpty() {
 	}
 }
 
-func (s *clientTestSuite) TestIsDirEmptyFalse() {
+func (s *s3StorageTestSuite) TestIsDirEmptyFalse() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateDirectoryName()
@@ -234,7 +234,7 @@ func (s *clientTestSuite) TestIsDirEmptyFalse() {
 	s.assert.False(empty)
 }
 
-func (s *clientTestSuite) TestCreateFile() {
+func (s *s3StorageTestSuite) TestCreateFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -254,7 +254,7 @@ func (s *clientTestSuite) TestCreateFile() {
 	s.assert.NotNil(result)
 }
 
-func (s *clientTestSuite) TestOpenFile() {
+func (s *s3StorageTestSuite) TestOpenFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -267,7 +267,7 @@ func (s *clientTestSuite) TestOpenFile() {
 	s.assert.EqualValues(0, h.Size)
 }
 
-func (s *clientTestSuite) TestOpenFileError() {
+func (s *s3StorageTestSuite) TestOpenFileError() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -278,7 +278,7 @@ func (s *clientTestSuite) TestOpenFileError() {
 	s.assert.Nil(h)
 }
 
-func (s *clientTestSuite) TestCloseFile() {
+func (s *s3StorageTestSuite) TestCloseFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -289,7 +289,7 @@ func (s *clientTestSuite) TestCloseFile() {
 	s.assert.Nil(err)
 }
 
-func (s *clientTestSuite) TestCloseFileFakeHandle() {
+func (s *s3StorageTestSuite) TestCloseFileFakeHandle() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -300,7 +300,7 @@ func (s *clientTestSuite) TestCloseFileFakeHandle() {
 	s.assert.Nil(err)
 }
 
-func (s *clientTestSuite) TestDeleteFile() {
+func (s *s3StorageTestSuite) TestDeleteFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -320,7 +320,7 @@ func (s *clientTestSuite) TestDeleteFile() {
 	s.assert.NotNil(err)
 }
 
-// func (s *clientTestSuite) TestDeleteFileError() {
+// func (s *s3StorageTestSuite) TestDeleteFileError() {
 // 	defer s.cleanupTest()
 // 	// Setup
 // 	name := generateFileName()
@@ -337,7 +337,7 @@ func (s *clientTestSuite) TestDeleteFile() {
 // 	s.assert.NotNil(err)
 // }
 
-func (s *clientTestSuite) TestCopyFromFile() {
+func (s *s3StorageTestSuite) TestCopyFromFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -364,7 +364,7 @@ func (s *clientTestSuite) TestCopyFromFile() {
 	s.assert.EqualValues(testData, output)
 }
 
-func (s *clientTestSuite) TestReadFile() {
+func (s *s3StorageTestSuite) TestReadFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -382,7 +382,7 @@ func (s *clientTestSuite) TestReadFile() {
 	s.assert.EqualValues(testData, output)
 }
 
-func (s *clientTestSuite) TestReadFileError() {
+func (s *s3StorageTestSuite) TestReadFileError() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -394,7 +394,7 @@ func (s *clientTestSuite) TestReadFileError() {
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
-func (s *clientTestSuite) TestReadInBuffer() {
+func (s *s3StorageTestSuite) TestReadInBuffer() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -414,7 +414,7 @@ func (s *clientTestSuite) TestReadInBuffer() {
 	s.assert.EqualValues(testData[:5], output)
 }
 
-func (s *clientTestSuite) TestReadInBufferLargeBuffer() {
+func (s *s3StorageTestSuite) TestReadInBufferLargeBuffer() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -431,7 +431,7 @@ func (s *clientTestSuite) TestReadInBufferLargeBuffer() {
 	s.assert.EqualValues(testData, output[:h.Size])
 }
 
-func (s *clientTestSuite) TestReadInBufferEmpty() {
+func (s *s3StorageTestSuite) TestReadInBufferEmpty() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -443,7 +443,7 @@ func (s *clientTestSuite) TestReadInBufferEmpty() {
 	s.assert.EqualValues(0, len)
 }
 
-func (s *clientTestSuite) TestReadInBufferBadRange() {
+func (s *s3StorageTestSuite) TestReadInBufferBadRange() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -455,7 +455,7 @@ func (s *clientTestSuite) TestReadInBufferBadRange() {
 	s.assert.EqualValues(syscall.ERANGE, err)
 }
 
-func (s *clientTestSuite) TestReadInBufferError() {
+func (s *s3StorageTestSuite) TestReadInBufferError() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -467,7 +467,7 @@ func (s *clientTestSuite) TestReadInBufferError() {
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
-func (s *clientTestSuite) TestWriteFile() {
+func (s *s3StorageTestSuite) TestWriteFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -490,7 +490,7 @@ func (s *clientTestSuite) TestWriteFile() {
 	s.assert.EqualValues(testData, output)
 }
 
-func (s *clientTestSuite) TestWriteSmallFile() {
+func (s *s3StorageTestSuite) TestWriteSmallFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -515,7 +515,7 @@ func (s *clientTestSuite) TestWriteSmallFile() {
 	f.Close()
 }
 
-func (s *clientTestSuite) TestOverwriteSmallFile() {
+func (s *s3StorageTestSuite) TestOverwriteSmallFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -545,7 +545,7 @@ func (s *clientTestSuite) TestOverwriteSmallFile() {
 	f.Close()
 }
 
-func (s *clientTestSuite) TestOverwriteAndAppendToSmallFile() {
+func (s *s3StorageTestSuite) TestOverwriteAndAppendToSmallFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -576,7 +576,7 @@ func (s *clientTestSuite) TestOverwriteAndAppendToSmallFile() {
 	f.Close()
 }
 
-func (s *clientTestSuite) TestAppendToSmallFile() {
+func (s *s3StorageTestSuite) TestAppendToSmallFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -607,7 +607,7 @@ func (s *clientTestSuite) TestAppendToSmallFile() {
 	f.Close()
 }
 
-func (s *clientTestSuite) TestAppendOffsetLargerThanSmallFile() {
+func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSmallFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -638,7 +638,7 @@ func (s *clientTestSuite) TestAppendOffsetLargerThanSmallFile() {
 	f.Close()
 }
 
-func (s *clientTestSuite) TestCopyToFileError() {
+func (s *s3StorageTestSuite) TestCopyToFileError() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -650,7 +650,7 @@ func (s *clientTestSuite) TestCopyToFileError() {
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
-func (s *clientTestSuite) TestReadDir() {
+func (s *s3StorageTestSuite) TestReadDir() {
 	defer s.cleanupTest()
 	// This tests the default listBlocked = 0. It should return the expected paths.
 	// Setup
@@ -671,7 +671,7 @@ func (s *clientTestSuite) TestReadDir() {
 	}
 }
 
-func (s *clientTestSuite) TestStreamDirSmallCountNoDuplicates() {
+func (s *s3StorageTestSuite) TestStreamDirSmallCountNoDuplicates() {
 	defer s.cleanupTest()
 	// Setup
 	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/blob1.txt"})
@@ -694,7 +694,7 @@ func (s *clientTestSuite) TestStreamDirSmallCountNoDuplicates() {
 		marker = new_marker
 		iteration++
 
-		log.Debug("AzStorage::ReadDir : So far retrieved %d objects in %d iterations", len(blobList), iteration)
+		log.Debug("s3StorageTestSuite::TestStreamDirSmallCountNoDuplicates : So far retrieved %d objects in %d iterations", len(blobList), iteration)
 		if new_marker == "" {
 			break
 		}
@@ -703,7 +703,7 @@ func (s *clientTestSuite) TestStreamDirSmallCountNoDuplicates() {
 	s.assert.EqualValues(5, len(blobList))
 }
 
-func (s *clientTestSuite) TestRenameFile() {
+func (s *s3StorageTestSuite) TestRenameFile() {
 	defer s.cleanupTest()
 	// Setup
 	src := generateFileName()
@@ -727,7 +727,7 @@ func (s *clientTestSuite) TestRenameFile() {
 	s.assert.Nil(err)
 }
 
-func (s *clientTestSuite) TestRenameFileError() {
+func (s *s3StorageTestSuite) TestRenameFileError() {
 	defer s.cleanupTest()
 	// Setup
 	src := generateFileName()
@@ -750,7 +750,7 @@ func (s *clientTestSuite) TestRenameFileError() {
 	s.assert.NotNil(err)
 }
 
-func (s *clientTestSuite) TestGetAttrDir() {
+func (s *s3StorageTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -785,7 +785,7 @@ func (s *clientTestSuite) TestGetAttrDir() {
 	}
 }
 
-func (s *clientTestSuite) TestGetAttrVirtualDir() {
+func (s *s3StorageTestSuite) TestGetAttrVirtualDir() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -812,7 +812,7 @@ func (s *clientTestSuite) TestGetAttrVirtualDir() {
 	s.assert.False(props.IsSymlink())
 }
 
-func (s *clientTestSuite) TestGetAttrVirtualDirSubDir() {
+func (s *s3StorageTestSuite) TestGetAttrVirtualDirSubDir() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -847,7 +847,7 @@ func (s *clientTestSuite) TestGetAttrVirtualDirSubDir() {
 	s.assert.False(props.IsSymlink())
 }
 
-func (s *clientTestSuite) TestGetAttrFile() {
+func (s *s3StorageTestSuite) TestGetAttrFile() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -875,7 +875,7 @@ func (s *clientTestSuite) TestGetAttrFile() {
 	}
 }
 
-// func (s *clientTestSuite) TestGetAttrLink() {
+// func (s *s3StorageTestSuite) TestGetAttrLink() {
 // 	defer s.cleanupTest()
 // 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 // 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -907,7 +907,7 @@ func (s *clientTestSuite) TestGetAttrFile() {
 // 	}
 // }
 
-func (s *clientTestSuite) TestGetAttrFileSize() {
+func (s *s3StorageTestSuite) TestGetAttrFileSize() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -939,7 +939,7 @@ func (s *clientTestSuite) TestGetAttrFileSize() {
 	}
 }
 
-func (s *clientTestSuite) TestGetAttrFileTime() {
+func (s *s3StorageTestSuite) TestGetAttrFileTime() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -978,7 +978,7 @@ func (s *clientTestSuite) TestGetAttrFileTime() {
 	}
 }
 
-func (s *clientTestSuite) TestGetAttrError() {
+func (s *s3StorageTestSuite) TestGetAttrError() {
 	defer s.cleanupTest()
 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -1003,6 +1003,6 @@ func (s *clientTestSuite) TestGetAttrError() {
 	}
 }
 
-func TestBlockBlob(t *testing.T) {
-	suite.Run(t, new(clientTestSuite))
+func TestS3Storage(t *testing.T) {
+	suite.Run(t, new(s3StorageTestSuite))
 }
