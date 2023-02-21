@@ -577,27 +577,16 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 			})
 		}
 
-		defer result.Body.Close()
-		body, err := io.ReadAll(result.Body)
-		if err != nil {
-			log.Err("Couldn't read object body from %v. Here's why: %v\n", name, err)
-			return err
-		}
-
-		_, err = fi.Write(body)
-		if err != nil {
-			log.Err("Couldn't write to file %v. Here's why: %v\n", name, err)
-			return err
-		}
-
 		// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
 		// So if we get this error we want to try again, and if not then we got a legitimate error so break
-		if errors.As(err, &apiErr) {
-			code := apiErr.ErrorCode()
-			if code != "InvalidAccessKeyId" {
-				break
+		if err != nil {
+			if errors.As(err, &apiErr) {
+				code := apiErr.ErrorCode()
+				if code != "InvalidAccessKeyId" {
+					break
+				}
+				log.Warn("S3Client::ReadToFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 			}
-			log.Warn("S3Client::ReadToFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 		}
 
 		if err == nil {
@@ -610,10 +599,23 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			log.Err("S3Object::ReadToFile : Failed to download object %s [%s]", name, err.Error())
+			log.Err("S3Client::ReadToFile : Failed to download object %s [%s]", name, err.Error())
 			return syscall.ENOENT
 		}
 		log.Err("Couldn't get object %v:%v. Here's why: %v\n", bucketName, name, err)
+		return err
+	}
+
+	defer result.Body.Close()
+	body, err := io.ReadAll(result.Body)
+	if err != nil {
+		log.Err("Couldn't read object body from %v. Here's why: %v\n", name, err)
+		return err
+	}
+
+	_, err = fi.Write(body)
+	if err != nil {
+		log.Err("Couldn't write to file %v. Here's why: %v\n", name, err)
 		return err
 	}
 
