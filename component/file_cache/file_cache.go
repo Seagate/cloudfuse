@@ -312,7 +312,7 @@ func (c *FileCache) OnConfigChange() {
 	_ = c.policy.UpdateConfig(c.GetPolicyConfig(conf))
 }
 
-func (c *FileCache) StatFs() (*syscall.Statfs_t, bool, error) {
+func (c *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	// cache_size = f_blocks * f_frsize/1024
 	// cache_size - used = f_frsize * f_bavail/1024
 	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
@@ -329,11 +329,18 @@ func (c *FileCache) StatFs() (*syscall.Statfs_t, bool, error) {
 		log.Debug("FileCache::StatFs : statfs err [%s].", err.Error())
 		return nil, false, err
 	}
-	statfs.Blocks = uint64(maxCacheSize) / uint64(statfs.Frsize)
-	statfs.Bavail = uint64(math.Max(0, available)) / uint64(statfs.Frsize)
-	statfs.Bfree = statfs.Bavail
+	stat := common.Statfs_t{
+		Blocks:  uint64(maxCacheSize) / uint64(statfs.Frsize),
+		Bavail:  uint64(math.Max(0, available)) / uint64(statfs.Frsize),
+		Bfree:   statfs.Bavail,
+		Bsize:   statfs.Bsize,
+		Ffree:   statfs.Ffree,
+		Files:   statfs.Files,
+		Frsize:  statfs.Frsize,
+		Namemax: 255,
+	}
 
-	return statfs, true, nil
+	return &stat, true, nil
 }
 
 func (c *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
