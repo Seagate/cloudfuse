@@ -164,14 +164,15 @@ type Block struct {
 
 // Statfs type used by component in replace of syscall.Statfs_t
 type Statfs_t struct {
-	Bsize  int64
-	Blocks uint64
-	Bfree  uint64
-	Bavail uint64
-	Files  uint64
-	Ffree  uint64
-	Frsize int64
-	Flags  int64
+	Bsize   int64
+	Blocks  uint64
+	Bfree   uint64
+	Bavail  uint64
+	Files   uint64
+	Ffree   uint64
+	Frsize  int64
+	Flags   int64
+	Namemax uint64
 }
 
 // Dirty : Handle is dirty or not
