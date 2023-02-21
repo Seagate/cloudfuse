@@ -12,9 +12,9 @@ pipeline = {
     "filecaching" : 1
 }
 
-butcketOptions = {
+bucketOptions = {
     "Azure" : 0,
-    "S3" : 1
+    "Lyve" : 1
 }
 
 class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
@@ -32,6 +32,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.mount_button.clicked.connect(self.mountBucket)
         self.unmount_button.clicked.connect(self.unmountBucket)
 
+
     # Define the slots that will be triggered when the signals in Qt are activated
     def showSettingsWidget(self):
         self.settingsWindow = mountSettingsWidget()
@@ -43,7 +44,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
     def mountBucket(self):
         msg = QtWidgets.QMessageBox()
-        if self.bucket_select.currentIndex() != butcketOptions["Azure"]:
+        if self.bucket_select.currentIndex() != bucketOptions["Azure"]:
             msg.setWindowTitle("Error")
             msg.setText("S3 bucket not enabled yet, use an Azure bucket for now")
             x = msg.exec()  # Show the message box
