@@ -1007,9 +1007,9 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 		fc.policy.CacheValid(localPath)
 	}
 
-	// Removing Pread as it is not supported on Windows
-	// return syscall.Pread(options.Handle.FD(), options.Data, options.Offset)
-	return f.ReadAt(options.Data, options.Offset)
+	// Removing f.ReadAt as it involves lot of house keeping and then calls syscall.Pread
+	// Instead we will call syscall directly for better perf
+	return syscall.Pread(options.Handle.FD(), options.Data, options.Offset)
 }
 
 // WriteFile: Write to the local file
@@ -1030,9 +1030,9 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 		fc.policy.CacheValid(localPath)
 	}
 
-	// Removing Pwrite as it is not supported on Windows
-	// bytesWritten, err := syscall.Pwrite(options.Handle.FD(), options.Data, options.Offset)
-	bytesWritten, err := f.WriteAt(options.Data, options.Offset)
+	// Removing f.WriteAt as it involves lot of house keeping and then calls syscall.Pwrite
+	// Instead we will call syscall directly for better perf
+	bytesWritten, err := syscall.Pwrite(options.Handle.FD(), options.Data, options.Offset)
 
 	if err == nil {
 		// Mark the handle dirty so the file is written back to storage on FlushFile.
@@ -1092,20 +1092,17 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 		// We cannot close the incoming handle since the user called flush, note close and flush can be called on the same handle multiple times.
 		// To ensure the data is flushed to disk before writing to storage, we duplicate the handle and close that handle.
 		// f.fsync() is another option but dup+close does it quickly compared to sync
-		// dupFd, err := syscall.Dup(int(f.Fd()))
-		// if err != nil {
-		// 	log.Err("FileCache::FlushFile : error [couldn't duplicate the fd] %s", options.Handle.Path)
-		// 	return syscall.EIO
-		// }
+		dupFd, err := syscall.Dup(int(f.Fd()))
+		if err != nil {
+			log.Err("FileCache::FlushFile : error [couldn't duplicate the fd] %s", options.Handle.Path)
+			return syscall.EIO
+		}
 
-		// err = syscall.Close(dupFd)
-		// if err != nil {
-		// 	log.Err("FileCache::FlushFile : error [unable to close duplicate fd] %s", options.Handle.Path)
-		// 	return syscall.EIO
-		// }
-
-		// Replace above with Sync since Dup is not supported on Windows
-		f.Sync()
+		err = syscall.Close(dupFd)
+		if err != nil {
+			log.Err("FileCache::FlushFile : error [unable to close duplicate fd] %s", options.Handle.Path)
+			return syscall.EIO
+		}
 
 		// Write to storage
 		// Create a new handle for the SDK to use to upload (read local file)
