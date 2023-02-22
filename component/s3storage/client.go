@@ -553,29 +553,25 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 
 	var apiErr smithy.APIError
 	var result *s3.GetObjectOutput
+	var rangeString string //string to be used to specify range of object to download from S3
+
+	//set up string (rangeString) to be used in the GetObject() call for S3 download
+	//TODO: add handle if the offset+count is greater than the end of Object.
+	if offset == 0 && count == 0 {
+		rangeString = "bytes=0-"
+	} else if offset != 0 && count == 0 {
+		rangeString = "bytes=" + fmt.Sprint(offset) + "-"
+	} else if offset != 0 && count != 0 {
+		endRange := offset + count
+		rangeString = "bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)
+	}
+
 	for i := 0; i < retryCount; i++ {
-
-		//TODO: add handle if the offset+count is greater than the end of Object.
-		if offset == 0 && count == 0 {
-			result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
-				Bucket: aws.String(cl.Config.authConfig.BucketName),
-				Key:    aws.String(name),
-			})
-
-		} else if offset != 0 && count == 0 {
-			result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
-				Bucket: aws.String(cl.Config.authConfig.BucketName),
-				Key:    aws.String(name),
-				Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-"),
-			})
-		} else if offset != 0 && count != 0 {
-			endRange := offset + count
-			result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
-				Bucket: aws.String(cl.Config.authConfig.BucketName),
-				Key:    aws.String(name),
-				Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)),
-			})
-		}
+		result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
+			Bucket: aws.String(cl.Config.authConfig.BucketName),
+			Key:    aws.String(name),
+			Range:  aws.String(rangeString),
+		})
 
 		// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
 		// So if we get this error we want to try again, and if not then we got a legitimate error so break
