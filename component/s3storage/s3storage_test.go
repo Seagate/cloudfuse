@@ -153,6 +153,38 @@ func (s *s3StorageTestSuite) SetupTest() {
 	s.setupTestHelper("", "", true)
 }
 
+/*
+description:
+
+	creates a file with bytes and uploads it to S3 and deletes it from local machine afgter upload.
+	to be called from other test functions. Hense why there is no cleanupTest() call
+
+input:
+
+	N/A
+
+output:
+ 1. string of file name that was uploaded
+ 2. []byte of the data that was written to the file.
+*/
+func (s *s3StorageTestSuite) UploadFile() string {
+
+	// Setup
+	name := generateFileName()
+	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data"
+	data := []byte(testData)
+	homeDir, _ := os.UserHomeDir()
+	file, _ := ioutil.TempFile(homeDir, name+".tmp")
+	defer os.Remove(file.Name())
+	file.Write(data)
+
+	err := s.s3.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: file})
+	s.assert.Nil(err)
+
+	return name
+}
+
 func (s *s3StorageTestSuite) setupTestHelper(configuration string, container string, create bool) {
 	if container == "" {
 		container = generateContainerName()
@@ -1006,39 +1038,6 @@ func (s *s3StorageTestSuite) TestGetAttrError() {
 
 func TestS3Storage(t *testing.T) {
 	suite.Run(t, new(s3StorageTestSuite))
-}
-
-/*
-description:
-
-	creates a file with bytes and uploads it to S3 and deletes it from local machine afgter upload.
-	to be called from other test functions. Hense why there is no cleanupTest() call
-
-input:
-
-	N/A
-
-output:
- 1. string of file name that was uploaded
- 2. []byte of the data that was written to the file.
-*/
-func (s *s3StorageTestSuite) UploadFile() string {
-
-	// Setup
-	name := generateFileName()
-	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-	testData := "test data"
-	data := []byte(testData)
-	homeDir, _ := os.UserHomeDir()
-	file, _ := ioutil.TempFile(homeDir, name+".tmp")
-	defer os.Remove(file.Name())
-	file.Write(data)
-
-	err := s.s3.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: file})
-	s.assert.Nil(err)
-
-	return name
-
 }
 
 /*
