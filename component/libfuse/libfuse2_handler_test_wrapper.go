@@ -108,7 +108,7 @@ func (suite *libfuseTestSuite) cleanupTest() {
 
 func testMkDir(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
-	name := "/path"
+	name := "path"
 	path := "/" + name
 	mode := fs.FileMode(0775)
 	options := internal.CreateDirOptions{Name: name, Mode: mode}
