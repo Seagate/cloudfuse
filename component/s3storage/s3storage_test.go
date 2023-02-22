@@ -1051,8 +1051,7 @@ func (s *s3StorageTestSuite) TestFullRangedDownload() {
 	s.assert.Nil(err)
 
 	//create byte array of characters that are identical to what we should have downloaded
-	currentData := []byte("test data")
-	dataLen := len(currentData)
+	dataLen := len(data)
 	output := make([]byte, dataLen) //empty byte array of that only holds 5 chars
 	file, _ = os.Open(file.Name())
 
@@ -1061,7 +1060,7 @@ func (s *s3StorageTestSuite) TestFullRangedDownload() {
 
 	s.assert.Nil(err)
 	s.assert.EqualValues(dataLen, len)
-	s.assert.EqualValues(currentData, output)
+	s.assert.EqualValues(data, output)
 }
 
 // uploads data from a temp file. downloads a portion/range of that data from S3 and tests the correct range was received.
