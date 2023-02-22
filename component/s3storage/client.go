@@ -528,21 +528,7 @@ func (cl *S3Client) List(prefix string, marker *string, count int32) ([]*interna
 func trackDownload(name string, bytesTransferred int64, count int64, downloadPtr *int64) {
 }
 
-/*
-description:
-
-	Download object to a local file
-
-input:
- 1. string representing name of object in S3 bucket
- 2. int64 representing a where in the object to start reading data
- 3. int64 representing how much data to read from the offset
- 4. os.file for the file being created and written to as data is being read from the object.
-
-output:
-
-	error
-*/
+// Download object to a local file with parameters: filename, bytes offset from start of object, bytes to include from offset, file to write to.
 func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
 
 	log.Trace("S3Client::ReadToFile : name %s, offset : %d, count %d", name, offset, count)

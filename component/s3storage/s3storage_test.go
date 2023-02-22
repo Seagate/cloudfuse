@@ -153,20 +153,7 @@ func (s *s3StorageTestSuite) SetupTest() {
 	s.setupTestHelper("", "", true)
 }
 
-/*
-description:
-
-	creates a file with bytes and uploads it to S3 and deletes it from local machine afgter upload.
-	to be called from other test functions. Hense why there is no cleanupTest() call
-
-input:
-
-	N/A
-
-output:
- 1. string of file name that was uploaded
- 2. []byte of the data that was written to the file.
-*/
+// generates a file and fills it with bytes provided by string argument and uploads it to the S3 Bucket. Returns a string for file name.
 func (s *s3StorageTestSuite) UploadFile(str string) string {
 
 	name := generateFileName()
@@ -1038,22 +1025,7 @@ func TestS3Storage(t *testing.T) {
 	suite.Run(t, new(s3StorageTestSuite))
 }
 
-/*
-description:
-
-	tests downloading full object from S3 bucket
-	does an assertion of two equal values between the follwoing:
-			1. A string of the data written to file before it was uploaded to the S3 Bucket
-			2. The data contained in the file downloaded of the object
-
-input:
-
-	N/A
-
-output:
-
-	N/A
-*/
+// uploads data from a temp file and downloads the full object and tests the correct data was received
 func (s *s3StorageTestSuite) TestFullRangedDownload() {
 	defer s.cleanupTest()
 
@@ -1092,28 +1064,7 @@ func (s *s3StorageTestSuite) TestFullRangedDownload() {
 	s.assert.EqualValues(currentData, output)
 }
 
-/*
-description:
-
-	tests handling of non zero values provided for offset and count parameters to ReadToFile()
-	does an assertion of two equal values between the follwoing:
-		1. A sub string of the data written to file before it was uploaded to the S3 Bucket
-		2. The data contained in the file downloaded from a specified range of the object
-
-	example:
-		-file uploaded with data "test data".
-		-substring of "st da" taken from the file that was uploaded
-		-download the range of data from the object into a file
-		-compare "st da" from file upload with "st da" from downloaded file.
-
-input:
-
-	N/A
-
-output:
-
-	N/A
-*/
+// uploads data from a temp file. downloads a portion/range of that data from S3 and tests the correct range was received.
 func (s *s3StorageTestSuite) TestRangedDownload() {
 	defer s.cleanupTest()
 
@@ -1152,30 +1103,7 @@ func (s *s3StorageTestSuite) TestRangedDownload() {
 
 }
 
-/*
-description:
-
-	tests handling of parameters, offset set to non zero value and count set to zero, for ReadToFile().
-	count set to zero means to read to end of object from offset.
-
-	does an assertion of two equal values between the follwoing:
-		1. A sub string of the data written to file before it was uploaded to the S3 Bucket
-		2. The data contained in the file downloaded from a specified range of the object
-
-	example:
-		-file uploaded with data "test data".
-		-substring of "t data" taken from the file that was uploaded
-		-download the range (offset to end) of data from the object into a file
-		-compare "st data" from file upload with "st data" from downloaded file.
-
-input:
-
-	N/A
-
-output:
-
-	N/A
-*/
+// uploads data from a temp file. downloads all except the first 3 bytes (based on offset) of that data from S3 and tests the correct portion was received.
 func (s *s3StorageTestSuite) TestOffsetToEndDownload() {
 	defer s.cleanupTest()
 
