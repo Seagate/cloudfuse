@@ -52,12 +52,18 @@ import (
 
 // CgofuseFS defines the file system with functions that interface with FUSE.
 type CgofuseFS struct {
+	// Implement the interface from cgofuse
 	fuse.FileSystemBase
+
+	// user identifier on linux
 	uid uint32
+
+	// group identifier on linux
 	gid uint32
 }
 
-// The flag for C.O_SYNC is 04010000 and C.__O_DIRECT is 040000
+// The flag for C.O_SYNC is 04010000 and C.__O_DIRECT is 040000 which are
+// defined here as cgofuse does not define them
 const (
 	O_SYNC   = 04010000 // nolint
 	O_DIRECT = 040000   // nolint
@@ -111,6 +117,9 @@ func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
 	stbuf.Birthtim = fuse.NewTimespec(attr.Mtime)
 }
 
+// initFuse passes the launch options for fuse and starts the mount.
+// Here are the options for FUSE.
+// LINK: https://man7.org/linux/man-pages/man8/mount.fuse3.8.html
 func (lf *Libfuse) initFuse() error {
 	log.Trace("Libfuse::initFuse : Initializing FUSE")
 
