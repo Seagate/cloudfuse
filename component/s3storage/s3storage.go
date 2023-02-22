@@ -51,8 +51,9 @@ import (
 // S3Storage Wrapper type around aws-sdk-go-v2/service/s3
 type S3Storage struct {
 	internal.BaseComponent
-	storage     S3Connection
-	stConfig    S3StorageConfig
+	storage  S3Connection
+	stConfig S3StorageConfig
+	// TODO: rip out listBlocked (and startTime, and Start()) if this is an Azure-specific quirk.
 	startTime   time.Time
 	listBlocked bool
 }

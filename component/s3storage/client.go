@@ -75,8 +75,10 @@ var _ S3Connection = &S3Client{}
 func (cl *S3Client) Configure(cfg S3StorageConfig) error {
 	cl.Config = cfg
 
+	// Set the endpoint supplied in the config file
+	// TODO: handle the case that the config does not have an endpoint (use Lyve Cloud as default)
+	// TODO: handle it when the config does not have a Region (use "us-east-1" as default)
 	endpointResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-		//if service == s3.ServiceID && region == "us-east-1" {
 		if service == s3.ServiceID {
 			return aws.Endpoint{
 				PartitionID:   "aws",
@@ -109,11 +111,15 @@ func (cl *S3Client) Configure(cfg S3StorageConfig) error {
 
 // For dynamic config update the config here
 func (cl *S3Client) UpdateConfig(cfg S3StorageConfig) error {
+	cl.Config.blockSize = cfg.blockSize
 	return nil
 }
 
 // NewCredentialKey : Update the credential key specified by the user
 func (cl *S3Client) NewCredentialKey(key, value string) (err error) {
+	// TODO: research whether and how credentials could change on the same bucket
+	// If they can, research whether we can change credentials on an existing client object
+	// 	(do we replace the credential provider?)
 	return nil
 }
 
@@ -151,11 +157,6 @@ func (cl *S3Client) ListContainers() ([]string, error) {
 	}
 
 	return cntList, nil
-}
-
-func exitErrorf(msg string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, msg+"\n", args...)
-	os.Exit(1)
 }
 
 func (cl *S3Client) SetPrefixPath(path string) error {

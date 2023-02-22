@@ -45,8 +45,10 @@ import (
 // For methods help refer : https://godoc.org/github.com/Azure/azure-storage-blob-go/azblob#ContainerURL
 type S3StorageConfig struct {
 	authConfig s3AuthConfig
-
 	prefixPath string
+	// TODO: use a fake block size to improve streaming performance
+	// 	even though S3 doesn't expose a block size
+	blockSize int64
 }
 
 type S3StorageConnection struct {

@@ -160,6 +160,8 @@ func (s *clientTestSuite) TestUpdateConfig() {
 func (s *clientTestSuite) TestNewCredentialKey() {
 }
 func (s *clientTestSuite) TestListContainers() {
+	// TODO: generalize this test by creating, listing, then destroying a bucket
+	// We need to get permissions to create buckets in Lyve Cloud, or implement this against AWS S3.
 	containers, err := s.s3Client.ListContainers()
 	s.assert.Nil(err)
 	s.assert.Equal(containers, []string{"stxe1-srg-lens-lab1"})
