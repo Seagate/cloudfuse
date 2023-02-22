@@ -1022,7 +1022,7 @@ output:
  1. string of file name that was uploaded
  2. []byte of the data that was written to the file.
 */
-func (s *s3StorageTestSuite) UploadFile() (string, []byte) {
+func (s *s3StorageTestSuite) UploadFile() string {
 
 	// Setup
 	name := generateFileName()
@@ -1037,7 +1037,7 @@ func (s *s3StorageTestSuite) UploadFile() (string, []byte) {
 	err := s.s3.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: file})
 	s.assert.Nil(err)
 
-	return name, data
+	return name
 
 }
 
@@ -1061,21 +1061,28 @@ func (s *s3StorageTestSuite) TestFullRangedDownload() {
 	defer s.cleanupTest()
 
 	//create and upload file to S3 for download testing
-	name, data := s.UploadFile()
+	name := s.UploadFile()
 
 	//create empty file for object download to write into
-	file, err := os.Create("testDownload")
-	s.assert.Nil(err)
+	file, _ := ioutil.TempFile("", generateFileName()+".tmp")
+	defer os.Remove(file.Name())
 
 	//download to testDownload file
-	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 0, Count: 0, File: file})
+	err := s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 0, Count: 0, File: file})
 	s.assert.Nil(err)
 
-	//reading downloaded file to compare with original data string slice.
-	dat, err := os.ReadFile(file.Name())
+	//create byte array of characters that are identical to what we should have downloaded
+	currentData := []byte("test data")
+	dataLen := len(currentData)
+	output := make([]byte, dataLen) //empty byte array of that only holds 5 chars
+	file, _ = os.Open(file.Name())
+
+	//downloaded data in file is being read and dumped into the byte array.
+	len, err := file.Read(output)
+
 	s.assert.Nil(err)
-	dataString := string(data)
-	s.assert.EqualValues(string(dat), dataString)
+	s.assert.EqualValues(dataLen, len)
+	s.assert.EqualValues(currentData, output)
 }
 
 /*
@@ -1104,22 +1111,28 @@ func (s *s3StorageTestSuite) TestRangedDownload() {
 	defer s.cleanupTest()
 
 	//create and upload file to S3 for download testing
-	name, data := s.UploadFile()
+	name := s.UploadFile()
 
 	//create empty file for object download to write into
-	file, err := os.Create("testDownload")
-	s.assert.Nil(err)
+	file, _ := ioutil.TempFile("", generateFileName()+".tmp")
+	defer os.Remove(file.Name())
 
 	//download to testDownload file
-	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 2, Count: 5, File: file})
+	err := s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 2, Count: 5, File: file})
 	s.assert.Nil(err)
+	//create byte array of characters that are identical to what we should have downloaded
+	currentData := []byte("st da")
+	dataLen := len(currentData)
+	output := make([]byte, dataLen) //empty byte array of that only holds 5 chars
+	file, _ = os.Open(file.Name())
 
-	//reading downloaded file to compare with original data string slice.
-	dat, err := os.ReadFile(file.Name())
+	//downloaded data in file is being read and dumped into the byte array.
+	len, err := file.Read(output)
+
 	s.assert.Nil(err)
-	dataString := string(data)
-	dataSlice := dataString[2:8]
-	s.assert.EqualValues(string(dat), dataSlice)
+	s.assert.EqualValues(dataLen, len)
+	s.assert.EqualValues(currentData, output)
+
 }
 
 /*
@@ -1134,7 +1147,7 @@ description:
 
 	example:
 		-file uploaded with data "test data".
-		-substring of "st data" taken from the file that was uploaded
+		-substring of "t data" taken from the file that was uploaded
 		-download the range (offset to end) of data from the object into a file
 		-compare "st data" from file upload with "st data" from downloaded file.
 
@@ -1150,20 +1163,27 @@ func (s *s3StorageTestSuite) TestOffsetToEndDownload() {
 	defer s.cleanupTest()
 
 	//create and upload file to S3 for download testing
-	name, data := s.UploadFile()
+	name := s.UploadFile()
 
 	//create empty file for object download to write into
-	file, err := os.Create("testDownload")
-	s.assert.Nil(err)
+	file, _ := ioutil.TempFile("", generateFileName()+".tmp")
+	defer os.Remove(file.Name())
 
 	//download to testDownload file
-	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 3, Count: 0, File: file})
+	err := s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 3, Count: 0, File: file})
 	s.assert.Nil(err)
 
-	//reading downloaded file to compare with original data string slice.
-	dat, err := os.ReadFile(file.Name())
+	//create byte array of characters that are identical to what we should have downloaded
+	currentData := []byte("t data")
+	dataLen := len(currentData)
+	output := make([]byte, dataLen) //empty byte array of that only holds 5 chars
+	file, _ = os.Open(file.Name())
+
+	//downloaded data in file is being read and dumped into the byte array.
+	len, err := file.Read(output)
+
 	s.assert.Nil(err)
-	dataString := string(data)
-	dataSlice := dataString[3:]
-	s.assert.EqualValues(string(dat), dataSlice)
+	s.assert.EqualValues(dataLen, len)
+	s.assert.EqualValues(currentData, output)
+
 }
