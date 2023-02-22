@@ -12,7 +12,7 @@ if [ $exit_code -ne 0 ]; then
     exit $exit_code
 fi
 
-source ./helper/env_variables.sh
+source ./helper/env_var.sh
 exit_code=$?
 if [ $exit_code -ne 0 ]; then
     echo "command failed with exit code ${exit_code}"
