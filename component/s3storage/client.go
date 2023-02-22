@@ -543,11 +543,9 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 
 	//set up string (rangeString) to be used in the GetObject() call for S3 download
 	//TODO: add handle if the offset+count is greater than the end of Object.
-	if offset == 0 && count == 0 {
-		rangeString = "bytes=0-"
-	} else if offset != 0 && count == 0 {
+	if count == 0 {
 		rangeString = "bytes=" + fmt.Sprint(offset) + "-"
-	} else if offset != 0 && count != 0 {
+	} else {
 		endRange := offset + count
 		rangeString = "bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)
 	}
