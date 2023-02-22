@@ -167,13 +167,11 @@ output:
  1. string of file name that was uploaded
  2. []byte of the data that was written to the file.
 */
-func (s *s3StorageTestSuite) UploadFile() string {
+func (s *s3StorageTestSuite) UploadFile(str string) string {
 
-	// Setup
 	name := generateFileName()
 	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
-	testData := "test data"
-	data := []byte(testData)
+	data := []byte(str)
 	homeDir, _ := os.UserHomeDir()
 	file, _ := ioutil.TempFile(homeDir, name+".tmp")
 	defer os.Remove(file.Name())
@@ -1059,15 +1057,25 @@ output:
 func (s *s3StorageTestSuite) TestFullRangedDownload() {
 	defer s.cleanupTest()
 
-	//create and upload file to S3 for download testing
-	name := s.UploadFile()
+	//create a temp file containing "test data"
+	name := generateFileName()
+	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
+	data := []byte("test data")
+	homeDir, _ := os.UserHomeDir()
+	uploadfile, _ := ioutil.TempFile(homeDir, name+".tmp")
+	defer os.Remove(uploadfile.Name())
+	uploadfile.Write(data)
+
+	// upload the temp file
+	err := s.s3.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: uploadfile})
+	s.assert.Nil(err)
 
 	//create empty file for object download to write into
 	file, _ := ioutil.TempFile("", generateFileName()+".tmp")
 	defer os.Remove(file.Name())
 
 	//download to testDownload file
-	err := s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 0, Count: 0, File: file})
+	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 0, Count: 0, File: file})
 	s.assert.Nil(err)
 
 	//create byte array of characters that are identical to what we should have downloaded
@@ -1109,15 +1117,25 @@ output:
 func (s *s3StorageTestSuite) TestRangedDownload() {
 	defer s.cleanupTest()
 
-	//create and upload file to S3 for download testing
-	name := s.UploadFile()
+	//create a temp file containing "test data"
+	name := generateFileName()
+	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
+	data := []byte("test data")
+	homeDir, _ := os.UserHomeDir()
+	uploadfile, _ := ioutil.TempFile(homeDir, name+".tmp")
+	defer os.Remove(uploadfile.Name())
+	uploadfile.Write(data)
+
+	// upload the temp file
+	err := s.s3.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: uploadfile})
+	s.assert.Nil(err)
 
 	//create empty file for object download to write into
 	file, _ := ioutil.TempFile("", generateFileName()+".tmp")
 	defer os.Remove(file.Name())
 
-	//download to testDownload file
-	err := s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 2, Count: 5, File: file})
+	//download portion of object to file
+	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 2, Count: 5, File: file})
 	s.assert.Nil(err)
 	//create byte array of characters that are identical to what we should have downloaded
 	currentData := []byte("st da")
@@ -1161,15 +1179,25 @@ output:
 func (s *s3StorageTestSuite) TestOffsetToEndDownload() {
 	defer s.cleanupTest()
 
-	//create and upload file to S3 for download testing
-	name := s.UploadFile()
+	//create a temp file containing "test data"
+	name := generateFileName()
+	s.s3.CreateFile(internal.CreateFileOptions{Name: name})
+	data := []byte("test data")
+	homeDir, _ := os.UserHomeDir()
+	uploadfile, _ := ioutil.TempFile(homeDir, name+".tmp")
+	defer os.Remove(uploadfile.Name())
+	uploadfile.Write(data)
+
+	// upload the temp file
+	err := s.s3.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: uploadfile})
+	s.assert.Nil(err)
 
 	//create empty file for object download to write into
 	file, _ := ioutil.TempFile("", generateFileName()+".tmp")
 	defer os.Remove(file.Name())
 
 	//download to testDownload file
-	err := s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 3, Count: 0, File: file})
+	err = s.s3.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 3, Count: 0, File: file})
 	s.assert.Nil(err)
 
 	//create byte array of characters that are identical to what we should have downloaded
