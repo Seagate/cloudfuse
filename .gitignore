@@ -23,3 +23,4 @@ bfusemon
 gui/__pycache__/
 gui/pyside6/__pycache__/
 lyvecloudfuse-logs.txt
+ui*.py
