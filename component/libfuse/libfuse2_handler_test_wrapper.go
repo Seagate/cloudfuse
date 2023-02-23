@@ -255,20 +255,6 @@ func testOpen(suite *libfuseTestSuite) {
 	suite.assert.Equal(0, err)
 }
 
-func testOpenSyncDirectFlag(suite *libfuseTestSuite) {
-	defer suite.cleanupTest()
-	name := "path"
-	path := "/" + name
-	mode := fs.FileMode(fuseFS.filePermission)
-	flags := fuse.O_RDWR
-	infoFlags := fuse.O_RDWR | O_SYNC | O_DIRECT
-	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
-	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, nil)
-
-	err, _ := cfuseFS.Open(path, infoFlags)
-	suite.assert.Equal(0, err)
-}
-
 // fuse2 does not have writeback caching, so append flag is passed unchanged
 func testOpenAppendFlagDefault(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
