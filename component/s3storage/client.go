@@ -820,7 +820,7 @@ func (cl *S3Client) WriteFromFile(name string, metadata map[string]string, fi *o
 	// }
 
 	if err != nil {
-		log.Err("S3Client::WriteFromFile : Failed to upload blob %s [%s]", name, err.Error())
+		log.Err("S3Client::WriteFromFile : Failed to upload object %s [%s]", name, err.Error())
 		return err
 	} else {
 		log.Debug("S3Client::WriteFromFile : Upload complete of object %v", name)
@@ -834,7 +834,7 @@ func (cl *S3Client) WriteFromFile(name string, metadata map[string]string, fi *o
 	return nil
 }
 
-// WriteFromBuffer : Upload from a buffer to a blob
+// WriteFromBuffer : Upload from a buffer to a object
 func (cl *S3Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) (err error) {
 	largeBuffer := bytes.NewReader(data)
 	// TODO: Move this variable into the config file
@@ -894,7 +894,7 @@ func (cl *S3Client) TruncateFile(name string, size int64) error {
 	return nil
 }
 
-// Write : write data at given offset to a blob
+// Write : write data at given offset to a object
 func (cl *S3Client) Write(options internal.WriteFileOptions) error {
 	name := options.Handle.Path
 	offset := options.Offset
@@ -935,7 +935,7 @@ func (cl *S3Client) Write(options internal.WriteFileOptions) error {
 	// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple blocks
 	err := cl.WriteFromBuffer(name, options.Metadata, *dataBuffer)
 	if err != nil {
-		log.Err("S3Client::Write : Failed to upload to blob %s ", name, err.Error())
+		log.Err("S3Client::Write : Failed to upload to object %s ", name, err.Error())
 		return err
 	}
 	return nil
@@ -950,12 +950,12 @@ func (cl *S3Client) StageAndCommit(name string, bol *common.BlockOffsetList) err
 	return nil
 }
 
-// ChangeMod : Change mode of a blob
+// ChangeMod : Change mode of a object
 func (cl *S3Client) ChangeMod(name string, _ os.FileMode) error {
 	return nil
 }
 
-// ChangeOwner : Change owner of a blob
+// ChangeOwner : Change owner of a object
 func (cl *S3Client) ChangeOwner(name string, _ int, _ int) error {
 	return nil
 }
