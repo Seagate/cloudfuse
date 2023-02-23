@@ -255,7 +255,6 @@ func testOpen(suite *libfuseTestSuite) {
 	suite.assert.Equal(0, err)
 }
 
-// TODO: Fix test to work with cgofuse
 func testOpenSyncDirectFlag(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
@@ -496,7 +495,6 @@ func testReadLinkError(suite *libfuseTestSuite) {
 	suite.assert.NotEqual("target", target)
 }
 
-// TODO: Fix tests to work with cgofuse
 func testFsync(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
