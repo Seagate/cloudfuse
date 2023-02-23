@@ -1,169 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>FCL_simpleSettings</class>
- <widget class="QWidget" name="FCL_simpleSettings">
+ <class>StAz_simpleSettings</class>
+ <widget class="QWidget" name="StAz_simpleSettings">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>460</width>
-    <height>320</height>
+    <width>634</width>
+    <height>471</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
-   <item row="4" column="2">
-    <widget class="QPushButton" name="resetDefautSettings">
-     <property name="text">
-      <string>Reset Default Settings</string>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="2">
-    <layout class="QHBoxLayout" name="horizontalLayout_2">
-     <item>
-      <widget class="QLabel" name="label_3">
-       <property name="text">
-        <string>Permissions</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QComboBox" name="libfuse_permissions_select">
-       <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Default permissions to be presented for block blobs&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-       </property>
-       <item>
-        <property name="text">
-         <string>0777</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>0666</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>0644</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>0444</string>
-        </property>
-       </item>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="0" column="0">
-    <layout class="QHBoxLayout" name="horizontalLayout_5">
-     <item>
-      <widget class="QLabel" name="label_11">
-       <property name="text">
-        <string>File level caching</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QComboBox" name="streaming_fileCachingLevel_select">
-       <item>
-        <property name="text">
-         <string>Handle level</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>File level</string>
-        </property>
-       </item>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="4" column="0">
-    <widget class="QToolButton" name="advanced_settings">
-     <property name="text">
-      <string>Advanced settings</string>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="2">
-    <layout class="QHBoxLayout" name="horizontalLayout_4">
-     <item>
-      <layout class="QVBoxLayout" name="verticalLayout">
-       <item>
-        <widget class="QLabel" name="label_4">
-         <property name="text">
-          <string>Attribute expiration (s)</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="label_5">
-         <property name="text">
-          <string>Entry expiration (s)</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="label_6">
-         <property name="text">
-          <string>negative entry exp (s)</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <layout class="QVBoxLayout" name="verticalLayout_2">
-       <item>
-        <widget class="QLineEdit" name="libfuse_attExp_input">
-         <property name="maximumSize">
-          <size>
-           <width>30</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>120</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="libfuse_entExp_input">
-         <property name="maximumSize">
-          <size>
-           <width>30</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>120</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="libfuse_negEntryExp_input">
-         <property name="maximumSize">
-          <size>
-           <width>30</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>120</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-    </layout>
-   </item>
-   <item row="3" column="2">
+   <item row="2" column="1">
     <layout class="QHBoxLayout" name="horizontalLayout_3">
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_4">
@@ -244,7 +95,156 @@
      </item>
     </layout>
    </item>
-   <item row="2" column="0" rowspan="2">
+   <item row="2" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_5">
+     <item>
+      <widget class="QLabel" name="label_11">
+       <property name="text">
+        <string>File level caching</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="streaming_fileCachingLevel_select">
+       <item>
+        <property name="text">
+         <string>Handle level</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>File level</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="4" column="0">
+    <widget class="QToolButton" name="advanced_settings">
+     <property name="text">
+      <string>Advanced settings</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <layout class="QHBoxLayout" name="horizontalLayout_4">
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <widget class="QLabel" name="label_4">
+         <property name="text">
+          <string>Attribute expiration (s)</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_5">
+         <property name="text">
+          <string>Entry expiration (s)</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_6">
+         <property name="text">
+          <string>negative entry exp (s)</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <widget class="QLineEdit" name="libfuse_attExp_input">
+         <property name="maximumSize">
+          <size>
+           <width>30</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>120</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="libfuse_entExp_input">
+         <property name="maximumSize">
+          <size>
+           <width>30</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>120</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="libfuse_negEntryExp_input">
+         <property name="maximumSize">
+          <size>
+           <width>30</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>120</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+   <item row="1" column="2">
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <widget class="QLabel" name="label_3">
+       <property name="text">
+        <string>Permissions</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="libfuse_permissions_select">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Default permissions to be presented for block blobs&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <item>
+        <property name="text">
+         <string>0777</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>0666</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>0644</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>0444</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="4" column="1">
+    <widget class="QPushButton" name="resetDefautSettings">
+     <property name="text">
+      <string>Reset Default Settings</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0">
     <layout class="QVBoxLayout" name="verticalLayout_10" stretch="0,0,0,0,0">
      <property name="spacing">
       <number>6</number>
@@ -295,6 +295,100 @@
         <bool>true</bool>
        </property>
       </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="0" column="0" colspan="3">
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_3">
+       <item>
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>Storage Type</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_7">
+         <property name="text">
+          <string>Account name</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_12">
+         <property name="text">
+          <string>Container</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_20">
+         <property name="text">
+          <string>Endpoint</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_21">
+         <property name="text">
+          <string>Mode</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_6">
+       <item>
+        <widget class="QComboBox" name="azTypesettings_select">
+         <item>
+          <property name="text">
+           <string>block</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>adls</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="azAccountName_input"/>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="azContainer_input"/>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="azEndpoint_input"/>
+       </item>
+       <item>
+        <widget class="QComboBox" name="azModesettings_select">
+         <item>
+          <property name="text">
+           <string>key</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>sas</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>spn</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>msi</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+      </layout>
      </item>
     </layout>
    </item>
