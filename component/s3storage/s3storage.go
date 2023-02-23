@@ -145,7 +145,7 @@ func (s3 *S3Storage) Start(ctx context.Context) error {
 	s3.startTime = time.Now()
 	s3.listBlocked = true
 
-	// create stats collector for azstorage
+	// create stats collector for s3storage
 	s3StatsCollector = stats_manager.NewStatsCollector(s3.Name())
 
 	return nil

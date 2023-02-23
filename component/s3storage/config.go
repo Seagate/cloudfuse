@@ -198,23 +198,6 @@ func formatEndpointProtocol(endpoint string, http bool) string {
 	return correctedEndpoint
 }
 
-// formatEndpointAccountType : format the endpoint to match the account type
-func formatEndpointAccountType(endpoint string, account AccountType) string {
-	// TODO : Modify this method when file share support is merged
-	correctedEndpoint := endpoint
-	if strings.Contains(correctedEndpoint, ".blob.") {
-		if account == EAccountType.ADLS() {
-			correctedEndpoint = strings.Replace(correctedEndpoint, ".blob.", ".dfs.", 1)
-		}
-	} else if strings.Contains(correctedEndpoint, ".dfs.") {
-		if account == EAccountType.BLOCK() {
-			correctedEndpoint = strings.Replace(correctedEndpoint, ".dfs.", ".blob.", 1)
-		}
-	}
-
-	return correctedEndpoint
-}
-
 // ParseAndValidateConfig : Parse and validate config
 func ParseAndValidateConfig(s3 *S3Storage, opt S3StorageOptions) error {
 	log.Trace("ParseAndValidateConfig : Parsing config")
