@@ -702,23 +702,23 @@ func (s *s3StorageTestSuite) TestStreamDirSmallCountNoDuplicates() {
 
 	var iteration int = 0
 	var marker string = ""
-	blobList := make([]*internal.ObjAttr, 0)
+	objectList := make([]*internal.ObjAttr, 0)
 
 	for {
 		new_list, new_marker, err := s.s3.StreamDir(internal.StreamDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/", Token: marker, Count: 1})
 		fmt.Println(err)
 		s.assert.Nil(err)
-		blobList = append(blobList, new_list...)
+		objectList = append(objectList, new_list...)
 		marker = new_marker
 		iteration++
 
-		log.Debug("s3StorageTestSuite::TestStreamDirSmallCountNoDuplicates : So far retrieved %d objects in %d iterations", len(blobList), iteration)
+		log.Debug("s3StorageTestSuite::TestStreamDirSmallCountNoDuplicates : So far retrieved %d objects in %d iterations", len(objectList), iteration)
 		if new_marker == "" {
 			break
 		}
 	}
 
-	s.assert.EqualValues(5, len(blobList))
+	s.assert.EqualValues(5, len(objectList))
 }
 
 func (s *s3StorageTestSuite) TestRenameFile() {

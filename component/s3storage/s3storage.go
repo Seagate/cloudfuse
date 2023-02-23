@@ -218,7 +218,7 @@ func (s3 *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 
 func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
 	log.Trace("S3Storage::ReadDir : %s", options.Name)
-	blobList := make([]*internal.ObjAttr, 0)
+	objectList := make([]*internal.ObjAttr, 0)
 
 	// if s3.listBlocked {
 	// 	diff := time.Since(s3.startTime)
@@ -227,7 +227,7 @@ func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 	// 		log.Info("S3Storage::ReadDir : Unblocked List API")
 	// 	} else {
 	// 		log.Info("S3Storage::ReadDir : Blocked List API for %d more seconds", int(s3.stConfig.cancelListForSeconds)-int(diff.Seconds()))
-	// 		return blobList, nil
+	// 		return objectList, nil
 	// 	}
 	// }
 
@@ -238,19 +238,19 @@ func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 		new_list, new_marker, err := s3.storage.List(path, marker, common.MaxDirListCount)
 		if err != nil {
 			log.Err("S3Storage::ReadDir : Failed to read dir [%s]", err)
-			return blobList, err
+			return objectList, err
 		}
-		blobList = append(blobList, new_list...)
+		objectList = append(objectList, new_list...)
 		marker = new_marker
 		iteration++
 
-		log.Debug("S3Storage::ReadDir : So far retrieved %d objects in %d iterations", len(blobList), iteration)
+		log.Debug("S3Storage::ReadDir : So far retrieved %d objects in %d iterations", len(objectList), iteration)
 		if new_marker == nil || *new_marker == "" {
 			break
 		}
 	}
 
-	return blobList, nil
+	return objectList, nil
 }
 
 func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
