@@ -62,13 +62,6 @@ type CgofuseFS struct {
 	gid uint32
 }
 
-// The flag for C.O_SYNC is 04010000 and C.__O_DIRECT is 040000 which are
-// defined here as cgofuse does not define them
-const (
-	O_SYNC   = 04010000 // nolint
-	O_DIRECT = 040000   // nolint
-)
-
 // Note: libfuse prepends "/" to the path.
 // TODO: Not sure if this is needed for cgofuse, will need to check
 // trimFusePath trims the first character from the path provided by libfuse
@@ -418,20 +411,6 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse:: Open : %s", name)
-	// TODO: Should this sit behind a user option? What if we change something to support these in the future?
-	// Mask out SYNC and DIRECT flags since write operation will fail
-
-	// Don't think we need to handle this as these flags aren't available in cgofuse
-	// but let's try to anyway.
-	if flags&O_SYNC != 0 || flags&O_DIRECT != 0 {
-		log.Err("Libfuse::libfuse_open : Reset flags for open %s, fi.flags %X", name, flags)
-		// Blobfuse2 does not support the SYNC or DIRECT flag. If a user application passes this flag on to blobfuse2
-		// and we open the file with this flag, subsequent write operations wlil fail with "Invalid argument" error.
-		// Mask them out here in the open call so that write works.
-		// Oracle RMAN is one such application that sends these flags during backup
-		flags = flags &^ O_SYNC
-		flags = flags &^ O_DIRECT
-	}
 
 	handle, err := fuseFS.NextComponent().OpenFile(
 		internal.OpenFileOptions{
