@@ -163,7 +163,7 @@ type Block struct {
 }
 
 // Statfs type used by component in replace of syscall.Statfs_t
-// as defined by cgofuse https://pkg.go.dev/syscall#Statfs_t
+// as defined by cgofuse https://pkg.go.dev/github.com/winfsp/cgofuse/fuse#Statfs_t
 type Statfs_t struct {
 	Bsize   int64
 	Blocks  uint64
