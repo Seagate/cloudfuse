@@ -497,7 +497,7 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 	s.assert.Nil(err)
 	s.assert.EqualValues(len(data), count)
 
-	// Blob should have updated data
+	// Object should have updated data
 	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
 		Key:    aws.String(name),
@@ -692,13 +692,13 @@ func (s *s3StorageTestSuite) TestReadDir() {
 func (s *s3StorageTestSuite) TestStreamDirSmallCountNoDuplicates() {
 	defer s.cleanupTest()
 	// Setup
-	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/blob1.txt"})
-	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/blob2.txt"})
-	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newblob1.txt"})
-	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newblob2.txt"})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/object1.txt"})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/object2.txt"})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newobject1.txt"})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newobject2.txt"})
 	s.s3.CreateDir(internal.CreateDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder"})
-	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder/newblobA.txt"})
-	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder/newblobB.txt"})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder/newobjectA.txt"})
+	s.s3.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myfolder/newobjectB.txt"})
 
 	var iteration int = 0
 	var marker string = ""
