@@ -76,40 +76,6 @@ func trimFusePath(path string) string {
 	return path
 }
 
-func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
-	stbuf.Uid = lf.ownerUID
-	stbuf.Gid = lf.ownerGID
-	stbuf.Nlink = 1
-	stbuf.Size = attr.Size
-
-	// Populate mode
-	// Backing storage implementation has support for mode.
-	if !attr.IsModeDefault() {
-		stbuf.Mode = uint32(attr.Mode) & 0xffffffff
-	} else {
-		if attr.IsDir() {
-			stbuf.Mode = uint32(lf.dirPermission) & 0xffffffff
-		} else {
-			stbuf.Mode = uint32(lf.filePermission) & 0xffffffff
-		}
-	}
-
-	if attr.IsDir() {
-		stbuf.Nlink = 2
-		stbuf.Size = 4096
-		stbuf.Mode |= fuse.S_IFDIR
-	} else if attr.IsSymlink() {
-		stbuf.Mode |= fuse.S_IFLNK
-	} else {
-		stbuf.Mode |= fuse.S_IFREG
-	}
-
-	stbuf.Atim = fuse.NewTimespec(attr.Atime)
-	stbuf.Ctim = fuse.NewTimespec(attr.Ctime)
-	stbuf.Mtim = fuse.NewTimespec(attr.Mtime)
-	stbuf.Birthtim = fuse.NewTimespec(attr.Mtime)
-}
-
 // initFuse passes the launch options for fuse and starts the mount.
 // Here are the options for FUSE.
 // LINK: https://man7.org/linux/man-pages/man8/mount.fuse3.8.html
@@ -161,6 +127,40 @@ func (lf *Libfuse) destroyFuse() error {
 	log.Trace("Libfuse::destroyFuse : Destroying FUSE")
 	lf.host.Unmount()
 	return nil
+}
+
+func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
+	stbuf.Uid = lf.ownerUID
+	stbuf.Gid = lf.ownerGID
+	stbuf.Nlink = 1
+	stbuf.Size = attr.Size
+
+	// Populate mode
+	// Backing storage implementation has support for mode.
+	if !attr.IsModeDefault() {
+		stbuf.Mode = uint32(attr.Mode) & 0xffffffff
+	} else {
+		if attr.IsDir() {
+			stbuf.Mode = uint32(lf.dirPermission) & 0xffffffff
+		} else {
+			stbuf.Mode = uint32(lf.filePermission) & 0xffffffff
+		}
+	}
+
+	if attr.IsDir() {
+		stbuf.Nlink = 2
+		stbuf.Size = 4096
+		stbuf.Mode |= fuse.S_IFDIR
+	} else if attr.IsSymlink() {
+		stbuf.Mode |= fuse.S_IFLNK
+	} else {
+		stbuf.Mode |= fuse.S_IFREG
+	}
+
+	stbuf.Atim = fuse.NewTimespec(attr.Atime)
+	stbuf.Ctim = fuse.NewTimespec(attr.Ctime)
+	stbuf.Mtim = fuse.NewTimespec(attr.Mtime)
+	stbuf.Birthtim = fuse.NewTimespec(attr.Mtime)
 }
 
 // NewcgofuseFS creates a new empty fuse filesystem.
