@@ -88,28 +88,33 @@ func (lf *Libfuse) initFuse() error {
 
 	lf.host = fuse.NewFileSystemHost(cf)
 
-	opts := []string{}
-	opts = append(opts, "-o", fmt.Sprintf("uid=%d", lf.ownerUID))
-	opts = append(opts, "-o", fmt.Sprintf("gid=%d", lf.ownerGID))
-	opts = append(opts, "-o", fmt.Sprintf("attr_timeout=%d", lf.attributeExpiration))
-	opts = append(opts, "-o", fmt.Sprintf("entry_timeout=%d", lf.entryExpiration))
-	opts = append(opts, "-o", fmt.Sprintf("negative_timeout=%d", lf.negativeTimeout))
+	options := fmt.Sprintf("uid=%d,gid=%d,entry_timeout=%d,attr_timeout=%d,negative_timeout=%d",
+		lf.ownerUID,
+		lf.ownerGID,
+		lf.entryExpiration,
+		lf.attributeExpiration,
+		lf.negativeTimeout)
 
 	// While reading a file let kernel do readahed for better perf
-	opts = append(opts, "-o", fmt.Sprintf("max_readahead=%d", 4*1024*1024))
+	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)
 
 	// Max background thread on the fuse layer for high parallelism
-	opts = append(opts, "-o", fmt.Sprintf("max_background=%d", 128))
+	options += fmt.Sprintf(",max_background=%d", 128)
 
 	if lf.allowOther {
-		opts = append(opts, "-o", "allow_other")
+		options += ",allow_other"
 	}
 	if lf.readOnly {
-		opts = append(opts, "-o", "ro")
+		options += ",ro"
 	}
 	if lf.nonEmptyMount {
-		opts = append(opts, "-o", "nonempty")
+		options += ",nonempty"
 	}
+
+	// Setup options as a slice
+	opts := []string{"-o", options}
+
+	// Enabling trace is done by using -d rather than setting an option in fuse
 	if lf.traceEnable {
 		opts = append(opts, "-d")
 	}
