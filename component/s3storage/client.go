@@ -64,15 +64,15 @@ const (
 	retryCount = 5
 )
 
-type S3Client struct {
+type Client struct {
 	S3StorageConnection
 	Client *s3.Client
 }
 
 // Verify that S3Client implements S3Connection interface
-var _ S3Connection = &S3Client{}
+var _ S3Connection = &Client{}
 
-func (cl *S3Client) Configure(cfg S3StorageConfig) error {
+func (cl *Client) Configure(cfg S3StorageConfig) error {
 	cl.Config = cfg
 
 	// Set the endpoint supplied in the config file
@@ -110,20 +110,20 @@ func (cl *S3Client) Configure(cfg S3StorageConfig) error {
 }
 
 // For dynamic config update the config here
-func (cl *S3Client) UpdateConfig(cfg S3StorageConfig) error {
+func (cl *Client) UpdateConfig(cfg S3StorageConfig) error {
 	cl.Config.blockSize = cfg.blockSize
 	return nil
 }
 
 // NewCredentialKey : Update the credential key specified by the user
-func (cl *S3Client) NewCredentialKey(key, value string) (err error) {
+func (cl *Client) NewCredentialKey(key, value string) (err error) {
 	// TODO: research whether and how credentials could change on the same bucket
 	// If they can, research whether we can change credentials on an existing client object
 	// 	(do we replace the credential provider?)
 	return nil
 }
 
-func (cl *S3Client) ListContainers() ([]string, error) {
+func (cl *Client) ListContainers() ([]string, error) {
 	log.Trace("S3Client::ListContainers : Listing containers")
 
 	cntList := make([]string, 0)
@@ -159,21 +159,26 @@ func (cl *S3Client) ListContainers() ([]string, error) {
 	return cntList, nil
 }
 
-func (cl *S3Client) SetPrefixPath(path string) error {
+func exitErrorf(msg string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, msg+"\n", args...)
+	os.Exit(1)
+}
+
+func (cl *Client) SetPrefixPath(path string) error {
 	log.Trace("S3Client::SetPrefixPath : path %s", path)
 	cl.Config.prefixPath = path
 	return nil
 }
 
 // CreateFile : Create a new file in the container/virtual directory
-func (cl *S3Client) CreateFile(name string, mode os.FileMode) error {
+func (cl *Client) CreateFile(name string, mode os.FileMode) error {
 	log.Trace("S3Client::CreateFile : name %s", name)
 	var data []byte
 	return cl.WriteFromBuffer(name, nil, data)
 }
 
 // CreateDirectory : Create a new directory in the container/virtual directory
-func (cl *S3Client) CreateDirectory(name string) error {
+func (cl *Client) CreateDirectory(name string) error {
 	log.Trace("S3Client::CreateDirectory : name %s", name)
 
 	// Lyve Cloud does not support creating an empty file to indicate a directory
@@ -182,7 +187,7 @@ func (cl *S3Client) CreateDirectory(name string) error {
 }
 
 // CreateLink : Create a symlink in the container/virtual directory
-func (cl *S3Client) CreateLink(source string, target string) error {
+func (cl *Client) CreateLink(source string, target string) error {
 	log.Trace("S3Client::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
 	metadata := make(map[string]string)
@@ -191,7 +196,7 @@ func (cl *S3Client) CreateLink(source string, target string) error {
 }
 
 // DeleteFile : Delete an object
-func (cl *S3Client) DeleteFile(name string) (err error) {
+func (cl *Client) DeleteFile(name string) (err error) {
 
 	log.Trace("S3Client::DeleteFile : name %s", name)
 	var apiErr smithy.APIError
@@ -234,12 +239,12 @@ func (cl *S3Client) DeleteFile(name string) (err error) {
 }
 
 // DeleteDirectory : Delete a virtual directory in the container/virtual directory
-func (cl *S3Client) DeleteDirectory(name string) (err error) {
+func (cl *Client) DeleteDirectory(name string) (err error) {
 	return err
 }
 
 // RenameFile : Rename the file
-func (cl *S3Client) RenameFile(source string, target string) (err error) {
+func (cl *Client) RenameFile(source string, target string) (err error) {
 	log.Trace("S3Client::RenameFile : %s -> %s", source, target)
 
 	var apiErr smithy.APIError
@@ -308,20 +313,20 @@ func (cl *S3Client) RenameFile(source string, target string) (err error) {
 }
 
 // RenameDirectory : Rename the directory
-func (cl *S3Client) RenameDirectory(source string, target string) error {
+func (cl *Client) RenameDirectory(source string, target string) error {
 	return nil
 }
 
-func (cl *S3Client) getAttrUsingRest(name string) (attr *internal.ObjAttr, err error) {
+func (cl *Client) getAttrUsingRest(name string) (attr *internal.ObjAttr, err error) {
 	return nil, err
 }
 
-func (cl *S3Client) getAttrUsingList(name string) (attr *internal.ObjAttr, err error) {
+func (cl *Client) getAttrUsingList(name string) (attr *internal.ObjAttr, err error) {
 	return nil, err
 }
 
 // GetAttr : Retrieve attributes of the object
-func (cl *S3Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
+func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	log.Trace("S3Client::GetAttr : name %s", name)
 
 	var marker *string = nil
@@ -358,7 +363,7 @@ func (cl *S3Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 // List : Get a list of objects matching the given prefix
 // This fetches the list using a marker so the caller code should handle marker logic
 // If count=0 - fetch max entries
-func (cl *S3Client) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
+func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
 	log.Trace("S3Client::List : prefix %s, marker %s", prefix, func(marker *string) string {
 		if marker != nil {
 			return *marker
@@ -529,7 +534,7 @@ func trackDownload(name string, bytesTransferred int64, count int64, downloadPtr
 }
 
 // Download object to a local file with parameters: filename, bytes offset from start of object, bytes to include from offset, file to write to.
-func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
+func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
 
 	log.Trace("S3Client::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
 	// var downloadPtr *int64 = new(int64)
@@ -603,7 +608,7 @@ func (cl *S3Client) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 }
 
 // ReadBuffer : Download a specific range from an object to a buffer
-func (cl *S3Client) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
+func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
 	log.Trace("S3Client::ReadBuffer : name %s", name)
 	var buff []byte
 
@@ -670,7 +675,7 @@ func (cl *S3Client) ReadBuffer(name string, offset int64, len int64) ([]byte, er
 }
 
 // ReadInBuffer : Download specific range from a file to a user provided buffer
-func (cl *S3Client) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
+func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
 	log.Trace("S3Client::ReadInBuffer : name %s", name)
 
 	var err error
@@ -731,7 +736,7 @@ func (cl *S3Client) ReadInBuffer(name string, offset int64, len int64, data []by
 	return nil
 }
 
-func (cl *S3Client) calculateBlockSize(name string, fileSize int64) (blockSize int64, err error) {
+func (cl *Client) calculateBlockSize(name string, fileSize int64) (blockSize int64, err error) {
 	return 0, nil
 }
 
@@ -740,7 +745,7 @@ func trackUpload(name string, bytesTransferred int64, count int64, uploadPtr *in
 }
 
 // WriteFromFile : Upload local file to object
-func (cl *S3Client) WriteFromFile(name string, metadata map[string]string, fi *os.File) (err error) {
+func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.File) (err error) {
 	log.Trace("S3Client::WriteFromFile : name %s", name)
 	//defer exectime.StatTimeCurrentBlock("WriteFromFile::WriteFromFile")()
 
@@ -835,7 +840,7 @@ func (cl *S3Client) WriteFromFile(name string, metadata map[string]string, fi *o
 }
 
 // WriteFromBuffer : Upload from a buffer to a object
-func (cl *S3Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) (err error) {
+func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) (err error) {
 	largeBuffer := bytes.NewReader(data)
 	// TODO: Move this variable into the config file
 	// var partMiBs int64 = 16
@@ -873,29 +878,29 @@ func (cl *S3Client) WriteFromBuffer(name string, metadata map[string]string, dat
 }
 
 // GetFileBlockOffsets: store blocks ids and corresponding offsets
-func (cl *S3Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, error) {
+func (cl *Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, error) {
 	return nil, nil
 }
 
-func (cl *S3Client) createBlock(blockIdLength, startIndex, size int64) *common.Block {
+func (cl *Client) createBlock(blockIdLength, startIndex, size int64) *common.Block {
 	return nil
 }
 
 // create new blocks based on the offset and total length we're adding to the file
-func (cl *S3Client) createNewBlocks(blockList *common.BlockOffsetList, offset, length int64) int64 {
+func (cl *Client) createNewBlocks(blockList *common.BlockOffsetList, offset, length int64) int64 {
 	return 0
 }
 
-func (cl *S3Client) removeBlocks(blockList *common.BlockOffsetList, size int64, name string) *common.BlockOffsetList {
+func (cl *Client) removeBlocks(blockList *common.BlockOffsetList, size int64, name string) *common.BlockOffsetList {
 	return nil
 }
 
-func (cl *S3Client) TruncateFile(name string, size int64) error {
+func (cl *Client) TruncateFile(name string, size int64) error {
 	return nil
 }
 
 // Write : write data at given offset to a object
-func (cl *S3Client) Write(options internal.WriteFileOptions) error {
+func (cl *Client) Write(options internal.WriteFileOptions) error {
 	name := options.Handle.Path
 	offset := options.Offset
 	defer log.TimeTrack(time.Now(), "S3Client::Write", options.Handle.Path)
@@ -942,20 +947,20 @@ func (cl *S3Client) Write(options internal.WriteFileOptions) error {
 }
 
 // TODO: make a similar method facing stream that would enable us to write to cached blocks then stage and commit
-func (cl *S3Client) stageAndCommitModifiedBlocks(name string, data []byte, offsetList *common.BlockOffsetList) error {
+func (cl *Client) stageAndCommitModifiedBlocks(name string, data []byte, offsetList *common.BlockOffsetList) error {
 	return nil
 }
 
-func (cl *S3Client) StageAndCommit(name string, bol *common.BlockOffsetList) error {
+func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error {
 	return nil
 }
 
 // ChangeMod : Change mode of a object
-func (cl *S3Client) ChangeMod(name string, _ os.FileMode) error {
+func (cl *Client) ChangeMod(name string, _ os.FileMode) error {
 	return nil
 }
 
 // ChangeOwner : Change owner of a object
-func (cl *S3Client) ChangeOwner(name string, _ int, _ int) error {
+func (cl *Client) ChangeOwner(name string, _ int, _ int) error {
 	return nil
 }

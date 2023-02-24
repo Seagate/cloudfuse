@@ -100,7 +100,7 @@ type S3Connection interface {
 
 // NewS3StorageConnection : Based on account type create respective S3Connection Object
 func NewS3StorageConnection(cfg S3StorageConfig) S3Connection {
-	stg := &S3Client{}
+	stg := &Client{}
 	_ = stg.Configure(cfg)
 	return stg
 }

@@ -188,7 +188,7 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, container str
 	_ = s.s3.Start(ctx) // Note: Start->TestValidation will fail but it doesn't matter. We are creating the container a few lines below anyway.
 	// We could create the container before but that requires rewriting the code to new up a service client.
 
-	s.client = s.s3.storage.(*S3Client).Client
+	s.client = s.s3.storage.(*Client).Client
 }
 
 func (s *s3StorageTestSuite) tearDownTestHelper(delete bool) {
@@ -264,7 +264,7 @@ func (s *s3StorageTestSuite) TestCreateFile() {
 	s.assert.EqualValues(0, h.Size)
 	// File should be in the account
 	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
 	s.assert.Nil(err)
@@ -330,7 +330,7 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
 	// File should not be in the account
 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
 
@@ -372,7 +372,7 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 
 	// Object will be updated with new data
 	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
 	s.assert.Nil(err)
@@ -499,7 +499,7 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 
 	// Object should have updated data
 	result, err := s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
 	s.assert.Nil(err)
@@ -733,13 +733,13 @@ func (s *s3StorageTestSuite) TestRenameFile() {
 
 	// Src should not be in the account
 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(src),
 	})
 	s.assert.NotNil(err)
 	// Dst should be in the account
 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(dst),
 	})
 	s.assert.Nil(err)
@@ -757,12 +757,12 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 
 	// Src and destination should not be in the account
 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(src),
 	})
 	s.assert.NotNil(err)
 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
+		Bucket: aws.String(s.s3.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(dst),
 	})
 	s.assert.NotNil(err)

@@ -57,12 +57,12 @@ type clientTestSuite struct {
 	suite.Suite
 	assert      *assert.Assertions
 	awsS3Client *s3.Client
-	s3Client    *S3Client
+	s3Client    *Client
 	config      string
 	container   string
 }
 
-func newTestClient(configuration string) (*S3Client, error) {
+func newTestClient(configuration string) (*Client, error) {
 	// push the given config data to config.go
 	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
 	// ask config to give us the config data back as S3StorageOptions
@@ -92,7 +92,7 @@ func newTestClient(configuration string) (*S3Client, error) {
 	// create an S3Client
 	s3Client := NewS3StorageConnection(configForS3Client)
 
-	return s3Client.(*S3Client), err
+	return s3Client.(*Client), err
 }
 
 func (s *clientTestSuite) SetupTest() {
