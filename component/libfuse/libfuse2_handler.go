@@ -255,7 +255,7 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 
 	val, found := handle.GetValue("cache")
 	if !found {
-		return fuse.EIO
+		return -fuse.EIO
 	}
 
 	ofst64 := uint64(ofst)
@@ -272,10 +272,10 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 		if err != nil {
 			log.Err("Libfuse::Readdir : Path %s, handle: %d, offset %d. Error in retrieval", handle.Path, handle.ID, ofst64)
 			if os.IsNotExist(err) {
-				return fuse.ENOENT
+				return -fuse.ENOENT
 			}
 
-			return fuse.EIO
+			return -fuse.EIO
 		}
 
 		if ofst64 == 0 {
