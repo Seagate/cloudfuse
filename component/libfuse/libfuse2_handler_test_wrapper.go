@@ -247,7 +247,7 @@ func testOpen(suite *libfuseTestSuite) {
 	name := "path"
 	path := "/" + name
 	mode := fs.FileMode(fuseFS.filePermission)
-	flags := fuse.O_RDWR
+	flags := fuse.O_RDWR & 0xffffffff
 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, nil)
 
@@ -326,7 +326,7 @@ func testOpenAppendFlagIgnoreAppendFlag(suite *libfuseTestSuite) {
 	err, _ = cfuseFS.Open(path, flags)
 	suite.assert.Equal(0, err)
 
-	flags = fuse.O_WRONLY
+	flags = fuse.O_WRONLY & 0xffffffff
 	options = internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, nil)
 
@@ -339,7 +339,7 @@ func testOpenNotExists(suite *libfuseTestSuite) {
 	name := "path"
 	path := "/" + name
 	mode := fs.FileMode(fuseFS.filePermission)
-	flags := fuse.O_RDWR
+	flags := fuse.O_RDWR & 0xffffffff
 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, syscall.ENOENT)
 
@@ -352,7 +352,7 @@ func testOpenError(suite *libfuseTestSuite) {
 	name := "path"
 	path := "/" + name
 	mode := fs.FileMode(fuseFS.filePermission)
-	flags := fuse.O_RDWR
+	flags := fuse.O_RDWR & 0xffffffff
 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, errors.New("failed to open a file"))
 
@@ -486,7 +486,7 @@ func testFsync(suite *libfuseTestSuite) {
 	name := "path"
 	path := "/" + name
 	mode := fs.FileMode(fuseFS.filePermission)
-	flags := fuse.O_RDWR
+	flags := fuse.O_RDWR & 0xffffffff
 	handle := &handlemap.Handle{}
 	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(openOptions).Return(handle, nil)
@@ -518,7 +518,7 @@ func testFsyncError(suite *libfuseTestSuite) {
 	name := "path"
 	path := "/" + name
 	mode := fs.FileMode(fuseFS.filePermission)
-	flags := fuse.O_RDWR
+	flags := fuse.O_RDWR & 0xffffffff
 	handle := &handlemap.Handle{}
 
 	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
