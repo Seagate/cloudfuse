@@ -66,7 +66,7 @@ const (
 
 type Client struct {
 	S3StorageConnection
-	Client *s3.Client
+	awsS3Client *s3.Client // S3 client library supplied by AWS
 }
 
 // Verify that S3Client implements S3Connection interface
@@ -104,7 +104,7 @@ func (cl *Client) Configure(cfg S3StorageConfig) error {
 	}
 
 	// Create an Amazon S3 service client
-	cl.Client = s3.NewFromConfig(defaultConfig)
+	cl.awsS3Client = s3.NewFromConfig(defaultConfig)
 
 	return nil
 }
@@ -132,7 +132,7 @@ func (cl *Client) ListContainers() ([]string, error) {
 	var apiErr smithy.APIError
 	var result *s3.ListBucketsOutput
 	for i := 0; i < retryCount; i++ {
-		result, err = cl.Client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
+		result, err = cl.awsS3Client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
 		if err == nil {
 			break
 		}
@@ -201,7 +201,7 @@ func (cl *Client) DeleteFile(name string) (err error) {
 	log.Trace("S3Client::DeleteFile : name %s", name)
 	var apiErr smithy.APIError
 	for i := 0; i < retryCount; i++ {
-		_, err = cl.Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+		_, err = cl.awsS3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
 			Bucket: aws.String(cl.Config.authConfig.BucketName),
 			Key:    aws.String(name),
 		})
@@ -249,7 +249,7 @@ func (cl *Client) RenameFile(source string, target string) (err error) {
 
 	var apiErr smithy.APIError
 	for i := 0; i < retryCount; i++ {
-		_, err = cl.Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
+		_, err = cl.awsS3Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
 			Bucket:     aws.String(cl.Config.authConfig.BucketName),
 			CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, source)),
 			Key:        aws.String(target),
@@ -395,7 +395,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		Delimiter: aws.String("/"), // delimeter is needed to get CommonPrefixes
 	}
 
-	paginator := s3.NewListObjectsV2Paginator(cl.Client, params)
+	paginator := s3.NewListObjectsV2Paginator(cl.awsS3Client, params)
 
 	// initialize list to be returned
 	objectAttrList := make([]*internal.ObjAttr, 0)
@@ -540,7 +540,7 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 	// var downloadPtr *int64 = new(int64)
 	// *downloadPtr = 1
 
-	bucketName := aws.String(cl.Config.authConfig.BucketName)
+	bucketName := cl.Config.authConfig.BucketName
 
 	var apiErr smithy.APIError
 	var result *s3.GetObjectOutput
@@ -556,8 +556,8 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 	}
 
 	for i := 0; i < retryCount; i++ {
-		result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
-			Bucket: aws.String(cl.Config.authConfig.BucketName),
+		result, err = cl.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+			Bucket: aws.String(bucketName),
 			Key:    aws.String(name),
 			Range:  aws.String(rangeString),
 		})
@@ -628,7 +628,7 @@ func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, erro
 	var apiErr smithy.APIError
 	var result *s3.GetObjectOutput
 	for i := 0; i < retryCount; i++ {
-		result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		result, err = cl.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 			Bucket: aws.String(cl.Config.authConfig.BucketName),
 			Key:    aws.String(name),
 			Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(len)),
@@ -683,7 +683,7 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 	var result *s3.GetObjectOutput
 	for i := 0; i < retryCount; i++ {
 		log.Trace("Offset is: ", offset, "  Length is: ", len)
-		result, err = cl.Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		result, err = cl.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 			Bucket: aws.String(cl.Config.authConfig.BucketName),
 			Key:    aws.String(name),
 			Range:  aws.String("bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(len+offset)),
@@ -798,7 +798,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 
 	var apiErr smithy.APIError
 	for i := 0; i < retryCount; i++ {
-		_, err = cl.Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		_, err = cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 			Bucket: aws.String(cl.Config.authConfig.BucketName),
 			Key:    aws.String(name),
 			Body:   fi,
@@ -850,7 +850,7 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data 
 
 	var apiErr smithy.APIError
 	for i := 0; i < retryCount; i++ {
-		_, err = cl.Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		_, err = cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 			Bucket: aws.String(cl.Config.authConfig.BucketName),
 			Key:    aws.String(name),
 			Body:   largeBuffer,

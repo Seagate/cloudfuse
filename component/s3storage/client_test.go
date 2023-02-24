@@ -56,8 +56,8 @@ import (
 type clientTestSuite struct {
 	suite.Suite
 	assert      *assert.Assertions
-	awsS3Client *s3.Client
-	s3Client    *Client
+	awsS3Client *s3.Client // S3 client library supplied by AWS
+	client      *Client
 	config      string
 	container   string
 }
@@ -141,8 +141,8 @@ func (s *clientTestSuite) setupTestHelper(configuration string, container string
 
 	s.assert = assert.New(s.T())
 
-	s.s3Client, _ = newTestClient(configuration)
-	s.awsS3Client = s.s3Client.Client
+	s.client, _ = newTestClient(configuration)
+	s.awsS3Client = s.client.awsS3Client
 }
 
 // TODO: do we need s3StatsCollector for this test suite?
@@ -162,7 +162,7 @@ func (s *clientTestSuite) TestNewCredentialKey() {
 func (s *clientTestSuite) TestListContainers() {
 	// TODO: generalize this test by creating, listing, then destroying a bucket
 	// We need to get permissions to create buckets in Lyve Cloud, or implement this against AWS S3.
-	containers, err := s.s3Client.ListContainers()
+	containers, err := s.client.ListContainers()
 	s.assert.Nil(err)
 	s.assert.Equal(containers, []string{"stxe1-srg-lens-lab1"})
 }
