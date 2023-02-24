@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>753</width>
-    <height>308</height>
+    <height>305</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -141,7 +141,7 @@
      <rect>
       <x>170</x>
       <y>60</y>
-      <width>212</width>
+      <width>261</width>
       <height>41</height>
      </rect>
     </property>
@@ -171,6 +171,13 @@
          <string>Azure</string>
         </property>
        </item>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="config_button">
+       <property name="text">
+        <string>Config</string>
+       </property>
       </widget>
      </item>
     </layout>

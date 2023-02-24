@@ -35,10 +35,15 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         #self.advancedSettings_action.triggered.connect(self.showSettingsWidget)
         self.setup_action.triggered.connect(self.showSettingsWidget)
         self.browse_button.clicked.connect(self.getFileDirInput)
+        self.config_button.clicked.connect(self.showCommonSettingsWidget)
         self.mount_button.clicked.connect(self.mountBucket)
         self.unmount_button.clicked.connect(self.unmountBucket)
 
     # Define the slots that will be triggered when the signals in Qt are activated
+    def showCommonSettingsWidget(self):
+        self.settingsWindow = 
+
+
     def showSettingsWidget(self):
 
         mode = self.pipeline_select.currentIndex()
