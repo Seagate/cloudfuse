@@ -89,10 +89,10 @@ func newTestClient(configuration string) (*Client, error) {
 		log.Warn("ParseAndValidateConfig : account endpoint not provided, assuming the default .lyvecloud.seagate.com style endpoint")
 		configForS3Client.authConfig.Endpoint = fmt.Sprintf("s3.%s.lyvecloud.seagate.com", conf.Region)
 	}
-	// create an S3Client
-	s3Client := NewS3StorageConnection(configForS3Client)
+	// create a Client
+	client := NewS3StorageConnection(configForS3Client)
 
-	return s3Client.(*Client), err
+	return client.(*Client), err
 }
 
 func (s *clientTestSuite) SetupTest() {

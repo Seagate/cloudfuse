@@ -348,7 +348,7 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 
 // 	// File should not be in the account
 // 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-// 		Bucket: aws.String(s.s3.storage.(*S3Client).Config.authConfig.BucketName),
+// 		Bucket: aws.String(s.s3.storage.(*Client).Config.authConfig.BucketName),
 // 		Key:    aws.String(name),
 // 	})
 // 	s.assert.NotNil(err)
