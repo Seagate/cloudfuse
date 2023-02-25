@@ -67,7 +67,7 @@ const (
 )
 
 type Client struct {
-	S3StorageConnection
+	Connection
 	awsS3Client *s3.Client // S3 client library supplied by AWS
 }
 
@@ -75,7 +75,7 @@ type Client struct {
 var _ S3Connection = &Client{}
 
 // Configure : Initialize the awsS3Client
-func (cl *Client) Configure(cfg S3StorageConfig) error {
+func (cl *Client) Configure(cfg Config) error {
 	log.Trace("Client::Configure : initialize awsS3Client")
 	cl.Config = cfg
 
@@ -115,7 +115,7 @@ func (cl *Client) Configure(cfg S3StorageConfig) error {
 
 // For dynamic config update the config here.
 // Currently only updates the blockSize.
-func (cl *Client) UpdateConfig(cfg S3StorageConfig) error {
+func (cl *Client) UpdateConfig(cfg Config) error {
 	log.Trace("Client::UpdateConfig : update block size")
 	cl.Config.blockSize = cfg.blockSize
 	return nil

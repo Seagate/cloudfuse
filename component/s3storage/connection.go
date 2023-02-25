@@ -43,7 +43,7 @@ import (
 
 // Example for azblob usage : https://godoc.org/github.com/Azure/azure-storage-blob-go/azblob#pkg-examples
 // For methods help refer : https://godoc.org/github.com/Azure/azure-storage-blob-go/azblob#ContainerURL
-type S3StorageConfig struct {
+type Config struct {
 	authConfig s3AuthConfig
 	prefixPath string
 	// TODO: use a fake block size to improve streaming performance
@@ -51,15 +51,15 @@ type S3StorageConfig struct {
 	blockSize int64
 }
 
-type S3StorageConnection struct {
-	Config S3StorageConfig
+type Connection struct {
+	Config Config
 
 	Endpoint *url.URL
 }
 
 type S3Connection interface {
-	Configure(cfg S3StorageConfig) error
-	UpdateConfig(cfg S3StorageConfig) error
+	Configure(cfg Config) error
+	UpdateConfig(cfg Config) error
 
 	ListBuckets() ([]string, error)
 
@@ -95,8 +95,8 @@ type S3Connection interface {
 	NewCredentialKey(_, _ string) error
 }
 
-// NewS3StorageConnection : Based on account type create respective S3Connection Object
-func NewS3StorageConnection(cfg S3StorageConfig) S3Connection {
+// NewConnection : Based on account type create respective S3Connection Object
+func NewConnection(cfg Config) S3Connection {
 	stg := &Client{}
 	_ = stg.Configure(cfg)
 	return stg

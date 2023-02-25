@@ -67,16 +67,16 @@ type clientTestSuite struct {
 func newTestClient(configuration string) (*Client, error) {
 	// push the given config data to config.go
 	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
-	// ask config to give us the config data back as S3StorageOptions
-	conf := S3StorageOptions{}
+	// ask config to give us the config data back as Options
+	conf := Options{}
 	err := config.UnmarshalKey(compName, &conf)
 	if err != nil {
 		fmt.Println("Unable to unmarshal")
 		log.Err("ClientTest::newTestClient : config error [invalid config attributes]")
 		return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, err.Error())
 	}
-	// now push S3StorageOptions data into an S3StorageConfig
-	configForS3Client := S3StorageConfig{
+	// now push Options data into an Config
+	configForS3Client := Config{
 		authConfig: s3AuthConfig{
 			BucketName: conf.BucketName,
 			AccessKey:  conf.AccessKey,
@@ -92,7 +92,7 @@ func newTestClient(configuration string) (*Client, error) {
 		configForS3Client.authConfig.Endpoint = fmt.Sprintf("s3.%s.lyvecloud.seagate.com", conf.Region)
 	}
 	// create a Client
-	client := NewS3StorageConnection(configForS3Client)
+	client := NewConnection(configForS3Client)
 
 	return client.(*Client), err
 }

@@ -52,7 +52,7 @@ import (
 type S3Storage struct {
 	internal.BaseComponent
 	storage  S3Connection
-	stConfig S3StorageConfig
+	stConfig Config
 	// TODO: rip out listBlocked (and startTime, and Start()) if this is an Azure-specific quirk.
 	startTime   time.Time
 	listBlocked bool
@@ -81,7 +81,7 @@ func (s3 *S3Storage) SetNextComponent(c internal.Component) {
 func (s3 *S3Storage) Configure(isParent bool) error {
 	log.Trace("S3Storage::Configure : %s", s3.Name())
 
-	conf := S3StorageOptions{}
+	conf := Options{}
 	err := config.UnmarshalKey(s3.Name(), &conf)
 	if err != nil {
 		fmt.Println("Unable to unmarshal")
@@ -113,7 +113,7 @@ func (s3 *S3Storage) Priority() internal.ComponentPriority {
 func (s3 *S3Storage) OnConfigChange() {
 	log.Trace("S3Storage::OnConfigChange : %s", s3.Name())
 
-	conf := S3StorageOptions{}
+	conf := Options{}
 	err := config.UnmarshalKey(s3.Name(), &conf)
 	if err != nil {
 		log.Err("S3Storage::OnConfigChange : Config error [invalid config attributes]")
@@ -134,7 +134,7 @@ func (s3 *S3Storage) OnConfigChange() {
 }
 
 func (s3 *S3Storage) configureAndTest(isParent bool) error {
-	s3.storage = NewS3StorageConnection(s3.stConfig)
+	s3.storage = NewConnection(s3.stConfig)
 	return nil
 }
 
@@ -526,7 +526,7 @@ func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 func News3storageComponent() internal.Component {
 	// Init the component with default config
 	s3 := &S3Storage{
-		stConfig: S3StorageConfig{
+		stConfig: Config{
 			// blockSize:      0,
 			// maxConcurrency: 32,
 			// defaultTier:    getAccessTierType("none"),

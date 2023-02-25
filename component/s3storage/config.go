@@ -134,7 +134,7 @@ const (
 	EnvAzStorageAccountContainer   = "AZURE_STORAGE_ACCOUNT_CONTAINER"
 )
 
-type S3StorageOptions struct {
+type Options struct {
 	BucketName string `config:"bucket-name" yaml:"bucket-name,omitempty"`
 	AccessKey  string `config:"access-key" yaml:"access-key,omitempty"`
 	SecretKey  string `config:"secret-key" yaml:"secret-key,omitempty"`
@@ -199,7 +199,7 @@ func formatEndpointProtocol(endpoint string, http bool) string {
 }
 
 // ParseAndValidateConfig : Parse and validate config
-func ParseAndValidateConfig(s3 *S3Storage, opt S3StorageOptions) error {
+func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	log.Trace("ParseAndValidateConfig : Parsing config")
 
 	// Validate account name is present or not
@@ -284,7 +284,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt S3StorageOptions) error {
 }
 
 // ParseAndReadDynamicConfig : On config change read only the required config
-// func ParseAndReadDynamicConfig(s3 *AzStorage, opt S3StorageOptions, reload bool) error {
+// func ParseAndReadDynamicConfig(s3 *AzStorage, opt Options, reload bool) error {
 // 	log.Trace("ParseAndReadDynamicConfig : Reparsing config")
 
 // 	// If block size and max concurrency is configured use those

@@ -239,28 +239,28 @@ func (s *utilsTestSuite) TestSanitizeSASKey() {
 
 func (s *utilsTestSuite) TestBlockNonProxyOptions() {
 	assert := assert.New(s.T())
-	po, ro := getAzBlobPipelineOptions(S3StorageConfig{})
+	po, ro := getAzBlobPipelineOptions(Config{})
 	assert.EqualValues(ro.MaxTries, int(0))
 	assert.NotEqual(po.RequestLog.SyslogDisabled, true)
 }
 
 func (s *utilsTestSuite) TestBlockProxyOptions() {
 	assert := assert.New(s.T())
-	po, ro := getAzBlobPipelineOptions(S3StorageConfig{proxyAddress: "127.0.0.1", maxRetries: 3})
+	po, ro := getAzBlobPipelineOptions(Config{proxyAddress: "127.0.0.1", maxRetries: 3})
 	assert.EqualValues(ro.MaxTries, 3)
 	assert.NotEqual(po.RequestLog.SyslogDisabled, true)
 }
 
 func (s *utilsTestSuite) TestBfsNonProxyOptions() {
 	assert := assert.New(s.T())
-	po, ro := getAzBfsPipelineOptions(S3StorageConfig{})
+	po, ro := getAzBfsPipelineOptions(Config{})
 	assert.EqualValues(ro.MaxTries, int(0))
 	assert.NotEqual(po.RequestLog.SyslogDisabled, true)
 }
 
 func (s *utilsTestSuite) TestBfsProxyOptions() {
 	assert := assert.New(s.T())
-	po, ro := getAzBfsPipelineOptions(S3StorageConfig{proxyAddress: "127.0.0.1", maxRetries: 3})
+	po, ro := getAzBfsPipelineOptions(Config{proxyAddress: "127.0.0.1", maxRetries: 3})
 	assert.EqualValues(ro.MaxTries, 3)
 	assert.NotEqual(po.RequestLog.SyslogDisabled, true)
 }
@@ -370,7 +370,7 @@ func (s *utilsTestSuite) TestAutoDetectAuthMode() {
 	assert := assert.New(s.T())
 
 	var authType string
-	authType = autoDetectAuthMode(S3StorageOptions{})
+	authType = autoDetectAuthMode(Options{})
 	assert.Equal(authType, "msi")
 
 	var authType_ AuthType
@@ -378,34 +378,34 @@ func (s *utilsTestSuite) TestAutoDetectAuthMode() {
 	assert.Nil(err)
 	assert.Equal(authType_, EAuthType.MSI())
 
-	authType = autoDetectAuthMode(S3StorageOptions{AccountKey: "abc"})
+	authType = autoDetectAuthMode(Options{AccountKey: "abc"})
 	assert.Equal(authType, "key")
 
-	authType = autoDetectAuthMode(S3StorageOptions{SaSKey: "abc"})
+	authType = autoDetectAuthMode(Options{SaSKey: "abc"})
 	assert.Equal(authType, "sas")
 
-	authType = autoDetectAuthMode(S3StorageOptions{ApplicationID: "abc"})
+	authType = autoDetectAuthMode(Options{ApplicationID: "abc"})
 	assert.Equal(authType, "msi")
 
-	authType = autoDetectAuthMode(S3StorageOptions{ResourceID: "abc"})
+	authType = autoDetectAuthMode(Options{ResourceID: "abc"})
 	assert.Equal(authType, "msi")
 
-	authType = autoDetectAuthMode(S3StorageOptions{ClientID: "abc"})
+	authType = autoDetectAuthMode(Options{ClientID: "abc"})
 	assert.Equal(authType, "spn")
 
-	authType = autoDetectAuthMode(S3StorageOptions{ClientSecret: "abc"})
+	authType = autoDetectAuthMode(Options{ClientSecret: "abc"})
 	assert.Equal(authType, "spn")
 
-	authType = autoDetectAuthMode(S3StorageOptions{TenantID: "abc"})
+	authType = autoDetectAuthMode(Options{TenantID: "abc"})
 	assert.Equal(authType, "spn")
 
-	authType = autoDetectAuthMode(S3StorageOptions{ApplicationID: "abc", AccountKey: "abc", SaSKey: "abc", ClientID: "abc"})
+	authType = autoDetectAuthMode(Options{ApplicationID: "abc", AccountKey: "abc", SaSKey: "abc", ClientID: "abc"})
 	assert.Equal(authType, "msi")
 
-	authType = autoDetectAuthMode(S3StorageOptions{AccountKey: "abc", SaSKey: "abc", ClientID: "abc"})
+	authType = autoDetectAuthMode(Options{AccountKey: "abc", SaSKey: "abc", ClientID: "abc"})
 	assert.Equal(authType, "key")
 
-	authType = autoDetectAuthMode(S3StorageOptions{SaSKey: "abc", ClientID: "abc"})
+	authType = autoDetectAuthMode(Options{SaSKey: "abc", ClientID: "abc"})
 	assert.Equal(authType, "sas")
 }
 
