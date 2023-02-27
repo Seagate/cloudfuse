@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>678</width>
-    <height>425</height>
+    <width>518</width>
+    <height>357</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -203,35 +203,29 @@
      <property name="title">
       <string/>
      </property>
-     <widget class="QWidget" name="layoutWidget">
-      <property name="geometry">
-       <rect>
-        <x>10</x>
-        <y>10</y>
-        <width>641</width>
-        <height>51</height>
-       </rect>
-      </property>
-      <layout class="QHBoxLayout" name="horizontalLayout">
-       <item>
-        <widget class="QLabel" name="fileCache_label">
-         <property name="text">
-          <string>File cache path</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="fileCache_path_input"/>
-       </item>
-       <item>
-        <widget class="QPushButton" name="browse_button">
-         <property name="text">
-          <string>Browse</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
+     <layout class="QGridLayout" name="gridLayout_3">
+      <item row="0" column="0">
+       <layout class="QHBoxLayout" name="horizontalLayout">
+        <item>
+         <widget class="QLabel" name="fileCache_label">
+          <property name="text">
+           <string>File cache path</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="fileCache_path_input"/>
+        </item>
+        <item>
+         <widget class="QPushButton" name="browse_button">
+          <property name="text">
+           <string>Browse</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
     </widget>
    </item>
    <item row="3" column="0">
@@ -252,116 +246,110 @@
      <property name="title">
       <string/>
      </property>
-     <widget class="QWidget" name="layoutWidget2">
-      <property name="geometry">
-       <rect>
-        <x>10</x>
-        <y>10</y>
-        <width>241</width>
-        <height>122</height>
-       </rect>
-      </property>
-      <layout class="QHBoxLayout" name="horizontalLayout_3">
-       <item>
-        <layout class="QVBoxLayout" name="verticalLayout_4">
-         <item>
-          <widget class="QLabel" name="fileLevelCaching_label">
-           <property name="text">
-            <string>File level caching</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="blockSize_label">
-           <property name="text">
-            <string>Block size (MB)</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="maxBuffer_label">
-           <property name="text">
-            <string>Max buffer (MB)</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="bufferSize_label">
-           <property name="text">
-            <string>Buffer size (MB)</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item>
-        <layout class="QVBoxLayout" name="verticalLayout_5">
-         <item>
-          <widget class="QComboBox" name="streaming_fileCachingLevel_select">
-           <item>
+     <layout class="QGridLayout" name="gridLayout_2">
+      <item row="0" column="0">
+       <layout class="QHBoxLayout" name="horizontalLayout_3">
+        <item>
+         <layout class="QVBoxLayout" name="verticalLayout_4">
+          <item>
+           <widget class="QLabel" name="fileLevelCaching_label">
             <property name="text">
-             <string>Handle level</string>
+             <string>File level caching</string>
             </property>
-           </item>
-           <item>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="blockSize_label">
             <property name="text">
-             <string>File level</string>
+             <string>Block size (MB)</string>
             </property>
-           </item>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLineEdit" name="streaming_blksz_input">
-           <property name="maximumSize">
-            <size>
-             <width>75</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="text">
-            <string>0</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLineEdit" name="streaming_mxbuff_input">
-           <property name="maximumSize">
-            <size>
-             <width>75</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="text">
-            <string>0</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLineEdit" name="streaming_buffsz_input">
-           <property name="maximumSize">
-            <size>
-             <width>75</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="text">
-            <string>0</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-      </layout>
-     </widget>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="maxBuffer_label">
+            <property name="text">
+             <string>Max buffer (MB)</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="bufferSize_label">
+            <property name="text">
+             <string>Buffer size (MB)</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QVBoxLayout" name="verticalLayout_5">
+          <item>
+           <widget class="QComboBox" name="streaming_fileCachingLevel_select">
+            <item>
+             <property name="text">
+              <string>Handle level</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>File level</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="streaming_blksz_input">
+            <property name="maximumSize">
+             <size>
+              <width>75</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>0</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="streaming_mxbuff_input">
+            <property name="maximumSize">
+             <size>
+              <width>75</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>0</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="streaming_buffsz_input">
+            <property name="maximumSize">
+             <size>
+              <width>75</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>0</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </item>
+     </layout>
     </widget>
    </item>
    <item row="3" column="1">
