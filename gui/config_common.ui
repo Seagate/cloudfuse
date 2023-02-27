@@ -14,18 +14,59 @@
    <string>Form</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
-   <item row="3" column="0">
-    <widget class="QToolButton" name="advanced_settings">
-     <property name="maximumSize">
-      <size>
-       <width>150</width>
-       <height>16777215</height>
-      </size>
+   <item row="0" column="0">
+    <layout class="QVBoxLayout" name="verticalLayout_10" stretch="0,0,0,0,0">
+     <property name="spacing">
+      <number>6</number>
      </property>
-     <property name="text">
-      <string>Advanced settings</string>
+     <property name="sizeConstraint">
+      <enum>QLayout::SetMinimumSize</enum>
      </property>
-    </widget>
+     <item>
+      <widget class="QCheckBox" name="commonConfig_multiuser_checkbox">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select to allow multiple users to access the container&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="text">
+        <string>Multiple Users</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="commonConfig_nonEmptyDir_checkbox">
+       <property name="text">
+        <string>Non-empty directory mount</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="commonConfig_readOnly_checkbox">
+       <property name="text">
+        <string>Read-only mount</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="daemonForeground_checkbox">
+       <property name="text">
+        <string>Run in foreground</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="libfuse_ignoreAppend_checkbox">
+       <property name="text">
+        <string>Ignore append/write only flags</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
    <item row="0" column="1">
     <layout class="QHBoxLayout" name="horizontalLayout_4">
@@ -157,60 +198,6 @@
      </item>
     </layout>
    </item>
-   <item row="0" column="0">
-    <layout class="QVBoxLayout" name="verticalLayout_10" stretch="0,0,0,0,0">
-     <property name="spacing">
-      <number>6</number>
-     </property>
-     <property name="sizeConstraint">
-      <enum>QLayout::SetMinimumSize</enum>
-     </property>
-     <item>
-      <widget class="QCheckBox" name="commonConfig_multiuser_checkbox">
-       <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select to allow multiple users to access the container&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-       </property>
-       <property name="text">
-        <string>Multiple Users</string>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="commonConfig_nonEmptyDir_checkbox">
-       <property name="text">
-        <string>Non-empty directory mount</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="commonConfig_readOnly_checkbox">
-       <property name="text">
-        <string>Read-only mount</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="daemonForeground_checkbox">
-       <property name="text">
-        <string>Run in foreground</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="libfuse_ignoreAppend_checkbox">
-       <property name="text">
-        <string>Ignore append/write only flags</string>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
    <item row="1" column="0" colspan="2">
     <widget class="QGroupBox" name="filecache_groupbox">
      <property name="title">
@@ -247,12 +234,25 @@
      </widget>
     </widget>
    </item>
+   <item row="3" column="0">
+    <widget class="QToolButton" name="advanced_settings">
+     <property name="maximumSize">
+      <size>
+       <width>150</width>
+       <height>16777215</height>
+      </size>
+     </property>
+     <property name="text">
+      <string>Advanced settings</string>
+     </property>
+    </widget>
+   </item>
    <item row="1" column="0" colspan="2">
     <widget class="QGroupBox" name="streaming_groupbox">
      <property name="title">
       <string/>
      </property>
-     <widget class="QWidget" name="layoutWidget">
+     <widget class="QWidget" name="layoutWidget2">
       <property name="geometry">
        <rect>
         <x>10</x>

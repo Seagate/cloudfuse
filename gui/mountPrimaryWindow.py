@@ -3,11 +3,14 @@ from PySide6 import QtWidgets
 from PySide6.QtWidgets import QMainWindow
 # import the custom class created with QtDesigner 
 from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
+
 from mountSettings import mountSettingsWidget
 from FCAz_simpleSettings import fcazSettingsWidget
 from FCL_simpleSettings import fclSettingsWidget
 from StAz_simpleSettings import stazSettingsWidget
 from StL_simpleSettings import stlzSettingsWidget
+
+from config_common import commonSettingsWidget
 
 import subprocess
 from sys import platform
@@ -41,7 +44,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
     # Define the slots that will be triggered when the signals in Qt are activated
     def showCommonSettingsWidget(self):
-        self.settingsWindow = 
+        self.settings = commonSettingsWidget()
+        self.settings.show()
 
 
     def showSettingsWidget(self):
@@ -49,14 +53,14 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         mode = self.pipeline_select.currentIndex()
         mountTarget = self.bucket_select.currentIndex()
 
-        if mode == pipeline['filecaching'] and mountTarget == bucketOptions['Lyve']:
-            self.settingsWindow = fclSettingsWidget()
-        elif mode == pipeline['filecaching'] and mountTarget == bucketOptions['Azure']:
-            self.settingsWindow = fcazSettingsWidget()
-        elif mode == pipeline['streaming'] and mountTarget == bucketOptions['Lyve']:
-            self.settingsWindow = stlzSettingsWidget()
-        elif mode == pipeline['streaming'] and mountTarget == bucketOptions['Azure']:
-            self.settingsWindow = stazSettingsWidget()
+        # if mode == pipeline['filecaching'] and mountTarget == bucketOptions['Lyve']:
+        #     self.settingsWindow = fclSettingsWidget()
+        # elif mode == pipeline['filecaching'] and mountTarget == bucketOptions['Azure']:
+        #     self.settingsWindow = fcazSettingsWidget()
+        # elif mode == pipeline['streaming'] and mountTarget == bucketOptions['Lyve']:
+        #     self.settingsWindow = stlzSettingsWidget()
+        # elif mode == pipeline['streaming'] and mountTarget == bucketOptions['Azure']:
+        #     self.settingsWindow = stazSettingsWidget()
 
         self.settingsWindow.show()
         # self.settingsWindow = mountSettingsWidget()
