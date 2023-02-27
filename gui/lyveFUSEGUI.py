@@ -4,8 +4,6 @@ from PySide6 import QtWidgets
 
 # Main FUSE window
 from mountPrimaryWindow import FUSEWindow
-# Mount settings widget
-from mountSettings import mountSettingsWidget
 
 # Define the application to run from the Qt library
 app = QtWidgets.QApplication(sys.argv)
