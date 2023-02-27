@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QWidget
 # import the custom class made from QtDesigner
 from ui_config_common import Ui_Form
 
-class commonSettingsWidget(QWidget, Ui_Form):
+class lyveSettingsWidget(QWidget, Ui_Form):
     def __init__(self):
         super().__init__()
         self.setupUi(self)

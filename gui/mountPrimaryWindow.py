@@ -10,15 +10,10 @@ from FCL_simpleSettings import fclSettingsWidget
 from StAz_simpleSettings import stazSettingsWidget
 from StL_simpleSettings import stlzSettingsWidget
 
-from config_common import commonSettingsWidget
-
+from config_common import lyveSettingsWidget
+from azure_config_common import azureSettingsWidget
 import subprocess
 from sys import platform
-
-pipeline = {
-    "streaming" : 1,
-    "filecaching" : 0
-}
 
 bucketOptions = {
     "Azure" : 1,
@@ -38,21 +33,20 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         #self.advancedSettings_action.triggered.connect(self.showSettingsWidget)
         self.setup_action.triggered.connect(self.showSettingsWidget)
         self.browse_button.clicked.connect(self.getFileDirInput)
-        self.config_button.clicked.connect(self.showCommonSettingsWidget)
+        self.config_button.clicked.connect(self.showSettingsWidget)
         self.mount_button.clicked.connect(self.mountBucket)
         self.unmount_button.clicked.connect(self.unmountBucket)
 
     # Define the slots that will be triggered when the signals in Qt are activated
-    def showCommonSettingsWidget(self):
-        self.settings = commonSettingsWidget()
-        self.settings.show()
-
 
     def showSettingsWidget(self):
 
-        mode = self.pipeline_select.currentIndex()
         mountTarget = self.bucket_select.currentIndex()
-
+        
+        if mountTarget == bucketOptions['Lyve']:
+            self.settings = lyveSettingsWidget()
+        else:
+            self.settings = azureSettingsWidget()
         # if mode == pipeline['filecaching'] and mountTarget == bucketOptions['Lyve']:
         #     self.settingsWindow = fclSettingsWidget()
         # elif mode == pipeline['filecaching'] and mountTarget == bucketOptions['Azure']:
@@ -62,7 +56,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         # elif mode == pipeline['streaming'] and mountTarget == bucketOptions['Azure']:
         #     self.settingsWindow = stazSettingsWidget()
 
-        self.settingsWindow.show()
+        self.settings.show()
         # self.settingsWindow = mountSettingsWidget()
         # self.settingsWindow.show()
 

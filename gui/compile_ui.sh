@@ -10,3 +10,4 @@ pyside6-uic FCL_simpleSettings.ui > ui_FCL_simpleSettings.py
 pyside6-uic StL_simpleSettings.ui > ui_StL_simpleSettings.py
 pyside6-uic mountSettings.ui > ui_mountSettings.py
 pyside6-uic config_common.ui > ui_config_common.py
+pyside6-uic azure_config_common.ui > ui_azure_config_common.py
