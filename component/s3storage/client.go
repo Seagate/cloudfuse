@@ -72,50 +72,6 @@ type Client struct {
 // Verify that Client implements S3Connection interface
 var _ S3Connection = &Client{}
 
-// Wrapper function of the GetObject S3 calls.
-func (cl *Client) getObject(name string, offset int64, count int64) (*s3.GetObjectOutput, error) {
-
-	var rangeString string //string to be used to specify range of object to download from S3
-	var apiErr smithy.APIError
-	bucketName := cl.Config.authConfig.BucketName
-
-	//TODO: add handle if the offset+count is greater than the end of Object.
-	if count == 0 {
-		rangeString = "bytes=" + fmt.Sprint(offset) + "-"
-	} else {
-		endRange := offset + count
-		rangeString = "bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)
-	}
-
-	var result *s3.GetObjectOutput
-	var err error
-	for i := 0; i < retryCount; i++ {
-		result, err = cl.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-			Bucket: aws.String(bucketName),
-			Key:    aws.String(name),
-			Range:  aws.String(rangeString),
-		})
-
-		// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
-		// So if we get this error we want to try again, and if not then we got a legitimate error so break
-		if err != nil {
-			if errors.As(err, &apiErr) {
-				code := apiErr.ErrorCode()
-				if code != "InvalidAccessKeyId" {
-					break
-				}
-				log.Warn("Client::getObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
-			}
-		}
-
-		if err == nil {
-			break
-		}
-
-	}
-	return result, err
-}
-
 func (cl *Client) Configure(cfg S3StorageConfig) error {
 	cl.Config = cfg
 
@@ -165,6 +121,50 @@ func (cl *Client) NewCredentialKey(key, value string) (err error) {
 	// If they can, research whether we can change credentials on an existing client object
 	// 	(do we replace the credential provider?)
 	return nil
+}
+
+// Wrapper function of the GetObject S3 calls.
+func (cl *Client) getObject(name string, offset int64, count int64) (*s3.GetObjectOutput, error) {
+
+	var rangeString string //string to be used to specify range of object to download from S3
+	var apiErr smithy.APIError
+	bucketName := cl.Config.authConfig.BucketName
+
+	//TODO: add handle if the offset+count is greater than the end of Object.
+	if count == 0 {
+		rangeString = "bytes=" + fmt.Sprint(offset) + "-"
+	} else {
+		endRange := offset + count
+		rangeString = "bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)
+	}
+
+	var result *s3.GetObjectOutput
+	var err error
+	for i := 0; i < retryCount; i++ {
+		result, err = cl.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+			Bucket: aws.String(bucketName),
+			Key:    aws.String(name),
+			Range:  aws.String(rangeString),
+		})
+
+		// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
+		// So if we get this error we want to try again, and if not then we got a legitimate error so break
+		if err != nil {
+			if errors.As(err, &apiErr) {
+				code := apiErr.ErrorCode()
+				if code != "InvalidAccessKeyId" {
+					break
+				}
+				log.Warn("Client::getObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			}
+		}
+
+		if err == nil {
+			break
+		}
+
+	}
+	return result, err
 }
 
 func (cl *Client) ListContainers() ([]string, error) {
