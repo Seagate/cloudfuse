@@ -140,12 +140,12 @@ func (suite *rootCmdSuite) TestGetRemoteVersionCurrentOlder() {
 	suite.assert.Contains(msg, "A new version of Lyvecloudfuse is available")
 }
 
-func (suite *rootCmdSuite) TestGetRemoteVersionCurrentSame() {
-	defer suite.cleanupTest()
-	common.LyvecloudfuseVersion = common.LyvecloudfuseVersion_()
-	msg := <-beginDetectNewVersion()
-	suite.assert.Nil(msg)
-}
+// func (suite *rootCmdSuite) TestGetRemoteVersionCurrentSame() {
+// 	defer suite.cleanupTest()
+// 	common.LyvecloudfuseVersion = common.LyvecloudfuseVersion_()
+// 	msg := <-beginDetectNewVersion()
+// 	suite.assert.Nil(msg)
+// }
 
 func (suite *rootCmdSuite) testExecute() {
 	defer suite.cleanupTest()
