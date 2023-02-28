@@ -104,7 +104,7 @@ func (cl *Client) getObject(name string, offset int64, count int64) (*s3.GetObje
 				if code != "InvalidAccessKeyId" {
 					break
 				}
-				log.Warn("Client::ReadToFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+				log.Warn("Client::getObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
 			}
 		}
 
