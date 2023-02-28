@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>932</width>
+    <width>993</width>
     <height>361</height>
    </rect>
   </property>
@@ -27,7 +27,7 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="0" colspan="2">
+   <item row="1" column="3" colspan="2">
     <widget class="QGroupBox" name="filecache_groupbox">
      <property name="title">
       <string/>
@@ -57,7 +57,7 @@
      </layout>
     </widget>
    </item>
-   <item row="1" column="2">
+   <item row="1" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout_4">
      <item>
       <layout class="QVBoxLayout" name="verticalLayout">
@@ -214,7 +214,7 @@
      </layout>
     </widget>
    </item>
-   <item row="1" column="3">
+   <item row="1" column="2">
     <layout class="QVBoxLayout" name="verticalLayout_10" stretch="0,0,0,0,0">
      <property name="spacing">
       <number>6</number>
@@ -268,7 +268,7 @@
      </item>
     </layout>
    </item>
-   <item row="1" column="0" colspan="2">
+   <item row="1" column="3" colspan="2">
     <widget class="QGroupBox" name="streaming_groupbox">
      <property name="title">
       <string/>
@@ -642,28 +642,6 @@
      </layout>
     </widget>
    </item>
-   <item row="5" column="1">
-    <widget class="QPushButton" name="resetDefautSettings">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="maximumSize">
-      <size>
-       <width>165</width>
-       <height>16777215</height>
-      </size>
-     </property>
-     <property name="layoutDirection">
-      <enum>Qt::RightToLeft</enum>
-     </property>
-     <property name="text">
-      <string>Reset Default Settings</string>
-     </property>
-     <property name="default">
-      <bool>false</bool>
-     </property>
-    </widget>
-   </item>
    <item row="5" column="3">
     <widget class="QPushButton" name="okay_button">
      <property name="maximumSize">
@@ -677,6 +655,28 @@
      </property>
      <property name="text">
       <string>Okay</string>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0">
+    <widget class="QPushButton" name="resetDefautSettings">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>165</width>
+       <height>16777215</height>
+      </size>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>Reset Default Settings</string>
+     </property>
+     <property name="default">
+      <bool>false</bool>
      </property>
     </widget>
    </item>
