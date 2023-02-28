@@ -588,7 +588,7 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 
 	var result *s3.GetObjectOutput
 
-	cl.getObject(name, offset, count)
+	result, err = cl.getObject(name, offset, count)
 
 	if err != nil {
 		// No such key found so object is not in S3
