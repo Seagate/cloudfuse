@@ -103,7 +103,7 @@
           <item>
            <widget class="QLabel" name="label_40">
             <property name="text">
-             <string>http proxy</string>
+             <string>Http proxy</string>
             </property>
            </widget>
           </item>

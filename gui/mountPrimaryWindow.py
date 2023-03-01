@@ -1,23 +1,22 @@
+# Import QT libraries
 from PySide6.QtCore import Qt
 from PySide6 import QtWidgets
 from PySide6.QtWidgets import QMainWindow
-# import the custom class created with QtDesigner 
-from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
 
-from mountSettings import mountSettingsWidget
-from FCAz_simpleSettings import fcazSettingsWidget
-from FCL_simpleSettings import fclSettingsWidget
-from StAz_simpleSettings import stazSettingsWidget
-from StL_simpleSettings import stlzSettingsWidget
-
-from config_common import lyveSettingsWidget
-from azure_config_common import azureSettingsWidget
+# System imports
 import subprocess
 from sys import platform
 
+# Import the custom class created with QtDesigner 
+from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
+from config_common import lyveSettingsWidget
+from azure_config_common import azureSettingsWidget
+
+
+
 bucketOptions = {
-    "Azure" : 1,
-    "Lyve" : 0
+    "Lyve" : 0,
+    "Azure" : 1
 }
 
 class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
@@ -29,8 +28,6 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
 
         # Set up the signals for this window
-        
-        #self.advancedSettings_action.triggered.connect(self.showSettingsWidget)
         self.setup_action.triggered.connect(self.showSettingsWidget)
         self.browse_button.clicked.connect(self.getFileDirInput)
         self.config_button.clicked.connect(self.showSettingsWidget)
@@ -47,18 +44,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             self.settings = lyveSettingsWidget()
         else:
             self.settings = azureSettingsWidget()
-        # if mode == pipeline['filecaching'] and mountTarget == bucketOptions['Lyve']:
-        #     self.settingsWindow = fclSettingsWidget()
-        # elif mode == pipeline['filecaching'] and mountTarget == bucketOptions['Azure']:
-        #     self.settingsWindow = fcazSettingsWidget()
-        # elif mode == pipeline['streaming'] and mountTarget == bucketOptions['Lyve']:
-        #     self.settingsWindow = stlzSettingsWidget()
-        # elif mode == pipeline['streaming'] and mountTarget == bucketOptions['Azure']:
-        #     self.settingsWindow = stazSettingsWidget()
-
         self.settings.show()
-        # self.settingsWindow = mountSettingsWidget()
-        # self.settingsWindow.show()
+
 
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
@@ -77,7 +64,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             if platform == "win32":
                 directory = directory+'/lyveCloudFuse'
                 mount = subprocess.Popen([".\lyvecloudfuse.exe", "mount", directory, "--config-file=.\config.yaml"], stdout=subprocess.PIPE)
-                # For future use to get output on Popen
+                # TODO: For future use to get output on Popen
                 # for line in mount.stdout.readlines():    
             else:            
                 mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"])#,capture_output=True)
@@ -85,7 +72,6 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     # Print to the text edit window on success.  
                     self.output_textEdit.setText("Successfully mounted container\n")
                 else:
-                    #print(mount.stdout.decode())
                     self.output_textEdit.setText("!!Error mounting container!!\n")# + mount.stdout.decode())
                     
                     # Get the users attention by popping open a new window on an error
@@ -101,7 +87,6 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         msg = QtWidgets.QMessageBox()
         try:
             unmount = subprocess.run(["./lyvecloudfuse", "unmount", "all"],capture_output=True)
-            #print(unmount.stdout)
             if unmount.returncode == 0:
                 self.output_textEdit.setText("Successfully unmounted container\n" + unmount.stdout.decode())
             else:

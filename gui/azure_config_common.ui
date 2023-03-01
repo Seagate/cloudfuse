@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>993</width>
-    <height>361</height>
+    <height>392</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -78,7 +78,7 @@
        <item>
         <widget class="QLabel" name="label_6">
          <property name="text">
-          <string>negative entry exp (s)</string>
+          <string>Negative entry exp (s)</string>
          </property>
         </widget>
        </item>
