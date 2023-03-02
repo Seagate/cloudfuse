@@ -9,7 +9,7 @@ from sys import platform
 
 # Import the custom class created with QtDesigner 
 from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
-from config_common import lyveSettingsWidget
+from lyve_config_common import lyveSettingsWidget
 from azure_config_common import azureSettingsWidget
 
 
