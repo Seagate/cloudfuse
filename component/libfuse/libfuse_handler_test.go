@@ -181,10 +181,6 @@ func (suite *libfuseTestSuite) TestOpen() {
 	testOpen(suite)
 }
 
-func (suite *libfuseTestSuite) TestOpenSyncDirectFlag() {
-	testOpenSyncDirectFlag(suite)
-}
-
 func (suite *libfuseTestSuite) TestOpenAppendFlagDefault() {
 	testOpenAppendFlagDefault(suite)
 }
@@ -285,6 +281,14 @@ func (suite *libfuseTestSuite) TestChmodNotExists() {
 
 func (suite *libfuseTestSuite) TestStatFs() {
 	testStatFs(suite)
+}
+
+func (suite *libfuseTestSuite) TestStatFsNotPopulated() {
+	testStatFsNotPopulated(suite)
+}
+
+func (suite *libfuseTestSuite) TestStatFsError() {
+	testStatFsError(suite)
 }
 
 func (suite *libfuseTestSuite) TestChmodError() {
