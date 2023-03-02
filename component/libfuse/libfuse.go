@@ -31,6 +31,8 @@
    SOFTWARE
 */
 
+// Package libfuse defines the component that interacts with the FUSE filesystem and defines all
+// functions to interface with FUSE.
 package libfuse
 
 import (
@@ -42,6 +44,8 @@ import (
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
 	"lyvecloudfuse/internal/stats_manager"
+
+	"github.com/winfsp/cgofuse/fuse"
 )
 
 /* NOTES:
@@ -51,9 +55,10 @@ import (
    - To read any new setting from config file follow the Configure method default comments
 */
 
-// Common structure for Component
+// Libfuse holds the settings and information for the FUSE component.
 type Libfuse struct {
 	internal.BaseComponent
+	host                  *fuse.FileSystemHost
 	mountPath             string
 	dirPermission         uint
 	filePermission        uint
@@ -81,7 +86,7 @@ type dirChildCache struct {
 	children []*internal.ObjAttr // Slice holding current block of children
 }
 
-// Structure defining your config parameters
+// LibfuseOptions defines the config parameters.
 type LibfuseOptions struct {
 	mountPath               string
 	DefaultPermission       uint32 `config:"default-permission" yaml:"default-permission,omitempty"`
@@ -118,14 +123,17 @@ var ignoreFiles = map[string]bool{
 // Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &Libfuse{}
 
+// Name returns the component name.
 func (lf *Libfuse) Name() string {
 	return compName
 }
 
+// SetName sets the component name.
 func (lf *Libfuse) SetName(name string) {
 	lf.BaseComponent.SetName(name)
 }
 
+// SetNextComponent sets the next component in the pipeline.
 func (lf *Libfuse) SetNextComponent(nc internal.Component) {
 	lf.BaseComponent.SetNextComponent(nc)
 }

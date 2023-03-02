@@ -35,7 +35,6 @@ package internal
 
 import (
 	"context"
-	"syscall"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/internal/handlemap"
@@ -323,7 +322,7 @@ func (base *BaseComponent) FileUsed(name string) error {
 	return nil
 }
 
-func (base *BaseComponent) StatFs() (*syscall.Statfs_t, bool, error) {
+func (base *BaseComponent) StatFs() (*common.Statfs_t, bool, error) {
 	if base.next != nil {
 		return base.next.StatFs()
 	}
