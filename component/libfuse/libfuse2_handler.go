@@ -184,6 +184,44 @@ func (cf *CgofuseFS) Destroy() {
 	log.Trace("Libfuse::Destroy : Destroy")
 }
 
+// Getattr retrieves the file attributes at the path and fills them in stat.
+func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
+	// TODO: Currently not using filehandle
+	name := trimFusePath(path)
+	name = common.NormalizeObjectName(name)
+	log.Trace("Libfuse::Getattr : %s", name)
+
+	// Return the default configuration for the root
+	if name == "" {
+		stat.Mode = fuse.S_IFDIR | 0777
+		stat.Uid = cf.uid
+		stat.Gid = cf.gid
+		stat.Nlink = 2
+		stat.Size = 4096
+		stat.Mtim = fuse.NewTimespec(time.Now())
+		stat.Atim = stat.Mtim
+		stat.Ctim = stat.Mtim
+		return 0
+	}
+
+	// TODO: How does this work if we trim the path?
+	// Check if the file is meant to be ignored
+	if ignore, found := ignoreFiles[name]; found && ignore {
+		return -fuse.ENOENT
+	}
+
+	// Get attributes
+	attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+	if err != nil {
+		log.Err("Libfuse::Getattr : Failed to get attributes of %s [%s]", name, err.Error())
+		return -fuse.ENOENT
+	}
+
+	// Populate stat
+	fuseFS.fillStat(attr, stat)
+	return 0
+}
+
 // Mkdir creates a new directory at the path with the given mode.
 func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 	name := trimFusePath(path)
@@ -310,44 +348,6 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 		fill(name, &stbuf, ofst)
 	}
 
-	return 0
-}
-
-// Getattr retrieves the file attributes at the path and fills them in stat.
-func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
-	// TODO: Currently not using filehandle
-	name := trimFusePath(path)
-	name = common.NormalizeObjectName(name)
-	log.Trace("Libfuse::Getattr : %s", name)
-
-	// Return the default configuration for the root
-	if name == "" {
-		stat.Mode = fuse.S_IFDIR | 0777
-		stat.Uid = cf.uid
-		stat.Gid = cf.gid
-		stat.Nlink = 2
-		stat.Size = 4096
-		stat.Mtim = fuse.NewTimespec(time.Now())
-		stat.Atim = stat.Mtim
-		stat.Ctim = stat.Mtim
-		return 0
-	}
-
-	// TODO: How does this work if we trim the path?
-	// Check if the file is meant to be ignored
-	if ignore, found := ignoreFiles[name]; found && ignore {
-		return -fuse.ENOENT
-	}
-
-	// Get attributes
-	attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
-	if err != nil {
-		log.Err("Libfuse::Getattr : Failed to get attributes of %s [%s]", name, err.Error())
-		return -fuse.ENOENT
-	}
-
-	// Populate stat
-	fuseFS.fillStat(attr, stat)
 	return 0
 }
 
