@@ -37,6 +37,7 @@
 package s3storage
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -47,7 +48,9 @@ import (
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/config"
 	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -169,16 +172,72 @@ func (s *clientTestSuite) TestListContainers() {
 func (s *clientTestSuite) TestSetPrefixPath() {
 }
 func (s *clientTestSuite) TestCreateFile() {
+
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+
+	//we aren't getting a handle from CreateFile that is used in s3Storage_test.go
+	err := s.client.CreateFile(name, os.FileMode(0))
+
+	s.assert.Nil(err)
+
+	// File should be in the account
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
+	s.assert.NotNil(result)
+
 }
 func (s *clientTestSuite) TestCreateDirectory() {
 }
 func (s *clientTestSuite) TestCreateLink() {
 }
 func (s *clientTestSuite) TestDeleteFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	s.client.CreateFile(name, os.FileMode(0))
+
+	err := s.client.DeleteFile(name)
+	s.assert.Nil(err)
+
+	// This is similar to the s3 bucket command, use getobject for now
+	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
+	// File should not be in the account
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+
+	s.assert.NotNil(err)
 }
 func (s *clientTestSuite) TestDeleteDirectory() {
 }
 func (s *clientTestSuite) TestRenameFile() {
+	defer s.cleanupTest()
+	// Setup
+	src := generateFileName()
+	s.client.CreateFile(src, os.FileMode(0))
+	dst := generateFileName()
+
+	err := s.client.RenameFile(src, dst)
+	s.assert.Nil(err)
+
+	// Src should not be in the account
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(src),
+	})
+	s.assert.NotNil(err)
+	// Dst should be in the account
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(dst),
+	})
+	s.assert.Nil(err)
 }
 func (s *clientTestSuite) TestRenameDirectory() {
 }
