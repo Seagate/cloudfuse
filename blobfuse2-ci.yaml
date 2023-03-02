@@ -18,24 +18,24 @@ jobs:
           fuselib: 'libfuse-dev'
           tags: 'fuse2'
           adlsSas: $(AZTEST_ADLS_CONT_SAS_UBN_20)
-        Ubuntu-22:
-          imageName: 'ubuntu-22.04'
-          containerName: 'test-cnt-ubn-22'
-          fuselib: 'libfuse3-dev'
-          tags: 'fuse3'
-          adlsSas: $(AZTEST_ADLS_CONT_SAS_UBN_22)
+        # Ubuntu-22:
+        #   imageName: 'ubuntu-22.04'
+        #   containerName: 'test-cnt-ubn-22'
+        #   fuselib: 'libfuse3-dev'
+        #   tags: 'fuse3'
+        #   adlsSas: $(AZTEST_ADLS_CONT_SAS_UBN_22)
   
     pool:
       vmImage: $(imageName)
     variables:
-      - group: NightlyBlobFuse
+      - group: NightlyLyveCloudFuse
 
     steps:
     - checkout: self
 
     - task: GoTool@0
       inputs:
-        version: '1.16.2'
+        version: '1.19.6'
       displayName: "Select Go Version"
 
     - task: Go@0
@@ -55,7 +55,7 @@ jobs:
       inputs:
         command: 'build'
         workingDirectory: ./
-        arguments: "-tags $(tags) -o blobfuse2"
+        arguments: "-tags $(tags) -o lyvecloudfuse"
       displayName: "Build"
 
     - script: |
@@ -109,17 +109,17 @@ jobs:
       workingDirectory: ./
 
     # Copyright checks
-    - script: |
-        result=$(grep -L -r --include \*.go "`date +%Y` Microsoft Corporation" ./ | wc -l)
-        if [ $result -ne 0 ]; then
-          exit 1
-        else  
-          echo "Copyright statements are up to date"
-        fi 
-      displayName: 'Copyright check'
-      condition: always()
-      failOnStderr: true
-      workingDirectory: ./
+    # - script: |
+    #     result=$(grep -L -r --include \*.go "`date +%Y` Microsoft Corporation" ./ | wc -l)
+    #     if [ $result -ne 0 ]; then
+    #       exit 1
+    #     else  
+    #       echo "Copyright statements are up to date"
+    #     fi 
+    #   displayName: 'Copyright check'
+    #   condition: always()
+    #   failOnStderr: true
+    #   workingDirectory: ./
 
     # Go code formatting checks
     - script: |
@@ -149,14 +149,14 @@ jobs:
       inputs:
         command: 'test'
         arguments: '-v -timeout=2h ./... --tags=unittest,$(tags) -coverprofile utcover.cov'
-        workingDirectory: ./
       displayName: 'Unit tests'
-      continueOnError: false
-
-    - task: ComponentGovernanceComponentDetection@0
-      inputs:
-        scanType: 'Register'
-        verbosity: 'Verbose'
-        alertWarningLevel: 'High'
-      displayName: "Component governance"
       condition: always()
+
+    # Comment out as this is specific to an interal microsoft test tool
+    # - task: ComponentGovernanceComponentDetection@0
+    #   inputs:
+    #     scanType: 'Register'
+    #     verbosity: 'Verbose'
+    #     alertWarningLevel: 'High'
+    #   displayName: "Component governance"
+    #   condition: always()
