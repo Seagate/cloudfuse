@@ -50,6 +50,17 @@ import (
 	"github.com/winfsp/cgofuse/fuse"
 )
 
+/* --- IMPORTANT NOTE ---
+In below code lot of places we are doing this sort of conversions:
+	- handle, exists := handlemap.Load(handlemap.HandleID(fh))
+or we are doing:
+	- handle.ID = (handlemap.HandleID)(fh)
+
+In lyve cloud fuse we maintain handles as an object stored in a handlemap. Cgofuse gives us handles as integer
+values so we need to do type conversions to conver those values to our Handle ID values that lyve cloud fuse
+uses so we convert the integer into a handle object.
+*/
+
 // CgofuseFS defines the file system with functions that interface with FUSE.
 type CgofuseFS struct {
 	// Implement the interface from cgofuse
