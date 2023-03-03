@@ -17,9 +17,8 @@ stages:
             AgentName: 'lyvecloudfuse-ubuntu20'
             imageName: 'ubuntu-20.04'
             containerName: 'test-cnt-ubn-20'
-            fuselib: 'libfuse3-dev'
-            fuselib2: 'fuse3'
-            tags: 'fuse3'
+            fuselib: 'libfuse-dev'
+            fuselib2: 'fuse2'
 
       pool:
         vmImage: $(imageName)
