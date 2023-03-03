@@ -35,7 +35,6 @@ package internal
 
 import (
 	"context"
-	"syscall"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/internal/handlemap"
@@ -138,5 +137,5 @@ type Component interface {
 	GetFileBlockOffsets(options GetFileBlockOffsetsOptions) (*common.BlockOffsetList, error)
 
 	FileUsed(name string) error
-	StatFs() (*syscall.Statfs_t, bool, error)
+	StatFs() (*common.Statfs_t, bool, error)
 }
