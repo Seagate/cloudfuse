@@ -1,5 +1,11 @@
 #!/bin/bash
 
+#let script exit if an unsed variable is used
+set -o nounset
+
+# Load variables
+source ./helper/var.env
+
 # Mount the directory
 source ./helper/mount.sh
 exit_code=$?
@@ -14,7 +20,7 @@ echo "-------------------------------------------------------------------"
 echo "Starting Stress Test"
 
 # run test
-go test -timeout=120m -v ../test/stress_test/stress_test.go -args -mnt-path=$mount_dir -quick=false
+go test -timeout=120m -v ../test/stress_test/stress_test.go -args -mnt-path=$MOUNT_DIR -quick=false
 
 # Cleanup test
 source ./helper/cleanup.sh
