@@ -140,6 +140,9 @@ func (suite *rootCmdSuite) TestGetRemoteVersionCurrentOlder() {
 	suite.assert.Contains(msg, "A new version of Lyvecloudfuse is available")
 }
 
+// Test failing until we update
+// TODO: We need to move this to our own version checking system rather than the one
+// linked to microsoft
 // func (suite *rootCmdSuite) TestGetRemoteVersionCurrentSame() {
 // 	defer suite.cleanupTest()
 // 	common.LyvecloudfuseVersion = common.LyvecloudfuseVersion_()
