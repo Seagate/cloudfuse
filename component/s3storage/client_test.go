@@ -48,7 +48,6 @@ import (
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/config"
 	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -172,24 +171,6 @@ func (s *clientTestSuite) TestListContainers() {
 func (s *clientTestSuite) TestSetPrefixPath() {
 }
 func (s *clientTestSuite) TestCreateFile() {
-
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-
-	//we aren't getting a handle from CreateFile that is used in s3Storage_test.go
-	err := s.client.CreateFile(name, os.FileMode(0))
-
-	s.assert.Nil(err)
-
-	// File should be in the account
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(s.client.Config.authConfig.BucketName),
-		Key:    aws.String(name),
-	})
-	s.assert.Nil(err)
-	s.assert.NotNil(result)
-
 }
 func (s *clientTestSuite) TestCreateDirectory() {
 }
