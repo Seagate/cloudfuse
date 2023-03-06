@@ -8,11 +8,10 @@ source ./helper/var.env
 
 # Cleanup
 source ./helper/cleanup.sh
-exit_code=$?
-if [ $exit_code -ne 0 ]; then
-    echo "command failed with exit code ${exit_code}"
+if [ $? -ne 0 ]; then
+    echo "command failed with exit code $?"
     echo "Stopping script"
-    exit $exit_code
+    exit $?
 fi
 
 # Mount step
@@ -26,7 +25,7 @@ echo "Checking for mount"
 sudo ps -aux | grep lyvecloudfuse
 
 # Delete the files in mount directory for test
-echo "Deleting files from mount directory with container mounted"
+#echo "Deleting files from mount directory with container mounted"
 #rm -rf $MOUNT_DIR/*
 
 #df | grep lyvecloudfuse

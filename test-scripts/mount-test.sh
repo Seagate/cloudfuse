@@ -8,11 +8,11 @@ source ./helper/var.env
 
 # Cleanup test
 source ./helper/cleanup.sh
-# if [ $exit_code -ne 0 ]; then
-#     echo "command failed with exit code ${exit_code}"
-#     echo "Stopping script"
-#     exit $exit_code
-# fi
+if [ $? -ne 0 ]; then
+    echo "command failed with exit code $?"
+    echo "Stopping script"
+    exit $?
+fi
 
 echo "-------------------------------------------------------------------"
 echo "Starting Mount Test"
