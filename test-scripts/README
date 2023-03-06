@@ -4,14 +4,17 @@ running on the CI/CD pipeline.
 
 To run follow the following steps:
 
-1. First check that the enviornment variables are correct. Do this
-   by checking the file in the helper folder called var.env which
-   stores environment variables. In particular a folder located at
+1. First go into the directory in the helper folder and run
+   ./setup.sh
+   
+   This will create a file that stores environment variables for the
+   tests. Some of the variables store locations where the tests will
+   be mounted and a cache folder. In particular the folders at
    ~/e2e-test  and  ~/e2e-temp are assumed to exist. So you will need
    to create these files. Additionally it assumed that the directory
    where lyvecloudfuse is installed is at ~/lyvecloudfuse. If your
    git repo is at a different folder then edit this variable in this
-   file (the file is included in .gitignore so don't worry about
+   file var.env (the file is included in .gitignore so don't worry about
    editing it).
 
 2. Ensure that you have a config.yaml file in the lyvecloudfuse 
