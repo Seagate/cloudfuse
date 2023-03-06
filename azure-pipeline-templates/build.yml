@@ -41,7 +41,7 @@ steps:
   # GoTool task used only for Microsoft Hosted Agents to install Go-lang
   - task: GoTool@0
     inputs:
-      version: '1.16.2'
+      version: '1.19.6'
     condition: ${{ parameters.hostedAgent }}
     displayName: "GoTool Setup"
 
@@ -49,7 +49,7 @@ steps:
   - task: ShellScript@2
     inputs:
       scriptPath: "${{ parameters.working_directory }}/go_installer.sh"
-      args: "${{ parameters.root_dir }}/ 1.16.2"
+      args: "${{ parameters.root_dir }}/ 1.19.6"
     condition: not(${{parameters.hostedAgent }})
     displayName: "GoTool Custom Setup"
 
@@ -65,7 +65,7 @@ steps:
   - task: Go@0
     inputs:
       command: 'build'
-      arguments: "-tags ${{ parameters.tags }} -o blobfuse2"
+      arguments: "-tags ${{ parameters.tags }} -o lyvecloudfuse"
       workingDirectory: ${{ parameters.working_directory }}
     displayName: "Go Build"
 
@@ -79,8 +79,8 @@ steps:
     
   #Verification of built binary
   - script: |
-      sudo chmod +x ${working_directory}/blobfuse2
-      ${working_directory}/blobfuse2 --version
+      sudo chmod +x ${working_directory}/lyvecloudfuse
+      ${working_directory}/lyvecloudfuse --version
     displayName: 'Test binary'
     env:
       working_directory: ${{ parameters.working_directory }}
