@@ -11,7 +11,7 @@ testname=$5
 outputPath=results_fio_$testname.txt
 rm $outputPath
 
-echo "| Case | latest v2 write IOPS | latest v2 read IOPS | v1 write IOPS | v2 read IOPS |" >> $outputPath
+echo "| Case | latest lcf write IOPS | latest lcf read IOPS | blob2 write IOPS | blob2 read IOPS |" >> $outputPath
 echo "| -- | -- | -- | -- | -- |" >> $outputPath
 
 for i in {1..5}; 
@@ -43,11 +43,11 @@ echo $fiocmd
 echo 
 
 # Mount Lyvecloudfuse
-./lyvecloudfuse mount $mntPath --config-file=$v2configPath &
+./lyvecloudfuse mount $mntPath --config-file=$v2configPath
 if [ $? -ne 0 ]; then
     exit 1
 fi
-sleep 3
+sleep 12
 ps -aux | grep lyvecloudfuse
 
 sed_line=3
@@ -80,20 +80,20 @@ do
 done
 sudo fusermount3 -u $mntPath
 
-# Mount Blobfuse
-blobfuse $mntPath --tmp-path=$tmpPath --config-file=$v1configPath --log-level=LOG_ERR --file-cache-timeout-in-seconds=0 --use-attr-cache=true
+# Mount Blobfuse2
+blobfuse2 mount $mntPath --config-file=$v2configPath
 if [ $? -ne 0 ]; then
     exit 1
 fi
-sleep 3
-ps -aux | grep blobfuse
+sleep 12
+ps -aux | grep blobfuse2
 
 sed_line=3
 blobfuse_write_average=0
 blobfuse_read_average=0
 for i in {1..5}; 
 do 
-	echo "Blobfuse Run $i"
+	echo "Blobfuse2 Run $i"
 
     fio_result=`$fiocmd$i`
     echo $fio_result
