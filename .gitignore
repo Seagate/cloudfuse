@@ -21,3 +21,4 @@ lint.log
 azure-storage-fuse
 bfusemon
 **/lyvecloudfuse-logs.txt
+test-scripts/helper/var.env
