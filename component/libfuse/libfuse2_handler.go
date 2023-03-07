@@ -268,11 +268,7 @@ func (cf *CgofuseFS) Opendir(path string) (int, uint64) {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	if name != "" {
-		if runtime.GOOS == "windows" {
-			name = name + "\\"
-		} else {
-			name = name + "/"
-		}
+		name = name + "/"
 	}
 
 	log.Trace("Libfuse::Opendir : %s", name)
