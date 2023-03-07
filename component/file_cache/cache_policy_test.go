@@ -76,7 +76,7 @@ func (suite *cachePolicyTestSuite) TestGetUsage() {
 // We should return the sector size used. Here there should be two sectors used
 func (suite *cachePolicyTestSuite) TestGetUsageSizeOnDisk() {
 	defer suite.cleanupTest()
-	f, _ := os.Create(filepath.Join(cache_path, "test"))
+	f, _ := os.Create(cache_path + "/test")
 	data := make([]byte, 4097)
 	f.Write(data)
 	result := getUsage(cache_path)
