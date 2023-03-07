@@ -15,7 +15,7 @@
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="5" column="0">
-    <widget class="QToolButton" name="advanced_settings">
+    <widget class="QToolButton" name="button_advancedSettings">
      <property name="maximumSize">
       <size>
        <width>150</width>
@@ -28,7 +28,7 @@
     </widget>
    </item>
    <item row="1" column="3" colspan="2">
-    <widget class="QGroupBox" name="filecache_groupbox">
+    <widget class="QGroupBox" name="groupbox_filecache">
      <property name="title">
       <string/>
      </property>
@@ -43,10 +43,10 @@
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="fileCache_path_input"/>
+         <widget class="QLineEdit" name="lineEdit_fileCache_path"/>
         </item>
         <item>
-         <widget class="QPushButton" name="browse_button">
+         <widget class="QPushButton" name="button_browse">
           <property name="text">
            <string>Browse</string>
           </property>
@@ -101,7 +101,7 @@
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
-        <widget class="QLineEdit" name="libfuse_attExp_input">
+        <widget class="QLineEdit" name="lineEdit_libfuse_attributeExp">
          <property name="maximumSize">
           <size>
            <width>30</width>
@@ -114,7 +114,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="libfuse_entExp_input">
+        <widget class="QLineEdit" name="lineEdit_libfuse_entryExp">
          <property name="maximumSize">
           <size>
            <width>30</width>
@@ -127,7 +127,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="libfuse_negEntryExp_input">
+        <widget class="QLineEdit" name="lineEdit_libfuse_negEntryExp">
          <property name="maximumSize">
           <size>
            <width>30</width>
@@ -140,7 +140,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QComboBox" name="libfuse_permissions_select">
+        <widget class="QComboBox" name="dropDown_libfuse_permissions">
          <property name="toolTip">
           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Default permissions to be presented for block blobs&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
@@ -167,7 +167,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QComboBox" name="pipeline_select">
+        <widget class="QComboBox" name="dropDown_pipeline">
          <property name="toolTip">
           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Set up the pipeline for LyveFuse. &lt;/p&gt;&lt;p&gt;Choose streaming or file caching&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
@@ -188,7 +188,7 @@
     </layout>
    </item>
    <item row="0" column="3">
-    <widget class="QGroupBox" name="sas_storage_groupbox">
+    <widget class="QGroupBox" name="groupbox_sas_storage">
      <property name="title">
       <string/>
      </property>
@@ -203,7 +203,7 @@
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="azSasStorage_input">
+         <widget class="QLineEdit" name="lineEdit_azure_sasStorage">
           <property name="enabled">
            <bool>true</bool>
           </property>
@@ -223,7 +223,7 @@
       <enum>QLayout::SetMinimumSize</enum>
      </property>
      <item>
-      <widget class="QCheckBox" name="commonConfig_multiuser_checkbox">
+      <widget class="QCheckBox" name="checkbox_commonConfig_multiUser">
        <property name="toolTip">
         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select to allow multiple users to access the container&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
@@ -236,28 +236,28 @@
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="commonConfig_nonEmptyDir_checkbox">
+      <widget class="QCheckBox" name="checkbox_commonConfig_nonEmptyDir">
        <property name="text">
         <string>Non-empty directory mount</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="commonConfig_readOnly_checkbox">
+      <widget class="QCheckBox" name="checkbox_commonConfig_readOnly">
        <property name="text">
         <string>Read-only mount</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="daemonForeground_checkbox">
+      <widget class="QCheckBox" name="checkbox_daemonForeground">
        <property name="text">
         <string>Run in foreground</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="libfuse_ignoreAppend_checkbox">
+      <widget class="QCheckBox" name="checkbox_libfuse_ignoreAppend">
        <property name="text">
         <string>Ignore append/write only flags</string>
        </property>
@@ -269,7 +269,7 @@
     </layout>
    </item>
    <item row="1" column="3" colspan="2">
-    <widget class="QGroupBox" name="streaming_groupbox">
+    <widget class="QGroupBox" name="groupbox_streaming">
      <property name="title">
       <string/>
      </property>
@@ -311,7 +311,7 @@
         <item>
          <layout class="QVBoxLayout" name="verticalLayout_5">
           <item>
-           <widget class="QComboBox" name="streaming_fileCachingLevel_select">
+           <widget class="QComboBox" name="dropDown_streaming_fileCachingLevel">
             <item>
              <property name="text">
               <string>Handle level</string>
@@ -325,7 +325,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="streaming_blksz_input">
+           <widget class="QLineEdit" name="lineEdit_streaming_blockSize">
             <property name="maximumSize">
              <size>
               <width>75</width>
@@ -341,7 +341,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="streaming_mxbuff_input">
+           <widget class="QLineEdit" name="lineEdit_streaming_maxBuff">
             <property name="maximumSize">
              <size>
               <width>75</width>
@@ -357,7 +357,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="streaming_buffsz_input">
+           <widget class="QLineEdit" name="lineEdit_streaming_buffSize">
             <property name="maximumSize">
              <size>
               <width>75</width>
@@ -380,7 +380,7 @@
     </widget>
    </item>
    <item row="0" column="3">
-    <widget class="QGroupBox" name="accnt_key_groupbox">
+    <widget class="QGroupBox" name="groupbox_account_key">
      <property name="title">
       <string/>
      </property>
@@ -395,7 +395,7 @@
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="azAccountKey_input"/>
+         <widget class="QLineEdit" name="lineEdit_azure_accountKey"/>
         </item>
        </layout>
       </item>
@@ -446,7 +446,7 @@
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_6">
        <item>
-        <widget class="QComboBox" name="AzTypesettings_select">
+        <widget class="QComboBox" name="dropDown_azure_storageType">
          <item>
           <property name="text">
            <string>block</string>
@@ -460,16 +460,16 @@
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="azAccountName_input"/>
+        <widget class="QLineEdit" name="lineEdit_azure_accountName"/>
        </item>
        <item>
-        <widget class="QLineEdit" name="azContainer_input"/>
+        <widget class="QLineEdit" name="lineEdit_azure_container"/>
        </item>
        <item>
-        <widget class="QLineEdit" name="azEndpoint_input"/>
+        <widget class="QLineEdit" name="lineEdit_azure_endpoint"/>
        </item>
        <item>
-        <widget class="QComboBox" name="azModesettings_select">
+        <widget class="QComboBox" name="dropDown_azure_modeSetting">
          <item>
           <property name="text">
            <string>key</string>
@@ -497,7 +497,7 @@
     </layout>
    </item>
    <item row="0" column="3">
-    <widget class="QGroupBox" name="msi_groupbox">
+    <widget class="QGroupBox" name="groupbox_msi">
      <property name="title">
       <string/>
      </property>
@@ -514,7 +514,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="azMsiAppid_input">
+           <widget class="QLineEdit" name="lineEdit_azure_msiAppID">
             <property name="enabled">
              <bool>true</bool>
             </property>
@@ -532,7 +532,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="azMsiResourceid_input">
+           <widget class="QLineEdit" name="lineEdit_azure_msiResourceID">
             <property name="enabled">
              <bool>true</bool>
             </property>
@@ -553,7 +553,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="azMsiObjectid_input">
+           <widget class="QLineEdit" name="lineEdit_azure_msiObjectID">
             <property name="enabled">
              <bool>true</bool>
             </property>
@@ -570,7 +570,7 @@
     </widget>
    </item>
    <item row="0" column="3">
-    <widget class="QGroupBox" name="spn_groupbox">
+    <widget class="QGroupBox" name="groupbox_spn">
      <property name="title">
       <string/>
      </property>
@@ -587,7 +587,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="azSpnTenantid_input">
+           <widget class="QLineEdit" name="lineEdit_azure_spnTenantID">
             <property name="enabled">
              <bool>true</bool>
             </property>
@@ -605,7 +605,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="azSpnclientid_input">
+           <widget class="QLineEdit" name="lineEdit_azure_spnClientID">
             <property name="enabled">
              <bool>true</bool>
             </property>
@@ -626,7 +626,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="azSpnClientSecret_input">
+           <widget class="QLineEdit" name="lineEdit_azure_spnClientSecret">
             <property name="enabled">
              <bool>true</bool>
             </property>
@@ -643,7 +643,7 @@
     </widget>
    </item>
    <item row="5" column="3">
-    <widget class="QPushButton" name="okay_button">
+    <widget class="QPushButton" name="button_okay">
      <property name="maximumSize">
       <size>
        <width>100</width>
@@ -659,7 +659,7 @@
     </widget>
    </item>
    <item row="3" column="0">
-    <widget class="QPushButton" name="resetDefautSettings">
+    <widget class="QPushButton" name="button_resetDefaultSettings">
      <property name="enabled">
       <bool>true</bool>
      </property>

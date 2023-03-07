@@ -15,7 +15,7 @@
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="1" column="2">
-    <widget class="QGroupBox" name="azure_groupbox">
+    <widget class="QGroupBox" name="groupbox_azure">
      <property name="title">
       <string>Azure Bucket</string>
      </property>
@@ -126,27 +126,27 @@
         <item>
          <layout class="QVBoxLayout" name="verticalLayout_16">
           <item>
-           <widget class="QLineEdit" name="azAadEndpoint_input"/>
+           <widget class="QLineEdit" name="lineEdit_azure_aadEndpoint"/>
           </item>
           <item>
-           <widget class="QLineEdit" name="azSubdirectory_input"/>
+           <widget class="QLineEdit" name="lineEdit_azure_subDirectory"/>
           </item>
           <item>
-           <widget class="QLineEdit" name="azblocksize_input">
+           <widget class="QLineEdit" name="lineEdit_azure_blockSize">
             <property name="text">
              <string>16</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="azMaxconcurrency_input">
+           <widget class="QLineEdit" name="lineEdit_azure_maxConcurrency">
             <property name="text">
              <string>32</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QComboBox" name="azblobtier_input">
+           <widget class="QComboBox" name="dropDown_azure_blobTier">
             <item>
              <property name="text">
               <string>none</string>
@@ -170,48 +170,48 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="azBlocklistOnmount_input">
+           <widget class="QLineEdit" name="lineEdit_azure_blockOnMount">
             <property name="text">
              <string>0</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="azMaxretries_input">
+           <widget class="QLineEdit" name="lineEdit_azure_maxRetries">
             <property name="text">
              <string>5</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="azMaxretrytimeout_input">
+           <widget class="QLineEdit" name="lineEdit_azure_maxRetryTimeout">
             <property name="text">
              <string>900</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="azRetrybackoffs">
+           <widget class="QLineEdit" name="lineEdit_azure_retryBackoff">
             <property name="text">
              <string>4</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="azMaxretrydelay_input">
+           <widget class="QLineEdit" name="lineEdit_azure_maxRetryDelay">
             <property name="text">
              <string>60</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="azHttpproxy_input"/>
+           <widget class="QLineEdit" name="lineEdit_azure_httpProxy"/>
           </item>
           <item>
-           <widget class="QLineEdit" name="azHttpsproxy_input"/>
+           <widget class="QLineEdit" name="lineEdit_azure_httpsProxy"/>
           </item>
           <item>
-           <widget class="QLineEdit" name="azAuthresource_input"/>
+           <widget class="QLineEdit" name="lineEdit_azure_authResource"/>
           </item>
          </layout>
         </item>
@@ -220,7 +220,7 @@
       <item row="0" column="1">
        <layout class="QVBoxLayout" name="verticalLayout_18">
         <item>
-         <widget class="QCheckBox" name="azUseHttp">
+         <widget class="QCheckBox" name="checkbox_azure_useHttp">
           <property name="toolTip">
            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use http instead of https&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
           </property>
@@ -230,35 +230,35 @@
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="azValidatemd5_checkbox">
+         <widget class="QCheckBox" name="checkbox_azure_validateMd5">
           <property name="text">
            <string>Validate md5 (file cache only)</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="azUpdatemd5_checkbox">
+         <widget class="QCheckBox" name="checkbox_azure_updateMd5">
           <property name="text">
            <string>Update md5 (file cache only)</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="azFailUnsupportedops_checkbox">
+         <widget class="QCheckBox" name="checkbox_azure_failUnsupportedOps">
           <property name="text">
            <string>Fail Unsupported Ops</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="azSdktrace_checkbox">
+         <widget class="QCheckBox" name="checkbox_azure_sdkTrace">
           <property name="text">
            <string>Sdk trace</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="azVirtualdirectory_checkbox">
+         <widget class="QCheckBox" name="checkbox_azure_virtualDirectory">
           <property name="text">
            <string>Virtual directory</string>
           </property>
@@ -270,7 +270,7 @@
     </widget>
    </item>
    <item row="3" column="0">
-    <widget class="QPushButton" name="resetDefautSettings">
+    <widget class="QPushButton" name="button_resetDefaultSettings">
      <property name="enabled">
       <bool>true</bool>
      </property>
@@ -292,7 +292,7 @@
     </widget>
    </item>
    <item row="3" column="2">
-    <widget class="QPushButton" name="okay_button">
+    <widget class="QPushButton" name="button_okay">
      <property name="maximumSize">
       <size>
        <width>100</width>
@@ -308,7 +308,7 @@
     </widget>
    </item>
    <item row="1" column="0">
-    <widget class="QGroupBox" name="filecache_groupbox">
+    <widget class="QGroupBox" name="groupbox_fileCache">
      <property name="title">
       <string>File Caching</string>
      </property>
@@ -366,7 +366,7 @@
           <item>
            <layout class="QVBoxLayout" name="verticalLayout_7">
             <item>
-             <widget class="QComboBox" name="fileCache_evictionPolicy_select">
+             <widget class="QComboBox" name="dropDown_fileCache_evictionPolicy">
               <item>
                <property name="text">
                 <string>lru - least recently used</string>
@@ -380,7 +380,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="fileCache_timeout_input">
+             <widget class="QLineEdit" name="lineEdit_fileCache_timeout">
               <property name="maximumSize">
                <size>
                 <width>30</width>
@@ -396,7 +396,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="fileCache_maxEviction_input">
+             <widget class="QLineEdit" name="lineEdit_fileCache_maxEviction">
               <property name="maximumSize">
                <size>
                 <width>75</width>
@@ -412,7 +412,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="fileCache_maxCacheSize_input">
+             <widget class="QLineEdit" name="lineEdit_fileCache_maxCacheSize">
               <property name="maximumSize">
                <size>
                 <width>75</width>
@@ -431,7 +431,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="fileCache_evictMaxThresh_input">
+             <widget class="QLineEdit" name="lineEdit_fileCache_evictMaxThresh">
               <property name="maximumSize">
                <size>
                 <width>30</width>
@@ -447,7 +447,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="fileCache_evictMinThresh_input">
+             <widget class="QLineEdit" name="lineEdit_fileCache_evictMinThresh">
               <property name="maximumSize">
                <size>
                 <width>30</width>
@@ -467,35 +467,35 @@
          </layout>
         </item>
         <item>
-         <widget class="QCheckBox" name="fileCache_allowNonEmptyTmp_checkbox">
+         <widget class="QCheckBox" name="checkbox_fileCache_allowNonEmptyTmp">
           <property name="text">
            <string>Allow non-empty temp</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="fileCache_policyLogs_checkbox">
+         <widget class="QCheckBox" name="checkbox_fileCache_policyLogs">
           <property name="text">
            <string>Policy logs</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="fileCache_createEmptyFile_checkbox">
+         <widget class="QCheckBox" name="checkbox_fileCache_createEmptyFile">
           <property name="text">
            <string>Create empty file</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="fileCache_cleanupStart_checkbox">
+         <widget class="QCheckBox" name="checkbox_fileCache_cleanupStart">
           <property name="text">
            <string>Cleanup on start</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="fileCache_offloadIO_checkbox">
+         <widget class="QCheckBox" name="checkbox_fileCache_offloadIO">
           <property name="text">
            <string>Offload io</string>
           </property>
@@ -507,7 +507,7 @@
     </widget>
    </item>
    <item row="2" column="0">
-    <widget class="QCheckBox" name="libfuse_disableWriteback_checkbox">
+    <widget class="QCheckBox" name="checkbox_libfuse_disableWriteback">
      <property name="text">
       <string>Disable write-back cache</string>
      </property>

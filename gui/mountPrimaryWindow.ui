@@ -40,10 +40,10 @@
        </widget>
       </item>
       <item>
-       <widget class="QLineEdit" name="mountPoint_input"/>
+       <widget class="QLineEdit" name="lineEdit_mountPoint"/>
       </item>
       <item>
-       <widget class="QPushButton" name="browse_button">
+       <widget class="QPushButton" name="button_browse">
         <property name="text">
          <string>Browse</string>
         </property>
@@ -61,7 +61,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QComboBox" name="bucket_select">
+       <widget class="QComboBox" name="dropDown_bucketSelect">
         <property name="toolTip">
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Set up the pipeline for LyveFuse. &lt;/p&gt;&lt;p&gt;Choose streaming or file caching&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
@@ -81,7 +81,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="config_button">
+       <widget class="QPushButton" name="button_config">
         <property name="text">
          <string>Config</string>
         </property>
@@ -90,21 +90,21 @@
      </layout>
     </item>
     <item row="2" column="0">
-     <widget class="QPushButton" name="mount_button">
+     <widget class="QPushButton" name="button_mount">
       <property name="text">
        <string>Mount</string>
       </property>
      </widget>
     </item>
     <item row="2" column="1">
-     <widget class="QPushButton" name="unmount_button">
+     <widget class="QPushButton" name="button_unmount">
       <property name="text">
        <string>Unmount</string>
       </property>
      </widget>
     </item>
     <item row="3" column="0" colspan="3">
-     <widget class="QTextEdit" name="output_textEdit">
+     <widget class="QTextEdit" name="textEdit_output">
       <property name="sizePolicy">
        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Expanding">
         <horstretch>0</horstretch>
@@ -156,15 +156,15 @@
      <height>22</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menuDebug">
+   <widget class="QMenu" name="menu_Debug">
     <property name="title">
      <string>Debug</string>
     </property>
-    <addaction name="debugLogging_action"/>
-    <addaction name="debugHealthMonitor_action"/>
-    <addaction name="debugTesting_action"/>
+    <addaction name="action_debugLogging"/>
+    <addaction name="action_debugHealthMonitor"/>
+    <addaction name="action_debugTesting"/>
    </widget>
-   <addaction name="menuDebug"/>
+   <addaction name="menu_Debug"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionReset_Default_Settings">
@@ -177,17 +177,17 @@
     <string>Advanced</string>
    </property>
   </action>
-  <action name="debugLogging_action">
+  <action name="action_debugLogging">
    <property name="text">
     <string>Logging</string>
    </property>
   </action>
-  <action name="debugHealthMonitor_action">
+  <action name="action_debugHealthMonitor">
    <property name="text">
     <string>Health Monitor</string>
    </property>
   </action>
-  <action name="debugTesting_action">
+  <action name="action_debugTesting">
    <property name="text">
     <string>Testing</string>
    </property>
