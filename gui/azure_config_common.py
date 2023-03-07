@@ -18,11 +18,11 @@ class azureSettingsWidget(QWidget, Ui_Form):
         self.showModeSettings()
 
         # Set up signals
-        self.pipeline_select.currentIndexChanged.connect(self.showModeSettings)
-        self.azModesettings_select.currentIndexChanged.connect(self.showAzureModeSettings)
-        self.browse_button.clicked.connect(self.getFileDirInput)
-        self.okay_button.clicked.connect(self.exitWindow)
-        self.advanced_settings.clicked.connect(self.openAdvanced)
+        self.dropDown_pipeline.currentIndexChanged.connect(self.showModeSettings)
+        self.dropDown_azure_modeSetting.currentIndexChanged.connect(self.showAzureModeSettings)
+        self.button_browse.clicked.connect(self.getFileDirInput)
+        self.button_okay.clicked.connect(self.exitWindow)
+        self.button_advancedSettings.clicked.connect(self.openAdvanced)
     
     
     
@@ -37,11 +37,11 @@ class azureSettingsWidget(QWidget, Ui_Form):
         
         self.hideModeBoxes()
         
-        match self.pipeline_select.currentIndex():
+        match self.dropDown_pipeline.currentIndex():
             case 0:
-                self.filecache_groupbox.setVisible(True)
+                self.groupbox_fileCache.setVisible(True)
             case 1:
-                self.streaming_groupbox.setVisible(True)
+                self.groupbox_streaming.setVisible(True)
             
 
     def showAzureModeSettings(self):
@@ -49,30 +49,30 @@ class azureSettingsWidget(QWidget, Ui_Form):
         self.hideAzureBoxes()
         
         # Azure mode group boxes
-        match self.azModesettings_select.currentIndex():
+        match self.dropDown_azure_modeSetting.currentIndex():
             case 0:
-                self.accnt_key_groupbox.setVisible(True)
+                self.groupbox_accountKey.setVisible(True)
             case 1:
-                self.sas_storage_groupbox.setVisible(True)
+                self.groupbox_sasStorage.setVisible(True)
             case 2:
-                self.spn_groupbox.setVisible(True)
+                self.groupbox_spn.setVisible(True)
             case 3:
-                self.msi_groupbox.setVisible(True)  
+                self.groupbox_msi.setVisible(True)  
         
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
-        self.fileCache_path_input.setText('{}'.format(directory))
+        self.lineEdit_fileCache_path.setText('{}'.format(directory))
         
     def hideModeBoxes(self):
-        self.filecache_groupbox.setVisible(False)
-        self.streaming_groupbox.setVisible(False)
+        self.groupbox_fileCache.setVisible(False)
+        self.groupbox_streaming.setVisible(False)
         
         
     def hideAzureBoxes(self):
-        self.accnt_key_groupbox.setVisible(False)
-        self.sas_storage_groupbox.setVisible(False)
-        self.spn_groupbox.setVisible(False)
-        self.msi_groupbox.setVisible(False)
+        self.groupbox_accountKey.setVisible(False)
+        self.groupbox_sasStorage.setVisible(False)
+        self.groupbox_spn.setVisible(False)
+        self.groupbox_msi.setVisible(False)
         
         
     def exitWindow(self):

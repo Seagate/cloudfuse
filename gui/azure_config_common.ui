@@ -28,7 +28,7 @@
     </widget>
    </item>
    <item row="1" column="3" colspan="2">
-    <widget class="QGroupBox" name="groupbox_filecache">
+    <widget class="QGroupBox" name="groupbox_fileCache">
      <property name="title">
       <string/>
      </property>
@@ -188,7 +188,7 @@
     </layout>
    </item>
    <item row="0" column="3">
-    <widget class="QGroupBox" name="groupbox_sas_storage">
+    <widget class="QGroupBox" name="groupbox_sasStorage">
      <property name="title">
       <string/>
      </property>
@@ -380,7 +380,7 @@
     </widget>
    </item>
    <item row="0" column="3">
-    <widget class="QGroupBox" name="groupbox_account_key">
+    <widget class="QGroupBox" name="groupbox_accountKey">
      <property name="title">
       <string/>
      </property>

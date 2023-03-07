@@ -14,10 +14,10 @@ class lyveSettingsWidget(QWidget, Ui_Form):
         self.setWindowTitle("LyveCloud Config Settings")
         self.showModeSettings()
        
-        self.pipeline_select.currentIndexChanged.connect(self.showModeSettings)
-        self.browse_button.clicked.connect(self.getFileDirInput)
-        self.okay_button.clicked.connect(self.exitWindow)
-        self.advanced_settings.clicked.connect(self.openAdvanced)
+        self.dropDown_pipeline.currentIndexChanged.connect(self.showModeSettings)
+        self.button_browse.clicked.connect(self.getFileDirInput)
+        self.button_okay.clicked.connect(self.exitWindow)
+        self.button_advancedSettings.clicked.connect(self.openAdvanced)
 
     # Set up slots
     def openAdvanced(self):
@@ -28,20 +28,20 @@ class lyveSettingsWidget(QWidget, Ui_Form):
         
         self.hideModeBoxes()
        
-        match self.pipeline_select.currentIndex():
+        match self.dropDown_pipeline.currentIndex():
             case 0:
-                self.filecache_groupbox.setVisible(True)
+                self.groupbox_fileCache.setVisible(True)
             case 1:
-                self.streaming_groupbox.setVisible(True)
+                self.groupbox_streaming.setVisible(True)
 
             
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
-        self.fileCache_path_input.setText('{}'.format(directory))
+        self.lineEdit_fileCache_path.setText('{}'.format(directory))
         
     def hideModeBoxes(self):
-        self.filecache_groupbox.setVisible(False)
-        self.streaming_groupbox.setVisible(False)        
+        self.groupbox_fileCache.setVisible(False)
+        self.groupbox_streaming.setVisible(False)        
         
     def exitWindow(self):
         self.close()

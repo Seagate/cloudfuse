@@ -12,8 +12,6 @@ from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
 from lyve_config_common import lyveSettingsWidget
 from azure_config_common import azureSettingsWidget
 
-
-
 bucketOptions = {
     "Lyve" : 0,
     "Azure" : 1
@@ -27,18 +25,19 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.setWindowTitle("LyveCloud FUSE")
 
 
-        # Set up the signals for this window
-        self.setup_action.triggered.connect(self.showSettingsWidget)
-        self.browse_button.clicked.connect(self.getFileDirInput)
-        self.config_button.clicked.connect(self.showSettingsWidget)
-        self.mount_button.clicked.connect(self.mountBucket)
-        self.unmount_button.clicked.connect(self.unmountBucket)
+        # Set up the signals for all the interactable intities
+        self.button_browse.clicked.connect(self.getFileDirInput)
+        self.button_config.clicked.connect(self.showSettingsWidget)
+        self.button_mount.clicked.connect(self.mountBucket)
+        self.button_unmount.clicked.connect(self.unmountBucket)
 
     # Define the slots that will be triggered when the signals in Qt are activated
 
+    # There are unique settings per bucket selected for the pipeline, 
+    # so we must use different widgets to show the different settings
     def showSettingsWidget(self):
 
-        mountTarget = self.bucket_select.currentIndex()
+        mountTarget = self.dropDown_bucketSelect.currentIndex()
         
         if mountTarget == bucketOptions['Lyve']:
             self.settings = lyveSettingsWidget()
@@ -46,40 +45,44 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             self.settings = azureSettingsWidget()
         self.settings.show()
 
-
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
-        self.mountPoint_input.setText('{}'.format(directory))
+        self.lineEdit_mountPoint.setText('{}'.format(directory))
 
     def mountBucket(self):
         msg = QtWidgets.QMessageBox()
-        if self.bucket_select.currentIndex() != bucketOptions["Azure"]:
+        
+        # TODO: remove temporary message when lyve is enabled
+        if self.dropDown_bucketSelect.currentIndex() != bucketOptions["Azure"]:
             msg.setWindowTitle("Error")
             msg.setText("S3 bucket not enabled yet, use an Azure bucket for now")
-            x = msg.exec()  # Show the message box
+            # Show the message box
+            x = msg.exec()
             return
         try:
-            directory = str(self.mountPoint_input.text())
+            directory = str(self.lineEdit_mountPoint.text())
             
             if platform == "win32":
+                # Windows mount has a quirk where the folder shouldn't exist yet,
+                # add lyveCloudFuse at the end of the directory 
                 directory = directory+'/lyveCloudFuse'
                 mount = subprocess.Popen([".\lyvecloudfuse.exe", "mount", directory, "--config-file=.\config.yaml"], stdout=subprocess.PIPE)
+                
                 # TODO: For future use to get output on Popen
-                # for line in mount.stdout.readlines():    
+                #   for line in mount.stdout.readlines():    
             else:            
                 mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"])#,capture_output=True)
+                
+                # Print to the text edit window the results of the mount
                 if mount.returncode == 0:
-                    # Print to the text edit window on success.  
-                    self.output_textEdit.setText("Successfully mounted container\n")
+                    self.textEdit_output.setText("Successfully mounted container\n")
                 else:
-                    self.output_textEdit.setText("!!Error mounting container!!\n")# + mount.stdout.decode())
-                    
+                    self.textEdit_output.setText("!!Error mounting container!!\n")# + mount.stdout.decode())
                     # Get the users attention by popping open a new window on an error
                     msg.setWindowTitle("Error")
                     msg.setText("Error mounting container - check the settings and try again")
-                    x = msg.exec()  # Show the message box
-            
-
+                    # Show the message box
+                    x = msg.exec()
         except ValueError:
             pass
 
@@ -87,12 +90,14 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         msg = QtWidgets.QMessageBox()
         try:
             unmount = subprocess.run(["./lyvecloudfuse", "unmount", "all"],capture_output=True)
+            # Print to the text edit window the results of the unmount
             if unmount.returncode == 0:
-                self.output_textEdit.setText("Successfully unmounted container\n" + unmount.stdout.decode())
+                self.textEdit_output.setText("Successfully unmounted container\n" + unmount.stdout.decode())
             else:
-                self.output_textEdit.setText("!!Error unmounting container!!\n" + unmount.stdout.decode())
+                self.textEdit_output.setText("!!Error unmounting container!!\n" + unmount.stdout.decode())
                 msg.setWindowTitle("Error")
                 msg.setText("Error unmounting container - check the logs")
-                x = msg.exec()  # Show the message box
+                # Show the message box
+                x = msg.exec()
         except ValueError:
             pass
