@@ -180,9 +180,13 @@ func (s *clientTestSuite) TestDeleteFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	s.client.CreateFile(name, os.FileMode(0))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
 
-	err := s.client.DeleteFile(name)
+	err = s.client.DeleteFile(name)
 	s.assert.Nil(err)
 
 	// This is similar to the s3 bucket command, use getobject for now
@@ -200,11 +204,16 @@ func (s *clientTestSuite) TestDeleteDirectory() {
 func (s *clientTestSuite) TestRenameFile() {
 	defer s.cleanupTest()
 	// Setup
+
 	src := generateFileName()
-	s.client.CreateFile(src, os.FileMode(0))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(src),
+	})
+	s.assert.Nil(err)
 	dst := generateFileName()
 
-	err := s.client.RenameFile(src, dst)
+	err = s.client.RenameFile(src, dst)
 	s.assert.Nil(err)
 
 	// Src should not be in the account
