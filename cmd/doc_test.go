@@ -37,7 +37,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"lyvecloudfuse/common"
@@ -69,7 +68,7 @@ func (suite *docTestSuite) cleanupTest() {
 func (suite *docTestSuite) TestDocsGeneration() {
 	defer suite.cleanupTest()
 
-	opDir := filepath.Join("tmp", "docs_"+randomString(6))
+	opDir := "/tmp/docs_" + randomString(6)
 	defer os.RemoveAll(opDir)
 
 	_, err := executeCommandC(rootCmd, "doc", fmt.Sprintf("--output-location=%s", opDir))
@@ -82,7 +81,7 @@ func (suite *docTestSuite) TestDocsGeneration() {
 func (suite *docTestSuite) TestOutputDirCreationError() {
 	defer suite.cleanupTest()
 
-	opDir := filepath.Join("var", "docs_"+randomString(6))
+	opDir := "/var/docs_" + randomString(6)
 
 	op, err := executeCommandC(rootCmd, "doc", fmt.Sprintf("--output-location=%s", opDir))
 	suite.assert.NotNil(err)
@@ -92,7 +91,7 @@ func (suite *docTestSuite) TestOutputDirCreationError() {
 func (suite *docTestSuite) TestDocsGenerationError() {
 	defer suite.cleanupTest()
 
-	opDir := filepath.Join("var")
+	opDir := "/var"
 
 	op, err := executeCommandC(rootCmd, "doc", fmt.Sprintf("--output-location=%s", opDir))
 	suite.assert.NotNil(err)
