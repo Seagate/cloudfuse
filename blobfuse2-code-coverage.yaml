@@ -1,4 +1,4 @@
-# Blobfuse2 Nightly Build-Sanity Pipeline
+# lyvecloudfuse Nightly Build-Sanity Pipeline
 
 # In case of failure on a Self-Hosted Agent perform the following steps to get the vm back online:
 # 1. Check which vm is offline by going to agent-pools in Azure pipelines portal
@@ -26,59 +26,59 @@ stages:
           timeoutInMinutes: 300
           strategy:
             matrix:
-              Ubuntu-18:
-                AgentName: 'blobfuse-ubuntu18'
-                imageName: 'ubuntu-18.04'
-                containerName: 'test-cnt-ubn-18'
-                fuselib: 'libfuse-dev'
-                fuselib2: 'fuse'
-                tags: 'fuse2'
+              # Ubuntu-18:
+              #   AgentName: 'lyvecloudfuse-ubuntu18'
+              #   imageName: 'ubuntu-18.04'
+              #   containerName: 'test-cnt-ubn-18'
+              #   fuselib: 'libfuse-dev'
+              #   fuselib2: 'fuse'
+              #   tags: 'fuse2'
               Ubuntu-20:
-                AgentName: 'blobfuse-ubuntu20'
+                AgentName: 'lyvecloudfuse-ubuntu20'
                 imageName: 'ubuntu-20.04'
                 containerName: 'test-cnt-ubn-20'
-                fuselib: 'libfuse3-dev'
-                fuselib2: 'fuse3'
-                tags: 'fuse3'          
+                fuselib: 'libfuse-dev'
+                fuselib2: 'fuse'        
 
           pool:
-            name: "blobfuse-ubuntu-pool"
-            demands:
-              - ImageOverride -equals $(AgentName)
+            vmImage: $(imageName)
+            # name: "lyvecloudfuse-ubuntu-pool"
+            # demands:
+            #   - ImageOverride -equals $(AgentName)
 
           variables:
-            - group: NightlyBlobFuse
+            - group: NightlyLyveCloudFuse
             - name: MOUNT_DIR
               value: '$(Pipeline.Workspace)/blob_mnt'
             - name: TEMP_DIR
-              value: '$(Pipeline.Workspace)/blobfuse2_tmp'
-            - name: BLOBFUSE2_CFG
-              value: '$(Pipeline.Workspace)/blobfuse2.yaml'
-            - name: BLOBFUSE2_STREAM_CFG
-              value: '$(Pipeline.Workspace)/blobfuse2_stream.yaml'
-            - name: BLOBFUSE2_ADLS_CFG
-              value: '$(Pipeline.Workspace)/blobfuse2.adls.yaml'
+              value: '$(Pipeline.Workspace)/lyvecloudfuse_tmp'
+            - name: lyvecloudfuse_CFG
+              value: '$(Pipeline.Workspace)/lyvecloudfuse.yaml'
+            - name: lyvecloudfuse_STREAM_CFG
+              value: '$(Pipeline.Workspace)/lyvecloudfuse_stream.yaml'
+            - name: lyvecloudfuse_ADLS_CFG
+              value: '$(Pipeline.Workspace)/lyvecloudfuse.adls.yaml'
             - name: GOPATH
               value: '$(Pipeline.Workspace)/go'
             - name: ROOT_DIR
-              value: '$(System.DefaultWorkingDirectory)' 
+              value: '$(Pipeline.Workspace)' 
             - name: WORK_DIR
-              value: '$(System.DefaultWorkingDirectory)/azure-storage-fuse'
+              value: '.'
 
           steps:
-            - checkout: none
+            - checkout: self
 
             # Clone the repo
-            - script: |
-                git clone https://github.com/Azure/azure-storage-fuse
-              displayName: 'Checkout Code'
-              workingDirectory: $(ROOT_DIR)
+            # - script: |
+            #     git clone https://github.com/Azure/azure-storage-fuse
+            #   displayName: 'Checkout Code'
+            #   workingDirectory: $(ROOT_DIR)
 
             # Checkout the branch
-            - script: |
-                git checkout `echo $(Build.SourceBranch) | cut -d "/" -f 1,2 --complement`
-              displayName: 'Checkout Branch'
-              workingDirectory: $(WORK_DIR)
+            # - script: |
+            #     git checkout `echo $(Build.SourceBranch) | cut -d "/" -f 1,2 --complement`
+            #   displayName: 'Checkout Branch'
+            #   workingDirectory: $(WORK_DIR)
           
             - script: |
                 sudo apt-get update --fix-missing -o Dpkg::Options::="--force-confnew"
@@ -106,26 +106,27 @@ stages:
                 tags: $(tags)
                 fuselib: $(fuselib)
                 skip_msi: "false"
+                skip_ut: true
 
             # -------------------------------------------------------
             # UT based code coverage test
             - script: |
-                go test -v -timeout=1h ./... --tags=unittest,$(tags) -covermode count -coverprofile ./blobfuse2_ut.cov
+                go test -v -timeout=1h ./... --tags=unittest,storagetest,$(tags) -covermode count -coverprofile ./lyvecloudfuse_ut.cov
               workingDirectory: $(WORK_DIR)
               displayName: "UT Code Coverage"
         
             # -------------------------------------------------------
             # Build code coverage binary
             - script: |
-                go test -coverpkg="./..." -covermode=count -c --tags=$(tags) -o blobfuse2.test
+                go test -coverpkg="./..." -covermode=count -c --tags=$(tags) -o lyvecloudfuse.test
               workingDirectory: $(WORK_DIR)
               displayName: "Build coverage binary"
+              condition: always()
 
             # -------------------------------------------------------
             # Config Generation (Block Blob)
             - script: |
-                cd $(WORK_DIR)
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/blobfuse2_gentest1.cov gen-test-config --config-file=azure_key.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(BLOBFUSE2_CFG)
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_gentest1.cov gen-test-config --config-file=azure_key.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(lyvecloudfuse_CFG)
               env:
                 NIGHTLY_STO_ACC_NAME: $(NIGHTLY_STO_BLOB_ACC_NAME)
                 NIGHTLY_STO_ACC_KEY: $(NIGHTLY_STO_BLOB_ACC_KEY)
@@ -135,15 +136,16 @@ stages:
                 USE_HTTP: false
               displayName: 'Create Config File - Block Blob'
               workingDirectory: $(WORK_DIR)
-              continueOnError: false
+              #continueOnError: false
+              condition: always()
             
             # Code Coverage with e2e-tests for block blob
             - script: |
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/blobfuse2_block.cov mount $(MOUNT_DIR) --config-file=$(BLOBFUSE2_CFG) --foreground=true &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_block.cov mount $(MOUNT_DIR) --config-file=$(lyvecloudfuse_CFG) --foreground=true &
                 sleep 10
-                ps -aux | grep blobfuse2
+                ps -aux | grep lyvecloudfuse
                 rm -rf $(MOUNT_DIR)/*
                 cd test/e2e_tests
                 go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
@@ -152,24 +154,25 @@ stages:
                 sleep 5
               workingDirectory: $(WORK_DIR)
               displayName: "Block Blob Coverage"
+              condition: always()
 
             # Code Coverage with health monitor, dynamic, CPU and mem profilers enabled for block blob
             - script: |
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
-                cp $(BLOBFUSE2_CFG) /tmp/configBlockProfilerTemp.yaml
+                cp $(lyvecloudfuse_CFG) /tmp/configBlockProfilerTemp.yaml
                 echo "dynamic-profile: true" >> /tmp/configBlockProfilerTemp.yaml
                 echo "cpu-profile: /tmp/cpuBlockProfTmp" >> /tmp/configBlockProfilerTemp.yaml
                 echo "mem-profile: /tmp/memBlockProfTmp" >> /tmp/configBlockProfilerTemp.yaml
                 echo "health_monitor:" >> /tmp/configBlockProfilerTemp.yaml
                 echo "  enable-monitoring: true" >> /tmp/configBlockProfilerTemp.yaml
                 echo "  monitor-disable-list:" >> /tmp/configBlockProfilerTemp.yaml
-                echo "    - blobfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
+                echo "    - lyvecloudfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
                 cat /tmp/configBlockProfilerTemp.yaml
 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/blobfuse2_block_profiler.cov mount $(MOUNT_DIR) --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_block_profiler.cov mount $(MOUNT_DIR) --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
                 sleep 10
-                ps -aux | grep blobfuse2
+                ps -aux | grep lyvecloudfuse
                 rm -rf $(MOUNT_DIR)/*
                 cd test/e2e_tests
                 go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
@@ -178,11 +181,11 @@ stages:
                 sleep 5
               workingDirectory: $(WORK_DIR)
               displayName: "Block Blob Coverage with profilers"
+              condition: always()
 
             # Config Generation (ADLS)
             - script: |
-                cd $(WORK_DIR)
-                $(WORK_DIR)/blobfuse2 gen-test-config --config-file=azure_key.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(BLOBFUSE2_ADLS_CFG)
+                ./lyvecloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(lyvecloudfuse_ADLS_CFG)
               env:
                 NIGHTLY_STO_ACC_NAME: $(AZTEST_ADLS_ACC_NAME)
                 NIGHTLY_STO_ACC_KEY:  $(AZTEST_ADLS_KEY)
@@ -191,41 +194,44 @@ stages:
                 VERBOSE_LOG: false
                 USE_HTTP: false
               displayName: 'Create Config File - ADLS'
-              continueOnError: false
+              workingDirectory: $(WORK_DIR)
+              #continueOnError: false
+              condition: always()
 
             # Code Coverage with e2e-tests for ADLS
             - script: |
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/blobfuse2_adls.cov mount $(MOUNT_DIR) --config-file=$(BLOBFUSE2_ADLS_CFG) --foreground=true &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_adls.cov mount $(MOUNT_DIR) --config-file=$(lyvecloudfuse_ADLS_CFG) --foreground=true &
                 sleep 10
-                ps -aux | grep blobfuse2
+                ps -aux | grep lyvecloudfuse
                 rm -rf $(MOUNT_DIR)/*
                 cd test/e2e_tests
                 go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -adls=true -tmp-path=$(TEMP_DIR)
                 cd -
-                ./blobfuse2 unmount all
+                ./lyvecloudfuse.test unmount all
                 sleep 5
               workingDirectory: $(WORK_DIR)
               displayName: "ADLS Coverage"
+              condition: always()
 
             # Code Coverage with health monitor, dynamic, CPU and mem profilers enabled for adls
             - script: |
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
-                cp $(BLOBFUSE2_ADLS_CFG) /tmp/configAdlsProfilerTemp.yaml
+                cp $(lyvecloudfuse_ADLS_CFG) /tmp/configAdlsProfilerTemp.yaml
                 echo "dynamic-profile: true" >> /tmp/configAdlsProfilerTemp.yaml
                 echo "cpu-profile: /tmp/cpuAdlsProfTmp" >> /tmp/configAdlsProfilerTemp.yaml
                 echo "mem-profile: /tmp/memAdlsProfTmp" >> /tmp/configAdlsProfilerTemp.yaml
                 echo "health_monitor:" >> /tmp/configAdlsProfilerTemp.yaml
                 echo "  enable-monitoring: true" >> /tmp/configAdlsProfilerTemp.yaml
                 echo "  monitor-disable-list:" >> /tmp/configAdlsProfilerTemp.yaml
-                echo "    - blobfuse_stats" >> /tmp/configAdlsProfilerTemp.yaml
+                echo "    - lyvecloudfuse_stats" >> /tmp/configAdlsProfilerTemp.yaml
                 cat /tmp/configAdlsProfilerTemp.yaml
 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/blobfuse2_adls_profiler.cov mount $(MOUNT_DIR) --config-file=/tmp/configAdlsProfilerTemp.yaml --foreground=true &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_adls_profiler.cov mount $(MOUNT_DIR) --config-file=/tmp/configAdlsProfilerTemp.yaml --foreground=true &
                 sleep 10
-                ps -aux | grep blobfuse2
+                ps -aux | grep lyvecloudfuse
                 rm -rf $(MOUNT_DIR)/*
                 cd test/e2e_tests
                 go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
@@ -234,13 +240,13 @@ stages:
                 sleep 5
               workingDirectory: $(WORK_DIR)
               displayName: "ADLS Coverage with profilers"
+              condition: always()
 
 
             # -------------------------------------------------------
             # Config Generation (Block Blob - LFU policy)
             - script: |
-                cd $(WORK_DIR)
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/blobfuse2_gentest2.cov gen-test-config --config-file=azure_key_lfu.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(BLOBFUSE2_CFG)
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_gentest2.cov gen-test-config --config-file=azure_key_lfu.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(lyvecloudfuse_CFG)
               env:
                 NIGHTLY_STO_ACC_NAME: $(NIGHTLY_STO_BLOB_ACC_NAME)
                 NIGHTLY_STO_ACC_KEY: $(NIGHTLY_STO_BLOB_ACC_KEY)
@@ -248,31 +254,32 @@ stages:
                 ACCOUNT_ENDPOINT: 'https://$(NIGHTLY_STO_BLOB_ACC_NAME).blob.core.windows.net'
                 VERBOSE_LOG: false
               displayName: 'Create Config File - LFU'
-              continueOnError: false
+              #continueOnError: false
               workingDirectory: $(WORK_DIR)
+              condition: always()
             
             # Code Coverage with e2e-tests for block blob with lfu policy
             - script: |
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/blobfuse2_block_lfu.cov mount $(MOUNT_DIR) --config-file=$(BLOBFUSE2_CFG) --foreground=true &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_block_lfu.cov mount $(MOUNT_DIR) --config-file=$(lyvecloudfuse_CFG) --foreground=true &
                 sleep 10
-                ps -aux | grep blobfuse2
+                ps -aux | grep lyvecloudfuse
                 rm -rf $(MOUNT_DIR)/*
                 cd test/e2e_tests
                 go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
                 cd -
-                ./blobfuse2 unmount $(MOUNT_DIR)
+                ./lyvecloudfuse.test unmount $(MOUNT_DIR)
                 sleep 5
               workingDirectory: $(WORK_DIR)
               displayName: "Block Blob LFU Coverage"
+              condition: always()
 
 
             # -------------------------------------------------------
             # Config Generation (Block Blob - Stream)
             - script: |
-                cd $(WORK_DIR)
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/blobfuse2_gentest3.cov gen-test-config --config-file=azure_stream.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(BLOBFUSE2_STREAM_CFG)
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_gentest3.cov gen-test-config --config-file=azure_stream.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(lyvecloudfuse_STREAM_CFG)
               displayName: 'Create Config File - Stream'
               env:
                 NIGHTLY_STO_ACC_NAME: $(NIGHTLY_STO_BLOB_ACC_NAME)
@@ -282,42 +289,44 @@ stages:
                 VERBOSE_LOG: false
               continueOnError: false
               workingDirectory: $(WORK_DIR)
+              condition: always()
             
             # Streaming test preparation
             - script: |
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/blobfuse2_stream_prep.cov mount $(MOUNT_DIR) --config-file=$(BLOBFUSE2_CFG) --foreground=true &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_stream_prep.cov mount $(MOUNT_DIR) --config-file=$(lyvecloudfuse_CFG) --foreground=true &
                 sleep 10
-                ps -aux | grep blobfuse2
+                ps -aux | grep lyvecloudfuse
                 for i in {10,50,100,200,500,1024}; do echo $i; done | parallel --will-cite -j 5 'head -c {}M < /dev/urandom > $(WORK_DIR)/myfile_{}'
                 for i in {10,50,100,200,500,1024}; do echo $i; done | parallel --will-cite -j 5 'cp $(WORK_DIR)/myfile_{} $(MOUNT_DIR)/'
-                ./blobfuse2 unmount "$(MOUNT_DIR)*"
+                ./lyvecloudfuse.test unmount "$(MOUNT_DIR)*"
                 sudo fusermount -u $(MOUNT_DIR) 
                 sleep 5
               workingDirectory: $(WORK_DIR)
               displayName: "Block Blob Stream Preparation"
+              condition: always()
 
             # Code Coverage with e2e-tests for block blob with streaming on
             - script: |
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/blobfuse2_stream.cov mount $(MOUNT_DIR) --config-file=$(BLOBFUSE2_STREAM_CFG) --foreground=true &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_stream.cov mount $(MOUNT_DIR) --config-file=$(lyvecloudfuse_STREAM_CFG) --foreground=true &
                 sleep 10
-                ps -aux | grep blobfuse2
-                ./blobfuse2 mount list
+                ps -aux | grep lyvecloudfuse
+                ./lyvecloudfuse.test mount list
                 for i in {10,50,100,200,500,1024}; do echo $i; done | parallel --will-cite -j 5 'diff $(WORK_DIR)/myfile_{} $(MOUNT_DIR)/myfile_{}' 
                 sudo fusermount -u $(MOUNT_DIR) 
                 sleep 5
               workingDirectory: $(WORK_DIR)
               displayName: "Block Blob Stream Coverage"
+              condition: always()
 
 
             # -------------------------------------------------------
             # Config Generation (Block Blob) for cli options
             - script: |
-                cd $(WORK_DIR)
-                $(WORK_DIR)/blobfuse2 gen-test-config --config-file=azure_key.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(BLOBFUSE2_CFG)
+                ./lyvecloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(lyvecloudfuse_CFG)
               displayName: 'Create Config File - Block Blob'
               env:
                 NIGHTLY_STO_ACC_NAME: $(NIGHTLY_STO_BLOB_ACC_NAME)
@@ -326,218 +335,231 @@ stages:
                 ACCOUNT_ENDPOINT: 'https://$(NIGHTLY_STO_BLOB_ACC_NAME).blob.core.windows.net'
                 VERBOSE_LOG: false
                 USE_HTTP: false
+              condition: always()
+              workingDirectory: $(WORK_DIR)
 
             # Component generation code coverage
             - script: |
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/generate_cmd.cov generate test_component
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/generate_cmd.cov generate test_component
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : Component Generation"
+              condition: always()
 
             # Mount / Unmount / List code coverage
             - script: |
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/list_empty_cmd.cov mount list
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/list_empty_cmd.cov mount list
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : Mount List"
+              condition: always()
 
             - script: |
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/mount_cmd.cov mount all $(MOUNT_DIR) --config-file=$(BLOBFUSE2_CFG) --log-level=log_debug 
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_cmd.cov mount all $(MOUNT_DIR) --config-file=$(lyvecloudfuse_CFG) --log-level=log_debug 
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
 
                 sleep 20     
 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/list_cmd_all.cov mount list
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/list_cmd_all.cov mount list
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
-                ./blobfuse2 unmount all
+                ./lyvecloudfuse.test unmount all
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : Mount all and List"
+              condition: always()
 
             - script: |
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/mount_cmd_all.cov mount all $(MOUNT_DIR) --config-file=$(BLOBFUSE2_CFG) --log-level=log_debug 
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_cmd_all.cov mount all $(MOUNT_DIR) --config-file=$(lyvecloudfuse_CFG) --log-level=log_debug 
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
 
                 sleep 20
                 cd $(MOUNT_DIR)/$(containerName)
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_cmd_cont_fail.cov unmount $(MOUNT_DIR)/$(containerName)
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_cmd_cont_fail.cov unmount $(MOUNT_DIR)/$(containerName)
                 cd -
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_cmd_cont.cov unmount $(MOUNT_DIR)/$(containerName)
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_cmd_cont.cov unmount $(MOUNT_DIR)/$(containerName)
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_wild_cmd.cov unmount "testmut*"
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_wild_cmd.cov unmount "testmut*"
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_wild_cmd.cov unmount "abcdef*"
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_wild_cmd.cov unmount "abcdef*"
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_negative_cmd.cov unmount abcdef
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_negative_cmd.cov unmount abcdef
                 if [ $? -ne 1 ]; then
                   exit 1
                 fi
 
-                for i in {1..5}; do ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_all_cmd$i.cov unmount all; done
+                for i in {1..5}; do ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_all_cmd$i.cov unmount all; done
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : Unmount options"
+              condition: always()
 
 
             # Mount / Unmount Negative tests
             - script: |
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/mount_neg.cov mount all /abc --config-file=$(BLOBFUSE2_CFG) --log-level=log_debug
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_neg.cov mount all /abc --config-file=$(lyvecloudfuse_CFG) --log-level=log_debug
                 if [ $? -eq 0 ]; then
                   exit 1
                 fi
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : Invalid mount path"
               timeoutInMinutes: 2
+              condition: always()
 
             - script: |
-                ./blobfuse2 unmount all
-                cp $(BLOBFUSE2_CFG) /tmp/configMountall.yaml
+                ./lyvecloudfuse.test unmount all
+                cp $(lyvecloudfuse_CFG) /tmp/configMountall.yaml
                 echo "mountall:" >> /tmp/configMountall.yaml
                 echo "  container-allowlist:" >> /tmp/configMountall.yaml
                 echo "    - abcd" >> /tmp/configMountall.yaml
                 cat /tmp/configMountall.yaml
 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/secure_encrypt_all.cov secure encrypt --config-file=/tmp/configMountall.yaml --output-file=$(Pipeline.Workspace)/blobfuse2.azsec --passphrase=123123123123123123123123 
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/secure_encrypt_all.cov secure encrypt --config-file=/tmp/configMountall.yaml --output-file=$(Pipeline.Workspace)/lyvecloudfuse.azsec --passphrase=123123123123123123123123 
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/mount_all_cmd_secure.cov mount all $(MOUNT_DIR) --config-file=$(Pipeline.Workspace)/blobfuse2.azsec --passphrase=123123123123123123123123 --log-level=log_debug --foreground=true &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_all_cmd_secure.cov mount all $(MOUNT_DIR) --config-file=$(Pipeline.Workspace)/lyvecloudfuse.azsec --passphrase=123123123123123123123123 --log-level=log_debug --foreground=true &
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
 
                 sleep 5
-                ./blobfuse2 unmount all
+                ./lyvecloudfuse.test unmount all
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : Mount all with secure config"
               timeoutInMinutes: 2
+              condition: always()
 
             - script: |
-                ./blobfuse2 unmount all
-                cp $(BLOBFUSE2_CFG) /tmp/configMountall.yaml
+                ./lyvecloudfuse.test unmount all
+                cp $(lyvecloudfuse_CFG) /tmp/configMountall.yaml
                 echo "mountall:" >> /tmp/configMountall.yaml
                 echo "  container-denylist:" >> /tmp/configMountall.yaml
                 echo "    - abcd" >> /tmp/configMountall.yaml
                 cat /tmp/configMountall.yaml
 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/secure_encrypt_all2.cov secure encrypt --config-file=/tmp/configMountall.yaml --output-file=$(Pipeline.Workspace)/blobfuse2.azsec --passphrase=123123123123123123123123 
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/secure_encrypt_all2.cov secure encrypt --config-file=/tmp/configMountall.yaml --output-file=$(Pipeline.Workspace)/lyvecloudfuse.azsec --passphrase=123123123123123123123123 
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/mount_all_cmd_secure2.cov mount all $(MOUNT_DIR) --config-file=$(Pipeline.Workspace)/blobfuse2.azsec --passphrase=123123123123123123123123 --log-level=log_debug --foreground=true &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_all_cmd_secure2.cov mount all $(MOUNT_DIR) --config-file=$(Pipeline.Workspace)/lyvecloudfuse.azsec --passphrase=123123123123123123123123 --log-level=log_debug --foreground=true &
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
 
                 sleep 5
-                ./blobfuse2 unmount all
+                ./lyvecloudfuse.test unmount all
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : Mount all with secure config 2"
               timeoutInMinutes: 2
+              condition: always()
 
             - script: |
-                ./blobfuse2 unmount all
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/mount_foreg.cov mount $(MOUNT_DIR) --config-file=$(BLOBFUSE2_CFG) --log-level=log_debug --foreground=true &
+                ./lyvecloudfuse.test unmount all
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_foreg.cov mount $(MOUNT_DIR) --config-file=$(lyvecloudfuse_CFG) --log-level=log_debug --foreground=true &
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
 
                 sleep 5
 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/mount_remount.cov mount $(MOUNT_DIR) --config-file=$(BLOBFUSE2_CFG) --log-level=log_debug
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_remount.cov mount $(MOUNT_DIR) --config-file=$(lyvecloudfuse_CFG) --log-level=log_debug
                 if [ $? -eq 0 ]; then
                   exit 1
                 fi
 
                 sleep 5
-                ./blobfuse2 unmount all
+                ./lyvecloudfuse.test unmount all
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : Remount test"
               timeoutInMinutes: 2
+              condition: always()
 
             # Doc generation tests
             - script: |
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/doc1.cov doc
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/doc2.cov doc --output-location /notexists
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/doc1.cov doc
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/doc2.cov doc --output-location /notexists
                 touch ~/a.txt
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/doc2.cov doc --output-location ~/a.txt
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/doc2.cov doc --output-location ~/a.txt
                 rm -rf ~/a.txt
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : doc generation"
               timeoutInMinutes: 2
+              condition: always()
 
             # Version check
             - script: |
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/version1.cov --version
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/version2.cov version
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/version2.cov version --check
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/version1.cov --version
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/version2.cov version
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/version2.cov version --check
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : version"
               timeoutInMinutes: 2
+              condition: always()
 
             # Simulate config change
             - script: |
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
-                ./blobfuse2 unmount all
+                ./lyvecloudfuse.test unmount all
                 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/mount_foreg_2.cov mount all $(MOUNT_DIR) --config-file=$(BLOBFUSE2_CFG) --log-level=log_debug --foreground=true &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_foreg_2.cov mount all $(MOUNT_DIR) --config-file=$(lyvecloudfuse_CFG) --log-level=log_debug --foreground=true &
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
 
                 sleep 5
-                echo -e "\n\nlogging:\n  level:log_debug\n  type:base" >> $(BLOBFUSE2_CFG)
-                sed -i 's/timeout:.*/timeout: 300/' $(BLOBFUSE2_CFG)
+                echo -e "\n\nlogging:\n  level:log_debug\n  type:base" >> $(lyvecloudfuse_CFG)
+                sed -i 's/timeout:.*/timeout: 300/' $(lyvecloudfuse_CFG)
                 sleep 5
 
-                ./blobfuse2 unmount all
+                ./lyvecloudfuse.test unmount all
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : Config change simulator"
+              condition: always()
 
             # Secure Config, fine to use insecure passphrase as this is just for testing
             - script: |
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
-                ./blobfuse2 unmount all
-                ./blobfuse2 gen-test-config --config-file=azure_key.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(BLOBFUSE2_CFG)
+                ./lyvecloudfuse.test unmount all
+                ./lyvecloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(lyvecloudfuse_CFG)
                 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/secure_encrypt.cov secure encrypt --config-file=$(BLOBFUSE2_CFG) --output-file=$(Pipeline.Workspace)/blobfuse2.azsec --passphrase=123123123123123123123123 
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/secure_encrypt.cov secure encrypt --config-file=$(lyvecloudfuse_CFG) --output-file=$(Pipeline.Workspace)/lyvecloudfuse.azsec --passphrase=123123123123123123123123 
                 if [ $? -ne 0 ]; then
                   exit 1
                 fi
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/mount_secure.cov mount $(MOUNT_DIR) --config-file=$(Pipeline.Workspace)/blobfuse2.azsec --passphrase=123123123123123123123123 &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_secure.cov mount $(MOUNT_DIR) --config-file=$(Pipeline.Workspace)/lyvecloudfuse.azsec --passphrase=123123123123123123123123 &
                 sleep 10
-                ps -aux | grep blobfuse2
+                ps -aux | grep lyvecloudfuse
                 rm -rf $(MOUNT_DIR)/*
                 cd test/e2e_tests
                 go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -adls=false -tmp-path=$(TEMP_DIR)
                 cd -
 
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/secure_set.cov secure set --config-file=$(Pipeline.Workspace)/blobfuse2.azsec --passphrase=123123123123123123123123 --key=logging.level --value=log_debug
-                ./blobfuse2 unmount all
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/secure_set.cov secure set --config-file=$(Pipeline.Workspace)/lyvecloudfuse.azsec --passphrase=123123123123123123123123 --key=logging.level --value=log_debug
+                ./lyvecloudfuse.test unmount all
                 sleep 5
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : Secure Config"
@@ -548,11 +570,12 @@ stages:
                 ACCOUNT_ENDPOINT: 'https://$(NIGHTLY_STO_BLOB_ACC_NAME).blob.core.windows.net'
                 VERBOSE_LOG: false
                 USE_HTTP: false
+              condition: always()
 
-            # stop health monitor binary associated with a given blobfuse2 pid
+            # stop health monitor binary associated with a given lyvecloudfuse pid
             - script: |
-                ./blobfuse2 unmount all
-                sudo kill -9 `pidof blobfuse2.test`
+                ./lyvecloudfuse.test unmount all
+                sudo kill -9 `pidof lyvecloudfuse.test`
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
                 mkdir -p $(MOUNT_DIR)/hmon_test
@@ -561,32 +584,34 @@ stages:
                 ls -l /usr/local/bin/bfusemon*
 
                 cat /tmp/configAdlsProfilerTemp.yaml
-                ./blobfuse2 mount $(MOUNT_DIR)/hmon_test --config-file=/tmp/configAdlsProfilerTemp.yaml
+                ./lyvecloudfuse.test mount $(MOUNT_DIR)/hmon_test --config-file=/tmp/configAdlsProfilerTemp.yaml
                 sleep 10
-                ps -aux | grep blobfuse2
+                ps -aux | grep lyvecloudfuse
                 ps -aux | grep bfusemon
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/bfusemon_stop_pid.cov health-monitor stop --pid=`pidof blobfuse2`
-                ./blobfuse2 unmount all
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/bfusemon_stop_pid.cov health-monitor stop --pid=`pidof lyvecloudfuse`
+                ./lyvecloudfuse.test unmount all
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : Health monitor stop pid"
+              condition: always()
 
             # stop all health monitor binaries
             - script: |
-                ./blobfuse2 unmount all
-                sudo kill -9 `pidof blobfuse2.test`
+                ./lyvecloudfuse.test unmount all
+                sudo kill -9 `pidof lyvecloudfuse.test`
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
                 mkdir -p $(MOUNT_DIR)/hmon_test
 
                 cat /tmp/configAdlsProfilerTemp.yaml
-                ./blobfuse2 mount $(MOUNT_DIR)/hmon_test --config-file=/tmp/configAdlsProfilerTemp.yaml
+                ./lyvecloudfuse.test mount $(MOUNT_DIR)/hmon_test --config-file=/tmp/configAdlsProfilerTemp.yaml
                 sleep 10
-                ps -aux | grep blobfuse2
+                ps -aux | grep lyvecloudfuse
                 ps -aux | grep bfusemon
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/bfusemon_stop_all.cov health-monitor stop all
-                ./blobfuse2 unmount all
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/bfusemon_stop_all.cov health-monitor stop all
+                ./lyvecloudfuse.test unmount all
               workingDirectory: $(WORK_DIR)
               displayName: "CLI : Health monitor stop all"
+              condition: always()
 
             # Start Proxy
             - script: |
@@ -606,11 +631,11 @@ stages:
                 export https_proxy="127.0.0.1:8080"
                 export http_proxy="127.0.0.1:8080"
               displayName: 'Configure Proxy'
+              condition: always()
 
             # Config Generation (Block Blob Proxy)
             - script: |
-                cd $(WORK_DIR)
-                $(WORK_DIR)/blobfuse2 gen-test-config --config-file=azure_key_proxy.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(BLOBFUSE2_CFG)
+                ./lyvecloudfuse.test gen-test-config --config-file=azure_key_proxy.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(lyvecloudfuse_CFG)
               env:
                 NIGHTLY_STO_ACC_NAME: $(NIGHTLY_STO_BLOB_ACC_NAME)
                 NIGHTLY_STO_ACC_KEY: $(NIGHTLY_STO_BLOB_ACC_KEY)
@@ -620,15 +645,16 @@ stages:
                 USE_HTTP: false
               displayName: 'Create Config File - Block Blob Proxy'
               workingDirectory: $(WORK_DIR)
-              continueOnError: false
+              #continueOnError: false
+              condition: always()
             
             # Code Coverage with e2e-tests for block blob Proxy
             - script: |
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/blobfuse2_block_proxy.cov mount $(MOUNT_DIR) --config-file=$(BLOBFUSE2_CFG) --foreground=true &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_block_proxy.cov mount $(MOUNT_DIR) --config-file=$(lyvecloudfuse_CFG) --foreground=true &
                 sleep 10
-                ps -aux | grep blobfuse2
+                ps -aux | grep lyvecloudfuse
                 rm -rf $(MOUNT_DIR)/*
                 cd test/e2e_tests
                 go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
@@ -637,11 +663,11 @@ stages:
                 sleep 5
               workingDirectory: $(WORK_DIR)
               displayName: "Block Blob Coverage Proxy"
+              condition: always()
 
             # Config Generation (ADLS Proxy)
             - script: |
-                cd $(WORK_DIR)
-                $(WORK_DIR)/blobfuse2 gen-test-config --config-file=azure_key_proxy.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(BLOBFUSE2_ADLS_CFG)
+                ./lyvecloudfuse.test gen-test-config --config-file=azure_key_proxy.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(lyvecloudfuse_ADLS_CFG)
               env:
                 NIGHTLY_STO_ACC_NAME: $(AZTEST_ADLS_ACC_NAME)
                 NIGHTLY_STO_ACC_KEY:  $(AZTEST_ADLS_KEY)
@@ -650,44 +676,48 @@ stages:
                 VERBOSE_LOG: false
                 USE_HTTP: false
               displayName: 'Create Config File - ADLS Proxy'
-              continueOnError: false
+              workingDirectory: $(WORK_DIR)
+              #continueOnError: false
+              condition: always()
 
             # Code Coverage with e2e-tests for ADLS Proxy
             - script: |
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
-                ./blobfuse2.test -test.v -test.coverprofile=$(WORK_DIR)/blobfuse2_adls_proxy.cov mount $(MOUNT_DIR) --config-file=$(BLOBFUSE2_ADLS_CFG) --foreground=true &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_adls_proxy.cov mount $(MOUNT_DIR) --config-file=$(lyvecloudfuse_ADLS_CFG) --foreground=true &
                 sleep 10
-                ps -aux | grep blobfuse2
+                ps -aux | grep lyvecloudfuse
                 rm -rf $(MOUNT_DIR)/*
                 cd test/e2e_tests
                 go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -adls=true -tmp-path=$(TEMP_DIR)
                 cd -
-                ./blobfuse2 unmount all
+                ./lyvecloudfuse.test unmount all
                 sleep 5
               workingDirectory: $(WORK_DIR)
               displayName: "ADLS Coverage Proxy"
+              condition: always()
 
             # -------------------------------------------------------
             # Coverage report consolidation
             - script: |
-                echo 'mode: count' > ./blobfuse2_coverage_raw.rpt
-                tail -q -n +2 ./*.cov >> ./blobfuse2_coverage_raw.rpt
-                cat ./blobfuse2_coverage_raw.rpt | grep -v mock_component | grep -v base_component | grep -v loopback | grep -v tools | grep -v "common/log" | grep -v "common/exectime" | grep -v "internal/stats_manager" > ./blobfuse2_coverage.rpt 
-                go tool cover -func blobfuse2_coverage.rpt  > ./blobfuse2_func_cover.rpt
-                go tool cover -html=./blobfuse2_coverage.rpt -o ./blobfuse2_coverage.html
-                go tool cover -html=./blobfuse2_ut.cov -o ./blobfuse2_ut.html
+                echo 'mode: count' > ./lyvecloudfuse_coverage_raw.rpt
+                tail -q -n +2 ./*.cov >> ./lyvecloudfuse_coverage_raw.rpt
+                cat ./lyvecloudfuse_coverage_raw.rpt | grep -v mock_component | grep -v base_component | grep -v loopback | grep -v tools | grep -v "common/log" | grep -v "common/exectime" | grep -v "internal/stats_manager" > ./lyvecloudfuse_coverage.rpt 
+                go tool cover -func lyvecloudfuse_coverage.rpt  > ./lyvecloudfuse_func_cover.rpt
+                go tool cover -html=./lyvecloudfuse_coverage.rpt -o ./lyvecloudfuse_coverage.html
+                go tool cover -html=./lyvecloudfuse_ut.cov -o ./lyvecloudfuse_ut.html
                 cp ./*.rpt  $(Build.ArtifactStagingDirectory)/
                 cp ./*.cov  $(Build.ArtifactStagingDirectory)/
                 cp ./*.html $(Build.ArtifactStagingDirectory)/
               workingDirectory: $(WORK_DIR)
               displayName: "Save coverage report"
+              condition: always()
 
             # Publish the Artifacts
             - task: PublishBuildArtifacts@1
               inputs:
-                artifactName: 'Blobfuse2 Coverage $(tags)'
-              displayName: 'Publish Artifacts for blobfuse2 code coverage'
+                artifactName: 'lyvecloudfuse Coverage $(tags)'
+              displayName: 'Publish Artifacts for lyvecloudfuse code coverage'
               condition: succeeded()
 
             # Overall code coverage check
@@ -696,6 +726,7 @@ stages:
                 ./test/scripts/coveragecheck.sh
               workingDirectory: $(WORK_DIR)
               displayName: "Overall coverage check"
+              condition: always()
 
             # File level code coverage check
             - script: |
@@ -715,7 +746,7 @@ stages:
           strategy:
             matrix:
               Ubuntu-20:
-                AgentName: 'blobfuse-ubuntu20'
+                AgentName: 'lyvecloudfuse-ubuntu20'
                 imageName: 'ubuntu-20.04'
                 containerName: 'test-cnt-ubn-20'
                 fuselib: 'libfuse3-dev'
@@ -723,22 +754,23 @@ stages:
                 tags: 'fuse3'          
 
           pool:
-            name: "blobfuse-ubuntu-pool"
-            demands:
-              - ImageOverride -equals $(AgentName)
+            vmImage: $(imageName)
+            # name: "lyvecloudfuse-ubuntu-pool"
+            # demands:
+            #   - ImageOverride -equals $(AgentName)
 
           variables:
-            - group: NightlyBlobFuse
+            - group: NightlyLyveCloudFuse
             - name: MOUNT_DIR
               value: '$(Pipeline.Workspace)/blob_mnt'
             - name: TEMP_DIR
-              value: '$(Pipeline.Workspace)/blobfuse2_tmp'
-            - name: BLOBFUSE2_CFG
-              value: '$(Pipeline.Workspace)/blobfuse2.yaml'
-            - name: BLOBFUSE2_STREAM_CFG
-              value: '$(Pipeline.Workspace)/blobfuse2_stream.yaml'
-            - name: BLOBFUSE2_ADLS_CFG
-              value: '$(Pipeline.Workspace)/blobfuse2.adls.yaml'
+              value: '$(Pipeline.Workspace)/lyvecloudfuse_tmp'
+            - name: lyvecloudfuse_CFG
+              value: '$(Pipeline.Workspace)/lyvecloudfuse.yaml'
+            - name: lyvecloudfuse_STREAM_CFG
+              value: '$(Pipeline.Workspace)/lyvecloudfuse_stream.yaml'
+            - name: lyvecloudfuse_ADLS_CFG
+              value: '$(Pipeline.Workspace)/lyvecloudfuse.adls.yaml'
             - name: GOPATH
               value: '$(Pipeline.Workspace)/go'
             - name: ROOT_DIR
@@ -747,12 +779,12 @@ stages:
               value: '$(System.DefaultWorkingDirectory)/azure-storage-fuse'
 
           steps:
-            - checkout: none
+            - checkout: self
 
             # GoTool task used only for Microsoft Hosted Agents to install Go-lang
             - task: GoTool@0
               inputs:
-                version: '1.16.2'
+                version: '1.19.6'
               displayName: "GoTool Setup"
 
             - script: |
@@ -761,23 +793,22 @@ stages:
               displayName: 'Install dependency'
 
             # Clone the repo
-            - script: |
-                git clone https://github.com/Azure/azure-storage-fuse
-              displayName: 'Checkout Code'
-              workingDirectory: $(ROOT_DIR)
+            # - script: |
+            #     git clone https://github.com/Azure/azure-storage-fuse
+            #   displayName: 'Checkout Code'
+            #   workingDirectory: $(ROOT_DIR)
 
             # Checkout the branch
-            - script: |
-                git checkout `echo $(Build.SourceBranch) | cut -d "/" -f 1,2 --complement`
-              displayName: 'Checkout Branch'
-              workingDirectory: $(WORK_DIR)
+            # - script: |
+            #     git checkout `echo $(Build.SourceBranch) | cut -d "/" -f 1,2 --complement`
+            #   displayName: 'Checkout Branch'
+            #   workingDirectory: $(WORK_DIR)
           
             # Run the block blob cleanup
             - task: Go@0
               inputs:
                 command: 'test'
                 arguments: '-timeout 120m -v test/accoutcleanup/accountcleanup_test.go'
-                workingDirectory:  $(WORK_DIR)
               displayName: 'Block Blob cleanup'
               timeoutInMinutes: 120
               continueOnError: true
@@ -790,7 +821,6 @@ stages:
               inputs:
                 command: 'test'
                 arguments: '-timeout 120m -v test/accoutcleanup/accountcleanup_test.go'
-                workingDirectory:  $(WORK_DIR)
               displayName: 'Gen2 cleanup'
               timeoutInMinutes: 120
               continueOnError: true
