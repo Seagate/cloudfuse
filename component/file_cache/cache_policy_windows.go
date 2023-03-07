@@ -24,7 +24,7 @@ output:
 		1. int64 representing number of sectors used in the directory path.
 		2. int64 representing number of bytes per sector
 */
-func totalSectors(path string) (int64, int64) {
+func totalSectors(path string) int64 {
 
 	/*
 		bytes per sector is hard coded to 4096 bytes since syscall to windows and BytesPerSector for the drive in question is an estimate.
