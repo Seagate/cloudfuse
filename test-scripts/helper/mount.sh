@@ -23,10 +23,3 @@ sleep 5s
 # Check for mount
 echo "Checking for mount"
 sudo ps -aux | grep lyvecloudfuse
-
-# Delete the files in mount directory for test
-#echo "Deleting files from mount directory with container mounted"
-#rm -rf $MOUNT_DIR/*
-
-#df | grep lyvecloudfuse
-#exit $?
