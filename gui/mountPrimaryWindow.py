@@ -1,11 +1,11 @@
+# System imports
+import subprocess
+from sys import platform
+
 # Import QT libraries
 from PySide6.QtCore import Qt
 from PySide6 import QtWidgets
 from PySide6.QtWidgets import QMainWindow
-
-# System imports
-import subprocess
-from sys import platform
 
 # Import the custom class created with QtDesigner 
 from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
