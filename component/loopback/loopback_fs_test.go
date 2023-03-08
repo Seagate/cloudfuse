@@ -170,6 +170,8 @@ func (suite *LoopbackFSTestSuite) TestCreateFile() {
 	assert.Nil(err, "CreateFile: unable to stat created file")
 	assert.Equal(info.Name(), fileEmpty)
 
+	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
+	assert.Nil(err, "CreateFile: Failed to close file")
 }
 
 func (suite *LoopbackFSTestSuite) TestDeleteFile() {
@@ -230,6 +232,7 @@ func (suite *LoopbackFSTestSuite) TestReadInBuffer() {
 	}
 
 	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
+	assert.Nil(err, "ReadInBuffer: Failed to close file")
 }
 
 func (suite *LoopbackFSTestSuite) TestWriteFile() {
@@ -266,6 +269,9 @@ func (suite *LoopbackFSTestSuite) TestTruncateFile() {
 	info, err := os.Stat(filepath.Join(testPath, fileLorem))
 	assert.Nil(err, "TruncateFile: cannot stat file")
 	assert.Equal(info.Size(), int64(0))
+
+	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
+	assert.Nil(err, "TruncateFile: Failed to close file")
 }
 
 func (suite *LoopbackFSTestSuite) TestGetAttr() {
