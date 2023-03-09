@@ -302,7 +302,29 @@ func (cl *Client) DeleteFile(name string) (err error) {
 
 // DeleteDirectory : Delete a virtual directory in the container/virtual directory
 func (cl *Client) DeleteDirectory(name string) (err error) {
-	return err
+	log.Trace("Client::DeleteDirectory : name %s", name)
+
+	for marker := (S3Object.Marker{}); marker.NotDone(); {
+		listBlock, err := s3.Container.ListContainersSegment(context.Background(), marker,
+			S3Object.ListContainersSegmentOptions{MaxResults: common.MaxDirListCount,
+				Prefix: filepath.Join(s3.Config.prefixPath, name) + "/",
+			})
+
+		if err != nil {
+			log.Err("Client::DeleteDirectory : Failed to get list of blocks %s", err.Error)
+			return err
+		}
+		marker = listBlock.NextMarker
+
+		// Process the blocks returned in this result segment (if the segment is empty, the loop body won't execute)
+		for _, blockInfo := range listBlock.Segment.BlockItems{
+			err = s3.DeleteFile(split(s3.Config.prefixPath, blockInfo.Name))
+			if err != nil {
+				log.Err("Client::DeleteDirectory : Failed to delete file %s [%s]", blockInfo.Name, err.Error)
+			}
+		}
+	}
+	return s3.DeleteFile(name)
 }
 
 // RenameFile : Rename the file
