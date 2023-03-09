@@ -61,6 +61,8 @@ import (
 const (
 	folderKey  = "hdi_isfolder"
 	symlinkKey = "is_symlink"
+	// how many times should we retry each call to Lyve Cloud to circumvent the InvalidAccessKeyId issue?
+	// TODO: set this to 1 to test whether this issue is fixed
 	retryCount = 5
 )
 
@@ -127,7 +129,6 @@ func (cl *Client) NewCredentialKey(key, value string) (err error) {
 func (cl *Client) getObject(name string, offset int64, count int64) (*s3.GetObjectOutput, error) {
 
 	var rangeString string //string to be used to specify range of object to download from S3
-	var apiErr smithy.APIError
 	bucketName := cl.Config.authConfig.BucketName
 
 	//TODO: add handle if the offset+count is greater than the end of Object.
@@ -146,25 +147,69 @@ func (cl *Client) getObject(name string, offset int64, count int64) (*s3.GetObje
 			Key:    aws.String(name),
 			Range:  aws.String(rangeString),
 		})
-
-		// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
-		// So if we get this error we want to try again, and if not then we got a legitimate error so break
-		if err != nil {
-			if errors.As(err, &apiErr) {
-				code := apiErr.ErrorCode()
-				if code != "InvalidAccessKeyId" {
-					break
-				}
-				log.Warn("Client::getObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
-			}
-		}
-
-		if err == nil {
+		// retry on InvalidAccessKeyId
+		if isInvalidAccessKeyID(err) {
+			log.Warn("Client::getObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+		} else {
 			break
 		}
-
 	}
 	return result, err
+}
+
+// Wrapper function for awsS3Client.PutObject
+func (cl *Client) putObject(name string, objectData io.Reader) (*s3.PutObjectOutput, error) {
+	var result *s3.PutObjectOutput
+	var err error
+	for i := 0; i < retryCount; i++ {
+		result, err = cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+			Bucket: aws.String(cl.Config.authConfig.BucketName),
+			Key:    aws.String(name),
+			Body:   objectData,
+		})
+		// retry on InvalidAccessKeyId
+		if isInvalidAccessKeyID(err) {
+			log.Warn("Client::putObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+		} else {
+			break
+		}
+	}
+	return result, err
+}
+
+// Wrapper function for awsS3Client.PutObject
+func (cl *Client) deleteObject(name string) (*s3.DeleteObjectOutput, error) {
+	log.Trace("Client::deleteObject : deleting object %s", name)
+	var result *s3.DeleteObjectOutput
+	var err error
+	for i := 0; i < retryCount; i++ {
+		result, err = cl.awsS3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+			Bucket: aws.String(cl.Config.authConfig.BucketName),
+			Key:    aws.String(name),
+		})
+		// retry on InvalidAccessKeyId
+		if isInvalidAccessKeyID(err) {
+			log.Warn("Client::deleteObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+		} else {
+			break
+		}
+	}
+	return result, err
+}
+
+// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
+// Check the returned err value for the associated error code
+func isInvalidAccessKeyID(err error) bool {
+	var apiErr smithy.APIError
+	if err != nil {
+		if errors.As(err, &apiErr) {
+			code := apiErr.ErrorCode()
+			if code == "InvalidAccessKeyId" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (cl *Client) ListContainers() ([]string, error) {
@@ -173,21 +218,14 @@ func (cl *Client) ListContainers() ([]string, error) {
 	cntList := make([]string, 0)
 
 	var err error
-	var apiErr smithy.APIError
 	var result *s3.ListBucketsOutput
 	for i := 0; i < retryCount; i++ {
 		result, err = cl.awsS3Client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
-		if err == nil {
-			break
-		}
-		// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
-		// So if we get this error we want to try again, and if not then we got a legitimate error so break
-		if errors.As(err, &apiErr) {
-			code := apiErr.ErrorCode()
-			if code != "InvalidAccessKeyId" {
-				break
-			}
+		// retry on InvalidAccessKeyId
+		if isInvalidAccessKeyID(err) {
 			log.Warn("Client::ListContainers Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+		} else {
+			break
 		}
 	}
 
@@ -201,11 +239,6 @@ func (cl *Client) ListContainers() ([]string, error) {
 	}
 
 	return cntList, nil
-}
-
-func exitErrorf(msg string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, msg+"\n", args...)
-	os.Exit(1)
 }
 
 func (cl *Client) SetPrefixPath(path string) error {
@@ -241,32 +274,11 @@ func (cl *Client) CreateLink(source string, target string) error {
 
 // DeleteFile : Delete an object
 func (cl *Client) DeleteFile(name string) (err error) {
-
 	log.Trace("Client::DeleteFile : name %s", name)
-	var apiErr smithy.APIError
-	for i := 0; i < retryCount; i++ {
-		_, err = cl.awsS3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
-			Bucket: aws.String(cl.Config.authConfig.BucketName),
-			Key:    aws.String(name),
-		})
-		if err == nil {
-			break
-		}
-		// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
-		// So if we get this error we want to try again, and if not then we got a legitimate error so break
-		if errors.As(err, &apiErr) {
-			code := apiErr.ErrorCode()
-			if code != "InvalidAccessKeyId" {
-				break
-			}
-			log.Warn("Client::DeleteFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
-		}
-	}
-
+	_, err = cl.deleteObject(name)
 	// TODO: If the object doesn't exist, the command will return success because there's nothing to delete.
 	// 		figure out how to force an error
 	if err != nil {
-
 		serr := storeBlobErrToErr(err)
 		if serr == ErrFileNotFound {
 			log.Err("Client::DeleteFile : %s does not exist", name)
@@ -291,24 +303,17 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 func (cl *Client) RenameFile(source string, target string) (err error) {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
-	var apiErr smithy.APIError
 	for i := 0; i < retryCount; i++ {
 		_, err = cl.awsS3Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
 			Bucket:     aws.String(cl.Config.authConfig.BucketName),
 			CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, source)),
 			Key:        aws.String(target),
 		})
-		if err == nil {
-			break
-		}
-		// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
-		// So if we get this error we want to try again, and if not then we got a legitimate error so break
-		if errors.As(err, &apiErr) {
-			code := apiErr.ErrorCode()
-			if code != "InvalidAccessKeyId" {
-				break
-			}
+		// retry on InvalidAccessKeyId
+		if isInvalidAccessKeyID(err) {
 			log.Warn("Client::RenameFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+		} else {
+			break
 		}
 	}
 
@@ -446,21 +451,14 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// fetch and process result pages
 	for paginator.HasMorePages() {
 		var err error
-		var apiErr smithy.APIError
 		var output *s3.ListObjectsV2Output
 		for i := 0; i < retryCount; i++ {
 			output, err = paginator.NextPage(context.TODO())
-			if err == nil {
-				break
-			}
-			// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
-			// So if we get this error we want to try again, and if not then we got a legitimate error so break
-			if errors.As(err, &apiErr) {
-				code := apiErr.ErrorCode()
-				if code != "InvalidAccessKeyId" {
-					break
-				}
+			// retry on InvalidAccessKeyId
+			if isInvalidAccessKeyID(err) {
 				log.Warn("Client::List Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			} else {
+				break
 			}
 		}
 		if err != nil {
@@ -617,7 +615,7 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 
 // ReadBuffer : Download a specific range from an object to a buffer
 func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
-	log.Trace("Client::ReadBuffer : name %s", name)
+	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, len)
 	var buff []byte
 
 	// If the len is 0, that means we need to read till the end of the object
@@ -761,26 +759,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	// 	u.PartSize = partMiBs * 1024 * 1024
 	// })
 
-	var apiErr smithy.APIError
-	for i := 0; i < retryCount; i++ {
-		_, err = cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
-			Bucket: aws.String(cl.Config.authConfig.BucketName),
-			Key:    aws.String(name),
-			Body:   fi,
-		})
-		if err == nil {
-			break
-		}
-		// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
-		// So if we get this error we want to try again, and if not then we got a legitimate error so break
-		if errors.As(err, &apiErr) {
-			code := apiErr.ErrorCode()
-			if code != "InvalidAccessKeyId" {
-				break
-			}
-			log.Warn("Client::WriteFromFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
-		}
-	}
+	cl.putObject(name, fi)
 
 	// TODO: Add monitor tracking
 	// if common.MonitorBfs() && stat.Size() > 0 {
@@ -813,26 +792,7 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data 
 	// 	u.PartSize = partMiBs * 1024 * 1024
 	// })
 
-	var apiErr smithy.APIError
-	for i := 0; i < retryCount; i++ {
-		_, err = cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
-			Bucket: aws.String(cl.Config.authConfig.BucketName),
-			Key:    aws.String(name),
-			Body:   largeBuffer,
-		})
-		if err == nil {
-			break
-		}
-		// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
-		// So if we get this error we want to try again, and if not then we got a legitimate error so break
-		if errors.As(err, &apiErr) {
-			code := apiErr.ErrorCode()
-			if code != "InvalidAccessKeyId" {
-				break
-			}
-			log.Warn("Client::WriteFromBuffer Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
-		}
-	}
+	cl.putObject(name, largeBuffer)
 
 	if err != nil {
 		log.Err("Couldn't upload object to %v:%v. Here's why: %v\n",
