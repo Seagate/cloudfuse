@@ -11,7 +11,7 @@ class azureSettingsWidget(QWidget, Ui_Form):
         super().__init__()
         self.setupUi(self)
 
-        self.setWindowTitle("LyveCloud Config Settings")
+        self.setWindowTitle("Azure Config Settings")
 
         # Hide the pipeline mode groupbox depending on the default select is
         self.showAzureModeSettings()

@@ -8,7 +8,7 @@ class azureAdvancedSettingsWidget(QWidget, Ui_Form):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.setWindowTitle("More LyveCloud Config Settings")
+        self.setWindowTitle("More Azure Config Settings")
         
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)
