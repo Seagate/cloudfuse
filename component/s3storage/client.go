@@ -133,7 +133,10 @@ func (cl *Client) getObject(name string, offset int64, count int64) (*s3.GetObje
 
 	//TODO: add handle if the offset+count is greater than the end of Object.
 	if count == 0 {
-		rangeString = "bytes=" + fmt.Sprint(offset) + "-"
+		// if offset is 0 too, leave rangeString empty
+		if offset != 0 {
+			rangeString = "bytes=" + fmt.Sprint(offset) + "-"
+		}
 	} else {
 		endRange := offset + count
 		rangeString = "bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)
@@ -149,7 +152,7 @@ func (cl *Client) getObject(name string, offset int64, count int64) (*s3.GetObje
 		})
 		// retry on InvalidAccessKeyId
 		if isInvalidAccessKeyID(err) {
-			log.Warn("Client::getObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			log.Warn("Client::getObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
 		} else {
 			break
 		}
@@ -169,7 +172,7 @@ func (cl *Client) putObject(name string, objectData io.Reader) (*s3.PutObjectOut
 		})
 		// retry on InvalidAccessKeyId
 		if isInvalidAccessKeyID(err) {
-			log.Warn("Client::putObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			log.Warn("Client::putObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
 		} else {
 			break
 		}
@@ -189,7 +192,7 @@ func (cl *Client) deleteObject(name string) (*s3.DeleteObjectOutput, error) {
 		})
 		// retry on InvalidAccessKeyId
 		if isInvalidAccessKeyID(err) {
-			log.Warn("Client::deleteObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			log.Warn("Client::deleteObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
 		} else {
 			break
 		}
@@ -223,7 +226,7 @@ func (cl *Client) ListContainers() ([]string, error) {
 		result, err = cl.awsS3Client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
 		// retry on InvalidAccessKeyId
 		if isInvalidAccessKeyID(err) {
-			log.Warn("Client::ListContainers Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			log.Warn("Client::ListContainers Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
 		} else {
 			break
 		}
@@ -311,7 +314,7 @@ func (cl *Client) RenameFile(source string, target string) (err error) {
 		})
 		// retry on InvalidAccessKeyId
 		if isInvalidAccessKeyID(err) {
-			log.Warn("Client::RenameFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+			log.Warn("Client::RenameFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
 		} else {
 			break
 		}
@@ -456,7 +459,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 			output, err = paginator.NextPage(context.TODO())
 			// retry on InvalidAccessKeyId
 			if isInvalidAccessKeyID(err) {
-				log.Warn("Client::List Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i, retryCount)
+				log.Warn("Client::List Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
 			} else {
 				break
 			}
