@@ -1286,7 +1286,6 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 	symlinkPath := suite.cache_path + ".lnk"
 	err = os.Symlink(common.NormalizeObjectName(suite.cache_path), symlinkPath)
 	defer os.Remove(symlinkPath)
-	fmt.Println(err)
 	suite.assert.Nil(err)
 	configuration := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n\nloopbackfs:\n  path: %s",
 		symlinkPath, suite.fake_storage_path)
