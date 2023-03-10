@@ -142,6 +142,10 @@ func GetCurrentUser() (uint32, uint32, error) {
 	return uint32(userUID), uint32(userGID), nil
 }
 
+func JoinUnixFilepath(elem ...string) string {
+	return NormalizeObjectName(filepath.Join(elem...))
+}
+
 // normalizeObjectName : If file contains \\ in name replace it with ..
 func NormalizeObjectName(name string) string {
 	return strings.ReplaceAll(name, "\\", "/")
@@ -260,7 +264,7 @@ func ExpandPath(path string) string {
 		if err != nil {
 			return path
 		}
-		path = filepath.Join(homeDir, path[2:])
+		path = JoinUnixFilepath(homeDir, path[2:])
 	}
 
 	return path

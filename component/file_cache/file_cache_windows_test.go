@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -36,8 +35,8 @@ func (suite *fileCacheWindowsTestSuite) SetupTest() {
 		panic("Unable to set silent logger as default.")
 	}
 	rand := randomString(8)
-	suite.cache_path = filepath.Join(home_dir, "file_cache"+rand)
-	suite.fake_storage_path = filepath.Join(home_dir, "fake_storage"+rand)
+	suite.cache_path = common.JoinUnixFilepath(home_dir, "file_cache"+rand)
+	suite.fake_storage_path = common.JoinUnixFilepath(home_dir, "fake_storage"+rand)
 	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
 	log.Debug(defaultConfig)
 
@@ -146,7 +145,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownCase2() {
 	path := "file"
 	oldMode := os.FileMode(0511)
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
-	_, _ = os.Stat(filepath.Join(suite.cache_path, path))
+	_, _ = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
 	//stat := info.Sys().(*syscall.Win32FileAttributeData)
 	//oldOwner := stat.Uid
 	//oldGroup := stat.Gid
@@ -158,13 +157,13 @@ func (suite *fileCacheWindowsTestSuite) TestChownCase2() {
 	suite.assert.Equal(err, syscall.EIO)
 
 	// Path should be in the file cache with old group and owner (since we failed the operation)
-	_, err = os.Stat(filepath.Join(suite.cache_path, path))
+	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
 	//stat = info.Sys().(*syscall.Win32FileAttributeData)
 	suite.assert.True(err == nil || os.IsExist(err))
 	//suite.assert.EqualValues(oldOwner, stat.Uid)
 	//suite.assert.EqualValues(oldGroup, stat.Gid)
 	// Path should not be in fake storage
-	_, err = os.Stat(filepath.Join(suite.fake_storage_path, path))
+	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
 	suite.assert.True(os.IsNotExist(err))
 }
 

@@ -294,7 +294,7 @@ func (bb *BlockBlob) CreateLink(source string, target string) error {
 func (bb *BlockBlob) DeleteFile(name string) (err error) {
 	log.Trace("BlockBlob::DeleteFile : name %s", name)
 
-	blobURL := bb.Container.NewBlobURL(filepath.Join(bb.Config.prefixPath, name))
+	blobURL := bb.Container.NewBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, name))
 	_, err = blobURL.Delete(context.Background(), azblob.DeleteSnapshotsOptionInclude, bb.blobAccCond)
 	if err != nil {
 		serr := storeBlobErrToErr(err)
@@ -320,7 +320,7 @@ func (bb *BlockBlob) DeleteDirectory(name string) (err error) {
 	for marker := (azblob.Marker{}); marker.NotDone(); {
 		listBlob, err := bb.Container.ListBlobsFlatSegment(context.Background(), marker,
 			azblob.ListBlobsSegmentOptions{MaxResults: common.MaxDirListCount,
-				Prefix: filepath.Join(bb.Config.prefixPath, name) + "/",
+				Prefix: common.JoinUnixFilepath(bb.Config.prefixPath, name) + "/",
 			})
 
 		if err != nil {
@@ -344,8 +344,8 @@ func (bb *BlockBlob) DeleteDirectory(name string) (err error) {
 func (bb *BlockBlob) RenameFile(source string, target string) error {
 	log.Trace("BlockBlob::RenameFile : %s -> %s", source, target)
 
-	blobURL := bb.Container.NewBlockBlobURL(filepath.Join(bb.Config.prefixPath, source))
-	newBlob := bb.Container.NewBlockBlobURL(filepath.Join(bb.Config.prefixPath, target))
+	blobURL := bb.Container.NewBlockBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, source))
+	newBlob := bb.Container.NewBlockBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, target))
 
 	prop, err := blobURL.GetProperties(context.Background(), bb.blobAccCond, bb.blobCPKOpt)
 	if err != nil {
@@ -406,7 +406,7 @@ func (bb *BlockBlob) RenameDirectory(source string, target string) error {
 	for marker := (azblob.Marker{}); marker.NotDone(); {
 		listBlob, err := bb.Container.ListBlobsFlatSegment(context.Background(), marker,
 			azblob.ListBlobsSegmentOptions{MaxResults: common.MaxDirListCount,
-				Prefix: filepath.Join(bb.Config.prefixPath, source) + "/",
+				Prefix: common.JoinUnixFilepath(bb.Config.prefixPath, source) + "/",
 			})
 
 		if err != nil {
@@ -431,7 +431,7 @@ func (bb *BlockBlob) RenameDirectory(source string, target string) error {
 func (bb *BlockBlob) getAttrUsingRest(name string) (attr *internal.ObjAttr, err error) {
 	log.Trace("BlockBlob::getAttrUsingRest : name %s", name)
 
-	blobURL := bb.Container.NewBlockBlobURL(filepath.Join(bb.Config.prefixPath, name))
+	blobURL := bb.Container.NewBlockBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, name))
 	prop, err := blobURL.GetProperties(context.Background(), bb.blobAccCond, bb.blobCPKOpt)
 
 	if err != nil {
@@ -548,7 +548,7 @@ func (bb *BlockBlob) List(prefix string, marker *string, count int32) ([]*intern
 		count = common.MaxDirListCount
 	}
 
-	listPath := filepath.Join(bb.Config.prefixPath, prefix)
+	listPath := common.JoinUnixFilepath(bb.Config.prefixPath, prefix)
 	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && bb.Config.prefixPath != "") {
 		listPath += "/"
 	}
@@ -667,7 +667,7 @@ func (bb *BlockBlob) ReadToFile(name string, offset int64, count int64, fi *os.F
 	log.Trace("BlockBlob::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
 	//defer exectime.StatTimeCurrentBlock("BlockBlob::ReadToFile")()
 
-	blobURL := bb.Container.NewBlobURL(filepath.Join(bb.Config.prefixPath, name))
+	blobURL := bb.Container.NewBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, name))
 
 	var downloadPtr *int64 = new(int64)
 	*downloadPtr = 1
@@ -739,7 +739,7 @@ func (bb *BlockBlob) ReadBuffer(name string, offset int64, len int64) ([]byte, e
 		buff = make([]byte, len)
 	}
 
-	blobURL := bb.Container.NewBlobURL(filepath.Join(bb.Config.prefixPath, name))
+	blobURL := bb.Container.NewBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, name))
 	err := azblob.DownloadBlobToBuffer(context.Background(), blobURL, offset, len, buff, bb.downloadOptions)
 
 	if err != nil {
@@ -760,7 +760,7 @@ func (bb *BlockBlob) ReadBuffer(name string, offset int64, len int64) ([]byte, e
 // ReadInBuffer : Download specific range from a file to a user provided buffer
 func (bb *BlockBlob) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
 	// log.Trace("BlockBlob::ReadInBuffer : name %s", name)
-	blobURL := bb.Container.NewBlobURL(filepath.Join(bb.Config.prefixPath, name))
+	blobURL := bb.Container.NewBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, name))
 	err := azblob.DownloadBlobToBuffer(context.Background(), blobURL, offset, len, data, bb.downloadOptions)
 
 	if err != nil {
@@ -833,7 +833,7 @@ func (bb *BlockBlob) WriteFromFile(name string, metadata map[string]string, fi *
 	log.Trace("BlockBlob::WriteFromFile : name %s", name)
 	//defer exectime.StatTimeCurrentBlock("WriteFromFile::WriteFromFile")()
 
-	blobURL := bb.Container.NewBlockBlobURL(filepath.Join(bb.Config.prefixPath, name))
+	blobURL := bb.Container.NewBlockBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, name))
 	defer log.TimeTrack(time.Now(), "BlockBlob::WriteFromFile", name)
 
 	var uploadPtr *int64 = new(int64)
@@ -911,7 +911,7 @@ func (bb *BlockBlob) WriteFromFile(name string, metadata map[string]string, fi *
 // WriteFromBuffer : Upload from a buffer to a blob
 func (bb *BlockBlob) WriteFromBuffer(name string, metadata map[string]string, data []byte) error {
 	log.Trace("BlockBlob::WriteFromBuffer : name %s", name)
-	blobURL := bb.Container.NewBlockBlobURL(filepath.Join(bb.Config.prefixPath, name))
+	blobURL := bb.Container.NewBlockBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, name))
 
 	defer log.TimeTrack(time.Now(), "BlockBlob::WriteFromBuffer", name)
 	_, err := azblob.UploadBufferToBlockBlob(context.Background(), data, blobURL, azblob.UploadToBlockBlobOptions{
@@ -936,7 +936,7 @@ func (bb *BlockBlob) WriteFromBuffer(name string, metadata map[string]string, da
 func (bb *BlockBlob) GetFileBlockOffsets(name string) (*common.BlockOffsetList, error) {
 	var blockOffset int64 = 0
 	blockList := common.BlockOffsetList{}
-	blobURL := bb.Container.NewBlockBlobURL(filepath.Join(bb.Config.prefixPath, name))
+	blobURL := bb.Container.NewBlockBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, name))
 	storageBlockList, err := blobURL.GetBlockList(
 		context.Background(), azblob.BlockListCommitted, bb.blobAccCond.LeaseAccessConditions)
 	if err != nil {
@@ -1166,7 +1166,7 @@ func (bb *BlockBlob) Write(options internal.WriteFileOptions) error {
 
 // TODO: make a similar method facing stream that would enable us to write to cached blocks then stage and commit
 func (bb *BlockBlob) stageAndCommitModifiedBlocks(name string, data []byte, offsetList *common.BlockOffsetList) error {
-	blobURL := bb.Container.NewBlockBlobURL(filepath.Join(bb.Config.prefixPath, name))
+	blobURL := bb.Container.NewBlockBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, name))
 	blockOffset := int64(0)
 	var blockIDList []string
 	for _, blk := range offsetList.BlockList {
@@ -1205,7 +1205,7 @@ func (bb *BlockBlob) StageAndCommit(name string, bol *common.BlockOffsetList) er
 	blobMtx := bb.blockLocks.GetLock(name)
 	blobMtx.Lock()
 	defer blobMtx.Unlock()
-	blobURL := bb.Container.NewBlockBlobURL(filepath.Join(bb.Config.prefixPath, name))
+	blobURL := bb.Container.NewBlockBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, name))
 	var blockIDList []string
 	var data []byte
 	staged := false

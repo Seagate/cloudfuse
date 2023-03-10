@@ -20,8 +20,8 @@ import (
 func newObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
 	stat := info.Sys().(*syscall.Win32FileAttributeData)
 	attrs := &internal.ObjAttr{
-		Path:  path,
-		Name:  info.Name(),
+		Path:  common.NormalizeObjectName(path),
+		Name:  common.NormalizeObjectName(info.Name()),
 		Size:  info.Size(),
 		Mode:  info.Mode(),
 		Mtime: time.Unix(0, stat.LastWriteTime.Nanoseconds()),

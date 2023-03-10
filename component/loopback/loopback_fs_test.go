@@ -37,9 +37,9 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"testing"
 
+	"lyvecloudfuse/common"
 	"lyvecloudfuse/internal"
 
 	"github.com/stretchr/testify/assert"
@@ -83,19 +83,19 @@ func (suite *LoopbackFSTestSuite) SetupTest() {
 
 	err := os.MkdirAll(testPath, os.FileMode(0777))
 	panicIfNotNil(err, "Failed to setup test directories")
-	err = os.MkdirAll(filepath.Join(testPath, dirOne), os.FileMode(0777))
+	err = os.MkdirAll(common.JoinUnixFilepath(testPath, dirOne), os.FileMode(0777))
 	panicIfNotNil(err, "Failed to setup test directories")
-	err = os.MkdirAll(filepath.Join(testPath, dirEmpty), os.FileMode(0777))
+	err = os.MkdirAll(common.JoinUnixFilepath(testPath, dirEmpty), os.FileMode(0777))
 	panicIfNotNil(err, "Failed to setup test directories")
 
-	f, err := os.OpenFile(filepath.Join(testPath, fileLorem), os.O_RDWR|os.O_CREATE, os.FileMode(0777))
+	f, err := os.OpenFile(common.JoinUnixFilepath(testPath, fileLorem), os.O_RDWR|os.O_CREATE, os.FileMode(0777))
 	panicIfNotNil(err, "Failed to setup test files")
 	_, err = f.WriteString(loremText)
 	panicIfNotNil(err, "Failed to setup test files")
 	err = f.Close()
 	panicIfNotNil(err, "Failed to setup test files")
 
-	f, err = os.OpenFile(filepath.Join(testPath, fileHello), os.O_RDWR|os.O_CREATE, os.FileMode(0777))
+	f, err = os.OpenFile(common.JoinUnixFilepath(testPath, fileHello), os.O_RDWR|os.O_CREATE, os.FileMode(0777))
 	panicIfNotNil(err, "Failed to setup test files")
 	err = f.Close()
 	panicIfNotNil(err, "Failed to setup test files")
@@ -114,7 +114,7 @@ func (suite *LoopbackFSTestSuite) TestCreateDir() {
 
 	err := suite.lfs.CreateDir(internal.CreateDirOptions{Name: dirTwo, Mode: os.FileMode(0777)})
 	assert.Nil(err, "CreateDir: Failed")
-	info, err := os.Stat(filepath.Join(testPath, dirTwo))
+	info, err := os.Stat(common.JoinUnixFilepath(testPath, dirTwo))
 	assert.Nil(err, "CreateDir: Could not stat created dir")
 	assert.True(info.IsDir(), "CreateDir: not a dir")
 }
@@ -125,7 +125,7 @@ func (suite *LoopbackFSTestSuite) TestDeleteDir() {
 
 	err := suite.lfs.DeleteDir(internal.DeleteDirOptions{Name: dirEmpty})
 	assert.Nil(err, "DeleteDir: Failed")
-	_, err = os.Stat(filepath.Join(testPath, dirEmpty))
+	_, err = os.Stat(common.JoinUnixFilepath(testPath, dirEmpty))
 	assert.NotNil(err, "DeleteDir: Failed to delete")
 }
 
@@ -133,7 +133,7 @@ func (suite *LoopbackFSTestSuite) TestReadDir() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	info, _ := os.Stat(filepath.Join(testPath, fileLorem))
+	info, _ := os.Stat(common.JoinUnixFilepath(testPath, fileLorem))
 
 	attrs, err := suite.lfs.ReadDir(internal.ReadDirOptions{Name: dirOne})
 	assert.Nil(err, "ReadDir: Failed")
@@ -152,7 +152,7 @@ func (suite *LoopbackFSTestSuite) TestRenameDir() {
 	err := suite.lfs.RenameDir(internal.RenameDirOptions{Src: dirEmpty, Dst: "newempty"})
 	assert.Nil(err, "RenameDir: Failed")
 
-	info, err := os.Stat(filepath.Join(testPath, "newempty"))
+	info, err := os.Stat(common.JoinUnixFilepath(testPath, "newempty"))
 	assert.Nil(err, "RenameDir: Unable to stat renamed dir")
 
 	assert.Equal(info.Name(), "newempty", "RenameDir: name does not match")
@@ -166,7 +166,7 @@ func (suite *LoopbackFSTestSuite) TestCreateFile() {
 	assert.Nil(err, "CreateFile: Failed")
 	assert.NotNil(handle)
 
-	info, err := os.Stat(filepath.Join(testPath, fileEmpty))
+	info, err := os.Stat(common.JoinUnixFilepath(testPath, fileEmpty))
 	assert.Nil(err, "CreateFile: unable to stat created file")
 	assert.Equal(info.Name(), fileEmpty)
 
@@ -180,7 +180,7 @@ func (suite *LoopbackFSTestSuite) TestDeleteFile() {
 
 	err := suite.lfs.DeleteFile(internal.DeleteFileOptions{Name: fileHello})
 	assert.Nil(err, "DeleteFile: Failed")
-	_, err = os.Stat(filepath.Join(testPath, fileHello))
+	_, err = os.Stat(common.JoinUnixFilepath(testPath, fileHello))
 	assert.NotNil(err, "DeleteFile: file was not deleted")
 }
 
@@ -266,7 +266,7 @@ func (suite *LoopbackFSTestSuite) TestTruncateFile() {
 
 	err = suite.lfs.TruncateFile(internal.TruncateFileOptions{Name: fileLorem, Size: 0})
 	assert.Nil(err)
-	info, err := os.Stat(filepath.Join(testPath, fileLorem))
+	info, err := os.Stat(common.JoinUnixFilepath(testPath, fileLorem))
 	assert.Nil(err, "TruncateFile: cannot stat file")
 	assert.Equal(info.Size(), int64(0))
 
@@ -280,7 +280,7 @@ func (suite *LoopbackFSTestSuite) TestGetAttr() {
 
 	attr, err := suite.lfs.GetAttr(internal.GetAttrOptions{Name: fileLorem})
 	assert.Nil(err)
-	info, err := os.Stat(filepath.Join(testPath, fileLorem))
+	info, err := os.Stat(common.JoinUnixFilepath(testPath, fileLorem))
 	assert.Nil(err)
 
 	assert.Equal(attr.Size, info.Size())
