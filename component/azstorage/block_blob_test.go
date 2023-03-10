@@ -183,6 +183,9 @@ func newTestAzStorage(configuration string) (*AzStorage, error) {
 }
 
 func (s *blockBlobTestSuite) SetupTest() {
+	// Seed the randomizer when we start the test
+	rand.Seed(time.Now().UnixNano())
+
 	// Logging config
 	cfg := common.LogConfig{
 		FilePath:    "./logfile.txt",
@@ -289,7 +292,6 @@ func (s *blockBlobTestSuite) TestDefault() {
 }
 
 func randomString(length int) string {
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, length)
 	rand.Read(b)
 	return fmt.Sprintf("%x", b)[:length]
