@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Let script exit if an unsed variable is used
+# Let script exit if an unused variable is used
 set -o nounset
 
 # Load variables
