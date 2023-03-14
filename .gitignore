@@ -21,3 +21,9 @@ test/manual_scripts/cachetest.go
 lint.log
 azure-storage-fuse
 bfusemon
+**/lyvecloudfuse-logs.txt
+test-scripts/helper/var.env
+gui/__pycache__/
+gui/pyside6/__pycache__/
+lyvecloudfuse-logs.txt
+ui_*.py
