@@ -302,29 +302,34 @@ func (cl *Client) DeleteFile(name string) (err error) {
 
 // DeleteDirectory : Delete a virtual directory in the container/virtual directory
 func (cl *Client) DeleteDirectory(name string) (err error) {
+
 	log.Trace("Client::DeleteDirectory : name %s", name)
 
-	for marker := (S3Object.Marker{}); marker.NotDone(); {
-		listBlock, err := s3.Container.ListContainersSegment(context.Background(), marker,
-			S3Object.ListContainersSegmentOptions{MaxResults: common.MaxDirListCount,
-				Prefix: filepath.Join(s3.Config.prefixPath, name) + "/",
-			})
+	var marker *string = nil
 
-		if err != nil {
-			log.Err("Client::DeleteDirectory : Failed to get list of blocks %s", err.Error)
-			return err
+	objects, _, err := cl.List(name, marker, 0)
+	if err != nil {
+		e := storeBlobErrToErr(err)
+		if e == ErrFileNotFound {
+			return syscall.ENOENT
+		} else if e == InvalidPermission {
+			return syscall.EPERM
+		} else {
+			log.Warn("Client::getAttr : Failed to list object properties for %s [%s]", name, err.Error())
 		}
-		marker = listBlock.NextMarker
+		return err
+	}
 
-		// Process the blocks returned in this result segment (if the segment is empty, the loop body won't execute)
-		for _, blockInfo := range listBlock.Segment.BlockItems{
-			err = s3.DeleteFile(split(s3.Config.prefixPath, blockInfo.Name))
-			if err != nil {
-				log.Err("Client::DeleteDirectory : Failed to delete file %s [%s]", blockInfo.Name, err.Error)
-			}
+	for _, object := range objects {
+		fullPath := filepath.Join(cl.Config.prefixPath, object.Path)
+		deleteErr := cl.DeleteFile(fullPath)
+		if deleteErr != nil {
+			log.Err("Client::DeleteDirectory : Failed to delete file %s [%s]", fullPath, deleteErr.Error)
+			return deleteErr
 		}
 	}
-	return s3.DeleteFile(name)
+
+	return nil
 }
 
 // RenameFile : Rename the file
@@ -457,7 +462,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// combine the configured prefix and the prefix being given to List to get a full listPath
 	listPath := filepath.Join(cl.Config.prefixPath, prefix)
 	// make sure the listPath ends with a forward slash
-	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
+	if listPath != "" && listPath[len(listPath)-1] != '/' {
 		listPath += "/"
 	}
 
