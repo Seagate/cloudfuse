@@ -22,6 +22,12 @@ jobs:
     steps:
     - checkout: self
 
+    - script: |
+        install_winfsp.bat
+      displayName: "Install WinFSP"
+      continueOnError: false
+      workingDirectory: ./
+
     - task: GoTool@0
       inputs:
         version: '1.19.6'
@@ -33,12 +39,6 @@ jobs:
         arguments: '-d ./...'
         workingDirectory: './'
       displayName: "Get Dependencies"
-
-    - script: |
-        install_winfsp.bat
-      displayName: "Install WinFSP"
-      continueOnError: false
-      workingDirectory: ./
 
     - task: Go@0
       inputs:
