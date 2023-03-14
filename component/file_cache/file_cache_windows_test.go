@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -90,7 +89,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	_, err = os.Stat(suite.fake_storage_path + "/" + path)
 	suite.assert.True(err == nil || os.IsExist(err))
 
-	// Chown
+	// Checking that nothing changed with existing files
 	owner := os.Getuid()
 	group := os.Getgid()
 	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
@@ -98,10 +97,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 
 	// Path in fake storage should be updated
 	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	//stat := info.Sys().(*syscall.Win32FileAttributeData)
 	suite.assert.True(err == nil || os.IsExist(err))
-	//suite.assert.EqualValues(owner, stat.Uid)
-	//suite.assert.EqualValues(group, stat.Gid)
 }
 
 func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
@@ -119,52 +115,20 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	_, err = os.Stat(suite.fake_storage_path + "/" + path)
 	suite.assert.True(err == nil || os.IsExist(err))
 
-	// Chown
+	// Chown is not supportred on Windows, but checking that calling it does not cause an error
 	owner := os.Getuid()
 	group := os.Getgid()
 	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
 	suite.assert.Nil(err)
-	// Path in fake storage and file cache should be updated
+
+	// Checking that nothing changed with existing files
 	_, err = os.Stat(suite.cache_path + "/" + path)
-	//stat := info.Sys().(*syscall.Win32FileAttributeData)
 	suite.assert.True(err == nil || os.IsExist(err))
-	//suite.assert.EqualValues(owner, stat.Uid)
-	//suite.assert.EqualValues(group, stat.Gid)
+
 	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	//stat = info.Sys().(*syscall.Win32FileAttributeData)
 	suite.assert.True(err == nil || os.IsExist(err))
-	//suite.assert.EqualValues(owner, stat.Uid)
-	//suite.assert.EqualValues(group, stat.Gid)
 
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
-}
-
-func (suite *fileCacheWindowsTestSuite) TestChownCase2() {
-	defer suite.cleanupTest()
-	// Default is to not create empty files on create file to support immutable storage.
-	path := "file"
-	oldMode := os.FileMode(0511)
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
-	_, _ = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	//stat := info.Sys().(*syscall.Win32FileAttributeData)
-	//oldOwner := stat.Uid
-	//oldGroup := stat.Gid
-
-	owner := os.Getuid()
-	group := os.Getgid()
-	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
-	suite.assert.NotNil(err)
-	suite.assert.Equal(err, syscall.EIO)
-
-	// Path should be in the file cache with old group and owner (since we failed the operation)
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	//stat = info.Sys().(*syscall.Win32FileAttributeData)
-	suite.assert.True(err == nil || os.IsExist(err))
-	//suite.assert.EqualValues(oldOwner, stat.Uid)
-	//suite.assert.EqualValues(oldGroup, stat.Gid)
-	// Path should not be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
-	suite.assert.True(os.IsNotExist(err))
 }
 
 // In order for 'go test' to run this suite, we need to create
