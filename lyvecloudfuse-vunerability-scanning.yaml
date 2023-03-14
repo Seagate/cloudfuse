@@ -1,10 +1,6 @@
 pr:
 - main
 
-
-trigger:
-- master
-
 pool:
   vmImage: ubuntu-20.04
 
