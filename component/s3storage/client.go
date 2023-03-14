@@ -127,6 +127,7 @@ func (cl *Client) NewCredentialKey(key, value string) (err error) {
 
 // Wrapper function of the GetObject S3 calls.
 func (cl *Client) getObject(name string, offset int64, count int64) (*s3.GetObjectOutput, error) {
+	log.Trace("Client::getObject : getting object %s (%d+%d)", name, offset, count)
 
 	var rangeString string //string to be used to specify range of object to download from S3
 	bucketName := cl.Config.authConfig.BucketName
@@ -162,6 +163,7 @@ func (cl *Client) getObject(name string, offset int64, count int64) (*s3.GetObje
 
 // Wrapper function for awsS3Client.PutObject
 func (cl *Client) putObject(name string, objectData io.Reader) (*s3.PutObjectOutput, error) {
+	log.Trace("Client::putObject : putting object %s", name)
 	var result *s3.PutObjectOutput
 	var err error
 	for i := 0; i < retryCount; i++ {
@@ -260,9 +262,10 @@ func (cl *Client) CreateFile(name string, mode os.FileMode) error {
 // CreateDirectory : Create a new directory in the container/virtual directory
 func (cl *Client) CreateDirectory(name string) error {
 	log.Trace("Client::CreateDirectory : name %s", name)
-
 	// Lyve Cloud does not support creating an empty file to indicate a directory
-	// so do nothing
+	// directories will be represented only as object prefixes
+	// we have no way of representing an empty directory, so do nothing
+	// TODO: research: is this supposed to throw an error if the directory already exists?
 	return nil
 }
 
@@ -408,7 +411,7 @@ func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	}
 
 	// not found
-	log.Err("GetAttr was asked for %s, but found no match (amont %d results).\n", name, numObjects)
+	log.Err("GetAttr was asked for %s, but found no match (among %d results).\n", name, numObjects)
 	return nil, syscall.ENOENT
 }
 
@@ -756,13 +759,17 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	// TODO: Is there a more elegant way to do this?
 	// The aws-sdk-go does not seem to see to the end of the file
 	// so let's seek to the start before uploading
-	fi.Seek(0, 0)
+	_, err = fi.Seek(0, 0)
+	if err != nil {
+		log.Err("Client::WriteFromFile : Failed to seek to beginning of input file %s", fi.Name())
+		return err
+	}
 
 	// uploader := manager.NewUploader(cl.Client, func(u *manager.Uploader) {
 	// 	u.PartSize = partMiBs * 1024 * 1024
 	// })
 
-	cl.putObject(name, fi)
+	_, err = cl.putObject(name, fi)
 
 	// TODO: Add monitor tracking
 	// if common.MonitorBfs() && stat.Size() > 0 {
@@ -774,13 +781,13 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	if err != nil {
 		log.Err("Client::WriteFromFile : Failed to upload object %s [%s]", name, err.Error())
 		return err
-	} else {
-		log.Debug("Client::WriteFromFile : Upload complete of object %v", name)
+	}
 
-		// store total bytes uploaded so far
-		if stat.Size() > 0 {
-			s3StatsCollector.UpdateStats(stats_manager.Increment, bytesUploaded, stat.Size())
-		}
+	log.Debug("Client::WriteFromFile : Upload complete of object %v", name)
+
+	// store total bytes uploaded so far
+	if stat.Size() > 0 {
+		s3StatsCollector.UpdateStats(stats_manager.Increment, bytesUploaded, stat.Size())
 	}
 
 	return nil
@@ -795,7 +802,7 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data 
 	// 	u.PartSize = partMiBs * 1024 * 1024
 	// })
 
-	cl.putObject(name, largeBuffer)
+	_, err = cl.putObject(name, largeBuffer)
 
 	if err != nil {
 		log.Err("Couldn't upload object to %v:%v. Here's why: %v\n",
@@ -831,15 +838,14 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 func (cl *Client) Write(options internal.WriteFileOptions) error {
 	name := options.Handle.Path
 	offset := options.Offset
+	data := options.Data
+	length := int64(len(data))
 	defer log.TimeTrack(time.Now(), "Client::Write", options.Handle.Path)
 	log.Trace("Client::Write : name %s offset %v", name, offset)
 	// tracks the case where our offset is great than our current file size (appending only - not modifying pre-existing data)
 	var dataBuffer *[]byte
 
-	length := int64(len(options.Data))
-	data := options.Data
-
-	// get all the data
+	// get the existing object data
 	oldData, _ := cl.ReadBuffer(name, 0, 0)
 	// update the data with the new data
 	// if we're only overwriting existing data
