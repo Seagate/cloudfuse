@@ -26,6 +26,8 @@ steps:
     displayName: "Get Dependencies"
 
   - script: |
+      sudo apt update
+      sudo apt upgrade
      ./TrivySetup.sh
     displayName: 'Install Trivy'
 
