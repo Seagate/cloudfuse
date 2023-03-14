@@ -42,10 +42,10 @@ jobs:
       displayName: "Build"
 
     - script: |
-      install_winfsp.bat
-    displayName: "Install WinFSP"
-    continueOnError: false
-    workingDirectory: ./
+        install_winfsp.bat
+      displayName: "Install WinFSP"
+      continueOnError: false
+      workingDirectory: ./
 
     - script: |
         cnfFile=$HOME/azuretest.json
