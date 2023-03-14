@@ -25,11 +25,13 @@ steps:
       workingDirectory: './'
     displayName: "Get Dependencies"
 
+  
+
   - script: |
-      ./installTrivy.sh
+      ./TrivySetup.sh
     displayName: 'Install Trivy'
 
   - script: |
-        ./TrivyScan.sh
-    displayName: 'Run Trivy'
+        ./RunTrivyScans.sh
+    displayName: 'Run Trivy scans'
 
