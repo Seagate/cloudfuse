@@ -6,7 +6,7 @@ trigger:
 - master
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: ubuntu-20.04
 
 
 steps:
@@ -26,8 +26,7 @@ steps:
     displayName: "Get Dependencies"
 
   - script: |
-      sudo apt update
-      ./TrivySetup.sh
+     ./TrivySetup.sh
     displayName: 'Install Trivy'
 
   - script: |
