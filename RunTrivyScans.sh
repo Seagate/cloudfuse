@@ -1,5 +1,5 @@
 #!/bin/bash
 
-trivy fs --dependency-tree ./ > TrivyDependencyTree
+trivy fs ./ --scanners license --exit-code 1 --severity HIGH,CRITICAL
 
-trivy fs --scanners license ./ > TrivyLicenses
+trivy fs ./ --exit-code 1 --severity MEDIUM,HIGH,CRITICAL --dependency-tree
