@@ -34,18 +34,18 @@ jobs:
         workingDirectory: './'
       displayName: "Get Dependencies"
 
+    - script: |
+        install_winfsp.bat
+      displayName: "Install WinFSP"
+      continueOnError: false
+      workingDirectory: ./
+
     - task: Go@0
       inputs:
         command: 'build'
         workingDirectory: ./
         arguments: "-tags $(tags) -o lyvecloudfuse"
       displayName: "Build"
-
-    - script: |
-        install_winfsp.bat
-      displayName: "Install WinFSP"
-      continueOnError: false
-      workingDirectory: ./
 
     - script: |
         cnfFile=$HOME/azuretest.json
