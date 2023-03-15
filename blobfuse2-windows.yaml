@@ -22,8 +22,8 @@ jobs:
     steps:
     - checkout: self
 
-    - script: |
-        install_winfsp.bat
+    - powershell: |
+        winget install winfsp.winfsp --source winget
       displayName: "Install WinFSP"
       continueOnError: false
       workingDirectory: ./
