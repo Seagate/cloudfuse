@@ -223,14 +223,12 @@ func (s *s3StorageTestSuite) TestListContainers() {
 
 func (s *s3StorageTestSuite) TestDeleteDirectory() {
 	defer s.cleanupTest()
+
 	// setup
 	dirName := generateDirectoryName()
 	// A directory isn't created unless there is a file in that directory, therefore create a file with
 	// 		the directory prefix instead of s.s3Storage.CreateDir(internal.CreateDirOptions{Name: name})
 	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: path.Join(dirName, generateFileName())})
-	// Testing dir and dir/
-
-	log.Debug(dirName)
 
 	err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: dirName})
 	s.assert.Nil(err)
