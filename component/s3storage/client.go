@@ -465,8 +465,8 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	}
 	// combine the configured prefix and the prefix being given to List to get a full listPath
 	listPath := filepath.Join(cl.Config.prefixPath, prefix)
-	// make sure the listPath ends with a forward slash
-	if listPath != "" && listPath[len(listPath)-1] != '/' {
+	// replace trailing forward slash stripped by filepath.Join
+	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
 		listPath += "/"
 	}
 
