@@ -320,6 +320,10 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 		return err
 	}
 
+	if len(objects) == 0 {
+		return syscall.ENOENT
+	}
+
 	for _, object := range objects {
 		fullPath := filepath.Join(cl.Config.prefixPath, object.Path)
 		deleteErr := cl.DeleteFile(fullPath)

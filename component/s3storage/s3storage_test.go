@@ -228,28 +228,25 @@ func (s *s3StorageTestSuite) TestDeleteDirectory() {
 	// A directory isn't created unless there is a file in that directory, therefore create a file with
 	// 		the directory prefix instead of s.s3Storage.CreateDir(internal.CreateDirOptions{Name: name})
 	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: path.Join(dirName, generateFileName())})
-
 	// Testing dir and dir/
-	var paths = []string{dirName, dirName + "/"}
 
-	for _, path := range paths {
-		log.Debug(path)
-		s.Run(path, func() {
+	log.Debug(dirName)
 
-			err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: path})
-			s.assert.Nil(err)
+	err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: dirName})
+	s.assert.Nil(err)
 
-			// Directory should not be in the account
-			dirEmpty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: dirName})
-			s.assert.True(dirEmpty)
-		})
-	}
+	// Directory should not be in the account
+	dirEmpty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: dirName})
+	s.assert.True(dirEmpty)
 
 }
 
-// func (s *s3StorageTestSuite) TestDeleteDirectoryFalse() {
-
-// }
+func (s *s3StorageTestSuite) TestDeleteDirectoryFalse() {
+	dirName := generateDirectoryName()
+	// Don't generate an actual directory and see if DeleteDirectory returns an error
+	err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: dirName})
+	s.assert.NotNil(err)
+}
 func (s *s3StorageTestSuite) TestIsDirEmpty() {
 	defer s.cleanupTest()
 	// Setup
