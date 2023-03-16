@@ -61,7 +61,7 @@ type S3Connection interface {
 	Configure(cfg S3StorageConfig) error
 	UpdateConfig(cfg S3StorageConfig) error
 
-	ListContainers() ([]string, error)
+	ListBuckets() ([]string, error)
 
 	// This is just for test, shall not be used otherwise
 	SetPrefixPath(string) error

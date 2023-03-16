@@ -159,8 +159,8 @@ func (s3 *S3Storage) Stop() error {
 }
 
 // ------------------------- Container listing -------------------------------------------
-func (s3 *S3Storage) ListContainers() ([]string, error) {
-	return s3.storage.ListContainers()
+func (s3 *S3Storage) ListBuckets() ([]string, error) {
+	return s3.storage.ListBuckets()
 }
 
 // ------------------------- Core Operations -------------------------------------------

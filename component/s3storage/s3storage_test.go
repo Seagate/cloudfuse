@@ -65,27 +65,6 @@ var ctx = context.Background()
 
 const MB = 1024 * 1024
 
-// A UUID representation compliant with specification in RFC 4122 document.
-type uuid [16]byte
-
-const reservedRFC4122 byte = 0x40
-
-func (u uuid) bytes() []byte {
-	return u[:]
-}
-
-// NewUUID returns a new uuid using RFC 4122 algorithm.
-func newUUID() (u uuid) {
-	u = uuid{}
-	// Set all bits to randomly (or pseudo-randomly) chosen values.
-	rand.Read(u[:])
-	u[8] = (u[8] | reservedRFC4122) & 0x7F // u.setVariant(ReservedRFC4122)
-
-	var version byte = 4
-	u[6] = (u[6] & 0xF) | (version << 4) // u.setVersion(4)
-	return
-}
-
 func randomString(length int) string {
 	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, length)
@@ -93,7 +72,7 @@ func randomString(length int) string {
 	return fmt.Sprintf("%x", b)[:length]
 }
 
-func generateContainerName() string {
+func generateBucketName() string {
 	return "fuseutc" + randomString(8)
 }
 
@@ -154,26 +133,9 @@ func (s *s3StorageTestSuite) SetupTest() {
 	s.setupTestHelper("", "", true)
 }
 
-// generates a file and fills it with bytes provided by string argument and uploads it to the S3 Bucket. Returns a string for file name.
-func (s *s3StorageTestSuite) UploadFile(str string) string {
-
-	name := generateFileName()
-	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	data := []byte(str)
-	homeDir, _ := os.UserHomeDir()
-	file, _ := ioutil.TempFile(homeDir, name+".tmp")
-	defer os.Remove(file.Name())
-	file.Write(data)
-
-	err := s.s3Storage.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: file})
-	s.assert.Nil(err)
-
-	return name
-}
-
 func (s *s3StorageTestSuite) setupTestHelper(configuration string, container string, create bool) {
 	if container == "" {
-		container = generateContainerName()
+		container = generateBucketName()
 	}
 	s.container = container
 	if configuration == "" {
@@ -201,7 +163,7 @@ func (s *s3StorageTestSuite) cleanupTest() {
 	_ = log.Destroy()
 }
 
-func (s *s3StorageTestSuite) TestListContainers() {
+func (s *s3StorageTestSuite) TestListBuckets() {
 	defer s.cleanupTest()
 
 	// TODO: Fix this so we can create buckets
@@ -216,15 +178,14 @@ func (s *s3StorageTestSuite) TestListContainers() {
 	// 		"lens-lab-test-create", "us-east-1", err)
 	// }
 
-	containers, err := s.s3Storage.ListContainers()
+	buckets, err := s.s3Storage.ListBuckets()
 	s.assert.Nil(err)
-	s.assert.Equal(containers, []string{"stxe1-srg-lens-lab1"})
+	s.assert.Equal(buckets, []string{"stxe1-srg-lens-lab1"})
 }
 
 func (s *s3StorageTestSuite) TestDeleteDirectory() {
 	defer s.cleanupTest()
-
-	// setup
+	// Setup
 	dirName := generateDirectoryName()
 	// A directory isn't created unless there is a file in that directory, therefore create a file with
 	// 		the directory prefix instead of s.s3Storage.CreateDir(internal.CreateDirOptions{Name: name})
@@ -236,7 +197,6 @@ func (s *s3StorageTestSuite) TestDeleteDirectory() {
 	// Directory should not be in the account
 	dirEmpty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: dirName})
 	s.assert.True(dirEmpty)
-
 }
 
 func (s *s3StorageTestSuite) TestDeleteDirectoryFalse() {
@@ -245,6 +205,7 @@ func (s *s3StorageTestSuite) TestDeleteDirectoryFalse() {
 	err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: dirName})
 	s.assert.NotNil(err)
 }
+
 func (s *s3StorageTestSuite) TestIsDirEmpty() {
 	defer s.cleanupTest()
 	// Setup

@@ -74,6 +74,7 @@ type Client struct {
 // Verify that Client implements S3Connection interface
 var _ S3Connection = &Client{}
 
+// Configure : Initialize the awsS3Client
 func (cl *Client) Configure(cfg S3StorageConfig) error {
 	cl.Config = cfg
 
@@ -112,12 +113,14 @@ func (cl *Client) Configure(cfg S3StorageConfig) error {
 }
 
 // For dynamic config update the config here
+// Currently only updates the blockSize
 func (cl *Client) UpdateConfig(cfg S3StorageConfig) error {
 	cl.Config.blockSize = cfg.blockSize
 	return nil
 }
 
 // NewCredentialKey : Update the credential key specified by the user
+// Currently not implemented
 func (cl *Client) NewCredentialKey(key, value string) (err error) {
 	// TODO: research whether and how credentials could change on the same bucket
 	// If they can, research whether we can change credentials on an existing client object
@@ -125,7 +128,9 @@ func (cl *Client) NewCredentialKey(key, value string) (err error) {
 	return nil
 }
 
-// Wrapper function of the GetObject S3 calls.
+// Wrapper for awsS3Client.GetObject
+// set count = 0 to read to the end of the object
+// Retries on InvalidAccessKeyID
 func (cl *Client) getObject(name string, offset int64, count int64) (*s3.GetObjectOutput, error) {
 	log.Trace("Client::getObject : getting object %s (%d+%d)", name, offset, count)
 
@@ -161,7 +166,9 @@ func (cl *Client) getObject(name string, offset int64, count int64) (*s3.GetObje
 	return result, err
 }
 
-// Wrapper function for awsS3Client.PutObject
+// Wrapper for awsS3Client.PutObject
+// Takes an io.Reader to work with both files and byte arrays
+// Retries on InvalidAccessKeyID
 func (cl *Client) putObject(name string, objectData io.Reader) (*s3.PutObjectOutput, error) {
 	log.Trace("Client::putObject : putting object %s", name)
 	var result *s3.PutObjectOutput
@@ -182,7 +189,8 @@ func (cl *Client) putObject(name string, objectData io.Reader) (*s3.PutObjectOut
 	return result, err
 }
 
-// Wrapper function for awsS3Client.PutObject
+// Wrapper for awsS3Client.DeleteObject
+// Retries on InvalidAccessKeyID
 func (cl *Client) deleteObject(name string) (*s3.DeleteObjectOutput, error) {
 	log.Trace("Client::deleteObject : deleting object %s", name)
 	var result *s3.DeleteObjectOutput
@@ -202,7 +210,7 @@ func (cl *Client) deleteObject(name string) (*s3.DeleteObjectOutput, error) {
 	return result, err
 }
 
-// Lyve Cloud sometimes returns InvalidAccessKey even if the access key is correct and the request was correct
+// Lyve Cloud sometimes returns InvalidAccessKeyId even if the access key is correct and the request was correct
 // Check the returned err value for the associated error code
 func isInvalidAccessKeyID(err error) bool {
 	var apiErr smithy.APIError
@@ -217,8 +225,9 @@ func isInvalidAccessKeyID(err error) bool {
 	return false
 }
 
-func (cl *Client) ListContainers() ([]string, error) {
-	log.Trace("Client::ListContainers : Listing containers")
+// Wrapper for awsS3Client.ListBuckets
+func (cl *Client) ListBuckets() ([]string, error) {
+	log.Trace("Client::ListBuckets : Listing buckets")
 
 	cntList := make([]string, 0)
 
@@ -228,7 +237,7 @@ func (cl *Client) ListContainers() ([]string, error) {
 		result, err = cl.awsS3Client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
 		// retry on InvalidAccessKeyId
 		if isInvalidAccessKeyID(err) {
-			log.Warn("Client::ListContainers Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
+			log.Warn("Client::ListBuckets Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
 		} else {
 			break
 		}
@@ -252,14 +261,14 @@ func (cl *Client) SetPrefixPath(path string) error {
 	return nil
 }
 
-// CreateFile : Create a new file in the container/virtual directory
+// CreateFile : Create a new file in the bucket/virtual directory
 func (cl *Client) CreateFile(name string, mode os.FileMode) error {
 	log.Trace("Client::CreateFile : name %s", name)
 	var data []byte
 	return cl.WriteFromBuffer(name, nil, data)
 }
 
-// CreateDirectory : Create a new directory in the container/virtual directory
+// CreateDirectory : Create a new directory in the bucket/virtual directory
 func (cl *Client) CreateDirectory(name string) error {
 	log.Trace("Client::CreateDirectory : name %s", name)
 	// Lyve Cloud does not support creating an empty file to indicate a directory
@@ -269,7 +278,7 @@ func (cl *Client) CreateDirectory(name string) error {
 	return nil
 }
 
-// CreateLink : Create a symlink in the container/virtual directory
+// CreateLink : Create a symlink in the bucket/virtual directory
 func (cl *Client) CreateLink(source string, target string) error {
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
@@ -290,17 +299,17 @@ func (cl *Client) DeleteFile(name string) (err error) {
 			log.Err("Client::DeleteFile : %s does not exist", name)
 			return syscall.ENOENT
 		} else if serr == BlobIsUnderLease {
-			log.Err("Client::DeleteFile : %s is under lease [%s]", name, err.Error())
+			log.Err("Client::DeleteFile : %s is under lease. Here's why: %v", name, err)
 			return syscall.EIO
 		} else {
-			log.Err("Client::DeleteFile : Failed to delete object %s [%s]", name, err.Error())
+			log.Err("Client::DeleteFile : Failed to delete object %s. Here's why: %v", name, err)
 			return err
 		}
 	}
 	return nil
 }
 
-// DeleteDirectory : Delete a virtual directory in the container/virtual directory
+// DeleteDirectory : Delete a virtual directory in the bucket/virtual directory
 func (cl *Client) DeleteDirectory(name string) (err error) {
 
 	log.Trace("Client::DeleteDirectory : name %s", name)
@@ -317,7 +326,7 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 		} else if e == InvalidPermission {
 			return syscall.EPERM
 		} else {
-			log.Warn("Client::getAttr : Failed to list object properties for %s [%s]", name, err.Error())
+			log.Warn("Client::getAttr : Failed to list object properties for %s. Here's why: %v", name, err)
 		}
 		return err
 	}
@@ -374,7 +383,7 @@ func (cl *Client) RenameFile(source string, target string) (err error) {
 				return syscall.ENOENT
 			}
 		}
-		log.Err("Client::RenameFile : Failed to start copy of file %s [%s]", source, err.Error())
+		log.Err("Client::RenameFile : Failed to start copy of file %s. Here's why: %v", source, err)
 		return err
 	}
 
@@ -429,7 +438,7 @@ func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 		} else if e == InvalidPermission {
 			return attr, syscall.EPERM
 		} else {
-			log.Warn("Client::getAttrUsingList : Failed to list object properties for %s [%s]", name, err.Error())
+			log.Warn("Client::getAttrUsingList : Failed to list object properties for %s. Here's why: %v", name, err)
 		}
 		return nil, err
 	}
@@ -610,39 +619,33 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	return objectAttrList, &newMarker, nil
 }
 
-// track the progress of download of objects where every 100MB of data downloaded is being tracked. It also tracks the completion of download
-func trackDownload(name string, bytesTransferred int64, count int64, downloadPtr *int64) {
-}
-
-// Download object to a local file with parameters: filename, bytes offset from start of object, bytes to include from offset, file to write to.
+// Download object with the given name to the given file handle.
+// Reads starting at a byte offset from the start of the object, with length count
+// count = 0 reads to the end of the object
 func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
-
 	log.Trace("Client::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
-	// var downloadPtr *int64 = new(int64)
-	// *downloadPtr = 1
-
 	bucketName := cl.Config.authConfig.BucketName
-
+	// get object data
 	result, err := cl.getObject(name, offset, count)
-
+	// does the object exist?
 	if err != nil {
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			log.Err("Client::ReadToFile : Failed to download object %s [%s]", name, err.Error())
+			log.Err("Client::ReadToFile : Failed to download object %s. Here's why: %v", name, err)
 			return syscall.ENOENT
 		}
 		log.Err("Couldn't get object %v:%v. Here's why: %v\n", bucketName, name, err)
 		return err
 	}
-
+	// read object data
 	defer result.Body.Close()
 	body, err := io.ReadAll(result.Body)
 	if err != nil {
 		log.Err("Couldn't read object body from %v. Here's why: %v\n", name, err)
 		return err
 	}
-
+	// write data to file
 	_, err = fi.Write(body)
 	if err != nil {
 		log.Err("Couldn't write to file %v. Here's why: %v\n", name, err)
@@ -652,63 +655,57 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 	return err
 }
 
-// ReadBuffer : Download a specific range from an object to a buffer
+// Download object with the given name and return the data as a byte array
+// Reads starting at a byte offset from the start of the object, with length in bytes = len
+// len = 0 reads to the end of the object
 func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
 	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, len)
-	var buff []byte
-
-	// If the len is 0, that means we need to read till the end of the object
-	if len == 0 {
-		attr, err := cl.GetAttr(name)
-		if err != nil {
-			return buff, err
-		}
-		buff = make([]byte, attr.Size)
-		len = attr.Size
-	} else {
-		buff = make([]byte, len)
-	}
-
+	// get the object data
 	result, err := cl.getObject(name, offset, len)
-
+	// check for errors
 	if err != nil {
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			log.Err("Client::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
-			return buff, syscall.ENOENT
+			log.Err("Client::ReadBuffer : Failed to download object %s. Here's why: %v", name, err)
+			return nil, syscall.ENOENT
 		}
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) {
 			// Range is incorrect
 			code := apiErr.ErrorCode()
 			if code == "InvalidRange" {
-				log.Err("Client::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
-				return buff, syscall.ERANGE
+				log.Err("Client::ReadBuffer : Failed to download object %s. Here's why: %v", name, err)
+				return nil, syscall.ERANGE
 			}
 		}
-		log.Err("Client::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
-		return buff, err
+		log.Err("Client::ReadBuffer : Failed to download object %s. Here's why: %v", name, err)
+		return nil, err
 	}
-
 	// Read the object into the buffer
 	defer result.Body.Close()
-	buff, _ = io.ReadAll(result.Body)
+	buff, err := io.ReadAll(result.Body)
+	if err != nil {
+		log.Err("Failed to read data from GetObject result. Here's why: %v", err)
+		return nil, err
+	}
 
 	return buff, nil
 }
 
-// ReadInBuffer : Download specific range from a file to a user provided buffer
+// Download object to provided byte array
+// Reads starting at a byte offset from the start of the object, with length in bytes = len
+// len = 0 reads to the end of the object
 func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
 	log.Trace("Client::ReadInBuffer : name %s", name)
-
+	// get object data
 	result, err := cl.getObject(name, offset, len)
-
+	// check for errors
 	if err != nil {
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
 		if errors.As(err, &nsk) {
-			log.Err("Client::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+			log.Err("Client::ReadBuffer : Failed to download object %s. Here's why: %v", name, err)
 			return syscall.ENOENT
 		}
 		var apiErr smithy.APIError
@@ -716,93 +713,56 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 			// Range is incorrect
 			code := apiErr.ErrorCode()
 			if code == "InvalidRange" {
-				log.Err("Client::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+				log.Err("Client::ReadBuffer : Failed to download object %s. Here's why: %v", name, err)
 				return syscall.ERANGE
 			}
 		}
-		log.Err("Client::ReadBuffer : Failed to download object %s [%s]", name, err.Error())
+		log.Err("Client::ReadBuffer : Failed to download object %s. Here's why: %v", name, err)
 		return err
 	}
-
+	// read object data
 	defer result.Body.Close()
 	_, err = result.Body.Read(data)
-
-	if err != nil {
-		// If we reached the EOF then all the data was correctly read so return
-		if err == io.EOF {
-			return nil
-		}
-		return err
+	if err == io.EOF {
+		// If we reached the EOF then all the data was correctly read
+		return nil
 	}
 
-	return nil
+	return err
 }
 
-func (cl *Client) calculateBlockSize(name string, fileSize int64) (blockSize int64, err error) {
-	return 0, nil
-}
-
-// track the progress of upload of objects where every 100MB of data uploaded is being tracked. It also tracks the completion of upload
-func trackUpload(name string, bytesTransferred int64, count int64, uploadPtr *int64) {
-}
-
-// WriteFromFile : Upload local file to object
+// Upload from a file handle to an object
+// the metadata parameter is not used
 func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.File) (err error) {
 	log.Trace("Client::WriteFromFile : name %s", name)
-	//defer exectime.StatTimeCurrentBlock("WriteFromFile::WriteFromFile")()
-
+	// track time for performance testing
 	defer log.TimeTrack(time.Now(), "Client::WriteFromFile", name)
-
-	var uploadPtr *int64 = new(int64)
-	*uploadPtr = 1
-
-	// TODO: Move this variable into the config file
-	// var partMiBs int64 = 16
-
 	// get the size of the file
 	stat, err := fi.Stat()
 	if err != nil {
-		log.Err("Client::WriteFromFile : Failed to get file size %s [%s]", name, err.Error())
+		log.Err("Client::WriteFromFile : Failed to get file size %s. Here's why: %v", name, err)
 		return err
 	}
-
-	// if the block size is not set then we configure it based on file size
-	// if blockSize == 0 {
-	// 	// based on file-size calculate block size
-	// 	blockSize, err = cl.calculateBlockSize(name, stat.Size())
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
-
-	// TODO: Add md5 hash support in S3
-	// Compute md5 of this file is requested by user
-	// If file is uploaded in one shot (no blocks created) then server is populating md5 on upload automatically.
-	// hence we take cost of calculating md5 only for files which are bigger in size and which will be converted to blocks.
-	// md5sum := []byte{}
-	// if cl.Config.updateMD5 && stat.Size() >= azblob.BlockBlobMaxUploadBlobBytes {
-	// 	md5sum, err = getMD5(fi)
-	// 	if err != nil {
-	// 		// Md5 sum generation failed so set nil while uploading
-	// 		log.Warn("Client::WriteFromFile : Failed to generate md5 of %s", name)
-	// 		md5sum = []byte{0}
-	// 	}
-	// }
-
-	// TODO: Is there a more elegant way to do this?
-	// The aws-sdk-go does not seem to see to the end of the file
+	// The aws-sdk-go-v2 does not seem to see to the end of the file
 	// so let's seek to the start before uploading
+	// TODO: Is there a more elegant way to do this?
 	_, err = fi.Seek(0, 0)
 	if err != nil {
 		log.Err("Client::WriteFromFile : Failed to seek to beginning of input file %s", fi.Name())
 		return err
 	}
 
+	// upload file data
+	_, err = cl.putObject(name, fi)
+	// TODO: decide when to use this higher-level API
 	// uploader := manager.NewUploader(cl.Client, func(u *manager.Uploader) {
 	// 	u.PartSize = partMiBs * 1024 * 1024
 	// })
-
-	_, err = cl.putObject(name, fi)
+	// check for errors
+	if err != nil {
+		log.Err("Client::WriteFromFile : Failed to upload object %s. Here's why: %v", name, err)
+		return err
+	}
 
 	// TODO: Add monitor tracking
 	// if common.MonitorBfs() && stat.Size() > 0 {
@@ -810,12 +770,6 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	// 		trackUpload(name, bytesTransferred, stat.Size(), uploadPtr)
 	// 	}
 	// }
-
-	if err != nil {
-		log.Err("Client::WriteFromFile : Failed to upload object %s [%s]", name, err.Error())
-		return err
-	}
-
 	log.Debug("Client::WriteFromFile : Upload complete of object %v", name)
 
 	// store total bytes uploaded so far
@@ -907,7 +861,7 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 	// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple blocks
 	err := cl.WriteFromBuffer(name, options.Metadata, *dataBuffer)
 	if err != nil {
-		log.Err("Client::Write : Failed to upload to object %s ", name, err.Error())
+		log.Err("Client::Write : Failed to upload to object. Here's why: %v ", name, err)
 		return err
 	}
 	return nil
