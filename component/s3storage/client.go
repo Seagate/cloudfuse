@@ -305,9 +305,11 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 
 	log.Trace("Client::DeleteDirectory : name %s", name)
 
+	reconstructedPath := filepath.Join(cl.Config.prefixPath, name) + "/"
+
 	var marker *string = nil
 
-	objects, _, err := cl.List(name, marker, 0)
+	objects, _, err := cl.List(reconstructedPath, marker, 0)
 	if err != nil {
 		e := storeBlobErrToErr(err)
 		if e == ErrFileNotFound {
