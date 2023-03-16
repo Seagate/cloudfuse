@@ -338,7 +338,14 @@ func (lfs *LoopbackFS) WriteFile(options internal.WriteFileOptions) (int, error)
 func (lfs *LoopbackFS) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("LoopbackFS::TruncateFile : name=%s", options.Name)
 	fsPath := common.JoinUnixFilepath(lfs.path, options.Name)
-	return os.Truncate(fsPath, options.Size)
+	// Need to check for existence of file since Windows does not check for that when
+	// it calls truncate
+	// TODO: Remove this when this github issue is resolved
+	// https://github.com/golang/go/issues/58977
+	if _, err := os.Stat(fsPath); err == nil || os.IsExist(err) {
+		return os.Truncate(fsPath, options.Size)
+	}
+	return &os.PathError{Op: "TruncateFile", Path: fsPath, Err: syscall.Errno(syscall.ERROR_PATH_NOT_FOUND)}
 }
 
 func (lfs *LoopbackFS) FlushFile(options internal.FlushFileOptions) error {
