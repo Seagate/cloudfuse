@@ -342,10 +342,11 @@ func (lfs *LoopbackFS) TruncateFile(options internal.TruncateFileOptions) error 
 	// it calls truncate
 	// TODO: Remove this when this github issue is resolved
 	// https://github.com/golang/go/issues/58977
-	if _, err := os.Stat(fsPath); err == nil || os.IsExist(err) {
+	_, err := os.Stat(fsPath)
+	if err == nil || os.IsExist(err) {
 		return os.Truncate(fsPath, options.Size)
 	}
-	return &os.PathError{Op: "TruncateFile", Path: fsPath, Err: syscall.Errno(syscall.ERROR_PATH_NOT_FOUND)}
+	return err
 }
 
 func (lfs *LoopbackFS) FlushFile(options internal.FlushFileOptions) error {
