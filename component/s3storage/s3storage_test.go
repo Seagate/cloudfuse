@@ -139,9 +139,7 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, container str
 	}
 	s.container = container
 	if configuration == "" {
-		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-			storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+		configuration = generateConfigYaml(storageTestConfigurationParameters)
 	}
 	s.config = configuration
 
@@ -152,6 +150,13 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, container str
 	// We could create the container before but that requires rewriting the code to new up a service client.
 
 	s.awsS3Client = s.s3Storage.storage.(*Client).awsS3Client
+}
+
+func generateConfigYaml(testParams storageTestConfiguration) string {
+	return fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n"+
+		"  endpoint: %s\n  region: %s\n  subdirectory: %s",
+		testParams.BucketName, testParams.AccessKey, testParams.SecretKey,
+		testParams.Endpoint, testParams.Region, testParams.Prefix)
 }
 
 func (s *s3StorageTestSuite) tearDownTestHelper(delete bool) {
@@ -763,9 +768,7 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 
 func (s *s3StorageTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	configs := []string{"", vdConfig}
 	for _, c := range configs {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
@@ -798,9 +801,7 @@ func (s *s3StorageTestSuite) TestGetAttrDir() {
 
 func (s *s3StorageTestSuite) TestGetAttrVirtualDir() {
 	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 	s.tearDownTestHelper(false)
 	s.setupTestHelper(vdConfig, s.container, true)
@@ -825,9 +826,7 @@ func (s *s3StorageTestSuite) TestGetAttrVirtualDir() {
 
 func (s *s3StorageTestSuite) TestGetAttrVirtualDirSubDir() {
 	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 	s.tearDownTestHelper(false)
 	s.setupTestHelper(vdConfig, s.container, true)
@@ -860,9 +859,7 @@ func (s *s3StorageTestSuite) TestGetAttrVirtualDirSubDir() {
 
 func (s *s3StorageTestSuite) TestGetAttrFile() {
 	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	configs := []string{"", vdConfig}
 	for _, c := range configs {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
@@ -888,9 +885,7 @@ func (s *s3StorageTestSuite) TestGetAttrFile() {
 
 // func (s *s3StorageTestSuite) TestGetAttrLink() {
 // 	defer s.cleanupTest()
-// 	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-// 		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-// 		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+// 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 // 	configs := []string{"", vdConfig}
 // 	for _, c := range configs {
 // 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
@@ -920,9 +915,7 @@ func (s *s3StorageTestSuite) TestGetAttrFile() {
 
 func (s *s3StorageTestSuite) TestGetAttrFileSize() {
 	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	configs := []string{"", vdConfig}
 	for _, c := range configs {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
@@ -952,9 +945,7 @@ func (s *s3StorageTestSuite) TestGetAttrFileSize() {
 
 func (s *s3StorageTestSuite) TestGetAttrFileTime() {
 	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	configs := []string{"", vdConfig}
 	for _, c := range configs {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
@@ -991,9 +982,7 @@ func (s *s3StorageTestSuite) TestGetAttrFileTime() {
 
 func (s *s3StorageTestSuite) TestGetAttrError() {
 	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
-		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	configs := []string{"", vdConfig}
 	for _, c := range configs {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
