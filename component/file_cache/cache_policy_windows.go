@@ -7,29 +7,11 @@ import (
 	"path/filepath"
 )
 
-/*
-description:
-
-	walk through all the files in the directorhy and sub directories and accumilate / calculate the total number of sectors being used.
-	this block of code is based on the solution provided in the following stack overflow link:
-		https://stackoverflow.com/questions/32482673/how-to-get-directory-total-size
-
-input:
-
-	string directory path
-
-output:
-
-	two values are returned:
-		1. int64 representing number of sectors used in the directory path.
-		2. int64 representing number of bytes per sector
-*/
+// totalSectors walks through all files in the path and gives an estimate of the total number of sectors
+// that are being used. Based on https://stackoverflow.com/questions/32482673/how-to-get-directory-total-size
 func totalSectors(path string) int64 {
-
-	/*
-		bytes per sector is hard coded to 4096 bytes since syscall to windows and BytesPerSector for the drive in question is an estimate.
-		source: https://devblogs.microsoft.com/oldnewthing/20160427-00/?p=93365
-	*/
+	//bytes per sector is hard coded to 4096 bytes since syscall to windows and BytesPerSector for the drive in question is an estimate.
+	// https://devblogs.microsoft.com/oldnewthing/20160427-00/?p=93365
 
 	var totalSectors int64
 	filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
@@ -48,26 +30,12 @@ func totalSectors(path string) int64 {
 
 }
 
-/*
-description:
-
-	provide an estimate size on disk in MB for provided directory path string
-
-input:
-
-	string directory path
-
-output:
-
-	float64 value representing the size on disk in MB.
-*/
+// getUsage providse an estimate of the size on disk in MB for provided directory path string
 func getUsage(path string) float64 {
-
 	totalSectors := totalSectors(path)
 
 	totalBytes := float64(totalSectors * sectorSize)
 	totalBytes = totalBytes / MB
 
 	return totalBytes
-
 }
