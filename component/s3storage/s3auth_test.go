@@ -42,6 +42,7 @@ type storageTestConfiguration struct {
 	SecretKey  string `json:"secret-key"`
 	Endpoint   string `json:"endpoint"`
 	Region     string `json:"region"`
+	Prefix     string `json:"prefix"`
 }
 
 var storageTestConfigurationParameters storageTestConfiguration
