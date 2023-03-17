@@ -375,8 +375,9 @@ var mountCmd = &cobra.Command{
 		log.Crit("Starting Lyvecloudfuse Mount : %s on [%s]", common.LyvecloudfuseVersion, common.GetCurrentDistro())
 		log.Crit("Logging level set to : %s", logLevel.String())
 
-		// If on linux start with the go deamon
-		// If on Windows, don't use the daemon since not supported
+		// If on Linux start with the go deamon
+		// If on Windows, don't use the daemon since it is not supported
+		// TODO: Enable running as a service on Windows
 		if runtime.GOOS == "windows" {
 			pipeline, err = internal.NewPipeline(options.Components, true)
 		} else {
