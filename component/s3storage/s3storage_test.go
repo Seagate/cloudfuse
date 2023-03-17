@@ -44,6 +44,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -261,9 +262,10 @@ func (s *s3StorageTestSuite) TestCreateFile() {
 	s.assert.EqualValues(name, h.Path)
 	s.assert.EqualValues(0, h.Size)
 	// File should be in the account
+	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
-		Key:    aws.String(name),
+		Key:    aws.String(key),
 	})
 	s.assert.Nil(err)
 	s.assert.NotNil(result)
@@ -327,9 +329,10 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 	// This is similar to the s3 bucket command, use getobject for now
 	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
 	// File should not be in the account
+	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
-		Key:    aws.String(name),
+		Key:    aws.String(key),
 	})
 
 	s.assert.NotNil(err)
@@ -345,9 +348,10 @@ func (s *s3StorageTestSuite) TestDeleteFileError() {
 	s.assert.EqualValues(syscall.ENOENT, err)
 
 	// File should not be in the account
+	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
-		Key:    aws.String(name),
+		Key:    aws.String(key),
 	})
 	s.assert.NotNil(err)
 }
@@ -369,9 +373,10 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 	s.assert.Nil(err)
 
 	// Object will be updated with new data
+	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
-		Key:    aws.String(name),
+		Key:    aws.String(key),
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
@@ -496,9 +501,10 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 	s.assert.EqualValues(len(data), count)
 
 	// Object should have updated data
+	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
-		Key:    aws.String(name),
+		Key:    aws.String(key),
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
@@ -730,15 +736,17 @@ func (s *s3StorageTestSuite) TestRenameFile() {
 	s.assert.Nil(err)
 
 	// Src should not be in the account
+	srcKey := filepath.Join(s.s3Storage.stConfig.prefixPath, src)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
-		Key:    aws.String(src),
+		Key:    aws.String(srcKey),
 	})
 	s.assert.NotNil(err)
 	// Dst should be in the account
+	dstKey := filepath.Join(s.s3Storage.stConfig.prefixPath, dst)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
-		Key:    aws.String(dst),
+		Key:    aws.String(dstKey),
 	})
 	s.assert.Nil(err)
 }
@@ -754,14 +762,16 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 	s.assert.EqualValues(syscall.ENOENT, err)
 
 	// Src and destination should not be in the account
+	srcKey := filepath.Join(s.s3Storage.stConfig.prefixPath, src)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
-		Key:    aws.String(src),
+		Key:    aws.String(srcKey),
 	})
 	s.assert.NotNil(err)
+	dstKey := filepath.Join(s.s3Storage.stConfig.prefixPath, dst)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
-		Key:    aws.String(dst),
+		Key:    aws.String(dstKey),
 	})
 	s.assert.NotNil(err)
 }
