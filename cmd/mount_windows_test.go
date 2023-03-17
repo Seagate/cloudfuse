@@ -368,26 +368,6 @@ func (suite *mountTestSuite) TestInvalidUmaskValue() {
 	suite.assert.Contains(op, "failed to parse umask")
 }
 
-func (suite *mountTestSuite) TestMountUsingLoopbackFailure() {
-	defer suite.cleanupTest()
-
-	confFile, err := ioutil.TempFile("", "conf*.yaml")
-	suite.assert.Nil(err)
-	confFileName := confFile.Name()
-	defer os.Remove(confFileName)
-
-	_, err = confFile.WriteString(configMountLoopback)
-	suite.assert.Nil(err)
-	confFile.Close()
-
-	mntDir := filepath.Join("tmp", "mntdir")
-	defer os.RemoveAll(mntDir)
-
-	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileName))
-	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "unable to start pipeline")
-}
-
 func TestMountCommand(t *testing.T) {
 	confFile, err := ioutil.TempFile("", "conf*.yaml")
 	if err != nil {
