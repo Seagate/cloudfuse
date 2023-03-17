@@ -816,6 +816,11 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	result, err := cl.getObject(name, 0, size)
 	if err != nil {
 		log.Err("Client::TruncateFile : Failed to get first %dB of object %s. Here's why: %v", size, name, err)
+		// No such key found so object is not in S3
+		var nsk *types.NoSuchKey
+		if errors.As(err, &nsk) {
+			return syscall.ENOENT
+		}
 		return err
 	}
 	// read object data
