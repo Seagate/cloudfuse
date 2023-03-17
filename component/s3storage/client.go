@@ -76,6 +76,7 @@ var _ S3Connection = &Client{}
 
 // Configure : Initialize the awsS3Client
 func (cl *Client) Configure(cfg S3StorageConfig) error {
+	log.Trace("Client::Configure : initialize awsS3Client")
 	cl.Config = cfg
 
 	// Set the endpoint supplied in the config file
@@ -112,25 +113,27 @@ func (cl *Client) Configure(cfg S3StorageConfig) error {
 	return nil
 }
 
-// For dynamic config update the config here
-// Currently only updates the blockSize
+// For dynamic config update the config here.
+// Currently only updates the blockSize.
 func (cl *Client) UpdateConfig(cfg S3StorageConfig) error {
+	log.Trace("Client::UpdateConfig : update block size")
 	cl.Config.blockSize = cfg.blockSize
 	return nil
 }
 
-// NewCredentialKey : Update the credential key specified by the user
-// Currently not implemented
+// NewCredentialKey : Update the credential key specified by the user.
+// Currently not implemented.
 func (cl *Client) NewCredentialKey(key, value string) (err error) {
+	log.Trace("Client::NewCredentialKey : not implemented")
 	// TODO: research whether and how credentials could change on the same bucket
 	// If they can, research whether we can change credentials on an existing client object
 	// 	(do we replace the credential provider?)
 	return nil
 }
 
-// Wrapper for awsS3Client.GetObject
-// set count = 0 to read to the end of the object
-// Retries on InvalidAccessKeyID
+// Wrapper for awsS3Client.GetObject.
+// Set count = 0 to read to the end of the object.
+// Retries on InvalidAccessKeyID.
 func (cl *Client) getObject(name string, offset int64, count int64) (*s3.GetObjectOutput, error) {
 	log.Trace("Client::getObject : getting object %s (%d+%d)", name, offset, count)
 
@@ -166,9 +169,9 @@ func (cl *Client) getObject(name string, offset int64, count int64) (*s3.GetObje
 	return result, err
 }
 
-// Wrapper for awsS3Client.PutObject
-// Takes an io.Reader to work with both files and byte arrays
-// Retries on InvalidAccessKeyID
+// Wrapper for awsS3Client.PutObject.
+// Takes an io.Reader to work with both files and byte arrays.
+// Retries on InvalidAccessKeyID.
 func (cl *Client) putObject(name string, objectData io.Reader) (*s3.PutObjectOutput, error) {
 	log.Trace("Client::putObject : putting object %s", name)
 	var result *s3.PutObjectOutput
@@ -189,8 +192,8 @@ func (cl *Client) putObject(name string, objectData io.Reader) (*s3.PutObjectOut
 	return result, err
 }
 
-// Wrapper for awsS3Client.DeleteObject
-// Retries on InvalidAccessKeyID
+// Wrapper for awsS3Client.DeleteObject.
+// Retries on InvalidAccessKeyID.
 func (cl *Client) deleteObject(name string) (*s3.DeleteObjectOutput, error) {
 	log.Trace("Client::deleteObject : deleting object %s", name)
 	var result *s3.DeleteObjectOutput
@@ -210,8 +213,8 @@ func (cl *Client) deleteObject(name string) (*s3.DeleteObjectOutput, error) {
 	return result, err
 }
 
-// Lyve Cloud sometimes returns InvalidAccessKeyId even if the access key is correct and the request was correct
-// Check the returned err value for the associated error code
+// Lyve Cloud sometimes returns InvalidAccessKeyId even if the access key is correct and the request was correct.
+// Check the returned err value for the associated error code.
 func isInvalidAccessKeyID(err error) bool {
 	var apiErr smithy.APIError
 	if err != nil {
@@ -255,6 +258,7 @@ func (cl *Client) ListBuckets() ([]string, error) {
 	return cntList, nil
 }
 
+// Set the prefix path - this overrides "subdirectory" in config.yaml
 func (cl *Client) SetPrefixPath(path string) error {
 	log.Trace("Client::SetPrefixPath : path %s", path)
 	cl.Config.prefixPath = path
@@ -287,12 +291,21 @@ func (cl *Client) CreateLink(source string, target string) error {
 	return cl.WriteFromBuffer(source, metadata, data)
 }
 
-// DeleteFile : Delete an object
+// DeleteFile : Delete an object.
+// if the file does not exist, this returns an error (ENOENT).
 func (cl *Client) DeleteFile(name string) (err error) {
 	log.Trace("Client::DeleteFile : name %s", name)
+	// first check if the object exists
+	_, err = cl.GetAttr(name)
+	if err == syscall.ENOENT {
+		log.Err("Client::DeleteFile : %s does not exist", name)
+		return syscall.ENOENT
+	} else if err != nil {
+		log.Err("Client::DeleteFile : Failed to GetAttr for object %s. Here's why: %v", name, err)
+		return err
+	}
+	// delete the object
 	_, err = cl.deleteObject(name)
-	// TODO: If the object doesn't exist, the command will return success because there's nothing to delete.
-	// 		figure out how to force an error
 	if err != nil {
 		serr := storeBlobErrToErr(err)
 		if serr == ErrFileNotFound {
@@ -309,16 +322,17 @@ func (cl *Client) DeleteFile(name string) (err error) {
 	return nil
 }
 
-// DeleteDirectory : Delete a virtual directory in the bucket/virtual directory
+// DeleteDirectory : Delete all objects with the given prefix.
+// If name is given without a trailing slash, a slash will be added.
+// If the directory does not exist, no error will be returned.
 func (cl *Client) DeleteDirectory(name string) (err error) {
-
 	log.Trace("Client::DeleteDirectory : name %s", name)
 
+	// get the full prefix with trailing slash
 	reconstructedPath := filepath.Join(cl.Config.prefixPath, name) + "/"
 
-	var marker *string = nil
-
-	objects, _, err := cl.List(reconstructedPath, marker, 0)
+	// list all objects with the prefix
+	objects, _, err := cl.List(reconstructedPath, nil, 0)
 	if err != nil {
 		e := storeBlobErrToErr(err)
 		if e == ErrFileNotFound {
@@ -326,31 +340,34 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 		} else if e == InvalidPermission {
 			return syscall.EPERM
 		} else {
-			log.Warn("Client::getAttr : Failed to list object properties for %s. Here's why: %v", name, err)
+			log.Warn("Client::DeleteDirectory : Failed to list object with prefix %s. Here's why: %v", reconstructedPath, err)
 		}
 		return err
 	}
 
-	if len(objects) == 0 {
-		return syscall.ENOENT
-	}
+	// we have no way of indicating empty folders in the bucket
+	// so if there are no objects with this prefix we can either:
+	// 1. return an error when the user tries to delete an empty directory, or
+	// 2. fail to return an error when trying to delete a non-existent directory
+	// the second one seems much less risky, so we don't check for an empty list here
 
 	for _, object := range objects {
 		fullPath := filepath.Join(cl.Config.prefixPath, object.Path)
-		deleteErr := cl.DeleteFile(fullPath)
-		if deleteErr != nil {
-			log.Err("Client::DeleteDirectory : Failed to delete file %s [%s]", fullPath, deleteErr.Error)
-			return deleteErr
+		err := cl.DeleteFile(fullPath)
+		if err != nil {
+			log.Err("Client::DeleteDirectory : Failed to delete file %s. Here's why: %v", fullPath, err)
+			return err
 		}
 	}
 
 	return nil
 }
 
-// RenameFile : Rename the file
+// RenameFile : Rename the object (copy then delete).
 func (cl *Client) RenameFile(source string, target string) (err error) {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
+	// copy the object to its new key
 	for i := 0; i < retryCount; i++ {
 		_, err = cl.awsS3Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
 			Bucket:     aws.String(cl.Config.authConfig.BucketName),
@@ -364,7 +381,7 @@ func (cl *Client) RenameFile(source string, target string) (err error) {
 			break
 		}
 	}
-
+	// check for errors on copy
 	if err != nil {
 		// No such key found so object is not in S3
 		var nsk *types.NoSuchKey
@@ -387,23 +404,14 @@ func (cl *Client) RenameFile(source string, target string) (err error) {
 		return err
 	}
 
-	log.Trace("Client::RenameFile : %s -> %s done", source, target)
+	log.Debug("Client::RenameFile : copy %s -> %s done", source, target)
 
 	// Copy of the file is done so now delete the older file
-	err = cl.DeleteFile(source)
-	for retry := 0; retry < 3 && err == syscall.ENOENT; retry++ {
-		// Sometimes backend is able to copy source file to destination but when we try to delete the
-		// source files it returns back with ENOENT. If file was just created on backend it might happen
-		// that it has not been synced yet at all layers and hence delete is not able to find the source file
-		log.Trace("Client::RenameFile : %s -> %s, unable to find source. Retrying %d", source, target, retry)
-		time.Sleep(1 * time.Second)
-		err = cl.DeleteFile(source)
-	}
-
-	if err == syscall.ENOENT {
-		// Even after 3 retries, 1 second apart if server returns 404 then source file no longer
-		// exists on the backend and its safe to assume rename was successful
-		err = nil
+	// in this case we don't need to check if the file exists, so we use deleteObject, not DeleteFile
+	// this is what S3's DeleteObject spec is meant for: to make sure the object doesn't exist anymore
+	_, err = cl.deleteObject(source)
+	if err != nil {
+		log.Err("Client::RenameFile : Failed to delete source object after copy. Here's why: %v", err)
 	}
 
 	return err
@@ -411,26 +419,41 @@ func (cl *Client) RenameFile(source string, target string) (err error) {
 
 // RenameDirectory : Rename the directory
 func (cl *Client) RenameDirectory(source string, target string) error {
+	log.Trace("Client::RenameDirectory : %s -> %s", source, target)
+
+	// first we need a list of all the object's we'll be moving
+	// get the full prefix, with trailing slash
+	sourcePrefix := filepath.Join(cl.Config.prefixPath, source) + "/"
+	sourceObjects, _, err := cl.List(sourcePrefix, nil, 0)
+	if err != nil {
+		e := storeBlobErrToErr(err)
+		if e == ErrFileNotFound {
+			return syscall.ENOENT
+		} else if e == InvalidPermission {
+			return syscall.EPERM
+		} else {
+			log.Err("Client::RenameDirectory : Failed to list objects with prefix %s. Here's why: %v", sourcePrefix, err)
+		}
+		return err
+	}
+	// it's better not to return an error when we don't find any matching objects (see note in DeleteDirectory)
+	for _, srcObject := range sourceObjects {
+		srcPath := srcObject.Path
+		err = cl.RenameFile(srcPath, strings.Replace(srcPath, source, target, 1))
+		if err != nil {
+			log.Err("Client::RenameDirectory : Failed to rename file %s. Here's why: %v", srcPath, err)
+		}
+	}
+
 	return nil
-}
-
-func (cl *Client) getAttrUsingRest(name string) (attr *internal.ObjAttr, err error) {
-	return nil, err
-}
-
-func (cl *Client) getAttrUsingList(name string) (attr *internal.ObjAttr, err error) {
-	return nil, err
 }
 
 // GetAttr : Retrieve attributes of the object
 func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	log.Trace("Client::GetAttr : name %s", name)
 
-	var marker *string = nil
-
-	// TODO: Call cl.List with a limit of 1 to reduce wasted resources
 	// TODO: Handle markers
-	objects, _, err := cl.List(name, marker, 1)
+	objects, _, err := cl.List(name, nil, 1)
 	if err != nil {
 		e := storeBlobErrToErr(err)
 		if e == ErrFileNotFound {
@@ -438,28 +461,28 @@ func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 		} else if e == InvalidPermission {
 			return attr, syscall.EPERM
 		} else {
-			log.Warn("Client::getAttrUsingList : Failed to list object properties for %s. Here's why: %v", name, err)
+			log.Warn("Client::GetAttr : Failed to list object properties for %s. Here's why: %v", name, err)
 		}
 		return nil, err
 	}
 
-	numObjects := len(objects)
-	for i, object := range objects {
-		log.Trace("Client::GetAttr : Item %d Object %s", i+numObjects, object.Name)
+	// search for a match
+	for _, object := range objects {
 		if object.Path == name {
-			// we found it!
 			return object, nil
 		}
 	}
 
 	// not found
-	log.Err("GetAttr was asked for %s, but found no match (among %d results).\n", name, numObjects)
+	log.Err("Client::GetAttr : Key not found: %s", name)
 	return nil, syscall.ENOENT
 }
 
-// List : Get a list of objects matching the given prefix
-// This fetches the list using a marker so the caller code should handle marker logic
-// If count=0 - fetch max entries
+// List : Get a list of objects matching the given prefix.
+// When the prefix has a trailing slash this will return a list of all objects with that prefix.
+// When there is no trailing slash, this will only return a single-item list with an exact match (if one exists).
+// This fetches the list using a marker so the caller code should handle marker logic.
+// If count=0 - fetch max entries.
 func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
 	log.Trace("Client::List : prefix %s, marker %s", prefix, func(marker *string) string {
 		if marker != nil {
@@ -474,9 +497,10 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	if count == 0 {
 		count = common.MaxDirListCount
 	}
+
 	// combine the configured prefix and the prefix being given to List to get a full listPath
 	listPath := filepath.Join(cl.Config.prefixPath, prefix)
-	// replace trailing forward slash stripped by filepath.Join
+	// replace any trailing forward slash stripped by filepath.Join
 	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
 		listPath += "/"
 	}
@@ -491,9 +515,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		Prefix:    aws.String(listPath),
 		Delimiter: aws.String("/"), // delimeter is needed to get CommonPrefixes
 	}
-
 	paginator := s3.NewListObjectsV2Paginator(cl.awsS3Client, params)
-
 	// initialize list to be returned
 	objectAttrList := make([]*internal.ObjAttr, 0)
 	// fetch and process result pages
@@ -516,12 +538,6 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		// documentation for this S3 data structure:
 		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
 		for _, value := range output.Contents {
-			// parse the ETag, on the chance that it is MD5
-			// md5, err := hex.DecodeString(*value.ETag)
-			// if err != nil {
-			// 	log.Warn("Failed to parse ETag %v of object %v as an MD5 hash. Here's why: %v", value.ETag, value.Key, err)
-			// 	md5 = nil
-			// }
 			// push object info into the list
 			attr := &internal.ObjAttr{
 				Path:   split(cl.Config.prefixPath, *value.Key),
@@ -533,7 +549,6 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 				Ctime:  *value.LastModified,
 				Crtime: *value.LastModified,
 				Flags:  internal.NewFileBitMap(),
-				// MD5:    md5,
 			}
 
 			// set flags
@@ -577,10 +592,6 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		}
 	}
 
-	// for _, objAttr := range objectAttrList {
-	// 	fmt.Println(objAttr.Path)
-	// }
-
 	// now let's add attributes for all the directories in dirList
 	for dir := range dirList {
 		if dir == listPath {
@@ -605,11 +616,6 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		objectAttrList = append(objectAttrList, attr)
 	}
 
-	// fmt.Println("Printing again with directories")
-	// for _, objAttr := range objectAttrList {
-	// 	fmt.Println(objAttr.Path)
-	// }
-
 	// Clean up the temp map as its no more needed
 	for k := range dirList {
 		delete(dirList, k)
@@ -619,9 +625,9 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	return objectAttrList, &newMarker, nil
 }
 
-// Download object with the given name to the given file handle.
-// Reads starting at a byte offset from the start of the object, with length count
-// count = 0 reads to the end of the object
+// Download object data to a file handle.
+// Read starting at a byte offset from the start of the object, with length in bytes = count.
+// count = 0 reads to the end of the object.
 func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
 	log.Trace("Client::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
 	bucketName := cl.Config.authConfig.BucketName
@@ -655,9 +661,9 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 	return err
 }
 
-// Download object with the given name and return the data as a byte array
-// Reads starting at a byte offset from the start of the object, with length in bytes = len
-// len = 0 reads to the end of the object
+// Download object with the given name and return the data as a byte array.
+// Reads starting at a byte offset from the start of the object, with length in bytes = len.
+// len = 0 reads to the end of the object.
 func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
 	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, len)
 	// get the object data
@@ -693,9 +699,9 @@ func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, erro
 	return buff, nil
 }
 
-// Download object to provided byte array
-// Reads starting at a byte offset from the start of the object, with length in bytes = len
-// len = 0 reads to the end of the object
+// Download object to provided byte array.
+// Reads starting at a byte offset from the start of the object, with length in bytes = len.
+// len = 0 reads to the end of the object.
 func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
 	log.Trace("Client::ReadInBuffer : name %s", name)
 	// get object data
@@ -731,8 +737,8 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 	return err
 }
 
-// Upload from a file handle to an object
-// the metadata parameter is not used
+// Upload from a file handle to an object.
+// The metadata parameter is not used.
 func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.File) (err error) {
 	log.Trace("Client::WriteFromFile : name %s", name)
 	// track time for performance testing
@@ -756,6 +762,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	_, err = cl.putObject(name, fi)
 	// TODO: decide when to use this higher-level API
 	// uploader := manager.NewUploader(cl.Client, func(u *manager.Uploader) {
+	//  // TODO: Move this variable into the config file
 	// 	u.PartSize = partMiBs * 1024 * 1024
 	// })
 	// check for errors
@@ -780,17 +787,14 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	return nil
 }
 
-// WriteFromBuffer : Upload from a buffer to a object
+// WriteFromBuffer : Upload from a buffer to an object
 func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) (err error) {
+	log.Trace("Client::WriteFromBuffer : name %s", name)
+
+	// convert byte array to io.Reader
 	largeBuffer := bytes.NewReader(data)
-	// TODO: Move this variable into the config file
-	// var partMiBs int64 = 16
-	// uploader := manager.NewUploader(cl.Client, func(u *manager.Uploader) {
-	// 	u.PartSize = partMiBs * 1024 * 1024
-	// })
-
+	// upload data to object
 	_, err = cl.putObject(name, largeBuffer)
-
 	if err != nil {
 		log.Err("Couldn't upload object to %v:%v. Here's why: %v\n",
 			cl.Config.authConfig.BucketName, name, err)
@@ -801,27 +805,42 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data 
 
 // GetFileBlockOffsets: store blocks ids and corresponding offsets
 func (cl *Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, error) {
+	// TODO: decide whether we have any use for this function
+	// if not, we can just skip this and return nil, nil in s3storage.go:GetFileBlockOffsets()
 	return nil, nil
 }
 
-func (cl *Client) createBlock(blockIdLength, startIndex, size int64) *common.Block {
-	return nil
-}
-
-// create new blocks based on the offset and total length we're adding to the file
-func (cl *Client) createNewBlocks(blockList *common.BlockOffsetList, offset, length int64) int64 {
-	return 0
-}
-
-func (cl *Client) removeBlocks(blockList *common.BlockOffsetList, size int64, name string) *common.BlockOffsetList {
-	return nil
-}
-
+// Truncate object to size in bytes
 func (cl *Client) TruncateFile(name string, size int64) error {
-	return nil
+	// Download up to size bytes of the object
+	result, err := cl.getObject(name, 0, size)
+	if err != nil {
+		log.Err("Client::TruncateFile : Failed to get first %dB of object %s. Here's why: %v", size, name, err)
+		return err
+	}
+	// read object data
+	defer result.Body.Close()
+	body, err := io.ReadAll(result.Body)
+	if err != nil {
+		log.Err("Client::TruncateFile : Failed to read object body from %v. Here's why: %v\n", name, err)
+		return err
+	}
+	// ensure data is of the expected length, or shorter
+	if int64(len(body)) > size {
+		log.Debug("Client::TruncateFile : Called cl.getObject(%s, 0, %d) but got %d bytes back. Manually truncating...", name, size, len(body))
+		body = body[:size]
+	}
+	// overwrite the object with the truncated data
+	truncatedDataReader := bytes.NewReader(body)
+	_, err = cl.putObject(name, truncatedDataReader)
+	if err != nil {
+		log.Err("Client::TruncateFile : Failed to write truncated data to object %s. Here's why: %v", name, err)
+	}
+
+	return err
 }
 
-// Write : write data at given offset to a object
+// Write : write data at given offset to an object
 func (cl *Client) Write(options internal.WriteFileOptions) error {
 	name := options.Handle.Path
 	offset := options.Offset
@@ -864,24 +883,5 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		log.Err("Client::Write : Failed to upload to object. Here's why: %v ", name, err)
 		return err
 	}
-	return nil
-}
-
-// TODO: make a similar method facing stream that would enable us to write to cached blocks then stage and commit
-func (cl *Client) stageAndCommitModifiedBlocks(name string, data []byte, offsetList *common.BlockOffsetList) error {
-	return nil
-}
-
-func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error {
-	return nil
-}
-
-// ChangeMod : Change mode of a object
-func (cl *Client) ChangeMod(name string, _ os.FileMode) error {
-	return nil
-}
-
-// ChangeOwner : Change owner of a object
-func (cl *Client) ChangeOwner(name string, _ int, _ int) error {
 	return nil
 }

@@ -203,7 +203,14 @@ func (s *s3StorageTestSuite) TestDeleteDirectoryFalse() {
 	dirName := generateDirectoryName()
 	// Don't generate an actual directory and see if DeleteDirectory returns an error
 	err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: dirName})
-	s.assert.NotNil(err)
+
+	// we have no way of indicating empty folders in the bucket
+	// so if there are no objects with this prefix we can either:
+	// 1. return an error when the user tries to delete an empty directory, or
+	// 2. fail to return an error when trying to delete a non-existent directory
+	// the second one seems much less risky, so let's choose it
+	// in that case, this test should enforce that choice:
+	s.assert.Nil(err)
 }
 
 func (s *s3StorageTestSuite) TestIsDirEmpty() {
@@ -323,22 +330,22 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 	s.assert.NotNil(err)
 }
 
-// func (s *s3StorageTestSuite) TestDeleteFileError() {
-// 	defer s.cleanupTest()
-// 	// Setup
-// 	name := generateFileName()
+func (s *s3StorageTestSuite) TestDeleteFileError() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
 
-// 	err := s.s3.DeleteFile(internal.DeleteFileOptions{Name: name})
-// 	s.assert.NotNil(err)
-// 	s.assert.EqualValues(syscall.ENOENT, err)
+	err := s.s3Storage.DeleteFile(internal.DeleteFileOptions{Name: name})
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
 
-// 	// File should not be in the account
-// 	_, err = s.client.GetObject(context.TODO(), &s3.GetObjectInput{
-// 		Bucket: aws.String(s.s3.storage.(*Client).Config.authConfig.BucketName),
-// 		Key:    aws.String(name),
-// 	})
-// 	s.assert.NotNil(err)
-// }
+	// File should not be in the account
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.NotNil(err)
+}
 
 func (s *s3StorageTestSuite) TestCopyFromFile() {
 	defer s.cleanupTest()

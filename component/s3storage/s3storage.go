@@ -496,26 +496,24 @@ func (s3 *S3Storage) GetAttr(options internal.GetAttrOptions) (attr *internal.Ob
 
 func (s3 *S3Storage) Chmod(options internal.ChmodOptions) error {
 	log.Trace("S3Storage::Chmod : Change mod of file %s", options.Name)
-	err := s3.storage.ChangeMod(options.Name, options.Mode)
 
-	if err == nil {
-		s3StatsCollector.PushEvents(chmod, options.Name, map[string]interface{}{mode: options.Mode.String()})
-		s3StatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))
-	}
+	s3StatsCollector.PushEvents(chmod, options.Name, map[string]interface{}{mode: options.Mode.String()})
+	s3StatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))
 
-	return err
+	return nil
 }
 
 func (s3 *S3Storage) Chown(options internal.ChownOptions) error {
 	log.Trace("S3Storage::Chown : Change ownership of file %s to %d-%d", options.Name, options.Owner, options.Group)
-	return s3.storage.ChangeOwner(options.Name, options.Owner, options.Group)
+	return nil
 }
 
 func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("S3Storage::FlushFile : Flush file %s", options.Handle.Path)
-	return s3.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
+	return nil
 }
 
+// TODO: decide if the TODO below is relevant and delete if not
 // TODO : Below methods are pending to be implemented
 // SetAttr(string, internal.ObjAttr) error
 // UnlinkFile(string) error
