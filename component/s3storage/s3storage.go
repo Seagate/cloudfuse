@@ -158,7 +158,7 @@ func (s3 *S3Storage) Stop() error {
 	return nil
 }
 
-// ------------------------- Container listing -------------------------------------------
+// ------------------------- Bucket listing -------------------------------------------
 func (s3 *S3Storage) ListBuckets() ([]string, error) {
 	return s3.storage.ListBuckets()
 }
