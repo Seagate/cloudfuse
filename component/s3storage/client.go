@@ -776,7 +776,7 @@ func (cl *Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, err
 // name is the file path.
 func (cl *Client) TruncateFile(name string, size int64) error {
 	// get object data
-	objectDataReader, err := cl.getFileObjectData(name, 0, size)
+	objectDataReader, err := cl.getFileObjectData(name, 0, 0)
 	if err != nil {
 		return err
 	}
@@ -787,10 +787,17 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 		log.Err("Client::TruncateFile : Failed to read object data from %v. Here's why: %v", name, err)
 		return err
 	}
-	// ensure data is of the expected length, or shorter
+	// ensure data is of the expected length
 	if int64(len(objectData)) > size {
-		log.Debug("Client::TruncateFile : Called getFileObjectData %s with byte range \"0-%d\" but got %d bytes back. Manually truncating...", name, size, len(objectData))
+		// truncate
 		objectData = objectData[:size]
+	} else if int64(len(objectData)) < size {
+		// pad the data with zeros
+		log.Warn("Client::TruncateFile : Padding file %s with zeros to truncate its original size (%dB) UP to %dB.", name, len(objectData), size)
+		oldObjectData := objectData
+		newObjectData := make([]byte, size)
+		copy(newObjectData, oldObjectData)
+		objectData = newObjectData
 	}
 	// overwrite the object with the truncated data
 	truncatedDataReader := bytes.NewReader(objectData)

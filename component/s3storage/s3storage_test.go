@@ -295,6 +295,21 @@ func (s *s3StorageTestSuite) TestOpenFileError() {
 	s.assert.Nil(h)
 }
 
+func (s *s3StorageTestSuite) TestOpenFileSize() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	size := 10
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(size)})
+
+	h, err := s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.NotNil(h)
+	s.assert.EqualValues(name, h.Path)
+	s.assert.EqualValues(size, h.Size)
+}
+
 func (s *s3StorageTestSuite) TestCloseFile() {
 	defer s.cleanupTest()
 	// Setup
@@ -510,6 +525,175 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 	defer result.Body.Close()
 	output, _ := ioutil.ReadAll(result.Body)
 	s.assert.EqualValues(testData, output)
+}
+
+func (s *s3StorageTestSuite) TestTruncateSmallFileSmaller() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data"
+	data := []byte(testData)
+	truncatedLength := 5
+	s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+
+	err := s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
+	s.assert.Nil(err)
+
+	// Object should have updated data
+	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, _ := ioutil.ReadAll(result.Body)
+	s.assert.EqualValues(testData[:truncatedLength], output)
+}
+
+func (s *s3StorageTestSuite) TestTruncateChunkedFileSmaller() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data"
+	data := []byte(testData)
+	truncatedLength := 5
+	_, err := s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+
+	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
+	s.assert.Nil(err)
+
+	// Object should have updated data
+	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, _ := ioutil.ReadAll(result.Body)
+	s.assert.EqualValues(testData[:truncatedLength], output)
+}
+
+func (s *s3StorageTestSuite) TestTruncateSmallFileEqual() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data"
+	data := []byte(testData)
+	truncatedLength := 9
+	s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+
+	err := s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
+	s.assert.Nil(err)
+
+	// Object should have updated data
+	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, _ := ioutil.ReadAll(result.Body)
+	s.assert.EqualValues(testData, output)
+}
+
+func (s *s3StorageTestSuite) TestTruncateChunkedFileEqual() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data"
+	data := []byte(testData)
+	truncatedLength := 9
+	_, err := s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+
+	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
+	s.assert.Nil(err)
+
+	// Object should have updated data
+	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, _ := ioutil.ReadAll(result.Body)
+	s.assert.EqualValues(testData, output)
+}
+
+func (s *s3StorageTestSuite) TestTruncateSmallFileBigger() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data"
+	data := []byte(testData)
+	truncatedLength := 15
+	s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+
+	err := s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
+	s.assert.Nil(err)
+
+	// Object should have updated data
+	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, _ := ioutil.ReadAll(result.Body)
+	s.assert.EqualValues(testData, output[:len(data)])
+}
+
+func (s *s3StorageTestSuite) TestTruncateChunkedFileBigger() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data"
+	data := []byte(testData)
+	truncatedLength := 15
+	_, err := s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+
+	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
+	s.assert.Nil(err)
+
+	// Object should have updated data
+	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, _ := ioutil.ReadAll(result.Body)
+	s.assert.EqualValues(testData, output[:len(data)])
+}
+
+func (s *s3StorageTestSuite) TestTruncateFileError() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+
+	err := s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name})
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
 func (s *s3StorageTestSuite) TestWriteSmallFile() {
