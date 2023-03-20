@@ -8,6 +8,10 @@ import (
 	"unsafe"
 )
 
+// This file adds all the changed needed to replace the os.OpenFile call
+// with one that allows for renaming and deleting an open file on
+// Windows.
+
 const (
 	_ERROR_BAD_NETPATH = syscall.Errno(53)
 )
@@ -18,6 +22,9 @@ const (
 // is passed, it is created with mode perm (before umask). If successful,
 // methods on the returned File can be used for I/O.
 // If there is an error, it will be of type *PathError.
+// We modify this function to allow renaming and deleting an open file
+// on Windows.
+// Copied from https://cs.opensource.google/go/go/+/refs/tags/go1.20.2:src/os/file_windows.go;drc=0f0aa5d8a6a0253627d58b3aa083b24a1091933f;l=164
 func OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
 	if name == "" {
 		return nil, &os.PathError{Op: "open", Path: name, Err: syscall.ENOENT}
@@ -75,6 +82,8 @@ func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 		access &^= syscall.GENERIC_WRITE
 		access |= syscall.FILE_APPEND_DATA
 	}
+	// We add the FILE_SHARE_DELETE flag which allows the open file to be renamed and deleted before being closed.
+	// This is not enabled in Go.
 	sharemode := uint32(syscall.FILE_SHARE_READ | syscall.FILE_SHARE_WRITE | syscall.FILE_SHARE_DELETE)
 	var sa *syscall.SecurityAttributes
 	if mode&syscall.O_CLOEXEC == 0 {
