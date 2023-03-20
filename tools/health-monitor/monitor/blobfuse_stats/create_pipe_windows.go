@@ -7,6 +7,8 @@ import (
 	"os"
 )
 
+// This currently does not do anything on Windows, this will need to be replaced
+// with named pipes.
 func createPipe(pipe string) error {
 	_, err := os.Stat(pipe)
 	if os.IsNotExist(err) {
