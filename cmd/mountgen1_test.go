@@ -113,21 +113,26 @@ func TestGenOneConfig(t *testing.T) {
 
 func (suite *genOneConfigTestSuite) TestConfigCreation() {
 	defer suite.cleanupTest()
-	confFile, _ := ioutil.TempFile("", "conf*.yaml")
-	outFile, _ := ioutil.TempFile("", "adlsgen1fuse*.json")
+	confFile, err := ioutil.TempFile("", "conf*.yaml")
+	suite.assert.Nil(err)
+	outFile, err := ioutil.TempFile("", "adlsgen1fuse*.json")
+	suite.assert.Nil(err)
 
 	// On Windows the mount directory must not exist, so only create it on Linux
-	mntDir := "mntdir"
+	var mntDir string
 	if runtime.GOOS != "windows" {
-		_, err := ioutil.TempDir("", "mntdir")
+		mntDir, err = ioutil.TempDir("", "mntdir")
 		suite.assert.Nil(err)
+	} else {
+		mntDir = "mntdir"
 	}
 
+	fmt.Println(mntDir)
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
 	defer os.Remove(mntDir)
 
-	_, err := confFile.WriteString(configGenOne)
+	_, err = confFile.WriteString(configGenOne)
 	suite.assert.Nil(err)
 
 	_, err = executeCommandC(rootCmd, "mountgen1", mntDir, "--generate-json-only=true", "--required-free-space-mb=500", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--output-file=%s", outFile.Name()))
@@ -150,21 +155,25 @@ func (suite *genOneConfigTestSuite) TestConfigCreation() {
 
 func (suite *genOneConfigTestSuite) TestInvalidConfig() {
 	defer suite.cleanupTest()
-	confFile, _ := ioutil.TempFile("", "conf*.yaml")
-	outFile, _ := ioutil.TempFile("", "adlsgen1fuse*.json")
+	confFile, err := ioutil.TempFile("", "conf*.yaml")
+	suite.assert.Nil(err)
+	outFile, err := ioutil.TempFile("", "adlsgen1fuse*.json")
+	suite.assert.Nil(err)
 
 	// On Windows the mount directory must not exist, so only create it on Linux
-	mntDir := "mntdir"
+	var mntDir string
 	if runtime.GOOS != "windows" {
-		_, err := ioutil.TempDir("", "mntdir")
+		mntDir, err = ioutil.TempDir("", "mntdir")
 		suite.assert.Nil(err)
+	} else {
+		mntDir = "mntdir"
 	}
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
 	defer os.Remove(mntDir)
 
-	_, err := confFile.WriteString(invalidConfig)
+	_, err = confFile.WriteString(invalidConfig)
 	suite.assert.Nil(err)
 
 	_, err = executeCommandC(rootCmd, "mountgen1", mntDir, "--generate-json-only=true", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--output-file=%s", outFile.Name()))
@@ -173,21 +182,25 @@ func (suite *genOneConfigTestSuite) TestInvalidConfig() {
 
 func (suite *genOneConfigTestSuite) TestInvalidAuthMode() {
 	defer suite.cleanupTest()
-	confFile, _ := ioutil.TempFile("", "conf*.yaml")
-	outFile, _ := ioutil.TempFile("", "adlsgen1fuse*.json")
+	confFile, err := ioutil.TempFile("", "conf*.yaml")
+	suite.assert.Nil(err)
+	outFile, err := ioutil.TempFile("", "adlsgen1fuse*.json")
+	suite.assert.Nil(err)
 
 	// On Windows the mount directory must not exist, so only create it on Linux
-	mntDir := "mntdir"
+	var mntDir string
 	if runtime.GOOS != "windows" {
-		_, err := ioutil.TempDir("", "mntdir")
+		mntDir, err = ioutil.TempDir("", "mntdir")
 		suite.assert.Nil(err)
+	} else {
+		mntDir = "mntdir"
 	}
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
 	defer os.Remove(mntDir)
 
-	_, err := confFile.WriteString(invalidAuthMode)
+	_, err = confFile.WriteString(invalidAuthMode)
 	suite.assert.Nil(err)
 
 	_, err = executeCommandC(rootCmd, "mountgen1", mntDir, "--generate-json-only=true", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--output-file=%s", outFile.Name()))
@@ -196,21 +209,25 @@ func (suite *genOneConfigTestSuite) TestInvalidAuthMode() {
 
 func (suite *genOneConfigTestSuite) TestGen1FuseMount() {
 	defer suite.cleanupTest()
-	confFile, _ := ioutil.TempFile("", "conf*.yaml")
-	outFile, _ := ioutil.TempFile("", "adlsgen1fuse*.json")
+	confFile, err := ioutil.TempFile("", "conf*.yaml")
+	suite.assert.Nil(err)
+	outFile, err := ioutil.TempFile("", "adlsgen1fuse*.json")
+	suite.assert.Nil(err)
 
 	// On Windows the mount directory must not exist, so only create it on Linux
-	mntDir := "mntdir"
+	var mntDir string
 	if runtime.GOOS != "windows" {
-		_, err := ioutil.TempDir("", "mntdir")
+		mntDir, err = ioutil.TempDir("", "mntdir")
 		suite.assert.Nil(err)
+	} else {
+		mntDir = "mntdir"
 	}
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
 	defer os.Remove(mntDir)
 
-	_, err := confFile.WriteString(configGenOne)
+	_, err = confFile.WriteString(configGenOne)
 	suite.assert.Nil(err)
 
 	_, err = executeCommandC(rootCmd, "mountgen1", mntDir, "--required-free-space-mb=500", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--output-file=%s", outFile.Name()))

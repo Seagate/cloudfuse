@@ -787,7 +787,11 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	}
 
 	// Open the file and grab a shared lock to prevent deletion by the cache policy.
-	f, err = os.OpenFile(localPath, options.Flags, options.Mode)
+	// If we are on Windows, we need to use our custome OpenFile function which allows the file
+	// to be deleted and renamed when open, which our codebase relies on.
+	// See the following issue to see why we need to do this ourselves
+	// https://github.com/golang/go/issues/32088
+	f, err = common.OpenFile(localPath, options.Flags, options.Mode)
 	if err != nil {
 		log.Err("FileCache::OpenFile : error opening cached file %s [%s]", options.Name, err.Error())
 		return nil, err
