@@ -1,6 +1,7 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 from PySide6 import QtWidgets
+import yaml
 
 # import the custom class made from QtDesigner
 from ui_lyve_config_common import Ui_Form
@@ -38,6 +39,7 @@ class lyveSettingsWidget(QWidget, Ui_Form):
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
         self.lineEdit_fileCache_path.setText('{}'.format(directory))
+        
         
     def hideModeBoxes(self):
         self.groupbox_fileCache.setVisible(False)
