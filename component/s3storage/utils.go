@@ -550,8 +550,13 @@ func split(prefixPath string, path string) string {
 	}
 
 	paths := strings.Split(path, string(os.PathSeparator))
-	if paths[0] == prefixPath {
-		paths = paths[1:]
+	prefixPaths := strings.Split(prefixPath, string(os.PathSeparator))
+	for i := 0; i < len(prefixPaths); i++ {
+		if paths[0] == prefixPaths[i] {
+			paths = paths[1:]
+		} else {
+			break
+		}
 	}
 	return filepath.Join(paths...)
 }

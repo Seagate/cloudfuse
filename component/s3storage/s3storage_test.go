@@ -37,6 +37,7 @@
 package s3storage
 
 import (
+	"container/list"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -91,7 +92,7 @@ type s3StorageTestSuite struct {
 	awsS3Client *s3.Client // S3 client library supplied by AWS
 	s3Storage   *S3Storage
 	config      string
-	container   string
+	bucket      string
 }
 
 func newTestS3Storage(configuration string) (*S3Storage, error) {
@@ -134,11 +135,11 @@ func (s *s3StorageTestSuite) SetupTest() {
 	s.setupTestHelper("", "", true)
 }
 
-func (s *s3StorageTestSuite) setupTestHelper(configuration string, container string, create bool) {
-	if container == "" {
-		container = generateBucketName()
+func (s *s3StorageTestSuite) setupTestHelper(configuration string, bucket string, create bool) {
+	if bucket == "" {
+		bucket = generateBucketName()
 	}
-	s.container = container
+	s.bucket = bucket
 	if configuration == "" {
 		configuration = generateConfigYaml(storageTestConfigurationParameters)
 	}
@@ -147,8 +148,7 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, container str
 	s.assert = assert.New(s.T())
 
 	s.s3Storage, _ = newTestS3Storage(configuration)
-	_ = s.s3Storage.Start(ctx) // Note: Start->TestValidation will fail but it doesn't matter. We are creating the container a few lines below anyway.
-	// We could create the container before but that requires rewriting the code to new up a service client.
+	_ = s.s3Storage.Start(ctx)
 
 	s.awsS3Client = s.s3Storage.storage.(*Client).awsS3Client
 }
@@ -205,18 +205,140 @@ func (s *s3StorageTestSuite) TestDeleteDirectory() {
 	s.assert.True(dirEmpty)
 }
 
-func (s *s3StorageTestSuite) TestDeleteDirectoryFalse() {
-	dirName := generateDirectoryName()
-	// Don't generate an actual directory and see if DeleteDirectory returns an error
-	err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: dirName})
+// Directory structure
+// a/
+//
+//	 a/c1/
+//	  a/c1/gc1
+//		a/c2
+//
+// ab/
+//
+//	ab/c1
+//
+// ac
+func generateNestedDirectory(path string) (*list.List, *list.List, *list.List) {
+	aPaths := list.New()
+	aPaths.PushBack(internal.TruncateDirName(path))
+
+	aPaths.PushBack(filepath.Join(path, "c1"))
+	aPaths.PushBack(filepath.Join(path, "c2"))
+	aPaths.PushBack(filepath.Join(filepath.Join(path, "c1"), "gc1"))
+
+	abPaths := list.New()
+	path = internal.TruncateDirName(path)
+	abPaths.PushBack(path + "b")
+	abPaths.PushBack(filepath.Join(path+"b", "c1"))
+
+	acPaths := list.New()
+	acPaths.PushBack(path + "c")
+
+	return aPaths, abPaths, acPaths
+}
+
+func (s *s3StorageTestSuite) setupHierarchy(base string) (*list.List, *list.List, *list.List) {
+	// Hierarchy looks as follows
+	// a/
+	//  a/c1/
+	//   a/c1/gc1
+	//	a/c2
+	// ab/
+	//  ab/c1
+	// ac
+	s.s3Storage.CreateDir(internal.CreateDirOptions{Name: base})
+	c1 := base + "/c1"
+	s.s3Storage.CreateDir(internal.CreateDirOptions{Name: c1})
+	gc1 := c1 + "/gc1"
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: gc1})
+	c2 := base + "/c2"
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: c2})
+	abPath := base + "b"
+	s.s3Storage.CreateDir(internal.CreateDirOptions{Name: abPath})
+	abc1 := abPath + "/c1"
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: abc1})
+	acPath := base + "c"
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: acPath})
+
+	a, ab, ac := generateNestedDirectory(base)
+
+	// Validate the paths were setup correctly and all paths exist
+	for p := a.Front(); p != nil; p = p.Next() {
+		_, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
+		s.assert.Nil(err)
+	}
+	for p := ab.Front(); p != nil; p = p.Next() {
+		_, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
+		s.assert.Nil(err)
+	}
+	for p := ac.Front(); p != nil; p = p.Next() {
+		_, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
+		s.assert.Nil(err)
+	}
+	return a, ab, ac
+}
+
+func (s *s3StorageTestSuite) TestDeleteDirHierarchy() {
+	defer s.cleanupTest()
+	// Setup
+	base := generateDirectoryName()
+	a, ab, ac := s.setupHierarchy(base)
+
+	err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: base})
+
+	s.assert.Nil(err)
+
+	/// a paths should be deleted
+	for p := a.Front(); p != nil; p = p.Next() {
+		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
+		s.assert.NotNil(err)
+	}
+	ab.PushBackList(ac) // ab and ac paths should exist
+	for p := ab.Front(); p != nil; p = p.Next() {
+		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
+		s.assert.Nil(err)
+	}
+}
+
+func (s *s3StorageTestSuite) TestDeleteSubDirPrefixPath() {
+	defer s.cleanupTest()
+	// Setup
+	s.s3Storage.storage.SetPrefixPath("")
+	base := generateDirectoryName()
+	a, ab, ac := s.setupHierarchy(base)
+
+	err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: "c1"})
+	s.assert.Nil(err)
+
+	s.s3Storage.storage.SetPrefixPath("")
+	// a paths under c1 should be deleted
+	for p := a.Front(); p != nil; p = p.Next() {
+		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
+		if strings.HasPrefix(p.Value.(string), "c1") {
+			s.assert.NotNil(err)
+		} else {
+			s.assert.Nil(err)
+		}
+	}
+	ab.PushBackList(ac) // ab and ac paths should exist
+	for p := ab.Front(); p != nil; p = p.Next() {
+		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
+		s.assert.Nil(err)
+	}
+}
+
+func (s *s3StorageTestSuite) TestDeleteDirError() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateDirectoryName()
+
+	err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: name})
 
 	// we have no way of indicating empty folders in the bucket
-	// so if there are no objects with this prefix we can either:
-	// 1. return an error when the user tries to delete an empty directory, or
-	// 2. fail to return an error when trying to delete a non-existent directory
-	// the second one seems much less risky, so let's choose it
-	// in that case, this test should enforce that choice:
+	// so deleting a non-existent directory should not cause an error
 	s.assert.Nil(err)
+	// Directory should not be in the account
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.NotNil(err)
 }
 
 func (s *s3StorageTestSuite) TestIsDirEmpty() {
@@ -248,6 +370,131 @@ func (s *s3StorageTestSuite) TestIsDirEmptyFalse() {
 	empty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 
 	s.assert.False(empty)
+}
+
+func (s *s3StorageTestSuite) TestRenameDir() {
+	defer s.cleanupTest()
+	// Test handling "dir" and "dir/"
+	var inputs = []struct {
+		src string
+		dst string
+	}{
+		{src: generateDirectoryName(), dst: generateDirectoryName()},
+		{src: generateDirectoryName() + "/", dst: generateDirectoryName()},
+		{src: generateDirectoryName(), dst: generateDirectoryName() + "/"},
+		{src: generateDirectoryName() + "/", dst: generateDirectoryName() + "/"},
+	}
+
+	for _, input := range inputs {
+		s.Run(input.src+"->"+input.dst, func() {
+			// Setup
+			// We don't keep track of empty directories, so let's create an object with the src prfix
+			s.s3Storage.CreateFile(internal.CreateFileOptions{Name: filepath.Join(input.src, generateFileName())})
+
+			err := s.s3Storage.RenameDir(internal.RenameDirOptions{Src: input.src, Dst: input.dst})
+			s.assert.Nil(err)
+
+			// Src should not be in the account
+			_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: input.src})
+			s.assert.NotNil(err)
+
+			// Dst should be in the account
+			_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: input.dst})
+			s.assert.Nil(err)
+		})
+	}
+
+}
+
+func (s *s3StorageTestSuite) TestRenameDirHierarchy() {
+	defer s.cleanupTest()
+	// Setup
+	baseSrc := generateDirectoryName()
+	aSrc, abSrc, acSrc := s.setupHierarchy(baseSrc)
+	baseDst := generateDirectoryName()
+	aDst, abDst, acDst := generateNestedDirectory(baseDst)
+
+	err := s.s3Storage.RenameDir(internal.RenameDirOptions{Src: baseSrc, Dst: baseDst})
+	s.assert.Nil(err)
+
+	// Source
+	// aSrc paths should be deleted
+	for p := aSrc.Front(); p != nil; p = p.Next() {
+		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
+		s.assert.NotNil(err)
+	}
+	abSrc.PushBackList(acSrc) // abSrc and acSrc paths should exist
+	for p := abSrc.Front(); p != nil; p = p.Next() {
+		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
+		s.assert.Nil(err)
+	}
+	// Destination
+	// aDst paths should exist
+	for p := aDst.Front(); p != nil; p = p.Next() {
+		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
+		s.assert.Nil(err)
+	}
+	abDst.PushBackList(acDst) // abDst and acDst paths should not exist
+	for p := abDst.Front(); p != nil; p = p.Next() {
+		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
+		s.assert.NotNil(err)
+	}
+}
+
+func (s *s3StorageTestSuite) TestRenameDirSubDirPrefixPath() {
+	defer s.cleanupTest()
+	// Setup
+	baseSrc := generateDirectoryName()
+	aSrc, abSrc, acSrc := s.setupHierarchy(baseSrc)
+	baseDst := generateDirectoryName()
+
+	// Test rename directory with prefix set
+	s.s3Storage.storage.SetPrefixPath(filepath.Join(s.s3Storage.stConfig.prefixPath, baseSrc))
+	err := s.s3Storage.RenameDir(internal.RenameDirOptions{Src: "c1", Dst: baseDst})
+	s.assert.Nil(err)
+
+	// remove extra prefix to check results
+	s.s3Storage.storage.SetPrefixPath(s.s3Storage.stConfig.prefixPath)
+	// aSrc paths under c1 should be deleted
+	for p := aSrc.Front(); p != nil; p = p.Next() {
+		path := p.Value.(string)
+		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: path})
+		if strings.HasPrefix(path, baseSrc+"/c1") {
+			s.assert.NotNil(err)
+		} else {
+			s.assert.Nil(err)
+		}
+	}
+	abSrc.PushBackList(acSrc) // abSrc and acSrc paths should exist
+	for p := abSrc.Front(); p != nil; p = p.Next() {
+		path := p.Value.(string)
+		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: path})
+		s.assert.Nil(err)
+	}
+	// Destination
+	// aDst paths should exist -> aDst and aDst/gc1
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + "/" + baseDst})
+	s.assert.Nil(err)
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + "/" + baseDst + "/gc1"})
+	s.assert.Nil(err)
+}
+
+func (s *s3StorageTestSuite) TestRenameDirError() {
+	defer s.cleanupTest()
+	// Setup
+	src := generateDirectoryName()
+	dst := generateDirectoryName()
+
+	err := s.s3Storage.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
+
+	// we have no way of indicating empty folders in the bucket
+	// so renaming a non-existent directory should not cause an error
+	s.assert.Nil(err)
+	// Neither directory should be in the account
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: src})
+	s.assert.NotNil(err)
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: dst})
+	s.assert.NotNil(err)
 }
 
 func (s *s3StorageTestSuite) TestCreateFile() {
@@ -303,6 +550,9 @@ func (s *s3StorageTestSuite) TestOpenFileSize() {
 	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
 	s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(size)})
 
+	// TODO: There is a sort of bug in S3 where writing zeros to the object causes it to be unreadable.
+	// I think it's related to this link, but this discussion is about the key, whereas this is the value...
+	// Is this another Lyve Cloud bug?
 	h, err := s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
 	s.assert.Nil(err)
 	s.assert.NotNil(h)
@@ -967,7 +1217,7 @@ func (s *s3StorageTestSuite) TestGetAttrDir() {
 	for _, c := range configs {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.container, true)
+		s.setupTestHelper(c, s.bucket, true)
 		testName := ""
 		if c != "" {
 			testName = "virtual-directory"
@@ -998,7 +1248,7 @@ func (s *s3StorageTestSuite) TestGetAttrVirtualDir() {
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 	s.tearDownTestHelper(false)
-	s.setupTestHelper(vdConfig, s.container, true)
+	s.setupTestHelper(vdConfig, s.bucket, true)
 	// Setup
 	dirName := generateFileName()
 	name := dirName + "/" + generateFileName()
@@ -1023,7 +1273,7 @@ func (s *s3StorageTestSuite) TestGetAttrVirtualDirSubDir() {
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 	s.tearDownTestHelper(false)
-	s.setupTestHelper(vdConfig, s.container, true)
+	s.setupTestHelper(vdConfig, s.bucket, true)
 	// Setup
 	dirName := generateFileName()
 	subDirName := dirName + "/" + generateFileName()
@@ -1058,7 +1308,7 @@ func (s *s3StorageTestSuite) TestGetAttrFile() {
 	for _, c := range configs {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.container, true)
+		s.setupTestHelper(c, s.bucket, true)
 		testName := ""
 		if c != "" {
 			testName = "virtual-directory"
@@ -1114,7 +1364,7 @@ func (s *s3StorageTestSuite) TestGetAttrFileSize() {
 	for _, c := range configs {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.container, true)
+		s.setupTestHelper(c, s.bucket, true)
 		testName := ""
 		if c != "" {
 			testName = "virtual-directory"
@@ -1144,7 +1394,7 @@ func (s *s3StorageTestSuite) TestGetAttrFileTime() {
 	for _, c := range configs {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.container, true)
+		s.setupTestHelper(c, s.bucket, true)
 		testName := ""
 		if c != "" {
 			testName = "virtual-directory"
@@ -1181,7 +1431,7 @@ func (s *s3StorageTestSuite) TestGetAttrError() {
 	for _, c := range configs {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.container, true)
+		s.setupTestHelper(c, s.bucket, true)
 		testName := ""
 		if c != "" {
 			testName = "virtual-directory"
