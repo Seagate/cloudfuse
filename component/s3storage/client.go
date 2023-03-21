@@ -51,11 +51,13 @@ import (
 	"lyvecloudfuse/internal/stats_manager"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	"github.com/aws/smithy-go/transport/http"
 )
 
 const (
@@ -245,6 +247,38 @@ func (cl *Client) deleteObject(key string) (*s3.DeleteObjectOutput, error) {
 	return result, err
 }
 
+// Wrapper for awsS3Client.GetObjectAttributes.
+// Retries on InvalidAccessKeyID.
+// key is the full path to the object (with the prefixPath)
+func (cl *Client) getObjectAttributes(key string) (*s3.GetObjectAttributesOutput, error) {
+	log.Trace("Client::getObjectAttributes : object %s", key)
+	var result *s3.GetObjectAttributesOutput
+	var err error
+	for i := 0; i < retryCount; i++ {
+		result, err = cl.awsS3Client.GetObjectAttributes(context.TODO(), &s3.GetObjectAttributesInput{
+			Bucket:           aws.String(cl.Config.authConfig.BucketName),
+			Key:              aws.String(key),
+			ObjectAttributes: []types.ObjectAttributes{types.ObjectAttributesObjectSize},
+		})
+		// retry on InvalidAccessKeyId
+		if isInvalidAccessKeyID(err) {
+			log.Warn("Client::getObjectAttributes : Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
+		} else {
+			break
+		}
+	}
+	if err == nil {
+		// I think Lyve Cloud is just treating this request as if it were GetObject...
+		// TODO: keep track of Lyve Cloud fixing this, and tear this out at the right time
+		contentLength := middleware.GetRawResponse(result.ResultMetadata).(*http.Response).ContentLength
+		if result.ObjectSize == 0 && contentLength > 0 {
+			log.Err("Client::getObjectAttributes : ObjectSize is %d and ContentLength is %d.", result.ObjectSize, contentLength)
+			result.ObjectSize = contentLength
+		}
+	}
+	return result, err
+}
+
 // Lyve Cloud sometimes returns InvalidAccessKeyId even if the access key is correct and the request was correct.
 // Check the returned err value for the associated error code.
 func isInvalidAccessKeyID(err error) bool {
@@ -290,7 +324,8 @@ func (cl *Client) ListBuckets() ([]string, error) {
 	return cntList, nil
 }
 
-// Set the prefix path - this overrides "subdirectory" in config.yaml
+// Set the prefix path - this overrides "subdirectory" in config.yaml.
+// This is only used for testing.
 func (cl *Client) SetPrefixPath(path string) error {
 	log.Trace("Client::SetPrefixPath : path %s", path)
 	cl.Config.prefixPath = path
@@ -354,7 +389,7 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 	log.Trace("Client::DeleteDirectory : name %s", name)
 
 	// make sure name has a trailing slash
-	name = filepath.Join(name) + "/"
+	name = internal.ExtendDirName(name)
 
 	// list all objects with the prefix
 	objects, _, err := cl.List(name, nil, 0)
@@ -369,15 +404,25 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 	// 2. fail to return an error when trying to delete a non-existent directory
 	// the second one seems much less risky, so we don't check for an empty list here
 
+	// List only returns the objects and prefixes up to the next "/" character after the prefix
+	// This is because List is setting the Delimiter field to "/"
+	// This means that recursive directory deletion actually needs to be recursive.
+	// Delete all found objects *and prefixes ("directories")*:
 	for _, object := range objects {
-		err := cl.DeleteFile(object.Path)
-		if err != nil {
-			log.Err("Client::DeleteDirectory : Failed to delete file %s. Here's why: %v", object.Path, err)
-			return err
+		if object.IsDir() {
+			err = cl.DeleteDirectory(object.Path)
+			if err != nil {
+				log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", object.Path, err)
+			}
+		} else {
+			err = cl.DeleteFile(object.Path)
+			if err != nil {
+				log.Err("Client::DeleteDirectory : Failed to delete file %s. Here's why: %v", object.Path, err)
+			}
 		}
 	}
 
-	return nil
+	return err
 }
 
 // RenameFile : Rename the object (copy then delete).
@@ -441,10 +486,9 @@ func (cl *Client) RenameFile(source string, target string) (err error) {
 func (cl *Client) RenameDirectory(source string, target string) error {
 	log.Trace("Client::RenameDirectory : %s -> %s", source, target)
 
-	// make sure source has a trailing forward slash
-	source = filepath.Join(source) + "/"
 	// first we need a list of all the object's we'll be moving
-	sourceObjects, _, err := cl.List(source, nil, 0)
+	// make sure to pass source with a trailing forward slash
+	sourceObjects, _, err := cl.List(internal.ExtendDirName(source), nil, 0)
 	if err != nil {
 		log.Err("Client::RenameDirectory : Failed to list objects with prefix %s. Here's why: %v", source, err)
 		return err
@@ -452,50 +496,70 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 	// it's better not to return an error when we don't find any matching objects (see note in DeleteDirectory)
 	for _, srcObject := range sourceObjects {
 		srcPath := srcObject.Path
-		err = cl.RenameFile(srcPath, strings.Replace(srcPath, source, target, 1))
+		dstPath := strings.Replace(srcPath, source, target, 1)
+		if srcObject.IsDir() {
+			err = cl.RenameDirectory(srcPath, dstPath)
+		} else {
+			err = cl.RenameFile(srcPath, dstPath)
+		}
 		if err != nil {
-			log.Err("Client::RenameDirectory : Failed to rename file %s. Here's why: %v", srcPath, err)
+			log.Err("Client::RenameDirectory : Failed to rename %s -> %s. Here's why: %v", srcPath, dstPath, err)
 		}
 	}
 
 	return nil
 }
 
-// GetAttr : Retrieve attributes of the object
+// GetAttr : Retrieve object attributes
 func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	log.Trace("Client::GetAttr : name %s", name)
 
-	// TODO: Handle markers
-	objects, _, err := cl.List(name, nil, 1)
-	if err != nil {
-		log.Warn("Client::GetAttr : Failed to list object properties for %s. Here's why: %v", name, err)
-		return nil, err
-	}
-
-	// search for a match
-	for _, object := range objects {
-		if object.Path == name {
-			return object, nil
+	// first let's suppose the caller is looking for a file
+	// there are no objects with trailing slashes (MinIO doesn't support them)
+	// 	and trailing slashes aren't allowed in filenames
+	// so if this was called with a trailing slash, getObjectAttributes won't work.
+	if len(name) > 0 && name[len(name)-1] != '/' {
+		// no trailing slash, so we can use GetObjectAttributes
+		key := filepath.Join(cl.Config.prefixPath, name)
+		result, err := cl.getObjectAttributes(key)
+		if err == nil {
+			// create and return an objAttr
+			attr = createFileObjAttr(name, result.ObjectSize, *result.LastModified)
+			return attr, err
 		}
+		// err is not nil, so assume object was not found
+		log.Debug("Client::GetAttr : getObjectAttributes(%s) failed. Here's why: %v", key, err)
 	}
 
-	// not found
-	log.Err("Client::GetAttr : Key not found: %s", name)
+	// now search for it as a "directory"
+	// to do this, accept anything that comes back from List() called with a trailing slash
+	dirName := internal.ExtendDirName(name)
+	objects, _, err := cl.List(dirName, nil, 1)
+	if err != nil {
+		log.Err("Client::GetAttr : List(%s) failed. Here's why: %v", dirName, err)
+		return nil, err
+	} else if len(objects) > 0 {
+		// create and return an objAttr for the directory
+		attr = createDirObjAttr(name)
+		return attr, nil
+	}
+
+	// object not found as "directory" either
+	log.Err("Client::GetAttr : not found: %s", name)
 	return nil, syscall.ENOENT
 }
 
-// List : Get a list of objects matching the given prefix.
-// When the prefix has a trailing slash this will return a list of all objects with that prefix.
-// When there is no trailing slash, this will only return a single-item list with an exact match (if one exists).
+// List : Get a list of objects matching the given prefix, up to the next "/", similar to listing a directory.
+// For predictable results, include the trailing slash in the prefix.
+// When prefix has no trailing slash, List has unintuitive behavior (e.g. prefix "file" would match "filet-o-fish").
 // This fetches the list using a marker so the caller code should handle marker logic.
 // If count=0 - fetch max entries.
 func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
 	log.Trace("Client::List : prefix %s, marker %s", prefix, func(marker *string) string {
 		if marker != nil {
 			return *marker
-		} else {
-			return ""
 		}
+		return ""
 	}(marker))
 
 	// prepare parameters
@@ -511,15 +575,22 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		listPath += "/"
 	}
 
+	// Only look for CommonPrefixes (subdirectories) if List was called with a prefix ending in a slash.
+	// If prefix does not end in a slash, CommonPrefixes would find unwanted results.
+	// For example, it would find "filet-of-fish/" when searching for "file".
+	findCommonPrefixes := listPath[len(listPath)-1] == '/'
+
 	// create a map to keep track of all directories
 	var dirList = make(map[string]bool)
 
 	// using paginator from here: https://aws.github.io/aws-sdk-go-v2/docs/making-requests/#using-paginators
+	// List is a tricky function. Here is a great explanation of how list works:
+	// 	https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-prefixes.html
 	params := &s3.ListObjectsV2Input{
 		Bucket:    aws.String(bucketName),
 		MaxKeys:   count,
 		Prefix:    aws.String(listPath),
-		Delimiter: aws.String("/"), // delimeter is needed to get CommonPrefixes
+		Delimiter: aws.String("/"), // delimeter limits results and provides CommonPrefixes
 	}
 	paginator := s3.NewListObjectsV2Paginator(cl.awsS3Client, params)
 	// initialize list to be returned
@@ -545,55 +616,44 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
 		for _, value := range output.Contents {
 			// push object info into the list
-			attr := &internal.ObjAttr{
-				Path:   split(cl.Config.prefixPath, *value.Key),
-				Name:   filepath.Base(*value.Key),
-				Size:   value.Size,
-				Mode:   0,
-				Mtime:  *value.LastModified,
-				Atime:  *value.LastModified,
-				Ctime:  *value.LastModified,
-				Crtime: *value.LastModified,
-				Flags:  internal.NewFileBitMap(),
-			}
-
-			// set flags
-			attr.Flags.Set(internal.PropFlagMetadataRetrieved)
-			attr.Flags.Set(internal.PropFlagModeDefault)
-			attr.Metadata = make(map[string]string)
+			path := split(cl.Config.prefixPath, *value.Key)
+			attr := createFileObjAttr(path, value.Size, *value.LastModified)
 			objectAttrList = append(objectAttrList, attr)
 		}
-		// documentation for CommonPrefixes:
-		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2/types#CommonPrefix
-		for _, value := range output.CommonPrefixes {
-			dir := *value.Prefix
-			dirList[dir] = true
-			// let's extract and add intermediate directories
-			// first cut the listPath (the full prefix path) off of the directory path
-			_, intermediatePath, listPathFound := strings.Cut(dir, listPath)
-			// if the listPath isn't here, that's weird
-			if !listPathFound {
-				log.Warn("Prefix mismatch with path %v when listing objects in %v.", dir, listPath)
-			}
-			// get an array of intermediate directories
-			intermediatDirectories := strings.Split(intermediatePath, "/")
-			// walk up the tree and add each one until we find an already existing parent
-			// we have to iterate in descending order
-			suffixToTrim := ""
-			for i := len(intermediatDirectories) - 1; i >= 0; i-- {
-				// ignore empty strings (split does not ommit them)
-				if intermediatDirectories[i] == "" {
-					continue
+
+		if findCommonPrefixes {
+			// documentation for CommonPrefixes:
+			// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2/types#CommonPrefix
+			for _, value := range output.CommonPrefixes {
+				dir := *value.Prefix
+				dirList[dir] = true
+				// let's extract and add intermediate directories
+				// first cut the listPath (the full prefix path) off of the directory path
+				_, intermediatePath, listPathFound := strings.Cut(dir, listPath)
+				// if the listPath isn't here, that's weird
+				if !listPathFound {
+					log.Warn("Prefix mismatch with path %v when listing objects in %v.", dir, listPath)
 				}
-				// add to the suffix we're trimming off
-				suffixToTrim = intermediatDirectories[i] + "/" + suffixToTrim
-				// get the trimmed (parent) directory
-				parentDir := strings.TrimSuffix(dir, suffixToTrim)
-				// have we seen this one already?
-				if dirList[parentDir] {
-					break
+				// get an array of intermediate directories
+				intermediatDirectories := strings.Split(intermediatePath, "/")
+				// walk up the tree and add each one until we find an already existing parent
+				// we have to iterate in descending order
+				suffixToTrim := ""
+				for i := len(intermediatDirectories) - 1; i >= 0; i-- {
+					// ignore empty strings (split does not ommit them)
+					if intermediatDirectories[i] == "" {
+						continue
+					}
+					// add to the suffix we're trimming off
+					suffixToTrim = intermediatDirectories[i] + "/" + suffixToTrim
+					// get the trimmed (parent) directory
+					parentDir := strings.TrimSuffix(dir, suffixToTrim)
+					// have we seen this one already?
+					if dirList[parentDir] {
+						break
+					}
+					dirList[parentDir] = true
 				}
-				dirList[parentDir] = true
 			}
 		}
 	}
@@ -603,27 +663,65 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		if dir == listPath {
 			continue
 		}
-		name := strings.TrimSuffix(dir, "/")
-		attr := &internal.ObjAttr{
-			Path:  split(cl.Config.prefixPath, name),
-			Name:  filepath.Base(name),
-			Size:  4096,
-			Mode:  os.ModeDir,
-			Mtime: time.Now(),
-			Flags: internal.NewDirBitMap(),
-		}
-		attr.Atime = attr.Mtime
-		attr.Crtime = attr.Mtime
-		attr.Ctime = attr.Mtime
-		attr.Flags.Set(internal.PropFlagMetadataRetrieved)
-		attr.Flags.Set(internal.PropFlagModeDefault)
-		attr.Metadata = make(map[string]string)
-		attr.Metadata[folderKey] = "true"
+		path := split(cl.Config.prefixPath, dir)
+		attr := createDirObjAttr(path)
 		objectAttrList = append(objectAttrList, attr)
 	}
 
+	// if prefix != "" && prefix[len(prefix)-1] != '/' {
+	// 	// List was called without a trailing slash
+	// 	// let's call it with the trailing slash and combine the results
+	// 	// this supports a case where they're looking for a directory but they don't send in the trailing slash
+	// 	dirListResult, _, err := cl.List(prefix+"/", marker, count)
+	// 	if err != nil {
+	// 		log.Err("Client::List : Listing %s/ failed. Here's why: %v", prefix, err)
+	// 	} else {
+	// 		objectAttrList = append(objectAttrList, dirListResult...)
+	// 	}
+	// }
+
 	newMarker := ""
 	return objectAttrList, &newMarker, nil
+}
+
+func createFileObjAttr(path string, size int64, lastModified time.Time) (attr *internal.ObjAttr) {
+	attr = &internal.ObjAttr{
+		Path:   path,
+		Name:   filepath.Base(path),
+		Size:   size,
+		Mode:   0,
+		Mtime:  lastModified,
+		Atime:  lastModified,
+		Ctime:  lastModified,
+		Crtime: lastModified,
+		Flags:  internal.NewFileBitMap(),
+	}
+	// set flags
+	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
+	attr.Flags.Set(internal.PropFlagModeDefault)
+	attr.Metadata = make(map[string]string)
+
+	return attr
+}
+
+func createDirObjAttr(path string) (attr *internal.ObjAttr) {
+	path = internal.TruncateDirName(path)
+	attr = &internal.ObjAttr{
+		Path:  path,
+		Name:  filepath.Base(path),
+		Size:  4096,
+		Mode:  os.ModeDir,
+		Mtime: time.Now(),
+		Flags: internal.NewDirBitMap(),
+	}
+	attr.Atime = attr.Mtime
+	attr.Crtime = attr.Mtime
+	attr.Ctime = attr.Mtime
+	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
+	attr.Flags.Set(internal.PropFlagModeDefault)
+	attr.Metadata = make(map[string]string)
+	attr.Metadata[folderKey] = "true"
+	return attr
 }
 
 // Download object data to a file handle.
@@ -795,7 +893,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 		// pad the data with zeros
 		log.Warn("Client::TruncateFile : Padding file %s with zeros to truncate its original size (%dB) UP to %dB.", name, len(objectData), size)
 		oldObjectData := objectData
-		newObjectData := make([]byte, size)
+		newObjectData := bytes.Repeat([]byte(" "), int(size))
 		copy(newObjectData, oldObjectData)
 		objectData = newObjectData
 	}
