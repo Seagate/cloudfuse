@@ -37,6 +37,7 @@
 package s3storage
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -252,9 +253,17 @@ func (s *clientTestSuite) TestReadToFile() {
 }
 func (s *clientTestSuite) TestReadBuffer() {
 	defer s.cleanupTest()
-	// Generate file name
-	// Generate body
-	// Put object with name and body in bucket
+	// setup
+	name := generateFileName()
+	body := bytes.NewReader([]byte(randomString(20)))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   body,
+	})
+	s.assert.Nil(err)
+
+	// TODO:
 	// Call read buffer
 	// Check result matches generated body
 }
@@ -266,10 +275,14 @@ func (s *clientTestSuite) TestWriteFromFile() {
 }
 func (s *clientTestSuite) TestWriteFromBuffer() {
 	defer s.cleanupTest()
-	// Generate file name
-	// Generate string to byte array
-	// Call write from buffer
-	// Assert error nil
+	// setup
+	name := generateFileName()
+	body := []byte(randomString(20))
+
+	err := s.client.WriteFromBuffer(name, nil, body)
+	s.assert.Nil(err)
+
+	// TODO:
 	// Get object from bucket
 	// Assert error nil
 	// Check body matches generated buffer
