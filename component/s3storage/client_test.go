@@ -161,8 +161,27 @@ func (s *clientTestSuite) TestListBuckets() {
 func (s *clientTestSuite) TestSetPrefixPath() {
 }
 func (s *clientTestSuite) TestCreateFile() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+
+	err := s.client.CreateFile(name, os.FileMode(0))
+	s.assert.Nil(err)
+
+	// file should be in bucket
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
 }
 func (s *clientTestSuite) TestCreateDirectory() {
+	defer s.cleanupTest()
+	// setup
+	name := generateDirectoryName()
+
+	err := s.client.CreateDirectory(name)
+	s.assert.Nil(err)
 }
 func (s *clientTestSuite) TestCreateLink() {
 }
@@ -232,6 +251,12 @@ func (s *clientTestSuite) TestList() {
 func (s *clientTestSuite) TestReadToFile() {
 }
 func (s *clientTestSuite) TestReadBuffer() {
+	defer s.cleanupTest()
+	// Generate file name
+	// Generate body
+	// Put object with name and body in bucket
+	// Call read buffer
+	// Check result matches generated body
 }
 func (s *clientTestSuite) TestReadInBuffer() {
 }
@@ -240,6 +265,14 @@ func (s *clientTestSuite) TestcalculateBlockSize() {
 func (s *clientTestSuite) TestWriteFromFile() {
 }
 func (s *clientTestSuite) TestWriteFromBuffer() {
+	defer s.cleanupTest()
+	// Generate file name
+	// Generate string to byte array
+	// Call write from buffer
+	// Assert error nil
+	// Get object from bucket
+	// Assert error nil
+	// Check body matches generated buffer
 }
 func (s *clientTestSuite) TestGetFileBlockOffsets() {
 }
