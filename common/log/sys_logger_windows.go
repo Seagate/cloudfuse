@@ -1,4 +1,4 @@
-//go:build linux
+//go:build windows
 
 /*
     _____           _____   _____   ____          ______  _____  ------
@@ -38,13 +38,12 @@ package log
 import (
 	"errors"
 	"fmt"
+	"golang.org/x/sys/windows/svc/eventlog"
 	"log"
 	"log/syslog"
+	"lyvecloudfuse/common"
 	"path/filepath"
 	"runtime"
-	"sys/eventlog"
-
-	"lyvecloudfuse/common"
 )
 
 type SysLogger struct {
@@ -55,7 +54,15 @@ type SysLogger struct {
 
 var NoSyslogService = errors.New("failed to create syslog object")
 
+func newEvent(lvl common.LogLevel) error {
+
+}
+
 func newSysLogger(lvl common.LogLevel, tag string) (*SysLogger, error) {
+
+	//Setup Windows Event log with the log source name and logging levels
+	err := eventlog.InstallAsEventCreate("LyveCloudFuse", eventlog.Info|eventlog.Warning|eventlog.Error)
+
 	l := &SysLogger{
 		level: lvl,
 		tag:   tag,
