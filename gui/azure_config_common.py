@@ -1,10 +1,23 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 from PySide6 import QtWidgets
+import yaml
+
 # import the custom class made from QtDesigner
 from ui_azure_config_common import Ui_Form
-
 from azure_config_advanced import azureAdvancedSettingsWidget
+
+pipelineChoices = {
+    "fileCache" : 0,
+    "streaming" : 1
+}
+
+bucketModeChoices = {
+    "key" : 0,
+    "sas" : 1,
+    "spn" : 2,
+    "msi" : 3
+}
 
 class azureSettingsWidget(QWidget, Ui_Form):
     def __init__(self):
@@ -37,28 +50,29 @@ class azureSettingsWidget(QWidget, Ui_Form):
         
         self.hideModeBoxes()
         
-        match self.dropDown_pipeline.currentIndex():
-            case 0:
-                self.groupbox_fileCache.setVisible(True)
-            case 1:
-                self.groupbox_streaming.setVisible(True)
+        pipelineSelection = self.dropDown_pipeline.currentIndex()
+        
+        if pipelineSelection == pipelineChoices['fileCache']:
+            self.groupbox_fileCache.setVisible(True)
+        elif pipelineSelection == pipelineChoices['streaming']:
+            self.groupbox_streaming.setVisible(True)
             
 
     def showAzureModeSettings(self):
 
         self.hideAzureBoxes()
-        
+        modeSelection = self.dropDown_azure_modeSetting.currentIndex()
+
         # Azure mode group boxes
-        match self.dropDown_azure_modeSetting.currentIndex():
-            case 0:
-                self.groupbox_accountKey.setVisible(True)
-            case 1:
-                self.groupbox_sasStorage.setVisible(True)
-            case 2:
-                self.groupbox_spn.setVisible(True)
-            case 3:
-                self.groupbox_msi.setVisible(True)  
-        
+        if modeSelection == bucketModeChoices["key"]:
+            self.groupbox_accountKey.setVisible(True)
+        elif modeSelection == bucketModeChoices["sas"]:
+            self.groupbox_sasStorage.setVisible(True)
+        elif modeSelection == bucketModeChoices["spn"]:
+            self.groupbox_spn.setVisible(True)
+        elif modeSelection == bucketModeChoices["msi"]:
+            self.groupbox_msi.setVisible(True) 
+    
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
         self.lineEdit_fileCache_path.setText('{}'.format(directory))

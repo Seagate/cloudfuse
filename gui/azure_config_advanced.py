@@ -13,6 +13,9 @@ class azureAdvancedSettingsWidget(QWidget, Ui_Form):
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)
         
+        self.lineEdit_secretKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+        self.lineEdit_azure_accountKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+        self.lineEdit_azure_spnClientSecret.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         
         
         
@@ -25,12 +28,17 @@ class azureAdvancedSettingsWidget(QWidget, Ui_Form):
         
         msg = QtWidgets.QMessageBox()
         msg.setWindowTitle("Are you sure?")
-        msg.setText("You have clicked the okay button.")
         msg.setInformativeText("Do you want to save you changes?")
-        msg.setStandardButtons(QtWidgets.QMessageBox.Save | QtWidgets.QMessageBox.Discard | QtWidgets.QMessageBox.Cancel)
-        msg.setDefaultButton(QtWidgets.QMessageBox.Save)
-        ret = msg.exec()        
-
-        # Insert all settings to yaml file
+        msg.setText("The settings have been modified.")
+        msg.setStandardButtons(QtWidgets.QMessageBox.Discard | QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Save)
+        msg.setDefaultButton(QtWidgets.QMessageBox.Cancel)
+        ret = msg.exec()
         
-        event.accept()
+        if ret == QtWidgets.QMessageBox.Discard:
+            event.accept()
+        elif ret == QtWidgets.QMessageBox.Cancel:
+            event.ignore()
+        elif ret == QtWidgets.QMessageBox.Save:
+            # Insert all settings to yaml file
+            self.writeConfigFile()
+            event.accept()
