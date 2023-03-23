@@ -38,12 +38,13 @@ package log
 import (
 	"errors"
 	"fmt"
-	"golang.org/x/sys/windows/svc/eventlog"
 	"log"
 	"log/syslog"
 	"lyvecloudfuse/common"
 	"path/filepath"
 	"runtime"
+
+	"golang.org/x/sys/windows/svc/eventlog"
 )
 
 type SysLogger struct {
@@ -54,14 +55,42 @@ type SysLogger struct {
 
 var NoSyslogService = errors.New("failed to create syslog object")
 
-func newEvent(lvl common.LogLevel) error {
+// where is this going to get called?
+func setupEvents() error {
+	//Setup Windows Event log with the log source name and logging levels
+	err := eventlog.InstallAsEventCreate("LyveCloudFuse", eventlog.Info|eventlog.Warning|eventlog.Error)
+	return err
+}
+
+func newEvent(l *SysLogger, format string, args ...interface{}) error {
+
+	wlog, err := eventlog.Open("LyveCloudFuse")
+	msg := fmt.Sprintf(format, args...)
+	arbID := 15
+	if l.level >= common.ELogLevel.LOG_DEBUG() {
+		wlog.Info(uint32(arbID), msg)
+	}
+	if l.level >= common.ELogLevel.LOG_TRACE() {
+		wlog.Info(uint32(arbID), msg)
+	}
+	if l.level >= common.ELogLevel.LOG_INFO() {
+		wlog.Info(uint32(arbID), msg)
+	}
+	if l.level >= common.ELogLevel.LOG_WARNING() {
+		wlog.Warning(uint32(arbID), msg)
+	}
+	if l.level >= common.ELogLevel.LOG_ERR() {
+		wlog.Error(uint32(arbID), msg)
+	}
+	if l.level >= common.ELogLevel.LOG_CRIT() {
+		wlog.Error(uint32(arbID), msg)
+	}
+
+	return err
 
 }
 
 func newSysLogger(lvl common.LogLevel, tag string) (*SysLogger, error) {
-
-	//Setup Windows Event log with the log source name and logging levels
-	err := eventlog.InstallAsEventCreate("LyveCloudFuse", eventlog.Info|eventlog.Warning|eventlog.Error)
 
 	l := &SysLogger{
 		level: lvl,
@@ -128,9 +157,14 @@ func getSyslogLevel(lvl common.LogLevel) syslog.Priority {
 }
 
 func (l *SysLogger) write(lvl string, format string, args ...interface{}) {
+
+	newEvent(l, format, args)
+
+	// how will the rest of this translate?
 	_, fn, ln, _ := runtime.Caller(3)
 	msg := fmt.Sprintf(format, args...)
 	l.logger.Print(lvl, " [", filepath.Base(fn), " (", ln, ")]: ", msg)
+
 }
 
 func (l *SysLogger) Debug(format string, args ...interface{}) {
