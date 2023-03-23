@@ -71,7 +71,6 @@ func newTestClient(configuration string) (*Client, error) {
 	conf := Options{}
 	err := config.UnmarshalKey(compName, &conf)
 	if err != nil {
-		fmt.Println("Unable to unmarshal")
 		log.Err("ClientTest::newTestClient : config error [invalid config attributes]")
 		return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, err.Error())
 	}

@@ -53,9 +53,6 @@ type S3Storage struct {
 	internal.BaseComponent
 	storage  S3Connection
 	stConfig Config
-	// TODO: rip out listBlocked (and startTime, and Start()) if this is an Azure-specific quirk.
-	startTime   time.Time
-	listBlocked bool
 }
 
 const compName = "s3storage"
@@ -84,14 +81,12 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 	conf := Options{}
 	err := config.UnmarshalKey(s3.Name(), &conf)
 	if err != nil {
-		fmt.Println("Unable to unmarshal")
 		log.Err("S3Storage::Configure : config error [invalid config attributes]")
 		return fmt.Errorf("config error in %s [%s]", s3.Name(), err.Error())
 	}
 
 	err = ParseAndValidateConfig(s3, conf)
 	if err != nil {
-		fmt.Println("Unable to parse and validate")
 		log.Err("S3Storage::Configure : Config validation failed [%s]", err.Error())
 		return fmt.Errorf("config error in %s [%s]", s3.Name(), err.Error())
 	}
@@ -141,10 +136,6 @@ func (s3 *S3Storage) configureAndTest(isParent bool) error {
 // Start : Initialize the go-sdk pipeline here and test auth is working fine
 func (s3 *S3Storage) Start(ctx context.Context) error {
 	log.Trace("S3Storage::Start : Starting component %s", s3.Name())
-	// On mount block the ListBlob call for certain amount of time
-	s3.startTime = time.Now()
-	s3.listBlocked = true
-
 	// create stats collector for s3storage
 	s3StatsCollector = stats_manager.NewStatsCollector(s3.Name())
 
@@ -220,17 +211,6 @@ func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 	log.Trace("S3Storage::ReadDir : %s", options.Name)
 	objectList := make([]*internal.ObjAttr, 0)
 
-	// if s3.listBlocked {
-	// 	diff := time.Since(s3.startTime)
-	// 	if diff.Seconds() > float64(s3.stConfig.cancelListForSeconds) {
-	// 		s3.listBlocked = false
-	// 		log.Info("S3Storage::ReadDir : Unblocked List API")
-	// 	} else {
-	// 		log.Info("S3Storage::ReadDir : Blocked List API for %d more seconds", int(s3.stConfig.cancelListForSeconds)-int(diff.Seconds()))
-	// 		return objectList, nil
-	// 	}
-	// }
-
 	path := formatListDirName(options.Name)
 	var iteration int = 0
 	var marker *string = nil
@@ -255,17 +235,6 @@ func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 
 func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
 	log.Trace("S3Storage::StreamDir : Path %s, offset %d, count %d", options.Name, options.Offset, options.Count)
-
-	// if s3.listBlocked {
-	// 	diff := time.Since(s3.startTime)
-	// 	if diff.Seconds() > float64(s3.stConfig.cancelListForSeconds) {
-	// 		s3.listBlocked = false
-	// 		log.Info("S3Storage::StreamDir : Unblocked List API")
-	// 	} else {
-	// 		log.Info("S3Storage::StreamDir : Blocked List API for %d more seconds", int(s3.stConfig.cancelListForSeconds)-int(diff.Seconds()))
-	// 		return make([]*internal.ObjAttr, 0), "", nil
-	// 	}
-	// }
 
 	path := formatListDirName(options.Name)
 
@@ -510,6 +479,9 @@ func (s3 *S3Storage) Chown(options internal.ChownOptions) error {
 
 func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("S3Storage::FlushFile : Flush file %s", options.Handle.Path)
+	// TODO: add support for flush by implementing our own version of StageAndCommit in client.go.
+	// 			S3 may not have "blocks", but this code is architected around them
+	// 			so we need to play along if we want streaming to actually work
 	return nil
 }
 

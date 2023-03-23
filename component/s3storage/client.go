@@ -41,6 +41,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort" // to sort List() results
 	"strings"
 	"syscall"
 	"time"
@@ -63,9 +64,6 @@ import (
 const (
 	folderKey  = "hdi_isfolder"
 	symlinkKey = "is_symlink"
-	// how many times should we retry each call to Lyve Cloud to circumvent the InvalidAccessKeyId issue?
-	// TODO: set this to 1 to test whether this issue is fixed
-	retryCount = 5
 )
 
 type Client struct {
@@ -136,7 +134,7 @@ func (cl *Client) NewCredentialKey(key, value string) (err error) {
 // Call getObject, check for errors, and prepare object data.
 // name is the file path (not including prefixPath).
 func (cl *Client) getFileObjectData(name string, offset int64, count int64) (body io.ReadCloser, err error) {
-	key := filepath.Join(cl.Config.prefixPath, name)
+	key := cl.getKey(name)
 	log.Trace("Client::getObjectData : get object %s and handle its output", key)
 	// get the object
 	result, err := cl.getObject(key, offset, count)
@@ -164,17 +162,16 @@ func (cl *Client) getFileObjectData(name string, offset int64, count int64) (bod
 
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
-// Retries on InvalidAccessKeyID.
 // key is the full path to the object (with the prefixPath).
 func (cl *Client) getObject(key string, offset int64, count int64) (*s3.GetObjectOutput, error) {
 	log.Trace("Client::getObject : getting object %s (%d+%d)", key, offset, count)
 
 	var rangeString string //string to be used to specify range of object to download from S3
-	bucketName := cl.Config.authConfig.BucketName
 
 	//TODO: add handle if the offset+count is greater than the end of Object.
 	if count == 0 {
-		// if offset is 0 too, leave rangeString empty
+		// sending Range:"bytes=0-" gives errors from Lyve Cloud ("InvalidRange: The requested range is not satisfiable")
+		// so if offset is 0 too, leave rangeString empty
 		if offset != 0 {
 			rangeString = "bytes=" + fmt.Sprint(offset) + "-"
 		}
@@ -183,90 +180,76 @@ func (cl *Client) getObject(key string, offset int64, count int64) (*s3.GetObjec
 		rangeString = "bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)
 	}
 
-	var result *s3.GetObjectOutput
-	var err error
-	for i := 0; i < retryCount; i++ {
-		result, err = cl.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-			Bucket: aws.String(bucketName),
-			Key:    aws.String(key),
-			Range:  aws.String(rangeString),
-		})
-		// retry on InvalidAccessKeyId
-		if isInvalidAccessKeyID(err) {
-			log.Warn("Client::getObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
-		} else {
-			break
-		}
-	}
+	result, err := cl.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(cl.Config.authConfig.BucketName),
+		Key:    aws.String(key),
+		Range:  aws.String(rangeString),
+	})
+
 	return result, err
 }
 
 // Wrapper for awsS3Client.PutObject.
 // Takes an io.Reader to work with both files and byte arrays.
-// Retries on InvalidAccessKeyID.
 // key is the full path to the object (with the prefixPath).
 func (cl *Client) putObject(key string, objectData io.Reader) (*s3.PutObjectOutput, error) {
 	log.Trace("Client::putObject : putting object %s", key)
-	var result *s3.PutObjectOutput
-	var err error
-	for i := 0; i < retryCount; i++ {
-		result, err = cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
-			Bucket: aws.String(cl.Config.authConfig.BucketName),
-			Key:    aws.String(key),
-			Body:   objectData,
-		})
-		// retry on InvalidAccessKeyId
-		if isInvalidAccessKeyID(err) {
-			log.Warn("Client::putObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
-		} else {
-			break
-		}
-	}
+
+	result, err := cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(cl.Config.authConfig.BucketName),
+		Key:    aws.String(key),
+		Body:   objectData,
+	})
+
 	return result, err
 }
 
 // Wrapper for awsS3Client.DeleteObject.
-// Retries on InvalidAccessKeyID.
 // key is the full path to the object (with the prefixPath).
 func (cl *Client) deleteObject(key string) (*s3.DeleteObjectOutput, error) {
 	log.Trace("Client::deleteObject : deleting object %s", key)
-	var result *s3.DeleteObjectOutput
-	var err error
-	for i := 0; i < retryCount; i++ {
-		result, err = cl.awsS3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
-			Bucket: aws.String(cl.Config.authConfig.BucketName),
-			Key:    aws.String(key),
-		})
-		// retry on InvalidAccessKeyId
-		if isInvalidAccessKeyID(err) {
-			log.Warn("Client::deleteObject Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
-		} else {
-			break
-		}
-	}
+
+	result, err := cl.awsS3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+		Bucket: aws.String(cl.Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+
 	return result, err
 }
 
+// Wrapper for awsS3Client.DeleteObjects.
+// keys is a list of full paths to the objects (with the prefixPath)
+func (cl *Client) deleteObjects(keys []string) (result *s3.DeleteObjectsOutput, err error) {
+	log.Trace("Client::deleteObjects : deleting %d objects", len(keys))
+	// build list to send to DeleteObjects
+	keyList := make([]types.ObjectIdentifier, len(keys))
+	for i := 0; i < len(keys); i++ {
+		keyList[i] = types.ObjectIdentifier{
+			Key: &keys[i],
+		}
+	}
+	// send keyList for deletion
+	result, err = cl.awsS3Client.DeleteObjects(context.TODO(), &s3.DeleteObjectsInput{
+		Bucket: &cl.Config.authConfig.BucketName,
+		Delete: &types.Delete{
+			Objects: keyList,
+			Quiet:   true,
+		},
+	})
+
+	return
+}
+
 // Wrapper for awsS3Client.GetObjectAttributes.
-// Retries on InvalidAccessKeyID.
 // key is the full path to the object (with the prefixPath)
 func (cl *Client) getObjectAttributes(key string) (*s3.GetObjectAttributesOutput, error) {
 	log.Trace("Client::getObjectAttributes : object %s", key)
-	var result *s3.GetObjectAttributesOutput
-	var err error
-	for i := 0; i < retryCount; i++ {
-		result, err = cl.awsS3Client.GetObjectAttributes(context.TODO(), &s3.GetObjectAttributesInput{
-			Bucket:           aws.String(cl.Config.authConfig.BucketName),
-			Key:              aws.String(key),
-			ObjectAttributes: []types.ObjectAttributes{types.ObjectAttributesObjectSize},
-		})
-		// retry on InvalidAccessKeyId
-		if isInvalidAccessKeyID(err) {
-			log.Warn("Client::getObjectAttributes : Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
-		} else {
-			break
-		}
-	}
+
+	result, err := cl.awsS3Client.GetObjectAttributes(context.TODO(), &s3.GetObjectAttributesInput{
+		Bucket:           aws.String(cl.Config.authConfig.BucketName),
+		Key:              aws.String(key),
+		ObjectAttributes: []types.ObjectAttributes{types.ObjectAttributesObjectSize},
+	})
 	if err == nil {
 		// I think Lyve Cloud is just treating this request as if it were GetObject...
 		// TODO: keep track of Lyve Cloud fixing this, and tear this out at the right time
@@ -279,19 +262,9 @@ func (cl *Client) getObjectAttributes(key string) (*s3.GetObjectAttributesOutput
 	return result, err
 }
 
-// Lyve Cloud sometimes returns InvalidAccessKeyId even if the access key is correct and the request was correct.
-// Check the returned err value for the associated error code.
-func isInvalidAccessKeyID(err error) bool {
-	var apiErr smithy.APIError
-	if err != nil {
-		if errors.As(err, &apiErr) {
-			code := apiErr.ErrorCode()
-			if code == "InvalidAccessKeyId" {
-				return true
-			}
-		}
-	}
-	return false
+// Convert file name to object getKey
+func (cl *Client) getKey(name string) string {
+	return filepath.Join(cl.Config.prefixPath, name)
 }
 
 // Wrapper for awsS3Client.ListBuckets
@@ -300,17 +273,7 @@ func (cl *Client) ListBuckets() ([]string, error) {
 
 	cntList := make([]string, 0)
 
-	var err error
-	var result *s3.ListBucketsOutput
-	for i := 0; i < retryCount; i++ {
-		result, err = cl.awsS3Client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
-		// retry on InvalidAccessKeyId
-		if isInvalidAccessKeyID(err) {
-			log.Warn("Client::ListBuckets Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
-		} else {
-			break
-		}
-	}
+	result, err := cl.awsS3Client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
 
 	if err != nil {
 		log.Err("Couldn't list buckets for your account. Here's why: %v", err)
@@ -372,7 +335,7 @@ func (cl *Client) DeleteFile(name string) (err error) {
 		return err
 	}
 	// delete the object
-	key := filepath.Join(cl.Config.prefixPath, name)
+	key := cl.getKey(name)
 	_, err = cl.deleteObject(key)
 	if err != nil {
 		log.Err("Client::DeleteFile : Failed to delete object %s. Here's why: %v", name, err)
@@ -407,7 +370,10 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 	// List only returns the objects and prefixes up to the next "/" character after the prefix
 	// This is because List is setting the Delimiter field to "/"
 	// This means that recursive directory deletion actually needs to be recursive.
-	// Delete all found objects *and prefixes ("directories")*:
+	// Delete all found objects *and prefixes ("directories")*.
+	// For improved performance, we'll use one call to delete all objects in this directory.
+	// 	To make one call, we need to make a list of objects to delete first.
+	var keysToDelete []string
 	for _, object := range objects {
 		if object.IsDir() {
 			err = cl.DeleteDirectory(object.Path)
@@ -415,10 +381,15 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 				log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", object.Path, err)
 			}
 		} else {
-			err = cl.DeleteFile(object.Path)
-			if err != nil {
-				log.Err("Client::DeleteDirectory : Failed to delete file %s. Here's why: %v", object.Path, err)
-			}
+			keysToDelete = append(keysToDelete, cl.getKey(object.Path))
+		}
+	}
+	// Delete the collected keys
+	result, err := cl.deleteObjects(keysToDelete)
+	if err != nil {
+		log.Err("Client::DeleteDirectory : Failed to delete %d files. Here's why: %v", len(keysToDelete), err)
+		for i := 0; i < len(result.Errors); i++ {
+			log.Err("Client::DeleteDirectory : Failed to delete key %s. Here's why: %s", result.Errors[i].Key, result.Errors[i].Message)
 		}
 	}
 
@@ -430,22 +401,14 @@ func (cl *Client) RenameFile(source string, target string) (err error) {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
 	// copy the object to its new key
-	sourceKey := filepath.Join(cl.Config.prefixPath, source)
-	targetKey := filepath.Join(cl.Config.prefixPath, target)
-	for i := 0; i < retryCount; i++ {
-		_, err = cl.awsS3Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
-			Bucket: aws.String(cl.Config.authConfig.BucketName),
-			// TODO: URL-encode CopySource
-			CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, sourceKey)),
-			Key:        aws.String(targetKey),
-		})
-		// retry on InvalidAccessKeyId
-		if isInvalidAccessKeyID(err) {
-			log.Warn("Client::RenameFile Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
-		} else {
-			break
-		}
-	}
+	sourceKey := cl.getKey(source)
+	targetKey := cl.getKey(target)
+	_, err = cl.awsS3Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
+		Bucket: aws.String(cl.Config.authConfig.BucketName),
+		// TODO: URL-encode CopySource
+		CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, sourceKey)),
+		Key:        aws.String(targetKey),
+	})
 	// check for errors on copy
 	if err != nil {
 		// No such key found so object is not in S3
@@ -520,7 +483,7 @@ func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	// so if this was called with a trailing slash, getObjectAttributes won't work.
 	if len(name) > 0 && name[len(name)-1] != '/' {
 		// no trailing slash, so we can use GetObjectAttributes
-		key := filepath.Join(cl.Config.prefixPath, name)
+		key := cl.getKey(name)
 		result, err := cl.getObjectAttributes(key)
 		if err == nil {
 			// create and return an objAttr
@@ -569,7 +532,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	}
 
 	// combine the configured prefix and the prefix being given to List to get a full listPath
-	listPath := filepath.Join(cl.Config.prefixPath, prefix)
+	listPath := cl.getKey(prefix)
 	// replace any trailing forward slash stripped by filepath.Join
 	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
 		listPath += "/"
@@ -597,17 +560,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	objectAttrList := make([]*internal.ObjAttr, 0)
 	// fetch and process result pages
 	for paginator.HasMorePages() {
-		var err error
-		var output *s3.ListObjectsV2Output
-		for i := 0; i < retryCount; i++ {
-			output, err = paginator.NextPage(context.TODO())
-			// retry on InvalidAccessKeyId
-			if isInvalidAccessKeyID(err) {
-				log.Warn("Client::List Lyve Cloud \"Invalid Access Key\" bug - retry %d of %d.", i+1, retryCount)
-			} else {
-				break
-			}
-		}
+		output, err := paginator.NextPage(context.TODO())
 		if err != nil {
 			log.Err("Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
 			return objectAttrList, nil, err
@@ -668,17 +621,11 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		objectAttrList = append(objectAttrList, attr)
 	}
 
-	// if prefix != "" && prefix[len(prefix)-1] != '/' {
-	// 	// List was called without a trailing slash
-	// 	// let's call it with the trailing slash and combine the results
-	// 	// this supports a case where they're looking for a directory but they don't send in the trailing slash
-	// 	dirListResult, _, err := cl.List(prefix+"/", marker, count)
-	// 	if err != nil {
-	// 		log.Err("Client::List : Listing %s/ failed. Here's why: %v", prefix, err)
-	// 	} else {
-	// 		objectAttrList = append(objectAttrList, dirListResult...)
-	// 	}
-	// }
+	// values should be returned in ascending order by key
+	// sort the list before returning it
+	sort.Slice(objectAttrList, func(i, j int) bool {
+		return objectAttrList[i].Path < objectAttrList[j].Path
+	})
 
 	newMarker := ""
 	return objectAttrList, &newMarker, nil
@@ -817,7 +764,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	}
 
 	// upload file data
-	key := filepath.Join(cl.Config.prefixPath, name)
+	key := cl.getKey(name)
 	_, err = cl.putObject(key, fi)
 	// TODO: decide when to use this higher-level API
 	// uploader := manager.NewUploader(cl.Client, func(u *manager.Uploader) {
@@ -854,7 +801,8 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data 
 	// convert byte array to io.Reader
 	dataReader := bytes.NewReader(data)
 	// upload data to object
-	key := filepath.Join(cl.Config.prefixPath, name)
+	key := cl.getKey(name)
+	// TODO: handle metadata with S3
 	_, err = cl.putObject(key, dataReader)
 	if err != nil {
 		log.Err("Couldn't upload object to %v. Here's why: %v", name, err)
@@ -899,7 +847,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	}
 	// overwrite the object with the truncated data
 	truncatedDataReader := bytes.NewReader(objectData)
-	key := filepath.Join(cl.Config.prefixPath, name)
+	key := cl.getKey(name)
 	_, err = cl.putObject(key, truncatedDataReader)
 	if err != nil {
 		log.Err("Client::TruncateFile : Failed to write truncated data to object %s. Here's why: %v", name, err)
