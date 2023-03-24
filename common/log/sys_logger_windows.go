@@ -38,9 +38,8 @@ package log
 import (
 	"errors"
 	"fmt"
-	"log"
-	"log/syslog"
 	"lyvecloudfuse/common"
+	"os"
 	"path/filepath"
 	"runtime"
 
@@ -48,9 +47,7 @@ import (
 )
 
 type SysLogger struct {
-	level  common.LogLevel
-	tag    string
-	logger *log.Logger
+	level common.LogLevel
 }
 
 var NoSyslogService = errors.New("failed to create syslog object")
@@ -62,28 +59,27 @@ func setupEvents() error {
 	return err
 }
 
-func newEvent(l *SysLogger, format string, args ...interface{}) error {
+func newEvent(l *SysLogger, lvl string, msg string) error {
 
 	wlog, err := eventlog.Open("LyveCloudFuse")
-	msg := fmt.Sprintf(format, args...)
-	arbID := 15
+	appID := os.Getpid() //make this the process id?
 	if l.level >= common.ELogLevel.LOG_DEBUG() {
-		wlog.Info(uint32(arbID), msg)
+		wlog.Info(uint32(appID), msg)
 	}
 	if l.level >= common.ELogLevel.LOG_TRACE() {
-		wlog.Info(uint32(arbID), msg)
+		wlog.Info(uint32(appID), msg)
 	}
 	if l.level >= common.ELogLevel.LOG_INFO() {
-		wlog.Info(uint32(arbID), msg)
+		wlog.Info(uint32(appID), msg)
 	}
 	if l.level >= common.ELogLevel.LOG_WARNING() {
-		wlog.Warning(uint32(arbID), msg)
+		wlog.Warning(uint32(appID), msg)
 	}
 	if l.level >= common.ELogLevel.LOG_ERR() {
-		wlog.Error(uint32(arbID), msg)
+		wlog.Error(uint32(appID), msg)
 	}
 	if l.level >= common.ELogLevel.LOG_CRIT() {
-		wlog.Error(uint32(arbID), msg)
+		wlog.Error(uint32(appID), msg)
 	}
 
 	return err
@@ -94,17 +90,13 @@ func newSysLogger(lvl common.LogLevel, tag string) (*SysLogger, error) {
 
 	l := &SysLogger{
 		level: lvl,
-		tag:   tag,
 	}
+
 	err := l.init()
 	if err != nil {
 		return nil, err
 	}
 	return l, nil
-}
-
-func (l *SysLogger) GetLoggerObj() *log.Logger {
-	return l.logger
 }
 
 func (l *SysLogger) SetLogLevel(level common.LogLevel) {
@@ -114,7 +106,7 @@ func (l *SysLogger) SetLogLevel(level common.LogLevel) {
 }
 
 func (l *SysLogger) GetType() string {
-	return "syslog"
+	return "log"
 }
 
 func (l *SysLogger) GetLogLevel() common.LogLevel {
@@ -122,48 +114,41 @@ func (l *SysLogger) GetLogLevel() common.LogLevel {
 }
 
 func (l *SysLogger) init() error {
-	// Configure logger to write to the syslog. You could do this in init(), too.
-	logwriter, e := syslog.New(getSyslogLevel(l.level), l.tag)
 
-	if e != nil {
+	err := setupEvents() //set up windows event registry for app
+	if err != nil {
 		return NoSyslogService
-	}
-
-	l.logger = log.New(logwriter, "", 0)
-	if l.logger == nil {
-		return errors.New("unable to create logger object")
 	}
 
 	return nil
 }
 
 // Convert our log levels to standard syslog levels
-func getSyslogLevel(lvl common.LogLevel) syslog.Priority {
+func getSyslogLevel(lvl common.LogLevel) string {
 	// By default keep the log level to log warning and match the rest
 	switch lvl {
 	case common.ELogLevel.LOG_CRIT():
-		return syslog.LOG_CRIT
+		return "error"
 	case common.ELogLevel.LOG_DEBUG():
-		return syslog.LOG_DEBUG
+		return "info"
 	case common.ELogLevel.LOG_ERR():
-		return syslog.LOG_ERR
+		return "error"
 	case common.ELogLevel.LOG_INFO():
-		return syslog.LOG_INFO
+		return "info"
 	case common.ELogLevel.LOG_TRACE():
-		return syslog.LOG_DEBUG
+		return "info"
 	default:
-		return syslog.LOG_WARNING
+		return "warning"
 	}
 }
 
 func (l *SysLogger) write(lvl string, format string, args ...interface{}) {
 
-	newEvent(l, format, args)
-
-	// how will the rest of this translate?
 	_, fn, ln, _ := runtime.Caller(3)
-	msg := fmt.Sprintf(format, args...)
-	l.logger.Print(lvl, " [", filepath.Base(fn), " (", ln, ")]: ", msg)
+	msg := fmt.Sprintf(lvl, " [", filepath.Base(fn), " (", ln, ")]: ", fmt.Sprintf(format, args...))
+
+	//send this to be provided in the windows event.
+	newEvent(l, lvl, msg)
 
 }
 
