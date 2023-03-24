@@ -52,13 +52,11 @@ import (
 	"lyvecloudfuse/internal/stats_manager"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
-	"github.com/aws/smithy-go/transport/http"
 )
 
 const (
@@ -240,25 +238,16 @@ func (cl *Client) deleteObjects(keys []string) (result *s3.DeleteObjectsOutput, 
 	return
 }
 
-// Wrapper for awsS3Client.GetObjectAttributes.
+// Wrapper for awsS3Client.HeadObject.
 // key is the full path to the object (with the prefixPath)
-func (cl *Client) getObjectAttributes(key string) (*s3.GetObjectAttributesOutput, error) {
-	log.Trace("Client::getObjectAttributes : object %s", key)
+func (cl *Client) headObject(key string) (*s3.HeadObjectOutput, error) {
+	log.Trace("Client::headObject : object %s", key)
 
-	result, err := cl.awsS3Client.GetObjectAttributes(context.TODO(), &s3.GetObjectAttributesInput{
-		Bucket:           aws.String(cl.Config.authConfig.BucketName),
-		Key:              aws.String(key),
-		ObjectAttributes: []types.ObjectAttributes{types.ObjectAttributesObjectSize},
+	result, err := cl.awsS3Client.HeadObject(context.TODO(), &s3.HeadObjectInput{
+		Bucket: aws.String(cl.Config.authConfig.BucketName),
+		Key:    aws.String(key),
 	})
-	if err == nil {
-		// I think Lyve Cloud is just treating this request as if it were GetObject...
-		// TODO: keep track of Lyve Cloud fixing this, and tear this out at the right time
-		contentLength := middleware.GetRawResponse(result.ResultMetadata).(*http.Response).ContentLength
-		if result.ObjectSize == 0 && contentLength > 0 {
-			log.Err("Client::getObjectAttributes : ObjectSize is %d and ContentLength is %d.", result.ObjectSize, contentLength)
-			result.ObjectSize = contentLength
-		}
-	}
+
 	return result, err
 }
 
@@ -480,18 +469,18 @@ func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	// first let's suppose the caller is looking for a file
 	// there are no objects with trailing slashes (MinIO doesn't support them)
 	// 	and trailing slashes aren't allowed in filenames
-	// so if this was called with a trailing slash, getObjectAttributes won't work.
+	// so if this was called with a trailing slash, headObject won't work.
 	if len(name) > 0 && name[len(name)-1] != '/' {
-		// no trailing slash, so we can use GetObjectAttributes
+		// no trailing slash, so we can use headObject
 		key := cl.getKey(name)
-		result, err := cl.getObjectAttributes(key)
+		result, err := cl.headObject(key)
 		if err == nil {
 			// create and return an objAttr
-			attr = createFileObjAttr(name, result.ObjectSize, *result.LastModified)
+			attr = createFileObjAttr(name, result.ContentLength, *result.LastModified)
 			return attr, err
 		}
 		// err is not nil, so assume object was not found
-		log.Debug("Client::GetAttr : getObjectAttributes(%s) failed. Here's why: %v", key, err)
+		log.Debug("Client::GetAttr : headObject(%s) failed. Here's why: %v", key, err)
 	}
 
 	// now search for it as a "directory"
