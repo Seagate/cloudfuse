@@ -129,43 +129,14 @@ func (cl *Client) NewCredentialKey(key, value string) (err error) {
 	return nil
 }
 
-// Call getObject, check for errors, and prepare object data.
-// name is the file path (not including prefixPath).
-func (cl *Client) getFileObjectData(name string, offset int64, count int64) (body io.ReadCloser, err error) {
-	key := cl.getKey(name)
-	log.Trace("Client::getObjectData : get object %s and handle its output", key)
-	// get the object
-	result, err := cl.getObject(key, offset, count)
-	// check for errors
-	if err != nil {
-		log.Err("Client::getObjectData : Failed to get object %s. Here's why: %v", key, err)
-		// No such key found so object is not in S3
-		var nsk *types.NoSuchKey
-		if errors.As(err, &nsk) {
-			err = syscall.ENOENT
-		}
-		// Invalid range
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			code := apiErr.ErrorCode()
-			if code == "InvalidRange" {
-				err = syscall.ERANGE
-			}
-		}
-		return nil, err
-	}
-	// return body
-	return result.Body, err
-}
-
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
 // key is the full path to the object (with the prefixPath).
-func (cl *Client) getObject(key string, offset int64, count int64) (*s3.GetObjectOutput, error) {
-	log.Trace("Client::getObject : getting object %s (%d+%d)", key, offset, count)
+func (cl *Client) getObject(key string, offset int64, count int64) (body io.ReadCloser, err error) {
+	log.Trace("Client::getObject : get object %s (%d+%d)", key, offset, count)
 
+	// deal with the range
 	var rangeString string //string to be used to specify range of object to download from S3
-
 	//TODO: add handle if the offset+count is greater than the end of Object.
 	if count == 0 {
 		// sending Range:"bytes=0-" gives errors from Lyve Cloud ("InvalidRange: The requested range is not satisfiable")
@@ -184,7 +155,26 @@ func (cl *Client) getObject(key string, offset int64, count int64) (*s3.GetObjec
 		Range:  aws.String(rangeString),
 	})
 
-	return result, err
+	// check for errors
+	if err != nil {
+		log.Err("Client::getObject : Failed to get object %s. Here's why: %v", key, err)
+		// No such key found so object is not in S3
+		var nsk *types.NoSuchKey
+		if errors.As(err, &nsk) {
+			err = syscall.ENOENT
+		}
+		// Invalid range
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			code := apiErr.ErrorCode()
+			if code == "InvalidRange" {
+				err = syscall.ERANGE
+			}
+		}
+		return nil, err
+	}
+	// return body
+	return result.Body, err
 }
 
 // Wrapper for awsS3Client.PutObject.
@@ -669,7 +659,7 @@ func createDirObjAttr(path string) (attr *internal.ObjAttr) {
 func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
 	log.Trace("Client::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
 	// get object data
-	objectDataReader, err := cl.getFileObjectData(name, offset, count)
+	objectDataReader, err := cl.getObject(cl.getKey(name), offset, count)
 	if err != nil {
 		return err
 	}
@@ -697,7 +687,7 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
 	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, len)
 	// get object data
-	objectDataReader, err := cl.getFileObjectData(name, offset, len)
+	objectDataReader, err := cl.getObject(cl.getKey(name), offset, len)
 	if err != nil {
 		return nil, err
 	}
@@ -719,7 +709,7 @@ func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, erro
 func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
 	log.Trace("Client::ReadInBuffer : name %s", name)
 	// get object data
-	objectDataReader, err := cl.getFileObjectData(name, offset, len)
+	objectDataReader, err := cl.getObject(cl.getKey(name), offset, len)
 	if err != nil {
 		return err
 	}
@@ -816,7 +806,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	log.Trace("Client::TruncateFile : Truncating %s to %dB.", name, size)
 
 	// get object data
-	objectDataReader, err := cl.getFileObjectData(name, 0, 0)
+	objectDataReader, err := cl.getObject(cl.getKey(name), 0, 0)
 	if err != nil {
 		return err
 	}
