@@ -240,6 +240,8 @@ func (cl *Client) deleteObjects(keys []string) (result *s3.DeleteObjectsOutput, 
 }
 
 // Wrapper for awsS3Client.HeadObject.
+// HeadObject() acts just like GetObject, except no contents are returned.
+// So this is used to get metadata / attributes for an object.
 // key is the full path to the object (with the prefixPath)
 func (cl *Client) headObject(key string) (*s3.HeadObjectOutput, error) {
 	log.Trace("Client::headObject : object %s", key)
