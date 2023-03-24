@@ -38,6 +38,7 @@ package log
 import (
 	"errors"
 	"fmt"
+	"log"
 	"lyvecloudfuse/common"
 	"os"
 	"path/filepath"
@@ -47,7 +48,9 @@ import (
 )
 
 type SysLogger struct {
-	level common.LogLevel
+	level  common.LogLevel
+	tag    string
+	logger *log.Logger
 }
 
 var NoSyslogService = errors.New("failed to create syslog object")
@@ -90,13 +93,18 @@ func newSysLogger(lvl common.LogLevel, tag string) (*SysLogger, error) {
 
 	l := &SysLogger{
 		level: lvl,
+		tag:   tag,
 	}
 
-	err := l.init()
+	err := l.init() //sets up events..
 	if err != nil {
 		return nil, err
 	}
 	return l, nil
+}
+
+func (l *SysLogger) GetLoggerObj() *log.Logger {
+	return l.logger
 }
 
 func (l *SysLogger) SetLogLevel(level common.LogLevel) {
@@ -121,25 +129,6 @@ func (l *SysLogger) init() error {
 	}
 
 	return nil
-}
-
-// Convert our log levels to standard syslog levels
-func getSyslogLevel(lvl common.LogLevel) string {
-	// By default keep the log level to log warning and match the rest
-	switch lvl {
-	case common.ELogLevel.LOG_CRIT():
-		return "error"
-	case common.ELogLevel.LOG_DEBUG():
-		return "info"
-	case common.ELogLevel.LOG_ERR():
-		return "error"
-	case common.ELogLevel.LOG_INFO():
-		return "info"
-	case common.ELogLevel.LOG_TRACE():
-		return "info"
-	default:
-		return "warning"
-	}
 }
 
 func (l *SysLogger) write(lvl string, format string, args ...interface{}) {
