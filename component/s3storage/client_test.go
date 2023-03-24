@@ -61,7 +61,6 @@ type clientTestSuite struct {
 	awsS3Client *s3.Client // S3 client library supplied by AWS
 	client      *Client
 	config      string
-	bucket      string
 }
 
 func newTestClient(configuration string) (*Client, error) {
@@ -125,14 +124,10 @@ func (s *clientTestSuite) SetupTest() {
 	}
 
 	cfgFile.Close()
-	s.setupTestHelper("", "", true)
+	s.setupTestHelper("", true)
 }
 
-func (s *clientTestSuite) setupTestHelper(configuration string, bucket string, create bool) {
-	if bucket == "" {
-		bucket = generateBucketName()
-	}
-	s.bucket = bucket
+func (s *clientTestSuite) setupTestHelper(configuration string, create bool) {
 	if configuration == "" {
 		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 			storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
@@ -162,7 +157,8 @@ func (s *clientTestSuite) TestNewCredentialKey() {
 }
 func (s *clientTestSuite) TestListBuckets() {
 	// TODO: generalize this test by creating, listing, then destroying a bucket
-	// We need to get permissions to create buckets in Lyve Cloud, or implement this against AWS S3.
+	// 	We need to get permissions to create buckets in Lyve Cloud, or implement this against AWS S3.
+	// 	For now, the bucket parameter has been removed from the test suite for tidiness sake
 	buckets, err := s.client.ListBuckets()
 	s.assert.Nil(err)
 	s.assert.Equal(buckets, []string{"stxe1-srg-lens-lab1"})
