@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -70,13 +70,6 @@ var mountAllCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !disableVersionCheck {
-			err := VersionCheck()
-			if err != nil {
-				return err
-			}
-		}
-
 		mountAllOpts.lyvecloudfuseBinPath = os.Args[0]
 		options.MountPath = args[0]
 		return processCommand()
@@ -144,6 +137,13 @@ func processCommand() error {
 
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger [%s]", err.Error())
+	}
+
+	if !disableVersionCheck {
+		err := VersionCheck()
+		if err != nil {
+			log.Err(err.Error())
+		}
 	}
 
 	config.Set("mount-path", options.MountPath)
@@ -317,8 +317,8 @@ func mountAllContainers(containerList []string, configFile string, mountPath str
 			cliParams[2] = "--config-file=" + contConfigFile
 		} else {
 			cliParams[2] = "--foreground=false"
-			cliParams[3] = "--container-name=" + container
-			cliParams[4] = "--tmp-path=" + filepath.Join(fileCachePath, container)
+			updateCliParams(&cliParams, "container-name", container)
+			updateCliParams(&cliParams, "tmp-path", filepath.Join(fileCachePath, container))
 		}
 
 		// Now that we have mount path and config file for this container fire a mount command for this one
@@ -338,6 +338,16 @@ func mountAllContainers(containerList []string, configFile string, mountPath str
 
 	fmt.Printf("%d of %d containers were successfully mounted\n", (len(containerList) - failCount), len(containerList))
 	return nil
+}
+
+func updateCliParams(cliParams *[]string, key string, val string) {
+	for i := 3; i < len(*cliParams); i++ {
+		if strings.Contains((*cliParams)[i], "--"+key) {
+			(*cliParams)[i] = "--" + key + "=" + val
+			return
+		}
+	}
+	*cliParams = append(*cliParams, "--"+key+"="+val)
 }
 
 func writeConfigFile(contConfigFile string) error {
