@@ -401,7 +401,7 @@ func convertBfCliParameters(flags *pflag.FlagSet) error {
 		//TODO: Change this logging to not be with syslog (this is not really crucial)
 	}
 
-	bfv2LoggingConfigOptions.Type = "base"
+	bfv2LoggingConfigOptions.Type = "syslog"
 	if flags.Lookup("log-level").Changed {
 		bfv2LoggingConfigOptions.LogLevel = bfConfCliOptions.logLevel
 	}
