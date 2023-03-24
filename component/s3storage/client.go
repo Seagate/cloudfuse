@@ -811,6 +811,8 @@ func (cl *Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, err
 // Truncate object to size in bytes.
 // name is the file path.
 func (cl *Client) TruncateFile(name string, size int64) error {
+	log.Trace("Client::TruncateFile : Truncating %s to %dB.", name, size)
+
 	// get object data
 	objectDataReader, err := cl.getFileObjectData(name, 0, 0)
 	if err != nil {
