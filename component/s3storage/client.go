@@ -194,9 +194,10 @@ func (cl *Client) putObject(key string, objectData io.Reader) (*s3.PutObjectOutp
 	log.Trace("Client::putObject : putting object %s", key)
 
 	result, err := cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket: aws.String(cl.Config.authConfig.BucketName),
-		Key:    aws.String(key),
-		Body:   objectData,
+		Bucket:      aws.String(cl.Config.authConfig.BucketName),
+		Key:         aws.String(key),
+		Body:        objectData,
+		ContentType: aws.String(getContentType(key)),
 	})
 
 	return result, err
@@ -830,7 +831,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 		// pad the data with zeros
 		log.Warn("Client::TruncateFile : Padding file %s with zeros to truncate its original size (%dB) UP to %dB.", name, len(objectData), size)
 		oldObjectData := objectData
-		newObjectData := bytes.Repeat([]byte(" "), int(size))
+		newObjectData := make([]byte, size)
 		copy(newObjectData, oldObjectData)
 		objectData = newObjectData
 	}

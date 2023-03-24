@@ -1061,6 +1061,29 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileBigger() {
 	s.assert.EqualValues(testData, output[:len(data)])
 }
 
+func (s *s3StorageTestSuite) TestTruncateEmptyFileBigger() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	truncatedLength := 15
+
+	err := s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
+	s.assert.Nil(err)
+
+	// Object should have updated data
+	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, _ := ioutil.ReadAll(result.Body)
+	s.assert.EqualValues(truncatedLength, len(output))
+	s.assert.EqualValues(make([]byte, truncatedLength), output[:])
+}
+
 func (s *s3StorageTestSuite) TestTruncateChunkedFileBigger() {
 	defer s.cleanupTest()
 	// Setup
