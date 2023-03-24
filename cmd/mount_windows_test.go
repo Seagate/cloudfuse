@@ -76,20 +76,6 @@ health_monitor:
     - blobfuse_stats
 `
 
-var configMountLoopback string = `
-logging:
-  type: silent
-default-working-dir: /tmp/lyvecloudfuse
-components:
-  - libfuse
-  - loopbackfs
-libfuse:
-  attribute-expiration-sec: 120
-  entry-expiration-sec: 60
-loopbackfs:
-  path: /tmp/bfuseloopback
-`
-
 var confFileMntTest string
 
 type mountTestSuite struct {
