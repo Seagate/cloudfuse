@@ -549,16 +549,14 @@ func split(prefixPath string, path string) string {
 		return path
 	}
 
-	paths := strings.Split(path, string(os.PathSeparator))
-	prefixPaths := strings.Split(prefixPath, string(os.PathSeparator))
-	for i := 0; i < len(prefixPaths); i++ {
-		if paths[0] == prefixPaths[i] {
-			paths = paths[1:]
-		} else {
-			break
-		}
+	// remove prefix's trailing slash too
+	prefixPath = internal.ExtendDirName(prefixPath)
+	if strings.HasPrefix(path, prefixPath) {
+		return strings.Replace(path, prefixPath, "", 1)
 	}
-	return filepath.Join(paths...)
+
+	// prefix not found - return the path unaltered
+	return path
 }
 
 func sanitizeSASKey(key string) string {
