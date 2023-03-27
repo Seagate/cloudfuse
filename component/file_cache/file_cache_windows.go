@@ -111,7 +111,7 @@ func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	stat := common.Statfs_t{
 		Blocks:  uint64(maxCacheSize) / uint64(blockSize),
 		Bavail:  uint64(math.Max(0, available)) / uint64(blockSize),
-		Bfree:   free,
+		Bfree:   free / uint64(blockSize),
 		Bsize:   blockSize,
 		Ffree:   1e9,
 		Files:   1e9,
