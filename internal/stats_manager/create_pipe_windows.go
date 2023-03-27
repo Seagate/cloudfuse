@@ -9,6 +9,7 @@ import (
 
 // This currently does not do anything on Windows, this will need to be replaced
 // with named pipes.
+// TODO: Replace with windows named pipes
 func createPipe(pipe string) error {
 	stMgrOpt.pollMtx.Lock()
 	defer stMgrOpt.pollMtx.Unlock()
