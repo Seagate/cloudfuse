@@ -61,6 +61,21 @@ class lyveSettingsWidget(QWidget, Ui_Form):
         return
 
     def writeConfigFile(self):
+        bucket = str(self.lineEdit_bucketName.text())
+        accKey = str(self.lineEdit_accessKey.text())
+        secKey = str(self.lineEdit_secretKey.text())
+        endpoint = str(self.lineEdit_endpoint.text())
+        
+        multiUser = self.checkbox_multiUser.isChecked()
+        nEmptDir = self.checkbox_nonEmptyDir.isChecked()
+        rOnlyMnt = self.checkbox_readOnly.isChecked()
+        foreground = self.checkbox_daemonForeground.isChecked()
+        ignoreAppFlags = self.checkbox_libfuse_ignoreAppend.isChecked()
+        
+        print(bucket, accKey, secKey, endpoint)
+        print(multiUser,nEmptDir,rOnlyMnt,foreground,ignoreAppFlags)
+        
+        
         return
 
     def closeEvent(self, event):
