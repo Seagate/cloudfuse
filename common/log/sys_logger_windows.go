@@ -67,21 +67,27 @@ func newEvent(l *SysLogger, lvl string, msg string) error {
 	wlog, err := eventlog.Open("LyveCloudFuse")
 	appID := os.Getpid() //make this the process id?
 	if l.level >= common.ELogLevel.LOG_DEBUG() {
+		fmt.Println("debug log" + msg)
 		wlog.Info(uint32(appID), msg)
 	}
 	if l.level >= common.ELogLevel.LOG_TRACE() {
+		fmt.Println("trace log" + msg)
 		wlog.Info(uint32(appID), msg)
 	}
 	if l.level >= common.ELogLevel.LOG_INFO() {
+		fmt.Println("info log" + msg)
 		wlog.Info(uint32(appID), msg)
 	}
 	if l.level >= common.ELogLevel.LOG_WARNING() {
+		fmt.Println("warning log" + msg)
 		wlog.Warning(uint32(appID), msg)
 	}
 	if l.level >= common.ELogLevel.LOG_ERR() {
+		fmt.Println("error log" + msg)
 		wlog.Error(uint32(appID), msg)
 	}
 	if l.level >= common.ELogLevel.LOG_CRIT() {
+		fmt.Println("critical log" + msg)
 		wlog.Error(uint32(appID), msg)
 	}
 
