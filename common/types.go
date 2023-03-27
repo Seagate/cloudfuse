@@ -86,6 +86,8 @@ var EnableMonitoring = false
 var BfsDisabled = false
 var TransferPipe = "/tmp/transferPipe"
 var PollingPipe = "/tmp/pollPipe"
+var WindowsTransferPipe = `\\.\pipe\transferPipe`
+var WindowsPollingPipe = `\\.\pipe\pollPipe`
 
 // LogLevel enum
 type LogLevel int
