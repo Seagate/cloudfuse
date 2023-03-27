@@ -634,18 +634,21 @@ func createFileObjAttr(path string, size int64, lastModified time.Time) (attr *i
 }
 
 func createDirObjAttr(path string) (attr *internal.ObjAttr) {
+	// strip any trailing slash
 	path = internal.TruncateDirName(path)
+	// For these dirs we get only the name and no other properties so hardcoding time to current time
+	currentTime := time.Now()
 	attr = &internal.ObjAttr{
-		Path:  path,
-		Name:  filepath.Base(path),
-		Size:  4096,
-		Mode:  os.ModeDir,
-		Mtime: time.Now(),
-		Flags: internal.NewDirBitMap(),
+		Path:   path,
+		Name:   filepath.Base(path),
+		Size:   4096,
+		Mode:   os.ModeDir,
+		Mtime:  currentTime,
+		Atime:  currentTime,
+		Crtime: currentTime,
+		Ctime:  currentTime,
+		Flags:  internal.NewDirBitMap(),
 	}
-	attr.Atime = attr.Mtime
-	attr.Crtime = attr.Mtime
-	attr.Ctime = attr.Mtime
 	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 	attr.Metadata = make(map[string]string)
