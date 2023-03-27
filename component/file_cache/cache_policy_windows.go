@@ -14,18 +14,24 @@ func totalSectors(path string) int64 {
 	// https://devblogs.microsoft.com/oldnewthing/20160427-00/?p=93365
 
 	var totalSectors int64
-	filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() {
 			totalSectors += (info.Size() / sectorSize)
 			if info.Size()%sectorSize != 0 {
-				totalSectors += 1
+				totalSectors++
 			}
 		}
 		return err
 	})
+
+	// TODO: Handle this error properly
+	if err != nil {
+		return totalSectors
+	}
+
 	return totalSectors
 
 }
