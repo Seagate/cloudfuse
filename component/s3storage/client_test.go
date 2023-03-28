@@ -288,7 +288,7 @@ func (s *clientTestSuite) TestReadToFile() {
 	})
 	s.assert.Nil(err)
 
-	f, err := os.CreateTemp("", name+"tmp-") // s3storage_test uses ioutil.TempFile which is deprecated
+	f, err := os.CreateTemp("", name+".tmp") // s3storage_test uses ioutil.TempFile which is deprecated
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 
@@ -326,8 +326,8 @@ func (s *clientTestSuite) TestReadInBuffer() {
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
-	len := 20
-	body := []byte(randomString(len))
+	bodyLen := 20
+	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
@@ -335,10 +335,13 @@ func (s *clientTestSuite) TestReadInBuffer() {
 	})
 	s.assert.Nil(err)
 
-	// TODO: (assert nil errors where needed)
-	// create empty buffer
-	// call read in buffer
-	// made buffer should match given range of generated body
+	outputLen := bodyLen - 5
+	output := make([]byte, outputLen)
+	err = s.client.ReadInBuffer(name, 0, int64(outputLen), output)
+
+	// read in buffer should match first outputLen characters of generated body
+	s.assert.Nil(err)
+	s.assert.EqualValues(body[:outputLen], output)
 }
 func (s *clientTestSuite) TestcalculateBlockSize() {
 }
