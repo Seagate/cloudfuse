@@ -236,6 +236,8 @@ func parseConfig() error {
 	return nil
 }
 
+// We use the cobra library to provide a CLI for Lyve Cloud FUSE.
+// Look at https://cobra.dev/ for more information
 var mountCmd = &cobra.Command{
 	Use:               "mount [path]",
 	Short:             "Mounts the azure container as a filesystem",
