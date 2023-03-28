@@ -136,6 +136,8 @@ func (suite *utilTestSuite) TestExpandPath() {
 		return
 	}
 
+	homeDir = JoinUnixFilepath(homeDir)
+
 	path := "~/a/b/c/d"
 	expandedPath := ExpandPath(path)
 	suite.assert.NotEqual(expandedPath, path)

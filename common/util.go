@@ -267,6 +267,12 @@ func ExpandPath(path string) string {
 			return path
 		}
 		path = JoinUnixFilepath(homeDir, path[2:])
+	} else if strings.HasPrefix(path, "$HOME/") {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		path = JoinUnixFilepath(homeDir, path[6:])
 	}
 
 	return os.ExpandEnv(path)
