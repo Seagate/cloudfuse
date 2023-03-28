@@ -308,12 +308,12 @@ func (cl *Client) CreateLink(source string, target string) error {
 func (cl *Client) DeleteFile(name string) (err error) {
 	log.Trace("Client::DeleteFile : name %s", name)
 	// first check if the object exists
-	_, err = cl.GetAttr(name)
+	_, err = cl.getFileAttr(name)
 	if err == syscall.ENOENT {
 		log.Err("Client::DeleteFile : %s does not exist", name)
 		return syscall.ENOENT
 	} else if err != nil {
-		log.Err("Client::DeleteFile : Failed to GetAttr for object %s. Here's why: %v", name, err)
+		log.Err("Client::DeleteFile : Failed to getFileAttr for object %s. Here's why: %v", name, err)
 		return err
 	}
 	// delete the object
@@ -455,42 +455,79 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 	return nil
 }
 
-// GetAttr : Retrieve object attributes
+// GetAttr : Get attributes for a given file or folder.
+// If name is a file, it should not have a trailing slash.
+// If name is a directory, the trailing slash is optional.
 func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	log.Trace("Client::GetAttr : name %s", name)
 
 	// first let's suppose the caller is looking for a file
 	// there are no objects with trailing slashes (MinIO doesn't support them)
 	// 	and trailing slashes aren't allowed in filenames
-	// so if this was called with a trailing slash, headObject won't work.
+	// so if this was called with a trailing slash, don't look for an object
 	if len(name) > 0 && name[len(name)-1] != '/' {
-		// no trailing slash, so we can use headObject
-		key := cl.getKey(name)
-		result, err := cl.headObject(key)
+		attr, err = cl.getFileAttr(name)
 		if err == nil {
-			// create and return an objAttr
-			attr = createFileObjAttr(name, result.ContentLength, *result.LastModified)
 			return attr, err
 		}
-		// err is not nil, so assume object was not found
-		log.Debug("Client::GetAttr : headObject(%s) failed. Here's why: %v", key, err)
 	}
 
-	// now search for it as a "directory"
-	// to do this, accept anything that comes back from List() called with a trailing slash
+	// ensure a trailing slash
 	dirName := internal.ExtendDirName(name)
+	// now search for that as a directory
+	return cl.getDirectoryAttr(dirName)
+}
+
+// Get attributes for the given file path.
+// Return ENOENT if there is no corresponding object in the bucket.
+// name should not have a trailing slash (nothing will be found!).
+func (cl *Client) getFileAttr(name string) (attr *internal.ObjAttr, err error) {
+	log.Trace("Client::getFileAttr : name %s", name)
+
+	// no trailing slash, so we can use headObject
+	key := cl.getKey(name)
+	result, err := cl.headObject(key)
+	if err == nil {
+		// create and return an objAttr
+		attr = createObjAttr(name, result.ContentLength, *result.LastModified)
+		return attr, err
+	}
+	// err is not nil
+	log.Debug("Client::getFileAttr : headObject(%s) failed. Here's why: %v", key, err)
+	// No such key found so object is not in S3
+	var nsk *types.NoSuchKey
+	if errors.As(err, &nsk) {
+		return nil, syscall.ENOENT
+	}
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		code := apiErr.ErrorCode()
+		if code == "NotFound" {
+			return nil, syscall.ENOENT
+		}
+	}
+
+	// unknown err - we have bigger problems than a non-existent object
+	log.Err("Client::getFileAttr : headObject(%s) failed. Here's why: %v", key, err)
+	return nil, err
+}
+
+func (cl *Client) getDirectoryAttr(dirName string) (attr *internal.ObjAttr, err error) {
+	log.Trace("Client::getDirectoryAttr : name %s", dirName)
+
+	// to do this, accept anything that comes back from List()
 	objects, _, err := cl.List(dirName, nil, 1)
 	if err != nil {
-		log.Err("Client::GetAttr : List(%s) failed. Here's why: %v", dirName, err)
+		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, err)
 		return nil, err
 	} else if len(objects) > 0 {
 		// create and return an objAttr for the directory
-		attr = createDirObjAttr(name)
+		attr = createObjAttrDir(dirName)
 		return attr, nil
 	}
 
-	// object not found as "directory" either
-	log.Err("Client::GetAttr : not found: %s", name)
+	// directory not found in bucket
+	log.Err("Client::getDirectoryAttr : not found: %s", dirName)
 	return nil, syscall.ENOENT
 }
 
@@ -552,7 +589,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		for _, value := range output.Contents {
 			// push object info into the list
 			path := split(cl.Config.prefixPath, *value.Key)
-			attr := createFileObjAttr(path, value.Size, *value.LastModified)
+			attr := createObjAttr(path, value.Size, *value.LastModified)
 			objectAttrList = append(objectAttrList, attr)
 		}
 
@@ -570,17 +607,17 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 					log.Warn("Prefix mismatch with path %v when listing objects in %v.", dir, listPath)
 				}
 				// get an array of intermediate directories
-				intermediatDirectories := strings.Split(intermediatePath, "/")
+				intermediateDirectories := strings.Split(intermediatePath, "/")
 				// walk up the tree and add each one until we find an already existing parent
 				// we have to iterate in descending order
 				suffixToTrim := ""
-				for i := len(intermediatDirectories) - 1; i >= 0; i-- {
+				for i := len(intermediateDirectories) - 1; i >= 0; i-- {
 					// ignore empty strings (split does not ommit them)
-					if intermediatDirectories[i] == "" {
+					if intermediateDirectories[i] == "" {
 						continue
 					}
 					// add to the suffix we're trimming off
-					suffixToTrim = intermediatDirectories[i] + "/" + suffixToTrim
+					suffixToTrim = intermediateDirectories[i] + "/" + suffixToTrim
 					// get the trimmed (parent) directory
 					parentDir := strings.TrimSuffix(dir, suffixToTrim)
 					// have we seen this one already?
@@ -599,7 +636,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 			continue
 		}
 		path := split(cl.Config.prefixPath, dir)
-		attr := createDirObjAttr(path)
+		attr := createObjAttrDir(path)
 		objectAttrList = append(objectAttrList, attr)
 	}
 
@@ -613,7 +650,8 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	return objectAttrList, &newMarker, nil
 }
 
-func createFileObjAttr(path string, size int64, lastModified time.Time) (attr *internal.ObjAttr) {
+// create an object attributes struct
+func createObjAttr(path string, size int64, lastModified time.Time) (attr *internal.ObjAttr) {
 	attr = &internal.ObjAttr{
 		Path:   path,
 		Name:   filepath.Base(path),
@@ -633,26 +671,22 @@ func createFileObjAttr(path string, size int64, lastModified time.Time) (attr *i
 	return attr
 }
 
-func createDirObjAttr(path string) (attr *internal.ObjAttr) {
+// create an object attributes struct for a directory
+func createObjAttrDir(path string) (attr *internal.ObjAttr) {
 	// strip any trailing slash
 	path = internal.TruncateDirName(path)
 	// For these dirs we get only the name and no other properties so hardcoding time to current time
 	currentTime := time.Now()
-	attr = &internal.ObjAttr{
-		Path:   path,
-		Name:   filepath.Base(path),
-		Size:   4096,
-		Mode:   os.ModeDir,
-		Mtime:  currentTime,
-		Atime:  currentTime,
-		Crtime: currentTime,
-		Ctime:  currentTime,
-		Flags:  internal.NewDirBitMap(),
-	}
+
+	attr = createObjAttr(path, 4096, currentTime)
+	// Change the relevant fields for a directory
+	attr.Mode = os.ModeDir
+	// set flags
+	attr.Flags = internal.NewDirBitMap()
 	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
-	attr.Metadata = make(map[string]string)
 	attr.Metadata[folderKey] = "true"
+
 	return attr
 }
 
