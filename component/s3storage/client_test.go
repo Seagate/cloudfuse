@@ -185,6 +185,32 @@ func (s *clientTestSuite) TestCreateDirectory() {
 	s.assert.Nil(err)
 }
 func (s *clientTestSuite) TestCreateLink() {
+	defer s.cleanupTest()
+	// setup
+	target := generateFileName()
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(target),
+	})
+	s.assert.Nil(err)
+	source := generateFileName()
+
+	err = s.client.CreateLink(source, target)
+	s.assert.Nil(err)
+
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(source),
+	})
+	s.assert.Nil(err)
+
+	// object body should match target file name
+	defer result.Body.Close()
+	output, err := ioutil.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(target, output)
+
+	// TODO : test metadata
 }
 func (s *clientTestSuite) TestDeleteFile() {
 	defer s.cleanupTest()
@@ -250,28 +276,80 @@ func (s *clientTestSuite) TestGetAttr() {
 func (s *clientTestSuite) TestList() {
 }
 func (s *clientTestSuite) TestReadToFile() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	bodyLen := 20
+	body := []byte(randomString(bodyLen))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	f, err := os.CreateTemp("", name+"tmp-") // s3storage_test uses ioutil.TempFile which is deprecated
+	s.assert.Nil(err)
+	defer os.Remove(f.Name())
+
+	err = s.client.ReadToFile(name, 0, int64(bodyLen), f)
+	s.assert.Nil(err)
+
+	output := make([]byte, bodyLen)
+	f, _ = os.Open(f.Name())
+	outputLen, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(bodyLen, outputLen)
+	s.assert.EqualValues(body, output)
+	f.Close()
 }
 func (s *clientTestSuite) TestReadBuffer() {
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
-	body := bytes.NewReader([]byte(randomString(20)))
+	len := 20
+	body := []byte(randomString(len))
 	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
-		Body:   body,
+		Body:   bytes.NewReader(body),
 	})
 	s.assert.Nil(err)
 
-	// TODO:
-	// Call read buffer
-	// Check result matches generated body
+	result, err := s.client.ReadBuffer(name, 0, int64(len))
+
+	// result should match generated body
+	s.assert.Nil(err)
+	s.assert.EqualValues(body, result)
 }
 func (s *clientTestSuite) TestReadInBuffer() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	len := 20
+	body := []byte(randomString(len))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	// TODO: (assert nil errors where needed)
+	// create empty buffer
+	// call read in buffer
+	// made buffer should match given range of generated body
 }
 func (s *clientTestSuite) TestcalculateBlockSize() {
 }
 func (s *clientTestSuite) TestWriteFromFile() {
+	// TODO: (assert nil errors where needed)
+	// generate file name and body
+	// create local temp file with body - ioutil.TempFile
+	// call write from file
+	// get object
+	// object body should match generated body
+	// close temp file
 }
 func (s *clientTestSuite) TestWriteFromBuffer() {
 	defer s.cleanupTest()
@@ -282,10 +360,17 @@ func (s *clientTestSuite) TestWriteFromBuffer() {
 	err := s.client.WriteFromBuffer(name, nil, body)
 	s.assert.Nil(err)
 
-	// TODO:
-	// Get object from bucket
-	// Assert error nil
-	// Check body matches generated buffer
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
+
+	// object body should match generated body
+	defer result.Body.Close()
+	output, err := ioutil.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(body, output)
 }
 func (s *clientTestSuite) TestGetFileBlockOffsets() {
 }
