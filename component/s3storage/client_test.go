@@ -160,6 +160,7 @@ func (s *clientTestSuite) TestListBuckets() {
 	s.assert.Equal(buckets, []string{"stxe1-srg-lens-lab1"})
 }
 func (s *clientTestSuite) TestSetPrefixPath() {
+	// implemented in client.go
 }
 func (s *clientTestSuite) TestCreateFile() {
 	defer s.cleanupTest()
@@ -272,8 +273,10 @@ func (s *clientTestSuite) TestgetAttrUsingRest() {
 func (s *clientTestSuite) TestgetAttrUsingList() {
 }
 func (s *clientTestSuite) TestGetAttr() {
+	// implemented in client.go
 }
 func (s *clientTestSuite) TestList() {
+	// implemented in client.go
 }
 func (s *clientTestSuite) TestReadToFile() {
 	defer s.cleanupTest()
@@ -346,19 +349,40 @@ func (s *clientTestSuite) TestReadInBuffer() {
 func (s *clientTestSuite) TestcalculateBlockSize() {
 }
 func (s *clientTestSuite) TestWriteFromFile() {
-	// TODO: (assert nil errors where needed)
-	// generate file name and body
-	// create local temp file with body - ioutil.TempFile
-	// call write from file
-	// get object
-	// object body should match generated body
-	// close temp file
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	bodyLen := 20
+	body := []byte(randomString(bodyLen))
+	f, err := os.CreateTemp("", name+".tmp") // s3storage_test uses ioutil.TempFile which is deprecated
+	s.assert.Nil(err)
+	defer os.Remove(f.Name())
+	outputLen, err := f.Write(body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(bodyLen, outputLen)
+
+	err = s.client.WriteFromFile(name, nil, f)
+	s.assert.Nil(err)
+	f.Close()
+
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
+
+	// object body should match generated body written to file
+	defer result.Body.Close()
+	output, err := ioutil.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(body, output)
 }
 func (s *clientTestSuite) TestWriteFromBuffer() {
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
-	body := []byte(randomString(20))
+	bodyLen := 20
+	body := []byte(randomString(bodyLen))
 
 	err := s.client.WriteFromBuffer(name, nil, body)
 	s.assert.Nil(err)
@@ -386,6 +410,7 @@ func (s *clientTestSuite) TestremoveBlocks() {
 func (s *clientTestSuite) TestTruncateFile() {
 }
 func (s *clientTestSuite) TestWrite() {
+	// implemented in client.go
 }
 func (s *clientTestSuite) TeststageAndCommitModifiedBlocks() {
 }
