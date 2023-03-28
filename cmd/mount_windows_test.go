@@ -41,7 +41,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"lyvecloudfuse/common"
@@ -75,20 +74,6 @@ health_monitor:
   monitor-disable-list:
     - network_profiler
     - blobfuse_stats
-`
-
-var configMountLoopback string = `
-logging:
-  type: silent
-default-working-dir: /tmp/lyvecloudfuse
-components:
-  - libfuse
-  - loopbackfs
-libfuse:
-  attribute-expiration-sec: 120
-  entry-expiration-sec: 60
-loopbackfs:
-  path: /tmp/bfuseloopback
 `
 
 var confFileMntTest string
@@ -187,22 +172,12 @@ func (suite *mountTestSuite) TestConfigFileNotFound() {
 	op, err := executeCommandC(rootCmd, "mount", mntDir, "--config-file=cfgNotFound.yaml")
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "invalid config file")
-	// The error message is different on Windows, so need to test with cases
-	if runtime.GOOS == "windows" {
-		suite.assert.Contains(op, "cannot find the file specified")
-	} else {
-		suite.assert.Contains(op, "no such file or directory")
-	}
+	suite.assert.Contains(op, "cannot find the file specified")
 
 	op, err = executeCommandC(rootCmd, "mount", "all", mntDir, "--config-file=cfgNotFound.yaml")
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "invalid config file")
-	// The error message is different on Windows, so need to test with cases
-	if runtime.GOOS == "windows" {
-		suite.assert.Contains(op, "cannot find the file specified")
-	} else {
-		suite.assert.Contains(op, "no such file or directory")
-	}
+	suite.assert.Contains(op, "cannot find the file specified")
 }
 
 // mount failure test where config file is not provided
@@ -366,6 +341,110 @@ func (suite *mountTestSuite) TestInvalidUmaskValue() {
 		"-o ro", "-o allow_root", "-o default_permissions", "-o umask=abcd")
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "failed to parse umask")
+}
+
+// fuse option parsing validation
+func (suite *mountTestSuite) TestFuseOptions() {
+	defer suite.cleanupTest()
+
+	type fuseOpt struct {
+		opt    string
+		ignore bool
+	}
+
+	opts := []fuseOpt{
+		{opt: "rw", ignore: true},
+		{opt: "dev", ignore: true},
+		{opt: "dev", ignore: true},
+		{opt: "nodev", ignore: true},
+		{opt: "suid", ignore: true},
+		{opt: "nosuid", ignore: true},
+		{opt: "delay_connect", ignore: true},
+		{opt: "uid=1000", ignore: true},
+		{opt: "gid=1000", ignore: true},
+		{opt: "auto", ignore: true},
+		{opt: "noauto", ignore: true},
+		{opt: "user", ignore: true},
+		{opt: "nouser", ignore: true},
+		{opt: "exec", ignore: true},
+		{opt: "noexec", ignore: true},
+
+		{opt: "allow_other", ignore: false},
+		{opt: "allow_other=true", ignore: false},
+		{opt: "allow_other=false", ignore: false},
+		{opt: "nonempty", ignore: false},
+		{opt: "attr_timeout=10", ignore: false},
+		{opt: "entry_timeout=10", ignore: false},
+		{opt: "negative_timeout=10", ignore: false},
+		{opt: "ro", ignore: false},
+		{opt: "allow_root", ignore: false},
+		{opt: "umask=777", ignore: false},
+	}
+
+	for _, val := range opts {
+		ret := ignoreFuseOptions(val.opt)
+		suite.assert.Equal(ret, val.ignore)
+	}
+}
+
+func (suite *mountTestSuite) TestUpdateCliParams() {
+	defer suite.cleanupTest()
+
+	cliParams := []string{"lyvecloudfuse", "mount", "~/mntdir/", "--foreground=false"}
+
+	updateCliParams(&cliParams, "tmp-path", "tmpPath1")
+	suite.assert.Equal(len(cliParams), 5)
+	suite.assert.Equal(cliParams[4], "--tmp-path=tmpPath1")
+
+	updateCliParams(&cliParams, "container-name", "testCnt1")
+	suite.assert.Equal(len(cliParams), 6)
+	suite.assert.Equal(cliParams[5], "--container-name=testCnt1")
+
+	updateCliParams(&cliParams, "tmp-path", "tmpPath2")
+	updateCliParams(&cliParams, "container-name", "testCnt2")
+	suite.assert.Equal(len(cliParams), 6)
+	suite.assert.Equal(cliParams[4], "--tmp-path=tmpPath2")
+	suite.assert.Equal(cliParams[5], "--container-name=testCnt2")
+}
+
+func (suite *mountTestSuite) TestMountOptionVaildate() {
+	defer suite.cleanupTest()
+	opts := &mountOptions{}
+
+	err := opts.validate(true)
+	suite.assert.NotNil(err)
+	suite.assert.Contains(err.Error(), "mount path not provided")
+
+	// Mount directory must not already exist for Windows
+	opts.MountPath = filepath.Join("tmp", "mntdir")
+	defer os.RemoveAll(opts.MountPath)
+
+	err = opts.validate(true)
+	suite.assert.NotNil(err)
+	suite.assert.Contains(err.Error(), "invalid log level")
+
+	opts.Logging.LogLevel = "log_junk"
+	err = opts.validate(true)
+	suite.assert.NotNil(err)
+	suite.assert.Contains(err.Error(), "invalid log level")
+
+	opts.Logging.LogLevel = "log_debug"
+	err = opts.validate(true)
+	suite.assert.Nil(err)
+	suite.assert.Empty(opts.Logging.LogFilePath)
+
+	opts.DefaultWorkingDir, _ = os.UserHomeDir()
+	err = opts.validate(true)
+	suite.assert.Nil(err)
+	suite.assert.Empty(opts.Logging.LogFilePath)
+	suite.assert.Equal(common.DefaultWorkDir, opts.DefaultWorkingDir)
+
+	opts.Logging.LogFilePath = common.DefaultLogFilePath
+	err = opts.validate(true)
+	suite.assert.Nil(err)
+	suite.assert.Contains(opts.Logging.LogFilePath, opts.DefaultWorkingDir)
+	suite.assert.Equal(common.DefaultWorkDir, opts.DefaultWorkingDir)
+	suite.assert.Equal(common.DefaultLogFilePath, opts.Logging.LogFilePath)
 }
 
 func TestMountCommand(t *testing.T) {

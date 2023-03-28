@@ -17,7 +17,7 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 	dmnCtx := &daemon.Context{
 		PidFileName: pidFileName,
 		PidFilePerm: 0644,
-		Umask:       027,
+		Umask:       022,
 	}
 
 	daemon.SetSigHandler(sigusrHandler(pipeline, ctx), syscall.SIGUSR1, syscall.SIGUSR2)

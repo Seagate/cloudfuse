@@ -51,9 +51,9 @@ func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 
 		stat.Bsize = blockSize
 		stat.Frsize = blockSize
-		stat.Blocks = free / blockSize
+		stat.Blocks = total / blockSize
 		stat.Bavail = avail / blockSize
-		stat.Bfree = free
+		stat.Bfree = free / blockSize
 		stat.Files = 1e9
 		stat.Ffree = 1e9
 		stat.Namemax = 255
