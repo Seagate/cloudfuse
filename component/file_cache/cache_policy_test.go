@@ -73,6 +73,20 @@ func (suite *cachePolicyTestSuite) TestGetUsage() {
 	suite.assert.Equal(float64(1), math.Floor(result))
 }
 
+// We should return the sector size used. Here there should be two sectors used
+func (suite *cachePolicyTestSuite) TestGetUsageSizeOnDisk() {
+	defer suite.cleanupTest()
+	f, _ := os.Create(cache_path + "/test")
+	data := make([]byte, 4097)
+	f.Write(data)
+	result := getUsage(cache_path)
+
+	// Linux du overestimates the number of sectors used by 1 sometimes
+	// So check that we aren't more or less than 1 sector size off.
+	suite.assert.GreaterOrEqual(result, 2.0*sectorSize/MB)
+	suite.assert.LessOrEqual(result, 3.0*sectorSize/MB)
+}
+
 func (suite *cachePolicyTestSuite) TestGetUsagePercentage() {
 	defer suite.cleanupTest()
 	f, _ := os.Create(cache_path + "/test")

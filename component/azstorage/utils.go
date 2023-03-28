@@ -554,11 +554,12 @@ func split(prefixPath string, path string) string {
 		return path
 	}
 
-	paths := strings.Split(path, string(os.PathSeparator))
+	// Split based on the unix path style in all cases
+	paths := strings.Split(path, "/")
 	if paths[0] == prefixPath {
 		paths = paths[1:]
 	}
-	return filepath.Join(paths...)
+	return common.JoinUnixFilepath(paths...)
 }
 
 func sanitizeSASKey(key string) string {

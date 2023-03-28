@@ -942,7 +942,11 @@ func (suite *generateConfigTestSuite) TestEnvVarAccountName() {
 	suite.assert.Nil(err)
 }
 
-func (suite *generateConfigTestSuite) TestEnvVarAccountNameError() {
+// This test must run first. Tests in testify run in alphabetical order
+// so the current name means that this runs after. There seems to be an issue around unsetting
+// environment issues in Windows that is causing this issue and this is the only way to seem to
+// avoid it on Windows without a serious investigation.
+func (suite *generateConfigTestSuite) TestAEnvVarAccountNameError() {
 	defer suite.cleanupTest()
 	name := generateFileName()
 	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")

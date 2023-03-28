@@ -39,6 +39,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"runtime"
 	"time"
 
 	"lyvecloudfuse/common"
@@ -105,6 +106,16 @@ func (lf *Libfuse) initFuse() error {
 		lf.entryExpiration,
 		lf.attributeExpiration,
 		lf.negativeTimeout)
+
+	// With WinFSP this will present all files as owned by the current user and group
+	if runtime.GOOS == "windows" {
+		options = fmt.Sprintf("uid=%d,gid=%d,entry_timeout=%d,attr_timeout=%d,negative_timeout=%d",
+			-1,
+			-1,
+			lf.entryExpiration,
+			lf.attributeExpiration,
+			lf.negativeTimeout)
+	}
 
 	// While reading a file let kernel do readahed for better perf
 	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)

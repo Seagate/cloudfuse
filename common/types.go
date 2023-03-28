@@ -37,7 +37,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"os"
-	"path/filepath"
 	"reflect"
 	"sync"
 	"time"
@@ -80,8 +79,8 @@ func LyvecloudfuseVersion_() string {
 }
 
 var DefaultWorkDir = "$HOME/.lyvecloudfuse"
-var DefaultLogFilePath = filepath.Join(DefaultWorkDir, "lyvecloudfuse.log")
-var StatsConfigFilePath = filepath.Join(DefaultWorkDir, "stats_monitor.cfg")
+var DefaultLogFilePath = JoinUnixFilepath(DefaultWorkDir, "lyvecloudfuse.log")
+var StatsConfigFilePath = JoinUnixFilepath(DefaultWorkDir, "stats_monitor.cfg")
 
 var EnableMonitoring = false
 var BfsDisabled = false

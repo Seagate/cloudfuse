@@ -39,7 +39,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log/syslog"
 	"os"
 	"strconv"
 	"strings"
@@ -398,8 +397,9 @@ func convertBfConfigParameter(flags *pflag.FlagSet, configParameterKey string, c
 func convertBfCliParameters(flags *pflag.FlagSet) error {
 	if flags.Lookup("set-content-type").Changed || flags.Lookup("ca-cert-file").Changed || flags.Lookup("basic-remount-check").Changed || flags.Lookup(
 		"background-download").Changed || flags.Lookup("cache-poll-timeout-msec").Changed || flags.Lookup("upload-modified-only").Changed || flags.Lookup("debug-libcurl").Changed {
-		logWriter, _ := syslog.New(syslog.LOG_WARNING, "")
-		_ = logWriter.Warning("one or more unsupported v1 parameters [set-content-type, ca-cert-file, basic-remount-check, background-download, cache-poll-timeout-msec, upload-modified-only, debug-libcurl] have been passed, ignoring and proceeding to mount")
+		//logWriter, _ := syslog.New(syslog.LOG_WARNING, "")
+		//_ = logWriter.Warning("one or more unsupported v1 parameters [set-content-type, ca-cert-file, basic-remount-check, background-download, cache-poll-timeout-msec, upload-modified-only, debug-libcurl] have been passed, ignoring and proceeding to mount")
+		//TODO: Change this logging to not be with syslog (this is not really crucial)
 	}
 
 	bfv2LoggingConfigOptions.Type = "syslog"

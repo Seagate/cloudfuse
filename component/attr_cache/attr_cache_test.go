@@ -138,17 +138,18 @@ func assertUntouched(suite *attrCacheTestSuite, path string) {
 //
 // ac
 func generateNestedDirectory(path string) (*list.List, *list.List, *list.List) {
-	aPaths := list.New()
-	aPaths.PushBack(internal.TruncateDirName(path))
+	path = internal.TruncateDirName(path)
 
-	aPaths.PushBack(filepath.Join(path, "c1"))
-	aPaths.PushBack(filepath.Join(path, "c2"))
-	aPaths.PushBack(filepath.Join(filepath.Join(path, "c1"), "gc1"))
+	aPaths := list.New()
+	aPaths.PushBack(path)
+
+	aPaths.PushBack(path + "/c1")
+	aPaths.PushBack(path + "/c2")
+	aPaths.PushBack(path + "/c1" + "/gc1")
 
 	abPaths := list.New()
-	path = internal.TruncateDirName(path)
 	abPaths.PushBack(path + "b")
-	abPaths.PushBack(filepath.Join(path+"b", "c1"))
+	abPaths.PushBack(path + "b" + "/c1")
 
 	acPaths := list.New()
 	acPaths.PushBack(path + "c")
