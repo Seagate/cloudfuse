@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -40,7 +40,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"lyvecloudfuse/common"
@@ -367,24 +366,6 @@ func statsPolling() {
 		}
 		stMgrOpt.statsMtx.Unlock()
 	}
-}
-
-func createPipe(pipe string) error {
-	stMgrOpt.pollMtx.Lock()
-	defer stMgrOpt.pollMtx.Unlock()
-
-	_, err := os.Stat(pipe)
-	if os.IsNotExist(err) {
-		err = syscall.Mkfifo(pipe, 0666)
-		if err != nil {
-			log.Err("stats_manager::createPipe : unable to create pipe %v [%v]", pipe, err)
-			return err
-		}
-	} else if err != nil {
-		log.Err("stats_manager::createPipe : [%v]", err)
-		return err
-	}
-	return nil
 }
 
 func disableMonitoring() {

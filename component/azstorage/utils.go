@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -554,11 +554,12 @@ func split(prefixPath string, path string) string {
 		return path
 	}
 
-	paths := strings.Split(path, string(os.PathSeparator))
+	// Split based on the unix path style in all cases
+	paths := strings.Split(path, "/")
 	if paths[0] == prefixPath {
 		paths = paths[1:]
 	}
-	return filepath.Join(paths...)
+	return common.JoinUnixFilepath(paths...)
 }
 
 func sanitizeSASKey(key string) string {

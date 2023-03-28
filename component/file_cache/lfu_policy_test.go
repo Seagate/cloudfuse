@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -37,7 +37,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -54,7 +53,7 @@ type lfuPolicyTestSuite struct {
 	policy *lfuPolicy
 }
 
-var cache_path = filepath.Join(home_dir, "file_cache")
+var cache_path = common.JoinUnixFilepath(home_dir, "file_cache")
 
 func (suite *lfuPolicyTestSuite) SetupTest() {
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
@@ -132,10 +131,12 @@ func (suite *lfuPolicyTestSuite) TestCacheValidNew() {
 
 func (suite *lfuPolicyTestSuite) TestClearItemFromCache() {
 	defer suite.cleanupTest()
-	f, _ := os.Create(cache_path + "/test")
+	f, err := os.Create(cache_path + "/test")
+	f.Close()
+	suite.assert.Nil(err)
 	suite.policy.clearItemFromCache(f.Name())
-	_, attr := os.Stat(f.Name())
-	suite.assert.NotEqual(nil, attr.Error())
+	_, err = os.Stat(f.Name())
+	suite.assert.NotEqual(nil, err)
 }
 
 func (suite *lfuPolicyTestSuite) TestCacheValidExisting() {

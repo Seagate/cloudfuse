@@ -1,5 +1,3 @@
-su root syslog
-
 /var/log/lyvecloudfuse.log 
 /var/log/bfusemon.log
 /var/log/lyvecloudfuse-rest.log {

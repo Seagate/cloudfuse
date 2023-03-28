@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -48,7 +48,6 @@ import (
 	"runtime/pprof"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/config"
@@ -99,20 +98,57 @@ func (opt *mountOptions) validate(skipEmptyMount bool) error {
 		return fmt.Errorf("mount path not provided")
 	}
 
-	if _, err := os.Stat(opt.MountPath); os.IsNotExist(err) {
-		return fmt.Errorf("mount directory does not exists")
-	} else if common.IsDirectoryMounted(opt.MountPath) {
+	// Windows requires that the mount directory does not exist while
+	// linux requires that the directory does exist. So we skip these
+	// checks if
+	if runtime.GOOS == "windows" {
+		_, err := os.Stat(opt.MountPath)
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("mount directory already exists")
+		}
+	} else {
+		if _, err := os.Stat(opt.MountPath); os.IsNotExist(err) {
+			return fmt.Errorf("mount directory does not exists")
+		} else if !skipEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
+			return fmt.Errorf("mount directory is not empty")
+		}
+	}
+
+	if common.IsDirectoryMounted(opt.MountPath) {
 		return fmt.Errorf("directory is already mounted")
-	} else if !skipEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
-		return fmt.Errorf("mount directory is not empty")
 	}
 
 	if err := common.ELogLevel.Parse(opt.Logging.LogLevel); err != nil {
 		return fmt.Errorf("invalid log level [%s]", err.Error())
 	}
-	opt.Logging.LogFilePath = os.ExpandEnv(opt.Logging.LogFilePath)
+
+	if opt.DefaultWorkingDir != "" {
+		common.DefaultWorkDir = opt.DefaultWorkingDir
+
+		if opt.Logging.LogFilePath == common.DefaultLogFilePath {
+			// If default-working-dir is set then default log path shall be set to that path
+			// Ignore if specific log-path is provided by user
+			opt.Logging.LogFilePath = filepath.Join(common.DefaultWorkDir, "blobfuse2.log")
+		}
+
+		common.DefaultLogFilePath = filepath.Join(common.DefaultWorkDir, "blobfuse2.log")
+	}
+
+	f, err := os.Stat(common.ExpandPath(common.DefaultWorkDir))
+	if err == nil && !f.IsDir() {
+		return fmt.Errorf("default work dir '%s' is not a directory", common.DefaultWorkDir)
+	}
+
+	if err != nil && os.IsNotExist(err) {
+		// create the default work dir
+		if err = os.MkdirAll(common.ExpandPath(common.DefaultWorkDir), 0777); err != nil {
+			return fmt.Errorf("failed to create default work dir [%s]", err.Error())
+		}
+	}
+
+	opt.Logging.LogFilePath = common.ExpandPath(opt.Logging.LogFilePath)
 	if !common.DirectoryExists(filepath.Dir(opt.Logging.LogFilePath)) {
-		err := os.MkdirAll(filepath.Dir(opt.Logging.LogFilePath), os.FileMode(0666)|os.ModeDir)
+		err := os.MkdirAll(filepath.Dir(opt.Logging.LogFilePath), os.FileMode(0776)|os.ModeDir)
 		if err != nil {
 			return fmt.Errorf("invalid log file path [%s]", err.Error())
 		}
@@ -125,11 +161,6 @@ func (opt *mountOptions) validate(skipEmptyMount bool) error {
 
 	if opt.Logging.LogFileCount == 0 {
 		opt.Logging.LogFileCount = common.DefaultLogFileCount
-	}
-
-	if opt.DefaultWorkingDir != "" {
-		common.DefaultWorkDir = opt.DefaultWorkingDir
-		common.DefaultLogFilePath = filepath.Join(common.DefaultWorkDir, "lyvecloudfuse.log")
 	}
 
 	return nil
@@ -150,7 +181,7 @@ func OnConfigChange() {
 
 	err = log.SetConfig(common.LogConfig{
 		Level:       logLevel,
-		FilePath:    os.ExpandEnv(newLogOptions.LogFilePath),
+		FilePath:    common.ExpandPath(newLogOptions.LogFilePath),
 		MaxFileSize: newLogOptions.MaxLogFileSize,
 		FileCount:   newLogOptions.LogFileCount,
 		TimeTracker: newLogOptions.TimeTracker,
@@ -205,6 +236,8 @@ func parseConfig() error {
 	return nil
 }
 
+// We use the cobra library to provide a CLI for Lyve Cloud FUSE.
+// Look at https://cobra.dev/ for more information
 var mountCmd = &cobra.Command{
 	Use:               "mount [path]",
 	Short:             "Mounts the azure container as a filesystem",
@@ -213,13 +246,6 @@ var mountCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, args []string) error {
-		if !disableVersionCheck {
-			err := VersionCheck()
-			if err != nil {
-				return err
-			}
-		}
-
 		options.MountPath = common.ExpandPath(args[0])
 		configFileExists := true
 
@@ -337,6 +363,13 @@ var mountCmd = &cobra.Command{
 			return fmt.Errorf("failed to initialize logger [%s]", err.Error())
 		}
 
+		if !disableVersionCheck {
+			err := VersionCheck()
+			if err != nil {
+				log.Err(err.Error())
+			}
+		}
+
 		if config.IsSet("invalidate-on-sync") {
 			log.Warn("mount: unsupported v1 CLI parameter: invalidate-on-sync is always true in lyvecloudfuse.")
 		}
@@ -363,24 +396,29 @@ var mountCmd = &cobra.Command{
 
 		log.Crit("Starting Lyvecloudfuse Mount : %s on [%s]", common.LyvecloudfuseVersion, common.GetCurrentDistro())
 		log.Crit("Logging level set to : %s", logLevel.String())
-		pipeline, err = internal.NewPipeline(options.Components, !daemon.WasReborn())
+
+		// If on Linux start with the go deamon
+		// If on Windows, don't use the daemon since it is not supported
+		// TODO: Enable running as a service on Windows
+		if runtime.GOOS == "windows" {
+			pipeline, err = internal.NewPipeline(options.Components, true)
+		} else {
+			pipeline, err = internal.NewPipeline(options.Components, !daemon.WasReborn())
+		}
 		if err != nil {
 			log.Err("mount : failed to initialize new pipeline [%v]", err)
 			return Destroy(fmt.Sprintf("failed to initialize new pipeline [%s]", err.Error()))
 		}
 
 		log.Info("mount: Mounting lyvecloudfuse on %s", options.MountPath)
-		if !options.Foreground {
+		// Prevent mounting in background on Windows
+		// TODO: Enable background support using windows services
+		if !options.Foreground && runtime.GOOS != "windows" {
 			pidFile := strings.Replace(options.MountPath, "/", "_", -1) + ".pid"
 			pidFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), pidFile)
-			dmnCtx := &daemon.Context{
-				PidFileName: pidFileName,
-				PidFilePerm: 0644,
-				Umask:       027,
-			}
-
 			ctx, _ := context.WithCancel(context.Background()) //nolint
-			daemon.SetSigHandler(sigusrHandler(pipeline, ctx), syscall.SIGUSR1, syscall.SIGUSR2)
+
+			dmnCtx := createDaemon(pipeline, ctx, pidFileName, 0644, 027)
 			child, err := dmnCtx.Reborn()
 			if err != nil {
 				log.Err("mount : failed to daemonize application [%v]", err)
@@ -442,7 +480,8 @@ var mountCmd = &cobra.Command{
 
 func ignoreFuseOptions(opt string) bool {
 	for _, o := range common.FuseIgnoredFlags() {
-		if o == opt {
+		// Flags like uid and gid come with value so exact string match is not correct in that case.
+		if strings.HasPrefix(opt, o) {
 			return true
 		}
 	}
@@ -485,20 +524,6 @@ func startMonitor(pid int) {
 			common.EnableMonitoring = false
 			log.Err("Mount::startMonitor : [%s]", err.Error())
 		}
-	}
-}
-
-func sigusrHandler(pipeline *internal.Pipeline, ctx context.Context) daemon.SignalHandlerFunc {
-	return func(sig os.Signal) error {
-		log.Crit("Mount::sigusrHandler : Signal %d received", sig)
-
-		var err error
-		if sig == syscall.SIGUSR1 {
-			log.Crit("Mount::sigusrHandler : SIGUSR1 received")
-			config.OnConfigChange()
-		}
-
-		return err
 	}
 }
 
@@ -563,7 +588,7 @@ func init() {
 	mountCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
 		"Key to decrypt config file. Can also be specified by env-variable LYVECLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\nKey length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 
-	mountCmd.PersistentFlags().String("log-type", "syslog", "Type of logger to be used by the system. Set to syslog by default. Allowed values are silent|syslog|base.")
+	mountCmd.PersistentFlags().String("log-type", "syslog", "Type of logger to be used by the system. Set to syslog by default on Linux and base on Windows. Allowed values are silent|syslog|base. Syslog is not supported on Windows.")
 	config.BindPFlag("logging.type", mountCmd.PersistentFlags().Lookup("log-type"))
 	_ = mountCmd.RegisterFlagCompletionFunc("log-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"silent", "base", "syslog"}, cobra.ShellCompDirectiveNoFileComp
@@ -581,7 +606,7 @@ func init() {
 	config.BindPFlag("logging.file-path", mountCmd.PersistentFlags().Lookup("log-file-path"))
 	_ = mountCmd.MarkPersistentFlagDirname("log-file-path")
 
-	mountCmd.PersistentFlags().Bool("foreground", false, "Mount the system in foreground mode. Default value false.")
+	mountCmd.PersistentFlags().Bool("foreground", false, "Mount the system in foreground mode. Default value false. (Ignored on Windows)")
 	config.BindPFlag("foreground", mountCmd.PersistentFlags().Lookup("foreground"))
 
 	mountCmd.PersistentFlags().Bool("read-only", false, "Mount the system in read only mode. Default value false.")

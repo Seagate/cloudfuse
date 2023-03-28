@@ -11,7 +11,7 @@ package libfuse
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -39,6 +39,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"runtime"
 	"time"
 
 	"lyvecloudfuse/common"
@@ -105,6 +106,16 @@ func (lf *Libfuse) initFuse() error {
 		lf.entryExpiration,
 		lf.attributeExpiration,
 		lf.negativeTimeout)
+
+	// With WinFSP this will present all files as owned by the current user and group
+	if runtime.GOOS == "windows" {
+		options = fmt.Sprintf("uid=%d,gid=%d,entry_timeout=%d,attr_timeout=%d,negative_timeout=%d",
+			-1,
+			-1,
+			lf.entryExpiration,
+			lf.attributeExpiration,
+			lf.negativeTimeout)
+	}
 
 	// While reading a file let kernel do readahed for better perf
 	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)
