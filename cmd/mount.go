@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -121,9 +121,34 @@ func (opt *mountOptions) validate(skipEmptyMount bool) error {
 	if err := common.ELogLevel.Parse(opt.Logging.LogLevel); err != nil {
 		return fmt.Errorf("invalid log level [%s]", err.Error())
 	}
-	opt.Logging.LogFilePath = os.ExpandEnv(opt.Logging.LogFilePath)
+
+	if opt.DefaultWorkingDir != "" {
+		common.DefaultWorkDir = opt.DefaultWorkingDir
+
+		if opt.Logging.LogFilePath == common.DefaultLogFilePath {
+			// If default-working-dir is set then default log path shall be set to that path
+			// Ignore if specific log-path is provided by user
+			opt.Logging.LogFilePath = filepath.Join(common.DefaultWorkDir, "blobfuse2.log")
+		}
+
+		common.DefaultLogFilePath = filepath.Join(common.DefaultWorkDir, "blobfuse2.log")
+	}
+
+	f, err := os.Stat(common.ExpandPath(common.DefaultWorkDir))
+	if err == nil && !f.IsDir() {
+		return fmt.Errorf("default work dir '%s' is not a directory", common.DefaultWorkDir)
+	}
+
+	if err != nil && os.IsNotExist(err) {
+		// create the default work dir
+		if err = os.MkdirAll(common.ExpandPath(common.DefaultWorkDir), 0777); err != nil {
+			return fmt.Errorf("failed to create default work dir [%s]", err.Error())
+		}
+	}
+
+	opt.Logging.LogFilePath = common.ExpandPath(opt.Logging.LogFilePath)
 	if !common.DirectoryExists(filepath.Dir(opt.Logging.LogFilePath)) {
-		err := os.MkdirAll(filepath.Dir(opt.Logging.LogFilePath), os.FileMode(0666)|os.ModeDir)
+		err := os.MkdirAll(filepath.Dir(opt.Logging.LogFilePath), os.FileMode(0776)|os.ModeDir)
 		if err != nil {
 			return fmt.Errorf("invalid log file path [%s]", err.Error())
 		}
@@ -136,11 +161,6 @@ func (opt *mountOptions) validate(skipEmptyMount bool) error {
 
 	if opt.Logging.LogFileCount == 0 {
 		opt.Logging.LogFileCount = common.DefaultLogFileCount
-	}
-
-	if opt.DefaultWorkingDir != "" {
-		common.DefaultWorkDir = opt.DefaultWorkingDir
-		common.DefaultLogFilePath = filepath.Join(common.DefaultWorkDir, "lyvecloudfuse.log")
 	}
 
 	return nil
@@ -161,7 +181,7 @@ func OnConfigChange() {
 
 	err = log.SetConfig(common.LogConfig{
 		Level:       logLevel,
-		FilePath:    os.ExpandEnv(newLogOptions.LogFilePath),
+		FilePath:    common.ExpandPath(newLogOptions.LogFilePath),
 		MaxFileSize: newLogOptions.MaxLogFileSize,
 		FileCount:   newLogOptions.LogFileCount,
 		TimeTracker: newLogOptions.TimeTracker,
@@ -224,13 +244,6 @@ var mountCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, args []string) error {
-		if !disableVersionCheck {
-			err := VersionCheck()
-			if err != nil {
-				return err
-			}
-		}
-
 		options.MountPath = common.ExpandPath(args[0])
 		configFileExists := true
 
@@ -348,6 +361,13 @@ var mountCmd = &cobra.Command{
 			return fmt.Errorf("failed to initialize logger [%s]", err.Error())
 		}
 
+		if !disableVersionCheck {
+			err := VersionCheck()
+			if err != nil {
+				log.Err(err.Error())
+			}
+		}
+
 		if config.IsSet("invalidate-on-sync") {
 			log.Warn("mount: unsupported v1 CLI parameter: invalidate-on-sync is always true in lyvecloudfuse.")
 		}
@@ -458,7 +478,8 @@ var mountCmd = &cobra.Command{
 
 func ignoreFuseOptions(opt string) bool {
 	for _, o := range common.FuseIgnoredFlags() {
-		if o == opt {
+		// Flags like uid and gid come with value so exact string match is not correct in that case.
+		if strings.HasPrefix(opt, o) {
 			return true
 		}
 	}
