@@ -228,11 +228,11 @@ func (sc *StatsCollector) statsDumper() {
 	for {
 		hPipe, err = windows.CreateFile(
 			windows.StringToUTF16Ptr(common.WindowsTransferPipe),
-			windows.GENERIC_WRITE,
+			windows.GENERIC_WRITE|windows.GENERIC_READ,
 			0,
 			nil,
 			windows.OPEN_EXISTING,
-			windows.FILE_FLAG_OVERLAPPED,
+			0,
 			0,
 		)
 
@@ -242,14 +242,18 @@ func (sc *StatsCollector) statsDumper() {
 
 		if err == windows.ERROR_FILE_NOT_FOUND {
 			log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.WindowsTransferPipe)
+			windows.CloseHandle(hPipe)
 			time.Sleep(1 * time.Second)
 		} else {
 			log.Err("stats_manager::statsDumper : unable to open pipe file [%v]", err)
-			return
+			windows.CloseHandle(hPipe)
+			time.Sleep(1 * time.Second)
+			//return
 		}
 	}
 
 	log.Info("stats_manager::statsDumper : opened transfer pipe file")
+	defer windows.CloseHandle(hPipe)
 
 	for st := range sc.channel {
 		// log.Debug("stats_manager::statsDumper : stats: %v", st)
@@ -347,6 +351,7 @@ func statsPolling() {
 		windows.CloseHandle(handle)
 		return
 	}
+	log.Info("StatsReader::statsReader : Connected polling pipe")
 
 	reader := bufio.NewReader(os.NewFile(uintptr(handle), common.WindowsPollingPipe))
 
@@ -404,10 +409,13 @@ func statsPolling() {
 
 				if err == windows.ERROR_FILE_NOT_FOUND {
 					log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.WindowsTransferPipe)
+					windows.CloseHandle(tPipe)
 					time.Sleep(1 * time.Second)
 				} else {
 					log.Err("stats_manager::statsDumper: unable to open pipe file [%v]", err)
-					return
+					windows.CloseHandle(tPipe)
+					time.Sleep(1 * time.Second)
+					//return
 				}
 			}
 

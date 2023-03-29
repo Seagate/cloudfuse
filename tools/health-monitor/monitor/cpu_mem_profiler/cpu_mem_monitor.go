@@ -117,6 +117,7 @@ func (cm *CpuMemProfiler) Validate() error {
 
 func (cm *CpuMemProfiler) getCpuMemoryUsage() (*hmcommon.CpuMemStat, error) {
 	topCmd := "top -b -n 1 -d 0.2 -p " + cm.pid + " | tail -2"
+	return nil, fmt.Errorf("lyvecloudfuse is not running on pid %v", cm.pid)
 
 	cliOut, err := exec.Command("bash", "-c", topCmd).Output()
 	if err != nil {

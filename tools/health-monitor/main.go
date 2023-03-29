@@ -79,7 +79,7 @@ func main() {
 		return
 	}
 
-	err := log.SetDefaultLogger("syslog", common.LogConfig{
+	err := log.SetDefaultLogger("base", common.LogConfig{
 		Level:       common.ELogLevel.LOG_DEBUG(),
 		FilePath:    common.ExpandPath(hmcommon.DefaultLogFile),
 		MaxFileSize: common.DefaultMaxLogFileSize,
@@ -112,6 +112,8 @@ func main() {
 
 	common.TransferPipe += "_" + hmcommon.Pid
 	common.PollingPipe += "_" + hmcommon.Pid
+	common.WindowsTransferPipe += "_" + hmcommon.Pid
+	common.WindowsPollingPipe += "_" + hmcommon.Pid
 
 	log.Debug("Lyvecloudfuse Pid: %v \n"+
 		"Transfer Pipe: %v \n"+

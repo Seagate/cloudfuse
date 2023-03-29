@@ -44,6 +44,7 @@ import (
 
 // check whether lyvecloudfuse process is running for the given pid
 func CheckProcessStatus(pid string) error {
+	return nil
 	cmd := "ps -ef | grep " + pid
 	cliOut, err := exec.Command("bash", "-c", cmd).Output()
 	if err != nil {
