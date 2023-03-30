@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -263,7 +263,7 @@ func (dl *Datalake) CreateFile(name string, mode os.FileMode) error {
 func (dl *Datalake) CreateDirectory(name string) error {
 	log.Trace("Datalake::CreateDirectory : name %s", name)
 
-	directoryURL := dl.Filesystem.NewDirectoryURL(filepath.Join(dl.Config.prefixPath, name))
+	directoryURL := dl.Filesystem.NewDirectoryURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
 	_, err := directoryURL.Create(context.Background(), false)
 
 	if err != nil {
@@ -284,7 +284,7 @@ func (dl *Datalake) CreateLink(source string, target string) error {
 func (dl *Datalake) DeleteFile(name string) (err error) {
 	log.Trace("Datalake::DeleteFile : name %s", name)
 
-	fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(filepath.Join(dl.Config.prefixPath, name))
+	fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
 	_, err = fileURL.Delete(context.Background())
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
@@ -307,7 +307,7 @@ func (dl *Datalake) DeleteFile(name string) (err error) {
 func (dl *Datalake) DeleteDirectory(name string) (err error) {
 	log.Trace("Datalake::DeleteDirectory : name %s", name)
 
-	directoryURL := dl.Filesystem.NewDirectoryURL(filepath.Join(dl.Config.prefixPath, name))
+	directoryURL := dl.Filesystem.NewDirectoryURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
 	_, err = directoryURL.Delete(context.Background(), nil, true)
 	// TODO : There is an ability to pass a continuation token here for recursive delete, should we implement this logic to follow continuation token? The SDK does not currently do this.
 	if err != nil {
@@ -328,11 +328,11 @@ func (dl *Datalake) DeleteDirectory(name string) (err error) {
 func (dl *Datalake) RenameFile(source string, target string) error {
 	log.Trace("Datalake::RenameFile : %s -> %s", source, target)
 
-	fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(filepath.Join(dl.Config.prefixPath, source))
+	fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(common.JoinUnixFilepath(dl.Config.prefixPath, source))
 
 	_, err := fileURL.Rename(context.Background(),
 		azbfs.RenameFileOptions{
-			DestinationPath: filepath.Join(dl.Config.prefixPath, target),
+			DestinationPath: common.JoinUnixFilepath(dl.Config.prefixPath, target),
 		})
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
@@ -352,11 +352,11 @@ func (dl *Datalake) RenameFile(source string, target string) error {
 func (dl *Datalake) RenameDirectory(source string, target string) error {
 	log.Trace("Datalake::RenameDirectory : %s -> %s", source, target)
 
-	directoryURL := dl.Filesystem.NewDirectoryURL(filepath.Join(dl.Config.prefixPath, source))
+	directoryURL := dl.Filesystem.NewDirectoryURL(common.JoinUnixFilepath(dl.Config.prefixPath, source))
 
 	_, err := directoryURL.Rename(context.Background(),
 		azbfs.RenameDirectoryOptions{
-			DestinationPath: filepath.Join(dl.Config.prefixPath, target),
+			DestinationPath: common.JoinUnixFilepath(dl.Config.prefixPath, target),
 		})
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
@@ -376,7 +376,7 @@ func (dl *Datalake) RenameDirectory(source string, target string) error {
 func (dl *Datalake) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	log.Trace("Datalake::GetAttr : name %s", name)
 
-	pathURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(filepath.Join(dl.Config.prefixPath, name))
+	pathURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
 	prop, err := pathURL.GetProperties(context.Background())
 
 	if err != nil {
@@ -441,7 +441,7 @@ func (dl *Datalake) List(prefix string, marker *string, count int32) ([]*interna
 		count = common.MaxDirListCount
 	}
 
-	prefixPath := filepath.Join(dl.Config.prefixPath, prefix)
+	prefixPath := common.JoinUnixFilepath(dl.Config.prefixPath, prefix)
 	if prefix != "" && prefix[len(prefix)-1] == '/' {
 		prefixPath += "/"
 	}
@@ -558,7 +558,7 @@ func (dl *Datalake) TruncateFile(name string, size int64) error {
 // ChangeMod : Change mode of a path
 func (dl *Datalake) ChangeMod(name string, mode os.FileMode) error {
 	log.Trace("Datalake::ChangeMod : Change mode of file %s to %s", name, mode)
-	fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(filepath.Join(dl.Config.prefixPath, name))
+	fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
 
 	/*
 		// If we need to call the ACL set api then we need to get older acl string here
@@ -599,7 +599,7 @@ func (dl *Datalake) ChangeOwner(name string, _ int, _ int) error {
 	}
 
 	// TODO: This is not supported for now.
-	// fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(filepath.Join(dl.Config.prefixPath, name))
+	// fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
 	// group := strconv.Itoa(gid)
 	// owner := strconv.Itoa(uid)
 	// _, err := fileURL.SetAccessControl(context.Background(), azbfs.BlobFSAccessControl{Group: group, Owner: owner})

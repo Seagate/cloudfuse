@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -940,10 +940,13 @@ func (suite *generateConfigTestSuite) TestEnvVarAccountName() {
 
 	_, err := executeCommandC(rootCmd, "mountv1", tempDir, "--convert-config-only=true", outputFile)
 	suite.assert.Nil(err)
-	os.Unsetenv("AZURE_STORAGE_ACCOUNT")
 }
 
-func (suite *generateConfigTestSuite) TestEnvVarAccountNameError() {
+// This test must run first. Tests in testify run in alphabetical order
+// so the current name means that this runs after. There seems to be an issue around unsetting
+// environment issues in Windows that is causing this issue and this is the only way to seem to
+// avoid it on Windows without a serious investigation.
+func (suite *generateConfigTestSuite) TestAEnvVarAccountNameError() {
 	defer suite.cleanupTest()
 	name := generateFileName()
 	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
