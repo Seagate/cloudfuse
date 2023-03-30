@@ -83,7 +83,8 @@ func (l *SysLogger) GetLogLevel() common.LogLevel {
 }
 
 func setupEvents() error {
-	//Setup Windows Event log with the log source name and logging levels
+
+	//TODO: set up / separate the InstallAsEventCreate() to only run from the installer.
 	err := eventlog.InstallAsEventCreate("LyveCloudFuse", eventlog.Info|eventlog.Warning|eventlog.Error)
 
 	if err.Error() == "Access is denied." {
