@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"runtime"
 	"testing"
 
 	"lyvecloudfuse/common"
@@ -136,7 +137,12 @@ func (suite *hmonTestSuite) TestHmonInvalidConfigFile() {
 	op, err := executeCommandC(rootCmd, "health-monitor", "--pid=12345", "--config-file=cfgNotFound.yaml")
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "invalid config file")
-	suite.assert.Contains(op, "no such file or directory")
+	// The error message is different on Windows, so need to test with cases
+	if runtime.GOOS == "windows" {
+		suite.assert.Contains(op, "cannot find the file specified")
+	} else {
+		suite.assert.Contains(op, "no such file or directory")
+	}
 }
 
 func (suite *hmonTestSuite) TestHmonWithConfigFailure() {

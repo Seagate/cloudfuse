@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -142,6 +142,12 @@ func GetCurrentUser() (uint32, uint32, error) {
 	return uint32(userUID), uint32(userGID), nil
 }
 
+// JoinUnixFilepath uses filepath.join to join a path and ensures that
+// path only uses unix path delimeters.
+func JoinUnixFilepath(elem ...string) string {
+	return NormalizeObjectName(filepath.Join(elem...))
+}
+
 // normalizeObjectName : If file contains \\ in name replace it with ..
 func NormalizeObjectName(name string) string {
 	return strings.ReplaceAll(name, "\\", "/")
@@ -260,8 +266,14 @@ func ExpandPath(path string) string {
 		if err != nil {
 			return path
 		}
-		path = filepath.Join(homeDir, path[2:])
+		path = JoinUnixFilepath(homeDir, path[2:])
+	} else if strings.HasPrefix(path, "$HOME/") {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		path = JoinUnixFilepath(homeDir, path[6:])
 	}
 
-	return path
+	return os.ExpandEnv(path)
 }

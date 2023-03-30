@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -127,6 +127,8 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncrypt() {
 	_, err := confFile.WriteString(testPlainTextConfig)
 	suite.assert.Nil(err)
 
+	confFile.Close()
+
 	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123123123123123123123123", fmt.Sprintf("--output-file=%s", outFile.Name()))
 	suite.assert.Nil(err)
 }
@@ -154,6 +156,8 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncryptNoKey() {
 	_, err := confFile.WriteString(testPlainTextConfig)
 	suite.assert.Nil(err)
 
+	confFile.Close()
+
 	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()))
 	suite.assert.NotNil(err)
 }
@@ -169,6 +173,9 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncryptInvalidKey() {
 	_, err := confFile.WriteString(testPlainTextConfig)
 	suite.assert.Nil(err)
 
+	confFile.Close()
+	outFile.Close()
+
 	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123", fmt.Sprintf("--output-file=%s", outFile.Name()))
 	suite.assert.NotNil(err)
 }
@@ -183,6 +190,9 @@ func (suite *secureConfigTestSuite) TestSecureConfigDecrypt() {
 
 	_, err := confFile.WriteString(testPlainTextConfig)
 	suite.assert.Nil(err)
+
+	confFile.Close()
+	outFile.Close()
 
 	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123123123123123123123123", fmt.Sprintf("--output-file=%s", outFile.Name()))
 	suite.assert.Nil(err)
@@ -230,6 +240,9 @@ func (suite *secureConfigTestSuite) TestSecureConfigGet() {
 	_, err := confFile.WriteString(testPlainTextConfig)
 	suite.assert.Nil(err)
 
+	confFile.Close()
+	outFile.Close()
+
 	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123123123123123123123123", fmt.Sprintf("--output-file=%s", outFile.Name()))
 	suite.assert.Nil(err)
 
@@ -248,6 +261,9 @@ func (suite *secureConfigTestSuite) TestSecureConfigGetInvalidKey() {
 	_, err := confFile.WriteString(testPlainTextConfig)
 	suite.assert.Nil(err)
 
+	confFile.Close()
+	outFile.Close()
+
 	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123123123123123123123123", fmt.Sprintf("--output-file=%s", outFile.Name()))
 	suite.assert.Nil(err)
 
@@ -265,6 +281,9 @@ func (suite *secureConfigTestSuite) TestSecureConfigSet() {
 
 	_, err := confFile.WriteString(testPlainTextConfig)
 	suite.assert.Nil(err)
+
+	confFile.Close()
+	outFile.Close()
 
 	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123123123123123123123123", fmt.Sprintf("--output-file=%s", outFile.Name()))
 	suite.assert.Nil(err)

@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -39,12 +39,12 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log/syslog"
 	"os"
 	"strconv"
 	"strings"
 
 	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/component/attr_cache"
 	"lyvecloudfuse/component/azstorage"
 	"lyvecloudfuse/component/file_cache"
@@ -153,7 +153,7 @@ var generateConfigCmd = &cobra.Command{
 		if !disableVersionCheck {
 			err := VersionCheck()
 			if err != nil {
-				return err
+				log.Err(err.Error())
 			}
 		}
 		resetOptions()
@@ -397,8 +397,9 @@ func convertBfConfigParameter(flags *pflag.FlagSet, configParameterKey string, c
 func convertBfCliParameters(flags *pflag.FlagSet) error {
 	if flags.Lookup("set-content-type").Changed || flags.Lookup("ca-cert-file").Changed || flags.Lookup("basic-remount-check").Changed || flags.Lookup(
 		"background-download").Changed || flags.Lookup("cache-poll-timeout-msec").Changed || flags.Lookup("upload-modified-only").Changed || flags.Lookup("debug-libcurl").Changed {
-		logWriter, _ := syslog.New(syslog.LOG_WARNING, "")
-		_ = logWriter.Warning("one or more unsupported v1 parameters [set-content-type, ca-cert-file, basic-remount-check, background-download, cache-poll-timeout-msec, upload-modified-only, debug-libcurl] have been passed, ignoring and proceeding to mount")
+		//logWriter, _ := syslog.New(syslog.LOG_WARNING, "")
+		//_ = logWriter.Warning("one or more unsupported v1 parameters [set-content-type, ca-cert-file, basic-remount-check, background-download, cache-poll-timeout-msec, upload-modified-only, debug-libcurl] have been passed, ignoring and proceeding to mount")
+		//TODO: Change this logging to not be with syslog (this is not really crucial)
 	}
 
 	bfv2LoggingConfigOptions.Type = "syslog"
