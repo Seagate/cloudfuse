@@ -160,7 +160,6 @@ func (s *clientTestSuite) TestListBuckets() {
 	s.assert.Equal(buckets, []string{"stxe1-srg-lens-lab1"})
 }
 func (s *clientTestSuite) TestSetPrefixPath() {
-	// implemented in client.go
 }
 func (s *clientTestSuite) TestCreateFile() {
 	defer s.cleanupTest()
@@ -273,10 +272,18 @@ func (s *clientTestSuite) TestgetAttrUsingRest() {
 func (s *clientTestSuite) TestgetAttrUsingList() {
 }
 func (s *clientTestSuite) TestGetAttr() {
-	// implemented in client.go
+	// TODO (assert nil where necessary)
+	// generate file name
+	// put object
+	// call get attr
 }
 func (s *clientTestSuite) TestList() {
-	// implemented in client.go
+	// TODO (assert nil where necessary)
+	// generate prefix
+	// leverage create/generate hierarchy:
+	// 	put a few objects with that prefix
+	// call list
+	// assert names match generated
 }
 func (s *clientTestSuite) TestReadToFile() {
 	defer s.cleanupTest()
@@ -298,6 +305,7 @@ func (s *clientTestSuite) TestReadToFile() {
 	err = s.client.ReadToFile(name, 0, int64(bodyLen), f)
 	s.assert.Nil(err)
 
+	// file content should match generated body
 	output := make([]byte, bodyLen)
 	f, _ = os.Open(f.Name())
 	outputLen, err := f.Read(output)
@@ -410,7 +418,8 @@ func (s *clientTestSuite) TestremoveBlocks() {
 func (s *clientTestSuite) TestTruncateFile() {
 }
 func (s *clientTestSuite) TestWrite() {
-	// implemented in client.go
+	// TODO : outline
+	// handlemap.NewHandle(name)
 }
 func (s *clientTestSuite) TeststageAndCommitModifiedBlocks() {
 }
