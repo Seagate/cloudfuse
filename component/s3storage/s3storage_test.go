@@ -1716,6 +1716,7 @@ func (s *s3StorageTestSuite) TestRangedDownload() {
 	//download portion of object to file
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 2, Count: 5, File: file})
 	s.assert.Nil(err)
+
 	//create byte array of characters that are identical to what we should have downloaded
 	currentData := []byte("st da")
 	dataLen := len(currentData)
