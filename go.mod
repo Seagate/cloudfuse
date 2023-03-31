@@ -17,7 +17,6 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/mock v1.6.0
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
-	github.com/miekg/dns v1.1.53 // indirect
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/montanaflynn/stats v0.6.6
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
@@ -29,10 +28,8 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/winfsp/cgofuse v1.5.0
 	go.uber.org/atomic v1.7.0
-	golang.org/x/crypto v0.7.0 // indirect
-	golang.org/x/image v0.6.0 // indirect
-	golang.org/x/sys v0.6.0
-	golang.org/x/tools v0.7.0 // indirect
+	golang.org/x/sys v0.4.0
+	golang.org/x/text v0.7.0 // indirect
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
