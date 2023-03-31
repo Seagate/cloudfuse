@@ -45,7 +45,6 @@ import (
 	"math/rand"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -236,14 +235,14 @@ func generateNestedDirectory(path string) (*list.List, *list.List, *list.List) {
 	aPaths := list.New()
 	aPaths.PushBack(internal.TruncateDirName(path))
 
-	aPaths.PushBack(filepath.Join(path, "c1"))
-	aPaths.PushBack(filepath.Join(path, "c2"))
-	aPaths.PushBack(filepath.Join(filepath.Join(path, "c1"), "gc1"))
+	aPaths.PushBack(path + "/c1")
+	aPaths.PushBack(path + "/c2")
+	aPaths.PushBack(path + "/c1" + "/gc1")
 
 	abPaths := list.New()
 	path = internal.TruncateDirName(path)
 	abPaths.PushBack(path + "b")
-	abPaths.PushBack(filepath.Join(path+"b", "c1"))
+	abPaths.PushBack(path + "b" + "/c1")
 
 	acPaths := list.New()
 	acPaths.PushBack(path + "c")
@@ -320,7 +319,7 @@ func (s *s3StorageTestSuite) TestDeleteSubDirPrefixPath() {
 	base := generateDirectoryName()
 	a, ab, ac := s.setupHierarchy(base)
 
-	s.s3Storage.storage.SetPrefixPath(filepath.Join(s.s3Storage.stConfig.prefixPath, base))
+	s.s3Storage.storage.SetPrefixPath(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, base))
 	err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: "c1"})
 	s.assert.Nil(err)
 
@@ -328,7 +327,7 @@ func (s *s3StorageTestSuite) TestDeleteSubDirPrefixPath() {
 	// a paths under c1 should be deleted
 	for p := a.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		if strings.HasPrefix(p.Value.(string), filepath.Join(base, "c1")) {
+		if strings.HasPrefix(p.Value.(string), base+"/c1") {
 			s.assert.NotNil(err)
 		} else {
 			s.assert.Nil(err)
@@ -497,7 +496,7 @@ func (s *s3StorageTestSuite) TestReadDirSubDirPrefixPath() {
 	base := generateDirectoryName()
 	s.setupHierarchy(base)
 
-	s.s3Storage.storage.SetPrefixPath(filepath.Join(s.s3Storage.stConfig.prefixPath, base))
+	s.s3Storage.storage.SetPrefixPath(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, base))
 
 	// ReadDir only reads the first level of the hierarchy
 	entries, err := s.s3Storage.ReadDir(internal.ReadDirOptions{Name: "/c1"})
@@ -542,7 +541,7 @@ func (s *s3StorageTestSuite) TestRenameDir() {
 		s.Run(input.src+"->"+input.dst, func() {
 			// Setup
 			// We don't keep track of empty directories, so let's create an object with the src prfix
-			s.s3Storage.CreateFile(internal.CreateFileOptions{Name: filepath.Join(input.src, generateFileName())})
+			s.s3Storage.CreateFile(internal.CreateFileOptions{Name: common.JoinUnixFilepath(input.src, generateFileName())})
 
 			err := s.s3Storage.RenameDir(internal.RenameDirOptions{Src: input.src, Dst: input.dst})
 			s.assert.Nil(err)
@@ -602,7 +601,7 @@ func (s *s3StorageTestSuite) TestRenameDirSubDirPrefixPath() {
 	baseDst := generateDirectoryName()
 
 	// Test rename directory with prefix set
-	s.s3Storage.storage.SetPrefixPath(filepath.Join(s.s3Storage.stConfig.prefixPath, baseSrc))
+	s.s3Storage.storage.SetPrefixPath(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, baseSrc))
 	err := s.s3Storage.RenameDir(internal.RenameDirOptions{Src: "c1", Dst: baseDst})
 	s.assert.Nil(err)
 
@@ -662,7 +661,7 @@ func (s *s3StorageTestSuite) TestCreateFile() {
 	s.assert.EqualValues(name, h.Path)
 	s.assert.EqualValues(0, h.Size)
 	// File should be in the account
-	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -747,7 +746,7 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 	// This is similar to the s3 bucket command, use getobject for now
 	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
 	// File should not be in the account
-	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -766,7 +765,7 @@ func (s *s3StorageTestSuite) TestDeleteFileError() {
 	s.assert.EqualValues(syscall.ENOENT, err)
 
 	// File should not be in the account
-	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -791,7 +790,7 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 	s.assert.Nil(err)
 
 	// Object will be updated with new data
-	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -918,7 +917,7 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 	s.assert.EqualValues(len(data), count)
 
 	// Object should have updated data
-	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -943,7 +942,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmaller() {
 	s.assert.Nil(err)
 
 	// Object should have updated data
-	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -970,7 +969,7 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileSmaller() {
 	s.assert.Nil(err)
 
 	// Object should have updated data
-	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -996,7 +995,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileEqual() {
 	s.assert.Nil(err)
 
 	// Object should have updated data
-	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -1023,7 +1022,7 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileEqual() {
 	s.assert.Nil(err)
 
 	// Object should have updated data
-	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -1049,7 +1048,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileBigger() {
 	s.assert.Nil(err)
 
 	// Object should have updated data
-	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -1072,7 +1071,7 @@ func (s *s3StorageTestSuite) TestTruncateEmptyFileBigger() {
 	s.assert.Nil(err)
 
 	// Object should have updated data
-	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -1099,7 +1098,7 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileBigger() {
 	s.assert.Nil(err)
 
 	// Object should have updated data
-	key := filepath.Join(s.s3Storage.stConfig.prefixPath, name)
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -1373,14 +1372,14 @@ func (s *s3StorageTestSuite) TestRenameFile() {
 	s.assert.Nil(err)
 
 	// Src should not be in the account
-	srcKey := filepath.Join(s.s3Storage.stConfig.prefixPath, src)
+	srcKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, src)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(srcKey),
 	})
 	s.assert.NotNil(err)
 	// Dst should be in the account
-	dstKey := filepath.Join(s.s3Storage.stConfig.prefixPath, dst)
+	dstKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, dst)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(dstKey),
@@ -1399,13 +1398,13 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 	s.assert.EqualValues(syscall.ENOENT, err)
 
 	// Src and destination should not be in the account
-	srcKey := filepath.Join(s.s3Storage.stConfig.prefixPath, src)
+	srcKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, src)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(srcKey),
 	})
 	s.assert.NotNil(err)
-	dstKey := filepath.Join(s.s3Storage.stConfig.prefixPath, dst)
+	dstKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, dst)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(dstKey),

@@ -246,7 +246,7 @@ func (cl *Client) headObject(key string) (*s3.HeadObjectOutput, error) {
 
 // Convert file name to object getKey
 func (cl *Client) getKey(name string) string {
-	return filepath.Join(cl.Config.prefixPath, name)
+	return common.JoinUnixFilepath(cl.Config.prefixPath, name)
 }
 
 // Wrapper for awsS3Client.ListBuckets
@@ -552,7 +552,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 
 	// combine the configured prefix and the prefix being given to List to get a full listPath
 	listPath := cl.getKey(prefix)
-	// replace any trailing forward slash stripped by filepath.Join
+	// replace any trailing forward slash stripped by common.JoinUnixFilepath
 	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
 		listPath += "/"
 	}
