@@ -36,7 +36,7 @@ package s3storage
 // s3AuthConfig : Config to authenticate to storage
 type s3AuthConfig struct {
 	BucketName string
-	AccessKey  string
+	KeyID      string
 	SecretKey  string
 	Endpoint   string
 	Region     string

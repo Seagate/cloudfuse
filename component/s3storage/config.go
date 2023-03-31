@@ -136,7 +136,7 @@ const (
 
 type Options struct {
 	BucketName string `config:"bucket-name" yaml:"bucket-name,omitempty"`
-	AccessKey  string `config:"key-id" yaml:"key-id,omitempty"`
+	KeyID      string `config:"key-id" yaml:"key-id,omitempty"`
 	SecretKey  string `config:"secret-key" yaml:"secret-key,omitempty"`
 	Region     string `config:"region" yaml:"region,omitempty"`
 	Endpoint   string `config:"endpoint" yaml:"endpoint,omitempty"`
@@ -207,7 +207,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 		return errors.New("bucket name not provided")
 	}
 	s3.stConfig.authConfig.BucketName = opt.BucketName
-	s3.stConfig.authConfig.AccessKey = opt.AccessKey
+	s3.stConfig.authConfig.KeyID = opt.KeyID
 	s3.stConfig.authConfig.SecretKey = opt.SecretKey
 	s3.stConfig.authConfig.Region = opt.Region
 

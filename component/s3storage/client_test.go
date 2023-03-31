@@ -77,7 +77,7 @@ func newTestClient(configuration string) (*Client, error) {
 	configForS3Client := Config{
 		authConfig: s3AuthConfig{
 			BucketName: conf.BucketName,
-			AccessKey:  conf.AccessKey,
+			KeyID:      conf.KeyID,
 			SecretKey:  conf.SecretKey,
 			Region:     conf.Region,
 			Endpoint:   conf.Endpoint,
@@ -130,7 +130,7 @@ func (s *clientTestSuite) SetupTest() {
 func (s *clientTestSuite) setupTestHelper(configuration string, create bool) {
 	if configuration == "" {
 		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
-			storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
+			storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
 			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
 	}
 	s.config = configuration

@@ -92,7 +92,7 @@ func (cl *Client) Configure(cfg Config) error {
 	})
 
 	staticProvider := credentials.NewStaticCredentialsProvider(
-		cl.Config.authConfig.AccessKey,
+		cl.Config.authConfig.KeyID,
 		cl.Config.authConfig.SecretKey,
 		"",
 	)

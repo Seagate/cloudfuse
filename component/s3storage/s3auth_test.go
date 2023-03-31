@@ -38,7 +38,7 @@ package s3storage
 
 type storageTestConfiguration struct {
 	BucketName string `json:"bucket-name"`
-	AccessKey  string `json:"access-key"`
+	KeyID      string `json:"access-key"`
 	SecretKey  string `json:"secret-key"`
 	Endpoint   string `json:"endpoint"`
 	Region     string `json:"region"`
