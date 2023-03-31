@@ -35,7 +35,6 @@ package s3storage
 
 import (
 	"crypto/md5"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,10 +47,7 @@ import (
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
 
-	"github.com/Azure/azure-storage-azcopy/v10/azbfs"
-
 	"github.com/Azure/azure-pipeline-go/pipeline"
-	"github.com/Azure/azure-storage-blob-go/azblob"
 )
 
 //    ----------- Helper to create pipeline options ---------------
@@ -278,100 +274,6 @@ const (
 	InvalidPermission
 )
 
-// ErrStr : Store error to string mapping
-var ErrStr = map[uint16]string{
-	ErrNoErr:             "No Error found",
-	ErrUnknown:           "Unknown store error",
-	ErrFileNotFound:      "Blob not found",
-	ErrFileAlreadyExists: "Blob already exists",
-}
-
-// For detailed error list refert ServiceCodeType at below link
-// https://godoc.org/github.com/Azure/azure-storage-blob-go/azblob#ListBlobsSegmentOptions
-// Convert blob storage error to common errors
-func storeBlobErrToErr(err error) uint16 {
-	// TODO: we need our own S3-specific error parser to type errors being returned
-	if serr, ok := err.(azblob.StorageError); ok {
-		switch serr.ServiceCode() {
-		case azblob.ServiceCodeBlobAlreadyExists:
-			return ErrFileAlreadyExists
-		case azblob.ServiceCodeBlobNotFound:
-			return ErrFileNotFound
-		case azblob.ServiceCodeInvalidRange:
-			return InvalidRange
-		case azblob.ServiceCodeLeaseIDMissing:
-			return BlobIsUnderLease
-		case azblob.ServiceCodeInsufficientAccountPermissions:
-			return InvalidPermission
-		default:
-			return ErrUnknown
-		}
-	}
-	return ErrNoErr
-}
-
-// Convert datalake storage error to common errors
-func storeDatalakeErrToErr(err error) uint16 {
-	if serr, ok := err.(azbfs.StorageError); ok {
-		switch serr.ServiceCode() {
-		case azbfs.ServiceCodePathAlreadyExists:
-			return ErrFileAlreadyExists
-		case azbfs.ServiceCodePathNotFound:
-			return ErrFileNotFound
-		case azbfs.ServiceCodeSourcePathNotFound:
-			return ErrFileNotFound
-		case "LeaseIdMissing":
-			return BlobIsUnderLease
-		default:
-			return ErrUnknown
-		}
-	}
-	return ErrNoErr
-}
-
-//	----------- Metadata handling  ---------------
-//
-// Converts datalake properties to a metadata map
-func newMetadata(properties string) map[string]string {
-	metadata := make(map[string]string)
-	if properties != "" {
-		// Create a map of the properties (metadata)
-		pairs := strings.Split(properties, ",")
-
-		for _, p := range pairs {
-			components := strings.SplitN(p, "=", 2)
-			key := components[0]
-			value, err := base64.StdEncoding.DecodeString(components[1])
-			if err == nil {
-				metadata[key] = string(value)
-			}
-		}
-	}
-	return metadata
-}
-
-// parseProperties : Parse the properties of a given datalake path and populate its attributes
-func parseProperties(attr *internal.ObjAttr, properties string) {
-	metadata := newMetadata(properties)
-	// Parse the metadata
-	parseMetadata(attr, metadata)
-}
-
-// parseMetadata : Parse the metadata of a given path and populate its attributes
-func parseMetadata(attr *internal.ObjAttr, metadata map[string]string) {
-	// Save the metadata in attributes so that later if someone wants to add anything it can work
-	attr.Metadata = metadata
-	for k, v := range metadata {
-		if strings.ToLower(k) == folderKey && v == "true" {
-			attr.Flags = internal.NewDirBitMap()
-			attr.Mode = attr.Mode | os.ModeDir
-		} else if strings.ToLower(k) == symlinkKey && v == "true" {
-			attr.Flags = internal.NewSymlinkBitMap()
-			attr.Mode = attr.Mode | os.ModeSymlink
-		}
-	}
-}
-
 //    ----------- Content-type handling  ---------------
 
 // ContentTypeMap : Store file extension to content-type mapping
@@ -457,39 +359,6 @@ func populateContentType(newSet string) error { //nolint
 	return nil
 }
 
-//	----------- Blob access tier type conversion  ---------------
-//
-// AccessTierMap : Store config to access tier mapping
-var AccessTiers = map[string]azblob.AccessTierType{
-	"none":    azblob.AccessTierNone,
-	"hot":     azblob.AccessTierHot,
-	"cool":    azblob.AccessTierCool,
-	"archive": azblob.AccessTierArchive,
-	"p4":      azblob.AccessTierP4,
-	"p6":      azblob.AccessTierP6,
-	"p10":     azblob.AccessTierP10,
-	"p15":     azblob.AccessTierP15,
-	"p20":     azblob.AccessTierP20,
-	"p30":     azblob.AccessTierP30,
-	"p40":     azblob.AccessTierP40,
-	"p50":     azblob.AccessTierP50,
-	"p60":     azblob.AccessTierP60,
-	"p70":     azblob.AccessTierP70,
-	"p80":     azblob.AccessTierP80,
-}
-
-func getAccessTierType(name string) azblob.AccessTierType {
-	if name == "" {
-		return azblob.AccessTierNone
-	}
-
-	value, found := AccessTiers[strings.ToLower(name)]
-	if found {
-		return value
-	}
-	return azblob.AccessTierNone
-}
-
 // Called by x method
 func getACLPermissions(mode os.FileMode) string {
 	// Format for ACL and Permission string is different
@@ -559,18 +428,6 @@ func split(prefixPath string, path string) string {
 	return path
 }
 
-func sanitizeSASKey(key string) string {
-	if key == "" {
-		return key
-	}
-
-	if key[0] != '?' {
-		return ("?" + key)
-	}
-
-	return key
-}
-
 func getMD5(fi *os.File) ([]byte, error) {
 	hasher := md5.New()
 	_, err := io.Copy(hasher, fi)
@@ -581,17 +438,3 @@ func getMD5(fi *os.File) ([]byte, error) {
 
 	return hasher.Sum(nil), nil
 }
-
-// func autoDetectAuthMode(opt Options) string {
-// 	if opt.ApplicationID != "" || opt.ResourceID != "" || opt.ObjectID != "" {
-// 		return "msi"
-// 	} else if opt.AccountKey != "" {
-// 		return "key"
-// 	} else if opt.SaSKey != "" {
-// 		return "sas"
-// 	} else if opt.ClientID != "" || opt.ClientSecret != "" || opt.TenantID != "" {
-// 		return "spn"
-// 	}
-
-// 	return "msi"
-// }

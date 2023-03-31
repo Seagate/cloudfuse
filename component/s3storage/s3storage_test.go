@@ -1437,9 +1437,6 @@ func (s *s3StorageTestSuite) TestGetAttrDir() {
 			s.assert.Nil(err)
 			s.assert.NotNil(props)
 			s.assert.True(props.IsDir())
-			s.assert.NotEmpty(props.Metadata)
-			s.assert.Contains(props.Metadata, folderKey)
-			s.assert.EqualValues("true", props.Metadata[folderKey])
 			s.assert.Nil(deleteError)
 		})
 	}

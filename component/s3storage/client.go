@@ -60,7 +60,6 @@ import (
 )
 
 const (
-	folderKey  = "hdi_isfolder"
 	symlinkKey = "is_symlink"
 )
 
@@ -685,7 +684,6 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) {
 	attr.Flags = internal.NewDirBitMap()
 	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
-	attr.Metadata[folderKey] = "true"
 
 	return attr
 }
