@@ -90,6 +90,8 @@ func (cl *Client) Configure(cfg Config) error {
 		return aws.Endpoint{}, fmt.Errorf("unknown endpoint requested")
 	})
 
+	// TODO: check if the config is missing credentials
+	// 	and allow the default config to find them in the environment on its own
 	staticProvider := credentials.NewStaticCredentialsProvider(
 		cl.Config.authConfig.KeyID,
 		cl.Config.authConfig.SecretKey,
