@@ -129,7 +129,7 @@ func (s *clientTestSuite) SetupTest() {
 
 func (s *clientTestSuite) setupTestHelper(configuration string, create bool) {
 	if configuration == "" {
-		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  access-key: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
 			storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.AccessKey,
 			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
 	}

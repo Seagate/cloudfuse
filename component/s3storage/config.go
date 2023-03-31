@@ -136,7 +136,7 @@ const (
 
 type Options struct {
 	BucketName string `config:"bucket-name" yaml:"bucket-name,omitempty"`
-	AccessKey  string `config:"access-key" yaml:"access-key,omitempty"`
+	AccessKey  string `config:"key-id" yaml:"key-id,omitempty"`
 	SecretKey  string `config:"secret-key" yaml:"secret-key,omitempty"`
 	Region     string `config:"region" yaml:"region,omitempty"`
 	Endpoint   string `config:"endpoint" yaml:"endpoint,omitempty"`
