@@ -148,8 +148,8 @@ azstorage:
 s3storage:
   # Required
   bucket-name: <name of the bucket to be mounted>
-  key-id: <S3 access key ID (your globally unique user identifier)>
-  secret-key: <S3 secret access key (your private key)>
+  key-id: <S3 access key ID (example - AKIAIOSFODNN7EXAMPLE)>
+  secret-key: <S3 secret access key (example - wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY)>
   region: <S3 region. (example - us-east-1)>
   endpoint: <S3 endpoint URL (example - https://s3.us-east-1.lyvecloud.seagate.com)>
   # Optional
