@@ -208,8 +208,8 @@ func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 	objectList := make([]*internal.ObjAttr, 0)
 
 	path := formatListDirName(options.Name)
-	var iteration int = 0
-	var marker *string = nil
+	var iteration int  // = 0
+	var marker *string // = nil
 	for {
 		newList, newMarker, err := s3.storage.List(path, marker, common.MaxDirListCount)
 		if err != nil {
