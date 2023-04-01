@@ -150,8 +150,8 @@ s3storage:
   bucket-name: <name of the bucket to be mounted>
   key-id: <S3 access key ID (example - AKIAIOSFODNN7EXAMPLE)>
   secret-key: <S3 secret access key (example - wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY)>
-  region: <S3 region. (example - us-east-1)>
   # Optional
+  region: <S3 region. Default - us-east-1>
   endpoint: <S3 endpoint URL. Default - https://s3.[region].lyvecloud.seagate.com>
   subdirectory: <name of subdirectory to be mounted instead of whole bucket>
 

@@ -77,10 +77,12 @@ func (cl *Client) Configure(cfg Config) error {
 	cl.Config = cfg
 
 	// Set the endpoint supplied in the config file
-	// TODO: handle the case that the config does not have an endpoint (use Lyve Cloud as default)
-	// TODO: handle it when the config does not have a Region (use "us-east-1" as default)
 	endpointResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		if service == s3.ServiceID {
+			// figure out the region
+			if cl.Config.authConfig.Region == "" && region == "" {
+				region = "us-east-1"
+			}
 			// figure out the endpoint URL
 			var url string
 			if cl.Config.authConfig.Endpoint != "" {
@@ -103,7 +105,8 @@ func (cl *Client) Configure(cfg Config) error {
 				default:
 					return aws.Endpoint{}, fmt.Errorf("unrecognized region \"%s\"", region)
 				}
-				// save the endpoint back to the config field
+				// save the results back to the config
+				cl.Config.authConfig.Region = region
 				cl.Config.authConfig.Endpoint = url
 			}
 			// create the endpoint
