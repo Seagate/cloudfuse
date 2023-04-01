@@ -112,11 +112,10 @@ func (cl *Client) Configure(cfg Config) error {
 	return nil
 }
 
-// For dynamic config update the config here.
-// Currently only updates the blockSize.
+// For dynamic configuration, update the config here.
+// Not implemented.
 func (cl *Client) UpdateConfig(cfg Config) error {
-	log.Trace("Client::UpdateConfig : update block size")
-	cl.Config.blockSize = cfg.blockSize
+	log.Trace("Client::UpdateConfig : no dynamic config update support")
 	return nil
 }
 

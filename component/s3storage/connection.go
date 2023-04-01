@@ -44,9 +44,9 @@ import (
 type Config struct {
 	authConfig s3AuthConfig
 	prefixPath string
-	// TODO: use a fake block size to improve streaming performance
+	// TODO: performance:
+	// 	use a fake block size to improve streaming performance
 	// 	even though S3 doesn't expose a block size
-	blockSize int64
 }
 
 type Connection struct {
