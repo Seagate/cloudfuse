@@ -41,8 +41,6 @@ import (
 	"lyvecloudfuse/internal"
 )
 
-// Example for azblob usage : https://godoc.org/github.com/Azure/azure-storage-blob-go/azblob#pkg-examples
-// For methods help refer : https://godoc.org/github.com/Azure/azure-storage-blob-go/azblob#ContainerURL
 type Config struct {
 	authConfig s3AuthConfig
 	prefixPath string
