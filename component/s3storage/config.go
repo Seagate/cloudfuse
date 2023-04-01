@@ -35,7 +35,6 @@ package s3storage
 
 import (
 	"errors"
-	"fmt"
 
 	"lyvecloudfuse/common/log"
 )
@@ -61,13 +60,6 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	s3.stConfig.authConfig.KeyID = opt.KeyID
 	s3.stConfig.authConfig.SecretKey = opt.SecretKey
 	s3.stConfig.authConfig.Region = opt.Region
-
-	// Validate endpoint
-	if opt.Endpoint == "" {
-		// TODO: change default to another provider (if we switch to another test S3 provider)
-		log.Warn("ParseAndValidateConfig : account endpoint not provided, assuming the default .lyvecloud.seagate.com style endpoint")
-		opt.Endpoint = fmt.Sprintf("s3.%s.lyvecloud.seagate.com", opt.Region)
-	}
 	s3.stConfig.authConfig.Endpoint = opt.Endpoint
 
 	// If subdirectory is mounted, take the prefix path

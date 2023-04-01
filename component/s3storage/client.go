@@ -81,9 +81,35 @@ func (cl *Client) Configure(cfg Config) error {
 	// TODO: handle it when the config does not have a Region (use "us-east-1" as default)
 	endpointResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		if service == s3.ServiceID {
+			// figure out the endpoint URL
+			var url string
+			if cl.Config.authConfig.Endpoint != "" {
+				url = cl.Config.authConfig.Endpoint
+			} else {
+				// TODO: default to another S3 provider
+				switch region {
+				case "us-east-1":
+					url = "https://s3.us-east-1.lyvecloud.seagate.com"
+				case "us-west-1":
+					url = "https://s3.us-west-1.lyvecloud.seagate.com"
+				case "ap-southeast-1":
+					url = "https://s3.ap-southeast-1.lyvecloud.seagate.com"
+				case "us-central-1":
+					url = "https://s3.us-central-1.lyvecloud.seagate.com"
+				case "eu-west-1":
+					url = "https://s3.eu-west-1.lyvecloud.seagate.com"
+				case "us-central-2":
+					url = "https://s3.us-central-2.lyvecloud.seagate.com"
+				default:
+					return aws.Endpoint{}, fmt.Errorf("unrecognized region \"%s\"", region)
+				}
+				// save the endpoint back to the config field
+				cl.Config.authConfig.Endpoint = url
+			}
+			// create the endpoint
 			return aws.Endpoint{
 				PartitionID:   "aws",
-				URL:           cl.Config.authConfig.Endpoint,
+				URL:           url,
 				SigningRegion: cl.Config.authConfig.Region,
 			}, nil
 		}
