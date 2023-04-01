@@ -247,7 +247,7 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		if len(newList) == 0 {
 			/* In some customer scenario we have seen that newList is empty but marker is not empty
 			   which means backend has not returned any items this time but there are more left.
-			   If we return back this empty list to libfuse layer it will assume listing has completed
+			   If we return back this empty list to fuse layer it will assume listing has completed
 			   and will terminate the readdir call. As there are more items left on the server side we
 			   need to retry getting a list here.
 			*/
@@ -263,7 +263,7 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	}
 	s3StatsCollector.PushEvents(streamDir, path, map[string]interface{}{count: len(newList)})
 
-	// increment streamdir call count
+	// increment streamDir call count
 	s3StatsCollector.UpdateStats(stats_manager.Increment, streamDir, (int64)(1))
 
 	return newList, *newMarker, nil

@@ -41,6 +41,11 @@ import (
 	"lyvecloudfuse/internal"
 )
 
+type Connection struct {
+	Config   Config
+	Endpoint *url.URL
+}
+
 type Config struct {
 	authConfig s3AuthConfig
 	prefixPath string
@@ -49,10 +54,24 @@ type Config struct {
 	// 	even though S3 doesn't expose a block size
 }
 
-type Connection struct {
-	Config Config
+// TODO: move s3AuthConfig to s3auth.go
+// TODO: handle different types of authentication
+// TODO: write tests in s3auth_test.go
 
-	Endpoint *url.URL
+// s3AuthConfig : Config to authenticate to storage
+type s3AuthConfig struct {
+	BucketName string
+	KeyID      string
+	SecretKey  string
+	Endpoint   string
+	Region     string
+}
+
+// NewConnection : Create S3Connection Object
+func NewConnection(cfg Config) S3Connection {
+	stg := &Client{}
+	_ = stg.Configure(cfg)
+	return stg
 }
 
 type S3Connection interface {
@@ -91,11 +110,4 @@ type S3Connection interface {
 	TruncateFile(string, int64) error
 
 	NewCredentialKey(_, _ string) error
-}
-
-// NewConnection : Based on account type create respective S3Connection Object
-func NewConnection(cfg Config) S3Connection {
-	stg := &Client{}
-	_ = stg.Configure(cfg)
-	return stg
 }

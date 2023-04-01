@@ -598,7 +598,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		Bucket:    aws.String(bucketName),
 		MaxKeys:   count,
 		Prefix:    aws.String(listPath),
-		Delimiter: aws.String("/"), // delimeter limits results and provides CommonPrefixes
+		Delimiter: aws.String("/"), // delimiter limits results and provides CommonPrefixes
 	}
 	paginator := s3.NewListObjectsV2Paginator(cl.awsS3Client, params)
 	// initialize list to be returned
@@ -638,7 +638,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 				// we have to iterate in descending order
 				suffixToTrim := ""
 				for i := len(intermediateDirectories) - 1; i >= 0; i-- {
-					// ignore empty strings (split does not ommit them)
+					// ignore empty strings (split does not omit them)
 					if intermediateDirectories[i] == "" {
 						continue
 					}
