@@ -64,6 +64,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 
 	// Validate endpoint
 	if opt.Endpoint == "" {
+		// TODO: change default to another provider (if we switch to another test S3 provider)
 		log.Warn("ParseAndValidateConfig : account endpoint not provided, assuming the default .lyvecloud.seagate.com style endpoint")
 		opt.Endpoint = fmt.Sprintf("s3.%s.lyvecloud.seagate.com", opt.Region)
 	}

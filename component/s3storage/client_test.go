@@ -86,6 +86,7 @@ func newTestClient(configuration string) (*Client, error) {
 	}
 	// Validate endpoint
 	if conf.Endpoint == "" {
+		// TODO: change default to another provider (if we switch to another test S3 provider)
 		log.Warn("ParseAndValidateConfig : account endpoint not provided, assuming the default .lyvecloud.seagate.com style endpoint")
 		configForS3Client.authConfig.Endpoint = fmt.Sprintf("s3.%s.lyvecloud.seagate.com", conf.Region)
 	}
