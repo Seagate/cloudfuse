@@ -1346,14 +1346,14 @@ func (s *s3StorageTestSuite) TestStreamDirSmallCountNoDuplicates() {
 	objectList := make([]*internal.ObjAttr, 0)
 
 	for {
-		new_list, new_marker, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/", Token: marker, Count: 1})
+		newList, newMarker, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/", Token: marker, Count: 1})
 		s.assert.Nil(err)
-		objectList = append(objectList, new_list...)
-		marker = new_marker
+		objectList = append(objectList, newList...)
+		marker = newMarker
 		iteration++
 
 		log.Debug("s3StorageTestSuite::TestStreamDirSmallCountNoDuplicates : So far retrieved %d objects in %d iterations", len(objectList), iteration)
-		if new_marker == "" {
+		if newMarker == "" {
 			break
 		}
 	}

@@ -211,17 +211,17 @@ func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 	var iteration int = 0
 	var marker *string = nil
 	for {
-		new_list, new_marker, err := s3.storage.List(path, marker, common.MaxDirListCount)
+		newList, newMarker, err := s3.storage.List(path, marker, common.MaxDirListCount)
 		if err != nil {
 			log.Err("S3Storage::ReadDir : Failed to read dir [%s]", err)
 			return objectList, err
 		}
-		objectList = append(objectList, new_list...)
-		marker = new_marker
+		objectList = append(objectList, newList...)
+		marker = newMarker
 		iteration++
 
 		log.Debug("S3Storage::ReadDir : So far retrieved %d objects in %d iterations", len(objectList), iteration)
-		if new_marker == nil || *new_marker == "" {
+		if newMarker == nil || *newMarker == "" {
 			break
 		}
 	}
@@ -234,25 +234,25 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 
 	path := formatListDirName(options.Name)
 
-	new_list, new_marker, err := s3.storage.List(path, &options.Token, options.Count)
+	newList, newMarker, err := s3.storage.List(path, &options.Token, options.Count)
 	if err != nil {
 		log.Err("S3Storage::StreamDir : Failed to read dir [%s]", err)
-		return new_list, "", err
+		return newList, "", err
 	}
 
-	log.Debug("S3Storage::StreamDir : Retrieved %d objects with %s marker for Path %s", len(new_list), options.Token, path)
+	log.Debug("S3Storage::StreamDir : Retrieved %d objects with %s marker for Path %s", len(newList), options.Token, path)
 
-	if new_marker != nil && *new_marker != "" {
-		log.Debug("S3Storage::StreamDir : next-marker %s for Path %s", *new_marker, path)
-		if len(new_list) == 0 {
-			/* In some customer scenario we have seen that new_list is empty but marker is not empty
+	if newMarker != nil && *newMarker != "" {
+		log.Debug("S3Storage::StreamDir : next-marker %s for Path %s", *newMarker, path)
+		if len(newList) == 0 {
+			/* In some customer scenario we have seen that newList is empty but marker is not empty
 			   which means backend has not returned any items this time but there are more left.
 			   If we return back this empty list to libfuse layer it will assume listing has completed
 			   and will terminate the readdir call. As there are more items left on the server side we
 			   need to retry getting a list here.
 			*/
-			log.Warn("S3Storage::StreamDir : next-marker %s but current list is empty. Need to retry listing", *new_marker)
-			options.Token = *new_marker
+			log.Warn("S3Storage::StreamDir : next-marker %s but current list is empty. Need to retry listing", *newMarker)
+			options.Token = *newMarker
 			return s3.StreamDir(options)
 		}
 	}
@@ -261,12 +261,12 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	if len(path) == 0 {
 		path = "/"
 	}
-	s3StatsCollector.PushEvents(streamDir, path, map[string]interface{}{count: len(new_list)})
+	s3StatsCollector.PushEvents(streamDir, path, map[string]interface{}{count: len(newList)})
 
 	// increment streamdir call count
 	s3StatsCollector.UpdateStats(stats_manager.Increment, streamDir, (int64)(1))
 
-	return new_list, *new_marker, nil
+	return newList, *newMarker, nil
 }
 
 func (s3 *S3Storage) RenameDir(options internal.RenameDirOptions) error {
