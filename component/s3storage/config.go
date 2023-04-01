@@ -77,3 +77,4 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 }
 
 // TODO: allow dynamic config changes to affect SDK behavior?
+// TODO: write config_test.go with unit tests

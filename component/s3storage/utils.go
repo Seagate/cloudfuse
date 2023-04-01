@@ -45,6 +45,8 @@ import (
 // TODO: add AWS SDK customization options and helper functions here to write any relevant SDK-specific structures
 // TODO: add AWS SDK logging function code here (like getLogOptions)
 // TODO: define any SDK-specific error code enumerations here
+// TODO: handle AWS S3 storage tiers here
+// TODO: write utils_test.go with unit tests
 
 //    ----------- Content-type handling  ---------------
 
