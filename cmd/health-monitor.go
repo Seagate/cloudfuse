@@ -36,6 +36,8 @@ package cmd
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"lyvecloudfuse/common"
@@ -103,7 +105,16 @@ var healthMonCmd = &cobra.Command{
 		log.Debug("health-monitor : Options = %v", cliParams)
 		log.Debug("health-monitor : Starting health-monitor for lyvecloudfuse pid = %s", pid)
 
-		hmcmd := exec.Command(hmcommon.BfuseMon, cliParams...)
+		var hmcmd *exec.Cmd
+		if runtime.GOOS == "windows" {
+			path, err := filepath.Abs(hmcommon.BfuseMon + ".exe")
+			if err != nil {
+				return fmt.Errorf("failed to start health monitor [%s]", err.Error())
+			}
+			hmcmd = exec.Command(path, cliParams...)
+		} else {
+			hmcmd = exec.Command(hmcommon.BfuseMon, cliParams...)
+		}
 		cliOut, err := hmcmd.Output()
 		if len(cliOut) > 0 {
 			log.Debug("health-monitor : cliout = %v", string(cliOut))
