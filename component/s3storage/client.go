@@ -589,7 +589,8 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// Only look for CommonPrefixes (subdirectories) if List was called with a prefix ending in a slash.
 	// If prefix does not end in a slash, CommonPrefixes would find unwanted results.
 	// For example, it would find "filet-of-fish/" when searching for "file".
-	findCommonPrefixes := listPath[len(listPath)-1] == '/'
+	// Check for an empty path to prevent indexing to [-1]
+	findCommonPrefixes := listPath == "" || listPath[len(listPath)-1] == '/'
 
 	// create a map to keep track of all directories
 	var dirList = make(map[string]bool)
