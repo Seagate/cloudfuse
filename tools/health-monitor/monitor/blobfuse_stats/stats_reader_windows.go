@@ -164,7 +164,9 @@ func (bfs *BlobfuseStats) statsReader() error {
 			return err
 		}
 
-		// connect to the named pipe
+		// This is a blocking call that waits for a client instance to call the CreateFile function and once that
+		// happens then we can safely start writing to the named pipe.
+		// See https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
 		err = windows.ConnectNamedPipe(handle, nil)
 		if err != nil {
 			log.Err("StatsReader::statsReader : unable to connect to named pipe %s: [%v]", bfs.transferPipe, err)

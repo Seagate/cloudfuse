@@ -37,7 +37,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -344,14 +343,47 @@ func statsPolling() {
 
 	log.Info("stats_manager::statsPolling : Creating named pipe %s", common.WindowsPollingPipe)
 
-	// connect to the named pipe
+	// This is a blocking call that waits for a client instance to call the CreateFile function and once that
+	// happens then we can safely start writing to the named pipe.
+	// See https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
 	err = windows.ConnectNamedPipe(handle, nil)
 	if err != nil {
 		log.Err("stats_manager::statsPolling : unable to connect to named pipe %s: [%v]", common.WindowsPollingPipe, err)
 		windows.CloseHandle(handle)
 		return
 	}
+	defer windows.Close(handle)
 	log.Info("StatsReader::statsReader : Connected polling pipe")
+
+	// Setup transfer pipe
+	var tPipe windows.Handle
+	for {
+		tPipe, err = windows.CreateFile(
+			windows.StringToUTF16Ptr(common.WindowsTransferPipe),
+			windows.GENERIC_WRITE,
+			0,
+			nil,
+			windows.OPEN_EXISTING,
+			0,
+			0,
+		)
+
+		if err == nil {
+			break
+		}
+
+		if err == windows.ERROR_FILE_NOT_FOUND {
+			log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.WindowsTransferPipe)
+			windows.CloseHandle(tPipe)
+			time.Sleep(1 * time.Second)
+		} else {
+			log.Err("stats_manager::statsDumper: unable to open pipe file [%v]", err)
+			windows.CloseHandle(tPipe)
+			time.Sleep(1 * time.Second)
+			//return
+		}
+	}
+	defer windows.CloseHandle(tPipe)
 
 	var buf [4096]byte
 	var bytesRead uint32
@@ -407,36 +439,7 @@ func statsPolling() {
 
 			// send the stats collected so far to transfer pipe
 			stMgrOpt.transferMtx.Lock()
-			var tPipe windows.Handle
-			for {
-				tPipe, err = windows.CreateFile(
-					windows.StringToUTF16Ptr(common.WindowsTransferPipe),
-					windows.GENERIC_WRITE,
-					0,
-					nil,
-					windows.OPEN_EXISTING,
-					0,
-					0,
-				)
-
-				if err == nil {
-					break
-				}
-
-				if err == windows.ERROR_FILE_NOT_FOUND {
-					log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.WindowsTransferPipe)
-					windows.CloseHandle(tPipe)
-					time.Sleep(1 * time.Second)
-				} else {
-					log.Err("stats_manager::statsDumper: unable to open pipe file [%v]", err)
-					windows.CloseHandle(tPipe)
-					time.Sleep(1 * time.Second)
-					//return
-				}
-			}
-
-			file := os.NewFile(uintptr(tPipe), common.WindowsPollingPipe)
-			_, err = file.WriteString(fmt.Sprintf("%v\n", string(msg)))
+			err = windows.WriteFile(tPipe, []byte(fmt.Sprintf("%v\n", string(msg))), nil, nil)
 			stMgrOpt.transferMtx.Unlock()
 			if err != nil {
 				log.Err("stats_manager::statsDumper : Unable to write to pipe [%v]", err)
