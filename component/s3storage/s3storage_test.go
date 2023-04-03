@@ -156,6 +156,7 @@ func (s *s3StorageTestSuite) SetupTest() {
 }
 
 func (s *s3StorageTestSuite) setupTestHelper(configuration string, bucket string, create bool) {
+	// TODO: actually create a bucket for testing (gated by privileges)
 	if bucket == "" {
 		bucket = generateBucketName()
 	}
@@ -178,6 +179,17 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, bucket string
 	}
 
 	s.awsS3Client = s.s3Storage.storage.(*Client).awsS3Client
+
+	// set a prefix for testing
+	// this is only necessary because our demo and our test share a single bucket
+	// TODO: once we have a separate test bucket, or (preferably) the ability to create one in testing
+	// 	remove this prefix so we can test operations at the root of the bucket
+	if s.s3Storage.stConfig.prefixPath == "" {
+		err = s.s3Storage.storage.SetPrefixPath("test")
+		if err != nil {
+			fmt.Printf("s3StorageTestSuite::setupTestHelper : SetPrefixPath failed. Here's why: %v\n", err)
+		}
+	}
 }
 
 func generateConfigYaml(testParams storageTestConfiguration) string {
