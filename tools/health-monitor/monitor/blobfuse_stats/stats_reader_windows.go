@@ -36,7 +36,7 @@
 package blobfuse_stats
 
 import (
-	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -105,22 +105,36 @@ func (bfs *BlobfuseStats) Validate() error {
 func (bfs *BlobfuseStats) handleStatsReader(handle windows.Handle) error {
 	defer windows.CloseHandle(handle)
 
-	reader := bufio.NewReader(os.NewFile(uintptr(handle), bfs.transferPipe))
+	var buf [4096]byte
+	var bytesRead uint32
+	var messageBuf bytes.Buffer
 	var e error
 
 	for {
-		line, err := reader.ReadBytes('\n')
-		log.Info(string(line))
-		if err != nil {
-			log.Err("StatsReader::statsReader : [%v]", err)
-			e = err
-			break
+		// Empty the buffer before reading
+		messageBuf.Reset()
+		// read the polling message sent by stats monitor
+		for {
+			err := windows.ReadFile(handle, buf[:], &bytesRead, nil)
+
+			if err != nil && err != windows.ERROR_MORE_DATA {
+				log.Err("StatsReader::statsReader : Unable to read from pipe [%v]", err)
+				return err
+			}
+
+			messageBuf.Write(buf[:bytesRead])
+
+			if err != windows.ERROR_MORE_DATA {
+				break
+			}
 		}
 
-		log.Debug("StatsReader::statsReader : Line: %v", string(line))
+		message := messageBuf.String()
+
+		log.Debug("StatsReader::statsReader : Message: %v", message)
 
 		st := stats_manager.PipeMsg{}
-		err = json.Unmarshal(line, &st)
+		err := json.Unmarshal([]byte(message), &st)
 		if err != nil {
 			log.Err("StatsReader::statsReader : Unable to unmarshal json [%v]", err)
 			continue
@@ -150,8 +164,6 @@ func (bfs *BlobfuseStats) statsReader() error {
 			return err
 		}
 
-		log.Info("StatsReader::statsReader : Creating named pipe %s", bfs.transferPipe)
-
 		// connect to the named pipe
 		err = windows.ConnectNamedPipe(handle, nil)
 		if err != nil {
@@ -159,7 +171,7 @@ func (bfs *BlobfuseStats) statsReader() error {
 			windows.CloseHandle(handle)
 			time.Sleep(1 * time.Second)
 		}
-		log.Info("StatsReader::statsReader : Connected transfer pipe")
+		log.Info("StatsReader::statsReader : Connected transfer pipe %s", bfs.transferPipe)
 
 		go bfs.handleStatsReader(handle)
 	}
@@ -200,7 +212,7 @@ func (bfs *BlobfuseStats) statsPoll() {
 			0,
 			nil,
 			windows.OPEN_EXISTING,
-			windows.FILE_FLAG_OVERLAPPED,
+			0,
 			0,
 		)
 
@@ -213,7 +225,8 @@ func (bfs *BlobfuseStats) statsPoll() {
 			time.Sleep(1 * time.Second)
 		} else {
 			log.Err("StatsReader::statsReader : unable to open pipe file [%v]", err)
-			return
+			time.Sleep(1 * time.Second)
+			// return
 		}
 	}
 	//defer windows.CloseHandle(hPipe)
@@ -227,6 +240,7 @@ func (bfs *BlobfuseStats) statsPoll() {
 
 	for t := range ticker.C {
 		_, err = writer.WriteString(fmt.Sprintf("Poll at %v\n", t.Format(time.RFC3339)))
+		log.Info("stats_manager::statsDumper : writing to polling pipe file:", fmt.Sprintf("Poll at %v\n", t.Format(time.RFC3339)))
 		if err != nil {
 			log.Err("StatsReader::statsPoll : [%v]", err)
 			break

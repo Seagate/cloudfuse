@@ -34,7 +34,7 @@
 package stats_manager
 
 import (
-	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -228,7 +228,7 @@ func (sc *StatsCollector) statsDumper() {
 	for {
 		hPipe, err = windows.CreateFile(
 			windows.StringToUTF16Ptr(common.WindowsTransferPipe),
-			windows.GENERIC_WRITE|windows.GENERIC_READ,
+			windows.GENERIC_WRITE,
 			0,
 			nil,
 			windows.OPEN_EXISTING,
@@ -353,19 +353,35 @@ func statsPolling() {
 	}
 	log.Info("StatsReader::statsReader : Connected polling pipe")
 
-	reader := bufio.NewReader(os.NewFile(uintptr(handle), common.WindowsPollingPipe))
+	var buf [4096]byte
+	var bytesRead uint32
+	var messageBuf bytes.Buffer
 
 	for {
+		// Empty the buffer before reading
+		messageBuf.Reset()
 		// read the polling message sent by stats monitor
-		line, err := reader.ReadBytes('\n')
-		if err != nil {
-			log.Err("stats_manager::statsPolling : Unable to read from pipe [%v]", err)
-			disableMonitoring()
-			break
+		for {
+			err := windows.ReadFile(handle, buf[:], &bytesRead, nil)
+
+			if err != nil && err != windows.ERROR_MORE_DATA {
+				log.Err("stats_manager::statsPolling : Unable to read from pipe [%v]", err)
+				disableMonitoring()
+				return
+			}
+
+			messageBuf.Write(buf[:bytesRead])
+
+			if err != windows.ERROR_MORE_DATA {
+				break
+			}
 		}
 
+		message := messageBuf.String()
+		log.Debug("stats_manager::statsPolling : Recieved message to polling pipe %v", message)
+
 		// validating poll message
-		if !strings.Contains(string(line), "Poll at") {
+		if !strings.Contains(string(message), "Poll at") {
 			continue
 		}
 
@@ -387,7 +403,7 @@ func statsPolling() {
 				continue
 			}
 
-			// log.Debug("stats_manager::statsPolling : stats: %v", string(msg))
+			log.Debug("stats_manager::statsPolling : stats: %v", string(msg))
 
 			// send the stats collected so far to transfer pipe
 			stMgrOpt.transferMtx.Lock()
@@ -399,7 +415,7 @@ func statsPolling() {
 					0,
 					nil,
 					windows.OPEN_EXISTING,
-					windows.FILE_FLAG_OVERLAPPED,
+					0,
 					0,
 				)
 
