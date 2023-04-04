@@ -148,10 +148,13 @@ func (s *clientTestSuite) cleanupTest() {
 }
 
 func (s *clientTestSuite) TestUpdateConfig() {
+	// TODO: outline
 }
 func (s *clientTestSuite) TestNewCredentialKey() {
+	// not implemented in client.go
 }
 func (s *clientTestSuite) TestListBuckets() {
+	defer s.cleanupTest()
 	// TODO: generalize this test by creating, listing, then destroying a bucket
 	// 	We need to get permissions to create buckets in Lyve Cloud, or implement this against AWS S3.
 	// 	For now, the bucket parameter has been removed from the test suite for tidiness sake
@@ -160,6 +163,7 @@ func (s *clientTestSuite) TestListBuckets() {
 	s.assert.Equal(buckets, []string{"stxe1-srg-lens-lab1"})
 }
 func (s *clientTestSuite) TestSetPrefixPath() {
+	// TODO: outline
 }
 func (s *clientTestSuite) TestCreateFile() {
 	defer s.cleanupTest()
@@ -236,6 +240,7 @@ func (s *clientTestSuite) TestDeleteFile() {
 	s.assert.NotNil(err)
 }
 func (s *clientTestSuite) TestDeleteDirectory() {
+	// TODO: outline
 }
 func (s *clientTestSuite) TestRenameFile() {
 	defer s.cleanupTest()
@@ -266,16 +271,21 @@ func (s *clientTestSuite) TestRenameFile() {
 	s.assert.Nil(err)
 }
 func (s *clientTestSuite) TestRenameDirectory() {
+	// TODO: outline
 }
 func (s *clientTestSuite) TestgetAttrUsingRest() {
+	// no longer in client.go
 }
 func (s *clientTestSuite) TestgetAttrUsingList() {
+	// no longer in client.go
 }
 func (s *clientTestSuite) TestGetAttr() {
 	// TODO (assert nil where necessary)
 	// generate file name
 	// put object
 	// call get attr
+
+	// TODO: also implement other tests for getatter (see s3storage_test)
 }
 func (s *clientTestSuite) TestList() {
 	// TODO (assert nil where necessary)
@@ -307,7 +317,8 @@ func (s *clientTestSuite) TestReadToFile() {
 
 	// file content should match generated body
 	output := make([]byte, bodyLen)
-	f, _ = os.Open(f.Name())
+	f, err = os.Open(f.Name())
+	s.assert.Nil(err)
 	outputLen, err := f.Read(output)
 	s.assert.Nil(err)
 	s.assert.EqualValues(bodyLen, outputLen)
@@ -355,6 +366,7 @@ func (s *clientTestSuite) TestReadInBuffer() {
 	s.assert.EqualValues(body[:outputLen], output)
 }
 func (s *clientTestSuite) TestcalculateBlockSize() {
+	// no longer in client.go
 }
 func (s *clientTestSuite) TestWriteFromFile() {
 	defer s.cleanupTest()
@@ -408,26 +420,42 @@ func (s *clientTestSuite) TestWriteFromBuffer() {
 	s.assert.EqualValues(body, output)
 }
 func (s *clientTestSuite) TestGetFileBlockOffsets() {
+	// not implemented in client.go
 }
 func (s *clientTestSuite) TestcreateBlock() {
+	// no longer in client.go
 }
 func (s *clientTestSuite) TestcreateNewBlocks() {
+	// no longer in client.go
 }
 func (s *clientTestSuite) TestremoveBlocks() {
+	// no longer in client.go
 }
 func (s *clientTestSuite) TestTruncateFile() {
+	// TODO: outline
 }
 func (s *clientTestSuite) TestWrite() {
-	// TODO : outline
-	// handlemap.NewHandle(name)
+	// TODO (assert nil where necessary)
+	// generate name
+	// generate data
+	// put object
+	// generate new data
+	// call write with new data and offset
+	//   handlemap.NewHandle(name) to pass into options
+	// get object
+	// assert body matches expected combo of old and new data
 }
 func (s *clientTestSuite) TeststageAndCommitModifiedBlocks() {
+	// no longer in client.go
 }
 func (s *clientTestSuite) TestStageAndCommit() {
+	// no longer in client.go
 }
 func (s *clientTestSuite) TestChangeMod() {
+	// no longer in client.go
 }
 func (s *clientTestSuite) TestChangeOwner() {
+	// no longer in client.go
 }
 
 func TestClient(t *testing.T) {
