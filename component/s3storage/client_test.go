@@ -43,6 +43,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"strings"
 	"testing"
 
@@ -242,7 +243,25 @@ func (s *clientTestSuite) TestDeleteFile() {
 	s.assert.NotNil(err)
 }
 func (s *clientTestSuite) TestDeleteDirectory() {
-	// TODO: outline
+	defer s.cleanupTest()
+	// setup
+	dirName := generateDirectoryName()
+	fileName := generateFileName() // can't have empty directory
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(path.Join(dirName, fileName)),
+	})
+	s.assert.Nil(err)
+
+	err = s.client.DeleteDirectory(dirName)
+	s.assert.Nil(err)
+
+	// file in directory should no longer be there
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(path.Join(dirName, fileName)),
+	})
+	s.assert.NotNil(err)
 }
 func (s *clientTestSuite) TestRenameFile() {
 	defer s.cleanupTest()
@@ -273,7 +292,32 @@ func (s *clientTestSuite) TestRenameFile() {
 	s.assert.Nil(err)
 }
 func (s *clientTestSuite) TestRenameDirectory() {
-	// TODO: outline
+	defer s.cleanupTest()
+	// setup
+	srcDir := generateDirectoryName()
+	fileName := generateFileName() // can't have empty directory
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(path.Join(srcDir, fileName)),
+	})
+	s.assert.Nil(err)
+
+	dstDir := generateDirectoryName()
+	err = s.client.RenameDirectory(srcDir, dstDir)
+	s.assert.Nil(err)
+
+	// file in srcDir should no longer be there
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(path.Join(srcDir, fileName)),
+	})
+	s.assert.NotNil(err)
+	// file in dstDir should be there
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(path.Join(dstDir, fileName)),
+	})
+	s.assert.Nil(err)
 }
 func (s *clientTestSuite) TestgetAttrUsingRest() {
 	// no longer in client.go
@@ -282,17 +326,25 @@ func (s *clientTestSuite) TestgetAttrUsingList() {
 	// no longer in client.go
 }
 func (s *clientTestSuite) TestGetAttr() {
-	// TODO: (assert nil where necessary)
-	// generate file name
-	// put object
-	// call get attr
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
+
+	attr, err := s.client.GetAttr(name)
+	s.assert.Nil(err)
+	s.assert.NotNil(attr)
 
 	// TODO: also implement other tests for getatter (see s3storage_test)
 }
 func (s *clientTestSuite) TestList() {
 	// TODO: (assert nil where necessary)
 	// generate prefix
-	// leverage create/generate hierarchy:
+	// leverage setup hierarchy:
 	// 	put a few objects with that prefix
 	// call list
 	// assert names match generated
