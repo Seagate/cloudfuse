@@ -49,6 +49,8 @@ import (
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/config"
 	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/handlemap"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -280,7 +282,7 @@ func (s *clientTestSuite) TestgetAttrUsingList() {
 	// no longer in client.go
 }
 func (s *clientTestSuite) TestGetAttr() {
-	// TODO (assert nil where necessary)
+	// TODO: (assert nil where necessary)
 	// generate file name
 	// put object
 	// call get attr
@@ -288,7 +290,7 @@ func (s *clientTestSuite) TestGetAttr() {
 	// TODO: also implement other tests for getatter (see s3storage_test)
 }
 func (s *clientTestSuite) TestList() {
-	// TODO (assert nil where necessary)
+	// TODO: (assert nil where necessary)
 	// generate prefix
 	// leverage create/generate hierarchy:
 	// 	put a few objects with that prefix
@@ -432,18 +434,65 @@ func (s *clientTestSuite) TestremoveBlocks() {
 	// no longer in client.go
 }
 func (s *clientTestSuite) TestTruncateFile() {
-	// TODO: outline
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	bodyLen := 20
+	body := []byte(randomString(bodyLen))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	size := 13
+	err = s.client.TruncateFile(name, int64(size))
+	s.assert.Nil(err)
+
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
+
+	// object body should match truncated initial body
+	defer result.Body.Close()
+	output, err := ioutil.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(body[:size], output)
 }
 func (s *clientTestSuite) TestWrite() {
-	// TODO (assert nil where necessary)
-	// generate name
-	// generate data
-	// put object
-	// generate new data
-	// call write with new data and offset
-	//   handlemap.NewHandle(name) to pass into options
-	// get object
-	// assert body matches expected combo of old and new data
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	bodyLen := 20
+	oldBody := []byte(randomString(bodyLen))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(oldBody),
+	})
+	s.assert.Nil(err)
+
+	offset := 13
+	newData := []byte(randomString(bodyLen - offset))
+	h := handlemap.NewHandle(name)
+	err = s.client.Write(internal.WriteFileOptions{Handle: h, Offset: int64(offset), Data: newData})
+	s.assert.Nil(err)
+
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
+
+	// object body should match generated combo of old and new data
+	defer result.Body.Close()
+	output, err := ioutil.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(oldBody[:offset], output[:offset])
+	s.assert.EqualValues(newData, output[offset:])
 }
 func (s *clientTestSuite) TeststageAndCommitModifiedBlocks() {
 	// no longer in client.go
