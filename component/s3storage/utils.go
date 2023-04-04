@@ -35,16 +35,82 @@ package s3storage
 
 import (
 	"encoding/json"
+	"errors"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
+
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 // TODO: add AWS SDK customization options and helper functions here to write any relevant SDK-specific structures
 // TODO: add AWS SDK logging function code here (like getLogOptions)
-// TODO: define any SDK-specific error code enumerations here
+
+// ----------- Cloud Storage error code handling ---------------
+
+// This takes an err from an S3 API call, parses the error,
+// prints a helpful error message, and returns the corresponding system error code.
+func parseS3Err(err error, attemptedAction string) error {
+
+	// trivial case
+	if err == nil {
+		noErr := syscall.Errno(0)
+		return noErr
+	}
+
+	// get the name of the function that called this
+	functionName := ""
+	pc, _, _, ok := runtime.Caller(1)
+	if ok {
+		longFuncName := runtime.FuncForPC(pc).Name()
+		// the function name returned is long, e.g. "lyvecloudfuse/component/s3storage.(*Client).getObject"
+		// split the long function name using the component name
+		funcNameParts := strings.Split(longFuncName, compName)
+		if len(funcNameParts) > 1 {
+			// trim the leading dot, so we get something like "(*Client).getObject"
+			functionName = strings.Trim(funcNameParts[1], ".")
+		}
+	}
+
+	// No such key (object not in bucket)
+	var nsk *types.NoSuchKey
+	if errors.As(err, &nsk) {
+		log.Err("%s : Failed to %s because key does not exist", functionName, attemptedAction)
+		return syscall.ENOENT
+	}
+
+	// Handle errors of type smithy.APIError
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		code := apiErr.ErrorCode()
+		// Invalid range
+		if code == "InvalidRange" {
+			log.Err("%s : Failed to %s with error %s because range is invalid", functionName, attemptedAction, code)
+			return syscall.ERANGE
+		}
+		// Not Found - this is a 404 HTTP response error)
+		if code == "NotFound" {
+			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
+			return syscall.ENOENT
+		}
+		// No Such Key (why didn't this match types.NoSuchKey above?)
+		if code == "NoSuchKey" {
+			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
+			return syscall.ENOENT
+		}
+	}
+
+	// unrecognized error - parsing failed
+	// print and return the original error
+	log.Err("%s : Failed to %s. Here's why: %v", functionName, attemptedAction, err)
+	return err
+}
+
 // TODO: handle AWS S3 storage tiers here
 // TODO: write utils_test.go with unit tests
 
@@ -117,7 +183,7 @@ func getContentType(key string) string {
 	return "application/octet-stream"
 }
 
-func populateContentType(newSet string) error { //nolint
+func populateContentType(newSet string) error {
 	var data map[string]string
 	if err := json.Unmarshal([]byte(newSet), &data); err != nil {
 		log.Err("Failed to parse config file : %s [%s]", newSet, err.Error())

@@ -36,7 +36,6 @@ package s3storage
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -56,7 +55,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/aws/smithy-go"
 )
 
 const (
@@ -186,22 +184,10 @@ func (cl *Client) getObject(key string, offset int64, count int64) (body io.Read
 
 	// check for errors
 	if err != nil {
-		log.Err("Client::getObject : Failed to get object %s. Here's why: %v", key, err)
-		// No such key found so object is not in S3
-		var nsk *types.NoSuchKey
-		if errors.As(err, &nsk) {
-			err = syscall.ENOENT
-		}
-		// Invalid range
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			code := apiErr.ErrorCode()
-			if code == "InvalidRange" {
-				err = syscall.ERANGE
-			}
-		}
-		return nil, err
+		attemptedAction := fmt.Sprintf("GetObject(%s)", key)
+		return nil, parseS3Err(err, attemptedAction)
 	}
+
 	// return body
 	return result.Body, err
 }
@@ -219,6 +205,7 @@ func (cl *Client) putObject(key string, objectData io.Reader) (*s3.PutObjectOutp
 		ContentType: aws.String(getContentType(key)),
 	})
 
+	// parse errors
 	return result, err
 }
 
@@ -422,35 +409,17 @@ func (cl *Client) RenameFile(source string, target string) (err error) {
 	})
 	// check for errors on copy
 	if err != nil {
-		// No such key found so object is not in S3
-		var nsk *types.NoSuchKey
-		if errors.As(err, &nsk) {
-			log.Err("Client::RenameFile : %s does not exist", source)
-			return syscall.ENOENT
-		}
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			// No Such Key
-			// TODO: Fix this error. For some reason, CopyObject gives a no such key error, but as a Smithy error
-			// so need a different case to catch this. Understand why this does not give a no such key error type
-			code := apiErr.ErrorCode()
-			if code == "NoSuchKey" {
-				log.Err("Client::RenameFile : %s does not exist", source)
-				return syscall.ENOENT
-			}
-		}
-		log.Err("Client::RenameFile : Failed to start copy of file %s. Here's why: %v", source, err)
-		return err
+		attemptedAction := fmt.Sprintf("copy %s to %s", sourceKey, targetKey)
+		return parseS3Err(err, attemptedAction)
 	}
-
-	log.Debug("Client::RenameFile : copy %s -> %s done", source, target)
 
 	// Copy of the file is done so now delete the older file
 	// in this case we don't need to check if the file exists, so we use deleteObject, not DeleteFile
 	// this is what S3's DeleteObject spec is meant for: to make sure the object doesn't exist anymore
 	_, err = cl.deleteObject(sourceKey)
 	if err != nil {
-		log.Err("Client::RenameFile : Failed to delete source object after copy. Here's why: %v", err)
+		attemptedAction := fmt.Sprintf("delete source object %s after copy", sourceKey)
+		return parseS3Err(err, attemptedAction)
 	}
 
 	return err
@@ -521,24 +490,9 @@ func (cl *Client) getFileAttr(name string) (attr *internal.ObjAttr, err error) {
 		attr = createObjAttr(name, result.ContentLength, *result.LastModified)
 		return attr, err
 	}
-	// err is not nil
-	log.Debug("Client::getFileAttr : headObject(%s) failed. Here's why: %v", key, err)
-	// No such key found so object is not in S3
-	var nsk *types.NoSuchKey
-	if errors.As(err, &nsk) {
-		return nil, syscall.ENOENT
-	}
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
-		code := apiErr.ErrorCode()
-		if code == "NotFound" {
-			return nil, syscall.ENOENT
-		}
-	}
 
-	// unknown err - we have bigger problems than a non-existent object
-	log.Err("Client::getFileAttr : headObject(%s) failed. Here's why: %v", key, err)
-	return nil, err
+	attemptedAction := fmt.Sprintf("HeadObject(%s)", key)
+	return nil, parseS3Err(err, attemptedAction)
 }
 
 func (cl *Client) getDirectoryAttr(dirName string) (attr *internal.ObjAttr, err error) {
@@ -821,8 +775,8 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	// })
 	// check for errors
 	if err != nil {
-		log.Err("Client::WriteFromFile : Failed to upload object %s. Here's why: %v", name, err)
-		return err
+		attemptedAction := fmt.Sprintf("upload object %s", key)
+		return parseS3Err(err, attemptedAction)
 	}
 
 	// TODO: Add monitor tracking
@@ -853,8 +807,8 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data 
 	// TODO: handle metadata with S3
 	_, err = cl.putObject(key, dataReader)
 	if err != nil {
-		log.Err("Couldn't upload object to %v. Here's why: %v", name, err)
-		return err
+		attemptedAction := fmt.Sprintf("upload object %s", key)
+		return parseS3Err(err, attemptedAction)
 	}
 	return nil
 }
@@ -900,7 +854,8 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	key := cl.getKey(name)
 	_, err = cl.putObject(key, truncatedDataReader)
 	if err != nil {
-		log.Err("Client::TruncateFile : Failed to write truncated data to object %s. Here's why: %v", name, err)
+		attemptedAction := fmt.Sprintf("write truncated data to object %s", key)
+		return parseS3Err(err, attemptedAction)
 	}
 
 	return err
