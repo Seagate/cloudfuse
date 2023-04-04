@@ -56,6 +56,8 @@ import (
 // This takes an err from an S3 API call, parses the error,
 // prints a helpful error message, and returns the corresponding system error code.
 func parseS3Err(err error, attemptedAction string) error {
+	// guide: https://aws.github.io/aws-sdk-go-v2/docs/handling-errors/
+	// reference: https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2/types
 
 	// trivial case
 	if err == nil {
@@ -77,29 +79,43 @@ func parseS3Err(err error, attemptedAction string) error {
 		}
 	}
 
-	// No such key (object not in bucket)
-	var nsk *types.NoSuchKey
-	if errors.As(err, &nsk) {
-		log.Err("%s : Failed to %s because key does not exist", functionName, attemptedAction)
-		return syscall.ENOENT
+	// Handle errors of type smithy.OperationError (unwrap these to get the APIError underneath)
+	var opErr *smithy.OperationError
+	if errors.As(err, &opErr) {
+		operation := opErr.Operation()
+		unwrappedError := opErr.Unwrap()
+		log.Err("failed to call %s with error: %v", operation, unwrappedError)
+		err = unwrappedError
 	}
 
 	// Handle errors of type smithy.APIError
 	var apiErr smithy.APIError
 	if errors.As(err, &apiErr) {
+
 		code := apiErr.ErrorCode()
+
+		// handle modeled service error responses (those that have their own types)
+		switch apiErr.(type) {
+		case *types.NotFound:
+			// Not Found - 404
+			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
+			return syscall.ENOENT
+		case *types.NoSuchKey:
+			// No Such Key
+			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
+			return syscall.ENOENT
+		}
+
+		// handle un-modeled service error responses (that do not have a dedicated type)
+
 		// Invalid range
 		if code == "InvalidRange" {
 			log.Err("%s : Failed to %s with error %s because range is invalid", functionName, attemptedAction, code)
 			return syscall.ERANGE
 		}
-		// Not Found - this is a 404 HTTP response error)
 		if code == "NotFound" {
-			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
-			return syscall.ENOENT
-		}
-		// No Such Key (why didn't this match types.NoSuchKey above?)
-		if code == "NoSuchKey" {
+			// the no such key error ends up here because after unwrapping it, it doesn't match the NotFound or NoSuchKey type
+			// TODO: research this further
 			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
 			return syscall.ENOENT
 		}
