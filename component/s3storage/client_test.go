@@ -151,7 +151,12 @@ func (s *clientTestSuite) cleanupTest() {
 }
 
 func (s *clientTestSuite) TestUpdateConfig() {
-	// TODO: outline
+	// TODO: ?
+	// save current config blocksize
+	// call update config to arbitrary blocksize
+	// assert nil err and equalvalues arbitrary blocksize in config
+	// update config to previous blocksize
+	// assert nil err and equalvalues expected previous blocksize
 }
 func (s *clientTestSuite) TestNewCredentialKey() {
 	// not implemented in client.go
@@ -166,7 +171,15 @@ func (s *clientTestSuite) TestListBuckets() {
 	s.assert.Equal(buckets, []string{"stxe1-srg-lens-lab1"})
 }
 func (s *clientTestSuite) TestSetPrefixPath() {
-	// TODO: outline
+	// TODO: ?
+	// save current prefix path
+	// put subdir with file
+	// set prefix path to current prefix path plus subdir
+	// assert nil err and prefix path as expected in config
+	// get file without subdir
+	// assert err nil
+	// reset prefix path
+	// assert nil err and prefix path as expected in config
 }
 func (s *clientTestSuite) TestCreateFile() {
 	defer s.cleanupTest()
