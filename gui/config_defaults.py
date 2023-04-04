@@ -64,7 +64,7 @@ default_libfuse = {
 default_dynamicProfiler = {
     'dynamic-profile' : False,   # allows to turn on dynamic profiler for cpu/memory usage monitoring. Only for debugging, shall not be used in production
     'profiler-port' : 6060,      # port number for dynamic-profiler to listen for REST calls
-    'profiler-ip' : localhost    # IP address for dynamic-profiler to listen for REST calls
+    'profiler-ip' : 'localhost'    # IP address for dynamic-profiler to listen for REST calls
 }
 
 # Logger configs, for future use
@@ -113,9 +113,9 @@ default_filecache = {
 
 # Attribute cache related configuration
 default_attribute_cache = {
-    'timeout-sec' : 120         # time attributes can be cached (in sec)
-    'no-cache-on-list' : False  # do not cache attributes during listing, to optimize performance
-    'no-symlinks' : False       # to improve performance disable symlink support. symlinks will be treated like regular files
+    'timeout-sec' : 120,         # time attributes can be cached (in sec)
+    'no-cache-on-list' : False,  # do not cache attributes during listing, to optimize performance
+    'no-symlinks' : False        # to improve performance disable symlink support. symlinks will be treated like regular files
 }
 
 # Loopback configuration
