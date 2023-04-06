@@ -3,8 +3,8 @@
 
 default_config_common = {
     'foreground': False,    # run lyvecloudfuse in foreground or background
-    'allow-other': True,    # mount in read only mode - used for Streaming and FUSE
-    'read-only' : False,    # allow other users to access the mounted directory - used for FUSE and File Cache
+    'allow-other': True,    # allow other users to access the mounted directory - used for FUSE and File Cache
+    'read-only' : False,    # mount in read only mode - used for Streaming and FUSE
     'nonempty' : False      # allow mounting on non-empty directory - used for FUSE
 }
 
