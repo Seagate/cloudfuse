@@ -149,18 +149,6 @@ func (s *clientTestSuite) cleanupTest() {
 	// s.tearDownTestHelper(true)
 	_ = log.Destroy()
 }
-
-func (s *clientTestSuite) TestUpdateConfig() {
-	// TODO: ?
-	// save current config blocksize
-	// call update config to arbitrary blocksize
-	// assert nil err and equalvalues arbitrary blocksize in config
-	// update config to previous blocksize
-	// assert nil err and equalvalues expected previous blocksize
-}
-func (s *clientTestSuite) TestNewCredentialKey() {
-	// not implemented in client.go
-}
 func (s *clientTestSuite) TestListBuckets() {
 	defer s.cleanupTest()
 	// TODO: generalize this test by creating, listing, then destroying a bucket
@@ -332,12 +320,6 @@ func (s *clientTestSuite) TestRenameDirectory() {
 	})
 	s.assert.Nil(err)
 }
-func (s *clientTestSuite) TestgetAttrUsingRest() {
-	// no longer in client.go
-}
-func (s *clientTestSuite) TestgetAttrUsingList() {
-	// no longer in client.go
-}
 func (s *clientTestSuite) TestGetAttr() {
 	defer s.cleanupTest()
 	// setup
@@ -351,6 +333,7 @@ func (s *clientTestSuite) TestGetAttr() {
 	attr, err := s.client.GetAttr(name)
 	s.assert.Nil(err)
 	s.assert.NotNil(attr)
+	s.assert.False(attr.IsDir())
 
 	// TODO: also implement other tests for getatter (see s3storage_test)
 }
@@ -432,9 +415,6 @@ func (s *clientTestSuite) TestReadInBuffer() {
 	s.assert.Nil(err)
 	s.assert.EqualValues(body[:outputLen], output)
 }
-func (s *clientTestSuite) TestcalculateBlockSize() {
-	// no longer in client.go
-}
 func (s *clientTestSuite) TestWriteFromFile() {
 	defer s.cleanupTest()
 	// setup
@@ -485,18 +465,6 @@ func (s *clientTestSuite) TestWriteFromBuffer() {
 	output, err := ioutil.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(body, output)
-}
-func (s *clientTestSuite) TestGetFileBlockOffsets() {
-	// not implemented in client.go
-}
-func (s *clientTestSuite) TestcreateBlock() {
-	// no longer in client.go
-}
-func (s *clientTestSuite) TestcreateNewBlocks() {
-	// no longer in client.go
-}
-func (s *clientTestSuite) TestremoveBlocks() {
-	// no longer in client.go
 }
 func (s *clientTestSuite) TestTruncateFile() {
 	defer s.cleanupTest()
@@ -558,18 +526,6 @@ func (s *clientTestSuite) TestWrite() {
 	s.assert.Nil(err)
 	s.assert.EqualValues(oldBody[:offset], output[:offset])
 	s.assert.EqualValues(newData, output[offset:])
-}
-func (s *clientTestSuite) TeststageAndCommitModifiedBlocks() {
-	// no longer in client.go
-}
-func (s *clientTestSuite) TestStageAndCommit() {
-	// no longer in client.go
-}
-func (s *clientTestSuite) TestChangeMod() {
-	// no longer in client.go
-}
-func (s *clientTestSuite) TestChangeOwner() {
-	// no longer in client.go
 }
 
 func TestClient(t *testing.T) {
