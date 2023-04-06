@@ -103,8 +103,11 @@ func (l *SysLogger) init() error {
 	return nil
 }
 
+// populates an event in the windows event viewer
 func newEvent(l *SysLogger, lvl string, msg string) error {
 
+	//the first argument of wlog.Info() is the event ID following the http convention
+	//https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 	wlog, err := eventlog.Open("LyveCloudFuse")
 	if l.level == common.ELogLevel.LOG_DEBUG() {
 		wlog.Info(uint32(101), msg)
