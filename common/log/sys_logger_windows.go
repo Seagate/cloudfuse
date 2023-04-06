@@ -53,33 +53,33 @@ type SysLogger struct {
 var NoSyslogService = errors.New("failed to create syslog object")
 
 func newSysLogger(lvl common.LogLevel, tag string) (*SysLogger, error) {
-	l := &SysLogger{
+	sysLog := &SysLogger{
 		level: lvl,
 		tag:   tag,
 	}
 
-	err := l.init() //sets up events..
+	err := sysLog.init() //sets up events..
 	if err != nil {
 		return nil, err
 	}
-	return l, nil
+	return sysLog, nil
 }
 
-func (l *SysLogger) GetLoggerObj() *log.Logger {
-	return l.logger
+func (sysLog *SysLogger) GetLoggerObj() *log.Logger {
+	return sysLog.logger
 }
 
-func (l *SysLogger) SetLogLevel(level common.LogLevel) {
-	l.level = level
-	l.write(common.ELogLevel.LOG_CRIT().String(), "Log level reset to : %s", level.String())
+func (sysLog *SysLogger) SetLogLevel(level common.LogLevel) {
+	sysLog.level = level
+	sysLog.write(common.ELogLevel.LOG_CRIT().String(), "Log level reset to : %s", level.String())
 }
 
-func (l *SysLogger) GetType() string {
+func (sysLog *SysLogger) GetType() string {
 	return "log"
 }
 
-func (l *SysLogger) GetLogLevel() common.LogLevel {
-	return l.level
+func (sysLog *SysLogger) GetLogLevel() common.LogLevel {
+	return sysLog.level
 }
 
 func setupEvents() error {
@@ -94,7 +94,7 @@ func setupEvents() error {
 	return err
 }
 
-func (l *SysLogger) init() error {
+func (sysLog *SysLogger) init() error {
 
 	err := setupEvents() //set up windows event registry for app
 	if err != nil {
@@ -104,91 +104,91 @@ func (l *SysLogger) init() error {
 }
 
 // populates an event in the windows event viewer
-func newEvent(l *SysLogger, lvl string, msg string) error {
+func newEvent(sysLog *SysLogger, lvl string, msg string) error {
 
 	//the first argument of wlog.Info() is the event ID following the http convention
 	//https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 	wlog, err := eventlog.Open("LyveCloudFuse")
-	if l.level == common.ELogLevel.LOG_DEBUG() {
+	if sysLog.level == common.ELogLevel.LOG_DEBUG() {
 		wlog.Info(uint32(101), msg)
 	}
-	if l.level == common.ELogLevel.LOG_TRACE() {
+	if sysLog.level == common.ELogLevel.LOG_TRACE() {
 		wlog.Info(uint32(102), msg)
 	}
-	if l.level == common.ELogLevel.LOG_INFO() {
+	if sysLog.level == common.ELogLevel.LOG_INFO() {
 		wlog.Info(uint32(100), msg)
 	}
-	if l.level == common.ELogLevel.LOG_WARNING() {
+	if sysLog.level == common.ELogLevel.LOG_WARNING() {
 		wlog.Warning(uint32(300), msg)
 	}
-	if l.level == common.ELogLevel.LOG_ERR() {
+	if sysLog.level == common.ELogLevel.LOG_ERR() {
 		wlog.Error(uint32(400), msg)
 	}
-	if l.level == common.ELogLevel.LOG_CRIT() {
+	if sysLog.level == common.ELogLevel.LOG_CRIT() {
 		wlog.Error(uint32(401), msg)
 	}
 	return err
 }
 
-func (l *SysLogger) write(lvl string, format string, args ...interface{}) {
+func (sysLog *SysLogger) write(lvl string, format string, args ...interface{}) {
 
 	msg := fmt.Sprintf(format, args...)
 	//send this to be provided in the windows event.
-	newEvent(l, lvl, msg)
+	newEvent(sysLog, lvl, msg)
 
 }
 
-func (l *SysLogger) Debug(format string, args ...interface{}) {
-	if l.level == common.ELogLevel.LOG_DEBUG() {
-		l.write(common.ELogLevel.LOG_DEBUG().String(), format, args...)
+func (sysLog *SysLogger) Debug(format string, args ...interface{}) {
+	if sysLog.level == common.ELogLevel.LOG_DEBUG() {
+		sysLog.write(common.ELogLevel.LOG_DEBUG().String(), format, args...)
 	}
 }
 
-func (l *SysLogger) Trace(format string, args ...interface{}) {
-	if l.level == common.ELogLevel.LOG_TRACE() {
-		l.write(common.ELogLevel.LOG_TRACE().String(), format, args...)
+func (sysLog *SysLogger) Trace(format string, args ...interface{}) {
+	if sysLog.level == common.ELogLevel.LOG_TRACE() {
+		sysLog.write(common.ELogLevel.LOG_TRACE().String(), format, args...)
 	}
 }
 
-func (l *SysLogger) Info(format string, args ...interface{}) {
-	if l.level == common.ELogLevel.LOG_INFO() {
-		l.write(common.ELogLevel.LOG_INFO().String(), format, args...)
+func (sysLog *SysLogger) Info(format string, args ...interface{}) {
+	if sysLog.level == common.ELogLevel.LOG_INFO() {
+		sysLog.write(common.ELogLevel.LOG_INFO().String(), format, args...)
 	}
 }
 
-func (l *SysLogger) Warn(format string, args ...interface{}) {
-	if l.level == common.ELogLevel.LOG_WARNING() {
-		l.write(common.ELogLevel.LOG_WARNING().String(), format, args...)
+func (sysLog *SysLogger) Warn(format string, args ...interface{}) {
+	if sysLog.level == common.ELogLevel.LOG_WARNING() {
+		sysLog.write(common.ELogLevel.LOG_WARNING().String(), format, args...)
 	}
 }
 
-func (l *SysLogger) Err(format string, args ...interface{}) {
-	if l.level == common.ELogLevel.LOG_ERR() {
-		l.write(common.ELogLevel.LOG_ERR().String(), format, args...)
+func (sysLog *SysLogger) Err(format string, args ...interface{}) {
+	if sysLog.level == common.ELogLevel.LOG_ERR() {
+		sysLog.write(common.ELogLevel.LOG_ERR().String(), format, args...)
 	}
 }
 
-func (l *SysLogger) Crit(format string, args ...interface{}) {
-	if l.level == common.ELogLevel.LOG_CRIT() {
-		l.write(common.ELogLevel.LOG_CRIT().String(), format, args...)
+func (sysLog *SysLogger) Crit(format string, args ...interface{}) {
+	if sysLog.level == common.ELogLevel.LOG_CRIT() {
+		sysLog.write(common.ELogLevel.LOG_CRIT().String(), format, args...)
 	}
 }
 
 // Methods not needed for syslog based logging
-func (l *SysLogger) SetLogFile(name string) error {
+func (sysLog *SysLogger) SetLogFile(name string) error {
 	return nil
 }
 
-func (l *SysLogger) SetMaxLogSize(size int) {
+func (sysLog *SysLogger) SetMaxLogSize(size int) {
 }
 
-func (l *SysLogger) SetLogFileCount(count int) {
+func (sysLog *SysLogger) SetLogFileCount(count int) {
 }
 
-func (l *SysLogger) Destroy() error {
+func (sysLog *SysLogger) Destroy() error {
 	return nil
 }
 
-func (l *SysLogger) LogRotate() error {
+func (sysLog *SysLogger) LogRotate() error {
 	return nil
 }
