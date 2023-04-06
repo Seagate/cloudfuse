@@ -13,11 +13,6 @@ class azureAdvancedSettingsWidget(QWidget, Ui_Form):
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)
         
-        self.lineEdit_secretKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
-        self.lineEdit_azure_accountKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
-        self.lineEdit_azure_spnClientSecret.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
-        
-        
         
     def exitWindow(self):
         self.close()

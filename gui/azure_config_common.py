@@ -37,6 +37,8 @@ class azureSettingsWidget(QWidget, Ui_Form):
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_advancedSettings.clicked.connect(self.openAdvanced)
     
+        self.lineEdit_azure_accountKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+        self.lineEdit_azure_spnClientSecret.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
     
     
     # Set up slots
