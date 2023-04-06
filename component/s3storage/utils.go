@@ -36,7 +36,6 @@ package s3storage
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -45,8 +44,6 @@ import (
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
 
-	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 )
 
@@ -82,96 +79,52 @@ func parseS3Err(err error, attemptedAction string) error {
 		}
 	}
 
-	// research print
-	fmt.Printf("(Start) Error in fn %s, failed to %s. Err is of type %T.\n", functionName, attemptedAction, err)
+	// Every error we've handled thus far follows this structure:
+	// *smithy.OperationError
+	// | .Operation() returns the API that was called (e.g. "GetObject")
+	// | .Unwrap() returns the next error in the tree:
+	// └-*s3shared.ResponseError - can be found using errors.As with type *awsHttp.ResponseError
+	//   | .HTTPStatusCode() returns the status code (e.g. 404)
+	//   | .Unwrap() returns the next error in the tree:
+	//   └-*smithy.GenericAPIError | *types.<modeledErrorType> - can be found using errors.As with type *smithy.APIError
+	//       .ErrorCode() returns a string identifying the error (e.g. "NoSuchKey", "NotFound", etc.)
 
-	// at the top layer, we have a smithy.OperationError
-	// if we unwrap that, we have a awsHttp.ResponseError
-	// or
-	// we have a smithy.APIError
-
-	// create a list of errors, initially populated with our original error
-	errorList := []error{err}
-
-	for i := 0; i < len(errorList); i++ {
-		// Ok, let's try to shove the error in all three boxes that it might fit into...
-		thisErr := errorList[i]
-		fmt.Printf("Index %d: Err is of type %T.\n", i, thisErr)
-
-		// Handle errors of type smithy.OperationError (unwrap these to get the APIError underneath)
-		var opErr *smithy.OperationError
-		if errors.As(thisErr, &opErr) {
-			operation := opErr.Operation()
-			unwrappedError := opErr.Unwrap()
-			fmt.Printf("Found smithy.OperationError in Err's tree with op %s. Unwrap() returned an %T with contents: %v.\n", operation, unwrappedError, unwrappedError)
-			log.Err("failed to call %s with error: %v", operation, unwrappedError)
-			fmt.Printf("Adding unwrapped error to errorList at index %d.\n", len(errorList))
-			errorList = append(errorList, unwrappedError)
+	// Any error that comes in should have an APIError somewhere in its tree
+	// Find the API error in the error's tree
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		// There is an error modeling system, which allows us to match errors by type:
+		//   e.g. *types.NoSuchKey, where types is "github.com/aws/aws-sdk-go-v2/service/s3/types"
+		// but sometimes the same errorCode (e.g. "NoSuchKey") will come up but be wrapped in a smithy.GenericAPIError,
+		// in which case the errorCode will match (e.g. "NoSuchKey"), but the type will not (*type.NoSuchKey).
+		// In testing LC, as of 4/6/2023, this happens with the 404 error response to CopyObject.
+		// So to reduce unhelpful complexity, we're just going to match the errorCode.
+		errorCode := apiErr.ErrorCode()
+		// Invalid range
+		if errorCode == "InvalidRange" {
+			// the range string sent with getObject is invalid
+			// InvalidRange is an un-modeled service error response (it is a *smithy.GenericAPIError)
+			log.Err("%s : Failed to %s with error %s because range is invalid", functionName, attemptedAction, errorCode)
+			// TODO: identify cases where this may come up in deployment, and identify which syscall.errno() is most appropriate
+			// this should not come up in normal operation, so for now we just return it without translating to a system error code
+			return err
 		}
-
-		// Handle errors of type awsHttp.ResponseError
-		var httpResponseErr *awsHttp.ResponseError
-		if errors.As(thisErr, &httpResponseErr) {
-			statusCode := httpResponseErr.HTTPStatusCode()
-			unwrappedError := httpResponseErr.Unwrap()
-			fmt.Printf("Found awsHttp.ResponseError in Err's tree with status code %d. Unwrap() returned an %T with contents: %v.\n", statusCode, unwrappedError, unwrappedError)
-			fmt.Printf("Adding unwrapped error to errorList at index %d.\n", len(errorList))
-			errorList = append(errorList, unwrappedError)
+		if errorCode == "NotFound" {
+			// HeadObject's 404 is not modeled (it is a *smithy.GenericAPIError)
+			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, errorCode)
+			return syscall.ENOENT
 		}
-
-		// Handle errors of type smithy.APIError
-		var apiErr smithy.APIError
-		if errors.As(thisErr, &apiErr) {
-			code := apiErr.ErrorCode()
-			fmt.Printf("Found smithy.APIError in Err's tree with error code %s. APIErr is of type %T\n", code, apiErr)
-
-			// handle modeled service error responses (those that have dedicated types)
-			switch apiErr.(type) {
-			case *types.NotFound:
-				// Not Found - 404
-				fmt.Println("apiErr matched model types.NotFound")
-				log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
-			case *types.NoSuchKey:
-				// No Such Key
-				fmt.Println("apiErr matched model types.NoSuchKey")
-				log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
-			default:
-				// the error is either un-modeled, or it was modeled but the model was not one of the cases above
-				fmt.Println("apiErr did not match any modeled cases")
-				// Invalid range
-				if code == "InvalidRange" {
-					// InvalidRange is an un-modeled service error response (it does not have a dedicated type)
-					fmt.Println("apiErr matched errorCode InvalidRange")
-					log.Err("%s : Failed to %s with error %s because range is invalid", functionName, attemptedAction, code)
-				}
-				if code == "NotFound" {
-					// HeadObject's 404 is not modeled (it is a smithy.GenericAPIError)
-					fmt.Println("apiErr matched errorCode NotFound")
-					log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
-				}
-				if code == "NoSuchKey" {
-					// CopyObject's 404 is not modeled (it is a smithy.GenericAPIError)
-					fmt.Println("apiErr matched errorCode NoSuchKey")
-					log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
-				}
-			}
+		if errorCode == "NoSuchKey" {
+			// GetObject's 404 is modeled (it is a *types.NoSuchKey)
+			// CopyObject's 404 is not modeled (it is a *smithy.GenericAPIError)
+			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, errorCode)
+			return syscall.ENOENT
 		}
-
-		// what about NSK?
-		// No such key (object not in bucket)
-		var nsk *types.NoSuchKey
-		if errors.As(err, &nsk) {
-			fmt.Println("Found types.NoSuchKey in Err's tree.")
-			log.Err("%s : Failed to %s because key does not exist", functionName, attemptedAction)
-		}
-
-		fmt.Printf("End index %d: (Err of type %T).\n", i, thisErr)
 	}
 
 	// unrecognized error - parsing failed
 	// print and return the original error
 	log.Err("%s : Failed to %s. Here's why: %v", functionName, attemptedAction, err)
-	fmt.Printf("(End) Error in fn %s, failed to %s. Err is of type %T.\n", functionName, attemptedAction, err)
 	return err
 }
 
