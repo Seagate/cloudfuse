@@ -1,18 +1,21 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 from PySide6 import QtWidgets
+
 import yaml
 
 # import the custom class made from QtDesigner
 from ui_lyve_config_common import Ui_Form
 from lyve_config_advanced import lyveAdvancedSettingsWidget
+#from closeGUIEvent import closeGUIEvent
+
 
 pipelineChoices = {
     "fileCache" : 0,
     "streaming" : 1
 }
 
-class lyveSettingsWidget(QWidget, Ui_Form):
+class lyveSettingsWidget(QWidget, Ui_Form):#, closeGUIEvent):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
@@ -29,6 +32,8 @@ class lyveSettingsWidget(QWidget, Ui_Form):
         self.button_browse.clicked.connect(self.getFileDirInput)
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_advancedSettings.clicked.connect(self.openAdvanced)
+
+        
 
     # Set up slots
     def openAdvanced(self):
@@ -55,26 +60,44 @@ class lyveSettingsWidget(QWidget, Ui_Form):
         self.groupbox_streaming.setVisible(False)        
         
     def exitWindow(self):
+        #self.closeEvent(PySide6.QtGui.QCloseEvent)
         self.close()
 
     def initOptionsFromConfig(self):
         return
 
     def writeConfigFile(self):
-        bucket = str(self.lineEdit_bucketName.text())
-        accKey = str(self.lineEdit_accessKey.text())
-        secKey = str(self.lineEdit_secretKey.text())
-        endpoint = str(self.lineEdit_endpoint.text())
         
-        multiUser = self.checkbox_multiUser.isChecked()
-        nEmptDir = self.checkbox_nonEmptyDir.isChecked()
-        rOnlyMnt = self.checkbox_readOnly.isChecked()
-        foreground = self.checkbox_daemonForeground.isChecked()
-        ignoreAppFlags = self.checkbox_libfuse_ignoreAppend.isChecked()
+        config_common = {
+            'foreground': self.checkbox_daemonForeground.isChecked(),
+            'allow-other': self.checkbox_multiUser.isChecked(),
+            'read-only' : self.checkbox_readOnly.isChecked(),
+            'nonempty' : self.checkbox_nonEmptyDir.isChecked() 
+        }
         
-        print(bucket, accKey, secKey, endpoint)
-        print(multiUser,nEmptDir,rOnlyMnt,foreground,ignoreAppFlags)
+        s3Storage = {
+            's3Storage': {
+            'Bucket': str(self.lineEdit_bucketName.text()),
+            'AccessKey': str(self.lineEdit_accessKey.text()),
+            'SecretKey': str(self.lineEdit_secretKey.text()),
+            'Endpoint': str(self.lineEdit_endpoint.text())
+            }
+        }
+
+        libfuse = {
+            'libfuse' : {
+                'default-permission' : self.dropDown_libfuse_permissions.currentIndex(), #0o777 
+                'attribute-expiration-sec': str(self.lineEdit_libfuse_attExp.text()),           
+                'entry-expiration-sec' : str(self.lineEdit_libfuse_entExp.text()),              
+                'negative-entry-expiration-sec' : str(self.lineEdit_libfuse_negEntryExp.text()),     
+                'ignore-open-flags' : self.checkbox_libfuse_ignoreAppend.isChecked()  
+            }
+        }
         
+        with open('/home/tinker/code/lyvecloudfuse/test_config.yaml', 'w') as file:
+            yaml.safe_dump(libfuse, file, sort_keys=False)
+            yaml.safe_dump(s3Storage, file, sort_keys=False)
+            yaml.safe_dump(config_common, file, sort_keys=False)
         
         return
 
@@ -98,8 +121,5 @@ class lyveSettingsWidget(QWidget, Ui_Form):
             # Insert all settings to yaml file
             self.writeConfigFile()
             event.accept()
-        
-
-        
 
         
