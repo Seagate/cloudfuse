@@ -82,6 +82,7 @@ func (sysLog *SysLogger) GetLogLevel() common.LogLevel {
 	return sysLog.level
 }
 
+// sets up the windows registry for application to be able to report events into the event viewer
 func setupEvents() error {
 
 	//TODO: set up / separate the InstallAsEventCreate() to only run from the installer.
