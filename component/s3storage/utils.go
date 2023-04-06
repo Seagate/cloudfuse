@@ -36,6 +36,7 @@ package s3storage
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -44,6 +45,7 @@ import (
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
 
+	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 )
@@ -58,6 +60,7 @@ import (
 func parseS3Err(err error, attemptedAction string) error {
 	// guide: https://aws.github.io/aws-sdk-go-v2/docs/handling-errors/
 	// reference: https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2/types
+	// discussion: https://github.com/aws/aws-sdk-go-v2/issues/1110#issuecomment-1054643716
 
 	// trivial case
 	if err == nil {
@@ -79,51 +82,96 @@ func parseS3Err(err error, attemptedAction string) error {
 		}
 	}
 
-	// Handle errors of type smithy.OperationError (unwrap these to get the APIError underneath)
-	var opErr *smithy.OperationError
-	if errors.As(err, &opErr) {
-		operation := opErr.Operation()
-		unwrappedError := opErr.Unwrap()
-		log.Err("failed to call %s with error: %v", operation, unwrappedError)
-		err = unwrappedError
-	}
+	// research print
+	fmt.Printf("(Start) Error in fn %s, failed to %s. Err is of type %T.\n", functionName, attemptedAction, err)
 
-	// Handle errors of type smithy.APIError
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
+	// at the top layer, we have a smithy.OperationError
+	// if we unwrap that, we have a awsHttp.ResponseError
+	// or
+	// we have a smithy.APIError
 
-		code := apiErr.ErrorCode()
+	// create a list of errors, initially populated with our original error
+	errorList := []error{err}
 
-		// handle modeled service error responses (those that have their own types)
-		switch apiErr.(type) {
-		case *types.NotFound:
-			// Not Found - 404
-			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
-			return syscall.ENOENT
-		case *types.NoSuchKey:
-			// No Such Key
-			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
-			return syscall.ENOENT
+	for i := 0; i < len(errorList); i++ {
+		// Ok, let's try to shove the error in all three boxes that it might fit into...
+		thisErr := errorList[i]
+		fmt.Printf("Index %d: Err is of type %T.\n", i, thisErr)
+
+		// Handle errors of type smithy.OperationError (unwrap these to get the APIError underneath)
+		var opErr *smithy.OperationError
+		if errors.As(thisErr, &opErr) {
+			operation := opErr.Operation()
+			unwrappedError := opErr.Unwrap()
+			fmt.Printf("Found smithy.OperationError in Err's tree with op %s. Unwrap() returned an %T with contents: %v.\n", operation, unwrappedError, unwrappedError)
+			log.Err("failed to call %s with error: %v", operation, unwrappedError)
+			fmt.Printf("Adding unwrapped error to errorList at index %d.\n", len(errorList))
+			errorList = append(errorList, unwrappedError)
 		}
 
-		// handle un-modeled service error responses (that do not have a dedicated type)
+		// Handle errors of type awsHttp.ResponseError
+		var httpResponseErr *awsHttp.ResponseError
+		if errors.As(thisErr, &httpResponseErr) {
+			statusCode := httpResponseErr.HTTPStatusCode()
+			unwrappedError := httpResponseErr.Unwrap()
+			fmt.Printf("Found awsHttp.ResponseError in Err's tree with status code %d. Unwrap() returned an %T with contents: %v.\n", statusCode, unwrappedError, unwrappedError)
+			fmt.Printf("Adding unwrapped error to errorList at index %d.\n", len(errorList))
+			errorList = append(errorList, unwrappedError)
+		}
 
-		// Invalid range
-		if code == "InvalidRange" {
-			log.Err("%s : Failed to %s with error %s because range is invalid", functionName, attemptedAction, code)
-			return syscall.ERANGE
+		// Handle errors of type smithy.APIError
+		var apiErr smithy.APIError
+		if errors.As(thisErr, &apiErr) {
+			code := apiErr.ErrorCode()
+			fmt.Printf("Found smithy.APIError in Err's tree with error code %s. APIErr is of type %T\n", code, apiErr)
+
+			// handle modeled service error responses (those that have dedicated types)
+			switch apiErr.(type) {
+			case *types.NotFound:
+				// Not Found - 404
+				fmt.Println("apiErr matched model types.NotFound")
+				log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
+			case *types.NoSuchKey:
+				// No Such Key
+				fmt.Println("apiErr matched model types.NoSuchKey")
+				log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
+			default:
+				// the error is either un-modeled, or it was modeled but the model was not one of the cases above
+				fmt.Println("apiErr did not match any modeled cases")
+				// Invalid range
+				if code == "InvalidRange" {
+					// InvalidRange is an un-modeled service error response (it does not have a dedicated type)
+					fmt.Println("apiErr matched errorCode InvalidRange")
+					log.Err("%s : Failed to %s with error %s because range is invalid", functionName, attemptedAction, code)
+				}
+				if code == "NotFound" {
+					// HeadObject's 404 is not modeled (it is a smithy.GenericAPIError)
+					fmt.Println("apiErr matched errorCode NotFound")
+					log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
+				}
+				if code == "NoSuchKey" {
+					// CopyObject's 404 is not modeled (it is a smithy.GenericAPIError)
+					fmt.Println("apiErr matched errorCode NoSuchKey")
+					log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
+				}
+			}
 		}
-		if code == "NotFound" {
-			// the no such key error ends up here because after unwrapping it, it doesn't match the NotFound or NoSuchKey type
-			// TODO: research this further
-			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, code)
-			return syscall.ENOENT
+
+		// what about NSK?
+		// No such key (object not in bucket)
+		var nsk *types.NoSuchKey
+		if errors.As(err, &nsk) {
+			fmt.Println("Found types.NoSuchKey in Err's tree.")
+			log.Err("%s : Failed to %s because key does not exist", functionName, attemptedAction)
 		}
+
+		fmt.Printf("End index %d: (Err of type %T).\n", i, thisErr)
 	}
 
 	// unrecognized error - parsing failed
 	// print and return the original error
 	log.Err("%s : Failed to %s. Here's why: %v", functionName, attemptedAction, err)
+	fmt.Printf("(End) Error in fn %s, failed to %s. Err is of type %T.\n", functionName, attemptedAction, err)
 	return err
 }
 
