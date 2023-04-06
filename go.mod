@@ -23,7 +23,7 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/winfsp/cgofuse v1.5.0
 	go.uber.org/atomic v1.7.0
-	golang.org/x/sys v0.4.0
+	golang.org/x/sys v0.6.0
 	golang.org/x/text v0.7.0 // indirect
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
