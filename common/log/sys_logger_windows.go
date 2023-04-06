@@ -104,7 +104,7 @@ func (sysLog *SysLogger) init() error {
 }
 
 // populates an event in the windows event viewer
-func newEvent(sysLog *SysLogger, lvl string, msg string) error {
+func logEvent(sysLog *SysLogger, lvl string, msg string) error {
 
 	//the first argument of wlog.Info() is the event ID following the http convention
 	//https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
@@ -134,7 +134,7 @@ func (sysLog *SysLogger) write(lvl string, format string, args ...interface{}) {
 
 	msg := fmt.Sprintf(format, args...)
 	//send this to be provided in the windows event.
-	newEvent(sysLog, lvl, msg)
+	logEvent(sysLog, lvl, msg)
 
 }
 
