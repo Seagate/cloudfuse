@@ -109,23 +109,19 @@ func logEvent(sysLog *SysLogger, lvl string, msg string) error {
 	//the first argument of wlog.Info() is the event ID following the http convention
 	//https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 	wlog, err := eventlog.Open("LyveCloudFuse")
-	if sysLog.level == common.ELogLevel.LOG_DEBUG() {
+	switch level := sysLog.level; level {
+	case common.ELogLevel.LOG_DEBUG():
 		wlog.Info(uint32(101), msg)
-	}
-	if sysLog.level == common.ELogLevel.LOG_TRACE() {
+	case common.ELogLevel.LOG_TRACE():
 		wlog.Info(uint32(102), msg)
-	}
-	if sysLog.level == common.ELogLevel.LOG_INFO() {
+	case common.ELogLevel.LOG_INFO():
 		wlog.Info(uint32(100), msg)
-	}
-	if sysLog.level == common.ELogLevel.LOG_WARNING() {
-		wlog.Warning(uint32(300), msg)
-	}
-	if sysLog.level == common.ELogLevel.LOG_ERR() {
-		wlog.Error(uint32(400), msg)
-	}
-	if sysLog.level == common.ELogLevel.LOG_CRIT() {
-		wlog.Error(uint32(401), msg)
+	case common.ELogLevel.LOG_WARNING():
+		wlog.Info(uint32(300), msg)
+	case common.ELogLevel.LOG_ERR():
+		wlog.Info(uint32(400), msg)
+	case common.ELogLevel.LOG_CRIT():
+		wlog.Info(uint32(401), msg)
 	}
 	return err
 }
