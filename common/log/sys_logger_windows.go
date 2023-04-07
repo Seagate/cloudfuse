@@ -75,7 +75,7 @@ func (sl *SysLogger) SetLogLevel(level common.LogLevel) {
 }
 
 func (sl *SysLogger) GetType() string {
-	return "log"
+	return "syslog"
 }
 
 func (sl *SysLogger) GetLogLevel() common.LogLevel {
