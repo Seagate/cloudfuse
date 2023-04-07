@@ -144,6 +144,16 @@ azstorage:
   validate-md5: true|false <validate md5 on download. Impacts performance. works only when file-cache component is part of the pipeline>
   virtual-directory: true|false <support virtual directories without existence of a special marker blob>
 
+# S3 storage configuration
+s3storage:
+  # Required
+  bucket-name: <name of the bucket to be mounted>
+  key-id: <S3 access key ID (example - AKIAIOSFODNN7EXAMPLE)>
+  secret-key: <S3 secret access key (example - wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY)>
+  # Optional
+  region: <S3 region. Default - us-east-1>
+  endpoint: <S3 endpoint URL. Default - https://s3.[region].lyvecloud.seagate.com>
+  subdirectory: <name of subdirectory to be mounted instead of whole bucket>
 
 # Mount all configuration
 mountall:

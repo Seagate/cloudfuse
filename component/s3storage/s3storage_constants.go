@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -31,14 +31,32 @@
    SOFTWARE
 */
 
-package cmd
+package s3storage
 
-import (
-	_ "lyvecloudfuse/component/attr_cache"
-	_ "lyvecloudfuse/component/azstorage"
-	_ "lyvecloudfuse/component/file_cache"
-	_ "lyvecloudfuse/component/libfuse"
-	_ "lyvecloudfuse/component/loopback"
-	_ "lyvecloudfuse/component/s3storage"
-	_ "lyvecloudfuse/component/stream"
+const (
+	bytesDownloaded  = "Bytes Downloaded"
+	bytesUploaded    = "Bytes Uploaded"
+	downloadProgress = "DownloadProgress"
+	uploadProgress   = "UploadProgress"
+	bytesTfrd        = "Bytes Transferred"
+
+	createDir    = "CreateDir"
+	deleteDir    = "DeleteDir"
+	streamDir    = "StreamDir"
+	renameDir    = "RenameDir"
+	createFile   = "CreateFile"
+	deleteFile   = "DeleteFile"
+	renameFile   = "RenameFile"
+	truncateFile = "TruncateFile"
+	createLink   = "CreateLink"
+	readLink     = "ReadLink"
+	chmod        = "Chmod"
+
+	openHandles = "OpenFileHandles"
+	mode        = "Mode"
+	count       = "Count"
+	src         = "Src"
+	dest        = "Dest"
+	size        = "Size"
+	target      = "Target"
 )
