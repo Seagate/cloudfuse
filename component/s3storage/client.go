@@ -39,8 +39,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"sort" // to sort List() results
 	"strings"
 	"syscall"
 	"time"
@@ -54,7 +52,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 const (
@@ -156,135 +153,6 @@ func (cl *Client) NewCredentialKey(key, value string) (err error) {
 	return nil
 }
 
-// Wrapper for awsS3Client.GetObject.
-// Set count = 0 to read to the end of the object.
-// key is the full path to the object (with the prefixPath).
-func (cl *Client) getObject(key string, offset int64, count int64) (body io.ReadCloser, err error) {
-	log.Trace("Client::getObject : get object %s (%d+%d)", key, offset, count)
-
-	// deal with the range
-	var rangeString string //string to be used to specify range of object to download from S3
-	//TODO: add handle if the offset+count is greater than the end of Object.
-	if count == 0 {
-		// sending Range:"bytes=0-" gives errors from Lyve Cloud ("InvalidRange: The requested range is not satisfiable")
-		// so if offset is 0 too, leave rangeString empty
-		if offset != 0 {
-			rangeString = "bytes=" + fmt.Sprint(offset) + "-"
-		}
-	} else {
-		endRange := offset + count
-		rangeString = "bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)
-	}
-
-	result, err := cl.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(cl.Config.authConfig.BucketName),
-		Key:    aws.String(key),
-		Range:  aws.String(rangeString),
-	})
-
-	// check for errors
-	if err != nil {
-		attemptedAction := fmt.Sprintf("GetObject(%s)", key)
-		return nil, parseS3Err(err, attemptedAction)
-	}
-
-	// return body
-	return result.Body, err
-}
-
-// Wrapper for awsS3Client.PutObject.
-// Takes an io.Reader to work with both files and byte arrays.
-// key is the full path to the object (with the prefixPath).
-func (cl *Client) putObject(key string, objectData io.Reader) (*s3.PutObjectOutput, error) {
-	log.Trace("Client::putObject : putting object %s", key)
-
-	result, err := cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket:      aws.String(cl.Config.authConfig.BucketName),
-		Key:         aws.String(key),
-		Body:        objectData,
-		ContentType: aws.String(getContentType(key)),
-	})
-
-	// parse errors
-	return result, err
-}
-
-// Wrapper for awsS3Client.DeleteObject.
-// key is the full path to the object (with the prefixPath).
-func (cl *Client) deleteObject(key string) (*s3.DeleteObjectOutput, error) {
-	log.Trace("Client::deleteObject : deleting object %s", key)
-
-	result, err := cl.awsS3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
-		Bucket: aws.String(cl.Config.authConfig.BucketName),
-		Key:    aws.String(key),
-	})
-
-	return result, err
-}
-
-// Wrapper for awsS3Client.DeleteObjects.
-// keys is a list of full paths to the objects (with the prefixPath)
-func (cl *Client) deleteObjects(keys []string) (result *s3.DeleteObjectsOutput, err error) {
-	log.Trace("Client::deleteObjects : deleting %d objects", len(keys))
-	// build list to send to DeleteObjects
-	keyList := make([]types.ObjectIdentifier, len(keys))
-	for i := 0; i < len(keys); i++ {
-		keyList[i] = types.ObjectIdentifier{
-			Key: &keys[i],
-		}
-	}
-	// send keyList for deletion
-	result, err = cl.awsS3Client.DeleteObjects(context.TODO(), &s3.DeleteObjectsInput{
-		Bucket: &cl.Config.authConfig.BucketName,
-		Delete: &types.Delete{
-			Objects: keyList,
-			Quiet:   true,
-		},
-	})
-
-	return
-}
-
-// Wrapper for awsS3Client.HeadObject.
-// HeadObject() acts just like GetObject, except no contents are returned.
-// So this is used to get metadata / attributes for an object.
-// key is the full path to the object (with the prefixPath)
-func (cl *Client) headObject(key string) (*s3.HeadObjectOutput, error) {
-	log.Trace("Client::headObject : object %s", key)
-
-	result, err := cl.awsS3Client.HeadObject(context.TODO(), &s3.HeadObjectInput{
-		Bucket: aws.String(cl.Config.authConfig.BucketName),
-		Key:    aws.String(key),
-	})
-
-	return result, err
-}
-
-// Convert file name to object getKey
-func (cl *Client) getKey(name string) string {
-	return common.JoinUnixFilepath(cl.Config.prefixPath, name)
-}
-
-// Wrapper for awsS3Client.ListBuckets
-func (cl *Client) ListBuckets() ([]string, error) {
-	log.Trace("Client::ListBuckets : Listing buckets")
-
-	cntList := make([]string, 0)
-
-	result, err := cl.awsS3Client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
-
-	if err != nil {
-		log.Err("Couldn't list buckets for your account. Here's why: %v", err)
-		return cntList, err
-	}
-
-	for _, bucket := range result.Buckets {
-		cntList = append(cntList, *bucket.Name)
-	}
-
-	return cntList, nil
-}
-
 // Set the prefix path - this overrides "subdirectory" in config.yaml.
 // This is only used for testing.
 func (cl *Client) SetPrefixPath(path string) error {
@@ -333,8 +201,7 @@ func (cl *Client) DeleteFile(name string) (err error) {
 		return err
 	}
 	// delete the object
-	key := cl.getKey(name)
-	_, err = cl.deleteObject(key)
+	err = cl.deleteObject(name)
 	if err != nil {
 		log.Err("Client::DeleteFile : Failed to delete object %s. Here's why: %v", name, err)
 		return err
@@ -343,7 +210,7 @@ func (cl *Client) DeleteFile(name string) (err error) {
 	return nil
 }
 
-// DeleteDirectory : Delete all objects with the given prefix.
+// DeleteDirectory : Recursively delete all objects with the given prefix.
 // If name is given without a trailing slash, a slash will be added.
 // If the directory does not exist, no error will be returned.
 func (cl *Client) DeleteDirectory(name string) (err error) {
@@ -371,7 +238,7 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 	// Delete all found objects *and prefixes ("directories")*.
 	// For improved performance, we'll use one call to delete all objects in this directory.
 	// 	To make one call, we need to make a list of objects to delete first.
-	var keysToDelete []string
+	var filesToDelete []string
 	for _, object := range objects {
 		if object.IsDir() {
 			err = cl.DeleteDirectory(object.Path)
@@ -379,17 +246,11 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 				log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", object.Path, err)
 			}
 		} else {
-			keysToDelete = append(keysToDelete, cl.getKey(object.Path))
+			filesToDelete = append(filesToDelete, object.Path)
 		}
 	}
-	// Delete the collected keys
-	result, err := cl.deleteObjects(keysToDelete)
-	if err != nil {
-		log.Err("Client::DeleteDirectory : Failed to delete %d files. Here's why: %v", len(keysToDelete), err)
-		for i := 0; i < len(result.Errors); i++ {
-			log.Err("Client::DeleteDirectory : Failed to delete key %s. Here's why: %s", result.Errors[i].Key, result.Errors[i].Message)
-		}
-	}
+	// Delete the collected files
+	err = cl.deleteObjects(filesToDelete)
 
 	return err
 }
@@ -398,29 +259,14 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 func (cl *Client) RenameFile(source string, target string) (err error) {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
-	// copy the object to its new key
-	sourceKey := cl.getKey(source)
-	targetKey := cl.getKey(target)
-	_, err = cl.awsS3Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
-		Bucket: aws.String(cl.Config.authConfig.BucketName),
-		// TODO: URL-encode CopySource
-		CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, sourceKey)),
-		Key:        aws.String(targetKey),
-	})
-	// check for errors on copy
+	err = cl.copyObject(source, target)
 	if err != nil {
-		attemptedAction := fmt.Sprintf("copy %s to %s", sourceKey, targetKey)
-		return parseS3Err(err, attemptedAction)
+		return err
 	}
-
 	// Copy of the file is done so now delete the older file
 	// in this case we don't need to check if the file exists, so we use deleteObject, not DeleteFile
 	// this is what S3's DeleteObject spec is meant for: to make sure the object doesn't exist anymore
-	_, err = cl.deleteObject(sourceKey)
-	if err != nil {
-		attemptedAction := fmt.Sprintf("delete source object %s after copy", sourceKey)
-		return parseS3Err(err, attemptedAction)
-	}
+	err = cl.deleteObject(source)
 
 	return err
 }
@@ -481,18 +327,7 @@ func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 // name should not have a trailing slash (nothing will be found!).
 func (cl *Client) getFileAttr(name string) (attr *internal.ObjAttr, err error) {
 	log.Trace("Client::getFileAttr : name %s", name)
-
-	// no trailing slash, so we can use headObject
-	key := cl.getKey(name)
-	result, err := cl.headObject(key)
-	if err == nil {
-		// create and return an objAttr
-		attr = createObjAttr(name, result.ContentLength, *result.LastModified)
-		return attr, err
-	}
-
-	attemptedAction := fmt.Sprintf("HeadObject(%s)", key)
-	return nil, parseS3Err(err, attemptedAction)
+	return cl.headObject(name)
 }
 
 func (cl *Client) getDirectoryAttr(dirName string) (attr *internal.ObjAttr, err error) {
@@ -520,157 +355,7 @@ func (cl *Client) getDirectoryAttr(dirName string) (attr *internal.ObjAttr, err 
 // This fetches the list using a marker so the caller code should handle marker logic.
 // If count=0 - fetch max entries.
 func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
-	log.Trace("Client::List : prefix %s, marker %s", prefix, func(marker *string) string {
-		if marker != nil {
-			return *marker
-		}
-		return ""
-	}(marker))
-
-	// prepare parameters
-	bucketName := cl.Config.authConfig.BucketName
-	if count == 0 {
-		count = common.MaxDirListCount
-	}
-
-	// combine the configured prefix and the prefix being given to List to get a full listPath
-	listPath := cl.getKey(prefix)
-	// replace any trailing forward slash stripped by common.JoinUnixFilepath
-	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
-		listPath += "/"
-	}
-
-	// Only look for CommonPrefixes (subdirectories) if List was called with a prefix ending in a slash.
-	// If prefix does not end in a slash, CommonPrefixes would find unwanted results.
-	// For example, it would find "filet-of-fish/" when searching for "file".
-	// Check for an empty path to prevent indexing to [-1]
-	findCommonPrefixes := listPath == "" || listPath[len(listPath)-1] == '/'
-
-	// create a map to keep track of all directories
-	var dirList = make(map[string]bool)
-
-	// using paginator from here: https://aws.github.io/aws-sdk-go-v2/docs/making-requests/#using-paginators
-	// List is a tricky function. Here is a great explanation of how list works:
-	// 	https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-prefixes.html
-	params := &s3.ListObjectsV2Input{
-		Bucket:    aws.String(bucketName),
-		MaxKeys:   count,
-		Prefix:    aws.String(listPath),
-		Delimiter: aws.String("/"), // delimiter limits results and provides CommonPrefixes
-	}
-	paginator := s3.NewListObjectsV2Paginator(cl.awsS3Client, params)
-	// initialize list to be returned
-	objectAttrList := make([]*internal.ObjAttr, 0)
-	// fetch and process result pages
-	for paginator.HasMorePages() {
-		output, err := paginator.NextPage(context.TODO())
-		if err != nil {
-			log.Err("Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
-			return objectAttrList, nil, err
-		}
-		// documentation for this S3 data structure:
-		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
-		for _, value := range output.Contents {
-			// push object info into the list
-			path := split(cl.Config.prefixPath, *value.Key)
-			attr := createObjAttr(path, value.Size, *value.LastModified)
-			objectAttrList = append(objectAttrList, attr)
-		}
-
-		if findCommonPrefixes {
-			// documentation for CommonPrefixes:
-			// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2/types#CommonPrefix
-			for _, value := range output.CommonPrefixes {
-				dir := *value.Prefix
-				dirList[dir] = true
-				// let's extract and add intermediate directories
-				// first cut the listPath (the full prefix path) off of the directory path
-				_, intermediatePath, listPathFound := strings.Cut(dir, listPath)
-				// if the listPath isn't here, that's weird
-				if !listPathFound {
-					log.Warn("Prefix mismatch with path %v when listing objects in %v.", dir, listPath)
-				}
-				// get an array of intermediate directories
-				intermediateDirectories := strings.Split(intermediatePath, "/")
-				// walk up the tree and add each one until we find an already existing parent
-				// we have to iterate in descending order
-				suffixToTrim := ""
-				for i := len(intermediateDirectories) - 1; i >= 0; i-- {
-					// ignore empty strings (split does not omit them)
-					if intermediateDirectories[i] == "" {
-						continue
-					}
-					// add to the suffix we're trimming off
-					suffixToTrim = intermediateDirectories[i] + "/" + suffixToTrim
-					// get the trimmed (parent) directory
-					parentDir := strings.TrimSuffix(dir, suffixToTrim)
-					// have we seen this one already?
-					if dirList[parentDir] {
-						break
-					}
-					dirList[parentDir] = true
-				}
-			}
-		}
-	}
-
-	// now let's add attributes for all the directories in dirList
-	for dir := range dirList {
-		if dir == listPath {
-			continue
-		}
-		path := split(cl.Config.prefixPath, dir)
-		attr := createObjAttrDir(path)
-		objectAttrList = append(objectAttrList, attr)
-	}
-
-	// values should be returned in ascending order by key
-	// sort the list before returning it
-	sort.Slice(objectAttrList, func(i, j int) bool {
-		return objectAttrList[i].Path < objectAttrList[j].Path
-	})
-
-	newMarker := ""
-	return objectAttrList, &newMarker, nil
-}
-
-// create an object attributes struct
-func createObjAttr(path string, size int64, lastModified time.Time) (attr *internal.ObjAttr) {
-	attr = &internal.ObjAttr{
-		Path:   path,
-		Name:   filepath.Base(path),
-		Size:   size,
-		Mode:   0,
-		Mtime:  lastModified,
-		Atime:  lastModified,
-		Ctime:  lastModified,
-		Crtime: lastModified,
-		Flags:  internal.NewFileBitMap(),
-	}
-	// set flags
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
-	attr.Flags.Set(internal.PropFlagModeDefault)
-	attr.Metadata = make(map[string]string)
-
-	return attr
-}
-
-// create an object attributes struct for a directory
-func createObjAttrDir(path string) (attr *internal.ObjAttr) {
-	// strip any trailing slash
-	path = internal.TruncateDirName(path)
-	// For these dirs we get only the name and no other properties so hardcoding time to current time
-	currentTime := time.Now()
-
-	attr = createObjAttr(path, 4096, currentTime)
-	// Change the relevant fields for a directory
-	attr.Mode = os.ModeDir
-	// set flags
-	attr.Flags = internal.NewDirBitMap()
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
-	attr.Flags.Set(internal.PropFlagModeDefault)
-
-	return attr
+	return cl.listObjects(prefix, marker, count)
 }
 
 // Download object data to a file handle.
@@ -679,7 +364,7 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) {
 func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
 	log.Trace("Client::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
 	// get object data
-	objectDataReader, err := cl.getObject(cl.getKey(name), offset, count)
+	objectDataReader, err := cl.getObject(name, offset, count)
 	if err != nil {
 		return err
 	}
@@ -707,7 +392,7 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
 	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, len)
 	// get object data
-	objectDataReader, err := cl.getObject(cl.getKey(name), offset, len)
+	objectDataReader, err := cl.getObject(name, offset, len)
 	if err != nil {
 		return nil, err
 	}
@@ -729,7 +414,7 @@ func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, erro
 func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
 	log.Trace("Client::ReadInBuffer : name %s", name)
 	// get object data
-	objectDataReader, err := cl.getObject(cl.getKey(name), offset, len)
+	objectDataReader, err := cl.getObject(name, offset, len)
 	if err != nil {
 		return err
 	}
@@ -766,18 +451,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	}
 
 	// upload file data
-	key := cl.getKey(name)
-	_, err = cl.putObject(key, fi)
-	// TODO: decide when to use this higher-level API
-	// uploader := manager.NewUploader(cl.Client, func(u *manager.Uploader) {
-	//  // TODO: Move this variable into the config file
-	// 	u.PartSize = partMiBs * 1024 * 1024
-	// })
-	// check for errors
-	if err != nil {
-		attemptedAction := fmt.Sprintf("upload object %s", key)
-		return parseS3Err(err, attemptedAction)
-	}
+	err = cl.putObject(name, fi)
 
 	// TODO: Add monitor tracking
 	// if common.MonitorBfs() && stat.Size() > 0 {
@@ -803,14 +477,9 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data 
 	// convert byte array to io.Reader
 	dataReader := bytes.NewReader(data)
 	// upload data to object
-	key := cl.getKey(name)
 	// TODO: handle metadata with S3
-	_, err = cl.putObject(key, dataReader)
-	if err != nil {
-		attemptedAction := fmt.Sprintf("upload object %s", key)
-		return parseS3Err(err, attemptedAction)
-	}
-	return nil
+	err = cl.putObject(name, dataReader)
+	return err
 }
 
 // GetFileBlockOffsets: store blocks ids and corresponding offsets.
@@ -826,7 +495,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	log.Trace("Client::TruncateFile : Truncating %s to %dB.", name, size)
 
 	// get object data
-	objectDataReader, err := cl.getObject(cl.getKey(name), 0, 0)
+	objectDataReader, err := cl.getObject(name, 0, 0)
 	if err != nil {
 		return err
 	}
@@ -851,11 +520,9 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	}
 	// overwrite the object with the truncated data
 	truncatedDataReader := bytes.NewReader(objectData)
-	key := cl.getKey(name)
-	_, err = cl.putObject(key, truncatedDataReader)
+	err = cl.putObject(name, truncatedDataReader)
 	if err != nil {
-		attemptedAction := fmt.Sprintf("write truncated data to object %s", key)
-		return parseS3Err(err, attemptedAction)
+		log.Err("Client::TruncateFile : Failed to write truncated data to object %s", name)
 	}
 
 	return err

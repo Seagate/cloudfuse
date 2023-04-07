@@ -61,8 +61,7 @@ func parseS3Err(err error, attemptedAction string) error {
 
 	// trivial case
 	if err == nil {
-		noErr := syscall.Errno(0)
-		return noErr
+		return nil
 	}
 
 	// get the name of the function that called this
