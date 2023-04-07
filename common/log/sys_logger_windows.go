@@ -136,37 +136,37 @@ func (sysLog *SysLogger) write(lvl string, format string, args ...interface{}) {
 }
 
 func (sysLog *SysLogger) Debug(format string, args ...interface{}) {
-	if sysLog.level == common.ELogLevel.LOG_DEBUG() {
+	if sysLog.level >= common.ELogLevel.LOG_DEBUG() {
 		sysLog.write(common.ELogLevel.LOG_DEBUG().String(), format, args...)
 	}
 }
 
 func (sysLog *SysLogger) Trace(format string, args ...interface{}) {
-	if sysLog.level == common.ELogLevel.LOG_TRACE() {
+	if sysLog.level >= common.ELogLevel.LOG_TRACE() {
 		sysLog.write(common.ELogLevel.LOG_TRACE().String(), format, args...)
 	}
 }
 
 func (sysLog *SysLogger) Info(format string, args ...interface{}) {
-	if sysLog.level == common.ELogLevel.LOG_INFO() {
+	if sysLog.level >= common.ELogLevel.LOG_INFO() {
 		sysLog.write(common.ELogLevel.LOG_INFO().String(), format, args...)
 	}
 }
 
 func (sysLog *SysLogger) Warn(format string, args ...interface{}) {
-	if sysLog.level == common.ELogLevel.LOG_WARNING() {
+	if sysLog.level >= common.ELogLevel.LOG_WARNING() {
 		sysLog.write(common.ELogLevel.LOG_WARNING().String(), format, args...)
 	}
 }
 
 func (sysLog *SysLogger) Err(format string, args ...interface{}) {
-	if sysLog.level == common.ELogLevel.LOG_ERR() {
+	if sysLog.level >= common.ELogLevel.LOG_ERR() {
 		sysLog.write(common.ELogLevel.LOG_ERR().String(), format, args...)
 	}
 }
 
 func (sysLog *SysLogger) Crit(format string, args ...interface{}) {
-	if sysLog.level == common.ELogLevel.LOG_CRIT() {
+	if sysLog.level >= common.ELogLevel.LOG_CRIT() {
 		sysLog.write(common.ELogLevel.LOG_CRIT().String(), format, args...)
 	}
 }
