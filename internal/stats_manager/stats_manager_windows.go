@@ -222,10 +222,10 @@ func (sc *StatsCollector) UpdateStats(op string, key string, val interface{}) {
 func (sc *StatsCollector) statsDumper() {
 	defer sc.workerDone.Done()
 
-	var hPipe windows.Handle
+	var tPipe windows.Handle
 	var err error
 	for {
-		hPipe, err = windows.CreateFile(
+		tPipe, err = windows.CreateFile(
 			windows.StringToUTF16Ptr(common.WindowsTransferPipe),
 			windows.GENERIC_WRITE,
 			0,
@@ -241,21 +241,25 @@ func (sc *StatsCollector) statsDumper() {
 
 		if err == windows.ERROR_FILE_NOT_FOUND {
 			log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.WindowsTransferPipe)
-			windows.CloseHandle(hPipe)
+			windows.CloseHandle(tPipe)
 			time.Sleep(1 * time.Second)
 		} else {
 			log.Err("stats_manager::statsDumper : unable to open pipe file [%v]", err)
-			windows.CloseHandle(hPipe)
+			windows.CloseHandle(tPipe)
 			time.Sleep(1 * time.Second)
 			//return
 		}
 	}
 
 	log.Info("stats_manager::statsDumper : opened transfer pipe file")
-	defer windows.CloseHandle(hPipe)
+	defer windows.CloseHandle(tPipe)
 
+	// The channel is used for two types of messages. First, if the message is an event
+	// then we send the message to the transfer pipe. If it is not an event, then it is
+	// a message about the changing of a given values such as incrementing or decrimenting
+	// the number of open file handles.
 	for st := range sc.channel {
-		// log.Debug("stats_manager::statsDumper : stats: %v", st)
+		log.Debug("stats_manager::statsDumper : stats from channel: %v", st)
 
 		idx := sc.compIdx
 		if st.IsEvent {
@@ -277,8 +281,8 @@ func (sc *StatsCollector) statsDumper() {
 			// log.Debug("stats_manager::statsDumper : stats: %v", string(msg))
 
 			stMgrOpt.transferMtx.Lock()
-			log.Info("stats_manager::createPipe : Writing message to pipe %s", msg)
-			err = windows.WriteFile(hPipe, msg, nil, nil)
+			log.Debug("stats_manager::statsDumper : Writing message to pipe %s", msg)
+			err = windows.WriteFile(tPipe, msg, nil, nil)
 			stMgrOpt.transferMtx.Unlock()
 			if err != nil {
 				log.Err("stats_manager::statsDumper : Unable to write to pipe [%v]", err)
@@ -355,7 +359,9 @@ func statsPolling() {
 	defer windows.Close(handle)
 	log.Info("StatsReader::statsReader : Connected polling pipe")
 
-	// Setup transfer pipe
+	// Setup transfer pipe by looping to try to create a file (open the pipe).
+	// If the server has not been setup yet, then this will fail so we wait
+	// and then try again.
 	var tPipe windows.Handle
 	for {
 		tPipe, err = windows.CreateFile(
@@ -368,6 +374,7 @@ func statsPolling() {
 			0,
 		)
 
+		// The pipe was created
 		if err == nil {
 			break
 		}
