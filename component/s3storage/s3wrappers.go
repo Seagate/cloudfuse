@@ -191,7 +191,7 @@ func (cl *Client) ListBuckets() ([]string, error) {
 // When prefix has no trailing slash, List has unintuitive behavior (e.g. prefix "file" would match "filet-o-fish").
 // This fetches the list using a marker so the caller code should handle marker logic.
 // If count=0 - fetch max entries.
-func (cl *Client) listObjects(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
+func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
 	log.Trace("Client::List : prefix %s, marker %s", prefix, func(marker *string) string {
 		if marker != nil {
 			return *marker

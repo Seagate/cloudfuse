@@ -349,15 +349,6 @@ func (cl *Client) getDirectoryAttr(dirName string) (attr *internal.ObjAttr, err 
 	return nil, syscall.ENOENT
 }
 
-// List : Get a list of objects matching the given prefix, up to the next "/", similar to listing a directory.
-// For predictable results, include the trailing slash in the prefix.
-// When prefix has no trailing slash, List has unintuitive behavior (e.g. prefix "file" would match "filet-o-fish").
-// This fetches the list using a marker so the caller code should handle marker logic.
-// If count=0 - fetch max entries.
-func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
-	return cl.listObjects(prefix, marker, count)
-}
-
 // Download object data to a file handle.
 // Read starting at a byte offset from the start of the object, with length in bytes = count.
 // count = 0 reads to the end of the object.
