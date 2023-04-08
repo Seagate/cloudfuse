@@ -34,14 +34,95 @@
 package s3storage
 
 import (
+	"net/http"
+	"strconv"
+	"syscall"
 	"testing"
 
+	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
+	smithyHttp "github.com/aws/smithy-go/transport/http"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
 type utilsTestSuite struct {
 	suite.Suite
+}
+
+func (s *utilsTestSuite) TestParseS3errGetObjectNoSuchKey() {
+	assert := assert.New(s.T())
+
+	errMessage := "No Such Key"
+	getObjectS3Err := generateS3Error("GetObject", 404, &types.NoSuchKey{
+		Message: &errMessage,
+	})
+	err := parseS3Err(getObjectS3Err, "test")
+	assert.Equal(err, syscall.ENOENT)
+}
+
+func (s *utilsTestSuite) TestParseS3errHeadObjectNotFound() {
+	assert := assert.New(s.T())
+
+	errMessage := "Not Found"
+	apiErrCode := "NotFound"
+	getObjectS3Err := generateS3Error("HeadObject", 404, &smithy.GenericAPIError{
+		Message: errMessage,
+		Code:    apiErrCode,
+		Fault:   smithy.FaultClient,
+	})
+	err := parseS3Err(getObjectS3Err, "test")
+	assert.Equal(err, syscall.ENOENT)
+}
+
+func (s *utilsTestSuite) TestParseS3errCopyObjectNoSuchKey() {
+	assert := assert.New(s.T())
+
+	errMessage := "No Such Key"
+	apiErrCode := "NoSuchKey"
+	getObjectS3Err := generateS3Error("CopyObject", 404, &smithy.GenericAPIError{
+		Message: errMessage,
+		Code:    apiErrCode,
+		Fault:   smithy.FaultClient,
+	})
+	err := parseS3Err(getObjectS3Err, "test")
+	assert.Equal(err, syscall.ENOENT)
+}
+
+func (s *utilsTestSuite) TestParseS3errGetObjectInvalidRange() {
+	assert := assert.New(s.T())
+
+	errMessage := "Invalid Range"
+	apiErrCode := "InvalidRange"
+	getObjectS3Err := generateS3Error("GetObject", 416, &smithy.GenericAPIError{
+		Message: errMessage,
+		Code:    apiErrCode,
+		Fault:   smithy.FaultClient,
+	})
+	err := parseS3Err(getObjectS3Err, "test")
+	// for an error like this, there is no system error
+	// so we expect to get the original error back
+	assert.Equal(err, getObjectS3Err)
+}
+
+func generateS3Error(operation string, httpStatusCode int, apiErr error) *smithy.OperationError {
+	return &smithy.OperationError{
+		ServiceID:     "S3",
+		OperationName: operation,
+		Err: &awsHttp.ResponseError{
+			RequestID: "",
+			ResponseError: &smithyHttp.ResponseError{
+				Response: &smithyHttp.Response{
+					Response: &http.Response{
+						Status:     strconv.Itoa(httpStatusCode),
+						StatusCode: httpStatusCode,
+					},
+				},
+				Err: apiErr,
+			},
+		},
+	}
 }
 
 func (s *utilsTestSuite) TestContentType() {
