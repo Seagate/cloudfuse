@@ -82,22 +82,10 @@ func (sl *SysLogger) GetLogLevel() common.LogLevel {
 	return sl.level
 }
 
-// sets up the windows registry for application to be able to report events into the event viewer
-func setupEvents() error {
-
-	//TODO: set up / separate the InstallAsEventCreate() to only run from the installer.
-	err := eventlog.InstallAsEventCreate("LyveCloudFuse", eventlog.Info|eventlog.Warning|eventlog.Error)
-
-	if err.Error() == "Access is denied." {
-		//this setup has already ran previously
-		return nil
-	}
-	return err
-}
-
 func (sl *SysLogger) init() error {
 
-	err := setupEvents() //set up windows event registry for app
+	//install or registry add should already have been ran.
+	err := sl.logEvent(common.ELogLevel.LOG_DEBUG().String(), "first debug event test")
 	if err != nil {
 		return NoSyslogService
 	}
@@ -108,9 +96,19 @@ func (sl *SysLogger) init() error {
 
 func (sl *SysLogger) logEvent(lvl string, msg string) error {
 
+	wlog, err := eventlog.Open("LyveCloudFuse")
+
+	if lvl == common.ELogLevel.LOG_DEBUG().String() {
+		wlog.Info(uint32(101), msg)
+		if err != nil {
+			return err
+		} else {
+			println("cool, it worked without install")
+		}
+	}
 	//the first argument of wlog.Info() is the event ID following the http convention
 	//https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
-	wlog, err := eventlog.Open("LyveCloudFuse")
+
 	switch level := sl.level; level {
 	case common.ELogLevel.LOG_DEBUG():
 		wlog.Info(uint32(101), msg)
