@@ -54,6 +54,10 @@ import (
 
 // This takes an err from an S3 API call, parses the error,
 // prints a helpful error message, and returns the corresponding system error code.
+// attemptedAction describes the action that failed with this error.
+// Any context that would help in debug should be included in the attemptedAction string.
+// This function uses the runtime library to look up the name of the function calling it,
+// so there's no need to include that in the attemptedAction.
 func parseS3Err(err error, attemptedAction string) error {
 	// guide: https://aws.github.io/aws-sdk-go-v2/docs/handling-errors/
 	// reference: https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2/types
