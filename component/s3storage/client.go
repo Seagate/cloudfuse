@@ -322,6 +322,9 @@ func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 		if err == nil {
 			return attr, err
 		}
+		if err != syscall.ENOENT {
+			log.Err("Client::GetAttr : Failed to getFileAttr(%s). Here's why: %v", name, err)
+		}
 	}
 
 	// ensure a trailing slash
@@ -361,10 +364,11 @@ func (cl *Client) getDirectoryAttr(dirName string) (attr *internal.ObjAttr, err 
 // Read starting at a byte offset from the start of the object, with length in bytes = count.
 // count = 0 reads to the end of the object.
 func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
-	log.Trace("Client::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
+	log.Trace("Client::ReadToFile : name %s, offset : %d, count %d -> file %s", name, offset, count, fi.Name())
 	// get object data
 	objectDataReader, err := cl.getObject(name, offset, count)
 	if err != nil {
+		log.Err("Client::ReadToFile : getObject(%s) failed. Here's why: %v", name, err)
 		return err
 	}
 	// read object data
@@ -393,6 +397,7 @@ func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, erro
 	// get object data
 	objectDataReader, err := cl.getObject(name, offset, len)
 	if err != nil {
+		log.Err("Client::ReadBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return nil, err
 	}
 	// read object data
@@ -415,6 +420,7 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 	// get object data
 	objectDataReader, err := cl.getObject(name, offset, len)
 	if err != nil {
+		log.Err("Client::ReadInBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return err
 	}
 	// read object data
@@ -482,6 +488,7 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data 
 	// upload data to object
 	// TODO: handle metadata with S3
 	err = cl.putObject(name, dataReader)
+	log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
 	return err
 }
 
@@ -500,6 +507,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	// get object data
 	objectDataReader, err := cl.getObject(name, 0, 0)
 	if err != nil {
+		log.Err("Client::TruncateFile : getObject(%s) failed. Here's why: %v", name, err)
 		return err
 	}
 	// read object data

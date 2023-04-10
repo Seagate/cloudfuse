@@ -174,7 +174,7 @@ func (cl *Client) ListBuckets() ([]string, error) {
 	result, err := cl.awsS3Client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
 
 	if err != nil {
-		log.Err("Couldn't list buckets for your account. Here's why: %v", err)
+		log.Err("Client::ListBuckets : Failed to list buckets. Here's why: %v", err)
 		return cntList, err
 	}
 
@@ -237,7 +237,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	for paginator.HasMorePages() {
 		output, err := paginator.NextPage(context.TODO())
 		if err != nil {
-			log.Err("Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
+			log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
 			return objectAttrList, nil, err
 		}
 		// documentation for this S3 data structure:
