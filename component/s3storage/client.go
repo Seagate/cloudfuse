@@ -146,7 +146,7 @@ func (cl *Client) UpdateConfig(cfg Config) error {
 
 // NewCredentialKey : Update the credential key specified by the user.
 // Currently not implemented.
-func (cl *Client) NewCredentialKey(key, value string) (err error) {
+func (cl *Client) NewCredentialKey(key, value string) error {
 	log.Trace("Client::NewCredentialKey : not implemented")
 	// TODO: research whether and how credentials could change on the same bucket
 	// If they can, research whether we can change credentials on an existing client object
@@ -190,10 +190,10 @@ func (cl *Client) CreateLink(source string, target string) error {
 
 // DeleteFile : Delete an object.
 // if the file does not exist, this returns an error (ENOENT).
-func (cl *Client) DeleteFile(name string) (err error) {
+func (cl *Client) DeleteFile(name string) error {
 	log.Trace("Client::DeleteFile : name %s", name)
 	// first check if the object exists
-	_, err = cl.getFileAttr(name)
+	_, err := cl.getFileAttr(name)
 	if err == syscall.ENOENT {
 		log.Err("Client::DeleteFile : %s does not exist", name)
 		return syscall.ENOENT
@@ -214,7 +214,7 @@ func (cl *Client) DeleteFile(name string) (err error) {
 // DeleteDirectory : Recursively delete all objects with the given prefix.
 // If name is given without a trailing slash, a slash will be added.
 // If the directory does not exist, no error will be returned.
-func (cl *Client) DeleteDirectory(name string) (err error) {
+func (cl *Client) DeleteDirectory(name string) error {
 	log.Trace("Client::DeleteDirectory : name %s", name)
 
 	// make sure name has a trailing slash
@@ -260,10 +260,10 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 }
 
 // RenameFile : Rename the object (copy then delete).
-func (cl *Client) RenameFile(source string, target string) (err error) {
+func (cl *Client) RenameFile(source string, target string) error {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
-	err = cl.copyObject(source, target)
+	err := cl.copyObject(source, target)
 	if err != nil {
 		log.Err("Client::RenameFile : copyObject(%s->%s) failed. Here's why: %v", source, target, err)
 		return err
@@ -310,7 +310,7 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 // GetAttr : Get attributes for a given file or folder.
 // If name is a file, it should not have a trailing slash.
 // If name is a directory, the trailing slash is optional.
-func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
+func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::GetAttr : name %s", name)
 
 	// first let's suppose the caller is looking for a file
@@ -318,7 +318,7 @@ func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	// 	and trailing slashes aren't allowed in filenames
 	// so if this was called with a trailing slash, don't look for an object
 	if len(name) > 0 && name[len(name)-1] != '/' {
-		attr, err = cl.getFileAttr(name)
+		attr, err := cl.getFileAttr(name)
 		if err == nil {
 			return attr, err
 		}
@@ -336,12 +336,12 @@ func (cl *Client) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 // Get attributes for the given file path.
 // Return ENOENT if there is no corresponding object in the bucket.
 // name should not have a trailing slash (nothing will be found!).
-func (cl *Client) getFileAttr(name string) (attr *internal.ObjAttr, err error) {
+func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getFileAttr : name %s", name)
 	return cl.headObject(name)
 }
 
-func (cl *Client) getDirectoryAttr(dirName string) (attr *internal.ObjAttr, err error) {
+func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
 	// to do this, accept anything that comes back from List()
@@ -351,7 +351,7 @@ func (cl *Client) getDirectoryAttr(dirName string) (attr *internal.ObjAttr, err 
 		return nil, err
 	} else if len(objects) > 0 {
 		// create and return an objAttr for the directory
-		attr = createObjAttrDir(dirName)
+		attr := createObjAttrDir(dirName)
 		return attr, nil
 	}
 
@@ -363,7 +363,7 @@ func (cl *Client) getDirectoryAttr(dirName string) (attr *internal.ObjAttr, err 
 // Download object data to a file handle.
 // Read starting at a byte offset from the start of the object, with length in bytes = count.
 // count = 0 reads to the end of the object.
-func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
+func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File) error {
 	log.Trace("Client::ReadToFile : name %s, offset : %d, count %d -> file %s", name, offset, count, fi.Name())
 	// get object data
 	objectDataReader, err := cl.getObject(name, offset, count)
@@ -436,7 +436,7 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 
 // Upload from a file handle to an object.
 // The metadata parameter is not used.
-func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.File) (err error) {
+func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.File) error {
 	log.Trace("Client::WriteFromFile : file %s -> name %s", fi.Name(), name)
 	// track time for performance testing
 	defer log.TimeTrack(time.Now(), "Client::WriteFromFile", name)
@@ -480,14 +480,14 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 
 // WriteFromBuffer : Upload from a buffer to an object.
 // name is the file path.
-func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) (err error) {
+func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) error {
 	log.Trace("Client::WriteFromBuffer : name %s", name)
 
 	// convert byte array to io.Reader
 	dataReader := bytes.NewReader(data)
 	// upload data to object
 	// TODO: handle metadata with S3
-	err = cl.putObject(name, dataReader)
+	err := cl.putObject(name, dataReader)
 	log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
 	return err
 }

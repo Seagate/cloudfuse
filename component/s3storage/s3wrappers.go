@@ -22,7 +22,7 @@ import (
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
 // name is the path to the file.
-func (cl *Client) getObject(name string, offset int64, count int64) (body io.ReadCloser, err error) {
+func (cl *Client) getObject(name string, offset int64, count int64) (io.ReadCloser, error) {
 	key := cl.getKey(name)
 	log.Trace("Client::getObject : get object %s (%d+%d)", key, offset, count)
 
@@ -59,7 +59,7 @@ func (cl *Client) getObject(name string, offset int64, count int64) (body io.Rea
 // Wrapper for awsS3Client.PutObject.
 // Takes an io.Reader to work with both files and byte arrays.
 // name is the path to the file.
-func (cl *Client) putObject(name string, objectData io.Reader) (err error) {
+func (cl *Client) putObject(name string, objectData io.Reader) error {
 	key := cl.getKey(name)
 	log.Trace("Client::putObject : putting object %s", key)
 
@@ -69,7 +69,7 @@ func (cl *Client) putObject(name string, objectData io.Reader) (err error) {
 	// 	u.PartSize = partMiBs * 1024 * 1024
 	// })
 
-	_, err = cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket:      aws.String(cl.Config.authConfig.BucketName),
 		Key:         aws.String(key),
 		Body:        objectData,
@@ -82,11 +82,11 @@ func (cl *Client) putObject(name string, objectData io.Reader) (err error) {
 
 // Wrapper for awsS3Client.DeleteObject.
 // name is the path to the file.
-func (cl *Client) deleteObject(name string) (err error) {
+func (cl *Client) deleteObject(name string) error {
 	key := cl.getKey(name)
 	log.Trace("Client::deleteObject : deleting object %s", key)
 
-	_, err = cl.awsS3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+	_, err := cl.awsS3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -97,7 +97,7 @@ func (cl *Client) deleteObject(name string) (err error) {
 
 // Wrapper for awsS3Client.DeleteObjects.
 // names is a list of paths to the objects.
-func (cl *Client) deleteObjects(names []string) (err error) {
+func (cl *Client) deleteObjects(names []string) error {
 	log.Trace("Client::deleteObjects : deleting %d objects", len(names))
 	// build list to send to DeleteObjects
 	keyList := make([]types.ObjectIdentifier, len(names))
@@ -122,14 +122,14 @@ func (cl *Client) deleteObjects(names []string) (err error) {
 		}
 	}
 
-	return
+	return err
 }
 
 // Wrapper for awsS3Client.HeadObject.
 // HeadObject() acts just like GetObject, except no contents are returned.
 // So this is used to get metadata / attributes for an object.
 // name is the path to the file.
-func (cl *Client) headObject(name string) (attr *internal.ObjAttr, err error) {
+func (cl *Client) headObject(name string) (*internal.ObjAttr, error) {
 	key := cl.getKey(name)
 	log.Trace("Client::headObject : object %s", key)
 
