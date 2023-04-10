@@ -21,7 +21,7 @@ import (
 
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
-// key is the full path to the object (with the prefixPath).
+// name is the path to the file.
 func (cl *Client) getObject(name string, offset int64, count int64) (body io.ReadCloser, err error) {
 	key := cl.getKey(name)
 	log.Trace("Client::getObject : get object %s (%d+%d)", key, offset, count)
@@ -58,7 +58,7 @@ func (cl *Client) getObject(name string, offset int64, count int64) (body io.Rea
 
 // Wrapper for awsS3Client.PutObject.
 // Takes an io.Reader to work with both files and byte arrays.
-// key is the full path to the object (with the prefixPath).
+// name is the path to the file.
 func (cl *Client) putObject(name string, objectData io.Reader) (err error) {
 	key := cl.getKey(name)
 	log.Trace("Client::putObject : putting object %s", key)
@@ -81,7 +81,7 @@ func (cl *Client) putObject(name string, objectData io.Reader) (err error) {
 }
 
 // Wrapper for awsS3Client.DeleteObject.
-// key is the full path to the object (with the prefixPath).
+// name is the path to the file.
 func (cl *Client) deleteObject(name string) (err error) {
 	key := cl.getKey(name)
 	log.Trace("Client::deleteObject : deleting object %s", key)
@@ -128,7 +128,7 @@ func (cl *Client) deleteObjects(names []string) (err error) {
 // Wrapper for awsS3Client.HeadObject.
 // HeadObject() acts just like GetObject, except no contents are returned.
 // So this is used to get metadata / attributes for an object.
-// name is the path to the file
+// name is the path to the file.
 func (cl *Client) headObject(name string) (attr *internal.ObjAttr, err error) {
 	key := cl.getKey(name)
 	log.Trace("Client::headObject : object %s", key)
