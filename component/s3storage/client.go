@@ -404,7 +404,7 @@ func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, erro
 	defer objectDataReader.Close()
 	buff, err := io.ReadAll(objectDataReader)
 	if err != nil {
-		log.Err("Failed to read data from GetObject result. Here's why: %v", err)
+		log.Err("Client::ReadBuffer : Failed to read data from GetObject result. Here's why: %v", err)
 		return nil, err
 	}
 
