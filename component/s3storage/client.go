@@ -127,6 +127,7 @@ func (cl *Client) Configure(cfg Config) error {
 		config.WithEndpointResolverWithOptions(endpointResolver),
 	)
 	if err != nil {
+		log.Err("Client::Configure : config.LoadDefaultConfig() failed. Here's why: %v", err)
 		return err
 	}
 
