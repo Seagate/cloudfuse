@@ -252,6 +252,9 @@ func (cl *Client) DeleteDirectory(name string) (err error) {
 	}
 	// Delete the collected files
 	err = cl.deleteObjects(filesToDelete)
+	if err != nil {
+		log.Err("Client::DeleteDirectory : deleteObjects() failed when called with %d objects. Here's why: %v", len(filesToDelete), err)
+	}
 
 	return err
 }
@@ -262,12 +265,16 @@ func (cl *Client) RenameFile(source string, target string) (err error) {
 
 	err = cl.copyObject(source, target)
 	if err != nil {
+		log.Err("Client::RenameFile : copyObject(%s->%s) failed. Here's why: %v", source, target, err)
 		return err
 	}
 	// Copy of the file is done so now delete the older file
 	// in this case we don't need to check if the file exists, so we use deleteObject, not DeleteFile
 	// this is what S3's DeleteObject spec is meant for: to make sure the object doesn't exist anymore
 	err = cl.deleteObject(source)
+	if err != nil {
+		log.Err("Client::RenameFile : deleteObject(%s) failed. Here's why: %v", source, err)
+	}
 
 	return err
 }
@@ -424,7 +431,7 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 // Upload from a file handle to an object.
 // The metadata parameter is not used.
 func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.File) (err error) {
-	log.Trace("Client::WriteFromFile : name %s", name)
+	log.Trace("Client::WriteFromFile : file %s -> name %s", fi.Name(), name)
 	// track time for performance testing
 	defer log.TimeTrack(time.Now(), "Client::WriteFromFile", name)
 	// get the size of the file
@@ -444,6 +451,10 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 
 	// upload file data
 	err = cl.putObject(name, fi)
+	if err != nil {
+		log.Err("Client::WriteFromFile : putObject(%s) failed. Here's why: %v", name, err)
+		return err
+	}
 
 	// TODO: Add monitor tracking
 	// if common.MonitorBfs() && stat.Size() > 0 {
