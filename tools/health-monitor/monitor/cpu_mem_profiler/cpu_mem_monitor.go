@@ -38,12 +38,15 @@ import (
 	"math"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"lyvecloudfuse/common/log"
 	hmcommon "lyvecloudfuse/tools/health-monitor/common"
 	hminternal "lyvecloudfuse/tools/health-monitor/internal"
+
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 type CpuMemProfiler struct {
@@ -118,46 +121,97 @@ func (cm *CpuMemProfiler) Validate() error {
 
 func (cm *CpuMemProfiler) getCpuMemoryUsage() (*hmcommon.CpuMemStat, error) {
 	if runtime.GOOS == "windows" {
-		cpuMemStat := &hmcommon.CpuMemStat{
-			CpuUsage: "0",
-			MemUsage: "0",
-		}
-		cpuMemStat.CpuUsage += "%"
-		return cpuMemStat, nil
-	} else {
-		topCmd := "top -b -n 1 -d 0.2 -p " + cm.pid + " | tail -2"
+		// processList, err := process.Processes()
+		// if err != nil {
+		// 	log.Err("Error getting processes")
+		// }
 
-		cliOut, err := exec.Command("bash", "-c", topCmd).Output()
+		// for _, p := range processList {
+		// 	name, err := p.Name()
+		// 	if err != nil {
+		// 		log.Err("Error getting processes")
+		// 	}
+		// 	if string.ToLower(name) == "bfusemon.exe" {
+		// 		cpuPercent, err := p.CPUPercent()
+		// 	}
+		// }
+
+		pid, err := strconv.ParseInt(cm.pid, 10, 32)
 		if err != nil {
-			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Lyvecloudfuse is not running on pid %v [%v]", cm.pid, err)
-			return nil, err
+			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error parsing process id")
+
+			cpuMemStat := &hmcommon.CpuMemStat{
+				CpuUsage: "0",
+				MemUsage: "0",
+			}
+			return cpuMemStat, nil
 		}
 
-		processes := strings.Split(strings.Trim(string(cliOut), "\n"), "\n")
-		if len(processes) < 2 {
-			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Lyvecloudfuse is not running on pid %v", cm.pid)
-			return nil, fmt.Errorf("lyvecloudfuse is not running on pid %v", cm.pid)
+		proc, err := process.NewProcess(int32(pid))
+		if err != nil {
+			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error getting process")
+
+			cpuMemStat := &hmcommon.CpuMemStat{
+				CpuUsage: "0",
+				MemUsage: "0",
+			}
+			return cpuMemStat, nil
 		}
 
-		cpuIndex, memIndex := getCpuMemIndex(processes[0])
-		stats := strings.Fields(processes[1])
-		if cpuIndex == -1 || memIndex == -1 || len(stats) <= int(math.Max(float64(cpuIndex), float64(memIndex))) || len(stats[cpuIndex]) == 0 || len(stats[memIndex]) == 0 {
-			log.Debug("cpu_mem_monitor::getCpuMemoryUsage : %v", processes)
-			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Lyvecloudfuse is not running on pid %v", cm.pid)
-			return nil, fmt.Errorf("lyvecloudfuse is not running on pid %v", cm.pid)
+		cpuPercent, err := proc.CPUPercent()
+		if err != nil {
+			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error getting cpu percentage")
+			cpuPercent = 0
+		}
+
+		memInfo, err := proc.MemoryInfo()
+		var memUsage uint64
+		if err != nil {
+			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error getting memory usage")
+		} else {
+			memUsage = memInfo.RSS
 		}
 
 		cpuMemStat := &hmcommon.CpuMemStat{
-			CpuUsage: stats[cpuIndex],
-			MemUsage: stats[memIndex],
+			CpuUsage: fmt.Sprintf("%.2f", cpuPercent),
+			MemUsage: fmt.Sprintf("%dk", memUsage/1024),
 		}
 		cpuMemStat.CpuUsage += "%"
-		if cpuMemStat.MemUsage[len(cpuMemStat.MemUsage)-1] >= '0' && cpuMemStat.MemUsage[len(cpuMemStat.MemUsage)-1] <= '9' {
-			cpuMemStat.MemUsage += "k"
-		}
-
 		return cpuMemStat, nil
 	}
+
+	topCmd := "top -b -n 1 -d 0.2 -p " + cm.pid + " | tail -2"
+
+	cliOut, err := exec.Command("bash", "-c", topCmd).Output()
+	if err != nil {
+		log.Err("cpu_mem_monitor::getCpuMemoryUsage : Lyvecloudfuse is not running on pid %v [%v]", cm.pid, err)
+		return nil, err
+	}
+
+	processes := strings.Split(strings.Trim(string(cliOut), "\n"), "\n")
+	if len(processes) < 2 {
+		log.Err("cpu_mem_monitor::getCpuMemoryUsage : Lyvecloudfuse is not running on pid %v", cm.pid)
+		return nil, fmt.Errorf("lyvecloudfuse is not running on pid %v", cm.pid)
+	}
+
+	cpuIndex, memIndex := getCpuMemIndex(processes[0])
+	stats := strings.Fields(processes[1])
+	if cpuIndex == -1 || memIndex == -1 || len(stats) <= int(math.Max(float64(cpuIndex), float64(memIndex))) || len(stats[cpuIndex]) == 0 || len(stats[memIndex]) == 0 {
+		log.Debug("cpu_mem_monitor::getCpuMemoryUsage : %v", processes)
+		log.Err("cpu_mem_monitor::getCpuMemoryUsage : Lyvecloudfuse is not running on pid %v", cm.pid)
+		return nil, fmt.Errorf("lyvecloudfuse is not running on pid %v", cm.pid)
+	}
+
+	cpuMemStat := &hmcommon.CpuMemStat{
+		CpuUsage: stats[cpuIndex],
+		MemUsage: stats[memIndex],
+	}
+	cpuMemStat.CpuUsage += "%"
+	if cpuMemStat.MemUsage[len(cpuMemStat.MemUsage)-1] >= '0' && cpuMemStat.MemUsage[len(cpuMemStat.MemUsage)-1] <= '9' {
+		cpuMemStat.MemUsage += "k"
+	}
+
+	return cpuMemStat, nil
 }
 
 func getCpuMemIndex(process string) (int, int) {
