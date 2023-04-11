@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strings"
+
 	"golang.org/x/sys/windows/svc/eventlog"
 )
 
@@ -19,7 +21,7 @@ func main() {
 	if err.Error() == "Access is denied." {
 		//this error will typically take place upon not running with sufficient privileges.
 		println("you should run this as admin and try again")
-	} else if err.Error() == "registry already exists" {
+	} else if strings.Contains(err.Error(), "registry key already exists") {
 		println("you already have this installed. You're all set")
 	} else if err != nil {
 		println("we ran into the following error from attempting to install:" + err.Error())
