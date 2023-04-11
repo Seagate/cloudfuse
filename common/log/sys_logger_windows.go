@@ -111,7 +111,7 @@ func (sl *SysLogger) logEvent(lvl common.LogLevel, msg string) error {
 	//the first argument of wlog.Info() is the event ID following the http convention
 	//https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 
-	switch level := sl.level; level {
+	switch lvl {
 	case common.ELogLevel.LOG_DEBUG():
 		wlog.Info(uint32(101), msg)
 	case common.ELogLevel.LOG_TRACE():
