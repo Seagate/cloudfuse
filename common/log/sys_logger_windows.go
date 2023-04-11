@@ -101,28 +101,22 @@ func (sl *SysLogger) logEvent(lvl common.LogLevel, msg string) error {
 	if err != nil {
 		return err
 	}
-	if lvl == common.ELogLevel.LOG_DEBUG() {
-		wlog.Info(uint32(101), msg)
-		if err != nil {
-			return err
-		}
-	}
+
 	//the first argument of wlog.Info() is the event ID following the http convention
 	//https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
-
 	switch lvl {
 	case common.ELogLevel.LOG_DEBUG():
-		wlog.Info(uint32(101), msg)
+		err = wlog.Info(uint32(101), msg)
 	case common.ELogLevel.LOG_TRACE():
-		wlog.Info(uint32(102), msg)
+		err = wlog.Info(uint32(102), msg)
 	case common.ELogLevel.LOG_INFO():
-		wlog.Info(uint32(100), msg)
+		err = wlog.Info(uint32(100), msg)
 	case common.ELogLevel.LOG_WARNING():
-		wlog.Warning(uint32(300), msg)
+		err = wlog.Warning(uint32(300), msg)
 	case common.ELogLevel.LOG_ERR():
-		wlog.Error(uint32(400), msg)
+		err = wlog.Error(uint32(400), msg)
 	case common.ELogLevel.LOG_CRIT():
-		wlog.Error(uint32(401), msg)
+		err = wlog.Error(uint32(401), msg)
 	}
 	return err
 }

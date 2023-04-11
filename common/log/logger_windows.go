@@ -20,6 +20,7 @@ func NewLogger(name string, config common.LogConfig) (Logger, error) {
 	if name == "syslog" {
 		sysLogger, err := newSysLogger(config.Level, config.Tag)
 		if err != nil {
+			//NoSyslogService
 			return NewLogger("base", config)
 		}
 		return sysLogger, nil
