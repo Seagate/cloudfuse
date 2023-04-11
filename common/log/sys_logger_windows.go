@@ -86,7 +86,7 @@ func (sl *SysLogger) GetLogLevel() common.LogLevel {
 func (sl *SysLogger) init() error {
 
 	//install or registry add should already have been ran.
-	err := sl.logEvent(common.ELogLevel.LOG_DEBUG(), "first debug event test")
+	err := sl.logEvent(common.ELogLevel.LOG_DEBUG(), "starting event logger")
 	if err != nil {
 		return NoSyslogService
 	}
