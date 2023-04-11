@@ -117,11 +117,11 @@ func (sl *SysLogger) logEvent(lvl string, msg string) error {
 	case common.ELogLevel.LOG_INFO():
 		wlog.Info(uint32(100), msg)
 	case common.ELogLevel.LOG_WARNING():
-		wlog.Info(uint32(300), msg)
+		wlog.Warning(uint32(300), msg)
 	case common.ELogLevel.LOG_ERR():
-		wlog.Info(uint32(400), msg)
+		wlog.Error(uint32(400), msg)
 	case common.ELogLevel.LOG_CRIT():
-		wlog.Info(uint32(401), msg)
+		wlog.Error(uint32(401), msg)
 	}
 	return err
 }
