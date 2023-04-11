@@ -65,6 +65,7 @@ func newSysLogger(lvl common.LogLevel, tag string) (*SysLogger, error) {
 	return sysLog, nil
 }
 
+// notice: logger object does not get populated since this is a relic from linux that has no windows equivalent.
 func (sl *SysLogger) GetLoggerObj() *log.Logger {
 	return sl.logger
 }
