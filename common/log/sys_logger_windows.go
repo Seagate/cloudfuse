@@ -97,7 +97,9 @@ func (sl *SysLogger) init() error {
 func (sl *SysLogger) logEvent(lvl common.LogLevel, msg string) error {
 
 	wlog, err := eventlog.Open("LyveCloudFuse")
-
+	if err != nil {
+		return err
+	}
 	if lvl == common.ELogLevel.LOG_DEBUG() {
 		wlog.Info(uint32(101), msg)
 		if err != nil {
