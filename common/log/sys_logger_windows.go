@@ -104,9 +104,6 @@ func (sl *SysLogger) logEvent(lvl common.LogLevel, msg string) error {
 		wlog.Info(uint32(101), msg)
 		if err != nil {
 			return err
-		} else {
-			println("cool, it worked without install")
-		}
 	}
 	//the first argument of wlog.Info() is the event ID following the http convention
 	//https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
