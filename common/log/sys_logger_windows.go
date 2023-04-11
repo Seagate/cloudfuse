@@ -71,7 +71,7 @@ func (sl *SysLogger) GetLoggerObj() *log.Logger {
 
 func (sl *SysLogger) SetLogLevel(level common.LogLevel) {
 	sl.level = level
-	sl.write(common.ELogLevel.LOG_CRIT().String(), "Log level reset to : %s", level.String())
+	sl.logEvent(common.ELogLevel.LOG_CRIT(), "Log level reset to :"+level.String())
 }
 
 func (sl *SysLogger) GetType() string {
@@ -85,7 +85,7 @@ func (sl *SysLogger) GetLogLevel() common.LogLevel {
 func (sl *SysLogger) init() error {
 
 	//install or registry add should already have been ran.
-	err := sl.logEvent(common.ELogLevel.LOG_DEBUG().String(), "first debug event test")
+	err := sl.logEvent(common.ELogLevel.LOG_DEBUG(), "first debug event test")
 	if err != nil {
 		return NoSyslogService
 	}
@@ -94,11 +94,11 @@ func (sl *SysLogger) init() error {
 
 // populates an event in the windows event viewer
 
-func (sl *SysLogger) logEvent(lvl string, msg string) error {
+func (sl *SysLogger) logEvent(lvl common.LogLevel, msg string) error {
 
 	wlog, err := eventlog.Open("LyveCloudFuse")
 
-	if lvl == common.ELogLevel.LOG_DEBUG().String() {
+	if lvl == common.ELogLevel.LOG_DEBUG() {
 		wlog.Info(uint32(101), msg)
 		if err != nil {
 			return err
@@ -126,47 +126,45 @@ func (sl *SysLogger) logEvent(lvl string, msg string) error {
 	return err
 }
 
-func (sl *SysLogger) write(lvl string, format string, args ...interface{}) {
-
-	msg := fmt.Sprintf(format, args...)
-	//send this to be provided in the windows event.
-	sl.logEvent(lvl, msg)
-
-}
-
 func (sl *SysLogger) Debug(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_DEBUG() {
-		sl.write(common.ELogLevel.LOG_DEBUG().String(), format, args...)
+		msg := fmt.Sprintf(format, args...)
+		sl.logEvent(common.ELogLevel.LOG_DEBUG(), msg)
 	}
 }
 
 func (sl *SysLogger) Trace(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_TRACE() {
-		sl.write(common.ELogLevel.LOG_TRACE().String(), format, args...)
+		msg := fmt.Sprintf(format, args...)
+		sl.logEvent(common.ELogLevel.LOG_TRACE(), msg)
 	}
 }
 
 func (sl *SysLogger) Info(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_INFO() {
-		sl.write(common.ELogLevel.LOG_INFO().String(), format, args...)
+		msg := fmt.Sprintf(format, args...)
+		sl.logEvent(common.ELogLevel.LOG_INFO(), msg)
 	}
 }
 
 func (sl *SysLogger) Warn(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_WARNING() {
-		sl.write(common.ELogLevel.LOG_WARNING().String(), format, args...)
+		msg := fmt.Sprintf(format, args...)
+		sl.logEvent(common.ELogLevel.LOG_WARNING(), msg)
 	}
 }
 
 func (sl *SysLogger) Err(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_ERR() {
-		sl.write(common.ELogLevel.LOG_ERR().String(), format, args...)
+		msg := fmt.Sprintf(format, args...)
+		sl.logEvent(common.ELogLevel.LOG_ERR(), msg)
 	}
 }
 
 func (sl *SysLogger) Crit(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_CRIT() {
-		sl.write(common.ELogLevel.LOG_CRIT().String(), format, args...)
+		msg := fmt.Sprintf(format, args...)
+		sl.logEvent(common.ELogLevel.LOG_CRIT(), msg)
 	}
 }
 
