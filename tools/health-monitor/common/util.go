@@ -36,15 +36,35 @@ package common
 import (
 	"fmt"
 	"os/exec"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"lyvecloudfuse/common/log"
+
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 // check whether lyvecloudfuse process is running for the given pid
 func CheckProcessStatus(pid string) error {
-	return nil
+	if runtime.GOOS == "windows" {
+		pid, err := strconv.ParseInt(pid, 10, 32)
+		if err != nil {
+			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error parsing process id")
+			return err
+		}
+
+		// Check if the pid is a current process, if err == nil
+		// then the proces is running
+		_, err = process.NewProcess(int32(pid))
+		if err != nil {
+			return nil
+		}
+		return fmt.Errorf("lyvecloudfuse is not running on pid %v", pid)
+	}
+
+	// We are running on Linux in this case
 	cmd := "ps -ef | grep " + pid
 	cliOut, err := exec.Command("bash", "-c", cmd).Output()
 	if err != nil {
