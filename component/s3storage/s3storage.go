@@ -367,12 +367,14 @@ func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 	return err
 }
 
-func (s3 *S3Storage) ReadFile(options internal.ReadFileOptions) (data []byte, err error) {
+// Read and return file data as a buffer.
+func (s3 *S3Storage) ReadFile(options internal.ReadFileOptions) ([]byte, error) {
 	//log.Trace("S3Storage::ReadFile : Read %s", h.Path)
 	return s3.storage.ReadBuffer(options.Handle.Path, 0, 0)
 }
 
-func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (length int, err error) {
+// Read file data into the buffer given in options.Data.
+func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
 	//log.Trace("S3Storage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 
 	if options.Offset > atomic.LoadInt64(&options.Handle.Size) {
@@ -388,13 +390,13 @@ func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (length 
 		return 0, nil
 	}
 
-	err = s3.storage.ReadInBuffer(options.Handle.Path, options.Offset, dataLen, options.Data)
+	err := s3.storage.ReadInBuffer(options.Handle.Path, options.Offset, dataLen, options.Data)
 	if err != nil {
 		log.Err("S3Storage::ReadInBuffer : Failed to read %s [%s]", options.Handle.Path, err.Error())
 	}
 
-	length = int(dataLen)
-	return
+	length := int(dataLen)
+	return length, err
 }
 
 func (s3 *S3Storage) WriteFile(options internal.WriteFileOptions) (int, error) {
@@ -454,7 +456,7 @@ func (s3 *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) 
 }
 
 // Attribute operations
-func (s3 *S3Storage) GetAttr(options internal.GetAttrOptions) (attr *internal.ObjAttr, err error) {
+func (s3 *S3Storage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
 	//log.Trace("S3Storage::GetAttr : Get attributes of file %s", name)
 	return s3.storage.GetAttr(options.Name)
 }
