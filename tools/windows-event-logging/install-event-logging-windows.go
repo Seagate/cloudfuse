@@ -7,6 +7,7 @@ import (
 )
 
 // sets up the windows registry for application to be able to report events into the event viewer
+// you will need to run this as an administrator. if you are running this inside vscode, run vscode as adamin.
 func setupEvents() error {
 
 	//TODO: set up / separate the InstallAsEventCreate() to only run from the installer.
