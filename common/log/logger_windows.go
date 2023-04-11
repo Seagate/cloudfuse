@@ -29,7 +29,7 @@ func NewLogger(name string, config common.LogConfig) (Logger, error) {
 		silentLogger := &SilentLogger{}
 		return silentLogger, nil
 	} else if name == "" || name == "default" || name == "base" || name == "syslog" {
-		// syslog not supported so make it base
+		// TODO: make syslog default
 		baseLogger, err := newBaseLogger(LogFileConfig{
 			LogFile:      config.FilePath,
 			LogLevel:     config.Level,
