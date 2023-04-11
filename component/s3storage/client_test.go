@@ -45,7 +45,9 @@ import (
 	"os"
 	"path"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/config"
@@ -159,15 +161,10 @@ func (s *clientTestSuite) TestListBuckets() {
 	s.assert.Equal(buckets, []string{"stxe1-srg-lens-lab1"})
 }
 func (s *clientTestSuite) TestSetPrefixPath() {
-	// TODO: ?
-	// save current prefix path
-	// put subdir with file
-	// set prefix path to current prefix path plus subdir
-	// assert nil err and prefix path as expected in config
-	// get file without subdir
-	// assert err nil
-	// reset prefix path
-	// assert nil err and prefix path as expected in config
+	// TODO: (assert nil where necessary)
+	// set prefix path
+	// call createfile
+	// get object and check expected results
 }
 func (s *clientTestSuite) TestCreateFile() {
 	defer s.cleanupTest()
@@ -320,22 +317,74 @@ func (s *clientTestSuite) TestRenameDirectory() {
 	})
 	s.assert.Nil(err)
 }
-func (s *clientTestSuite) TestGetAttr() {
+func (s *clientTestSuite) TestGetAttrDir() {
+	defer s.cleanupTest()
+	// setup
+	dirName := generateDirectoryName()
+	filename := dirName + "/" + generateFileName()
+
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(filename),
+	})
+	s.assert.Nil(err)
+
+	attr, err := s.client.GetAttr(dirName)
+	s.assert.Nil(err)
+	s.assert.NotNil(attr)
+	s.assert.True(attr.IsDir())
+}
+func (s *clientTestSuite) TestGetAttrFile() {
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
+	bodyLen := 20
+	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
 	})
 	s.assert.Nil(err)
 
 	attr, err := s.client.GetAttr(name)
+
+	// file info
 	s.assert.Nil(err)
 	s.assert.NotNil(attr)
 	s.assert.False(attr.IsDir())
+	s.assert.False(attr.IsSymlink())
 
-	// TODO: also implement other tests for getatter (see s3storage_test)
+	// file size
+	s.assert.EqualValues(bodyLen, attr.Size)
+
+	// file time
+	s.assert.NotNil(attr.Mtime)
+
+	time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
+
+	_, err = s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	after, err := s.client.GetAttr(name)
+	s.assert.Nil(err)
+	s.assert.NotNil(after.Mtime)
+
+	s.assert.True(after.Mtime.After(attr.Mtime))
+}
+func (s *clientTestSuite) TestGetAttrError() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+
+	// non existent file should throw error
+	_, err := s.client.GetAttr(name)
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
 }
 func (s *clientTestSuite) TestList() {
 	// TODO: (assert nil where necessary)
@@ -343,7 +392,11 @@ func (s *clientTestSuite) TestList() {
 	// leverage setup hierarchy:
 	// 	put a few objects with that prefix
 	// call list
-	// assert names match generated
+	// assert names match generated - outer level and not inner levels
+
+	// test w/ and w/o trailing '/' for prefix vs. object
+	// and test for whatever happens w/o
+	// may need split into a new test depending
 }
 func (s *clientTestSuite) TestReadToFile() {
 	defer s.cleanupTest()
