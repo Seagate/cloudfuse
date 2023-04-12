@@ -1,7 +1,7 @@
 # /lyvecloudfuse/setup/baseConfig.yaml
 # comments duplicated from baseconfig
 
-default_config_common = {
+config_common = {
     'foreground': False,    # run lyvecloudfuse in foreground or background
     'allow-other': True,    # allow other users to access the mounted directory - used for FUSE and File Cache
     'read-only' : False,    # mount in read only mode - used for Streaming and FUSE
@@ -45,7 +45,7 @@ lyve_pipeline_streaming = {
 
 
 # Libfuse configurations
-default_libfuse = {
+libfuse = {
     'libfuse' : {
         'default-permission' : 0o777,               # 0o777|0o666|0o644|0o444 default permissions to be presented for block blobs
         'attribute-expiration-sec': 120,            # time kernel can cache inode attributes (in sec)
@@ -61,14 +61,14 @@ default_libfuse = {
 }
 
 # Dynamic profiler related configuration. This helps to root-cause high memory/cpu usage related issues.
-default_dynamicProfiler = {
+dynamicProfiler = {
     'dynamic-profile' : False,   # allows to turn on dynamic profiler for cpu/memory usage monitoring. Only for debugging, shall not be used in production
     'profiler-port' : 6060,      # port number for dynamic-profiler to listen for REST calls
     'profiler-ip' : 'localhost'    # IP address for dynamic-profiler to listen for REST calls
 }
 
 # Logger configs, for future use
-default_logging = {
+logging = {
     'logging' : {
         'type' : 'syslog',                                              # syslog|silent|base
         'level' : 'log_warning',                                        # log_off|log_crit|log_err|log_warning|log_info|log_trace|log_debug
@@ -81,7 +81,7 @@ default_logging = {
 
 
 # Streaming configuration
-default_streaming = {
+streaming = {
     'stream' : {
         # If block-size-mb, blocks-per-file or cache-size-mb are 0, the stream component will not cache blocks. 
         'block-size-mb' : 0,        # for read only mode:: size of each block to be cached in memory while streaming (in MB). For read/write:: size of newly created blocks
@@ -92,7 +92,7 @@ default_streaming = {
 }
 
 # Disk cache related configuration
-default_filecache = {
+filecache = {
     'file_cache' : {
         # Required
         'path' : '',                     # path to local disk cache
@@ -112,19 +112,19 @@ default_filecache = {
 }
 
 # Attribute cache related configuration
-default_attribute_cache = {
+attribute_cache = {
     'timeout-sec' : 120,         # time attributes can be cached (in sec)
     'no-cache-on-list' : False,  # do not cache attributes during listing, to optimize performance
     'no-symlinks' : False        # to improve performance disable symlink support. symlinks will be treated like regular files
 }
 
 # Loopback configuration
-default_loopbackfs = {
+loopbackfs = {
     'path' : ''     # path to local directory
 }
 
 # Azure storage configuration
-default_azstorage = {
+azstorage = {
     'azstorage' : {
         'type' : 'block',               # block|adls type of storage account to be connected
         'account-name' : '',            # name of the storage account
@@ -169,17 +169,17 @@ default_azstorage = {
 
 
 # Mount all configuration
-default_mountall = {
+mountall = {
     'mountall' : {
         # allowlist takes precedence over denylist in case of conflicts
         'container-allowlist' : [], # list of containers to be mounted
-        'container-denylist' : [] # list of containers not to be mounted
+        'container-denylist' : []   # list of containers not to be mounted
     }
 }
 
 
 # Health Monitor configuration
-default_health_monitor = {
+health_monitor = {
     'health_monitor' : {
         'enable-monitoring' : False,            # enable health monitor
         'stats-poll-interval-sec' : 10,         # Lyvecloudfuse stats polling interval (in sec)
@@ -189,7 +189,7 @@ default_health_monitor = {
 }
 
 # list of monitors to be disabled
-default_monitor_disable = {
+monitor_disable = {
     'monitor-disable-list': [
         'blobfuse_stats',       # Disable lyvecloudfuse stats polling
         'file_cache_monitor',   # Disable file cache directory monitor

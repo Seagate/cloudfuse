@@ -1,11 +1,9 @@
 from PySide6 import QtWidgets
 from PySide6.QtWidgets import QWidget
 
-class closeGUIEvent():
+class closeGUIEvent(QWidget):
     def __init__(self):
         super().__init__()
-        self.setupUi(self)
-
         
     def closeEvent(self, event):# Double check with user before closing
         msg = QtWidgets.QMessageBox()
