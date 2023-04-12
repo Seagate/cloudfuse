@@ -5,7 +5,9 @@ class closeGUIEvent(QWidget):
     def __init__(self):
         super().__init__()
         
-    def closeEvent(self, event):# Double check with user before closing
+        
+    # Override the closeEvent function from parent class to enable custom behavior
+    def closeEvent(self, event):
         msg = QtWidgets.QMessageBox()
         msg.setWindowTitle("Are you sure?")
         msg.setInformativeText("Do you want to save you changes?")
