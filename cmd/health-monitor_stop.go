@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -73,6 +74,18 @@ var healthMonStop = &cobra.Command{
 
 // Attempts to get pid of the health monitor
 func getPid(lyvecloudfusePid string) (string, error) {
+	if runtime.GOOS == "windows" {
+		cliOut := exec.Command("wmic", "process", "where", fmt.Sprintf("ParentProcessId=%s", lyvecloudfusePid), "get", "ProcessId")
+		output, err := cliOut.Output()
+		if err != nil {
+			return "", err
+		}
+
+		lines := strings.Split(strings.TrimSpace(string(output)), "\n")[1:]
+		pid := strings.TrimSpace(lines[0])
+		return pid, nil
+	}
+
 	psAux := exec.Command("ps", "aux")
 	out, err := psAux.Output()
 	if err != nil {
@@ -97,6 +110,15 @@ func getPid(lyvecloudfusePid string) (string, error) {
 
 // Attempts to kill all health monitors
 func stop(pid string) error {
+	if runtime.GOOS == "windows" {
+		cliOut := exec.Command("taskkill", "/PID", pid, "/F")
+		_, err := cliOut.Output()
+		if err != nil {
+			return err
+		}
+		fmt.Println("Successfully stopped health monitor binary.")
+		return nil
+	}
 	cliOut := exec.Command("kill", "-9", pid)
 	_, err := cliOut.Output()
 	if err != nil {
