@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>625</width>
-    <height>306</height>
+    <height>311</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -169,85 +169,46 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="checkbox_fileCache_timeout">
-            <property name="maximumSize">
-             <size>
-              <width>30</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>120</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+           <widget class="QSpinBox" name="spinBox_fileCache_evictionTimeout">
+            <property name="maximum">
+             <number>3000</number>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="checkbox_fileCache_maxEviction">
-            <property name="maximumSize">
-             <size>
-              <width>75</width>
-              <height>16777215</height>
-             </size>
+           <widget class="QSpinBox" name="spinBox_fileCache_maxEviction">
+            <property name="maximum">
+             <number>15000</number>
             </property>
-            <property name="text">
-             <string>5000</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+            <property name="value">
+             <number>5000</number>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="checkbox_fileCache_maxCacheSize">
-            <property name="maximumSize">
-             <size>
-              <width>75</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="toolTip">
-             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Enter cache size in MB - 0 indicates unlimited&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-            </property>
-            <property name="text">
-             <string>0</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+           <widget class="QSpinBox" name="spinBox_fileCache_maxCacheSize">
+            <property name="maximum">
+             <number>3000</number>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="checkbox_fileCache_evictMaxThresh">
-            <property name="maximumSize">
-             <size>
-              <width>30</width>
-              <height>16777215</height>
-             </size>
+           <widget class="QSpinBox" name="spinBox_fileCache_evictMaxThresh">
+            <property name="maximum">
+             <number>3000</number>
             </property>
-            <property name="text">
-             <string>80</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+            <property name="value">
+             <number>80</number>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="checkbox_fileCache_evictMinThresh">
-            <property name="maximumSize">
-             <size>
-              <width>30</width>
-              <height>16777215</height>
-             </size>
+           <widget class="QSpinBox" name="spinBox_fileCache_evictMinThresh">
+            <property name="maximum">
+             <number>3000</number>
             </property>
-            <property name="text">
-             <string>60</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+            <property name="value">
+             <number>60</number>
             </property>
            </widget>
           </item>
