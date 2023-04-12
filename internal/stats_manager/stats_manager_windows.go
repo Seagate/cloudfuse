@@ -91,35 +91,6 @@ type statsManagerOpt struct {
 	statsMtx    sync.Mutex
 }
 
-// func createPipe(pipe string) error {
-// 	handle, err := windows.CreateNamedPipe(
-// 		windows.StringToUTF16Ptr(pipe),
-// 		windows.PIPE_ACCESS_DUPLEX|windows.FILE_FLAG_OVERLAPPED,
-// 		windows.PIPE_TYPE_BYTE|windows.PIPE_READMODE_BYTE|windows.PIPE_WAIT,
-// 		windows.PIPE_UNLIMITED_INSTANCES,
-// 		4096,
-// 		4096,
-// 		0,
-// 		nil,
-// 	)
-// 	if err != nil && err != windows.ERROR_PIPE_BUSY {
-// 		log.Err("stats_manager::createPipe : unable to create pipe [%v]", err)
-// 		return err
-// 	}
-
-// 	log.Info("stats_manager::createPipe : Creating named pipe %s", pipe)
-
-// 	// connect to the named pipe
-// 	err = windows.ConnectNamedPipe(handle, nil)
-// 	if err != nil {
-// 		log.Err("stats_manager::createPipe : unable to connect to named pipe %s: [%v]", pipe, err)
-// 		windows.CloseHandle(handle)
-// 		return err
-// 	}
-
-// 	return nil
-// }
-
 var stMgrOpt statsManagerOpt
 
 func NewStatsCollector(componentName string) *StatsCollector {

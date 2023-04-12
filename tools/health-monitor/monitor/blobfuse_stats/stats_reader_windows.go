@@ -177,31 +177,6 @@ func (bfs *BlobfuseStats) statsReader() error {
 
 		go bfs.handleStatsReader(handle)
 	}
-
-	// reader := bufio.NewReader(os.NewFile(uintptr(handle), bfs.transferPipe))
-	// var e error
-
-	// for {
-	// 	line, err := reader.ReadBytes('\n')
-	// 	log.Info(string(line))
-	// 	if err != nil {
-	// 		log.Err("StatsReader::statsReader : [%v]", err)
-	// 		e = err
-	// 		break
-	// 	}
-
-	// 	log.Debug("StatsReader::statsReader : Line: %v", string(line))
-
-	// 	st := stats_manager.PipeMsg{}
-	// 	err = json.Unmarshal(line, &st)
-	// 	if err != nil {
-	// 		log.Err("StatsReader::statsReader : Unable to unmarshal json [%v]", err)
-	// 		continue
-	// 	}
-	// 	bfs.ExportStats(st.Timestamp, st)
-	// }
-
-	// return e
 }
 
 func (bfs *BlobfuseStats) statsPoll() {
@@ -261,35 +236,6 @@ func NewBlobfuseStatsMonitor() hminternal.Monitor {
 
 	return bfs
 }
-
-// func createPipe(pipe string) error {
-// 	handle, err := windows.CreateNamedPipe(
-// 		windows.StringToUTF16Ptr(pipe),
-// 		windows.PIPE_ACCESS_DUPLEX|windows.FILE_FLAG_OVERLAPPED,
-// 		windows.PIPE_TYPE_BYTE|windows.PIPE_READMODE_BYTE|windows.PIPE_WAIT,
-// 		windows.PIPE_UNLIMITED_INSTANCES,
-// 		4096,
-// 		4096,
-// 		0,
-// 		nil,
-// 	)
-// 	if err != nil && err != windows.ERROR_PIPE_BUSY {
-// 		log.Err("StatsReader::createPipe : unable to create pipe [%v]", err)
-// 		return err
-// 	}
-
-// 	log.Info("StatsReader::createPipe : Creating named pipe %s", pipe)
-
-// 	// connect to the named pipe
-// 	err = windows.ConnectNamedPipe(handle, nil)
-// 	if err != nil {
-// 		log.Err("StatsReader::createPipe : unable to connect to named pipe %s: [%v]", pipe, err)
-// 		windows.CloseHandle(handle)
-// 		return err
-// 	}
-
-// 	return nil
-// }
 
 func init() {
 	hminternal.AddMonitor(hmcommon.BlobfuseStats, NewBlobfuseStatsMonitor)
