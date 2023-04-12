@@ -34,93 +34,77 @@
 package blobfuse_stats
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
-	"os"
-	"syscall"
-	"time"
 
+	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal/stats_manager"
+	hmcommon "lyvecloudfuse/tools/health-monitor/common"
+	hminternal "lyvecloudfuse/tools/health-monitor/internal"
 )
 
-func (bfs *BlobfuseStats) statsReader() error {
-	err := createPipe(bfs.transferPipe)
-	if err != nil {
-		log.Err("StatsReader::statsReader : [%v]", err)
-		return err
-	}
-
-	f, err := os.OpenFile(bfs.transferPipe, os.O_RDONLY, os.ModeNamedPipe)
-	if err != nil {
-		log.Err("StatsReader::statsReader : unable to open pipe file [%v]", err)
-		return err
-	}
-	defer f.Close()
-
-	reader := bufio.NewReader(f)
-	var e error = nil
-
-	for {
-		line, err := reader.ReadBytes('\n')
-		if err != nil {
-			log.Err("StatsReader::statsReader : [%v]", err)
-			e = err
-			break
-		}
-
-		// log.Debug("StatsReader::statsReader : Line: %v", string(line))
-
-		st := stats_manager.PipeMsg{}
-		err = json.Unmarshal(line, &st)
-		if err != nil {
-			log.Err("StatsReader::statsReader : Unable to unmarshal json [%v]", err)
-			continue
-		}
-		bfs.ExportStats(st.Timestamp, st)
-	}
-
-	return e
+type BlobfuseStats struct {
+	name         string
+	pollInterval int
+	transferPipe string
+	pollingPipe  string
 }
 
-func (bfs *BlobfuseStats) statsPoll() {
-	err := createPipe(bfs.pollingPipe)
+func (bfs *BlobfuseStats) GetName() string {
+	return bfs.name
+}
+
+func (bfs *BlobfuseStats) SetName(name string) {
+	bfs.name = name
+}
+
+func (bfs *BlobfuseStats) Monitor() error {
+	err := bfs.Validate()
 	if err != nil {
-		log.Err("StatsReader::statsPoll : [%v]", err)
+		log.Err("StatsReader::Monitor : [%v]", err)
+		return err
+	}
+	log.Debug("StatsReader::Monitor : started")
+
+	go bfs.statsPoll()
+
+	return bfs.statsReader()
+}
+
+func (bfs *BlobfuseStats) ExportStats(timestamp string, st interface{}) {
+	se, err := hminternal.NewStatsExporter()
+	if err != nil || se == nil {
+		log.Err("stats_reader::ExportStats : Error in creating stats exporter instance [%v]", err)
 		return
 	}
 
-	pf, err := os.OpenFile(bfs.pollingPipe, os.O_CREATE|os.O_WRONLY, 0777)
-	if err != nil {
-		log.Err("StatsReader::statsPoll : unable to open pipe file [%v]", err)
-		return
-	}
-	defer pf.Close()
-
-	ticker := time.NewTicker(time.Duration(bfs.pollInterval) * time.Second)
-	defer ticker.Stop()
-
-	for t := range ticker.C {
-		_, err = pf.WriteString(fmt.Sprintf("Poll at %v\n", t.Format(time.RFC3339)))
-		if err != nil {
-			log.Err("StatsReader::statsPoll : [%v]", err)
-			break
-		}
-	}
+	se.AddMonitorStats(bfs.GetName(), timestamp, st)
 }
 
-func createPipe(pipe string) error {
-	_, err := os.Stat(pipe)
-	if os.IsNotExist(err) {
-		err = syscall.Mkfifo(pipe, 0666)
-		if err != nil {
-			log.Err("StatsReader::createPipe : unable to create pipe [%v]", err)
-			return err
-		}
-	} else if err != nil {
-		log.Err("StatsReader::createPipe : [%v]", err)
+func (bfs *BlobfuseStats) Validate() error {
+	if bfs.pollInterval == 0 {
+		return fmt.Errorf("blobfuse-poll-interval should be non-zero")
+	}
+
+	err := hmcommon.CheckProcessStatus(hmcommon.Pid)
+	if err != nil {
 		return err
 	}
+
 	return nil
+}
+
+func NewBlobfuseStatsMonitor() hminternal.Monitor {
+	bfs := &BlobfuseStats{
+		pollInterval: hmcommon.BfsPollInterval,
+		transferPipe: common.TransferPipe,
+		pollingPipe:  common.PollingPipe,
+	}
+
+	bfs.SetName(hmcommon.BlobfuseStats)
+
+	return bfs
+}
+
+func init() {
+	hminternal.AddMonitor(hmcommon.BlobfuseStats, NewBlobfuseStatsMonitor)
 }

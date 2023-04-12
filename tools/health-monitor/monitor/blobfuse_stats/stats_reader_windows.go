@@ -42,65 +42,11 @@ import (
 	"os"
 	"time"
 
-	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal/stats_manager"
-	hmcommon "lyvecloudfuse/tools/health-monitor/common"
-	hminternal "lyvecloudfuse/tools/health-monitor/internal"
 
 	"golang.org/x/sys/windows"
 )
-
-type BlobfuseStats struct {
-	name         string
-	pollInterval int
-	transferPipe string
-	pollingPipe  string
-}
-
-func (bfs *BlobfuseStats) GetName() string {
-	return bfs.name
-}
-
-func (bfs *BlobfuseStats) SetName(name string) {
-	bfs.name = name
-}
-
-func (bfs *BlobfuseStats) Monitor() error {
-	err := bfs.Validate()
-	if err != nil {
-		log.Err("StatsReader::Monitor : [%v]", err)
-		return err
-	}
-	log.Debug("StatsReader::Monitor : started")
-
-	go bfs.statsPoll()
-
-	return bfs.statsReader()
-}
-
-func (bfs *BlobfuseStats) ExportStats(timestamp string, st interface{}) {
-	se, err := hminternal.NewStatsExporter()
-	if err != nil || se == nil {
-		log.Err("stats_reader::ExportStats : Error in creating stats exporter instance [%v]", err)
-		return
-	}
-
-	se.AddMonitorStats(bfs.GetName(), timestamp, st)
-}
-
-func (bfs *BlobfuseStats) Validate() error {
-	if bfs.pollInterval == 0 {
-		return fmt.Errorf("blobfuse-poll-interval should be non-zero")
-	}
-
-	err := hmcommon.CheckProcessStatus(hmcommon.Pid)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func (bfs *BlobfuseStats) handleStatsReader(handle windows.Handle) error {
 	defer windows.CloseHandle(handle)
@@ -223,20 +169,4 @@ func (bfs *BlobfuseStats) statsPoll() {
 			break
 		}
 	}
-}
-
-func NewBlobfuseStatsMonitor() hminternal.Monitor {
-	bfs := &BlobfuseStats{
-		pollInterval: hmcommon.BfsPollInterval,
-		transferPipe: common.TransferPipe,
-		pollingPipe:  common.PollingPipe,
-	}
-
-	bfs.SetName(hmcommon.BlobfuseStats)
-
-	return bfs
-}
-
-func init() {
-	hminternal.AddMonitor(hmcommon.BlobfuseStats, NewBlobfuseStatsMonitor)
 }
