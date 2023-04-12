@@ -6,7 +6,7 @@ import yaml
 # import the custom class made from QtDesigner
 from ui_lyve_config_common import Ui_Form
 from lyve_config_advanced import lyveAdvancedSettingsWidget
-from closeGUIEvent import closeGUIEvent
+from common_qt_functions import closeGUIEvent
 
 pipelineChoices = {
     "fileCache" : 0,

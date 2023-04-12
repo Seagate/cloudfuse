@@ -6,7 +6,7 @@ import yaml
 # import the custom class made from QtDesigner
 from ui_azure_config_common import Ui_Form
 from azure_config_advanced import azureAdvancedSettingsWidget
-from closeGUIEvent import closeGUIEvent
+from common_qt_functions import closeGUIEvent
 
 pipelineChoices = {
     "fileCache" : 0,

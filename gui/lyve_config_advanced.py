@@ -3,7 +3,7 @@ from PySide6.QtWidgets import QWidget
 from PySide6 import QtWidgets
 # import the custom class made from QtDesigner
 from ui_lyve_config_advanced import Ui_Form
-from closeGUIEvent import closeGUIEvent
+from common_qt_functions import closeGUIEvent
 
 class lyveAdvancedSettingsWidget(closeGUIEvent, Ui_Form):
     def __init__(self):
