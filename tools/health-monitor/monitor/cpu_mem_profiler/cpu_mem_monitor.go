@@ -158,6 +158,7 @@ func (cm *CpuMemProfiler) getCpuMemoryUsage() (*hmcommon.CpuMemStat, error) {
 			memUsage = memInfo.RSS
 		}
 
+		// Get CPU as a percentage and the number of kilobytes of memory
 		cpuMemStat := &hmcommon.CpuMemStat{
 			CpuUsage: fmt.Sprintf("%.2f", cpuPercent),
 			MemUsage: fmt.Sprintf("%dk", memUsage/1024),
