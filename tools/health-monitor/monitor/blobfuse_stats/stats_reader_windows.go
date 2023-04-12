@@ -155,7 +155,7 @@ func (bfs *BlobfuseStats) statsPoll() {
 		}
 
 		if err == windows.ERROR_FILE_NOT_FOUND {
-			log.Info("StatsReader::statsReader : Named pipe %s not found, retrying...", bfs.pollingPipe)
+			log.Err("StatsReader::statsReader : Named pipe %s not found, retrying...", bfs.pollingPipe)
 			windows.CloseHandle(hPipe)
 			time.Sleep(1 * time.Second)
 		} else if err == windows.ERROR_PIPE_BUSY {
@@ -179,7 +179,7 @@ func (bfs *BlobfuseStats) statsPoll() {
 
 	for t := range ticker.C {
 		_, err = writer.WriteString(fmt.Sprintf("Poll at %v\n", t.Format(time.RFC3339)))
-		log.Info("stats_manager::statsDumper : writing to polling pipe file:", fmt.Sprintf("Poll at %v\n", t.Format(time.RFC3339)))
+		log.Debug("stats_manager::statsDumper : writing to polling pipe file:", fmt.Sprintf("Poll at %v\n", t.Format(time.RFC3339)))
 		if err != nil {
 			log.Err("StatsReader::statsPoll : [%v]", err)
 			break
