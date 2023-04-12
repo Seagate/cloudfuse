@@ -34,10 +34,11 @@
 package stats_manager
 
 import (
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
 	"sync"
 	"time"
+
+	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
 )
 
 const (

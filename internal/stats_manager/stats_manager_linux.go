@@ -39,9 +39,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"syscall"
-	"time"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
