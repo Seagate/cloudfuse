@@ -60,6 +60,7 @@ func (bfs *BlobfuseStats) handleStatsReader(handle windows.Handle) error {
 		// Empty the buffer before reading
 		messageBuf.Reset()
 		// read the polling message sent by stats monitor
+		// we iterate until we have read the entire message
 		for {
 			err := windows.ReadFile(handle, buf[:], &bytesRead, nil)
 
@@ -83,7 +84,8 @@ func (bfs *BlobfuseStats) handleStatsReader(handle windows.Handle) error {
 		err := json.Unmarshal([]byte(message), &st)
 		if err != nil {
 			log.Err("StatsReader::statsReader : Unable to unmarshal json [%v]", err)
-			continue
+			e = err
+			break
 		}
 		bfs.ExportStats(st.Timestamp, st)
 	}
@@ -117,7 +119,7 @@ func (bfs *BlobfuseStats) statsReader() error {
 		if err != nil {
 			log.Err("StatsReader::statsReader : unable to connect to named pipe %s: [%v]", bfs.transferPipe, err)
 			windows.CloseHandle(handle)
-			time.Sleep(1 * time.Second)
+			return err
 		}
 		log.Info("StatsReader::statsReader : Connected transfer pipe %s", bfs.transferPipe)
 
