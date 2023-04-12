@@ -120,22 +120,8 @@ func (cm *CpuMemProfiler) Validate() error {
 }
 
 func (cm *CpuMemProfiler) getCpuMemoryUsage() (*hmcommon.CpuMemStat, error) {
+	// If on windows we use an external library to get CPU and memory usage
 	if runtime.GOOS == "windows" {
-		// processList, err := process.Processes()
-		// if err != nil {
-		// 	log.Err("Error getting processes")
-		// }
-
-		// for _, p := range processList {
-		// 	name, err := p.Name()
-		// 	if err != nil {
-		// 		log.Err("Error getting processes")
-		// 	}
-		// 	if string.ToLower(name) == "bfusemon.exe" {
-		// 		cpuPercent, err := p.CPUPercent()
-		// 	}
-		// }
-
 		pid, err := strconv.ParseInt(cm.pid, 10, 32)
 		if err != nil {
 			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error parsing process id")
