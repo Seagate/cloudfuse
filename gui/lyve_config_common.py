@@ -1,3 +1,4 @@
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 from PySide6 import QtWidgets
 import yaml
@@ -35,6 +36,7 @@ class lyveSettingsWidget(closeGUIEvent, Ui_Form):
     # Set up slots
     def openAdvanced(self):
         self.moreSettings = lyveAdvancedSettingsWidget()
+        self.moreSettings.setWindowModality(Qt.ApplicationModal)
         self.moreSettings.show()
 
     def showModeSettings(self):

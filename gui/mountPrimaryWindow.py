@@ -43,6 +43,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             self.settings = lyveSettingsWidget()
         else:
             self.settings = azureSettingsWidget()
+        self.settings.setWindowModality(Qt.ApplicationModal)
         self.settings.show()
 
     def getFileDirInput(self):
@@ -52,13 +53,10 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def mountBucket(self):
         msg = QtWidgets.QMessageBox()
         
-        # TODO: remove temporary message when lyve is enabled
-        if self.dropDown_bucketSelect.currentIndex() != bucketOptions["Azure"]:
-            msg.setWindowTitle("Error")
-            msg.setText("S3 bucket not enabled yet, use an Azure bucket for now")
-            # Show the message box
-            x = msg.exec()
-            return
+        # TODO: If target is set, the pipeline needs to change the target to azure or s3, 
+        #   at the moment the settings widgets change the pipeline, 
+        #   but if the user just wants to change the target and nothing else they wouldn't go into the settings. 
+
         try:
             directory = str(self.lineEdit_mountPoint.text())
             

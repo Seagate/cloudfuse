@@ -45,6 +45,7 @@ class azureSettingsWidget(closeGUIEvent, Ui_Form):
     # Set up slots
     def openAdvanced(self):
         self.moreSettings = azureAdvancedSettingsWidget()
+        self.moreSettings.setWindowModality(Qt.ApplicationModal)
         self.moreSettings.show()
 
 
