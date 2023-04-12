@@ -116,7 +116,11 @@ func (bfs *BlobfuseStats) statsReader() error {
 		// happens then we can safely start writing to the named pipe.
 		// See https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
 		err = windows.ConnectNamedPipe(handle, nil)
-		if err != nil {
+		if err == windows.ERROR_PIPE_CONNECTED {
+			log.Err("StatsReader::statsReader : There is a process at other end of pipe %s: retrying...", bfs.transferPipe, err)
+			windows.CloseHandle(handle)
+			time.Sleep(1 * time.Second)
+		} else if err != nil {
 			log.Err("StatsReader::statsReader : unable to connect to named pipe %s: [%v]", bfs.transferPipe, err)
 			windows.CloseHandle(handle)
 			return err
@@ -130,6 +134,10 @@ func (bfs *BlobfuseStats) statsReader() error {
 func (bfs *BlobfuseStats) statsPoll() {
 	var hPipe windows.Handle
 	var err error
+
+	// Setup polling pipe by looping to try to create a file (open the pipe).
+	// If the server has not been setup yet, then this will fail so we wait
+	// and then try again.
 	for {
 		hPipe, err = windows.CreateFile(
 			windows.StringToUTF16Ptr(bfs.pollingPipe),
@@ -141,20 +149,26 @@ func (bfs *BlobfuseStats) statsPoll() {
 			0,
 		)
 
+		// The pipe was created
 		if err == nil {
 			break
 		}
 
 		if err == windows.ERROR_FILE_NOT_FOUND {
 			log.Info("StatsReader::statsReader : Named pipe %s not found, retrying...", bfs.pollingPipe)
+			windows.CloseHandle(hPipe)
+			time.Sleep(1 * time.Second)
+		} else if err == windows.ERROR_PIPE_BUSY {
+			log.Err("StatsReader::statsReader : Pipe instances are busy, retrying...")
+			windows.CloseHandle(hPipe)
 			time.Sleep(1 * time.Second)
 		} else {
-			log.Err("StatsReader::statsReader : unable to open pipe file [%v]", err)
-			time.Sleep(1 * time.Second)
-			// return
+			log.Err("StatsReader::statsReader : Unable to open pipe %s with error [%v]", bfs.pollingPipe, err)
+			windows.CloseHandle(hPipe)
+			return
 		}
 	}
-	//defer windows.CloseHandle(hPipe)
+	defer windows.CloseHandle(hPipe)
 
 	log.Info("stats_manager::statsDumper : opened polling pipe file")
 

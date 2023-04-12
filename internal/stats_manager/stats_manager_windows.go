@@ -70,11 +70,14 @@ func (sc *StatsCollector) statsDumper() {
 			log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.TransferPipe)
 			windows.CloseHandle(tPipe)
 			time.Sleep(1 * time.Second)
-		} else {
-			log.Err("stats_manager::statsDumper : unable to open pipe file [%v]", err)
+		} else if err == windows.ERROR_PIPE_BUSY {
+			log.Err("stats_manager::statsDumper: Pipe instances are busy, retrying...")
 			windows.CloseHandle(tPipe)
 			time.Sleep(1 * time.Second)
-			//return
+		} else {
+			log.Err("stats_manager::statsDumper: Unable to open pipe %s with error [%v]", common.TransferPipe, err)
+			windows.CloseHandle(tPipe)
+			return
 		}
 	}
 
@@ -207,14 +210,17 @@ func statsPolling() {
 		}
 
 		if err == windows.ERROR_FILE_NOT_FOUND {
-			log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.TransferPipe)
+			log.Info("stats_manager::statsPolling : Named pipe %s not found, retrying...", common.TransferPipe)
+			windows.CloseHandle(tPipe)
+			time.Sleep(1 * time.Second)
+		} else if err == windows.ERROR_PIPE_BUSY {
+			log.Err("stats_manager::statsPolling: Pipe instances are busy, retrying...")
 			windows.CloseHandle(tPipe)
 			time.Sleep(1 * time.Second)
 		} else {
-			log.Err("stats_manager::statsDumper: unable to open pipe file [%v]", err)
+			log.Err("stats_manager::statsPolling: Unable to open pipe %s with error [%v]", common.TransferPipe, err)
 			windows.CloseHandle(tPipe)
-			time.Sleep(1 * time.Second)
-			//return
+			return
 		}
 	}
 	defer windows.CloseHandle(tPipe)
