@@ -112,8 +112,6 @@ func main() {
 
 	common.TransferPipe += "_" + hmcommon.Pid
 	common.PollingPipe += "_" + hmcommon.Pid
-	common.WindowsTransferPipe += "_" + hmcommon.Pid
-	common.WindowsPollingPipe += "_" + hmcommon.Pid
 
 	log.Debug("Lyvecloudfuse Pid: %v \n"+
 		"Transfer Pipe: %v \n"+

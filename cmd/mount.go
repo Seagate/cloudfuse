@@ -492,8 +492,6 @@ func runPipeline(pipeline *internal.Pipeline, ctx context.Context) error {
 	pid := fmt.Sprintf("%v", os.Getpid())
 	common.TransferPipe += "_" + pid
 	common.PollingPipe += "_" + pid
-	common.WindowsTransferPipe += "_" + pid
-	common.WindowsPollingPipe += "_" + pid
 	log.Debug("Mount::runPipeline : lyvecloudfuse pid = %v, transfer pipe = %v, polling pipe = %v", pid, common.TransferPipe, common.PollingPipe)
 
 	go startMonitor(os.Getpid())

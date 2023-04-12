@@ -197,7 +197,7 @@ func (sc *StatsCollector) statsDumper() {
 	var err error
 	for {
 		tPipe, err = windows.CreateFile(
-			windows.StringToUTF16Ptr(common.WindowsTransferPipe),
+			windows.StringToUTF16Ptr(common.TransferPipe),
 			windows.GENERIC_WRITE,
 			0,
 			nil,
@@ -211,7 +211,7 @@ func (sc *StatsCollector) statsDumper() {
 		}
 
 		if err == windows.ERROR_FILE_NOT_FOUND {
-			log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.WindowsTransferPipe)
+			log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.TransferPipe)
 			windows.CloseHandle(tPipe)
 			time.Sleep(1 * time.Second)
 		} else {
@@ -302,7 +302,7 @@ func (sc *StatsCollector) statsDumper() {
 func statsPolling() {
 	// create polling pipe
 	handle, err := windows.CreateNamedPipe(
-		windows.StringToUTF16Ptr(common.WindowsPollingPipe),
+		windows.StringToUTF16Ptr(common.PollingPipe),
 		windows.PIPE_ACCESS_DUPLEX,
 		windows.PIPE_TYPE_MESSAGE|windows.PIPE_READMODE_MESSAGE|windows.PIPE_WAIT,
 		windows.PIPE_UNLIMITED_INSTANCES,
@@ -316,14 +316,14 @@ func statsPolling() {
 		return
 	}
 
-	log.Info("stats_manager::statsPolling : Creating named pipe %s", common.WindowsPollingPipe)
+	log.Info("stats_manager::statsPolling : Creating named pipe %s", common.PollingPipe)
 
 	// This is a blocking call that waits for a client instance to call the CreateFile function and once that
 	// happens then we can safely start writing to the named pipe.
 	// See https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
 	err = windows.ConnectNamedPipe(handle, nil)
 	if err != nil {
-		log.Err("stats_manager::statsPolling : unable to connect to named pipe %s: [%v]", common.WindowsPollingPipe, err)
+		log.Err("stats_manager::statsPolling : unable to connect to named pipe %s: [%v]", common.PollingPipe, err)
 		windows.CloseHandle(handle)
 		return
 	}
@@ -336,7 +336,7 @@ func statsPolling() {
 	var tPipe windows.Handle
 	for {
 		tPipe, err = windows.CreateFile(
-			windows.StringToUTF16Ptr(common.WindowsTransferPipe),
+			windows.StringToUTF16Ptr(common.TransferPipe),
 			windows.GENERIC_WRITE,
 			0,
 			nil,
@@ -351,7 +351,7 @@ func statsPolling() {
 		}
 
 		if err == windows.ERROR_FILE_NOT_FOUND {
-			log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.WindowsTransferPipe)
+			log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.TransferPipe)
 			windows.CloseHandle(tPipe)
 			time.Sleep(1 * time.Second)
 		} else {

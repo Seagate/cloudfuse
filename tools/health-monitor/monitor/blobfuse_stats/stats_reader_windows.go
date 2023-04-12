@@ -228,8 +228,8 @@ func (bfs *BlobfuseStats) statsPoll() {
 func NewBlobfuseStatsMonitor() hminternal.Monitor {
 	bfs := &BlobfuseStats{
 		pollInterval: hmcommon.BfsPollInterval,
-		transferPipe: common.WindowsTransferPipe,
-		pollingPipe:  common.WindowsPollingPipe,
+		transferPipe: common.TransferPipe,
+		pollingPipe:  common.PollingPipe,
 	}
 
 	bfs.SetName(hmcommon.BlobfuseStats)
