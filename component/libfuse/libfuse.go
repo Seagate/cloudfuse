@@ -146,7 +146,7 @@ func (lf *Libfuse) Start(ctx context.Context) error {
 
 	// create stats collector for libfuse
 	libfuseStatsCollector = stats_manager.NewStatsCollector(lf.Name())
-	log.Info("Starting libfuse stats collector")
+	log.Debug("Starting libfuse stats collector")
 
 	lf.lsFlags = internal.NewDirBitMap()
 	lf.lsFlags.Set(internal.PropFlagModeDefault)
