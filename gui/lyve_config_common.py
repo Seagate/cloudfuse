@@ -59,50 +59,14 @@ class lyveSettingsWidget(closeGUIEvent, Ui_Form):
         self.groupbox_streaming.setVisible(False)        
         
     def exitWindow(self):
-        #self.closeEvent(PySide6.QtGui.QCloseEvent)
         self.close()
 
     def initOptionsFromConfig(self):
         return
 
     def writeConfigFile(self):
-        
-        #closeGUIEvent.config_common['foreground'] = self.checkbox_daemonForeground.isChecked()
-        #print(closeGUIEvent.config_common['foreground'])
-
-        configs = self.getConfigs()
-        print(configs)
-        # config_common = {
-        #     'foreground': ,
-        #     'allow-other': self.checkbox_multiUser.isChecked(),
-        #     'read-only' : self.checkbox_readOnly.isChecked(),
-        #     'nonempty' : self.checkbox_nonEmptyDir.isChecked() 
-        # }
-        
-        # s3Storage = {
-        #     's3Storage': {
-        #     'Bucket': str(self.lineEdit_bucketName.text()),
-        #     'AccessKey': str(self.lineEdit_accessKey.text()),
-        #     'SecretKey': str(self.lineEdit_secretKey.text()),
-        #     'Endpoint': str(self.lineEdit_endpoint.text())
-        #     }
-        # }
-
-        # libfuse = {
-        #     'libfuse' : {
-        #         'default-permission' : self.dropDown_libfuse_permissions.currentIndex(), #0o777 
-        #         'attribute-expiration-sec': str(self.lineEdit_libfuse_attExp.text()),           
-        #         'entry-expiration-sec' : str(self.lineEdit_libfuse_entExp.text()),              
-        #         'negative-entry-expiration-sec' : str(self.lineEdit_libfuse_negEntryExp.text()),     
-        #         'ignore-open-flags' : self.checkbox_libfuse_ignoreAppend.isChecked()  
-        #     }
-        # }
-        
-        # with open('/home/tinker/code/lyvecloudfuse/test_config.yaml', 'w') as file:
-        #     yaml.safe_dump(libfuse, file, sort_keys=False)
-        #     yaml.safe_dump(s3Storage, file, sort_keys=False)
-        #     yaml.safe_dump(config_common, file, sort_keys=False)
-        
+         configs = self.getConfigs()
+        # print(configs)
         return
     
     def getConfigs(self,useDefault=False):
