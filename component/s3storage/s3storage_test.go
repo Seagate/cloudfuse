@@ -856,7 +856,7 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 	data := []byte(testData)
 	homeDir, err := os.UserHomeDir()
 	s.assert.Nil(err)
-	f, err := ioutil.TempFile(homeDir, name+".tmp")
+	f, err := os.CreateTemp(homeDir, name+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 	_, err = f.Write(data)
@@ -1232,7 +1232,7 @@ func (s *s3StorageTestSuite) TestWriteSmallFile() {
 	dataLen := len(data)
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, err := ioutil.TempFile("", name+".tmp")
+	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 
@@ -1260,7 +1260,7 @@ func (s *s3StorageTestSuite) TestOverwriteSmallFile() {
 	dataLen := len(data)
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, err := ioutil.TempFile("", name+".tmp")
+	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
@@ -1293,7 +1293,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendToSmallFile() {
 
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, err := ioutil.TempFile("", name+".tmp")
+	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
@@ -1327,7 +1327,7 @@ func (s *s3StorageTestSuite) TestAppendToSmallFile() {
 
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, err := ioutil.TempFile("", name+".tmp")
+	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("-newdata")
@@ -1361,7 +1361,7 @@ func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSmallFile() {
 
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, err := ioutil.TempFile("", name+".tmp")
+	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
@@ -1395,7 +1395,7 @@ func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSize() {
 
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Data: data})
 	s.assert.Nil(err)
-	f, err := ioutil.TempFile("", name+".tmp")
+	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
@@ -1422,7 +1422,7 @@ func (s *s3StorageTestSuite) TestCopyToFileError() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	f, err := ioutil.TempFile("", name+".tmp")
+	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 
@@ -1802,7 +1802,7 @@ func (s *s3StorageTestSuite) TestFullRangedDownload() {
 	data := []byte("test data")
 	homeDir, err := os.UserHomeDir()
 	s.assert.Nil(err)
-	uploadFile, err := ioutil.TempFile(homeDir, name+".tmp")
+	uploadFile, err := os.CreateTemp(homeDir, name+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(uploadFile.Name())
 	_, err = uploadFile.Write(data)
@@ -1813,7 +1813,7 @@ func (s *s3StorageTestSuite) TestFullRangedDownload() {
 	s.assert.Nil(err)
 
 	//create empty file for object download to write into
-	file, err := ioutil.TempFile("", generateFileName()+".tmp")
+	file, err := os.CreateTemp("", generateFileName()+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(file.Name())
 
@@ -1846,7 +1846,7 @@ func (s *s3StorageTestSuite) TestRangedDownload() {
 	data := []byte("test data")
 	homeDir, err := os.UserHomeDir()
 	s.assert.Nil(err)
-	uploadFile, err := ioutil.TempFile(homeDir, name+".tmp")
+	uploadFile, err := os.CreateTemp(homeDir, name+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(uploadFile.Name())
 	_, err = uploadFile.Write(data)
@@ -1857,7 +1857,7 @@ func (s *s3StorageTestSuite) TestRangedDownload() {
 	s.assert.Nil(err)
 
 	//create empty file for object download to write into
-	file, err := ioutil.TempFile("", generateFileName()+".tmp")
+	file, err := os.CreateTemp("", generateFileName()+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(file.Name())
 
@@ -1892,7 +1892,7 @@ func (s *s3StorageTestSuite) TestOffsetToEndDownload() {
 	data := []byte("test data")
 	homeDir, err := os.UserHomeDir()
 	s.assert.Nil(err)
-	uploadFile, err := ioutil.TempFile(homeDir, name+".tmp")
+	uploadFile, err := os.CreateTemp(homeDir, name+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(uploadFile.Name())
 	_, err = uploadFile.Write(data)
@@ -1903,7 +1903,7 @@ func (s *s3StorageTestSuite) TestOffsetToEndDownload() {
 	s.assert.Nil(err)
 
 	//create empty file for object download to write into
-	file, err := ioutil.TempFile("", generateFileName()+".tmp")
+	file, err := os.CreateTemp("", generateFileName()+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(file.Name())
 
