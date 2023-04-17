@@ -44,6 +44,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -155,6 +156,12 @@ func NormalizeObjectName(name string) string {
 
 // List all mount points which were mounted using lyvecloudfuse
 func ListMountPoints() ([]string, error) {
+	// TODO: Add support to list current mounts
+	// We cannot list mount points like we do on Linux
+	if runtime.GOOS == "windows" {
+		return nil, nil
+	}
+
 	file, err := os.Open("/etc/mtab")
 	if err != nil {
 		return nil, err
