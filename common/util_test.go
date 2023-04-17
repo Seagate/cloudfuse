@@ -154,3 +154,25 @@ func (suite *utilTestSuite) TestExpandPath() {
 	expandedPath = ExpandPath(path)
 	suite.assert.Equal(expandedPath, path)
 }
+
+func (suite *utilTestSuite) TestIsDriveLetter() {
+	path := "D:"
+	match := IsDriveLetter(path)
+	suite.assert.Equal(true, match)
+
+	path = "x:"
+	match = IsDriveLetter(path)
+	suite.assert.Equal(true, match)
+
+	path = "D"
+	match = IsDriveLetter(path)
+	suite.assert.Equal(false, match)
+
+	path = "C/folder"
+	match = IsDriveLetter(path)
+	suite.assert.Equal(false, match)
+
+	path = "C:\\Users"
+	match = IsDriveLetter(path)
+	suite.assert.Equal(false, match)
+}
