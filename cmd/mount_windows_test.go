@@ -52,7 +52,7 @@ import (
 
 var configMountTest string = `
 logging:
-  type: silent
+  type: syslog
 default-working-dir: /tmp/lyvecloudfuse
 file_cache:
   path: /tmp/fileCachePath
