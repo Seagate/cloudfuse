@@ -220,26 +220,32 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 
 	// create a map to keep track of all directories
 	var dirList = make(map[string]bool)
+	var newMarker *string
 
 	// using paginator from here: https://aws.github.io/aws-sdk-go-v2/docs/making-requests/#using-paginators
 	// List is a tricky function. Here is a great explanation of how list works:
 	// 	https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-prefixes.html
 	params := &s3.ListObjectsV2Input{
-		Bucket:    aws.String(bucketName),
-		MaxKeys:   count,
-		Prefix:    aws.String(listPath),
-		Delimiter: aws.String("/"), // delimiter limits results and provides CommonPrefixes
+		Bucket:            aws.String(bucketName),
+		MaxKeys:           count,
+		Prefix:            aws.String(listPath),
+		Delimiter:         aws.String("/"), // delimiter limits results and provides CommonPrefixes
+		ContinuationToken: marker,          //how do I continue the pagination when I receive a continuation token?
 	}
 	paginator := s3.NewListObjectsV2Paginator(cl.awsS3Client, params)
 	// initialize list to be returned
 	objectAttrList := make([]*internal.ObjAttr, 0)
 	// fetch and process result pages
-	for paginator.HasMorePages() {
+
+	if paginator.HasMorePages() {
+
 		output, err := paginator.NextPage(context.TODO())
 		if err != nil {
 			log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
 			return objectAttrList, nil, err
 		}
+		newMarker = output.ContinuationToken
+
 		// documentation for this S3 data structure:
 		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
 		for _, value := range output.Contents {
@@ -284,26 +290,27 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 				}
 			}
 		}
-	}
 
-	// now let's add attributes for all the directories in dirList
-	for dir := range dirList {
-		if dir == listPath {
-			continue
+		// now let's add attributes for all the directories in dirList
+		for dir := range dirList {
+			if dir == listPath {
+				continue
+			}
+			path := split(cl.Config.prefixPath, dir)
+			attr := createObjAttrDir(path)
+			objectAttrList = append(objectAttrList, attr)
 		}
-		path := split(cl.Config.prefixPath, dir)
-		attr := createObjAttrDir(path)
-		objectAttrList = append(objectAttrList, attr)
+
+		// values should be returned in ascending order by key
+		// sort the list before returning it
+		sort.Slice(objectAttrList, func(i, j int) bool {
+			return objectAttrList[i].Path < objectAttrList[j].Path
+		})
+
 	}
 
-	// values should be returned in ascending order by key
-	// sort the list before returning it
-	sort.Slice(objectAttrList, func(i, j int) bool {
-		return objectAttrList[i].Path < objectAttrList[j].Path
-	})
+	return objectAttrList, newMarker, nil
 
-	newMarker := ""
-	return objectAttrList, &newMarker, nil
 }
 
 // create an object attributes struct
