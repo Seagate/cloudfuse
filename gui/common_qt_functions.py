@@ -5,6 +5,9 @@ class closeGUIEvent(QWidget):
     def __init__(self):
         super().__init__()
         
+
+    def exitWindow(self):
+        self.close()
         
     # Override the closeEvent function from parent class to enable custom behavior
     def closeEvent(self, event):

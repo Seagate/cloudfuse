@@ -2,6 +2,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 from PySide6 import QtWidgets
 import yaml
+import os
 
 # import the custom class made from QtDesigner
 from ui_lyve_config_common import Ui_Form
@@ -58,22 +59,20 @@ class lyveSettingsWidget(closeGUIEvent, Ui_Form):
         self.groupbox_fileCache.setVisible(False)
         self.groupbox_streaming.setVisible(False)        
         
-    def exitWindow(self):
-        self.close()
-
     def initOptionsFromConfig(self):
         return
 
     def writeConfigFile(self):
-         configs = self.getConfigs()
+        configs = self.getConfigs()
         # print(configs)
         return
     
     def getConfigs(self,useDefault=False):
+        currentDir = os.getcwd()
         if useDefault:
-            with open('/home/tinker/code/lyvecloudfuse/default_config.yaml','r') as file:
+            with open(currentDir+'/default_config.yaml','r') as file:
                 configs = yaml.safe_load(file)
         else:
-            with open('/home/tinker/code/lyvecloudfuse/config.yaml', 'r') as file:
+            with open(currentDir+'/config.yaml', 'r') as file:
                 configs = yaml.safe_load(file)
         return configs

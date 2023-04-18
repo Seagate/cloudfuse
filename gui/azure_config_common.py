@@ -97,5 +97,3 @@ class azureSettingsWidget(closeGUIEvent, Ui_Form):
         # Add relevant code here
         return
         
-    def exitWindow(self):
-        self.close()

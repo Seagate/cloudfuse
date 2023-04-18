@@ -14,9 +14,5 @@ class azureAdvancedSettingsWidget(closeGUIEvent, Ui_Form):
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)
         
-        
-    def exitWindow(self):
-        self.close()
-
     def writeConfigFile(self):
         return
