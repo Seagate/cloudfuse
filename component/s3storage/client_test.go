@@ -161,10 +161,22 @@ func (s *clientTestSuite) TestListBuckets() {
 	s.assert.Equal(buckets, []string{"stxe1-srg-lens-lab1"})
 }
 func (s *clientTestSuite) TestSetPrefixPath() {
-	// TODO: (assert nil where necessary)
-	// set prefix path
-	// call createfile
-	// get object and check expected results
+	defer s.cleanupTest()
+	// setup
+	prefix := generateDirectoryName()
+	fileName := generateFileName()
+
+	err := s.client.SetPrefixPath(prefix)
+	s.assert.Nil(err)
+	err = s.client.CreateFile(fileName, os.FileMode(0)) // create file uses prefix
+	s.assert.Nil(err)
+
+	// object should be at prefix
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(path.Join(prefix, fileName)),
+	})
+	s.assert.Nil(err)
 }
 func (s *clientTestSuite) TestCreateFile() {
 	defer s.cleanupTest()
@@ -215,7 +227,7 @@ func (s *clientTestSuite) TestCreateLink() {
 	s.assert.Nil(err)
 	s.assert.EqualValues(target, output)
 
-	// TODO : test metadata
+	// TODO: test metadata
 }
 func (s *clientTestSuite) TestDeleteFile() {
 	defer s.cleanupTest()
@@ -387,16 +399,59 @@ func (s *clientTestSuite) TestGetAttrError() {
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 func (s *clientTestSuite) TestList() {
-	// TODO: (assert nil where necessary)
-	// generate prefix
-	// leverage setup hierarchy:
-	// 	put a few objects with that prefix
-	// call list
-	// assert names match generated - outer level and not inner levels
+	defer s.cleanupTest()
+	// setup
+	base := generateDirectoryName()
+	// setup directory hierarchy like setupHierarchy in s3storage_test where 'a' is generated base
+	// a/c1/gc1
+	gc1 := base + "/c1" + "/gc1"
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(gc1),
+	})
+	s.assert.Nil(err)
+	// a/c2
+	c2 := base + "/c2"
+	_, err = s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(c2),
+	})
+	s.assert.Nil(err)
+	// ab/c1
+	abc1 := base + "b/c1"
+	_, err = s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(abc1),
+	})
+	s.assert.Nil(err)
+	// ac
+	ac := base + "c"
+	_, err = s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(ac),
+	})
+	s.assert.Nil(err)
 
-	// test w/ and w/o trailing '/' for prefix vs. object
-	// and test for whatever happens w/o
-	// may need split into a new test depending
+	// with trailing "/" should return only the directory c1 and the file c2
+	baseTrail := base + "/"
+	objects, _, err := s.client.List(baseTrail, nil, 0)
+	s.assert.Nil(err)
+	s.assert.NotNil(objects)
+	s.assert.EqualValues(len(objects), 2)
+	s.assert.EqualValues(objects[0].Name, "c1")
+	s.assert.True(objects[0].IsDir())
+	s.assert.EqualValues(objects[1].Name, "c2")
+	s.assert.False(objects[1].IsDir())
+
+	// without trailing "/" only get file ac
+	// if not including the trailing "/", List will return any files with the given prefix
+	// but no directories
+	objects, _, err = s.client.List(base, nil, 0)
+	s.assert.Nil(err)
+	s.assert.NotNil(objects)
+	s.assert.EqualValues(len(objects), 1)
+	s.assert.EqualValues(objects[0].Name, base+"c")
+	s.assert.False(objects[0].IsDir())
 }
 func (s *clientTestSuite) TestReadToFile() {
 	defer s.cleanupTest()
@@ -411,7 +466,7 @@ func (s *clientTestSuite) TestReadToFile() {
 	})
 	s.assert.Nil(err)
 
-	f, err := os.CreateTemp("", name+".tmp") // s3storage_test uses ioutil.TempFile which is deprecated
+	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 
