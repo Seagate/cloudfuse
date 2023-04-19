@@ -291,23 +291,23 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 			}
 		}
 
-	}
-
-	// now let's add attributes for all the directories in dirList
-	for dir := range dirList {
-		if dir == listPath {
-			continue
+		// now let's add attributes for all the directories in dirList
+		for dir := range dirList {
+			if dir == listPath {
+				continue
+			}
+			path := split(cl.Config.prefixPath, dir)
+			attr := createObjAttrDir(path)
+			objectAttrList = append(objectAttrList, attr)
 		}
-		path := split(cl.Config.prefixPath, dir)
-		attr := createObjAttrDir(path)
-		objectAttrList = append(objectAttrList, attr)
-	}
 
-	// values should be returned in ascending order by key
-	// sort the list before returning it
-	sort.Slice(objectAttrList, func(i, j int) bool {
-		return objectAttrList[i].Path < objectAttrList[j].Path
-	})
+		// values should be returned in ascending order by key
+		// sort the list before returning it
+		sort.Slice(objectAttrList, func(i, j int) bool {
+			return objectAttrList[i].Path < objectAttrList[j].Path
+		})
+
+	}
 
 	return objectAttrList, newMarker, nil
 
