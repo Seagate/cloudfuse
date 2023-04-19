@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -34,12 +34,8 @@
 package file_cache
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
-	"strconv"
-	"strings"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
@@ -47,6 +43,7 @@ import (
 )
 
 const DefaultEvictTime = 10
+const sectorSize = 4096
 
 type cachePolicyConfig struct {
 	tmpPath      string
@@ -75,53 +72,6 @@ type cachePolicy interface {
 	IsCached(name string) bool // Whether or not the cache policy considers this file cached
 
 	Name() string // The name of the policy
-}
-
-// getUsage: The current cache usage in MB
-func getUsage(path string) float64 {
-	log.Trace("cachePolicy::getCacheUsage : %s", path)
-
-	var currSize float64
-	var out bytes.Buffer
-
-	// du - estimates file space usage
-	// https://man7.org/linux/man-pages/man1/du.1.html
-	// Note: We cannot just pass -BM as a parameter here since it will result in less accurate estimates of the size of the path
-	// (i.e. du will round up to 1M if the path is smaller than 1M).
-	cmd := exec.Command("du", "-sh", path)
-	cmd.Stdout = &out
-
-	err := cmd.Run()
-	if err != nil {
-		log.Err("cachePolicy::getCacheUsage : error running du [%s]", err.Error())
-		return 0
-	}
-
-	size := strings.Split(out.String(), "\t")[0]
-	if size == "0" {
-		return 0
-	}
-	// some OS's use "," instead of "." that will not work for float parsing - replace it
-	size = strings.Replace(size, ",", ".", 1)
-	parsed, err := strconv.ParseFloat(size[:len(size)-1], 64)
-	if err != nil {
-		log.Err("cachePolicy::getCacheUsage : error parsing folder size [%s]", err.Error())
-		return 0
-	}
-
-	switch size[len(size)-1] {
-	case 'K':
-		currSize = parsed / float64(1024)
-	case 'M':
-		currSize = parsed
-	case 'G':
-		currSize = parsed * 1024
-	case 'T':
-		currSize = parsed * 1024 * 1024
-	}
-
-	log.Debug("cachePolicy::getCacheUsage : current cache usage : %fMB", currSize)
-	return currSize
 }
 
 // getUsagePercentage:  The current cache usage as a percentage of the maxSize

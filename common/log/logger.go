@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -34,10 +34,7 @@
 package log
 
 import (
-	"errors"
 	"log"
-	"os"
-	"strings"
 	"time"
 
 	"lyvecloudfuse/common"
@@ -63,44 +60,6 @@ type Logger interface {
 	Err(format string, args ...interface{})
 	Crit(format string, args ...interface{})
 	LogRotate() error
-}
-
-// newLogger : Method to create Logger object
-func NewLogger(name string, config common.LogConfig) (Logger, error) {
-	timeTracker = config.TimeTracker
-
-	if len(strings.TrimSpace(config.Tag)) == 0 {
-		config.Tag = common.FileSystemName
-	}
-
-	if name == "base" {
-		baseLogger, err := newBaseLogger(LogFileConfig{
-			LogFile:      config.FilePath,
-			LogLevel:     config.Level,
-			LogSize:      config.MaxFileSize * 1024 * 1024,
-			LogFileCount: int(config.FileCount),
-			LogTag:       config.Tag,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return baseLogger, nil
-	} else if name == "silent" {
-		silentLogger := &SilentLogger{}
-		return silentLogger, nil
-	} else if name == "" || name == "default" || name == "syslog" {
-		sysLogger, err := newSysLogger(config.Level, config.Tag)
-		if err != nil {
-			if err == NoSyslogService {
-				// Syslog service does not exists on this system
-				// fallback to file based logging.
-				return NewLogger("base", config)
-			}
-			return nil, err
-		}
-		return sysLogger, nil
-	}
-	return nil, errors.New("invalid logger type")
 }
 
 var logObj Logger
@@ -227,17 +186,8 @@ func LogRotate() error {
 }
 
 func init() {
-	workDir := os.ExpandEnv(common.DefaultWorkDir)
-	err := os.MkdirAll(workDir, os.ModeDir|os.FileMode(0777))
-	if err != nil {
-		panic("Unable to create lyvecloudfuse temp directory for logs")
-	}
-
 	logObj, _ = NewLogger("syslog", common.LogConfig{
-		Level:       common.ELogLevel.LOG_DEBUG(),
-		FilePath:    os.ExpandEnv(common.DefaultLogFilePath),
-		MaxFileSize: common.DefaultMaxLogFileSize,
-		FileCount:   common.DefaultLogFileCount,
+		Level: common.ELogLevel.LOG_DEBUG(),
 	})
 }
 

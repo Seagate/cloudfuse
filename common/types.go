@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -37,7 +37,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"os"
-	"path/filepath"
 	"reflect"
 	"sync"
 	"time"
@@ -47,7 +46,7 @@ import (
 
 // Standard config default values
 const (
-	lyvecloudfuseVersion_ = "2.0.1"
+	lyvecloudfuseVersion_ = "2.0.2"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
@@ -80,8 +79,8 @@ func LyvecloudfuseVersion_() string {
 }
 
 var DefaultWorkDir = "$HOME/.lyvecloudfuse"
-var DefaultLogFilePath = filepath.Join(DefaultWorkDir, "lyvecloudfuse.log")
-var StatsConfigFilePath = filepath.Join(DefaultWorkDir, "stats_monitor.cfg")
+var DefaultLogFilePath = JoinUnixFilepath(DefaultWorkDir, "lyvecloudfuse.log")
+var StatsConfigFilePath = JoinUnixFilepath(DefaultWorkDir, "stats_monitor.cfg")
 
 var EnableMonitoring = false
 var BfsDisabled = false
