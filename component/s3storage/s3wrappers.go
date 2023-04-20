@@ -230,7 +230,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		MaxKeys:           count,
 		Prefix:            aws.String(listPath),
 		Delimiter:         aws.String("/"), // delimiter limits results and provides CommonPrefixes
-		ContinuationToken: marker,          //how do I continue the pagination when I receive a continuation token?
+		ContinuationToken: marker,
 	}
 	paginator := s3.NewListObjectsV2Paginator(cl.awsS3Client, params)
 	// initialize list to be returned
