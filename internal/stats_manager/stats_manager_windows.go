@@ -52,14 +52,16 @@ func (sc *StatsCollector) statsDumper() {
 	var tPipe windows.Handle
 	var err error
 	for {
+		// To see documentation for the arguments for this function see
+		// https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
 		tPipe, err = windows.CreateFile(
 			windows.StringToUTF16Ptr(common.TransferPipe),
 			windows.GENERIC_WRITE,
-			0,
+			windows.FILE_SHARE_WRITE,
 			nil,
 			windows.OPEN_EXISTING,
-			0,
-			0,
+			windows.FILE_ATTRIBUTE_NORMAL,
+			windows.InvalidHandle,
 		)
 
 		if err == nil {
@@ -194,14 +196,16 @@ func statsPolling() {
 	// and then try again.
 	var tPipe windows.Handle
 	for {
+		// To see documentation for the arguments for this function see
+		// https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
 		tPipe, err = windows.CreateFile(
 			windows.StringToUTF16Ptr(common.TransferPipe),
 			windows.GENERIC_WRITE,
-			0,
+			windows.FILE_SHARE_WRITE,
 			nil,
 			windows.OPEN_EXISTING,
-			0,
-			0,
+			windows.FILE_ATTRIBUTE_NORMAL,
+			windows.InvalidHandle,
 		)
 
 		// The pipe was created

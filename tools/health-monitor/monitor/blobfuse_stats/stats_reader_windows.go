@@ -142,11 +142,11 @@ func (bfs *BlobfuseStats) statsPoll() {
 		hPipe, err = windows.CreateFile(
 			windows.StringToUTF16Ptr(bfs.pollingPipe),
 			windows.GENERIC_WRITE,
-			0,
+			windows.FILE_SHARE_WRITE,
 			nil,
 			windows.OPEN_EXISTING,
-			0,
-			0,
+			windows.FILE_ATTRIBUTE_NORMAL,
+			windows.InvalidHandle,
 		)
 
 		// The pipe was created
@@ -178,8 +178,8 @@ func (bfs *BlobfuseStats) statsPoll() {
 	defer ticker.Stop()
 
 	for t := range ticker.C {
-		_, err = writer.WriteString(fmt.Sprintf("Poll at %v\n", t.Format(time.RFC3339)))
-		log.Debug("stats_manager::statsDumper : writing to polling pipe file:", fmt.Sprintf("Poll at %v\n", t.Format(time.RFC3339)))
+		_, err = writer.WriteString(fmt.Sprintf("Poll at %v", t.Format(time.RFC3339)))
+		log.Debug("stats_manager::statsDumper : writing to polling pipe file:", fmt.Sprintf("Poll at %v", t.Format(time.RFC3339)))
 		if err != nil {
 			log.Err("StatsReader::statsPoll : [%v]", err)
 			break
