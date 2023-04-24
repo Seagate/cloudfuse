@@ -112,6 +112,17 @@ const (
 	MB                      = 1024 * 1024
 )
 
+/*
+	In file cache, all calls to Open or OpenFile are done by the implementation in common,
+	rather than by calling os.Open or os.OpenFile. This is due to an issue on Windows, where
+	the implementation in os is not correct.
+
+	If we are on Windows, we need to use our custom OpenFile or Open function which allows a file
+	in the file cache to be deleted and renamed when open, which our codebase relies on.
+	See the following issue to see why we need to do this ourselves
+	https://github.com/golang/go/issues/32088
+*/
+
 // Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &FileCache{}
 
@@ -339,7 +350,7 @@ func (c *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 
 // isLocalDirEmpty: Whether or not the local directory is empty.
 func isLocalDirEmpty(path string) bool {
-	f, _ := os.Open(path)
+	f, _ := common.Open(path)
 	defer f.Close()
 
 	_, err := f.Readdirnames(1)
@@ -506,7 +517,7 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 
 	// If the directory does not exist locally then call the next component
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
-	f, err := os.Open(localPath)
+	f, err := common.Open(localPath)
 	if err == nil {
 		log.Debug("FileCache::IsDirEmpty : %s found in local cache", options.Name)
 
@@ -586,7 +597,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	}
 
 	// Open the file and grab a shared lock to prevent deletion by the cache policy.
-	f, err := os.OpenFile(localPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, options.Mode)
+	f, err := common.OpenFile(localPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, options.Mode)
 	if err != nil {
 		log.Err("FileCache::CreateFile : error opening local file %s [%s]", options.Name, err.Error())
 		return nil, err
@@ -722,7 +733,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		}
 
 		// Open the file in write mode.
-		f, err = os.OpenFile(localPath, os.O_CREATE|os.O_RDWR, options.Mode)
+		f, err = common.OpenFile(localPath, os.O_CREATE|os.O_RDWR, options.Mode)
 		if err != nil {
 			log.Err("FileCache::OpenFile : error creating new file %s [%s]", options.Name, err.Error())
 			return nil, err
@@ -787,10 +798,6 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	}
 
 	// Open the file and grab a shared lock to prevent deletion by the cache policy.
-	// If we are on Windows, we need to use our custom OpenFile function which allows the file
-	// to be deleted and renamed when open, which our codebase relies on.
-	// See the following issue to see why we need to do this ourselves
-	// https://github.com/golang/go/issues/32088
 	f, err = common.OpenFile(localPath, options.Flags, options.Mode)
 	if err != nil {
 		log.Err("FileCache::OpenFile : error opening cached file %s [%s]", options.Name, err.Error())
@@ -1022,7 +1029,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 		// Write to storage
 		// Create a new handle for the SDK to use to upload (read local file)
 		// The local handle can still be used for read and write.
-		uploadHandle, err := os.Open(localPath)
+		uploadHandle, err := common.Open(localPath)
 		if err != nil {
 			log.Err("FileCache::FlushFile : error [unable to open upload handle] %s [%s]", options.Handle.Path, err.Error())
 			return nil
