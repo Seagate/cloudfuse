@@ -221,16 +221,23 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// create a map to keep track of all directories
 	var dirList = make(map[string]bool)
 	var newMarker *string
+	var token *string
 
 	// using paginator from here: https://aws.github.io/aws-sdk-go-v2/docs/making-requests/#using-paginators
 	// List is a tricky function. Here is a great explanation of how list works:
 	// 	https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-prefixes.html
+
+	if marker != nil && *marker == "" {
+		token = nil
+	} else {
+		token = marker
+	}
 	params := &s3.ListObjectsV2Input{
 		Bucket:            aws.String(bucketName),
 		MaxKeys:           count,
 		Prefix:            aws.String(listPath),
 		Delimiter:         aws.String("/"), // delimiter limits results and provides CommonPrefixes
-		ContinuationToken: marker,
+		ContinuationToken: token,
 	}
 	paginator := s3.NewListObjectsV2Paginator(cl.awsS3Client, params)
 	// initialize list to be returned
