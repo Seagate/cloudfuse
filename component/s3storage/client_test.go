@@ -42,6 +42,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path"
 	"strings"
@@ -350,7 +351,9 @@ func (s *clientTestSuite) TestGetAttrFile() {
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
-	bodyLen := 20
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -359,19 +362,19 @@ func (s *clientTestSuite) TestGetAttrFile() {
 	})
 	s.assert.Nil(err)
 
-	attr, err := s.client.GetAttr(name)
+	before, err := s.client.GetAttr(name)
 
 	// file info
 	s.assert.Nil(err)
-	s.assert.NotNil(attr)
-	s.assert.False(attr.IsDir())
-	s.assert.False(attr.IsSymlink())
+	s.assert.NotNil(before)
+	s.assert.False(before.IsDir())
+	s.assert.False(before.IsSymlink())
 
 	// file size
-	s.assert.EqualValues(bodyLen, attr.Size)
+	s.assert.EqualValues(bodyLen, before.Size)
 
 	// file time
-	s.assert.NotNil(attr.Mtime)
+	s.assert.NotNil(before.Mtime)
 
 	time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
 
@@ -386,7 +389,7 @@ func (s *clientTestSuite) TestGetAttrFile() {
 	s.assert.Nil(err)
 	s.assert.NotNil(after.Mtime)
 
-	s.assert.True(after.Mtime.After(attr.Mtime))
+	s.assert.True(after.Mtime.After(before.Mtime))
 }
 func (s *clientTestSuite) TestGetAttrError() {
 	defer s.cleanupTest()
@@ -457,7 +460,9 @@ func (s *clientTestSuite) TestReadToFile() {
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
-	bodyLen := 20
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -487,8 +492,10 @@ func (s *clientTestSuite) TestReadBuffer() {
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
-	len := 20
-	body := []byte(randomString(len))
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
@@ -496,7 +503,7 @@ func (s *clientTestSuite) TestReadBuffer() {
 	})
 	s.assert.Nil(err)
 
-	result, err := s.client.ReadBuffer(name, 0, int64(len))
+	result, err := s.client.ReadBuffer(name, 0, int64(bodyLen))
 
 	// result should match generated body
 	s.assert.Nil(err)
@@ -506,7 +513,9 @@ func (s *clientTestSuite) TestReadInBuffer() {
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
-	bodyLen := 20
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -515,7 +524,7 @@ func (s *clientTestSuite) TestReadInBuffer() {
 	})
 	s.assert.Nil(err)
 
-	outputLen := bodyLen - 5
+	outputLen := rand.Intn(bodyLen-1) + 1 // minimum buffer length of 1
 	output := make([]byte, outputLen)
 	err = s.client.ReadInBuffer(name, 0, int64(outputLen), output)
 
@@ -527,9 +536,11 @@ func (s *clientTestSuite) TestWriteFromFile() {
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
-	bodyLen := 20
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
-	f, err := os.CreateTemp("", name+".tmp") // s3storage_test uses ioutil.TempFile which is deprecated
+	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 	outputLen, err := f.Write(body)
@@ -556,7 +567,9 @@ func (s *clientTestSuite) TestWriteFromBuffer() {
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
-	bodyLen := 20
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 
 	err := s.client.WriteFromBuffer(name, nil, body)
@@ -578,7 +591,9 @@ func (s *clientTestSuite) TestTruncateFile() {
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
-	bodyLen := 20
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -587,7 +602,7 @@ func (s *clientTestSuite) TestTruncateFile() {
 	})
 	s.assert.Nil(err)
 
-	size := 13
+	size := rand.Intn(bodyLen-1) + 1 // minimum size of 1
 	err = s.client.TruncateFile(name, int64(size))
 	s.assert.Nil(err)
 
@@ -607,7 +622,9 @@ func (s *clientTestSuite) TestWrite() {
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
-	bodyLen := 20
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	oldBody := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -616,7 +633,7 @@ func (s *clientTestSuite) TestWrite() {
 	})
 	s.assert.Nil(err)
 
-	offset := 13
+	offset := rand.Intn(bodyLen-1) + 1 // minimum offset of 1
 	newData := []byte(randomString(bodyLen - offset))
 	h := handlemap.NewHandle(name)
 	err = s.client.Write(internal.WriteFileOptions{Handle: h, Offset: int64(offset), Data: newData})
