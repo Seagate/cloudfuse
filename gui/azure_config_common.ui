@@ -101,41 +101,32 @@
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
-        <widget class="QLineEdit" name="lineEdit_libfuse_attributeExp">
-         <property name="maximumSize">
-          <size>
-           <width>30</width>
-           <height>16777215</height>
-          </size>
+        <widget class="QSpinBox" name="spinBox_libfuse_attributeExp">
+         <property name="maximum">
+          <number>3000</number>
          </property>
-         <property name="text">
-          <string>120</string>
+         <property name="value">
+          <number>120</number>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="lineEdit_libfuse_entryExp">
-         <property name="maximumSize">
-          <size>
-           <width>30</width>
-           <height>16777215</height>
-          </size>
+        <widget class="QSpinBox" name="spinBox_libfuse_entryExp">
+         <property name="maximum">
+          <number>3000</number>
          </property>
-         <property name="text">
-          <string>120</string>
+         <property name="value">
+          <number>120</number>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="lineEdit_libfuse_negEntryExp">
-         <property name="maximumSize">
-          <size>
-           <width>30</width>
-           <height>16777215</height>
-          </size>
+        <widget class="QSpinBox" name="spinBox_libfuse_negEntryExp">
+         <property name="maximum">
+          <number>3000</number>
          </property>
-         <property name="text">
-          <string>120</string>
+         <property name="value">
+          <number>120</number>
          </property>
         </widget>
        </item>
@@ -325,50 +316,23 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="lineEdit_streaming_blockSize">
-            <property name="maximumSize">
-             <size>
-              <width>75</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>0</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+           <widget class="QSpinBox" name="spinBox_streaming_blockSize">
+            <property name="maximum">
+             <number>3000</number>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="lineEdit_streaming_maxBuff">
-            <property name="maximumSize">
-             <size>
-              <width>75</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>0</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+           <widget class="QSpinBox" name="spinBox_streaming_maxBuff">
+            <property name="maximum">
+             <number>3000</number>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="lineEdit_streaming_buffSize">
-            <property name="maximumSize">
-             <size>
-              <width>75</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>0</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+           <widget class="QSpinBox" name="spinBox_streaming_buffSize">
+            <property name="maximum">
+             <number>3000</number>
             </property>
            </widget>
           </item>
