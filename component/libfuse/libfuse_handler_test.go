@@ -50,6 +50,7 @@ func (suite *libfuseTestSuite) TestDefault() {
 	suite.assert.False(suite.libfuse.readOnly)
 	suite.assert.False(suite.libfuse.traceEnable)
 	suite.assert.False(suite.libfuse.allowOther)
+	suite.assert.False(suite.libfuse.networkShare)
 	suite.assert.Equal(suite.libfuse.dirPermission, uint(common.DefaultDirectoryPermissionBits))
 	suite.assert.Equal(suite.libfuse.filePermission, uint(common.DefaultFilePermissionBits))
 	suite.assert.Equal(suite.libfuse.entryExpiration, uint32(120))
@@ -62,7 +63,7 @@ func (suite *libfuseTestSuite) TestDefault() {
 func (suite *libfuseTestSuite) TestConfig() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default libfuse generated
-	config := "allow-other: true\nread-only: true\nlibfuse:\n  attribute-expiration-sec: 60\n  entry-expiration-sec: 60\n  negative-entry-expiration-sec: 60\n  fuse-trace: true\n  disable-writeback-cache: true\n  ignore-open-flags: false\n"
+	config := "allow-other: true\nread-only: true\nlibfuse:\n  attribute-expiration-sec: 60\n  entry-expiration-sec: 60\n  negative-entry-expiration-sec: 60\n  fuse-trace: true\n  disable-writeback-cache: true\n  ignore-open-flags: false\n  network-share: true\n"
 	suite.setupTestHelper(config) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal(suite.libfuse.Name(), "libfuse")
@@ -72,6 +73,7 @@ func (suite *libfuseTestSuite) TestConfig() {
 	suite.assert.True(suite.libfuse.disableWritebackCache)
 	suite.assert.False(suite.libfuse.ignoreOpenFlags)
 	suite.assert.True(suite.libfuse.allowOther)
+	suite.assert.True(suite.libfuse.networkShare)
 	suite.assert.Equal(suite.libfuse.dirPermission, uint(fs.FileMode(0777)))
 	suite.assert.Equal(suite.libfuse.filePermission, uint(fs.FileMode(0777)))
 	suite.assert.Equal(suite.libfuse.entryExpiration, uint32(60))
@@ -90,6 +92,7 @@ func (suite *libfuseTestSuite) TestConfigZero() {
 	suite.assert.True(suite.libfuse.readOnly)
 	suite.assert.True(suite.libfuse.traceEnable)
 	suite.assert.False(suite.libfuse.allowOther)
+	suite.assert.False(suite.libfuse.networkShare)
 	suite.assert.Equal(suite.libfuse.dirPermission, uint(fs.FileMode(0775)))
 	suite.assert.Equal(suite.libfuse.filePermission, uint(fs.FileMode(0755)))
 	suite.assert.Equal(suite.libfuse.entryExpiration, uint32(0))
@@ -108,6 +111,7 @@ func (suite *libfuseTestSuite) TestConfigDefaultPermission() {
 	suite.assert.True(suite.libfuse.readOnly)
 	suite.assert.True(suite.libfuse.traceEnable)
 	suite.assert.False(suite.libfuse.allowOther)
+	suite.assert.False(suite.libfuse.networkShare)
 	suite.assert.Equal(suite.libfuse.dirPermission, uint(fs.FileMode(0555)))
 	suite.assert.Equal(suite.libfuse.filePermission, uint(fs.FileMode(0555)))
 	suite.assert.Equal(suite.libfuse.entryExpiration, uint32(0))

@@ -44,6 +44,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -276,4 +277,12 @@ func ExpandPath(path string) string {
 	}
 
 	return os.ExpandEnv(path)
+}
+
+// IsDriveLetter returns true if the path is a drive letter on Windows, such
+// as 'D:' or 'f:'. Returns false otherwise.
+func IsDriveLetter(path string) bool {
+	pattern := `^[A-Za-z]:$`
+	match, _ := regexp.MatchString(pattern, path)
+	return match
 }
