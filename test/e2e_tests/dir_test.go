@@ -117,7 +117,12 @@ func (suite *dirTestSuite) TestDirCreateDuplicate() {
 	suite.Equal(nil, err)
 	// duplicate dir - we expect to throw
 	err = os.Mkdir(dirName, 0777)
-	suite.Contains(err.Error(), "file exists")
+
+	if runtime.GOOS == "windows" {
+		suite.Contains(err.Error(), "file already exists")
+	} else {
+		suite.Contains(err.Error(), "file exists")
+	}
 
 	// cleanup
 	suite.dirTestCleanup([]string{dirName})
