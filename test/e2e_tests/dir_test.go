@@ -130,6 +130,10 @@ func (suite *dirTestSuite) TestDirCreateDuplicate() {
 
 // # Create Directory with special characters in name
 func (suite *dirTestSuite) TestDirCreateSplChar() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
 	dirName := suite.testPath + "/" + "@#$^&*()_+=-{}[]|?><.,~"
 	err := os.Mkdir(dirName, 0777)
 	suite.Equal(nil, err)
@@ -140,6 +144,10 @@ func (suite *dirTestSuite) TestDirCreateSplChar() {
 
 // # Create Directory with slash in name
 func (suite *dirTestSuite) TestDirCreateSlashChar() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
 	dirName := suite.testPath + "/" + "PRQ\\STUV"
 	err := os.Mkdir(dirName, 0777)
 	suite.Equal(nil, err)
