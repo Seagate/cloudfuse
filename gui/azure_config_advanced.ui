@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>937</width>
-    <height>523</height>
+    <height>530</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -132,16 +132,22 @@
            <widget class="QLineEdit" name="lineEdit_azure_subDirectory"/>
           </item>
           <item>
-           <widget class="QLineEdit" name="lineEdit_azure_blockSize">
-            <property name="text">
-             <string>16</string>
+           <widget class="QSpinBox" name="spinBox_azure_blockSize">
+            <property name="maximum">
+             <number>3000</number>
+            </property>
+            <property name="value">
+             <number>16</number>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="lineEdit_azure_maxConcurrency">
-            <property name="text">
-             <string>32</string>
+           <widget class="QSpinBox" name="spinBox_azure_maxConcurrency">
+            <property name="maximum">
+             <number>3000</number>
+            </property>
+            <property name="value">
+             <number>32</number>
             </property>
            </widget>
           </item>
@@ -170,37 +176,49 @@
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="lineEdit_azure_blockOnMount">
-            <property name="text">
-             <string>0</string>
+           <widget class="QSpinBox" name="spinBox_azure_blockOnMount">
+            <property name="maximum">
+             <number>3000</number>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="lineEdit_azure_maxRetries">
-            <property name="text">
-             <string>5</string>
+           <widget class="QSpinBox" name="spinBox_azure_maxRetries">
+            <property name="maximum">
+             <number>3000</number>
+            </property>
+            <property name="value">
+             <number>5</number>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="lineEdit_azure_maxRetryTimeout">
-            <property name="text">
-             <string>900</string>
+           <widget class="QSpinBox" name="spinBox_azure_maxRetryTimeout">
+            <property name="maximum">
+             <number>3000</number>
+            </property>
+            <property name="value">
+             <number>900</number>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="lineEdit_azure_retryBackoff">
-            <property name="text">
-             <string>4</string>
+           <widget class="QSpinBox" name="spinBox_azure_retryBackoff">
+            <property name="maximum">
+             <number>3000</number>
+            </property>
+            <property name="value">
+             <number>4</number>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="lineEdit_azure_maxRetryDelay">
-            <property name="text">
-             <string>60</string>
+           <widget class="QSpinBox" name="spinBox_azure_maxRetryDelay">
+            <property name="maximum">
+             <number>3000</number>
+            </property>
+            <property name="value">
+             <number>60</number>
             </property>
            </widget>
           </item>
@@ -380,85 +398,49 @@
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="lineEdit_fileCache_timeout">
-              <property name="maximumSize">
-               <size>
-                <width>30</width>
-                <height>16777215</height>
-               </size>
+             <widget class="QSpinBox" name="spinBox_fileCache_timeout">
+              <property name="maximum">
+               <number>3000</number>
               </property>
-              <property name="text">
-               <string>120</string>
-              </property>
-              <property name="alignment">
-               <set>Qt::AlignCenter</set>
+              <property name="value">
+               <number>120</number>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="lineEdit_fileCache_maxEviction">
-              <property name="maximumSize">
-               <size>
-                <width>75</width>
-                <height>16777215</height>
-               </size>
+             <widget class="QSpinBox" name="spinBox_fileCache_maxEviction">
+              <property name="maximum">
+               <number>15000</number>
               </property>
-              <property name="text">
-               <string>5000</string>
-              </property>
-              <property name="alignment">
-               <set>Qt::AlignCenter</set>
+              <property name="value">
+               <number>5000</number>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="lineEdit_fileCache_maxCacheSize">
-              <property name="maximumSize">
-               <size>
-                <width>75</width>
-                <height>16777215</height>
-               </size>
-              </property>
-              <property name="toolTip">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Enter cache size in MB - 0 indicates unlimited&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-              </property>
-              <property name="text">
-               <string>0</string>
-              </property>
-              <property name="alignment">
-               <set>Qt::AlignCenter</set>
+             <widget class="QSpinBox" name="spinBox_fileCache_maxCacheSize">
+              <property name="maximum">
+               <number>3000</number>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="lineEdit_fileCache_evictMaxThresh">
-              <property name="maximumSize">
-               <size>
-                <width>30</width>
-                <height>16777215</height>
-               </size>
+             <widget class="QSpinBox" name="spinBox_fileCache_evictMaxThresh">
+              <property name="maximum">
+               <number>3000</number>
               </property>
-              <property name="text">
-               <string>80</string>
-              </property>
-              <property name="alignment">
-               <set>Qt::AlignCenter</set>
+              <property name="value">
+               <number>80</number>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="lineEdit_fileCache_evictMinThresh">
-              <property name="maximumSize">
-               <size>
-                <width>30</width>
-                <height>16777215</height>
-               </size>
+             <widget class="QSpinBox" name="spinBox_fileCache_evictMinThresh">
+              <property name="maximum">
+               <number>3000</number>
               </property>
-              <property name="text">
-               <string>60</string>
-              </property>
-              <property name="alignment">
-               <set>Qt::AlignCenter</set>
+              <property name="value">
+               <number>60</number>
               </property>
              </widget>
             </item>

@@ -136,6 +136,13 @@ func (lf *Libfuse) initFuse() error {
 	// Setup options as a slice
 	opts := []string{"-o", options}
 
+	// Runs as network file share on Windows only when mounting to drive letter.
+	if runtime.GOOS == "windows" && lf.networkShare && common.IsDriveLetter(lf.mountPath) {
+		// TODO: We can support any type of valid network share path so this path could
+		// be configurable for the config file. But this is a good default.
+		opts = append(opts, "--VolumePrefix=\\server\\share")
+	}
+
 	// Enabling trace is done by using -d rather than setting an option in fuse
 	if lf.traceEnable {
 		opts = append(opts, "-d")

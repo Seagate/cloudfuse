@@ -74,6 +74,7 @@ type Libfuse struct {
 	disableWritebackCache bool
 	ignoreOpenFlags       bool
 	nonEmptyMount         bool
+	networkShare          bool // Run as a network file share on Windows
 	lsFlags               common.BitMap16
 }
 
@@ -100,6 +101,7 @@ type LibfuseOptions struct {
 	DisableWritebackCache   bool   `config:"disable-writeback-cache" yaml:"-"`
 	IgnoreOpenFlags         bool   `config:"ignore-open-flags" yaml:"ignore-open-flags,omitempty"`
 	nonEmptyMount           bool   `config:"nonempty" yaml:"nonempty,omitempty"`
+	NetworkShare            bool   `config:"network-share" yaml:"network-share,omitempty"`
 }
 
 const compName = "libfuse"
@@ -181,6 +183,7 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 	lf.disableWritebackCache = opt.DisableWritebackCache
 	lf.ignoreOpenFlags = opt.IgnoreOpenFlags
 	lf.nonEmptyMount = opt.nonEmptyMount
+	lf.networkShare = opt.NetworkShare
 
 	if opt.allowOther {
 		lf.dirPermission = uint(common.DefaultAllowOtherPermissionBits)
@@ -267,8 +270,10 @@ func (lf *Libfuse) Configure(_ bool) error {
 		return fmt.Errorf("config error in %s [invalid config settings]", lf.Name())
 	}
 
-	log.Info("Libfuse::Configure : read-only %t, allow-other %t, default-perm %d, entry-timeout %d, attr-time %d, negative-timeout %d, ignore-open-flags: %t, nonempty %t",
-		lf.readOnly, lf.allowOther, lf.filePermission, lf.entryExpiration, lf.attributeExpiration, lf.negativeTimeout, lf.ignoreOpenFlags, lf.nonEmptyMount)
+	log.Info("Libfuse::Configure : read-only %t, allow-other %t, default-perm %d, entry-timeout %d, attr-time %d, negative-timeout %d, "+
+		"ignore-open-flags: %t, nonempty %t, network-share %t",
+		lf.readOnly, lf.allowOther, lf.filePermission, lf.entryExpiration, lf.attributeExpiration, lf.negativeTimeout,
+		lf.ignoreOpenFlags, lf.nonEmptyMount, lf.networkShare)
 
 	return nil
 }
@@ -312,4 +317,7 @@ func init() {
 
 	ignoreOpenFlags := config.AddBoolFlag("ignore-open-flags", true, "Ignore unsupported open flags (APPEND, WRONLY) by blobfuse when writeback caching is enabled.")
 	config.BindPFlag(compName+".ignore-open-flags", ignoreOpenFlags)
+
+	networkShareFlags := config.AddBoolFlag("network-share", false, "Run as a network share. Only supported on Windows.")
+	config.BindPFlag(compName+".network-share", networkShareFlags)
 }
