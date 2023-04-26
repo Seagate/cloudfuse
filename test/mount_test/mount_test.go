@@ -530,6 +530,7 @@ func TestMain(m *testing.M) {
 		fmt.Println("Could not cleanup mount directory before testing")
 	}
 
+	// On Linux the folder must exist so we need to create it, on Windows it cannot exist.
 	if runtime.GOOS != "windows" {
 		os.Mkdir(mntDir, 0777)
 	}
