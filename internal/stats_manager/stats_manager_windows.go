@@ -88,7 +88,7 @@ func (sc *StatsCollector) statsDumper() {
 
 	// The channel is used for two types of messages. First, if the message is an event
 	// then we send the message to the transfer pipe. If it is not an event, then it is
-	// a message about the changing of given values such as incrementing or decrimenting
+	// a message about the changing of given values such as incrementing or decrementing
 	// the number of open file handles.
 	for st := range sc.channel {
 		log.Debug("stats_manager::statsDumper : stats from channel: %v", st)
