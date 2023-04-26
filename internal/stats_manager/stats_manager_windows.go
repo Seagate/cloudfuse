@@ -113,7 +113,6 @@ func (sc *StatsCollector) statsDumper() {
 			// log.Debug("stats_manager::statsDumper : stats: %v", string(msg))
 
 			stMgrOpt.transferMtx.Lock()
-			log.Debug("stats_manager::statsDumper : Writing message to pipe %s", msg)
 			err = windows.WriteFile(tPipe, msg, nil, nil)
 			stMgrOpt.transferMtx.Unlock()
 			if err != nil {
