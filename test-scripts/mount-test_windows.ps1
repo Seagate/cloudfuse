@@ -1,10 +1,7 @@
 #! /usr/bin/pwsh
 
-# Cleanup test
-${mount_dir} = ""
-
-# This is the directory where you cloned the repo
-${work_dir} = ""
+# Load the variables
+. ".\helper\var.ps1"
 
 Write-Output "-------------------------------------------------------------------"
 Write-Output "Starting Mount Test"

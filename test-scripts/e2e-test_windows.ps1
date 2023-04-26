@@ -1,10 +1,7 @@
 #! /usr/bin/pwsh
 
-# Cleanup test
-${mount_dir} = ""
-
-# This is a temporary folder used to write some files during the test
-${mount_tmp} = ""
+# Load the variables
+. ".\helper\var.ps1"
 
 Write-Output "-------------------------------------------------------------------"
 Write-Output "Starting e2e Tests"
