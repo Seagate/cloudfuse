@@ -255,6 +255,9 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			options.Token = *newMarker
 			return s3.StreamDir(options)
 		}
+	} else {
+		blnkStr := ""
+		newMarker = &blnkStr
 	}
 
 	// if path is empty, it means it is the root, relative to the mounted directory
@@ -266,7 +269,7 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	// increment streamDir call count
 	s3StatsCollector.UpdateStats(stats_manager.Increment, streamDir, (int64)(1))
 
-	return newList, *newMarker, nil
+	return newList, *newMarker, nil //as soon as *newMarker is nil we run into suite.go getting "unreadable could not resolve interface type. invalid memory add"
 }
 
 func (s3 *S3Storage) RenameDir(options internal.RenameDirOptions) error {
