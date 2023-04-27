@@ -125,23 +125,13 @@ func (cm *CpuMemProfiler) getCpuMemoryUsage() (*hmcommon.CpuMemStat, error) {
 		pid, err := strconv.ParseInt(cm.pid, 10, 32)
 		if err != nil {
 			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error parsing process id")
-
-			cpuMemStat := &hmcommon.CpuMemStat{
-				CpuUsage: "0",
-				MemUsage: "0",
-			}
-			return cpuMemStat, nil
+			return &hmcommon.CpuMemStat{}, nil
 		}
 
 		proc, err := process.NewProcess(int32(pid))
 		if err != nil {
 			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error getting process")
-
-			cpuMemStat := &hmcommon.CpuMemStat{
-				CpuUsage: "0",
-				MemUsage: "0",
-			}
-			return cpuMemStat, nil
+			return &hmcommon.CpuMemStat{}, nil
 		}
 
 		cpuPercent, err := proc.CPUPercent()
