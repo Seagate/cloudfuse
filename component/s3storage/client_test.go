@@ -37,17 +37,24 @@
 package s3storage
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
+	"path"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/config"
 	"lyvecloudfuse/common/log"
+	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/handlemap"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -145,12 +152,8 @@ func (s *clientTestSuite) cleanupTest() {
 	// s.tearDownTestHelper(true)
 	_ = log.Destroy()
 }
-
-func (s *clientTestSuite) TestUpdateConfig() {
-}
-func (s *clientTestSuite) TestNewCredentialKey() {
-}
 func (s *clientTestSuite) TestListBuckets() {
+	defer s.cleanupTest()
 	// TODO: generalize this test by creating, listing, then destroying a bucket
 	// 	We need to get permissions to create buckets in Lyve Cloud, or implement this against AWS S3.
 	// 	For now, the bucket parameter has been removed from the test suite for tidiness sake
@@ -159,12 +162,73 @@ func (s *clientTestSuite) TestListBuckets() {
 	s.assert.Equal(buckets, []string{"stxe1-srg-lens-lab1"})
 }
 func (s *clientTestSuite) TestSetPrefixPath() {
+	defer s.cleanupTest()
+	// setup
+	prefix := generateDirectoryName()
+	fileName := generateFileName()
+
+	err := s.client.SetPrefixPath(prefix)
+	s.assert.Nil(err)
+	err = s.client.CreateFile(fileName, os.FileMode(0)) // create file uses prefix
+	s.assert.Nil(err)
+
+	// object should be at prefix
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(path.Join(prefix, fileName)),
+	})
+	s.assert.Nil(err)
 }
 func (s *clientTestSuite) TestCreateFile() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+
+	err := s.client.CreateFile(name, os.FileMode(0))
+	s.assert.Nil(err)
+
+	// file should be in bucket
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
 }
 func (s *clientTestSuite) TestCreateDirectory() {
+	defer s.cleanupTest()
+	// setup
+	name := generateDirectoryName()
+
+	err := s.client.CreateDirectory(name)
+	s.assert.Nil(err)
 }
 func (s *clientTestSuite) TestCreateLink() {
+	defer s.cleanupTest()
+	// setup
+	target := generateFileName()
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(target),
+	})
+	s.assert.Nil(err)
+	source := generateFileName()
+
+	err = s.client.CreateLink(source, target)
+	s.assert.Nil(err)
+
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(source),
+	})
+	s.assert.Nil(err)
+
+	// object body should match target file name
+	defer result.Body.Close()
+	output, err := ioutil.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(target, output)
+
+	// TODO: test metadata
 }
 func (s *clientTestSuite) TestDeleteFile() {
 	defer s.cleanupTest()
@@ -190,6 +254,25 @@ func (s *clientTestSuite) TestDeleteFile() {
 	s.assert.NotNil(err)
 }
 func (s *clientTestSuite) TestDeleteDirectory() {
+	defer s.cleanupTest()
+	// setup
+	dirName := generateDirectoryName()
+	fileName := generateFileName() // can't have empty directory
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(path.Join(dirName, fileName)),
+	})
+	s.assert.Nil(err)
+
+	err = s.client.DeleteDirectory(dirName)
+	s.assert.Nil(err)
+
+	// file in directory should no longer be there
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(path.Join(dirName, fileName)),
+	})
+	s.assert.NotNil(err)
 }
 func (s *clientTestSuite) TestRenameFile() {
 	defer s.cleanupTest()
@@ -220,46 +303,354 @@ func (s *clientTestSuite) TestRenameFile() {
 	s.assert.Nil(err)
 }
 func (s *clientTestSuite) TestRenameDirectory() {
+	defer s.cleanupTest()
+	// setup
+	srcDir := generateDirectoryName()
+	fileName := generateFileName() // can't have empty directory
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(path.Join(srcDir, fileName)),
+	})
+	s.assert.Nil(err)
+
+	dstDir := generateDirectoryName()
+	err = s.client.RenameDirectory(srcDir, dstDir)
+	s.assert.Nil(err)
+
+	// file in srcDir should no longer be there
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(path.Join(srcDir, fileName)),
+	})
+	s.assert.NotNil(err)
+	// file in dstDir should be there
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(path.Join(dstDir, fileName)),
+	})
+	s.assert.Nil(err)
 }
-func (s *clientTestSuite) TestgetAttrUsingRest() {
+func (s *clientTestSuite) TestGetAttrDir() {
+	defer s.cleanupTest()
+	// setup
+	dirName := generateDirectoryName()
+	filename := dirName + "/" + generateFileName()
+
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(filename),
+	})
+	s.assert.Nil(err)
+
+	attr, err := s.client.GetAttr(dirName)
+	s.assert.Nil(err)
+	s.assert.NotNil(attr)
+	s.assert.True(attr.IsDir())
 }
-func (s *clientTestSuite) TestgetAttrUsingList() {
+func (s *clientTestSuite) TestGetAttrFile() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	body := []byte(randomString(bodyLen))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	before, err := s.client.GetAttr(name)
+
+	// file info
+	s.assert.Nil(err)
+	s.assert.NotNil(before)
+	s.assert.False(before.IsDir())
+	s.assert.False(before.IsSymlink())
+
+	// file size
+	s.assert.EqualValues(bodyLen, before.Size)
+
+	// file time
+	s.assert.NotNil(before.Mtime)
+
+	time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
+
+	_, err = s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	after, err := s.client.GetAttr(name)
+	s.assert.Nil(err)
+	s.assert.NotNil(after.Mtime)
+
+	s.assert.True(after.Mtime.After(before.Mtime))
 }
-func (s *clientTestSuite) TestGetAttr() {
+func (s *clientTestSuite) TestGetAttrError() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+
+	// non existent file should throw error
+	_, err := s.client.GetAttr(name)
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
 }
 func (s *clientTestSuite) TestList() {
+	defer s.cleanupTest()
+	// setup
+	base := generateDirectoryName()
+	// setup directory hierarchy like setupHierarchy in s3storage_test where 'a' is generated base
+	// a/c1/gc1
+	gc1 := base + "/c1" + "/gc1"
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(gc1),
+	})
+	s.assert.Nil(err)
+	// a/c2
+	c2 := base + "/c2"
+	_, err = s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(c2),
+	})
+	s.assert.Nil(err)
+	// ab/c1
+	abc1 := base + "b/c1"
+	_, err = s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(abc1),
+	})
+	s.assert.Nil(err)
+	// ac
+	ac := base + "c"
+	_, err = s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(ac),
+	})
+	s.assert.Nil(err)
+
+	// with trailing "/" should return only the directory c1 and the file c2
+	baseTrail := base + "/"
+	objects, _, err := s.client.List(baseTrail, nil, 0)
+	s.assert.Nil(err)
+	s.assert.NotNil(objects)
+	s.assert.EqualValues(len(objects), 2)
+	s.assert.EqualValues(objects[0].Name, "c1")
+	s.assert.True(objects[0].IsDir())
+	s.assert.EqualValues(objects[1].Name, "c2")
+	s.assert.False(objects[1].IsDir())
+
+	// without trailing "/" only get file ac
+	// if not including the trailing "/", List will return any files with the given prefix
+	// but no directories
+	objects, _, err = s.client.List(base, nil, 0)
+	s.assert.Nil(err)
+	s.assert.NotNil(objects)
+	s.assert.EqualValues(len(objects), 1)
+	s.assert.EqualValues(objects[0].Name, base+"c")
+	s.assert.False(objects[0].IsDir())
 }
 func (s *clientTestSuite) TestReadToFile() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	body := []byte(randomString(bodyLen))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	f, err := os.CreateTemp("", name+".tmp")
+	s.assert.Nil(err)
+	defer os.Remove(f.Name())
+
+	err = s.client.ReadToFile(name, 0, int64(bodyLen), f)
+	s.assert.Nil(err)
+
+	// file content should match generated body
+	output := make([]byte, bodyLen)
+	f, err = os.Open(f.Name())
+	s.assert.Nil(err)
+	outputLen, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(bodyLen, outputLen)
+	s.assert.EqualValues(body, output)
+	f.Close()
 }
 func (s *clientTestSuite) TestReadBuffer() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	body := []byte(randomString(bodyLen))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	result, err := s.client.ReadBuffer(name, 0, int64(bodyLen))
+
+	// result should match generated body
+	s.assert.Nil(err)
+	s.assert.EqualValues(body, result)
 }
 func (s *clientTestSuite) TestReadInBuffer() {
-}
-func (s *clientTestSuite) TestcalculateBlockSize() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	body := []byte(randomString(bodyLen))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	outputLen := rand.Intn(bodyLen-1) + 1 // minimum buffer length of 1
+	output := make([]byte, outputLen)
+	err = s.client.ReadInBuffer(name, 0, int64(outputLen), output)
+
+	// read in buffer should match first outputLen characters of generated body
+	s.assert.Nil(err)
+	s.assert.EqualValues(body[:outputLen], output)
 }
 func (s *clientTestSuite) TestWriteFromFile() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	body := []byte(randomString(bodyLen))
+	f, err := os.CreateTemp("", name+".tmp")
+	s.assert.Nil(err)
+	defer os.Remove(f.Name())
+	outputLen, err := f.Write(body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(bodyLen, outputLen)
+
+	err = s.client.WriteFromFile(name, nil, f)
+	s.assert.Nil(err)
+	f.Close()
+
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
+
+	// object body should match generated body written to file
+	defer result.Body.Close()
+	output, err := ioutil.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(body, output)
 }
 func (s *clientTestSuite) TestWriteFromBuffer() {
-}
-func (s *clientTestSuite) TestGetFileBlockOffsets() {
-}
-func (s *clientTestSuite) TestcreateBlock() {
-}
-func (s *clientTestSuite) TestcreateNewBlocks() {
-}
-func (s *clientTestSuite) TestremoveBlocks() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	body := []byte(randomString(bodyLen))
+
+	err := s.client.WriteFromBuffer(name, nil, body)
+	s.assert.Nil(err)
+
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
+
+	// object body should match generated body
+	defer result.Body.Close()
+	output, err := ioutil.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(body, output)
 }
 func (s *clientTestSuite) TestTruncateFile() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	body := []byte(randomString(bodyLen))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	size := rand.Intn(bodyLen-1) + 1 // minimum size of 1
+	err = s.client.TruncateFile(name, int64(size))
+	s.assert.Nil(err)
+
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
+
+	// object body should match truncated initial body
+	defer result.Body.Close()
+	output, err := ioutil.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(body[:size], output)
 }
 func (s *clientTestSuite) TestWrite() {
-}
-func (s *clientTestSuite) TeststageAndCommitModifiedBlocks() {
-}
-func (s *clientTestSuite) TestStageAndCommit() {
-}
-func (s *clientTestSuite) TestChangeMod() {
-}
-func (s *clientTestSuite) TestChangeOwner() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	oldBody := []byte(randomString(bodyLen))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(oldBody),
+	})
+	s.assert.Nil(err)
+
+	offset := rand.Intn(bodyLen-1) + 1 // minimum offset of 1
+	newData := []byte(randomString(bodyLen - offset))
+	h := handlemap.NewHandle(name)
+	err = s.client.Write(internal.WriteFileOptions{Handle: h, Offset: int64(offset), Data: newData})
+	s.assert.Nil(err)
+
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+	})
+	s.assert.Nil(err)
+
+	// object body should match generated combo of old and new data
+	defer result.Body.Close()
+	output, err := ioutil.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(oldBody[:offset], output[:offset])
+	s.assert.EqualValues(newData, output[offset:])
 }
 
 func TestClient(t *testing.T) {
