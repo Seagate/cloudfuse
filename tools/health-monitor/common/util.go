@@ -56,7 +56,7 @@ func CheckProcessStatus(pid string) error {
 		}
 
 		// Check if the pid is a current process, if err == nil
-		// then the proces is running
+		// then the process is running
 		_, err = process.NewProcess(int32(pid))
 		if err != nil {
 			return fmt.Errorf("lyvecloudfuse is not running on pid %v", pid)
