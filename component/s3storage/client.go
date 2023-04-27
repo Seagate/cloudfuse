@@ -221,12 +221,12 @@ func (cl *Client) DeleteDirectory(name string) error {
 	name = internal.ExtendDirName(name)
 
 	done := false
-
+	var marker *string
 	var err error
 	for !done {
 
 		// list all objects with the prefix
-		objects, marker, err := cl.List(name, nil, 0)
+		objects, marker, err := cl.List(name, marker, 0)
 		if err != nil {
 			log.Warn("Client::DeleteDirectory : Failed to list object with prefix %s. Here's why: %v", name, err)
 			return err
@@ -298,9 +298,10 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 	// make sure to pass source with a trailing forward slash
 
 	done := false
+	var marker *string
 
 	for !done {
-		sourceObjects, marker, err := cl.List(internal.ExtendDirName(source), nil, 0)
+		sourceObjects, marker, err := cl.List(internal.ExtendDirName(source), marker, 0)
 		if err != nil {
 			log.Err("Client::RenameDirectory : Failed to list objects with prefix %s. Here's why: %v", source, err)
 			return err
