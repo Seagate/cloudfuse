@@ -255,7 +255,8 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			options.Token = *newMarker
 			return s3.StreamDir(options)
 		}
-	} else {
+	}
+	if newMarker == nil {
 		blnkStr := ""
 		newMarker = &blnkStr
 	}
