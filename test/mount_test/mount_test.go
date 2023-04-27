@@ -102,7 +102,6 @@ func blobfuseUnmount(suite *mountSuite, unmountOutput string) {
 func (suite *mountSuite) TestMountCmd() {
 	// TODO: Allow test to run on Windows.
 	if runtime.GOOS == "windows" {
-		suite.Equal(0, 0)
 		fmt.Println("Skipping tests on windows. We should enable this in the future.")
 		return
 	}
@@ -273,7 +272,6 @@ func (suite *mountSuite) TestEnvVarMountFailure() {
 func (suite *mountSuite) TestEnvVarMount() {
 	// TODO: Allow test to run on Windows.
 	if runtime.GOOS == "windows" {
-		suite.Equal(0, 0)
 		fmt.Println("Skipping tests on windows. We should enable this in the future.")
 		return
 	}
