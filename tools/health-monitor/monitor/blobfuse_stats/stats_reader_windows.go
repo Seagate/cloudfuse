@@ -48,6 +48,44 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+func (bfs *BlobfuseStats) statsReader() error {
+	// Accept incoming connections
+	for {
+		log.Info("StatsReader::statsReader : In stats reader")
+		handle, err := windows.CreateNamedPipe(
+			windows.StringToUTF16Ptr(bfs.transferPipe),
+			windows.PIPE_ACCESS_DUPLEX,
+			windows.PIPE_TYPE_MESSAGE|windows.PIPE_READMODE_MESSAGE|windows.PIPE_WAIT,
+			windows.PIPE_UNLIMITED_INSTANCES,
+			4096,
+			4096,
+			0,
+			nil,
+		)
+		if err != nil && err != windows.ERROR_PIPE_BUSY {
+			log.Err("StatsReader::statsReader : unable to create pipe [%v]", err)
+			return err
+		}
+
+		// This is a blocking call that waits for a client instance to call the CreateFile function and once that
+		// happens then we can safely start writing to the named pipe.
+		// See https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
+		err = windows.ConnectNamedPipe(handle, nil)
+		if err == windows.ERROR_PIPE_CONNECTED {
+			log.Err("StatsReader::statsReader : There is a process at other end of pipe %s: retrying...", bfs.transferPipe, err)
+			windows.CloseHandle(handle)
+			time.Sleep(1 * time.Second)
+		} else if err != nil {
+			log.Err("StatsReader::statsReader : unable to connect to named pipe %s: [%v]", bfs.transferPipe, err)
+			windows.CloseHandle(handle)
+			return err
+		}
+		log.Info("StatsReader::statsReader : Connected transfer pipe %s", bfs.transferPipe)
+
+		go bfs.handleStatsReader(handle)
+	}
+}
+
 func (bfs *BlobfuseStats) handleStatsReader(handle windows.Handle) error {
 	defer windows.CloseHandle(handle)
 
@@ -91,44 +129,6 @@ func (bfs *BlobfuseStats) handleStatsReader(handle windows.Handle) error {
 	}
 
 	return e
-}
-
-func (bfs *BlobfuseStats) statsReader() error {
-	// Accept incoming connections
-	for {
-		log.Info("StatsReader::statsReader : In stats reader")
-		handle, err := windows.CreateNamedPipe(
-			windows.StringToUTF16Ptr(bfs.transferPipe),
-			windows.PIPE_ACCESS_DUPLEX,
-			windows.PIPE_TYPE_MESSAGE|windows.PIPE_READMODE_MESSAGE|windows.PIPE_WAIT,
-			windows.PIPE_UNLIMITED_INSTANCES,
-			4096,
-			4096,
-			0,
-			nil,
-		)
-		if err != nil && err != windows.ERROR_PIPE_BUSY {
-			log.Err("StatsReader::statsReader : unable to create pipe [%v]", err)
-			return err
-		}
-
-		// This is a blocking call that waits for a client instance to call the CreateFile function and once that
-		// happens then we can safely start writing to the named pipe.
-		// See https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe
-		err = windows.ConnectNamedPipe(handle, nil)
-		if err == windows.ERROR_PIPE_CONNECTED {
-			log.Err("StatsReader::statsReader : There is a process at other end of pipe %s: retrying...", bfs.transferPipe, err)
-			windows.CloseHandle(handle)
-			time.Sleep(1 * time.Second)
-		} else if err != nil {
-			log.Err("StatsReader::statsReader : unable to connect to named pipe %s: [%v]", bfs.transferPipe, err)
-			windows.CloseHandle(handle)
-			return err
-		}
-		log.Info("StatsReader::statsReader : Connected transfer pipe %s", bfs.transferPipe)
-
-		go bfs.handleStatsReader(handle)
-	}
 }
 
 func (bfs *BlobfuseStats) statsPoll() {
