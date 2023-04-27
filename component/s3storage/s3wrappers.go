@@ -251,7 +251,13 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 			log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
 			return objectAttrList, nil, err
 		}
-		newMarker = output.NextContinuationToken
+
+		if output.IsTruncated {
+			newMarker = output.NextContinuationToken
+		} else {
+			blnkStr := ""
+			newMarker = &blnkStr
+		}
 
 		// documentation for this S3 data structure:
 		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
