@@ -62,7 +62,7 @@ func (bfs *BlobfuseStats) statsReader() error {
 			0,
 			nil,
 		)
-		if err != nil && err != windows.ERROR_PIPE_BUSY {
+		if err != nil {
 			log.Err("StatsReader::statsReader : unable to create pipe [%v]", err)
 			return err
 		}

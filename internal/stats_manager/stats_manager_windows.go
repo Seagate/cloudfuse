@@ -169,7 +169,7 @@ func statsPolling() {
 		0,
 		nil,
 	)
-	if err != nil && err != windows.ERROR_PIPE_BUSY {
+	if err != nil {
 		log.Err("stats_manager::statsPolling : unable to create pipe [%v]", err)
 		return
 	}
