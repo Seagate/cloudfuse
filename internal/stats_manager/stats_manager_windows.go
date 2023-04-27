@@ -67,24 +67,22 @@ func (sc *StatsCollector) statsDumper() {
 		if err == nil {
 			break
 		}
+		windows.Close(tPipe)
 
 		if err == windows.ERROR_FILE_NOT_FOUND {
 			log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.TransferPipe)
-			windows.CloseHandle(tPipe)
 			time.Sleep(1 * time.Second)
 		} else if err == windows.ERROR_PIPE_BUSY {
 			log.Err("stats_manager::statsDumper: Pipe instances are busy, retrying...")
-			windows.CloseHandle(tPipe)
 			time.Sleep(1 * time.Second)
 		} else {
 			log.Err("stats_manager::statsDumper: Unable to open pipe %s with error [%v]", common.TransferPipe, err)
-			windows.CloseHandle(tPipe)
 			return
 		}
 	}
 
 	log.Info("stats_manager::statsDumper : opened transfer pipe file")
-	defer windows.CloseHandle(tPipe)
+	defer windows.Close(tPipe)
 
 	// The channel is used for two types of messages. First, if the message is an event
 	// then we send the message to the transfer pipe. If it is not an event, then it is
@@ -175,6 +173,7 @@ func statsPolling() {
 		log.Err("stats_manager::statsPolling : unable to create pipe [%v]", err)
 		return
 	}
+	defer windows.Close(handle)
 
 	log.Info("stats_manager::statsPolling : Creating named pipe %s", common.PollingPipe)
 
@@ -184,10 +183,8 @@ func statsPolling() {
 	err = windows.ConnectNamedPipe(handle, nil)
 	if err != nil {
 		log.Err("stats_manager::statsPolling : unable to connect to named pipe %s: [%v]", common.PollingPipe, err)
-		windows.CloseHandle(handle)
 		return
 	}
-	defer windows.Close(handle)
 	log.Info("StatsReader::statsReader : Connected polling pipe")
 
 	// Setup transfer pipe by looping to try to create a file (open the pipe).
@@ -212,21 +209,19 @@ func statsPolling() {
 			break
 		}
 
+		windows.Close(tPipe)
 		if err == windows.ERROR_FILE_NOT_FOUND {
 			log.Info("stats_manager::statsPolling : Named pipe %s not found, retrying...", common.TransferPipe)
-			windows.CloseHandle(tPipe)
 			time.Sleep(1 * time.Second)
 		} else if err == windows.ERROR_PIPE_BUSY {
 			log.Err("stats_manager::statsPolling: Pipe instances are busy, retrying...")
-			windows.CloseHandle(tPipe)
 			time.Sleep(1 * time.Second)
 		} else {
 			log.Err("stats_manager::statsPolling: Unable to open pipe %s with error [%v]", common.TransferPipe, err)
-			windows.CloseHandle(tPipe)
 			return
 		}
 	}
-	defer windows.CloseHandle(tPipe)
+	defer windows.Close(tPipe)
 
 	var buf [4096]byte
 	var bytesRead uint32

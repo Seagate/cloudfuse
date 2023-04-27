@@ -73,11 +73,11 @@ func (bfs *BlobfuseStats) statsReader() error {
 		err = windows.ConnectNamedPipe(handle, nil)
 		if err == windows.ERROR_PIPE_CONNECTED {
 			log.Err("StatsReader::statsReader : There is a process at other end of pipe %s: retrying...", bfs.transferPipe, err)
-			windows.CloseHandle(handle)
+			windows.Close(handle)
 			time.Sleep(1 * time.Second)
 		} else if err != nil {
 			log.Err("StatsReader::statsReader : unable to connect to named pipe %s: [%v]", bfs.transferPipe, err)
-			windows.CloseHandle(handle)
+			windows.Close(handle)
 			return err
 		}
 		log.Info("StatsReader::statsReader : Connected transfer pipe %s", bfs.transferPipe)
@@ -87,7 +87,7 @@ func (bfs *BlobfuseStats) statsReader() error {
 }
 
 func (bfs *BlobfuseStats) handleStatsReader(handle windows.Handle) error {
-	defer windows.CloseHandle(handle)
+	defer windows.Close(handle)
 
 	var buf [4096]byte
 	var bytesRead uint32
@@ -153,22 +153,20 @@ func (bfs *BlobfuseStats) statsPoll() {
 		if err == nil {
 			break
 		}
+		windows.Close(hPipe)
 
 		if err == windows.ERROR_FILE_NOT_FOUND {
 			log.Err("StatsReader::statsReader : Named pipe %s not found, retrying...", bfs.pollingPipe)
-			windows.CloseHandle(hPipe)
 			time.Sleep(1 * time.Second)
 		} else if err == windows.ERROR_PIPE_BUSY {
 			log.Err("StatsReader::statsReader : Pipe instances are busy, retrying...")
-			windows.CloseHandle(hPipe)
 			time.Sleep(1 * time.Second)
 		} else {
 			log.Err("StatsReader::statsReader : Unable to open pipe %s with error [%v]", bfs.pollingPipe, err)
-			windows.CloseHandle(hPipe)
 			return
 		}
 	}
-	defer windows.CloseHandle(hPipe)
+	defer windows.Close(hPipe)
 
 	log.Info("stats_manager::statsDumper : opened polling pipe file")
 
