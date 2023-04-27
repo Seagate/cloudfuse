@@ -92,20 +92,28 @@ class lyveSettingsWidget(closeGUIEvent, Ui_Form):
             self.checkbox_libfuse_ignoreAppend.setCheckState(Qt.CheckState.Unchecked)
         
         if dictForConfigs.get('libfuse').get('default-permission') != None:
-            self.dropDown_pipeline.setCurrentIndex(libfusePermissions[oct(dictForConfigs.get('libfuse').get('default-permission'))])
+            self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions[oct(dictForConfigs.get('libfuse').get('default-permission'))])
+
+        if dictForConfigs.get('libfuse').get('attribute-expiration-sec') != None:
+            self.spinBox_libfuse_attExp.setValue(int(dictForConfigs.get('libfuse').get('attribute-expiration-sec')))
+
+        if dictForConfigs.get('libfuse').get('entry-expiration-sec') != None:
+            self.spinBox_libfuse_entExp.setValue(int(dictForConfigs.get('libfuse').get('entry-expiration-sec')))
             
-        
+        if dictForConfigs.get('libfuse').get('negative-entry-expiration-sec') != None:
+            self.spinBox_libfuse_negEntryExp.setValue(int(dictForConfigs.get('libfuse').get('negative-entry-expiration-sec')))
+
         if dictForConfigs.get('read-only') == True:
             self.checkbox_readOnly.setCheckState(Qt.CheckState.Checked)
         elif dictForConfigs.get('read-only') == False:
             self.checkbox_readOnly.setCheckState(Qt.CheckState.Unchecked)
-            
-        
-            
+                       
         if 'file_cache' in dictForConfigs.get('components'):
             self.dropDown_pipeline.setCurrentIndex(pipelineChoices['fileCache'])
         elif 'stream' in dictForConfigs.get('components'):
             self.dropDown_pipeline.setCurrentIndex(pipelineChoices['streaming'])
+            
+        
             
         
         
