@@ -84,8 +84,6 @@ var StatsConfigFilePath = JoinUnixFilepath(DefaultWorkDir, "stats_monitor.cfg")
 
 var EnableMonitoring = false
 var BfsDisabled = false
-var TransferPipe = "/tmp/transferPipe"
-var PollingPipe = "/tmp/pollPipe"
 
 // LogLevel enum
 type LogLevel int

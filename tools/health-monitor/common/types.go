@@ -33,10 +33,6 @@
 
 package common
 
-import (
-	"path/filepath"
-)
-
 const (
 	BlobfuseStats     = "blobfuse_stats"
 	FileCacheMon      = "file_cache_monitor"
@@ -74,7 +70,7 @@ var (
 const BfuseMonitorVersion = "1.0.0-preview.1"
 
 var DefaultWorkDir = "$HOME/.lyvecloudfuse"
-var DefaultLogFile = filepath.Join(DefaultWorkDir, "bfuseMonitor.log")
+var DefaultLogFile = DefaultWorkDir + "/bfuseMonitor.log"
 
 type CacheEvent struct {
 	CacheEvent      string            `json:"cacheEvent"`

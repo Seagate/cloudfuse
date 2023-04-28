@@ -34,15 +34,10 @@
 package blobfuse_stats
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
-	"os"
-	"time"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal/stats_manager"
 	hmcommon "lyvecloudfuse/tools/health-monitor/common"
 	hminternal "lyvecloudfuse/tools/health-monitor/internal"
 )
@@ -96,71 +91,6 @@ func (bfs *BlobfuseStats) Validate() error {
 	}
 
 	return nil
-}
-
-func (bfs *BlobfuseStats) statsReader() error {
-	err := createPipe(bfs.transferPipe)
-	if err != nil {
-		log.Err("StatsReader::statsReader : [%v]", err)
-		return err
-	}
-
-	f, err := os.OpenFile(bfs.transferPipe, os.O_RDONLY, os.ModeNamedPipe)
-	if err != nil {
-		log.Err("StatsReader::statsReader : unable to open pipe file [%v]", err)
-		return err
-	}
-	defer f.Close()
-
-	reader := bufio.NewReader(f)
-	var e error = nil
-
-	for {
-		line, err := reader.ReadBytes('\n')
-		if err != nil {
-			log.Err("StatsReader::statsReader : [%v]", err)
-			e = err
-			break
-		}
-
-		// log.Debug("StatsReader::statsReader : Line: %v", string(line))
-
-		st := stats_manager.PipeMsg{}
-		err = json.Unmarshal(line, &st)
-		if err != nil {
-			log.Err("StatsReader::statsReader : Unable to unmarshal json [%v]", err)
-			continue
-		}
-		bfs.ExportStats(st.Timestamp, st)
-	}
-
-	return e
-}
-
-func (bfs *BlobfuseStats) statsPoll() {
-	err := createPipe(bfs.pollingPipe)
-	if err != nil {
-		log.Err("StatsReader::statsPoll : [%v]", err)
-		return
-	}
-
-	pf, err := os.OpenFile(bfs.pollingPipe, os.O_CREATE|os.O_WRONLY, 0777)
-	if err != nil {
-		log.Err("StatsReader::statsPoll : unable to open pipe file [%v]", err)
-		return
-	}
-	defer pf.Close()
-
-	ticker := time.NewTicker(time.Duration(bfs.pollInterval) * time.Second)
-	defer ticker.Stop()
-
-	for t := range ticker.C {
-		_, err = pf.WriteString(fmt.Sprintf("Poll at %v\n", t.Format(time.RFC3339)))
-		if err != nil {
-			log.Err("StatsReader::statsPoll : [%v]", err)
-			break
-		}
-	}
 }
 
 func NewBlobfuseStatsMonitor() hminternal.Monitor {

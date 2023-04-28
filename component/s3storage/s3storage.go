@@ -134,6 +134,7 @@ func (s3 *S3Storage) Start(ctx context.Context) error {
 	log.Trace("S3Storage::Start : Starting component %s", s3.Name())
 	// create stats collector for s3storage
 	s3StatsCollector = stats_manager.NewStatsCollector(s3.Name())
+	log.Debug("Starting s3 stats collector")
 
 	return nil
 }

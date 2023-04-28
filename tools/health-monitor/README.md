@@ -20,6 +20,10 @@ Lyvecloudfuse Health Monitor is a tool which will help in monitoring Lyvecloudfu
 
 > **Note:** Health Monitor runs as a separate process where one health monitor process is associated with monitoring one lyvecloudfuse mounted directory.
 
+## On Windows
+
+Lyvecloudfuse Health Monitor can also run fully on Windows. All of the functionality of the Health Monitor is fully supported.
+
 ## Enable Health Monitor
 
 The different configuration options for the health monitor are,
@@ -35,7 +39,7 @@ The different configuration options for the health monitor are,
 
 ### Sample Config
 
-Add the following section to your lyvecloudfuse config file. Here file cache and memory monitors are disabled.
+Add the following section to your lyvecloudfuse config file. Here file cache and memory monitors are disabled. If you want to enable all monitors simply remove the monitor-disable-list section.
 ```yaml
 health_monitor:
   enable-monitoring: true

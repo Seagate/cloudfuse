@@ -159,6 +159,7 @@ func (c *FileCache) Start(ctx context.Context) error {
 
 	// create stats collector for file cache
 	fileCacheStatsCollector = stats_manager.NewStatsCollector(c.Name())
+	log.Debug("Starting file cache stats collector")
 
 	return nil
 }
