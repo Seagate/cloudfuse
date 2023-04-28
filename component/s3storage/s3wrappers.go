@@ -255,8 +255,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		if output.IsTruncated {
 			newMarker = output.NextContinuationToken
 		} else {
-			blnkStr := ""
-			newMarker = &blnkStr
+			newMarker = nil
 		}
 
 		// documentation for this S3 data structure:
