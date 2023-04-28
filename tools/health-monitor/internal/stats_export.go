@@ -199,6 +199,7 @@ func (se *StatsExporter) checkInList(t string) int {
 }
 
 func (se *StatsExporter) addToOutputFile(op *Output) error {
+	log.Debug("stats_exporter::addToOutputFile : Writing to output file")
 	jsonData, err := json.MarshalIndent(op, "", "\t")
 	if err != nil {
 		log.Err("stats_exporter::addToOutputFile : unable to marshal [%v]", err)

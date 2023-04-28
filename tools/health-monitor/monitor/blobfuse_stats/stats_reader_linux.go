@@ -31,69 +31,96 @@
    SOFTWARE
 */
 
-package common
+package blobfuse_stats
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
-	"os/exec"
-	"runtime"
-	"strconv"
-	"strings"
+	"os"
+	"syscall"
 	"time"
 
 	"lyvecloudfuse/common/log"
-
-	"github.com/shirou/gopsutil/v3/process"
+	"lyvecloudfuse/internal/stats_manager"
 )
 
-// check whether lyvecloudfuse process is running for the given pid
-func CheckProcessStatus(pid string) error {
-	if runtime.GOOS == "windows" {
-		pid, err := strconv.ParseInt(pid, 10, 32)
-		if err != nil {
-			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error parsing process id")
-			return err
-		}
-
-		// Check if the pid is a current process, if err == nil
-		// then the process is running
-		_, err = process.NewProcess(int32(pid))
-		if err != nil {
-			return fmt.Errorf("lyvecloudfuse is not running on pid %v", pid)
-		}
-		return nil
-	}
-
-	// We are running on Linux in this case
-	cmd := "ps -ef | grep " + pid
-	cliOut, err := exec.Command("bash", "-c", cmd).Output()
+func (bfs *BlobfuseStats) statsReader() error {
+	err := createPipe(bfs.transferPipe)
 	if err != nil {
+		log.Err("StatsReader::statsReader : [%v]", err)
 		return err
 	}
 
-	processes := strings.Split(string(cliOut), "\n")
-	for _, process := range processes {
-		l := strings.Fields(process)
-		if len(l) >= 2 && l[1] == pid {
-			return nil
+	f, err := os.OpenFile(bfs.transferPipe, os.O_RDONLY, os.ModeNamedPipe)
+	if err != nil {
+		log.Err("StatsReader::statsReader : unable to open pipe file [%v]", err)
+		return err
+	}
+	defer f.Close()
+
+	reader := bufio.NewReader(f)
+	var e error = nil
+
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err != nil {
+			log.Err("StatsReader::statsReader : [%v]", err)
+			e = err
+			break
 		}
+
+		// log.Debug("StatsReader::statsReader : Line: %v", string(line))
+
+		st := stats_manager.PipeMsg{}
+		err = json.Unmarshal(line, &st)
+		if err != nil {
+			log.Err("StatsReader::statsReader : Unable to unmarshal json [%v]", err)
+			continue
+		}
+		bfs.ExportStats(st.Timestamp, st)
 	}
 
-	return fmt.Errorf("lyvecloudfuse is not running on pid %v", pid)
+	return e
 }
 
-// check lyvecloudfuse pid status at every second
-func MonitorPid() {
-	ticker := time.NewTicker(1 * time.Second)
+func (bfs *BlobfuseStats) statsPoll() {
+	err := createPipe(bfs.pollingPipe)
+	if err != nil {
+		log.Err("StatsReader::statsPoll : [%v]", err)
+		return
+	}
+
+	pf, err := os.OpenFile(bfs.pollingPipe, os.O_CREATE|os.O_WRONLY, 0777)
+	if err != nil {
+		log.Err("StatsReader::statsPoll : unable to open pipe file [%v]", err)
+		return
+	}
+	defer pf.Close()
+
+	ticker := time.NewTicker(time.Duration(bfs.pollInterval) * time.Second)
 	defer ticker.Stop()
 
 	for t := range ticker.C {
-		err := CheckProcessStatus(Pid)
+		_, err = pf.WriteString(fmt.Sprintf("Poll at %v\n", t.Format(time.RFC3339)))
 		if err != nil {
-			log.Err("util::MonitorPid : time = %v, [%v]", t.Format(time.RFC3339), err)
-			// wait for 5 seconds for monitor threads to exit
-			time.Sleep(5 * time.Second)
+			log.Err("StatsReader::statsPoll : [%v]", err)
 			break
 		}
 	}
+}
+
+func createPipe(pipe string) error {
+	_, err := os.Stat(pipe)
+	if os.IsNotExist(err) {
+		err = syscall.Mkfifo(pipe, 0666)
+		if err != nil {
+			log.Err("StatsReader::createPipe : unable to create pipe [%v]", err)
+			return err
+		}
+	} else if err != nil {
+		log.Err("StatsReader::createPipe : [%v]", err)
+		return err
+	}
+	return nil
 }

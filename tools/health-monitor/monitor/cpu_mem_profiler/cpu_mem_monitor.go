@@ -37,12 +37,16 @@ import (
 	"fmt"
 	"math"
 	"os/exec"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"lyvecloudfuse/common/log"
 	hmcommon "lyvecloudfuse/tools/health-monitor/common"
 	hminternal "lyvecloudfuse/tools/health-monitor/internal"
+
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 type CpuMemProfiler struct {
@@ -116,6 +120,43 @@ func (cm *CpuMemProfiler) Validate() error {
 }
 
 func (cm *CpuMemProfiler) getCpuMemoryUsage() (*hmcommon.CpuMemStat, error) {
+	// If on windows we use an external library to get CPU and memory usage
+	if runtime.GOOS == "windows" {
+		pid, err := strconv.ParseInt(cm.pid, 10, 32)
+		if err != nil {
+			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error parsing process id")
+			return nil, err
+		}
+
+		proc, err := process.NewProcess(int32(pid))
+		if err != nil {
+			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error getting process")
+			return nil, err
+		}
+
+		cpuPercent, err := proc.CPUPercent()
+		if err != nil {
+			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error getting cpu percentage")
+			cpuPercent = 0
+		}
+
+		memInfo, err := proc.MemoryInfo()
+		var memUsage uint64
+		if err != nil {
+			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error getting memory usage")
+		} else {
+			memUsage = memInfo.RSS
+		}
+
+		// Get CPU as a percentage and the number of kilobytes of memory
+		cpuMemStat := &hmcommon.CpuMemStat{
+			CpuUsage: fmt.Sprintf("%.2f", cpuPercent),
+			MemUsage: fmt.Sprintf("%dk", memUsage/1024),
+		}
+		cpuMemStat.CpuUsage += "%"
+		return cpuMemStat, nil
+	}
+
 	topCmd := "top -b -n 1 -d 0.2 -p " + cm.pid + " | tail -2"
 
 	cliOut, err := exec.Command("bash", "-c", topCmd).Output()

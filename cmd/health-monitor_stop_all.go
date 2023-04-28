@@ -36,6 +36,7 @@ package cmd
 import (
 	"fmt"
 	"os/exec"
+	"runtime"
 
 	"github.com/spf13/cobra"
 )
@@ -57,6 +58,15 @@ var healthMonStopAll = &cobra.Command{
 
 // Attempts to kill all health monitors
 func stopAll() error {
+	if runtime.GOOS == "windows" {
+		cliOut := exec.Command("taskkill", "/IM", "bfusemon.exe", "/F")
+		_, err := cliOut.Output()
+		if err != nil {
+			return err
+		}
+		fmt.Println("Successfully stopped all health monitor binaries.")
+		return nil
+	}
 	cliOut := exec.Command("killall", "bfusemon")
 	_, err := cliOut.Output()
 	if err != nil {
