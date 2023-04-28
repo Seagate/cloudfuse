@@ -652,7 +652,7 @@ stages:
             - script: |
                 rm -rf $(MOUNT_DIR)/*
                 rm -rf $(TEMP_DIR)/*
-                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_block_proxy.cov mount $(MOUNT_DIR) --config-file=$(lyvecloudfuse_CFG) --foreground=true &
+                ./lyvecloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/lyvecloudfuse_block_proxy.cov mount $(MOUNT_DIR) --config-file=$(lyvecloudfuse_CFG) --disable-compression=true --foreground=true &
                 sleep 10
                 ps -aux | grep lyvecloudfuse
                 rm -rf $(MOUNT_DIR)/*

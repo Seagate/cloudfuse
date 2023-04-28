@@ -46,7 +46,7 @@ import (
 
 // Standard config default values
 const (
-	lyvecloudfuseVersion_ = "2.0.2"
+	lyvecloudfuseVersion_ = "2.0.3"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
@@ -69,7 +69,7 @@ const (
 )
 
 func FuseIgnoredFlags() []string {
-	return []string{"default_permissions", "rw", "dev", "nodev", "suid", "nosuid", "delay_connect", "uid", "gid", "auto", "noauto", "user", "nouser", "exec", "noexec"}
+	return []string{"default_permissions", "rw", "dev", "nodev", "suid", "nosuid", "delay_connect", "auto", "noauto", "user", "nouser", "exec", "noexec"}
 }
 
 var LyvecloudfuseVersion = LyvecloudfuseVersion_()

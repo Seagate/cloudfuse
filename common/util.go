@@ -53,6 +53,7 @@ import (
 )
 
 var RootMount bool
+var ForegroundMount bool
 
 // IsDirectoryMounted is a utility function that returns true if the directory is already mounted using fuse
 func IsDirectoryMounted(path string) bool {

@@ -48,6 +48,7 @@ import (
 	"runtime/pprof"
 	"strconv"
 	"strings"
+	"time"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/config"
@@ -84,6 +85,7 @@ type mountOptions struct {
 	ProfilerPort      int            `config:"profiler-port"`
 	ProfilerIP        string         `config:"profiler-ip"`
 	MonitorOpt        monitorOptions `config:"health_monitor"`
+	WaitForMount      time.Duration  `config:"wait-for-mount"`
 
 	// v1 support
 	Streaming      bool     `config:"streaming"`
@@ -294,6 +296,7 @@ var mountCmd = &cobra.Command{
 		}
 
 		skipNonEmpty := false
+
 		if config.IsSet("libfuse-options") {
 			for _, v := range options.LibfuseOptions {
 				parameter := strings.Split(v, "=")
@@ -314,8 +317,9 @@ var mountCmd = &cobra.Command{
 					config.Set("libfuse.negative-entry-expiration-sec", parameter[1])
 				} else if v == "ro" || v == "ro=true" {
 					config.Set("read-only", "true")
-				} else if v == "allow_root" {
-					config.Set("libfuse.default-permission", "700")
+				} else if v == "allow_root" || v == "allow_root=true" {
+					config.Set("allow-root", "true")
+					// config.Set("libfuse.default-permission", "700")
 				} else if v == "nonempty" {
 					skipNonEmpty = true
 					config.Set("nonempty", "true")
@@ -326,6 +330,18 @@ var mountCmd = &cobra.Command{
 					}
 					perm := ^uint32(permission) & 777
 					config.Set("libfuse.default-permission", fmt.Sprint(perm))
+				} else if strings.HasPrefix(v, "uid=") {
+					val, err := strconv.ParseUint(parameter[1], 10, 32)
+					if err != nil {
+						return fmt.Errorf("failed to parse uid [%s]", err.Error())
+					}
+					config.Set("libfuse.uid", fmt.Sprint(val))
+				} else if strings.HasPrefix(v, "gid=") {
+					val, err := strconv.ParseUint(parameter[1], 10, 32)
+					if err != nil {
+						return fmt.Errorf("failed to parse gid [%s]", err.Error())
+					}
+					config.Set("libfuse.gid", fmt.Sprint(val))
 				} else {
 					return errors.New(common.FuseAllowedFlags)
 				}
@@ -410,31 +426,22 @@ var mountCmd = &cobra.Command{
 			return Destroy(fmt.Sprintf("failed to initialize new pipeline [%s]", err.Error()))
 		}
 
+		common.ForegroundMount = options.Foreground
+
 		log.Info("mount: Mounting lyvecloudfuse on %s", options.MountPath)
 		// Prevent mounting in background on Windows
 		// TODO: Enable background support using windows services
 		if !options.Foreground && runtime.GOOS != "windows" {
 			pidFile := strings.Replace(options.MountPath, "/", "_", -1) + ".pid"
 			pidFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), pidFile)
+
+			pid := os.Getpid()
+			fname := fmt.Sprintf("/tmp/lyvecloudfuse.%v", pid)
+
 			ctx, _ := context.WithCancel(context.Background()) //nolint
-
-			dmnCtx := createDaemon(pipeline, ctx, pidFileName, 0644, 027)
-			child, err := dmnCtx.Reborn()
+			err := createDaemon(pipeline, ctx, pidFileName, 0644, 027, fname)
 			if err != nil {
-				log.Err("mount : failed to daemonize application [%v]", err)
-				return Destroy(fmt.Sprintf("failed to daemonize application [%s]", err.Error()))
-			}
-
-			log.Debug("mount: foreground disabled, child = %v", daemon.WasReborn())
-			if child == nil {
-				defer dmnCtx.Release() // nolint
-				setGOConfig()
-				go startDynamicProfiler()
-
-				err = runPipeline(pipeline, ctx)
-				if err != nil {
-					return err
-				}
+				log.Err("mount: failed to create daemon [%v]", err.Error())
 			}
 		} else {
 			if options.CPUProfile != "" {
@@ -458,6 +465,7 @@ var mountCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
+
 			if options.MemProfile != "" {
 				os.Remove(options.MemProfile)
 				f, err := os.Create(options.MemProfile)
@@ -640,6 +648,8 @@ func init() {
 	mountCmd.PersistentFlags().StringSliceVarP(&options.LibfuseOptions, "o", "o", []string{}, "FUSE options.")
 	config.BindPFlag("libfuse-options", mountCmd.PersistentFlags().ShorthandLookup("o"))
 	mountCmd.PersistentFlags().ShorthandLookup("o").Hidden = true
+
+	mountCmd.PersistentFlags().DurationVar(&options.WaitForMount, "wait-for-mount", 5*time.Second, "Let parent process wait for given timeout before exit")
 
 	config.AttachToFlagSet(mountCmd.PersistentFlags())
 	config.AttachFlagCompletions(mountCmd)
