@@ -29,3 +29,4 @@ gui/pyside6/__pycache__/
 lyvecloudfuse-logs.txt
 ui_*.py
 test/scripts/dirIterate.go
+**/logfile.txt
