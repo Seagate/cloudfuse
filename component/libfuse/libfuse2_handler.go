@@ -257,6 +257,14 @@ func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::libfuse_mkdir : %s", name)
 
+	// Check if the directory already exists. On Windows we need to make this call explicitly
+	if runtime.GOOS == "windows" {
+		attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+		if (attr != nil || os.IsExist(err)) && attr.IsDir() {
+			return -fuse.EEXIST
+		}
+	}
+
 	// blobfuse uses a bitwise and trick to make sure mode is a uint32, we don't need that here
 	err := fuseFS.NextComponent().CreateDir(internal.CreateDirOptions{Name: name, Mode: fs.FileMode(mode)})
 	if err != nil {
