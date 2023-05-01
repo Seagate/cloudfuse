@@ -379,6 +379,12 @@ func (s *s3StorageTestSuite) TestDeleteSubDirPrefixPath() {
 
 	err := s.s3Storage.storage.SetPrefixPath(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, base))
 	s.assert.Nil(err)
+
+	attr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: "c1"})
+	s.assert.Nil(err)
+	s.assert.NotNil(attr)
+	s.assert.True(attr.IsDir())
+
 	err = s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: "c1"})
 	s.assert.Nil(err)
 
