@@ -257,6 +257,10 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			return s3.StreamDir(options)
 		}
 	}
+	if newMarker == nil {
+		blnkStr := ""
+		newMarker = &blnkStr
+	}
 
 	// if path is empty, it means it is the root, relative to the mounted directory
 	if len(path) == 0 {
