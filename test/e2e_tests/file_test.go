@@ -43,6 +43,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -120,6 +121,10 @@ func (suite *fileTestSuite) TestFileCreateUtf8Char() {
 }
 
 func (suite *fileTestSuite) TestFileCreatSpclChar() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
 	speclChar := "abcd%23ABCD%34123-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत.txt"
 	fileName := suite.testPath + "/" + speclChar
 
@@ -174,6 +179,10 @@ func (suite *fileTestSuite) TestFileCreatEncodeChar() {
 }
 
 func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
 	speclChar := "abcd%23ABCD%34123-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत.txt"
 	speclDirName := suite.testPath + "/" + "abc%23%24%25efg-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत"
 	secFile := speclDirName + "/" + "abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|\\abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|.txt"
@@ -219,6 +228,11 @@ func (suite *fileTestSuite) TestFileCreateLongName() {
 }
 
 func (suite *fileTestSuite) TestFileCreateSlashName() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
+
 	fileName := suite.testPath + "/abcd\\efg.txt"
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
@@ -584,11 +598,9 @@ func TestFileTestSuite(t *testing.T) {
 
 	// Generate random test dir name where our End to End test run is contained
 	testDirName := getFileTestDirName(10)
-	fmt.Println(testDirName)
 
 	// Create directory for testing the End to End test on mount path
 	fileTest.testPath = fileTestPathPtr + "/" + testDirName
-	fmt.Println(fileTest.testPath)
 	if fileTestAdlsPtr == "true" || fileTestAdlsPtr == "True" {
 		fmt.Println("ADLS Testing...")
 		fileTest.adlsTest = true

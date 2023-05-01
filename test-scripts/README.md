@@ -2,7 +2,7 @@ This folder contains scripts to run the end to end tests easily
 on your machine if you need to run them locally rather than just
 running on the CI/CD pipeline.
 
-To run follow the following steps:
+To run on Linux follow the following steps:
 
 1. First go into the directory in the helper folder and run
    ./setup.sh
@@ -45,3 +45,27 @@ To run follow the following steps:
    you can change this to false. Do note that the longer tests generate a
    large amount of data, so don't run them frequently as that will bring
    our data charges up.
+
+To run on Windows follow the following steps:
+
+1. First go into the directory in the helper folder and run
+   .\setup.ps1
+
+   This will create a file that stores environment variables for the
+   tests. Some of the variables store locations where the tests will
+   be mounted and a cache folder. The default to mount the directory is
+   in the Z: directory. Also thethe folder at ~/e2e-temp is assumed to exist. 
+   So you will need to create these or change them to ones you prefer. 
+   Additionally it assumed that the directory where lyvecloudfuse is 
+   installed is at ~\lyvecloudfuse. If your git repo is at a different 
+   folder then edit this variable in this file var.env (the file is included 
+   in .gitignore so don't worry about editing it).
+
+2. When running the e2e tests you will need to open a separate terminal and mount lyvecloudfuse
+   into the folder that you reference in the e2e-test_windows.ps1 file.
+
+3. Run the test file using a powershell terminal on Windows. You can run them like
+
+   .\e2e-test_windows.ps1
+
+   .\mount-test_windows.ps1

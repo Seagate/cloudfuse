@@ -44,6 +44,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -116,7 +117,12 @@ func (suite *dirTestSuite) TestDirCreateDuplicate() {
 	suite.Equal(nil, err)
 	// duplicate dir - we expect to throw
 	err = os.Mkdir(dirName, 0777)
-	suite.Contains(err.Error(), "file exists")
+
+	if runtime.GOOS == "windows" {
+		suite.Contains(err.Error(), "file already exists")
+	} else {
+		suite.Contains(err.Error(), "file exists")
+	}
 
 	// cleanup
 	suite.dirTestCleanup([]string{dirName})
@@ -124,6 +130,10 @@ func (suite *dirTestSuite) TestDirCreateDuplicate() {
 
 // # Create Directory with special characters in name
 func (suite *dirTestSuite) TestDirCreateSplChar() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
 	dirName := suite.testPath + "/" + "@#$^&*()_+=-{}[]|?><.,~"
 	err := os.Mkdir(dirName, 0777)
 	suite.Equal(nil, err)
@@ -134,6 +144,10 @@ func (suite *dirTestSuite) TestDirCreateSplChar() {
 
 // # Create Directory with slash in name
 func (suite *dirTestSuite) TestDirCreateSlashChar() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
 	dirName := suite.testPath + "/" + "PRQ\\STUV"
 	err := os.Mkdir(dirName, 0777)
 	suite.Equal(nil, err)
@@ -223,7 +237,12 @@ func (suite *dirTestSuite) TestDirDeleteNonEmpty() {
 
 	err = os.Remove(dir3Name)
 	suite.NotNil(err)
-	suite.Contains(err.Error(), "directory not empty")
+	// Error message is different on Windows
+	if runtime.GOOS == "windows" {
+		suite.Contains(err.Error(), "directory is not empty")
+	} else {
+		suite.Contains(err.Error(), "directory not empty")
+	}
 
 	// cleanup
 	suite.dirTestCleanup([]string{dir3Name})
@@ -549,11 +568,15 @@ func TestDirTestSuite(t *testing.T) {
 	suite.Run(t, &dirTest)
 
 	//  Wipe out the test directory created for End to End test
-	os.RemoveAll(dirTest.testPath)
+	err = os.RemoveAll(dirTest.testPath)
+	if err != nil {
+		fmt.Println("Could not cleanup feature dir after testing")
+	}
 }
 
 func init() {
 	regDirTestFlag(&pathPtr, "mnt-path", "", "Mount Path of Container")
 	regDirTestFlag(&adlsPtr, "adls", "", "Account is ADLS or not")
-	regFileTestFlag(&fileTestGitClonePtr, "clone", "", "Git clone test is enable or not")
+	regDirTestFlag(&clonePtr, "clone", "", "Git clone test is enable or not")
+	regDirTestFlag(&streamDirectPtr, "stream-direct-test", "false", "Run stream direct tests")
 }

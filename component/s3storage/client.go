@@ -220,40 +220,51 @@ func (cl *Client) DeleteDirectory(name string) error {
 	// make sure name has a trailing slash
 	name = internal.ExtendDirName(name)
 
-	// list all objects with the prefix
-	objects, _, err := cl.List(name, nil, 0)
-	if err != nil {
-		log.Warn("Client::DeleteDirectory : Failed to list object with prefix %s. Here's why: %v", name, err)
-		return err
-	}
+	done := false
+	var marker *string
+	var err error
+	for !done {
 
-	// we have no way of indicating empty folders in the bucket
-	// so if there are no objects with this prefix we can either:
-	// 1. return an error when the user tries to delete an empty directory, or
-	// 2. fail to return an error when trying to delete a non-existent directory
-	// the second one seems much less risky, so we don't check for an empty list here
-
-	// List only returns the objects and prefixes up to the next "/" character after the prefix
-	// This is because List is setting the Delimiter field to "/"
-	// This means that recursive directory deletion actually needs to be recursive.
-	// Delete all found objects *and prefixes ("directories")*.
-	// For improved performance, we'll use one call to delete all objects in this directory.
-	// 	To make one call, we need to make a list of objects to delete first.
-	var filesToDelete []string
-	for _, object := range objects {
-		if object.IsDir() {
-			err = cl.DeleteDirectory(object.Path)
-			if err != nil {
-				log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", object.Path, err)
-			}
-		} else {
-			filesToDelete = append(filesToDelete, object.Path)
+		// list all objects with the prefix
+		objects, marker, err := cl.List(name, marker, 0)
+		if err != nil {
+			log.Warn("Client::DeleteDirectory : Failed to list object with prefix %s. Here's why: %v", name, err)
+			return err
 		}
-	}
-	// Delete the collected files
-	err = cl.deleteObjects(filesToDelete)
-	if err != nil {
-		log.Err("Client::DeleteDirectory : deleteObjects() failed when called with %d objects. Here's why: %v", len(filesToDelete), err)
+
+		// we have no way of indicating empty folders in the bucket
+		// so if there are no objects with this prefix we can either:
+		// 1. return an error when the user tries to delete an empty directory, or
+		// 2. fail to return an error when trying to delete a non-existent directory
+		// the second one seems much less risky, so we don't check for an empty list here
+
+		// List only returns the objects and prefixes up to the next "/" character after the prefix
+		// This is because List is setting the Delimiter field to "/"
+		// This means that recursive directory deletion actually needs to be recursive.
+		// Delete all found objects *and prefixes ("directories")*.
+		// For improved performance, we'll use one call to delete all objects in this directory.
+		// 	To make one call, we need to make a list of objects to delete first.
+		var filesToDelete []string
+		for _, object := range objects {
+			if object.IsDir() {
+				err = cl.DeleteDirectory(object.Path)
+				if err != nil {
+					log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", object.Path, err)
+				}
+			} else {
+				filesToDelete = append(filesToDelete, object.Path)
+			}
+		}
+		// Delete the collected files
+		err = cl.deleteObjects(filesToDelete)
+		if err != nil {
+			log.Err("Client::DeleteDirectory : deleteObjects() failed when called with %d objects. Here's why: %v", len(filesToDelete), err)
+		}
+
+		if marker == nil {
+			done = true
+		}
+
 	}
 
 	return err
@@ -285,25 +296,33 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 
 	// first we need a list of all the object's we'll be moving
 	// make sure to pass source with a trailing forward slash
-	sourceObjects, _, err := cl.List(internal.ExtendDirName(source), nil, 0)
-	if err != nil {
-		log.Err("Client::RenameDirectory : Failed to list objects with prefix %s. Here's why: %v", source, err)
-		return err
-	}
-	// it's better not to return an error when we don't find any matching objects (see note in DeleteDirectory)
-	for _, srcObject := range sourceObjects {
-		srcPath := srcObject.Path
-		dstPath := strings.Replace(srcPath, source, target, 1)
-		if srcObject.IsDir() {
-			err = cl.RenameDirectory(srcPath, dstPath)
-		} else {
-			err = cl.RenameFile(srcPath, dstPath)
-		}
-		if err != nil {
-			log.Err("Client::RenameDirectory : Failed to rename %s -> %s. Here's why: %v", srcPath, dstPath, err)
-		}
-	}
 
+	done := false
+	var marker *string
+
+	for !done {
+		sourceObjects, marker, err := cl.List(internal.ExtendDirName(source), marker, 0)
+		if err != nil {
+			log.Err("Client::RenameDirectory : Failed to list objects with prefix %s. Here's why: %v", source, err)
+			return err
+		}
+		// it's better not to return an error when we don't find any matching objects (see note in DeleteDirectory)
+		for _, srcObject := range sourceObjects {
+			srcPath := srcObject.Path
+			dstPath := strings.Replace(srcPath, source, target, 1)
+			if srcObject.IsDir() {
+				err = cl.RenameDirectory(srcPath, dstPath)
+			} else {
+				err = cl.RenameFile(srcPath, dstPath)
+			}
+			if err != nil {
+				log.Err("Client::RenameDirectory : Failed to rename %s -> %s. Here's why: %v", srcPath, dstPath, err)
+			}
+		}
+		if marker == nil {
+			done = true
+		}
+	}
 	return nil
 }
 

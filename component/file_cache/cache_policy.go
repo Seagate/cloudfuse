@@ -112,7 +112,7 @@ func deleteFile(name string) error {
 	}
 
 	if err != nil {
-		log.Err("lruPolicy::DeleteItem : Failed to delete local file %s", name)
+		log.Err("lruPolicy::DeleteItem : Failed to delete local file %s, [%s]", name, err.Error())
 		return err
 	}
 
