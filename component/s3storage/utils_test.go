@@ -35,7 +35,7 @@ package s3storage
 
 import (
 	"net/http"
-	"path/filepath"
+	"path"
 	"strconv"
 	"syscall"
 	"testing"
@@ -183,7 +183,7 @@ func (s *utilsTestSuite) TestPrefixPathRemoval() {
 	}
 
 	for _, i := range inputs {
-		s.Run(filepath.Join(i.prefix, i.path), func() {
+		s.Run(path.Join(i.prefix, i.path), func() {
 			output := split(i.prefix, i.path)
 			assert.EqualValues(i.result, output)
 		})
