@@ -126,6 +126,9 @@ func (lf *Libfuse) initFuse() error {
 	if lf.allowOther {
 		options += ",allow_other"
 	}
+	if lf.allowRoot {
+		options += ",allow_root"
+	}
 	if lf.readOnly {
 		options += ",ro"
 	}
@@ -192,9 +195,13 @@ func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
 	}
 
 	stbuf.Atim = fuse.NewTimespec(attr.Atime)
+	stbuf.Atim.Nsec = 0
 	stbuf.Ctim = fuse.NewTimespec(attr.Ctime)
+	stbuf.Ctim.Nsec = 0
 	stbuf.Mtim = fuse.NewTimespec(attr.Mtime)
+	stbuf.Mtim.Nsec = 0
 	stbuf.Birthtim = fuse.NewTimespec(attr.Mtime)
+	stbuf.Birthtim.Nsec = 0
 }
 
 // NewcgofuseFS creates a new empty fuse filesystem.
@@ -203,9 +210,14 @@ func NewcgofuseFS() *CgofuseFS {
 	return cf
 }
 
-// Init does nothing here, as init is handled elsewhere
+// Init notifies the parent process once the mount is successful.
 func (cf *CgofuseFS) Init() {
 	log.Trace("Libfuse::Init : Initializing FUSE")
+
+	log.Info("Libfuse::Init : Notifying parent for successful mount")
+	if err := common.NotifyMountToParent(); err != nil {
+		log.Err("Libfuse::initFuse : Failed to notify parent, error: [%v]", err)
+	}
 }
 
 // Destroy does nothing in blobfuse, so same here.

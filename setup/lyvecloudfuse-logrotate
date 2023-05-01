@@ -1,4 +1,5 @@
 /var/log/lyvecloudfuse.log 
+/var/log/blobfuse2.log 
 /var/log/bfusemon.log
 /var/log/lyvecloudfuse-rest.log {
     rotate 10
