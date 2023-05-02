@@ -51,6 +51,9 @@ import (
 // By default attr cache is valid for 120 seconds
 const defaultAttrCacheTimeout uint32 = (120)
 
+// TODO: move this to config
+const cacheEmptyFolders = true
+
 // Common structure for AttrCache Component
 type AttrCache struct {
 	internal.BaseComponent
@@ -226,7 +229,13 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 	if err == nil {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		ac.invalidatePath(options.Name)
+		if cacheEmptyFolders {
+			newDirPath := internal.TruncateDirName(options.Name)
+			newDirAttr := internal.CreateObjAttrDir(newDirPath)
+			ac.cacheMap[newDirPath] = newAttrCacheItem(newDirAttr, true, time.Now())
+		} else {
+			ac.invalidatePath(options.Name)
+		}
 	}
 	return err
 }
@@ -304,10 +313,16 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		ac.deleteDirectory(options.Src, deletionTime)
-		// TLDR: Dst is guaranteed to be non-existent or empty.
-		// Note: We do not need to invalidate children of Dst due to the logic in our FUSE connector, see comments there,
-		// but it is always safer to double check than not.
-		ac.invalidateDirectory(options.Dst)
+		if cacheEmptyFolders {
+			newDirPath := internal.TruncateDirName(options.Dst)
+			newDirAttr := internal.CreateObjAttrDir(newDirPath)
+			ac.cacheMap[newDirPath] = newAttrCacheItem(newDirAttr, true, time.Now())
+		} else {
+			// TLDR: Dst is guaranteed to be non-existent or empty.
+			// Note: We do not need to invalidate children of Dst due to the logic in our FUSE connector, see comments there,
+			// but it is always safer to double check than not.
+			ac.invalidateDirectory(options.Dst)
+		}
 	}
 
 	return err
@@ -445,9 +460,11 @@ func (ac *AttrCache) SyncDir(options internal.SyncDirOptions) error {
 
 	err := ac.NextComponent().SyncDir(options)
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
-		ac.invalidateDirectory(options.Name)
+		if !cacheEmptyFolders {
+			ac.cacheLock.RLock()
+			defer ac.cacheLock.RUnlock()
+			ac.invalidateDirectory(options.Name)
+		}
 	}
 	return err
 }
@@ -508,7 +525,9 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		ac.invalidatePath(options.Name)
-		ac.invalidatePath(options.Target) // TODO : Why do we invalidate the target? Shouldn't the target remain unchanged?
+		if !cacheEmptyFolders {
+			ac.invalidatePath(options.Target) // TODO : Why do we invalidate the target? Shouldn't the target remain unchanged?
+		}
 	}
 
 	return err

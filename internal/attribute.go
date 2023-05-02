@@ -35,10 +35,50 @@ package internal
 
 import (
 	"os"
+	"path"
 	"time"
 
 	"lyvecloudfuse/common"
 )
+
+// create an object attributes struct
+func CreateObjAttr(objectPath string, size int64, lastModified time.Time) (attr *ObjAttr) {
+	attr = &ObjAttr{
+		Path:   objectPath,
+		Name:   path.Base(objectPath),
+		Size:   size,
+		Mode:   0,
+		Mtime:  lastModified,
+		Atime:  lastModified,
+		Ctime:  lastModified,
+		Crtime: lastModified,
+		Flags:  NewFileBitMap(),
+	}
+	// set flags
+	attr.Flags.Set(PropFlagMetadataRetrieved)
+	attr.Flags.Set(PropFlagModeDefault)
+	attr.Metadata = make(map[string]string)
+
+	return attr
+}
+
+// create an object attributes struct for a directory
+func CreateObjAttrDir(path string) (attr *ObjAttr) {
+	// strip any trailing slash
+	path = TruncateDirName(path)
+	// For these dirs we get only the name and no other properties so hardcoding time to current time
+	currentTime := time.Now()
+
+	attr = CreateObjAttr(path, 4096, currentTime)
+	// Change the relevant fields for a directory
+	attr.Mode = os.ModeDir
+	// set flags
+	attr.Flags = NewDirBitMap()
+	attr.Flags.Set(PropFlagMetadataRetrieved)
+	attr.Flags.Set(PropFlagModeDefault)
+
+	return attr
+}
 
 func NewDirBitMap() common.BitMap16 {
 	bm := common.BitMap16(0)

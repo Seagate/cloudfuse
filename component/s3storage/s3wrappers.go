@@ -4,11 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"sort" // to sort List() results
 	"strings"
-	"time"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
@@ -142,7 +139,7 @@ func (cl *Client) headObject(name string) (*internal.ObjAttr, error) {
 		return nil, parseS3Err(err, attemptedAction)
 	}
 
-	return createObjAttr(name, result.ContentLength, *result.LastModified), nil
+	return internal.CreateObjAttr(name, result.ContentLength, *result.LastModified), nil
 }
 
 // Wrapper for awsS3Client.CopyObject
@@ -264,7 +261,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		for _, value := range output.Contents {
 			// push object info into the list
 			path := split(cl.Config.prefixPath, *value.Key)
-			attr := createObjAttr(path, value.Size, *value.LastModified)
+			attr := internal.CreateObjAttr(path, value.Size, *value.LastModified)
 			objectAttrList = append(objectAttrList, attr)
 		}
 
@@ -310,7 +307,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 				continue
 			}
 			path := split(cl.Config.prefixPath, dir)
-			attr := createObjAttrDir(path)
+			attr := internal.CreateObjAttrDir(path)
 			objectAttrList = append(objectAttrList, attr)
 		}
 
@@ -324,45 +321,6 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 
 	return objectAttrList, newMarker, nil
 
-}
-
-// create an object attributes struct
-func createObjAttr(path string, size int64, lastModified time.Time) (attr *internal.ObjAttr) {
-	attr = &internal.ObjAttr{
-		Path:   path,
-		Name:   filepath.Base(path),
-		Size:   size,
-		Mode:   0,
-		Mtime:  lastModified,
-		Atime:  lastModified,
-		Ctime:  lastModified,
-		Crtime: lastModified,
-		Flags:  internal.NewFileBitMap(),
-	}
-	// set flags
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
-	attr.Flags.Set(internal.PropFlagModeDefault)
-	attr.Metadata = make(map[string]string)
-
-	return attr
-}
-
-// create an object attributes struct for a directory
-func createObjAttrDir(path string) (attr *internal.ObjAttr) {
-	// strip any trailing slash
-	path = internal.TruncateDirName(path)
-	// For these dirs we get only the name and no other properties so hardcoding time to current time
-	currentTime := time.Now()
-
-	attr = createObjAttr(path, 4096, currentTime)
-	// Change the relevant fields for a directory
-	attr.Mode = os.ModeDir
-	// set flags
-	attr.Flags = internal.NewDirBitMap()
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
-	attr.Flags.Set(internal.PropFlagModeDefault)
-
-	return attr
 }
 
 // Convert file name to object getKey
