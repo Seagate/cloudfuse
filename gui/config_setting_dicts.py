@@ -116,6 +116,7 @@ attribute_cache = {
     'timeout-sec' : 120,         # time attributes can be cached (in sec)
     'no-cache-on-list' : False,  # do not cache attributes during listing, to optimize performance
     'no-symlinks' : False        # to improve performance disable symlink support. symlinks will be treated like regular files
+    'no-cache-dirs' : False      # to make directory timestamps accurate disable caching directories. Breaks s3storage.
 }
 
 # Loopback configuration

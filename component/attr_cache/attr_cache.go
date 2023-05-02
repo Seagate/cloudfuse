@@ -51,15 +51,13 @@ import (
 // By default attr cache is valid for 120 seconds
 const defaultAttrCacheTimeout uint32 = (120)
 
-// TODO: move this to config
-const cacheEmptyFolders = true
-
 // Common structure for AttrCache Component
 type AttrCache struct {
 	internal.BaseComponent
 	cacheTimeout uint32
 	cacheOnList  bool
 	noSymlinks   bool
+	noCacheDirs  bool
 	cacheMap     map[string]*attrCacheItem
 	cacheLock    sync.RWMutex
 }
@@ -69,6 +67,7 @@ type AttrCacheOptions struct {
 	Timeout       uint32 `config:"timeout-sec" yaml:"timeout-sec,omitempty"`
 	NoCacheOnList bool   `config:"no-cache-on-list" yaml:"no-cache-on-list,omitempty"`
 	NoSymlinks    bool   `config:"no-symlinks" yaml:"no-symlinks,omitempty"`
+	NoCacheDirs   bool   `config:"no-cache-dirs" yaml:"no-cache-dirs,omitempty"`
 
 	// support v1
 	CacheOnList bool `config:"cache-on-list"`
@@ -146,6 +145,7 @@ func (ac *AttrCache) Configure(_ bool) error {
 	}
 
 	ac.noSymlinks = conf.NoSymlinks
+	ac.noCacheDirs = conf.NoCacheDirs
 
 	log.Info("AttrCache::Configure : cache-timeout %d, symlink %t, cache-on-list %t",
 		ac.cacheTimeout, ac.noSymlinks, ac.cacheOnList)
@@ -229,12 +229,12 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 	if err == nil {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		if cacheEmptyFolders {
+		if ac.noCacheDirs {
+			ac.invalidatePath(options.Name)
+		} else {
 			newDirPath := internal.TruncateDirName(options.Name)
 			newDirAttr := internal.CreateObjAttrDir(newDirPath)
 			ac.cacheMap[newDirPath] = newAttrCacheItem(newDirAttr, true, time.Now())
-		} else {
-			ac.invalidatePath(options.Name)
 		}
 	}
 	return err
@@ -313,15 +313,15 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		ac.deleteDirectory(options.Src, deletionTime)
-		if cacheEmptyFolders {
-			newDirPath := internal.TruncateDirName(options.Dst)
-			newDirAttr := internal.CreateObjAttrDir(newDirPath)
-			ac.cacheMap[newDirPath] = newAttrCacheItem(newDirAttr, true, time.Now())
-		} else {
+		if ac.noCacheDirs {
 			// TLDR: Dst is guaranteed to be non-existent or empty.
 			// Note: We do not need to invalidate children of Dst due to the logic in our FUSE connector, see comments there,
 			// but it is always safer to double check than not.
 			ac.invalidateDirectory(options.Dst)
+		} else {
+			newDirPath := internal.TruncateDirName(options.Dst)
+			newDirAttr := internal.CreateObjAttrDir(newDirPath)
+			ac.cacheMap[newDirPath] = newAttrCacheItem(newDirAttr, true, time.Now())
 		}
 	}
 
@@ -460,7 +460,7 @@ func (ac *AttrCache) SyncDir(options internal.SyncDirOptions) error {
 
 	err := ac.NextComponent().SyncDir(options)
 	if err == nil {
-		if !cacheEmptyFolders {
+		if ac.noCacheDirs {
 			ac.cacheLock.RLock()
 			defer ac.cacheLock.RUnlock()
 			ac.invalidateDirectory(options.Name)
@@ -525,7 +525,7 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		ac.invalidatePath(options.Name)
-		if !cacheEmptyFolders {
+		if ac.noCacheDirs {
 			ac.invalidatePath(options.Target) // TODO : Why do we invalidate the target? Shouldn't the target remain unchanged?
 		}
 	}
@@ -594,6 +594,8 @@ func init() {
 	config.BindPFlag(compName+".timeout-sec", attrCacheTimeout)
 	noSymlinks := config.AddBoolFlag("no-symlinks", false, "whether or not symlinks should be supported")
 	config.BindPFlag(compName+".no-symlinks", noSymlinks)
+	noCacheDirs := config.AddBoolFlag("no-cache-dirs", false, "whether or not empty directories should be cached")
+	config.BindPFlag(compName+".no-cache-dirs", noCacheDirs)
 
 	cacheOnList := config.AddBoolFlag("cache-on-list", true, "Cache attributes on listing.")
 	config.BindPFlag(compName+".cache-on-list", cacheOnList)
