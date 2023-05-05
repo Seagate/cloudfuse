@@ -175,7 +175,18 @@ func (cl *Client) CreateDirectory(name string) error {
 	// Lyve Cloud does not support creating an empty file to indicate a directory
 	// directories will be represented only as object prefixes
 	// we have no way of representing an empty directory, so do nothing
-	// TODO: research: is this supposed to throw an error if the directory already exists?
+	// but we do need to return an error if the directory already exists
+	name = internal.ExtendDirName(name)
+	list, _, err := cl.List(name, nil, 1)
+	if err != nil {
+		log.Err("Client::CreateDirectory : Failed to List %s. Here's why: %v", name, err)
+		// return the error (this prevents the attribute cache from creating a bogus cache entry)
+		return err
+	}
+	if len(list) > 0 {
+		// directory already exists
+		return syscall.EEXIST
+	}
 	return nil
 }
 
@@ -293,6 +304,10 @@ func (cl *Client) RenameFile(source string, target string) error {
 // RenameDirectory : Rename the directory
 func (cl *Client) RenameDirectory(source string, target string) error {
 	log.Trace("Client::RenameDirectory : %s -> %s", source, target)
+
+	// TODO: should this fail when the target directory exists?
+	// current behavior merges into the target directory
+	// best to check and see what the azstorage code does
 
 	// first we need a list of all the object's we'll be moving
 	// make sure to pass source with a trailing forward slash
