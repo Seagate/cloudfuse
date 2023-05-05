@@ -22,8 +22,8 @@ import (
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
 // name is the path to the file.
-func (cl *Client) getObject(name string, offset int64, count int64) (io.ReadCloser, error) {
-	key := cl.getKey(name)
+func (cl *Client) getObject(name string, offset int64, count int64, symLink bool) (io.ReadCloser, error) {
+	key := cl.getFile(name, symLink)
 	log.Trace("Client::getObject : get object %s (%d+%d)", key, offset, count)
 
 	// deal with the range
@@ -59,8 +59,8 @@ func (cl *Client) getObject(name string, offset int64, count int64) (io.ReadClos
 // Wrapper for awsS3Client.PutObject.
 // Takes an io.Reader to work with both files and byte arrays.
 // name is the path to the file.
-func (cl *Client) putObject(name string, objectData io.Reader) error {
-	key := cl.getKey(name)
+func (cl *Client) putObject(name string, objectData io.Reader, symLink bool) error {
+	key := cl.getKey(name, symLink)
 	log.Trace("Client::putObject : putting object %s", key)
 
 	// TODO: decide when to use this higher-level API
@@ -82,8 +82,8 @@ func (cl *Client) putObject(name string, objectData io.Reader) error {
 
 // Wrapper for awsS3Client.DeleteObject.
 // name is the path to the file.
-func (cl *Client) deleteObject(name string) error {
-	key := cl.getKey(name)
+func (cl *Client) deleteObject(name string, symLink bool) error {
+	key := cl.getKey(name, symLink)
 	log.Trace("Client::deleteObject : deleting object %s", key)
 
 	_, err := cl.awsS3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
@@ -97,12 +97,13 @@ func (cl *Client) deleteObject(name string) error {
 
 // Wrapper for awsS3Client.DeleteObjects.
 // names is a list of paths to the objects.
-func (cl *Client) deleteObjects(names []string) error {
+// how will []bool be provided here?
+func (cl *Client) deleteObjects(names []string, symLink []bool) error {
 	log.Trace("Client::deleteObjects : deleting %d objects", len(names))
 	// build list to send to DeleteObjects
 	keyList := make([]types.ObjectIdentifier, len(names))
 	for i, name := range names {
-		key := cl.getKey(name)
+		key := cl.getKey(name, symLink[i]) //this is likely not the best way to do this and may very well be incorrect.
 		keyList[i] = types.ObjectIdentifier{
 			Key: &key,
 		}
@@ -129,8 +130,8 @@ func (cl *Client) deleteObjects(names []string) error {
 // HeadObject() acts just like GetObject, except no contents are returned.
 // So this is used to get metadata / attributes for an object.
 // name is the path to the file.
-func (cl *Client) headObject(name string) (*internal.ObjAttr, error) {
-	key := cl.getKey(name)
+func (cl *Client) headObject(name string, symLink bool) (*internal.ObjAttr, error) {
+	key := cl.getFile(name, symLink)
 	log.Trace("Client::headObject : object %s", key)
 
 	result, err := cl.awsS3Client.HeadObject(context.TODO(), &s3.HeadObjectInput{
@@ -146,10 +147,10 @@ func (cl *Client) headObject(name string) (*internal.ObjAttr, error) {
 }
 
 // Wrapper for awsS3Client.CopyObject
-func (cl *Client) copyObject(source string, target string) error {
+func (cl *Client) copyObject(source string, target string, symLink bool) error {
 	// copy the object to its new key
-	sourceKey := cl.getKey(source)
-	targetKey := cl.getKey(target)
+	sourceKey := cl.getKey(source, symLink)
+	targetKey := cl.getKey(target, symLink)
 	_, err := cl.awsS3Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		// TODO: URL-encode CopySource
@@ -192,7 +193,7 @@ func (cl *Client) ListBuckets() ([]string, error) {
 // This fetches the list using a marker so the caller code should handle marker logic.
 // If count=0 - fetch max entries.
 // the *string being returned is the token / marker and will be nil when the listing is complete.
-func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
+func (cl *Client) List(prefix string, marker *string, count int32, symLink bool) ([]*internal.ObjAttr, *string, error) {
 	log.Trace("Client::List : prefix %s, marker %s", prefix, func(marker *string) string {
 		if marker != nil {
 			return *marker
@@ -207,7 +208,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	}
 
 	// combine the configured prefix and the prefix being given to List to get a full listPath
-	listPath := cl.getKey(prefix)
+	listPath := cl.getKey(prefix, symLink)
 	// replace any trailing forward slash stripped by common.JoinUnixFilepath
 	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
 		listPath += "/"
@@ -366,6 +367,20 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) {
 }
 
 // Convert file name to object getKey
-func (cl *Client) getKey(name string) string {
+func (cl *Client) getKey(name string, symlinkKey bool) string {
+
+	if symlinkKey == true {
+		name = name + ".rclonelink"
+	}
+
+	return common.JoinUnixFilepath(cl.Config.prefixPath, name)
+}
+
+func (cl *Client) getFile(name string, symlinkKey bool) string {
+
+	if symlinkKey == true {
+		name = name[:len(name)-11] // ".rclonelink" is 11 chars long. we take that off of the provided name string.
+	}
+
 	return common.JoinUnixFilepath(cl.Config.prefixPath, name)
 }

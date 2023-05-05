@@ -182,10 +182,9 @@ func (cl *Client) CreateDirectory(name string) error {
 // CreateLink : Create a symlink in the bucket/virtual directory
 func (cl *Client) CreateLink(source string, target string) error {
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
+	symLink := true
 	data := []byte(target)
-	metadata := make(map[string]string)
-	metadata[symlinkKey] = "true"
-	return cl.WriteFromBuffer(source, metadata, data)
+	return cl.WriteFromBuffer(source, symLink, data)
 }
 
 // DeleteFile : Delete an object.
@@ -499,14 +498,14 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 
 // WriteFromBuffer : Upload from a buffer to an object.
 // name is the file path.
-func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) error {
+func (cl *Client) WriteFromBuffer(name string, symLink bool, data []byte) error {
 	log.Trace("Client::WriteFromBuffer : name %s", name)
 
 	// convert byte array to io.Reader
 	dataReader := bytes.NewReader(data)
 	// upload data to object
 	// TODO: handle metadata with S3
-	err := cl.putObject(name, dataReader)
+	err := cl.putObject(name, dataReader, symLink)
 	log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
 	return err
 }
