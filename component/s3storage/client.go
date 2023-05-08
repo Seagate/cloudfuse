@@ -243,7 +243,7 @@ func (cl *Client) DeleteDirectory(name string) error {
 		// Delete all found objects *and prefixes ("directories")*.
 		// For improved performance, we'll use one call to delete all objects in this directory.
 		// 	To make one call, we need to make a list of objects to delete first.
-		var filesToDelete []string
+		var objectsToDelete []*internal.ObjAttr
 		for _, object := range objects {
 			if object.IsDir() {
 				err = cl.DeleteDirectory(object.Path)
@@ -251,11 +251,11 @@ func (cl *Client) DeleteDirectory(name string) error {
 					log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", object.Path, err)
 				}
 			} else {
-				filesToDelete = append(filesToDelete, object.Path)
+				objectsToDelete = append(objectsToDelete, object.Path) //consider just object instead of object.path to pass down attributes that come from list.
 			}
 		}
 		// Delete the collected files
-		err = cl.deleteObjects(filesToDelete)
+		err = cl.deleteObjects(objectsToDelete)
 		if err != nil {
 			log.Err("Client::DeleteDirectory : deleteObjects() failed when called with %d objects. Here's why: %v", len(filesToDelete), err)
 		}
@@ -384,7 +384,7 @@ func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
 func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File) error {
 	log.Trace("Client::ReadToFile : name %s, offset : %d, count %d -> file %s", name, offset, count, fi.Name())
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, count)
+	objectDataReader, _, err := cl.getObject(name, offset, count)
 	if err != nil {
 		log.Err("Client::ReadToFile : getObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -413,7 +413,7 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
 	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, len)
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, len)
+	objectDataReader, _, err := cl.getObject(name, offset, len)
 	if err != nil {
 		log.Err("Client::ReadBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return nil, err
@@ -454,7 +454,7 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 
 // Upload from a file handle to an object.
 // The metadata parameter is not used.
-func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.File) error {
+func (cl *Client) WriteFromFile(name string, object *internal.ObjAttr, fi *os.File) error {
 	log.Trace("Client::WriteFromFile : file %s -> name %s", fi.Name(), name)
 	// track time for performance testing
 	defer log.TimeTrack(time.Now(), "Client::WriteFromFile", name)
@@ -474,7 +474,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	}
 
 	// upload file data
-	err = cl.putObject(name, fi)
+	err = cl.putObject(name, fi, object.IsSymlink())
 	if err != nil {
 		log.Err("Client::WriteFromFile : putObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -523,7 +523,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	log.Trace("Client::TruncateFile : Truncating %s to %dB.", name, size)
 
 	// get object data
-	objectDataReader, err := cl.getObject(name, 0, 0)
+	objectDataReader, object, err := cl.getObject(name, 0, 0)
 	if err != nil {
 		log.Err("Client::TruncateFile : getObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -549,7 +549,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	}
 	// overwrite the object with the truncated data
 	truncatedDataReader := bytes.NewReader(objectData)
-	err = cl.putObject(name, truncatedDataReader)
+	err = cl.putObject(name, truncatedDataReader, object.IsSymlink()) //because I have to pass along the symLink bool, I have to go get it from getObject()
 	if err != nil {
 		log.Err("Client::TruncateFile : Failed to write truncated data to object %s", name)
 	}

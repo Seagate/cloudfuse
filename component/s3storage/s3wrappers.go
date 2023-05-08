@@ -22,8 +22,8 @@ import (
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
 // name is the path to the file.
-func (cl *Client) getObject(name string, offset int64, count int64, symLink bool) (io.ReadCloser, error) {
-	key := cl.getFile(name, symLink)
+func (cl *Client) getObject(name string, offset int64, count int64) (io.ReadCloser, internal.ObjAttr, error) {
+	key, symLink := cl.getFile(name)
 	log.Trace("Client::getObject : get object %s (%d+%d)", key, offset, count)
 
 	// deal with the range
@@ -46,14 +46,19 @@ func (cl *Client) getObject(name string, offset int64, count int64, symLink bool
 		Range:  aws.String(rangeString),
 	})
 
+	object := *createObjAttr(key, result.ContentLength, *result.LastModified)
+	if symLink == true {
+		object.Flags.Set(internal.PropFlagSymlink)
+	}
+
 	// check for errors
 	if err != nil {
 		attemptedAction := fmt.Sprintf("GetObject(%s)", key)
-		return nil, parseS3Err(err, attemptedAction)
+		return nil, object, parseS3Err(err, attemptedAction)
 	}
 
-	// return body
-	return result.Body, err
+	// return body, object
+	return result.Body, object, err
 }
 
 // Wrapper for awsS3Client.PutObject.
@@ -98,12 +103,12 @@ func (cl *Client) deleteObject(name string, symLink bool) error {
 // Wrapper for awsS3Client.DeleteObjects.
 // names is a list of paths to the objects.
 // how will []bool be provided here?
-func (cl *Client) deleteObjects(names []string, symLink []bool) error {
-	log.Trace("Client::deleteObjects : deleting %d objects", len(names))
+func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
+	log.Trace("Client::deleteObjects : deleting %d objects", len(objects))
 	// build list to send to DeleteObjects
-	keyList := make([]types.ObjectIdentifier, len(names))
-	for i, name := range names {
-		key := cl.getKey(name, symLink[i]) //this is likely not the best way to do this and may very well be incorrect.
+	keyList := make([]types.ObjectIdentifier, len(objects))
+	for i, object := range objects { //look at object attr and check if symlinkkey is set. also get path.
+		key := cl.getKey(object.Path, object.IsSymlink()) //this is likely not the best way to do this and may very well be incorrect.
 		keyList[i] = types.ObjectIdentifier{
 			Key: &key,
 		}
@@ -117,7 +122,7 @@ func (cl *Client) deleteObjects(names []string, symLink []bool) error {
 		},
 	})
 	if err != nil {
-		log.Err("Client::DeleteDirectory : Failed to delete %d files. Here's why: %v", len(names), err)
+		log.Err("Client::DeleteDirectory : Failed to delete %d files. Here's why: %v", len(objects), err)
 		for i := 0; i < len(result.Errors); i++ {
 			log.Err("Client::DeleteDirectory : Failed to delete key %s. Here's why: %s", result.Errors[i].Key, result.Errors[i].Message)
 		}
@@ -130,8 +135,8 @@ func (cl *Client) deleteObjects(names []string, symLink []bool) error {
 // HeadObject() acts just like GetObject, except no contents are returned.
 // So this is used to get metadata / attributes for an object.
 // name is the path to the file.
-func (cl *Client) headObject(name string, symLink bool) (*internal.ObjAttr, error) {
-	key := cl.getFile(name, symLink)
+func (cl *Client) headObject(name string) (*internal.ObjAttr, error) {
+	key, symLink := cl.getFile(name)
 	log.Trace("Client::headObject : object %s", key)
 
 	result, err := cl.awsS3Client.HeadObject(context.TODO(), &s3.HeadObjectInput{
@@ -143,7 +148,13 @@ func (cl *Client) headObject(name string, symLink bool) (*internal.ObjAttr, erro
 		return nil, parseS3Err(err, attemptedAction)
 	}
 
-	return createObjAttr(name, result.ContentLength, *result.LastModified), nil
+	var object *internal.ObjAttr
+	if symLink == true {
+		object = createObjAttr(name, result.ContentLength, *result.LastModified)
+		object.Flags.Set(internal.PropFlagSymlink)
+	}
+
+	return object, nil
 }
 
 // Wrapper for awsS3Client.CopyObject
@@ -193,7 +204,7 @@ func (cl *Client) ListBuckets() ([]string, error) {
 // This fetches the list using a marker so the caller code should handle marker logic.
 // If count=0 - fetch max entries.
 // the *string being returned is the token / marker and will be nil when the listing is complete.
-func (cl *Client) List(prefix string, marker *string, count int32, symLink bool) ([]*internal.ObjAttr, *string, error) {
+func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
 	log.Trace("Client::List : prefix %s, marker %s", prefix, func(marker *string) string {
 		if marker != nil {
 			return *marker
@@ -208,7 +219,7 @@ func (cl *Client) List(prefix string, marker *string, count int32, symLink bool)
 	}
 
 	// combine the configured prefix and the prefix being given to List to get a full listPath
-	listPath := cl.getKey(prefix, symLink)
+	listPath := cl.getKey(prefix, false)
 	// replace any trailing forward slash stripped by common.JoinUnixFilepath
 	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
 		listPath += "/"
@@ -264,8 +275,15 @@ func (cl *Client) List(prefix string, marker *string, count int32, symLink bool)
 		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
 		for _, value := range output.Contents {
 			// push object info into the list
-			path := split(cl.Config.prefixPath, *value.Key)
+			key, symLink := cl.getFile(*value.Key)
+
+			path := split(cl.Config.prefixPath, key)
 			attr := createObjAttr(path, value.Size, *value.LastModified)
+
+			if symLink == true {
+				attr.Flags.Set(internal.PropFlagSymlink)
+			}
+
 			objectAttrList = append(objectAttrList, attr)
 		}
 
@@ -376,11 +394,14 @@ func (cl *Client) getKey(name string, symlinkKey bool) string {
 	return common.JoinUnixFilepath(cl.Config.prefixPath, name)
 }
 
-func (cl *Client) getFile(name string, symlinkKey bool) string {
+func (cl *Client) getFile(name string) (string, bool) {
 
-	if symlinkKey == true {
-		name = name[:len(name)-11] // ".rclonelink" is 11 chars long. we take that off of the provided name string.
+	isSymLink := false
+
+	if name[len(name)-11:] == ".rclonelink" {
+		isSymLink = true
+		name = name[:len(name)-11]
 	}
 
-	return common.JoinUnixFilepath(cl.Config.prefixPath, name)
+	return common.JoinUnixFilepath(cl.Config.prefixPath, name), isSymLink
 }

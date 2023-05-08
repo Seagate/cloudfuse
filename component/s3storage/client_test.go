@@ -547,7 +547,11 @@ func (s *clientTestSuite) TestWriteFromFile() {
 	s.assert.Nil(err)
 	s.assert.EqualValues(bodyLen, outputLen)
 
-	err = s.client.WriteFromFile(name, nil, f)
+	fileInfo, err := f.Stat()
+	s.assert.Nil(err)
+	object := createObjAttr("", 4096, fileInfo.ModTime())
+
+	err = s.client.WriteFromFile(name, object, f)
 	s.assert.Nil(err)
 	f.Close()
 
