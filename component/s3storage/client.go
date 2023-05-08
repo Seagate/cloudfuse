@@ -270,10 +270,10 @@ func (cl *Client) DeleteDirectory(name string) error {
 }
 
 // RenameFile : Rename the object (copy then delete).
-func (cl *Client) RenameFile(source string, target string) error {
+func (cl *Client) RenameFile(source string, target string, symLink bool) error {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
-	err := cl.copyObject(source, target)
+	err := cl.copyObject(source, target, symLink)
 	if err != nil {
 		log.Err("Client::RenameFile : copyObject(%s->%s) failed. Here's why: %v", source, target, err)
 		return err
@@ -312,7 +312,7 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 			if srcObject.IsDir() {
 				err = cl.RenameDirectory(srcPath, dstPath)
 			} else {
-				err = cl.RenameFile(srcPath, dstPath)
+				err = cl.RenameFile(srcPath, dstPath, srcObject.IsSymlink()) //use sourceObjects to pass along symLink bool
 			}
 			if err != nil {
 				log.Err("Client::RenameDirectory : Failed to rename %s -> %s. Here's why: %v", srcPath, dstPath, err)
