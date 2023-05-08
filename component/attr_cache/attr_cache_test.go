@@ -214,7 +214,7 @@ func (suite *attrCacheTestSuite) TestDefault() {
 	suite.assert.EqualValues(suite.attrCache.cacheTimeout, 120)
 	suite.assert.Equal(suite.attrCache.cacheOnList, true)
 	suite.assert.Equal(suite.attrCache.noSymlinks, false)
-	suite.assert.Equal(suite.attrCache.noCacheDirs, false)
+	suite.assert.Equal(suite.attrCache.cacheDirs, true)
 }
 
 // Tests configuration
@@ -228,7 +228,7 @@ func (suite *attrCacheTestSuite) TestConfig() {
 	suite.assert.EqualValues(suite.attrCache.cacheTimeout, 60)
 	suite.assert.Equal(suite.attrCache.cacheOnList, false)
 	suite.assert.Equal(suite.attrCache.noSymlinks, true)
-	suite.assert.Equal(suite.attrCache.noCacheDirs, true)
+	suite.assert.Equal(suite.attrCache.cacheDirs, false)
 }
 
 func (suite *attrCacheTestSuite) TestConfigZero() {
@@ -241,7 +241,7 @@ func (suite *attrCacheTestSuite) TestConfigZero() {
 	suite.assert.EqualValues(suite.attrCache.cacheTimeout, 0)
 	suite.assert.Equal(suite.attrCache.cacheOnList, false)
 	suite.assert.Equal(suite.attrCache.noSymlinks, true)
-	suite.assert.Equal(suite.attrCache.noCacheDirs, true)
+	suite.assert.Equal(suite.attrCache.cacheDirs, false)
 }
 
 // Tests Create Directory
@@ -296,7 +296,7 @@ func (suite *attrCacheTestSuite) TestCreateDirNoCacheDirs() {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		suite.cleanupTest()
 		suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-		suite.assert.EqualValues(suite.attrCache.noCacheDirs, noCacheDirs)
+		suite.assert.EqualValues(suite.attrCache.cacheDirs, !noCacheDirs)
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
 			options := internal.CreateDirOptions{Name: path}
@@ -603,7 +603,7 @@ func (suite *attrCacheTestSuite) TestRenameDirNoCacheDirs() {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		suite.cleanupTest()
 		suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-		suite.assert.EqualValues(suite.attrCache.noCacheDirs, noCacheDirs)
+		suite.assert.EqualValues(suite.attrCache.cacheDirs, !noCacheDirs)
 		suite.Run(input.src+"->"+input.dst, func() {
 			truncatedSrc := internal.TruncateDirName(input.src)
 			truncatedDst := internal.TruncateDirName(input.dst)
