@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows/registry"
+	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
@@ -56,6 +57,40 @@ var removeCmd = &cobra.Command{
 		err := removeService()
 		if err != nil {
 			return fmt.Errorf("failed to remove as a Windows service [%s]", err.Error())
+		}
+
+		return nil
+	},
+}
+
+var startCmd = &cobra.Command{
+	Use:               "start",
+	Short:             "start the Windows service",
+	Long:              "start the Windows service",
+	SuggestFor:        []string{"sta", "star"},
+	Example:           "lyvecloudfuse service start",
+	FlagErrorHandling: cobra.ExitOnError,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		err := startService()
+		if err != nil {
+			return fmt.Errorf("failed to start as a Windows service [%s]", err.Error())
+		}
+
+		return nil
+	},
+}
+
+var stopCmd = &cobra.Command{
+	Use:               "stop",
+	Short:             "stop the Windows service",
+	Long:              "stop the Windows service",
+	SuggestFor:        []string{"sto"},
+	Example:           "lyvecloudfuse service stop",
+	FlagErrorHandling: cobra.ExitOnError,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		err := stopService()
+		if err != nil {
+			return fmt.Errorf("failed to stop the Windows service [%s]", err.Error())
 		}
 
 		return nil
@@ -120,6 +155,49 @@ func removeService() error {
 	return nil
 }
 
+// startService starts the windows service.
+func startService() error {
+	scm, err := mgr.Connect()
+	if err != nil {
+		return err
+	}
+	defer scm.Disconnect()
+
+	service, err := scm.OpenService(SvcName)
+	if err != nil {
+		return fmt.Errorf("%s service is not installed", SvcName)
+	}
+	defer service.Close()
+
+	err = service.Start()
+	if err != nil {
+		return fmt.Errorf("%s service could not be started: %v", SvcName, err)
+	}
+	return nil
+}
+
+// startService stops the windows service.
+func stopService() error {
+	scm, err := mgr.Connect()
+	if err != nil {
+		return err
+	}
+	defer scm.Disconnect()
+
+	service, err := scm.OpenService(SvcName)
+	if err != nil {
+		return fmt.Errorf("%s service is not installed", SvcName)
+	}
+	defer service.Close()
+
+	_, err = service.Control(svc.Stop)
+	if err != nil {
+		return fmt.Errorf("%s service could not be stopped: %v", SvcName, err)
+	}
+
+	return nil
+}
+
 // createRegistryEntry creates an entry in the registry for WinFsp
 // so the WinFsp launch tool can launch our service.
 func createRegistryEntry() error {
@@ -160,4 +238,6 @@ func init() {
 	rootCmd.AddCommand(serviceCmd)
 	serviceCmd.AddCommand(installCmd)
 	serviceCmd.AddCommand(removeCmd)
+	serviceCmd.AddCommand(startCmd)
+	serviceCmd.AddCommand(stopCmd)
 }

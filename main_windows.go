@@ -3,9 +3,8 @@
 package main
 
 import (
-	"fmt"
 	"lyvecloudfuse/cmd"
-	_ "lyvecloudfuse/common/log"
+	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal/windows_service"
 
 	"golang.org/x/sys/windows/svc"
@@ -15,15 +14,19 @@ import (
 //  To use go:generate run command   "NAME="component" go generate"
 
 func main() {
-	isInteractive, err := svc.IsWindowsService()
+	isService, err := svc.IsWindowsService()
 	if err != nil {
-		fmt.Println(err)
+		log.Err("Unable to determine if running as Windows service: %v", err.Error())
 	}
 
-	if !isInteractive {
-		_ = cmd.Execute()
-	} else {
+	if isService {
 		handler := &windows_service.LyveCloudFuse{}
-		svc.Run(windows_service.SvcName, handler)
+		run := svc.Run
+		err = run(cmd.SvcName, handler)
+		if err != nil {
+			log.Err("Unable to start Windows service: %v", err.Error())
+		}
+	} else {
+		_ = cmd.Execute()
 	}
 }
