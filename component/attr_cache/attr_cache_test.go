@@ -182,7 +182,13 @@ func generateNestedPathAttr(path string, size int64, mode os.FileMode) []*intern
 	pathAttrs := make([]*internal.ObjAttr, 0)
 	i := 0
 	for p := a.Front(); p != nil; p = p.Next() {
-		pathAttrs = append(pathAttrs, getPathAttr(p.Value.(string), size, mode, false))
+		currentPath := p.Value.(string)
+		isDir := currentPath[len(currentPath)-1] == '/'
+		newPathAttr := getPathAttr(currentPath, size, mode, false)
+		if isDir {
+			newPathAttr = getDirPathAttr(currentPath)
+		}
+		pathAttrs = append(pathAttrs, newPathAttr)
 		i++
 	}
 	return pathAttrs
