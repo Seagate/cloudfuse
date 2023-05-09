@@ -239,7 +239,7 @@ func (ac *AttrCache) pathExistsInCache(path string) bool {
 // cacheParent: add the parent directory of the given entity to the cache
 func (ac *AttrCache) cacheParent(childPath string, cacheAt time.Time) {
 	parentDir := path.Dir(internal.TruncateDirName(childPath))
-	if !ac.pathExistsInCache(parentDir) {
+	if parentDir != "." && !ac.pathExistsInCache(parentDir) {
 		ac.cacheMap[parentDir] = newAttrCacheItem(internal.CreateObjAttrDir(parentDir), true, cacheAt)
 	}
 }
@@ -298,16 +298,16 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	for key, value := range ac.cacheMap {
 		if strings.HasPrefix(key, srcDir) {
 			foundCachedContents = true
+			dstKey := strings.Replace(key, srcDir, dstDir, 1)
 			// to keep the directory cache coherent,
 			// any renamed directories need a new cache entry
 			if value.attr.IsDir() && value.valid() && value.exists() {
-				dstKey := strings.Replace(key, srcDir, dstDir, 1)
 				// add the destination directory to our cache
 				dstDirAttr := internal.CreateObjAttrDir(dstKey)
-				ac.cacheMap[dstDir] = newAttrCacheItem(dstDirAttr, true, time)
+				ac.cacheMap[dstKey] = newAttrCacheItem(dstDirAttr, true, time)
 			} else {
 				// invalidate files so attributes get refreshed from the backend
-				value.invalidate()
+				ac.invalidatePath(dstKey)
 			}
 			// either way, mark the old cache entry deleted
 			value.markDeleted(time)
