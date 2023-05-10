@@ -60,12 +60,12 @@ var installCmd = &cobra.Command{
 	},
 }
 
-var removeCmd = &cobra.Command{
-	Use:               "remove",
+var uninstallCmd = &cobra.Command{
+	Use:               "uninstall",
 	Short:             "Remove as a Windows service",
 	Long:              "Remove as a Windows service",
-	SuggestFor:        []string{"ins", "inst"},
-	Example:           "lyvecloudfuse service remove",
+	SuggestFor:        []string{"uninst", "uninstal"},
+	Example:           "lyvecloudfuse service uninstall",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := removeService()
@@ -102,12 +102,7 @@ var stopCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service stop",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateStopOptions()
-		if err != nil {
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
-		}
-
-		err = stopService()
+		err := stopService()
 		if err != nil {
 			return fmt.Errorf("failed to stop the Windows service [%s]", err.Error())
 		}
@@ -118,18 +113,40 @@ var stopCmd = &cobra.Command{
 
 var createCmd = &cobra.Command{
 	Use:               "create",
-	Short:             "create a mount that will start when the Windows service starts",
-	Long:              "create a mount that will start when the Windows service starts",
+	Short:             "create an instance that will start when the Windows service starts",
+	Long:              "create aa instance mount that will start when the Windows service starts",
 	SuggestFor:        []string{"crea", "creat"},
 	Example:           "lyvecloudfuse service create --name=Mount1 --config-file=C:\\config.yaml --mount-dir=Z:",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateStartOptions()
+		err := validateCreateOptions()
 		if err != nil {
 			return fmt.Errorf("failed to validate options [%s]", err.Error())
 		}
 
 		err = createOurRegistryEntry()
+		if err != nil {
+			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
+		}
+
+		return nil
+	},
+}
+
+var removeCmd = &cobra.Command{
+	Use:               "remove",
+	Short:             "remove an instance that will start when the Windows service starts",
+	Long:              "remove aa instance mount that will start when the Windows service starts",
+	SuggestFor:        []string{"crea", "creat"},
+	Example:           "lyvecloudfuse service remove --name=Mount1",
+	FlagErrorHandling: cobra.ExitOnError,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		err := validateRemoveOptions()
+		if err != nil {
+			return fmt.Errorf("failed to validate options [%s]", err.Error())
+		}
+
+		err = removeOurRegistryEntry()
 		if err != nil {
 			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
 		}
@@ -299,7 +316,17 @@ func createOurRegistryEntry() error {
 	return nil
 }
 
-func validateStartOptions() error {
+func removeOurRegistryEntry() error {
+	registryPath := lcfRegistry + servOpts.InstanceName
+	err := registry.DeleteKey(registry.LOCAL_MACHINE, registryPath)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateCreateOptions() error {
 	if servOpts.MountDir == "" {
 		return errors.New("mount-dir does not exist")
 	}
@@ -319,7 +346,7 @@ func validateStartOptions() error {
 	return nil
 }
 
-func validateStopOptions() error {
+func validateRemoveOptions() error {
 	if servOpts.InstanceName == "" {
 		return errors.New("name does not exist")
 	}
@@ -332,10 +359,11 @@ func validateStopOptions() error {
 func init() {
 	rootCmd.AddCommand(serviceCmd)
 	serviceCmd.AddCommand(installCmd)
-	serviceCmd.AddCommand(removeCmd)
+	serviceCmd.AddCommand(uninstallCmd)
 	serviceCmd.AddCommand(startCmd)
 	serviceCmd.AddCommand(stopCmd)
 	serviceCmd.AddCommand(createCmd)
+	serviceCmd.AddCommand(removeCmd)
 
 	createCmd.Flags().StringVar(&servOpts.ConfigFile, "config-file", "",
 		"Configures the path for the file where the account credentials are provided.")
@@ -349,7 +377,7 @@ func init() {
 		"Name to uniquely identify this instance of a mount.")
 	_ = createCmd.MarkFlagRequired("name")
 
-	stopCmd.Flags().StringVar(&servOpts.InstanceName, "name", "",
+	removeCmd.Flags().StringVar(&servOpts.InstanceName, "name", "",
 		"Name to uniquely identify this instance of a mount.")
-	_ = stopCmd.MarkFlagRequired("name")
+	_ = removeCmd.MarkFlagRequired("name")
 }
