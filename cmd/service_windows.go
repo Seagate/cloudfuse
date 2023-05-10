@@ -3,9 +3,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows/registry"
@@ -13,7 +13,21 @@ import (
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
+type serviceOptions struct {
+	ConfigFile   string
+	InstanceName string
+	MountDir     string
+}
+
 const SvcName = "lyvecloudfuse"
+
+// Windows Registry Paths
+const (
+	winFspRegistry = `SOFTWARE\WOW6432Node\WinFsp\Services\`
+	lcfRegistry    = `SOFTWARE\Seagate\LyveCloudFuse\Instances\`
+)
+
+var servOpts serviceOptions
 
 // Section defining all the command that we have in secure feature
 var serviceCmd = &cobra.Command{
@@ -88,9 +102,36 @@ var stopCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service stop",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := stopService()
+		err := validateStopOptions()
+		if err != nil {
+			return fmt.Errorf("failed to validate options [%s]", err.Error())
+		}
+
+		err = stopService()
 		if err != nil {
 			return fmt.Errorf("failed to stop the Windows service [%s]", err.Error())
+		}
+
+		return nil
+	},
+}
+
+var createCmd = &cobra.Command{
+	Use:               "create",
+	Short:             "create a mount that will start when the Windows service starts",
+	Long:              "create a mount that will start when the Windows service starts",
+	SuggestFor:        []string{"crea", "creat"},
+	Example:           "lyvecloudfuse service create --name=Mount1 --config-file=C:\\config.yaml --mount-dir=Z:",
+	FlagErrorHandling: cobra.ExitOnError,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		err := validateStartOptions()
+		if err != nil {
+			return fmt.Errorf("failed to validate options [%s]", err.Error())
+		}
+
+		err = createOurRegistryEntry()
+		if err != nil {
+			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
 		}
 
 		return nil
@@ -201,12 +242,11 @@ func stopService() error {
 // createRegistryEntry creates an entry in the registry for WinFsp
 // so the WinFsp launch tool can launch our service.
 func createRegistryEntry() error {
-	const registryPath = `SOFTWARE\WOW6432Node\WinFsp\Services\` + SvcName
+	registryPath := winFspRegistry + SvcName
 	executablePath, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	executableDir := filepath.Dir(executablePath)
 
 	key, _, err := registry.CreateKey(registry.LOCAL_MACHINE, registryPath, registry.ALL_ACCESS)
 	if err != nil {
@@ -218,7 +258,7 @@ func createRegistryEntry() error {
 		return err
 	}
 	// TODO: Add ability to pass in mounth path and config file path
-	err = key.SetStringValue("CommandLine", `mount Z: --config-file=`+filepath.Join(executableDir, "config.yaml"))
+	err = key.SetStringValue("CommandLine", `mount %1 --config-file=%2`)
 	if err != nil {
 		return err
 	}
@@ -234,10 +274,82 @@ func createRegistryEntry() error {
 	return nil
 }
 
+func createOurRegistryEntry() error {
+	registryPath := lcfRegistry + servOpts.InstanceName
+	key, _, err := registry.CreateKey(registry.LOCAL_MACHINE, registryPath, registry.ALL_ACCESS)
+	if err != nil {
+		return err
+	}
+
+	err = key.SetStringValue("InstanceName", servOpts.InstanceName)
+	if err != nil {
+		return err
+	}
+
+	err = key.SetStringValue("MountDir", servOpts.MountDir)
+	if err != nil {
+		return err
+	}
+
+	err = key.SetStringValue("ConfigFile", servOpts.ConfigFile)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateStartOptions() error {
+	if servOpts.MountDir == "" {
+		return errors.New("mount-dir does not exist")
+	}
+
+	if servOpts.ConfigFile == "" {
+		return errors.New("config file not provided, check usage")
+	}
+
+	if _, err := os.Stat(servOpts.ConfigFile); os.IsNotExist(err) {
+		return errors.New("config file does not exist")
+	}
+
+	if servOpts.InstanceName == "" {
+		return errors.New("name does not exist")
+	}
+
+	return nil
+}
+
+func validateStopOptions() error {
+	if servOpts.InstanceName == "" {
+		return errors.New("name does not exist")
+	}
+
+	// Check if this instance is currectly running by calling info to WinFsp
+
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(serviceCmd)
 	serviceCmd.AddCommand(installCmd)
 	serviceCmd.AddCommand(removeCmd)
 	serviceCmd.AddCommand(startCmd)
 	serviceCmd.AddCommand(stopCmd)
+	serviceCmd.AddCommand(createCmd)
+
+	createCmd.Flags().StringVar(&servOpts.ConfigFile, "config-file", "",
+		"Configures the path for the file where the account credentials are provided.")
+	_ = createCmd.MarkFlagRequired("config-file")
+
+	createCmd.Flags().StringVar(&servOpts.MountDir, "mount-dir", "",
+		"Location where the mount will appear. Recommend that this is an unused drive letter.")
+	_ = createCmd.MarkFlagRequired("mount-dir")
+
+	createCmd.Flags().StringVar(&servOpts.InstanceName, "name", "",
+		"Name to uniquely identify this instance of a mount.")
+	_ = createCmd.MarkFlagRequired("name")
+
+	stopCmd.Flags().StringVar(&servOpts.InstanceName, "name", "",
+		"Name to uniquely identify this instance of a mount.")
+	_ = stopCmd.MarkFlagRequired("name")
 }
