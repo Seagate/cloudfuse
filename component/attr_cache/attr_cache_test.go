@@ -118,22 +118,22 @@ func addPathToCache(assert *assert.Assertions, attrCache *AttrCache, path string
 
 func assertDeleted(suite *attrCacheTestSuite, path string) {
 	suite.assert.Contains(suite.attrCache.cacheMap, path)
-	suite.assert.EqualValues(suite.attrCache.cacheMap[path].attr, &internal.ObjAttr{})
+	suite.assert.EqualValues(&internal.ObjAttr{}, suite.attrCache.cacheMap[path].attr)
 	suite.assert.True(suite.attrCache.cacheMap[path].valid())
 	suite.assert.False(suite.attrCache.cacheMap[path].exists())
 }
 
 func assertInvalid(suite *attrCacheTestSuite, path string) {
 	suite.assert.Contains(suite.attrCache.cacheMap, path)
-	suite.assert.EqualValues(suite.attrCache.cacheMap[path].attr, &internal.ObjAttr{})
+	suite.assert.EqualValues(&internal.ObjAttr{}, suite.attrCache.cacheMap[path].attr)
 	suite.assert.False(suite.attrCache.cacheMap[path].valid())
 }
 
 func assertUntouched(suite *attrCacheTestSuite, path string) {
 	suite.assert.Contains(suite.attrCache.cacheMap, path)
 	suite.assert.NotEqualValues(suite.attrCache.cacheMap[path].attr, &internal.ObjAttr{})
-	suite.assert.EqualValues(suite.attrCache.cacheMap[path].attr.Size, defaultSize)
-	suite.assert.EqualValues(suite.attrCache.cacheMap[path].attr.Mode, defaultMode)
+	suite.assert.EqualValues(defaultSize, suite.attrCache.cacheMap[path].attr.Size)
+	suite.assert.EqualValues(defaultMode, suite.attrCache.cacheMap[path].attr.Mode)
 	suite.assert.True(suite.attrCache.cacheMap[path].valid())
 	suite.assert.True(suite.attrCache.cacheMap[path].exists())
 }
@@ -238,7 +238,7 @@ func (suite *attrCacheTestSuite) cleanupTest() {
 func (suite *attrCacheTestSuite) TestDefault() {
 	defer suite.cleanupTest()
 	suite.assert.Equal(suite.attrCache.Name(), "attr_cache")
-	suite.assert.EqualValues(suite.attrCache.cacheTimeout, 120)
+	suite.assert.EqualValues(120, suite.attrCache.cacheTimeout)
 	suite.assert.Equal(suite.attrCache.cacheOnList, true)
 	suite.assert.Equal(suite.attrCache.noSymlinks, false)
 	suite.assert.Equal(suite.attrCache.cacheDirs, true)
@@ -252,7 +252,7 @@ func (suite *attrCacheTestSuite) TestConfig() {
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal(suite.attrCache.Name(), "attr_cache")
-	suite.assert.EqualValues(suite.attrCache.cacheTimeout, 60)
+	suite.assert.EqualValues(60, suite.attrCache.cacheTimeout)
 	suite.assert.Equal(suite.attrCache.cacheOnList, false)
 	suite.assert.Equal(suite.attrCache.noSymlinks, true)
 	suite.assert.Equal(suite.attrCache.cacheDirs, false)
@@ -265,7 +265,7 @@ func (suite *attrCacheTestSuite) TestConfigZero() {
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal(suite.attrCache.Name(), "attr_cache")
-	suite.assert.EqualValues(suite.attrCache.cacheTimeout, 0)
+	suite.assert.EqualValues(0, suite.attrCache.cacheTimeout)
 	suite.assert.Equal(suite.attrCache.cacheOnList, false)
 	suite.assert.Equal(suite.attrCache.noSymlinks, true)
 	suite.assert.Equal(suite.attrCache.cacheDirs, false)
@@ -556,7 +556,7 @@ func (suite *attrCacheTestSuite) TestReadDirNoCacheOnList() {
 	cacheOnList := false
 	config := fmt.Sprintf("attr_cache:\n  no-cache-on-list: %t", !cacheOnList)
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-	suite.assert.EqualValues(suite.attrCache.cacheOnList, cacheOnList)
+	suite.assert.EqualValues(cacheOnList, suite.attrCache.cacheOnList)
 	path := "a"
 	size := int64(1024)
 	mode := os.FileMode(0)
@@ -1062,8 +1062,8 @@ func (suite *attrCacheTestSuite) TestTruncateFile() {
 	suite.assert.Nil(err)
 	suite.assert.Contains(suite.attrCache.cacheMap, path)
 	suite.assert.NotEqualValues(suite.attrCache.cacheMap[path].attr, &internal.ObjAttr{})
-	suite.assert.EqualValues(suite.attrCache.cacheMap[path].attr.Size, size) // new size should be set
-	suite.assert.EqualValues(suite.attrCache.cacheMap[path].attr.Mode, defaultMode)
+	suite.assert.EqualValues(size, suite.attrCache.cacheMap[path].attr.Size) // new size should be set
+	suite.assert.EqualValues(defaultMode, suite.attrCache.cacheMap[path].attr.Mode)
 	suite.assert.True(suite.attrCache.cacheMap[path].valid())
 	suite.assert.True(suite.attrCache.cacheMap[path].exists())
 }
@@ -1135,7 +1135,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsDeleted() {
 
 			result, err := suite.attrCache.GetAttr(options)
 			suite.assert.Equal(err, syscall.ENOENT)
-			suite.assert.EqualValues(result, &internal.ObjAttr{})
+			suite.assert.EqualValues(&internal.ObjAttr{}, result)
 		})
 	}
 }
@@ -1173,7 +1173,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadataNoSymlinks() {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		suite.cleanupTest()
 		suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-		suite.assert.EqualValues(suite.attrCache.cacheOnList, noSymlinks)
+		suite.assert.EqualValues(noSymlinks, suite.attrCache.cacheOnList)
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
 			addDirectoryToCache(suite.assert, suite.attrCache, "a", true) // add the paths to the cache with IsMetadataRetrived=true
@@ -1250,7 +1250,7 @@ func (suite *attrCacheTestSuite) TestGetAttrOtherError() {
 
 			result, err := suite.attrCache.GetAttr(options)
 			suite.assert.Equal(err, os.ErrNotExist)
-			suite.assert.EqualValues(result, &internal.ObjAttr{})
+			suite.assert.EqualValues(&internal.ObjAttr{}, result)
 			suite.assert.NotContains(suite.attrCache.cacheMap, truncatedPath)
 		})
 	}
@@ -1272,9 +1272,9 @@ func (suite *attrCacheTestSuite) TestGetAttrEnonetError() {
 
 			result, err := suite.attrCache.GetAttr(options)
 			suite.assert.Equal(err, syscall.ENOENT)
-			suite.assert.EqualValues(result, &internal.ObjAttr{})
+			suite.assert.EqualValues(&internal.ObjAttr{}, result)
 			suite.assert.Contains(suite.attrCache.cacheMap, truncatedPath)
-			suite.assert.EqualValues(suite.attrCache.cacheMap[truncatedPath].attr, &internal.ObjAttr{})
+			suite.assert.EqualValues(&internal.ObjAttr{}, suite.attrCache.cacheMap[truncatedPath].attr)
 			suite.assert.True(suite.attrCache.cacheMap[truncatedPath].valid())
 			suite.assert.False(suite.attrCache.cacheMap[truncatedPath].exists())
 			suite.assert.NotNil(suite.attrCache.cacheMap[truncatedPath].cachedAt)
@@ -1289,7 +1289,7 @@ func (suite *attrCacheTestSuite) TestCacheTimeout() {
 	cacheTimeout := 1
 	config := fmt.Sprintf("attr_cache:\n  timeout-sec: %d", cacheTimeout)
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-	suite.assert.EqualValues(suite.attrCache.cacheTimeout, cacheTimeout)
+	suite.assert.EqualValues(cacheTimeout, suite.attrCache.cacheTimeout)
 
 	path := "a"
 	options := internal.GetAttrOptions{Name: path}
@@ -1387,8 +1387,8 @@ func (suite *attrCacheTestSuite) TestChmod() {
 			suite.assert.Nil(err)
 			suite.assert.Contains(suite.attrCache.cacheMap, truncatedPath)
 			suite.assert.NotEqualValues(suite.attrCache.cacheMap[truncatedPath].attr, &internal.ObjAttr{})
-			suite.assert.EqualValues(suite.attrCache.cacheMap[truncatedPath].attr.Size, defaultSize)
-			suite.assert.EqualValues(suite.attrCache.cacheMap[truncatedPath].attr.Mode, mode) // new mode should be set
+			suite.assert.EqualValues(defaultSize, suite.attrCache.cacheMap[truncatedPath].attr.Size)
+			suite.assert.EqualValues(mode, suite.attrCache.cacheMap[truncatedPath].attr.Mode) // new mode should be set
 			suite.assert.True(suite.attrCache.cacheMap[truncatedPath].valid())
 			suite.assert.True(suite.attrCache.cacheMap[truncatedPath].exists())
 		})
