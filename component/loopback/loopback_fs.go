@@ -37,7 +37,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"runtime"
 	"strings"
@@ -134,7 +133,7 @@ func (lfs *LoopbackFS) ReadDir(options internal.ReadDirOptions) ([]*internal.Obj
 	path := common.JoinUnixFilepath(lfs.path, options.Name)
 
 	log.Debug("LoopbackFS: ReadDir requested for %s", path)
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		log.Err("LoopbackFS: ReadDir error[%s]", err)
 		return nil, err
@@ -142,12 +141,14 @@ func (lfs *LoopbackFS) ReadDir(options internal.ReadDirOptions) ([]*internal.Obj
 	log.Debug("LoopbackFS: ReadDir on %s returned %d items", path, len(files))
 
 	for _, file := range files {
+		info, _ := file.Info()
+
 		attr := &internal.ObjAttr{
 			Path:  common.JoinUnixFilepath(options.Name, file.Name()),
 			Name:  file.Name(),
-			Size:  file.Size(),
-			Mode:  file.Mode(),
-			Mtime: file.ModTime(),
+			Size:  info.Size(),
+			Mode:  info.Mode(),
+			Mtime: info.ModTime(),
 		}
 		attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 		attr.Flags.Set(internal.PropFlagModeDefault)
@@ -171,7 +172,7 @@ func (lfs *LoopbackFS) StreamDir(options internal.StreamDirOptions) ([]*internal
 	path := common.JoinUnixFilepath(lfs.path, options.Name)
 
 	log.Debug("LoopbackFS: StreamDir requested for %s", path)
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		log.Err("LoopbackFS: StreamDir error[%s]", err)
 		return nil, "", err
@@ -179,12 +180,13 @@ func (lfs *LoopbackFS) StreamDir(options internal.StreamDirOptions) ([]*internal
 	log.Debug("LoopbackFS: StreamDir on %s returned %d items", path, len(files))
 
 	for _, file := range files {
+		info, _ := file.Info()
 		attr := &internal.ObjAttr{
 			Path:  common.JoinUnixFilepath(options.Name, file.Name()),
 			Name:  file.Name(),
-			Size:  file.Size(),
-			Mode:  file.Mode(),
-			Mtime: file.ModTime(),
+			Size:  info.Size(),
+			Mode:  info.Mode(),
+			Mtime: info.ModTime(),
 		}
 		attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 		attr.Flags.Set(internal.PropFlagModeDefault)

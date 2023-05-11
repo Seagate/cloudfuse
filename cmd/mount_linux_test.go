@@ -38,7 +38,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -134,7 +133,7 @@ func (suite *mountTestSuite) TestMountDirNotExists() {
 func (suite *mountTestSuite) TestMountDirNotEmpty() {
 	defer suite.cleanupTest()
 
-	mntDir, err := ioutil.TempDir("", "mntdir")
+	mntDir, err := os.MkdirTemp("", "mntdir")
 	suite.assert.Nil(err)
 	tempDir := filepath.Join(mntDir, "tempdir")
 
@@ -167,7 +166,7 @@ func (suite *mountTestSuite) TestMountPathNotProvided() {
 func (suite *mountTestSuite) TestUnsupportedConfigFileType() {
 	defer suite.cleanupTest()
 
-	mntDir, err := ioutil.TempDir("", "mntdir")
+	mntDir, err := os.MkdirTemp("", "mntdir")
 	suite.assert.Nil(err)
 	defer os.RemoveAll(mntDir)
 
@@ -181,7 +180,7 @@ func (suite *mountTestSuite) TestUnsupportedConfigFileType() {
 func (suite *mountTestSuite) TestConfigFileNotFound() {
 	defer suite.cleanupTest()
 
-	mntDir, err := ioutil.TempDir("", "mntdir")
+	mntDir, err := os.MkdirTemp("", "mntdir")
 	suite.assert.Nil(err)
 	defer os.RemoveAll(mntDir)
 
@@ -200,7 +199,7 @@ func (suite *mountTestSuite) TestConfigFileNotFound() {
 func (suite *mountTestSuite) TestConfigFileNotProvided() {
 	defer suite.cleanupTest()
 
-	mntDir, err := ioutil.TempDir("", "mntdir")
+	mntDir, err := os.MkdirTemp("", "mntdir")
 	suite.assert.Nil(err)
 	defer os.RemoveAll(mntDir)
 
@@ -212,7 +211,7 @@ func (suite *mountTestSuite) TestConfigFileNotProvided() {
 func (suite *mountTestSuite) TestDefaultConfigFile() {
 	defer suite.cleanupTest()
 
-	mntDir, err := ioutil.TempDir("", "mntdir")
+	mntDir, err := os.MkdirTemp("", "mntdir")
 	suite.assert.Nil(err)
 	defer os.RemoveAll(mntDir)
 
@@ -245,7 +244,7 @@ func (suite *mountTestSuite) TestDefaultConfigFile() {
 func (suite *mountTestSuite) TestInvalidLogLevel() {
 	defer suite.cleanupTest()
 
-	mntDir, err := ioutil.TempDir("", "mntdir")
+	mntDir, err := os.MkdirTemp("", "mntdir")
 	suite.assert.Nil(err)
 	defer os.RemoveAll(mntDir)
 
@@ -257,7 +256,7 @@ func (suite *mountTestSuite) TestInvalidLogLevel() {
 func (suite *mountTestSuite) TestCliParamsV1() {
 	defer suite.cleanupTest()
 
-	mntDir, err := ioutil.TempDir("", "mntdir")
+	mntDir, err := os.MkdirTemp("", "mntdir")
 	suite.assert.Nil(err)
 	defer os.RemoveAll(mntDir)
 
@@ -273,7 +272,7 @@ func (suite *mountTestSuite) TestCliParamsV1() {
 func (suite *mountTestSuite) TestStreamAttrCacheOptionsV1() {
 	defer suite.cleanupTest()
 
-	mntDir, err := ioutil.TempDir("", "mntdir")
+	mntDir, err := os.MkdirTemp("", "mntdir")
 	suite.assert.Nil(err)
 	defer os.RemoveAll(mntDir)
 
@@ -290,7 +289,7 @@ func (suite *mountTestSuite) TestStreamAttrCacheOptionsV1() {
 func (suite *mountTestSuite) TestInvalidLibfuseOption() {
 	defer suite.cleanupTest()
 
-	mntDir, err := ioutil.TempDir("", "mntdir")
+	mntDir, err := os.MkdirTemp("", "mntdir")
 	suite.assert.Nil(err)
 	defer os.RemoveAll(mntDir)
 
@@ -306,7 +305,7 @@ func (suite *mountTestSuite) TestInvalidLibfuseOption() {
 func (suite *mountTestSuite) TestUndefinedLibfuseOption() {
 	defer suite.cleanupTest()
 
-	mntDir, err := ioutil.TempDir("", "mntdir")
+	mntDir, err := os.MkdirTemp("", "mntdir")
 	suite.assert.Nil(err)
 	defer os.RemoveAll(mntDir)
 
@@ -322,7 +321,7 @@ func (suite *mountTestSuite) TestUndefinedLibfuseOption() {
 func (suite *mountTestSuite) TestInvalidUmaskValue() {
 	defer suite.cleanupTest()
 
-	mntDir, err := ioutil.TempDir("", "mntdir")
+	mntDir, err := os.MkdirTemp("", "mntdir")
 	suite.assert.Nil(err)
 	defer os.RemoveAll(mntDir)
 
@@ -436,7 +435,7 @@ func (suite *mountTestSuite) TestMountOptionVaildate() {
 }
 
 func TestMountCommand(t *testing.T) {
-	confFile, err := ioutil.TempFile("", "conf*.yaml")
+	confFile, err := os.CreateTemp("", "conf*.yaml")
 	if err != nil {
 		t.Error("Failed to create config file")
 	}

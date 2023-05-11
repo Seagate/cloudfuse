@@ -35,7 +35,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"runtime"
 	"testing"
@@ -113,15 +112,14 @@ func TestGenOneConfig(t *testing.T) {
 
 func (suite *genOneConfigTestSuite) TestConfigCreation() {
 	defer suite.cleanupTest()
-	confFile, err := ioutil.TempFile("", "conf*.yaml")
-	suite.assert.Nil(err)
-	outFile, err := ioutil.TempFile("", "adlsgen1fuse*.json")
-	suite.assert.Nil(err)
+	confFile, _ := os.CreateTemp("", "conf*.yaml")
+	outFile, _ := os.CreateTemp("", "adlsgen1fuse*.json")
 
 	// On Windows the mount directory must not exist, so only create it on Linux
 	var mntDir string
+	var err error
 	if runtime.GOOS != "windows" {
-		mntDir, err = ioutil.TempDir("", "mntdir")
+		mntDir, err = os.MkdirTemp("", "mntdir")
 		suite.assert.Nil(err)
 	} else {
 		mntDir = "mntdir"
@@ -155,15 +153,14 @@ func (suite *genOneConfigTestSuite) TestConfigCreation() {
 
 func (suite *genOneConfigTestSuite) TestInvalidConfig() {
 	defer suite.cleanupTest()
-	confFile, err := ioutil.TempFile("", "conf*.yaml")
-	suite.assert.Nil(err)
-	outFile, err := ioutil.TempFile("", "adlsgen1fuse*.json")
-	suite.assert.Nil(err)
+	confFile, _ := os.CreateTemp("", "conf*.yaml")
+	outFile, _ := os.CreateTemp("", "adlsgen1fuse*.json")
 
 	// On Windows the mount directory must not exist, so only create it on Linux
 	var mntDir string
+	var err error
 	if runtime.GOOS != "windows" {
-		mntDir, err = ioutil.TempDir("", "mntdir")
+		mntDir, err = os.MkdirTemp("", "mntdir")
 		suite.assert.Nil(err)
 	} else {
 		mntDir = "mntdir"
@@ -182,15 +179,14 @@ func (suite *genOneConfigTestSuite) TestInvalidConfig() {
 
 func (suite *genOneConfigTestSuite) TestInvalidAuthMode() {
 	defer suite.cleanupTest()
-	confFile, err := ioutil.TempFile("", "conf*.yaml")
-	suite.assert.Nil(err)
-	outFile, err := ioutil.TempFile("", "adlsgen1fuse*.json")
-	suite.assert.Nil(err)
+	confFile, _ := os.CreateTemp("", "conf*.yaml")
+	outFile, _ := os.CreateTemp("", "adlsgen1fuse*.json")
 
 	// On Windows the mount directory must not exist, so only create it on Linux
 	var mntDir string
+	var err error
 	if runtime.GOOS != "windows" {
-		mntDir, err = ioutil.TempDir("", "mntdir")
+		mntDir, err = os.MkdirTemp("", "mntdir")
 		suite.assert.Nil(err)
 	} else {
 		mntDir = "mntdir"
@@ -209,15 +205,14 @@ func (suite *genOneConfigTestSuite) TestInvalidAuthMode() {
 
 func (suite *genOneConfigTestSuite) TestGen1FuseMount() {
 	defer suite.cleanupTest()
-	confFile, err := ioutil.TempFile("", "conf*.yaml")
-	suite.assert.Nil(err)
-	outFile, err := ioutil.TempFile("", "adlsgen1fuse*.json")
-	suite.assert.Nil(err)
+	confFile, _ := os.CreateTemp("", "conf*.yaml")
+	outFile, _ := os.CreateTemp("", "adlsgen1fuse*.json")
 
 	// On Windows the mount directory must not exist, so only create it on Linux
 	var mntDir string
+	var err error
 	if runtime.GOOS != "windows" {
-		mntDir, err = ioutil.TempDir("", "mntdir")
+		mntDir, err = os.MkdirTemp("", "mntdir")
 		suite.assert.Nil(err)
 	} else {
 		mntDir = "mntdir"
