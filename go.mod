@@ -35,8 +35,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/Azure/azure-storage-fuse/v2 v2.0.0-20230510123710-9a0589a44567
-
 require (
 	cloud.google.com/go v0.110.0 // indirect
 	cloud.google.com/go/compute v1.18.0 // indirect
