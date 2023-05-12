@@ -136,8 +136,8 @@ var unmountServiceCmd = &cobra.Command{
 	Use:               "unmount",
 	Short:             "unmount an instance that will start when the Windows service starts",
 	Long:              "remove aa instance mount that will start when the Windows service starts",
-	SuggestFor:        []string{"crea", "creat"},
-	Example:           "lyvecloudfuse service remove --name=Mount1",
+	SuggestFor:        []string{"umount", "unmoun"},
+	Example:           "lyvecloudfuse service unmount --name=Mount1",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := validateName()
@@ -145,14 +145,15 @@ var unmountServiceCmd = &cobra.Command{
 			return fmt.Errorf("failed to validate options [%s]", err.Error())
 		}
 
-		err = windowsService.RemoveRegistryMount(servOpts.InstanceName)
-		if err != nil {
-			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
-		}
-
 		err = unmountInstance()
 		if err != nil {
 			return fmt.Errorf("failed to unmount instance [%s]", err.Error())
+		}
+
+		// Remove registry after unmounting since we need to read from registry to unmount
+		err = windowsService.RemoveRegistryMount(servOpts.InstanceName)
+		if err != nil {
+			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
 		}
 
 		return nil
