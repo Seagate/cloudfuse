@@ -38,7 +38,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -106,7 +105,7 @@ func (suite *mountTestSuite) cleanupTest() {
 func (suite *mountTestSuite) TestMountDirDoesExist() {
 	defer suite.cleanupTest()
 
-	mntDir, err := ioutil.TempDir("", "mntdir")
+	mntDir, err := os.TempDir("", "mntdir")
 	suite.assert.Nil(err)
 	tempDir := filepath.Join(mntDir, "tempdir")
 	err = os.MkdirAll(tempDir, 0777)
@@ -124,7 +123,7 @@ func (suite *mountTestSuite) TestMountDirDoesExist() {
 func (suite *mountTestSuite) TestMountDirNotEmpty() {
 	defer suite.cleanupTest()
 
-	mntDir, err := ioutil.TempDir("", "mntdir")
+	mntDir, err := os.TempDir("", "mntdir")
 	suite.assert.Nil(err)
 	tempDir := filepath.Join(mntDir, "tempdir")
 
@@ -390,7 +389,7 @@ func (suite *mountTestSuite) TestMountOptionVaildate() {
 }
 
 func TestMountCommand(t *testing.T) {
-	confFile, err := ioutil.TempFile("", "conf*.yaml")
+	confFile, err := os.TempFile("", "conf*.yaml")
 	if err != nil {
 		t.Error("Failed to create config file")
 	}

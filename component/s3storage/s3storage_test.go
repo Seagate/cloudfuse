@@ -41,7 +41,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"os"
 	"path"
@@ -141,7 +141,7 @@ func (s *s3StorageTestSuite) SetupTest() {
 		os.Exit(1)
 	}
 
-	cfgData, err := ioutil.ReadAll(cfgFile)
+	cfgData, err := io.ReadAll(cfgFile)
 	if err != nil {
 		fmt.Println("Failed to read config file")
 	}
@@ -880,7 +880,7 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output)
 
@@ -1013,7 +1013,7 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output)
 }
@@ -1042,7 +1042,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmaller() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData[:truncatedLength], output)
 }
@@ -1071,7 +1071,7 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileSmaller() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData[:truncatedLength], output)
 }
@@ -1100,7 +1100,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileEqual() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output)
 }
@@ -1129,7 +1129,7 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileEqual() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output)
 }
@@ -1158,7 +1158,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileBigger() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output[:len(data)])
 }
@@ -1182,7 +1182,7 @@ func (s *s3StorageTestSuite) TestTruncateEmptyFileBigger() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, len(output))
 	s.assert.EqualValues(make([]byte, truncatedLength), output[:])
@@ -1212,7 +1212,7 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileBigger() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output[:len(data)])
 }
