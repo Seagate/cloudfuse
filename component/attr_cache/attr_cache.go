@@ -424,6 +424,39 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 	}
 }
 
+// IsDirEmpty: Whether or not the directory is empty
+func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
+	log.Trace("AttrCache::IsDirEmpty : %s", options.Name)
+
+	// This function only has a use if we're caching directories
+	if !ac.cacheDirs {
+		log.Debug("AttrCache::IsDirEmpty : %s Dir cache is disabled. Checking with container", options.Name)
+		return ac.NextComponent().IsDirEmpty(options)
+	}
+	// Is the directory in our cache?
+	ac.cacheLock.RLock()
+	defer ac.cacheLock.RUnlock()
+	// If the directory does not exist in the attribute cache then call the next component
+	if !ac.pathExistsInCache(options.Name) {
+		log.Debug("AttrCache::IsDirEmpty : %s not found in attr_cache. Checking with container", options.Name)
+		return ac.NextComponent().IsDirEmpty(options)
+	}
+
+	log.Debug("AttrCache::IsDirEmpty : %s found in attr_cache", options.Name)
+	// Check if the cached directory is empty or not
+	// Add a trailing / so that we only find child paths under the directory and not paths that have the same prefix
+	prefix := internal.ExtendDirName(options.Name)
+	for key, value := range ac.cacheMap {
+		if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
+			log.Debug("AttrCache::IsDirEmpty : %s has a subpath in attr_cache", options.Name)
+			return false
+		}
+	}
+	// Not found in cache so check with container
+	log.Debug("AttrCache::IsDirEmpty : %s children not found in cache. Checking with container", options.Name)
+	return ac.NextComponent().IsDirEmpty(options)
+}
+
 // RenameDir : Mark the source directory deleted and recursively mark all it's children deleted.
 // Invalidate the destination since we may have overwritten it.
 func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {

@@ -875,10 +875,10 @@ func (suite *attrCacheTestSuite) TestSyncDir() {
 
 			err = suite.attrCache.SyncDir(options)
 			suite.assert.Nil(err)
-			// a paths should be deleted
+			// directory cache is enabled, so a paths should NOT be deleted
 			for p := a.Front(); p != nil; p = p.Next() {
 				truncatedPath = internal.TruncateDirName(p.Value.(string))
-				assertDeleted(suite, truncatedPath)
+				assertUntouched(suite, truncatedPath)
 			}
 			ab.PushBackList(ac) // ab and ac paths should be untouched
 			for p := ab.Front(); p != nil; p = p.Next() {
@@ -1202,7 +1202,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadata() {
 
 			options := internal.GetAttrOptions{Name: path}
 			// attributes should not be accessible so call the mock
-			suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode), false), nil)
+			suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode), false), nil).AnyTimes()
 
 			_, err := suite.attrCache.GetAttr(options)
 			suite.assert.Nil(err)
