@@ -90,7 +90,7 @@ type S3Connection interface {
 	DeleteFile(name string) error
 	DeleteDirectory(name string) error
 
-	RenameFile(string, string) error
+	RenameFile(string, string, bool) error
 	RenameDirectory(string, string) error
 
 	GetAttr(name string) (attr *internal.ObjAttr, err error)
@@ -99,11 +99,11 @@ type S3Connection interface {
 	List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error)
 
 	ReadToFile(name string, offset int64, count int64, fi *os.File) error
-	ReadBuffer(name string, offset int64, len int64) ([]byte, error)
+	ReadBuffer(name string, offset int64, len int64) ([]byte, error) //add the symlink bool here
 	ReadInBuffer(name string, offset int64, len int64, data []byte) error
 
-	WriteFromFile(name string, metadata map[string]string, fi *os.File) error
-	WriteFromBuffer(name string, metadata map[string]string, data []byte) error
+	WriteFromFile(name string, fi *os.File) error
+	WriteFromBuffer(name string, symLink bool, data []byte) error
 	Write(options internal.WriteFileOptions) error
 	GetFileBlockOffsets(name string) (*common.BlockOffsetList, error)
 

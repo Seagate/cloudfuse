@@ -22,8 +22,8 @@ import (
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
 // name is the path to the file.
-func (cl *Client) getObject(name string, offset int64, count int64) (io.ReadCloser, internal.ObjAttr, error) {
-	key, symLink := cl.getFile(name)
+func (cl *Client) getObject(name string, offset int64, count int64, symLink bool) (io.ReadCloser, error) {
+	key := cl.getKey(name, symLink)
 	log.Trace("Client::getObject : get object %s (%d+%d)", key, offset, count)
 
 	// deal with the range
@@ -46,25 +46,21 @@ func (cl *Client) getObject(name string, offset int64, count int64) (io.ReadClos
 		Range:  aws.String(rangeString),
 	})
 
-	object := *createObjAttr(key, result.ContentLength, *result.LastModified)
-	if symLink == true {
-		object.Flags.Set(internal.PropFlagSymlink)
-	}
-
 	// check for errors
 	if err != nil {
 		attemptedAction := fmt.Sprintf("GetObject(%s)", key)
-		return nil, object, parseS3Err(err, attemptedAction)
+		return nil, parseS3Err(err, attemptedAction)
 	}
 
 	// return body, object
-	return result.Body, object, err
+	return result.Body, err
 }
 
 // Wrapper for awsS3Client.PutObject.
 // Takes an io.Reader to work with both files and byte arrays.
 // name is the path to the file.
 func (cl *Client) putObject(name string, objectData io.Reader, symLink bool) error {
+
 	key := cl.getKey(name, symLink)
 	log.Trace("Client::putObject : putting object %s", key)
 
@@ -107,8 +103,8 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 	log.Trace("Client::deleteObjects : deleting %d objects", len(objects))
 	// build list to send to DeleteObjects
 	keyList := make([]types.ObjectIdentifier, len(objects))
-	for i, object := range objects { //look at object attr and check if symlinkkey is set. also get path.
-		key := cl.getKey(object.Path, object.IsSymlink()) //this is likely not the best way to do this and may very well be incorrect.
+	for i, object := range objects {
+		key := cl.getKey(object.Path, object.IsSymlink())
 		keyList[i] = types.ObjectIdentifier{
 			Key: &key,
 		}
@@ -135,8 +131,9 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 // HeadObject() acts just like GetObject, except no contents are returned.
 // So this is used to get metadata / attributes for an object.
 // name is the path to the file.
-func (cl *Client) headObject(name string) (*internal.ObjAttr, error) {
-	key, symLink := cl.getFile(name)
+func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, error) {
+
+	key := cl.getKey(name, isSymlink)
 	log.Trace("Client::headObject : object %s", key)
 
 	result, err := cl.awsS3Client.HeadObject(context.TODO(), &s3.HeadObjectInput{
@@ -148,12 +145,7 @@ func (cl *Client) headObject(name string) (*internal.ObjAttr, error) {
 		return nil, parseS3Err(err, attemptedAction)
 	}
 
-	var object *internal.ObjAttr
-	if symLink == true {
-		object = createObjAttr(name, result.ContentLength, *result.LastModified)
-		object.Flags.Set(internal.PropFlagSymlink)
-	}
-
+	object := createObjAttr(name, result.ContentLength, *result.LastModified, isSymlink)
 	return object, nil
 }
 
@@ -275,15 +267,10 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
 		for _, value := range output.Contents {
 			// push object info into the list
-			key, symLink := cl.getFile(*value.Key)
+			key, isSymLink := cl.getFile(*value.Key)
 
 			path := split(cl.Config.prefixPath, key)
-			attr := createObjAttr(path, value.Size, *value.LastModified)
-
-			if symLink == true {
-				attr.Flags.Set(internal.PropFlagSymlink)
-			}
-
+			attr := createObjAttr(path, value.Size, *value.LastModified, isSymLink)
 			objectAttrList = append(objectAttrList, attr)
 		}
 
@@ -346,7 +333,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 }
 
 // create an object attributes struct
-func createObjAttr(path string, size int64, lastModified time.Time) (attr *internal.ObjAttr) {
+func createObjAttr(path string, size int64, lastModified time.Time, isSymLink bool) (attr *internal.ObjAttr) {
 	attr = &internal.ObjAttr{
 		Path:   path,
 		Name:   filepath.Base(path),
@@ -361,6 +348,10 @@ func createObjAttr(path string, size int64, lastModified time.Time) (attr *inter
 	// set flags
 	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
+	if isSymLink {
+		attr.Flags.Set(internal.PropFlagSymlink)
+	}
+
 	attr.Metadata = make(map[string]string)
 
 	return attr
@@ -373,7 +364,7 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) {
 	// For these dirs we get only the name and no other properties so hardcoding time to current time
 	currentTime := time.Now()
 
-	attr = createObjAttr(path, 4096, currentTime)
+	attr = createObjAttr(path, 4096, currentTime, false)
 	// Change the relevant fields for a directory
 	attr.Mode = os.ModeDir
 	// set flags

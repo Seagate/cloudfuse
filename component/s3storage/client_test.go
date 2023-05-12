@@ -286,7 +286,7 @@ func (s *clientTestSuite) TestRenameFile() {
 	s.assert.Nil(err)
 	dst := generateFileName()
 
-	err = s.client.RenameFile(src, dst)
+	err = s.client.RenameFile(src, dst, false) //when will this need to be true for symlink?
 	s.assert.Nil(err)
 
 	// Src should not be in the account
@@ -547,11 +547,7 @@ func (s *clientTestSuite) TestWriteFromFile() {
 	s.assert.Nil(err)
 	s.assert.EqualValues(bodyLen, outputLen)
 
-	fileInfo, err := f.Stat()
-	s.assert.Nil(err)
-	object := createObjAttr("", 4096, fileInfo.ModTime())
-
-	err = s.client.WriteFromFile(name, object, f)
+	err = s.client.WriteFromFile(name, f)
 	s.assert.Nil(err)
 	f.Close()
 
@@ -576,7 +572,7 @@ func (s *clientTestSuite) TestWriteFromBuffer() {
 	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 
-	err := s.client.WriteFromBuffer(name, nil, body)
+	err := s.client.WriteFromBuffer(name, false, body)
 	s.assert.Nil(err)
 
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{

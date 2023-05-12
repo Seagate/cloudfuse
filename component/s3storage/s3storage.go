@@ -363,7 +363,7 @@ func (s3 *S3Storage) DeleteFile(options internal.DeleteFileOptions) error {
 func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("S3Storage::RenameFile : %s to %s", options.Src, options.Dst)
 
-	err := s3.storage.RenameFile(options.Src, options.Dst)
+	err := s3.storage.RenameFile(options.Src, options.Dst, false) //when is symlink true?
 
 	if err == nil {
 		s3StatsCollector.PushEvents(renameFile, options.Src, map[string]interface{}{src: options.Src, dest: options.Dst})
@@ -432,7 +432,7 @@ func (s3 *S3Storage) CopyToFile(options internal.CopyToFileOptions) error {
 
 func (s3 *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("S3Storage::CopyFromFile : Upload file %s", options.Name)
-	return s3.storage.WriteFromFile(options.Name, options.Metadata, options.File)
+	return s3.storage.WriteFromFile(options.Name, options.File) // object needed here?
 }
 
 // Symlink operations
@@ -450,6 +450,8 @@ func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 
 func (s3 *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) {
 	log.Trace("S3Storage::ReadLink : Read symlink %s", options.Name)
+
+	//todo: add isSymlink bool here and pass to ReadBuffer
 	data, err := s3.storage.ReadBuffer(options.Name, 0, 0)
 
 	if err != nil {
