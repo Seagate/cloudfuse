@@ -5,10 +5,10 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"lyvecloudfuse/internal/windowsService"
 	"os"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/sys/windows/registry"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
@@ -21,19 +21,13 @@ type serviceOptions struct {
 
 const SvcName = "lyvecloudfuse"
 
-// Windows Registry Paths
-const (
-	winFspRegistry = `SOFTWARE\WOW6432Node\WinFsp\Services\`
-	lcfRegistry    = `SOFTWARE\Seagate\LyveCloudFuse\Instances\`
-)
-
 var servOpts serviceOptions
 
 // Section defining all the command that we have in secure feature
 var serviceCmd = &cobra.Command{
 	Use:               "service",
-	Short:             "Manage lyvecloudfuse as a Windows service",
-	Long:              "Manage lyvecloudfuse as a Windows service",
+	Short:             "Manage lyvecloudfuse as a Windows service. This requires Administrator rights to run.",
+	Long:              "Manage lyvecloudfuse as a Windows service. This requires Administrator rights to run.",
 	SuggestFor:        []string{"ser", "serv"},
 	Example:           "lyvecloudfuse service install",
 	Args:              cobra.ExactArgs(1),
@@ -111,12 +105,12 @@ var stopCmd = &cobra.Command{
 	},
 }
 
-var createCmd = &cobra.Command{
-	Use:               "create",
-	Short:             "create an instance that will start when the Windows service starts",
-	Long:              "create aa instance mount that will start when the Windows service starts",
-	SuggestFor:        []string{"crea", "creat"},
-	Example:           "lyvecloudfuse service create --name=Mount1 --config-file=C:\\config.yaml --mount-dir=Z:",
+var mountServiceCmd = &cobra.Command{
+	Use:               "mount",
+	Short:             "mount an instance that will persist in Windows when restarted",
+	Long:              "mount an instance that will persist in Windows when restarted",
+	SuggestFor:        []string{"mnt", "mout"},
+	Example:           "lyvecloudfuse service mount --name=Mount1 --config-file=C:\\config.yaml --mount-dir=Z:",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := validateCreateOptions()
@@ -124,31 +118,41 @@ var createCmd = &cobra.Command{
 			return fmt.Errorf("failed to validate options [%s]", err.Error())
 		}
 
-		err = createOurRegistryEntry()
+		err = windowsService.CreateRegistryMount(servOpts.InstanceName, servOpts.MountDir, servOpts.ConfigFile)
 		if err != nil {
 			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
+		}
+
+		err = mountInstance()
+		if err != nil {
+			return fmt.Errorf("failed to mount instance [%s]", err.Error())
 		}
 
 		return nil
 	},
 }
 
-var removeCmd = &cobra.Command{
-	Use:               "remove",
-	Short:             "remove an instance that will start when the Windows service starts",
+var unmountServiceCmd = &cobra.Command{
+	Use:               "unmount",
+	Short:             "unmount an instance that will start when the Windows service starts",
 	Long:              "remove aa instance mount that will start when the Windows service starts",
 	SuggestFor:        []string{"crea", "creat"},
 	Example:           "lyvecloudfuse service remove --name=Mount1",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateRemoveOptions()
+		err := validateName()
 		if err != nil {
 			return fmt.Errorf("failed to validate options [%s]", err.Error())
 		}
 
-		err = removeOurRegistryEntry()
+		err = windowsService.RemoveRegistryMount(servOpts.InstanceName)
 		if err != nil {
 			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
+		}
+
+		err = unmountInstance()
+		if err != nil {
+			return fmt.Errorf("failed to unmount instance [%s]", err.Error())
 		}
 
 		return nil
@@ -184,7 +188,7 @@ func installService() error {
 	defer service.Close()
 
 	// Create the registry for WinFsp
-	err = createRegistryEntry()
+	err = windowsService.CreateWinFspRegistry()
 	if err != nil {
 		return err
 	}
@@ -256,74 +260,12 @@ func stopService() error {
 	return nil
 }
 
-// createRegistryEntry creates an entry in the registry for WinFsp
-// so the WinFsp launch tool can launch our service.
-func createRegistryEntry() error {
-	registryPath := winFspRegistry + SvcName
-	executablePath, err := os.Executable()
-	if err != nil {
-		return err
-	}
-
-	key, _, err := registry.CreateKey(registry.LOCAL_MACHINE, registryPath, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-
-	err = key.SetStringValue("Executable", executablePath)
-	if err != nil {
-		return err
-	}
-	// TODO: Add ability to pass in mounth path and config file path
-	err = key.SetStringValue("CommandLine", `mount %1 --config-file=%2`)
-	if err != nil {
-		return err
-	}
-	err = key.SetStringValue("Security", "D:P(A;;RPWPLC;;;WD)")
-	if err != nil {
-		return err
-	}
-	err = key.SetDWordValue("JobControl", 1)
-	if err != nil {
-		return err
-	}
-
-	return nil
+func mountInstance() error {
+	return windowsService.LaunchMount(servOpts.InstanceName)
 }
 
-func createOurRegistryEntry() error {
-	registryPath := lcfRegistry + servOpts.InstanceName
-	key, _, err := registry.CreateKey(registry.LOCAL_MACHINE, registryPath, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-
-	err = key.SetStringValue("InstanceName", servOpts.InstanceName)
-	if err != nil {
-		return err
-	}
-
-	err = key.SetStringValue("MountDir", servOpts.MountDir)
-	if err != nil {
-		return err
-	}
-
-	err = key.SetStringValue("ConfigFile", servOpts.ConfigFile)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func removeOurRegistryEntry() error {
-	registryPath := lcfRegistry + servOpts.InstanceName
-	err := registry.DeleteKey(registry.LOCAL_MACHINE, registryPath)
-	if err != nil {
-		return err
-	}
-
-	return nil
+func unmountInstance() error {
+	return windowsService.StopMount(servOpts.InstanceName)
 }
 
 func validateCreateOptions() error {
@@ -346,7 +288,7 @@ func validateCreateOptions() error {
 	return nil
 }
 
-func validateRemoveOptions() error {
+func validateName() error {
 	if servOpts.InstanceName == "" {
 		return errors.New("name does not exist")
 	}
@@ -362,22 +304,22 @@ func init() {
 	serviceCmd.AddCommand(uninstallCmd)
 	serviceCmd.AddCommand(startCmd)
 	serviceCmd.AddCommand(stopCmd)
-	serviceCmd.AddCommand(createCmd)
-	serviceCmd.AddCommand(removeCmd)
+	serviceCmd.AddCommand(mountServiceCmd)
+	serviceCmd.AddCommand(unmountServiceCmd)
 
-	createCmd.Flags().StringVar(&servOpts.ConfigFile, "config-file", "",
+	mountServiceCmd.Flags().StringVar(&servOpts.ConfigFile, "config-file", "",
 		"Configures the path for the file where the account credentials are provided.")
-	_ = createCmd.MarkFlagRequired("config-file")
+	_ = mountServiceCmd.MarkFlagRequired("config-file")
 
-	createCmd.Flags().StringVar(&servOpts.MountDir, "mount-dir", "",
+	mountServiceCmd.Flags().StringVar(&servOpts.MountDir, "mount-dir", "",
 		"Location where the mount will appear. Recommend that this is an unused drive letter.")
-	_ = createCmd.MarkFlagRequired("mount-dir")
+	_ = mountServiceCmd.MarkFlagRequired("mount-dir")
 
-	createCmd.Flags().StringVar(&servOpts.InstanceName, "name", "",
+	mountServiceCmd.Flags().StringVar(&servOpts.InstanceName, "name", "",
 		"Name to uniquely identify this instance of a mount.")
-	_ = createCmd.MarkFlagRequired("name")
+	_ = mountServiceCmd.MarkFlagRequired("name")
 
-	removeCmd.Flags().StringVar(&servOpts.InstanceName, "name", "",
+	unmountServiceCmd.Flags().StringVar(&servOpts.InstanceName, "name", "",
 		"Name to uniquely identify this instance of a mount.")
-	_ = removeCmd.MarkFlagRequired("name")
+	_ = unmountServiceCmd.MarkFlagRequired("name")
 }

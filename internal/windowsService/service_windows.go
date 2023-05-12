@@ -1,6 +1,6 @@
 //go:build windows
 
-package windows_service
+package windowsService
 
 import (
 	"bytes"
@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/registry"
 	"golang.org/x/sys/windows/svc"
 )
 
@@ -36,7 +35,7 @@ func (m *LyveCloudFuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes 
 	log.Trace("Starting %s service", SvcName)
 
 	// Send request to WinFSP to start the process
-	err := startService()
+	err := startServices()
 	// If unable to start, then stop the service
 	if err != nil {
 		changes <- svc.Status{State: svc.StopPending}
@@ -63,7 +62,7 @@ func (m *LyveCloudFuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes 
 				changes <- svc.Status{State: svc.StopPending}
 
 				// Tell WinFSP to stop the service
-				err := stopService()
+				err := stopServices()
 				if err != nil {
 					log.Err("Error stopping %s service: %v", SvcName, err.Error())
 				}
@@ -73,8 +72,53 @@ func (m *LyveCloudFuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes 
 	}
 }
 
+// LaunchMount starts the mount if the name exists in our Windows registry.
+func LaunchMount(name string) error {
+	// Read registry to get names of the instances we need to start
+	instances, err := ReadRegistryInstanceEntry(name)
+	if err != nil {
+		return err
+	}
+
+	cmd := uint16(startCmd)
+
+	utf16className := windows.StringToUTF16(SvcName)
+	utf16instanceName := windows.StringToUTF16(instances.InstanceName)
+	utf16driveName := windows.StringToUTF16(instances.MountDir)
+	utf16configFile := windows.StringToUTF16(instances.ConfigFile)
+
+	buf := writeToUtf16(cmd, utf16className, utf16instanceName, utf16driveName, utf16configFile)
+	err = winFspCommand(buf)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// StopMount stops the mount if the name exists in our Windows registry.
+func StopMount(name string) error {
+	// Read registry to get names of the instances we need to start
+	instances, err := ReadRegistryInstanceEntry(name)
+	if err != nil {
+		return err
+	}
+
+	cmd := uint16(stopCmd)
+
+	utf16className := windows.StringToUTF16(SvcName)
+	utf16instanceName := windows.StringToUTF16(instances.InstanceName)
+	utf16driveName := windows.StringToUTF16(instances.MountDir)
+
+	buf := writeToUtf16(cmd, utf16className, utf16instanceName, utf16driveName)
+	err = winFspCommand(buf)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // startService starts lyvecloudfuse by instructing WinFsp to launch it.
-func startService() error {
+func startServices() error {
 	// Read registry to get names of the instances we need to start
 	instances, err := readRegistryEntry()
 	if err != nil {
@@ -99,8 +143,8 @@ func startService() error {
 	return nil
 }
 
-// startService stops lyvecloudfuse by instructing WinFsp to stop it.
-func stopService() error {
+// stopServicess stops lyvecloudfuse by instructing WinFsp to stop it.
+func stopServices() error {
 	// Read registry to get names of the instances we need to stop
 	instances, err := readRegistryEntry()
 	if err != nil {
@@ -196,56 +240,4 @@ func winFspCommand(command []byte) error {
 	}
 
 	return nil
-}
-
-func readRegistryEntry() ([]KeyData, error) {
-	registryPath := `SOFTWARE\Seagate\LyveCloudFuse\Instances\`
-
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, registryPath, registry.ALL_ACCESS)
-	if err != nil {
-		log.Err("Unable to read instance names from Windows Registry: %v", err.Error())
-		return nil, err
-	}
-	defer key.Close()
-
-	keys, err := key.ReadSubKeyNames(-1)
-	if err != nil {
-		log.Err("Unable to read subkey names from Windows Registry: %v", err.Error())
-		return nil, err
-	}
-
-	var data []KeyData
-
-	for _, k := range keys {
-		subkey, err := registry.OpenKey(key, k, registry.QUERY_VALUE)
-		if err != nil {
-			log.Err("Unable to open subkey from Windows Registry: %v", err.Error())
-			return nil, err
-		}
-
-		var d KeyData
-
-		d.InstanceName, _, err = subkey.GetStringValue("InstanceName")
-		if err != nil {
-			log.Err("Unable to read key InstanceName from instance in Windows Registry: %v", err.Error())
-			return nil, err
-		}
-
-		d.ConfigFile, _, err = subkey.GetStringValue("ConfigFile")
-		if err != nil {
-			log.Err("Unable to read key ConfigFile from instance in Windows Registry: %v", err.Error())
-			return nil, err
-		}
-
-		d.MountDir, _, err = subkey.GetStringValue("MountDir")
-		if err != nil {
-			log.Err("Unable to read key MountDir from instance in Windows Registry: %v", err.Error())
-			return nil, err
-		}
-
-		data = append(data, d)
-		_ = subkey.Close()
-	}
-
-	return data, nil
 }
