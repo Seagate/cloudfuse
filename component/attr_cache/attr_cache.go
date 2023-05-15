@@ -38,6 +38,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -380,24 +381,99 @@ func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 }
 
 // ReadDir : Optionally cache attributes of paths returned by next component
+// If cacheDirs is true, then directory cache results are merged into the results from the next component
 func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*internal.ObjAttr, err error) {
 	log.Trace("AttrCache::ReadDir : %s", options.Name)
 
 	pathList, err = ac.NextComponent().ReadDir(options)
 	if err == nil {
 		ac.cacheAttributes(pathList)
-	}
+		// merge directory cache into the results
+		if ac.cacheDirs {
+			// move the pathList into a map for faster lookups
+			pathMap := make(map[string]*internal.ObjAttr)
+			for _, objAttr := range pathList {
+				pathMap[objAttr.Path] = objAttr
+			}
+			// merge results from our cache into pathMap
+			numAdded := 0
+			prefix := internal.ExtendDirName(options.Name)
+			for key, value := range ac.cacheMap {
+				if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
+					if pathMap[key] == nil {
+						pathMap[key] = value.attr
+						numAdded++
+					}
+				}
+			}
+			// move the map back into a slice to return
+			pathList := []*internal.ObjAttr{}
+			for _, value := range pathMap {
+				pathList = append(pathList, value)
+			}
+			// values should be returned in ascending order by key
+			// sort the list before returning it
+			sort.Slice(pathList, func(i, j int) bool {
+				return pathList[i].Path < pathList[j].Path
+			})
 
+			log.Trace("AttrCache::ReadDir : %s +%d from cache = %d",
+				options.Name, numAdded, len(pathList))
+		}
+	}
 	return pathList, err
 }
 
 // StreamDir : Optionally cache attributes of paths returned by next component
 func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
-	log.Trace("AttrCache::ReadDir : %s", options.Name)
+	log.Trace("AttrCache::StreamDir : %s", options.Name)
 
 	pathList, token, err := ac.NextComponent().StreamDir(options)
 	if err == nil && options.Offset < maxFilesPerDir {
 		ac.cacheAttributes(pathList)
+		// merge directory cache into the results
+		if ac.cacheDirs {
+			log.Trace("AttrCache::StreamDir : %s - merging cache into %d results from %s...",
+				options.Name, len(pathList), ac.NextComponent().Name())
+			// move the pathList into a map for faster lookups
+			pathMap := make(map[string]*internal.ObjAttr)
+			for _, objAttr := range pathList {
+				pathMap[objAttr.Path] = objAttr
+			}
+			// respect the marker
+			firstPath := ""
+			lastPath := ""
+			if len(pathList) > 0 {
+				firstPath = pathList[0].Path
+				lastPath = pathList[len(pathList)-1].Path
+			}
+			// merge results from our cache into pathMap
+			numAdded := 0
+			prefix := internal.ExtendDirName(options.Name)
+			for key, value := range ac.cacheMap {
+				if strings.HasPrefix(key, prefix) && value.valid() && value.exists() &&
+					pathMap[key] == nil &&
+					(options.Token == "" || key > firstPath) &&
+					(token == "" || key < lastPath) {
+
+					pathMap[key] = value.attr
+					numAdded++
+				}
+			}
+			// move the map back into a slice to return
+			pathList = []*internal.ObjAttr{}
+			for _, value := range pathMap {
+				pathList = append(pathList, value)
+			}
+			// values should be returned in ascending order by key
+			// sort the list before returning it
+			sort.Slice(pathList, func(i, j int) bool {
+				return pathList[i].Path < pathList[j].Path
+			})
+
+			log.Trace("AttrCache::StreamDir : %s +%d from cache = %d",
+				options.Name, numAdded, len(pathList))
+		}
 	}
 
 	return pathList, token, err
@@ -448,7 +524,7 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	prefix := internal.ExtendDirName(options.Name)
 	for key, value := range ac.cacheMap {
 		if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
-			log.Debug("AttrCache::IsDirEmpty : %s has a subpath in attr_cache", options.Name)
+			log.Debug("AttrCache::IsDirEmpty : %s has a subpath in attr_cache (%s)", options.Name, key)
 			return false
 		}
 	}
