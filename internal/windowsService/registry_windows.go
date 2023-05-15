@@ -33,17 +33,11 @@ func ReadRegistryInstanceEntry(name string) (KeyData, error) {
 	defer key.Close()
 
 	var d KeyData
-	d.InstanceName = name
+	d.MountPath = name
 
 	d.ConfigFile, _, err = key.GetStringValue("ConfigFile")
 	if err != nil {
 		log.Err("Unable to read key ConfigFile from instance in Windows Registry: %v", err.Error())
-		return KeyData{}, err
-	}
-
-	d.MountDir, _, err = key.GetStringValue("MountDir")
-	if err != nil {
-		log.Err("Unable to read key MountDir from instance in Windows Registry: %v", err.Error())
 		return KeyData{}, err
 	}
 
@@ -114,14 +108,9 @@ func CreateWinFspRegistry() error {
 }
 
 // CreateRegistryMount adds an entry to our registry that
-func CreateRegistryMount(name string, mountDir string, configFile string) error {
-	registryPath := lcfRegistry + name
+func CreateRegistryMount(mountPath string, configFile string) error {
+	registryPath := lcfRegistry + mountPath
 	key, _, err := registry.CreateKey(registry.LOCAL_MACHINE, registryPath, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-
-	err = key.SetStringValue("MountDir", mountDir)
 	if err != nil {
 		return err
 	}

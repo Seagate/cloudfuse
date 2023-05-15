@@ -5,8 +5,10 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"lyvecloudfuse/common"
 	"lyvecloudfuse/internal/windowsService"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows/svc"
@@ -14,9 +16,8 @@ import (
 )
 
 type serviceOptions struct {
-	ConfigFile   string
-	InstanceName string
-	MountDir     string
+	ConfigFile string
+	MountPath  string
 }
 
 const SvcName = "lyvecloudfuse"
@@ -110,15 +111,18 @@ var mountServiceCmd = &cobra.Command{
 	Short:             "mount an instance that will persist in Windows when restarted",
 	Long:              "mount an instance that will persist in Windows when restarted",
 	SuggestFor:        []string{"mnt", "mout"},
-	Example:           "lyvecloudfuse service mount --name=Mount1 --config-file=C:\\config.yaml --mount-dir=Z:",
+	Args:              cobra.ExactArgs(1),
+	Example:           "lyvecloudfuse service mount Z: --config-file=C:\\config.yaml",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateCreateOptions()
+		servOpts.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
+
+		err := validateMountOptions()
 		if err != nil {
 			return fmt.Errorf("failed to validate options [%s]", err.Error())
 		}
 
-		err = windowsService.CreateRegistryMount(servOpts.InstanceName, servOpts.MountDir, servOpts.ConfigFile)
+		err = windowsService.CreateRegistryMount(servOpts.MountPath, servOpts.ConfigFile)
 		if err != nil {
 			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
 		}
@@ -134,15 +138,21 @@ var mountServiceCmd = &cobra.Command{
 
 var unmountServiceCmd = &cobra.Command{
 	Use:               "unmount",
-	Short:             "unmount an instance that will start when the Windows service starts",
-	Long:              "remove aa instance mount that will start when the Windows service starts",
+	Short:             "unmount an instance and remove entry from Windows service",
+	Long:              "unmount an instance and remove entry from Windows service",
 	SuggestFor:        []string{"umount", "unmoun"},
+	Args:              cobra.ExactArgs(1),
 	Example:           "lyvecloudfuse service unmount --name=Mount1",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateName()
+		servOpts.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
+
+		// Check with winfsp to see if this is currently mounted
+		ret, err := isMounted()
 		if err != nil {
 			return fmt.Errorf("failed to validate options [%s]", err.Error())
+		} else if !ret {
+			return fmt.Errorf("nothing is mounted here")
 		}
 
 		err = unmountInstance()
@@ -150,10 +160,9 @@ var unmountServiceCmd = &cobra.Command{
 			return fmt.Errorf("failed to unmount instance [%s]", err.Error())
 		}
 
-		// Remove registry after unmounting since we need to read from registry to unmount
-		err = windowsService.RemoveRegistryMount(servOpts.InstanceName)
+		err = windowsService.RemoveRegistryMount(servOpts.MountPath)
 		if err != nil {
-			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
+			return fmt.Errorf("failed to remove registry entry [%s]", err.Error())
 		}
 
 		return nil
@@ -262,39 +271,41 @@ func stopService() error {
 }
 
 func mountInstance() error {
-	return windowsService.LaunchMount(servOpts.InstanceName)
+	return windowsService.StartMount(servOpts.MountPath)
 }
 
 func unmountInstance() error {
-	return windowsService.StopMount(servOpts.InstanceName)
+	return windowsService.StopMount(servOpts.MountPath)
 }
 
-func validateCreateOptions() error {
-	if servOpts.MountDir == "" {
-		return errors.New("mount-dir does not exist")
+// isMounted returns if the current mountPath is mounted using lyvecloudfuse.
+func isMounted() (bool, error) {
+	return windowsService.IsMounted(servOpts.MountPath)
+}
+
+// validateMountPath checks whether the mountpath is correct and does not exist.
+func validateMountOptions() error {
+	// Mount Path
+	if servOpts.MountPath == "" {
+		return errors.New("mmount path not provided")
 	}
 
+	if strings.Contains(servOpts.MountPath, "\\") {
+		return errors.New("mmount path contains '\\' which is not allowed")
+	}
+
+	if _, err := os.Stat(servOpts.MountPath); os.IsExist(err) || err == nil {
+		return errors.New("mmount path exists")
+	}
+
+	// Config file
 	if servOpts.ConfigFile == "" {
-		return errors.New("config file not provided, check usage")
+		return errors.New("config file not provided")
 	}
 
 	if _, err := os.Stat(servOpts.ConfigFile); os.IsNotExist(err) {
 		return errors.New("config file does not exist")
 	}
-
-	if servOpts.InstanceName == "" {
-		return errors.New("name does not exist")
-	}
-
-	return nil
-}
-
-func validateName() error {
-	if servOpts.InstanceName == "" {
-		return errors.New("name does not exist")
-	}
-
-	// Check if this instance is currectly running by calling info to WinFsp
 
 	return nil
 }
@@ -311,16 +322,4 @@ func init() {
 	mountServiceCmd.Flags().StringVar(&servOpts.ConfigFile, "config-file", "",
 		"Configures the path for the file where the account credentials are provided.")
 	_ = mountServiceCmd.MarkFlagRequired("config-file")
-
-	mountServiceCmd.Flags().StringVar(&servOpts.MountDir, "mount-dir", "",
-		"Location where the mount will appear. Recommend that this is an unused drive letter.")
-	_ = mountServiceCmd.MarkFlagRequired("mount-dir")
-
-	mountServiceCmd.Flags().StringVar(&servOpts.InstanceName, "name", "",
-		"Name to uniquely identify this instance of a mount.")
-	_ = mountServiceCmd.MarkFlagRequired("name")
-
-	unmountServiceCmd.Flags().StringVar(&servOpts.InstanceName, "name", "",
-		"Name to uniquely identify this instance of a mount.")
-	_ = unmountServiceCmd.MarkFlagRequired("name")
 }

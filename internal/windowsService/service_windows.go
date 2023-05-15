@@ -18,15 +18,16 @@ const (
 	winfspPipe = `\\.\pipe\WinFsp.{14E7137D-22B4-437A-B0C1-D21D1BDF3767}`
 	startCmd   = 'S'
 	stopCmd    = 'T'
+	listCmd    = 'L'
 	successCmd = '$'
+	failCmd    = '!'
 )
 
 type LyveCloudFuse struct{}
 
 type KeyData struct {
-	InstanceName string
-	MountDir     string
-	ConfigFile   string
+	MountPath  string
+	ConfigFile string
 }
 
 func (m *LyveCloudFuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
@@ -72,10 +73,10 @@ func (m *LyveCloudFuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes 
 	}
 }
 
-// LaunchMount starts the mount if the name exists in our Windows registry.
-func LaunchMount(name string) error {
+// StartMount starts the mount if the name exists in our Windows registry.
+func StartMount(mountPath string) error {
 	// Read registry to get names of the instances we need to start
-	instances, err := ReadRegistryInstanceEntry(name)
+	instances, err := ReadRegistryInstanceEntry(mountPath)
 	if err != nil {
 		return err
 	}
@@ -83,12 +84,12 @@ func LaunchMount(name string) error {
 	cmd := uint16(startCmd)
 
 	utf16className := windows.StringToUTF16(SvcName)
-	utf16instanceName := windows.StringToUTF16(instances.InstanceName)
-	utf16driveName := windows.StringToUTF16(instances.MountDir)
+	utf16driveName := windows.StringToUTF16(mountPath)
+	utf16instanceName := utf16driveName
 	utf16configFile := windows.StringToUTF16(instances.ConfigFile)
 
 	buf := writeToUtf16(cmd, utf16className, utf16instanceName, utf16driveName, utf16configFile)
-	err = winFspCommand(buf)
+	_, err = winFspCommand(buf)
 	if err != nil {
 		return err
 	}
@@ -96,25 +97,43 @@ func LaunchMount(name string) error {
 }
 
 // StopMount stops the mount if the name exists in our Windows registry.
-func StopMount(name string) error {
-	// Read registry to get names of the instances we need to start
-	instances, err := ReadRegistryInstanceEntry(name)
-	if err != nil {
-		return err
-	}
-
+func StopMount(mountPath string) error {
 	cmd := uint16(stopCmd)
 
 	utf16className := windows.StringToUTF16(SvcName)
-	utf16instanceName := windows.StringToUTF16(instances.InstanceName)
-	utf16driveName := windows.StringToUTF16(instances.MountDir)
+	utf16driveName := windows.StringToUTF16(mountPath)
+	utf16instanceName := utf16driveName
 
 	buf := writeToUtf16(cmd, utf16className, utf16instanceName, utf16driveName)
-	err = winFspCommand(buf)
+	_, err := winFspCommand(buf)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func IsMounted(mountPath string) (bool, error) {
+	cmd := uint16(listCmd)
+
+	buf := writeToUtf16(cmd)
+	list, err := winFspCommand(buf)
+	if err != nil {
+		return false, err
+	}
+
+	// Everything in the list is a name of a service using WinFsp, like lyvecloudfuse and then
+	// the name of the mount which is the mount path
+	if len(list)%2 != 0 {
+		return false, errors.New("unable to get list from Winfsp because received odd number of elements")
+	}
+
+	for i := 0; i < len(list); i += 2 {
+		// Check if the mountpath is associated with our service
+		if list[i] == SvcName && list[i+1] == mountPath {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // startService starts lyvecloudfuse by instructing WinFsp to launch it.
@@ -129,12 +148,12 @@ func startServices() error {
 
 	for _, inst := range instances {
 		utf16className := windows.StringToUTF16(SvcName)
-		utf16instanceName := windows.StringToUTF16(inst.InstanceName)
-		utf16driveName := windows.StringToUTF16(inst.MountDir)
+		utf16driveName := windows.StringToUTF16(inst.MountPath)
+		utf16instanceName := utf16driveName
 		utf16configFile := windows.StringToUTF16(inst.ConfigFile)
 
 		buf := writeToUtf16(cmd, utf16className, utf16instanceName, utf16driveName, utf16configFile)
-		err = winFspCommand(buf)
+		_, err = winFspCommand(buf)
 		if err != nil {
 			return err
 		}
@@ -155,11 +174,11 @@ func stopServices() error {
 
 	for _, inst := range instances {
 		utf16className := windows.StringToUTF16(SvcName)
-		utf16instanceName := windows.StringToUTF16(inst.InstanceName)
-		utf16driveName := windows.StringToUTF16(inst.MountDir)
+		utf16driveName := windows.StringToUTF16(inst.MountPath)
+		utf16instanceName := utf16driveName
 
 		buf := writeToUtf16(cmd, utf16className, utf16instanceName, utf16driveName)
-		err = winFspCommand(buf)
+		_, err = winFspCommand(buf)
 		if err != nil {
 			return err
 		}
@@ -185,10 +204,11 @@ func writeToUtf16(cmd uint16, args ...[]uint16) []byte {
 }
 
 // winFspCommand sends an instruciton to WinFsp.
-func winFspCommand(command []byte) error {
+func winFspCommand(command []byte) ([]string, error) {
+	var retStrings []string
 	winPipe, err := windows.UTF16PtrFromString(winfspPipe)
 	if err != nil {
-		return err
+		return retStrings, err
 	}
 
 	handle, err := windows.CreateFile(
@@ -201,7 +221,7 @@ func winFspCommand(command []byte) error {
 		windows.InvalidHandle,
 	)
 	if err != nil {
-		return err
+		return retStrings, err
 	}
 	defer windows.CloseHandle(handle)
 
@@ -210,10 +230,10 @@ func winFspCommand(command []byte) error {
 	if err == windows.ERROR_IO_PENDING {
 		err = windows.GetOverlappedResult(handle, &overlapped, nil, true)
 		if err != nil {
-			return err
+			return retStrings, err
 		}
 	} else if err != nil {
-		return err
+		return retStrings, err
 	}
 
 	overlapped = windows.Overlapped{}
@@ -223,21 +243,46 @@ func winFspCommand(command []byte) error {
 	if err == windows.ERROR_IO_PENDING {
 		err = windows.GetOverlappedResult(handle, &overlapped, &bytesRead, true)
 		if err != nil {
-			return err
+			return retStrings, err
 		}
 	} else if err != nil {
-		return err
+		return retStrings, err
 	}
 
 	// If there are not enough bytes for the return character, then it failed
 	if bytesRead < 2 {
-		return errors.New("winfsp launchctl tool was unable to start the mount")
+		return retStrings, errors.New("winfsp launchctl tool failed with non standard return")
 	}
 
-	ret := binary.LittleEndian.Uint16(buf)
-	if ret != successCmd {
-		return errors.New("winfsp launchctl tool was unable to start the mount")
+	ubuf := bytesToUint16(buf)
+	if ubuf[0] == failCmd {
+		return retStrings, errors.New("winfsp launchctl tool was not successful")
+	} else if ubuf[0] != successCmd {
+		return retStrings, errors.New("winfsp launchctl tool failed with non standard return")
 	}
 
-	return nil
+	// If there is more to read then we are using a command with return data,
+	// so let's try to read it
+	if bytesRead > 2 {
+		var start int
+		buffer := ubuf[1 : bytesRead/2]
+		for i, v := range buffer {
+			if v == 0 {
+				if start != i {
+					retStrings = append(retStrings, windows.UTF16ToString(buffer[start:i]))
+				}
+				start = i + 1
+			}
+		}
+	}
+
+	return retStrings, nil
+}
+
+func bytesToUint16(buf []byte) []uint16 {
+	var ubuf []uint16
+	for i := 0; i < len(buf); i += 2 {
+		ubuf = append(ubuf, binary.LittleEndian.Uint16(buf[i:i+2]))
+	}
+	return ubuf
 }
