@@ -407,7 +407,7 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 				}
 			}
 			// move the map back into a slice to return
-			pathList := []*internal.ObjAttr{}
+			pathList = []*internal.ObjAttr{}
 			for _, value := range pathMap {
 				pathList = append(pathList, value)
 			}
