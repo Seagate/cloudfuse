@@ -287,7 +287,7 @@ func (s *clientTestSuite) TestRenameFile() {
 	s.assert.Nil(err)
 	dst := generateFileName()
 
-	err = s.client.RenameFile(src, dst, false) //when will this need to be true for symlink?
+	err = s.client.RenameFile(src, dst, false)
 	s.assert.Nil(err)
 
 	// Src should not be in the account
