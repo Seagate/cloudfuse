@@ -595,6 +595,48 @@ func (suite *attrCacheTestSuite) TestReadDirError() {
 	}
 }
 
+func (suite *attrCacheTestSuite) TestIsDirEmpty() {
+	defer suite.cleanupTest()
+	// Setup
+	path := "dir/"
+	options := internal.IsDirEmptyOptions{
+		Name: path,
+	}
+	addPathToCache(suite.assert, suite.attrCache, path, false)
+	suite.mock.EXPECT().IsDirEmpty(options).Return(true)
+
+	empty := suite.attrCache.IsDirEmpty(options)
+	suite.assert.True(empty)
+}
+
+func (suite *attrCacheTestSuite) TestIsDirEmptyFalse() {
+	defer suite.cleanupTest()
+	// Setup
+	path := "dir/"
+	options := internal.IsDirEmptyOptions{
+		Name: path,
+	}
+	suite.mock.EXPECT().IsDirEmpty(options).Return(false)
+
+	empty := suite.attrCache.IsDirEmpty(options)
+	suite.assert.False(empty)
+}
+
+func (suite *attrCacheTestSuite) TestIsDirEmptyFalseInCache() {
+	defer suite.cleanupTest()
+	// Setup
+	path := "dir/"
+	options := internal.IsDirEmptyOptions{
+		Name: path,
+	}
+	addDirectoryToCache(suite.assert, suite.attrCache, path, false)
+	// make sure the attribute cache handles the request itself
+	suite.mock.EXPECT().IsDirEmpty(options).MaxTimes(0)
+
+	empty := suite.attrCache.IsDirEmpty(options)
+	suite.assert.False(empty)
+}
+
 // Tests Rename Directory
 func (suite *attrCacheTestSuite) TestRenameDir() {
 	defer suite.cleanupTest()

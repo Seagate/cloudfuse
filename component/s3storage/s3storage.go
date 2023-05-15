@@ -198,10 +198,8 @@ func (s3 *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 		log.Err("S3Storage::IsDirEmpty : error listing [%s]", err)
 		return false
 	}
-	if len(list) == 0 {
-		return true
-	}
-	return false
+
+	return len(list) == 0
 }
 
 func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
