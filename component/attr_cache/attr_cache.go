@@ -343,8 +343,8 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 	err := ac.NextComponent().CreateDir(options)
 
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		if ac.cacheDirs {
 			// check if directory already exists
 			newDirPath := internal.TruncateDirName(options.Name)
@@ -368,11 +368,15 @@ func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 	err := ac.NextComponent().DeleteDir(options)
 
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
 		if ac.cacheDirs {
+			// deleteCachedDirectory may add the parent directory to the cache
+			// so we must lock the cache for writing
+			ac.cacheLock.Lock()
+			defer ac.cacheLock.Unlock()
 			err = ac.deleteCachedDirectory(options.Name, deletionTime)
 		} else {
+			ac.cacheLock.RLock()
+			defer ac.cacheLock.RUnlock()
 			ac.deleteDirectory(options.Name, deletionTime)
 		}
 	}
@@ -480,6 +484,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 }
 
 // cacheAttributes : On dir listing cache the attributes for all files
+// this will lock and release the mutex for writing
 func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 	// Check whether or not we are supposed to cache on list
 	if ac.cacheOnList && len(pathList) > 0 {
@@ -487,14 +492,13 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 		// If there are millions of blobs then cost of this is very high.
 		currTime := time.Now()
 
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		for _, attr := range pathList {
 			if len(ac.cacheMap) > maxTotalFiles {
 				break
 			}
-
-			ac.cacheLock.Lock()
 			ac.cacheMap[internal.TruncateDirName(attr.Path)] = newAttrCacheItem(attr, true, currTime)
-			ac.cacheLock.Unlock()
 		}
 
 	}
@@ -511,26 +515,35 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	}
 	// Is the directory in our cache?
 	ac.cacheLock.RLock()
-	defer ac.cacheLock.RUnlock()
-	// If the directory does not exist in the attribute cache then call the next component
-	if !ac.pathExistsInCache(options.Name) {
+	pathInCache := ac.pathExistsInCache(options.Name)
+	ac.cacheLock.RUnlock()
+	// If the directory does not exist in the attribute cache then let the next component answer
+	if !pathInCache {
 		log.Debug("AttrCache::IsDirEmpty : %s not found in attr_cache. Checking with container", options.Name)
 		return ac.NextComponent().IsDirEmpty(options)
 	}
-
 	log.Debug("AttrCache::IsDirEmpty : %s found in attr_cache", options.Name)
 	// Check if the cached directory is empty or not
-	// Add a trailing / so that we only find child paths under the directory and not paths that have the same prefix
-	prefix := internal.ExtendDirName(options.Name)
-	for key, value := range ac.cacheMap {
-		if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
-			log.Debug("AttrCache::IsDirEmpty : %s has a subpath in attr_cache (%s)", options.Name, key)
-			return false
-		}
+	if ac.anyContentsInCache(options.Name) {
+		log.Debug("AttrCache::IsDirEmpty : %s has a subpath in attr_cache", options.Name)
+		return false
 	}
-	// Not found in cache so check with container
+	// Dir is in cache but no contents are, so check with container
 	log.Debug("AttrCache::IsDirEmpty : %s children not found in cache. Checking with container", options.Name)
 	return ac.NextComponent().IsDirEmpty(options)
+}
+
+func (ac *AttrCache) anyContentsInCache(prefix string) bool {
+	// Add a trailing / so that we only find child paths under the directory and not paths that have the same prefix
+	prefix = internal.ExtendDirName(prefix)
+	ac.cacheLock.RLock()
+	defer ac.cacheLock.RUnlock()
+	for key, value := range ac.cacheMap {
+		if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
+			return true
+		}
+	}
+	return false
 }
 
 // RenameDir : Mark the source directory deleted and recursively mark all it's children deleted.
@@ -542,11 +555,15 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 	err := ac.NextComponent().RenameDir(options)
 
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
 		if ac.cacheDirs {
+			// renameCachedDirectory may cache the parent directory
+			// so lock the cache for writing
+			ac.cacheLock.Lock()
+			defer ac.cacheLock.Unlock()
 			err = ac.renameCachedDirectory(options.Src, options.Dst, currentTime)
 		} else {
+			ac.cacheLock.RLock()
+			defer ac.cacheLock.RUnlock()
 			ac.deleteDirectory(options.Src, currentTime)
 			// TLDR: Dst is guaranteed to be non-existent or empty.
 			// Note: We do not need to invalidate children of Dst due to the logic in our FUSE connector, see comments there,
@@ -578,14 +595,17 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 	err := ac.NextComponent().DeleteFile(options)
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
 		deletionTime := time.Now()
-		ac.deletePath(options.Name, deletionTime)
 		if ac.cacheDirs {
 			// cache the parent directory's existence, just in case this deletion leaves it empty
+			ac.cacheLock.Lock()
 			ac.cacheParent(options.Name, deletionTime)
+			ac.cacheLock.Unlock()
+
 		}
+		ac.cacheLock.RLock()
+		defer ac.cacheLock.RUnlock()
+		ac.deletePath(options.Name, deletionTime)
 	}
 
 	return err
@@ -597,16 +617,18 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 
 	err := ac.NextComponent().RenameFile(options)
 	if err == nil {
+		renameTime := time.Now()
+		if ac.cacheDirs {
+			// cache the parent directory's existence, just in case this rename leaves it empty
+			ac.cacheLock.Lock()
+			ac.cacheParent(options.Src, renameTime)
+			ac.cacheLock.Unlock()
+		}
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		renameTime := time.Now()
 		// TODO: Can we just copy over the attributes from the source to the destination so we don't have to invalidate?
 		ac.deletePath(options.Src, renameTime)
 		ac.invalidatePath(options.Dst)
-		if ac.cacheDirs {
-			// cache the parent directory's existence, just in case this rename leaves it empty
-			ac.cacheParent(options.Src, renameTime)
-		}
 	}
 
 	return err
@@ -762,7 +784,6 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		ac.invalidatePath(options.Name)
-		ac.invalidatePath(options.Target) // TODO : Why do we invalidate the target? Shouldn't the target remain unchanged?
 	}
 
 	return err
