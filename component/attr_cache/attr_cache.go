@@ -402,6 +402,7 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 			// merge results from our cache into pathMap
 			numAdded := 0
 			prefix := internal.ExtendDirName(options.Name)
+			ac.cacheLock.RLock()
 			for key, value := range ac.cacheMap {
 				if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
 					if pathMap[key] == nil {
@@ -410,6 +411,7 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 					}
 				}
 			}
+			ac.cacheLock.RUnlock()
 			// move the map back into a slice to return
 			pathList = []*internal.ObjAttr{}
 			for _, value := range pathMap {
@@ -454,6 +456,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			// merge results from our cache into pathMap
 			numAdded := 0
 			prefix := internal.ExtendDirName(options.Name)
+			ac.cacheLock.RLock()
 			for key, value := range ac.cacheMap {
 				if strings.HasPrefix(key, prefix) && value.valid() && value.exists() &&
 					pathMap[key] == nil &&
@@ -464,6 +467,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 					numAdded++
 				}
 			}
+			ac.cacheLock.RUnlock()
 			// move the map back into a slice to return
 			pathList = []*internal.ObjAttr{}
 			for _, value := range pathMap {
