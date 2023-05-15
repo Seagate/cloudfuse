@@ -222,7 +222,7 @@ func (s *clientTestSuite) TestCreateLink() {
 
 	// object body should match target file name
 	defer result.Close()
-	buffer := make([]byte, 12)
+	buffer := make([]byte, len(target))
 	_, err = result.Read(buffer)
 
 	s.assert.NotNil(err)
