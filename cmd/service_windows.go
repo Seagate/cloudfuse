@@ -123,19 +123,20 @@ var mountServiceCmd = &cobra.Command{
 			return fmt.Errorf("failed to validate options [%s]", err.Error())
 		}
 
+		// Only allow mounts if the service is running
 		running, _ := isServiceRunning()
 		if !running {
 			return fmt.Errorf("windows service is not running")
 		}
 
-		err = windowsService.CreateRegistryMount(servOpts.MountPath, servOpts.ConfigFile)
-		if err != nil {
-			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
-		}
-
 		err = mountInstance()
 		if err != nil {
 			return fmt.Errorf("failed to mount instance [%s]", err.Error())
+		}
+
+		err = windowsService.CreateRegistryMount(servOpts.MountPath, servOpts.ConfigFile)
+		if err != nil {
+			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
 		}
 
 		return nil
@@ -161,14 +162,14 @@ var unmountServiceCmd = &cobra.Command{
 			return fmt.Errorf("nothing is mounted here")
 		}
 
-		err = unmountInstance()
-		if err != nil {
-			return fmt.Errorf("failed to unmount instance [%s]", err.Error())
-		}
-
 		err = windowsService.RemoveRegistryMount(servOpts.MountPath)
 		if err != nil {
 			return fmt.Errorf("failed to remove registry entry [%s]", err.Error())
+		}
+
+		err = unmountInstance()
+		if err != nil {
+			return fmt.Errorf("failed to unmount instance [%s]", err.Error())
 		}
 
 		return nil
@@ -277,7 +278,7 @@ func stopService() error {
 }
 
 func mountInstance() error {
-	return windowsService.StartMount(servOpts.MountPath)
+	return windowsService.StartMount(servOpts.MountPath, servOpts.ConfigFile)
 }
 
 func unmountInstance() error {

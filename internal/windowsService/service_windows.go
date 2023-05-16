@@ -74,22 +74,16 @@ func (m *LyveCloudFuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes 
 }
 
 // StartMount starts the mount if the name exists in our Windows registry.
-func StartMount(mountPath string) error {
-	// Read registry to get names of the instances we need to start
-	instances, err := ReadRegistryInstanceEntry(mountPath)
-	if err != nil {
-		return err
-	}
-
+func StartMount(mountPath string, configFile string) error {
 	cmd := uint16(startCmd)
 
 	utf16className := windows.StringToUTF16(SvcName)
 	utf16driveName := windows.StringToUTF16(mountPath)
 	utf16instanceName := utf16driveName
-	utf16configFile := windows.StringToUTF16(instances.ConfigFile)
+	utf16configFile := windows.StringToUTF16(configFile)
 
 	buf := writeToUtf16(cmd, utf16className, utf16instanceName, utf16driveName, utf16configFile)
-	_, err = winFspCommand(buf)
+	_, err := winFspCommand(buf)
 	if err != nil {
 		return err
 	}
@@ -144,18 +138,10 @@ func startServices() error {
 		return err
 	}
 
-	cmd := uint16(startCmd)
-
 	for _, inst := range instances {
-		utf16className := windows.StringToUTF16(SvcName)
-		utf16driveName := windows.StringToUTF16(inst.MountPath)
-		utf16instanceName := utf16driveName
-		utf16configFile := windows.StringToUTF16(inst.ConfigFile)
-
-		buf := writeToUtf16(cmd, utf16className, utf16instanceName, utf16driveName, utf16configFile)
-		_, err = winFspCommand(buf)
+		err := StartMount(inst.MountPath, inst.ConfigFile)
 		if err != nil {
-			return err
+			log.Err("Unable to start mount with mountpath: ", inst.MountPath)
 		}
 	}
 
@@ -170,17 +156,10 @@ func stopServices() error {
 		return err
 	}
 
-	cmd := uint16(stopCmd)
-
 	for _, inst := range instances {
-		utf16className := windows.StringToUTF16(SvcName)
-		utf16driveName := windows.StringToUTF16(inst.MountPath)
-		utf16instanceName := utf16driveName
-
-		buf := writeToUtf16(cmd, utf16className, utf16instanceName, utf16driveName)
-		_, err = winFspCommand(buf)
+		err := StopMount(inst.MountPath)
 		if err != nil {
-			return err
+			log.Err("Unable to stop mount with mountpath: ", inst.MountPath)
 		}
 	}
 
