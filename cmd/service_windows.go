@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
@@ -120,6 +121,11 @@ var mountServiceCmd = &cobra.Command{
 		err := validateMountOptions()
 		if err != nil {
 			return fmt.Errorf("failed to validate options [%s]", err.Error())
+		}
+
+		running, _ := isServiceRunning()
+		if !running {
+			return fmt.Errorf("windows service is not running")
 		}
 
 		err = windowsService.CreateRegistryMount(servOpts.MountPath, servOpts.ConfigFile)
@@ -281,6 +287,31 @@ func unmountInstance() error {
 // isMounted returns if the current mountPath is mounted using lyvecloudfuse.
 func isMounted() (bool, error) {
 	return windowsService.IsMounted(servOpts.MountPath)
+}
+
+// isServiceRunning returns whether the lyvecloudservice is currently running.
+func isServiceRunning() (bool, error) {
+	scm, err := mgr.Connect()
+	if err != nil {
+		return false, err
+	}
+	defer scm.Disconnect()
+
+	service, err := scm.OpenService(SvcName)
+	if err != nil {
+		return false, err
+	}
+	defer service.Close()
+
+	status, err := service.Query()
+	if err != nil {
+		return false, err
+	}
+
+	if status.State == windows.SERVICE_RUNNING {
+		return true, nil
+	}
+	return false, nil
 }
 
 // validateMountPath checks whether the mountpath is correct and does not exist.
