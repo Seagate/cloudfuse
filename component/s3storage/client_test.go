@@ -504,7 +504,7 @@ func (s *clientTestSuite) TestReadBuffer() {
 	})
 	s.assert.Nil(err)
 
-	result, err := s.client.ReadBuffer(name, 0, int64(bodyLen))
+	result, err := s.client.ReadBuffer(name, 0, int64(bodyLen), false)
 
 	// result should match generated body
 	s.assert.Nil(err)

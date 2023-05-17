@@ -22,8 +22,8 @@ import (
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
 // name is the path to the file.
-func (cl *Client) getObject(name string, offset int64, count int64, symLink bool) (io.ReadCloser, error) {
-	key := cl.getKey(name, symLink)
+func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bool) (io.ReadCloser, error) {
+	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::getObject : get object %s (%d+%d)", key, offset, count)
 
 	// deal with the range
@@ -376,9 +376,9 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) {
 }
 
 // Convert file name to object getKey
-func (cl *Client) getKey(name string, symlinkKey bool) string {
+func (cl *Client) getKey(name string, isSymlink bool) string {
 
-	if symlinkKey == true {
+	if isSymlink == true {
 		name = name + ".rclonelink"
 	}
 

@@ -419,10 +419,10 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 // Reads starting at a byte offset from the start of the object, with length in bytes = len.
 // len = 0 reads to the end of the object.
 // name is the file path
-func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
+func (cl *Client) ReadBuffer(name string, offset int64, len int64, isSymlink bool) ([]byte, error) {
 	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, len)
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, len, false) //pass symlink bool to getObject
+	objectDataReader, err := cl.getObject(name, offset, len, isSymlink)
 	if err != nil {
 		log.Err("Client::ReadBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return nil, err
@@ -578,7 +578,7 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 	var dataBuffer *[]byte
 
 	// get the existing object data
-	oldData, _ := cl.ReadBuffer(name, 0, 0)
+	oldData, _ := cl.ReadBuffer(name, 0, 0, false)
 	// update the data with the new data
 	// if we're only overwriting existing data
 	if int64(len(oldData)) >= offset+length {
