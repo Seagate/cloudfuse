@@ -451,7 +451,6 @@ func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 func (s3 *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) {
 	log.Trace("S3Storage::ReadLink : Read symlink %s", options.Name)
 
-	//todo: add isSymlink bool here and pass to ReadBuffer
 	data, err := s3.storage.ReadBuffer(options.Name, 0, 0, true)
 
 	if err != nil {

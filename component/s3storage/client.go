@@ -361,7 +361,7 @@ func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getFileAttr : name %s", name)
 	isSymLink := false
 	object, err := cl.headObject(name, isSymLink) //revisit
-	if err == syscall.ENOENT {
+	if err == syscall.ENOENT {                    //if object does not exist in bucket, check if it is asymlink.
 		isSymLink = true
 		return cl.headObject(name, isSymLink)
 	}

@@ -210,7 +210,7 @@ func (s *clientTestSuite) TestCreateLink() {
 
 	var reader io.Reader
 
-	err := s.client.putObject(target, reader, false)
+	err := s.client.putObject(target, reader, false) //test passes without putting target object in bucket;
 	s.assert.Nil(err)
 	source := generateFileName()
 
@@ -229,8 +229,83 @@ func (s *clientTestSuite) TestCreateLink() {
 	s.assert.EqualError(err, io.EOF.Error())
 	s.assert.EqualValues(target, string(buffer))
 
-	// TODO: test metadata
 }
+func (s *clientTestSuite) TestReadLink() {
+	defer s.cleanupTest()
+	// setup
+	target := generateFileName()
+
+	source := generateFileName()
+
+	err := s.client.CreateLink(source, target)
+	s.assert.Nil(err)
+
+	data, err := s.client.ReadBuffer(source, 0, 0, true)
+	s.assert.Nil(err)
+
+	s.assert.EqualValues(string(data), target)
+
+}
+
+func (s *clientTestSuite) TestDeleteLink() {
+	defer s.cleanupTest()
+	// setup
+	target := generateFileName()
+
+	source := generateFileName()
+
+	err := s.client.CreateLink(source, target)
+	s.assert.Nil(err)
+
+	err = s.client.DeleteFile(source)
+	s.assert.Nil(err)
+
+	_, err = s.client.getObject(source, 0, 0, true)
+	s.assert.NotNil(err)
+
+}
+
+func (s *clientTestSuite) TestDeleteLinks() {
+	defer s.cleanupTest()
+	// setup
+
+	// generate folder / prefix name
+
+	prefix := generateFileName()
+
+	folder := internal.ExtendDirName(prefix)
+
+	// generate series of file names
+	// create link for all file names with prefix name
+	var sources [5]string
+	var targets [5]string
+	for i := 0; i < 5; i++ {
+		sources[i] = generateFileName()
+		targets[i] = generateFileName()
+		err := s.client.CreateLink(folder+sources[i], targets[i])
+		s.assert.Nil(err)
+
+		// make sure the links are there
+		result, err := s.client.getObject(folder+sources[i], 0, 0, true)
+		s.assert.Nil(err)
+
+		// object body should match target file name
+		defer result.Close()
+		buffer := make([]byte, len(targets[i]))
+		_, err = result.Read(buffer)
+
+		s.assert.NotNil(err)
+		s.assert.EqualError(err, io.EOF.Error())
+		s.assert.EqualValues(targets[i], string(buffer))
+	}
+
+	// run delete directory with prefix arugment.
+
+	err := s.client.DeleteDirectory(folder)
+	s.assert.Nil(err)
+
+}
+
 func (s *clientTestSuite) TestDeleteFile() {
 	defer s.cleanupTest()
 	// Setup
