@@ -258,7 +258,9 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 
 	for key, value := range ac.cacheMap {
 		if strings.HasPrefix(key, prefix) {
-			value.invalidate()
+			if !(ac.cacheDirs && value.attr.IsDir()) {
+				value.invalidate()
+			}
 		}
 	}
 
@@ -724,7 +726,7 @@ func (ac *AttrCache) SyncDir(options internal.SyncDirOptions) error {
 	log.Trace("AttrCache::SyncDir : %s", options.Name)
 
 	err := ac.NextComponent().SyncDir(options)
-	if err == nil && !ac.cacheDirs {
+	if err == nil {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		ac.invalidateDirectory(options.Name)
