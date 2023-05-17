@@ -408,6 +408,11 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 			for key, value := range ac.cacheMap {
 				if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
 					if pathMap[key] == nil {
+						// exclude entries in subdirectories
+						pathInsideDirectory := strings.TrimPrefix(key, prefix)
+						if strings.Contains(pathInsideDirectory, "/") {
+							continue
+						}
 						pathMap[key] = value.attr
 						numAdded++
 					}
@@ -449,23 +454,52 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 				pathMap[objAttr.Path] = objAttr
 			}
 			// respect the marker
+			startingToken := options.Token
+			endingToken := token
 			firstPath := ""
 			lastPath := ""
 			if len(pathList) > 0 {
 				firstPath = pathList[0].Path
 				lastPath = pathList[len(pathList)-1].Path
 			}
-			// merge results from our cache into pathMap
 			numAdded := 0
 			prefix := internal.ExtendDirName(options.Name)
+			// We don't want to miss cached directories that fall between pages.
+			// To avoid missing them, we need to find the last file from the previous page,
+			// so we can use that as a starting marker.
+			// The simplest approach is to search through the whole cache twice
+			// (once to find that last file, and again to get the directories).
+			// Instead, we can do both in one loop by getting a larger list of directories
+			// which we can later whittle down to the ones we want to insert into the results.
+			// So in this loop we will:
+			// 1. Collect cached directories that we may want to add to the results, and
+			// 2. Find the last cached file from the previous page of results.
+			cachedDirCandidates := make(map[string]*internal.ObjAttr)
+			prevPageLastKey := ""
 			ac.cacheLock.RLock()
 			for key, value := range ac.cacheMap {
 				if strings.HasPrefix(key, prefix) && value.valid() && value.exists() &&
-					pathMap[key] == nil &&
-					(options.Token == "" || key > firstPath) &&
-					(token == "" || key < lastPath) {
+					pathMap[key] == nil && (endingToken == "" || key < lastPath) {
 
-					pathMap[key] = value.attr
+					// exclude entries in subdirectories
+					pathInsideDirectory := strings.TrimPrefix(key, prefix)
+					if strings.Contains(pathInsideDirectory, "/") {
+						continue
+					}
+
+					if value.attr.IsDir() {
+						// add cached directory to the list of candidates
+						cachedDirCandidates[key] = value.attr
+					} else if startingToken != "" && key < firstPath && key > prevPageLastKey {
+						// look for the last key in the previous page
+						prevPageLastKey = key
+					}
+				}
+			}
+			// now loop over the candidates and add the ones that come after prevPageLastKey
+			for key, value := range cachedDirCandidates {
+				if key > prevPageLastKey {
+					pathMap[key] = value
 					numAdded++
 				}
 			}
