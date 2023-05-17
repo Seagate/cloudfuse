@@ -267,9 +267,9 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
 		for _, value := range output.Contents {
 			// push object info into the list
-			key, isSymLink := cl.getFile(*value.Key)
+			name, isSymLink := cl.getFile(*value.Key)
 
-			path := split(cl.Config.prefixPath, key)
+			path := split(cl.Config.prefixPath, name)
 			attr := createObjAttr(path, value.Size, *value.LastModified, isSymLink)
 			objectAttrList = append(objectAttrList, attr)
 		}
