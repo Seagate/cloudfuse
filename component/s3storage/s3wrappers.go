@@ -394,5 +394,5 @@ func (cl *Client) getFile(name string) (string, bool) {
 		name = name[:len(name)-11]
 	}
 
-	return common.JoinUnixFilepath(cl.Config.prefixPath, name), isSymLink
+	return name, isSymLink
 }
