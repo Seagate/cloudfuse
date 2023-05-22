@@ -10,18 +10,23 @@ class settingsManager():
             # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
             
             self.settings.setValue('foreground',False)
+            self.settings.setValue('allow-other',True)
+            self.settings.setValue('read-only',False)
+            self.settings.setValue('nonempty',False)
             self.settings.setValue('dynamic-profile',False)
             self.settings.setValue('profiler-port',6060)
             self.settings.setValue('profiler-ip','localhost')
             self.settings.setValue('components',['libfuse','file_cache','attr_cache','azstorage'])
             self.settings.setValue('libfuse',{
-                'type' : 'syslog',
-                'level' : 'log_warning',        
-                'file-path' : '$HOME/.lyvecloudfuse/lyvecloudfuse.log',         
-                'max-file-size-mb' : 512,                                       
-                'file-count' : 10 ,                                             
-                'track-time' : False                                            
-                })
+                'default-permission' : 0o777,
+                'attribute-expiration-sec': 120,
+                'entry-expiration-sec' : 120,   
+                'negative-entry-expiration-sec' : 120,
+                'fuse-trace' : False,
+                'extension' : '', 
+                'disable-writeback-cache' : False,
+                'ignore-open-flags' : True
+            })
             self.settings.setValue('stream',{
                 'block-size-mb': 0,
                 'max-buffers': 0,
@@ -29,19 +34,19 @@ class settingsManager():
                 'file-caching': False # false - handle level caching ON
             })
             self.settings.setValue('file_cache',{
-                'path': ''
+                'path': '',
+                'policy': 'lru',
+                'timeout-sec' : 120,
+                'max-eviction': 5000,
+                'max-size-mb': 0,
+                'high-threshold': 80,
+                'low-threshold': 60,
+                'create-empty-file': False,
+                'allow-non-empty-temp': False,
+                'cleanup-on-start': False,
+                'policy-trace': False,
+                'offload-io': False
             })
-            self.settings.setValue('policy', 'lru')
-            self.settings.setValue('timeout-sec',120)
-            self.settings.setValue('max-eviction',5000)
-            self.settings.setValue('max-size-mb',0)
-            self.settings.setValue('high-threshold',80)
-            self.settings.setValue('low-threshold',60)
-            self.settings.setValue('create-empty-file',False)
-            self.settings.setValue('allow-non-empty-temp',False)
-            self.settings.setValue('cleanup-on-start',False)
-            self.settings.setValue('policy-trace',False)
-            self.settings.setValue('offload-io',False)
             self.settings.setValue('attr_cache',{
                 'timeout-sec': 120,
                 'no-cache-on-list': False,
@@ -109,6 +114,16 @@ class settingsManager():
                     'network_profiler'
                     ]
             })
+
+            self.settings.setValue('logging',{
+                'type' : 'syslog',
+                'level' : 'log_warning',        
+                'file-path' : '$HOME/.lyvecloudfuse/lyvecloudfuse.log',         
+                'max-file-size-mb' : 512,                                       
+                'file-count' : 10 ,                                             
+                'track-time' : False                                            
+                })
+            
 
 class closeGUIEvent(QWidget):
     def __init__(self):
