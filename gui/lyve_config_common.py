@@ -7,7 +7,7 @@ import os
 # import the custom class made from QtDesigner
 from ui_lyve_config_common import Ui_Form
 from lyve_config_advanced import lyveAdvancedSettingsWidget
-from common_qt_functions import closeGUIEvent
+from common_qt_functions import closeGUIEvent, settingsManager
 
 pipelineChoices = {
     "fileCache" : 0,
@@ -15,21 +15,20 @@ pipelineChoices = {
 }
 
 libfusePermissions = {
-    '0o777' : 0,
-    '0o666' : 1,
-    '0o644' : 2,
-    '0o444' : 3
+    0o777 : 0,
+    0o666 : 1,
+    0o644 : 2,
+    0o444 : 3
 }
 
-dictForConfigs = []
-
-class lyveSettingsWidget(closeGUIEvent, Ui_Form): 
+class lyveSettingsWidget(settingsManager,closeGUIEvent,Ui_Form): 
     def __init__(self):
         super().__init__()
         self.setupUi(self)
         
         self.setWindowTitle("LyveCloud Config Settings")
-        self.initOptionsFromConfig()
+        self.initSettingsFromConfig()
+        self.populateOptions()
         self.showModeSettings()
                 
         # Hide sensitive data QtWidgets.QLineEdit.EchoMode.PasswordEchoOnEdit
@@ -42,7 +41,11 @@ class lyveSettingsWidget(closeGUIEvent, Ui_Form):
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_advancedSettings.clicked.connect(self.openAdvanced)
         
-        
+        try:
+            self.resize(self.settings.value("lyc window size"))
+            self.move(self.settings.value("lyc window position"))
+        except:
+            pass
 
     # Set up slots
     def openAdvanced(self):
@@ -68,72 +71,106 @@ class lyveSettingsWidget(closeGUIEvent, Ui_Form):
         self.groupbox_fileCache.setVisible(False)
         self.groupbox_streaming.setVisible(False)        
         
-    def initOptionsFromConfig(self):
+    def initSettingsFromConfig(self):
         dictForConfigs = self.getConfigs()
-        
-        if dictForConfigs.get('allow-other') == True:
-            self.checkbox_multiUser.setCheckState(Qt.CheckState.Checked)
-        elif dictForConfigs.get('allow-other') == False:
-            self.checkbox_multiUser.setCheckState(Qt.CheckState.Unchecked)
+        for option in dictForConfigs:
+            if type(dictForConfigs[option]) == dict:
+                tempDict = self.settings.value(option)
+                for suboption in dictForConfigs[option]:
+                    tempDict[suboption] = dictForConfigs[option][suboption]
+                self.settings.setValue(option,tempDict)
+            else:
+                self.settings.setValue(option,dictForConfigs[option])
+        return
 
-        if dictForConfigs.get('nonempty') == True:
-            self.checkbox_nonEmptyDir.setCheckState(Qt.CheckState.Checked)
-        elif dictForConfigs.get('nonempty') == False:
-            self.checkbox_nonEmptyDir.setCheckState(Qt.CheckState.Unchecked)
+    def showOptionStatesFromSettings(self):
+        pass
 
-        if dictForConfigs.get('foreground') == True:
-            self.checkbox_daemonForeground.setCheckState(Qt.CheckState.Checked)
-        elif dictForConfigs.get('foreground') == False:
-            self.checkbox_daemonForeground.setCheckState(Qt.CheckState.Unchecked)
-            
-        if dictForConfigs.get('libfuse').get('ignore-open-flags') == True:
-            self.checkbox_libfuse_ignoreAppend.setCheckState(Qt.CheckState.Checked)
-        elif dictForConfigs.get('libfuse').get('ignore-open-flags') == False:
-            self.checkbox_libfuse_ignoreAppend.setCheckState(Qt.CheckState.Unchecked)
-        
-        if dictForConfigs.get('libfuse').get('default-permission') != None:
-            self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions[oct(dictForConfigs.get('libfuse').get('default-permission'))])
-
-        if dictForConfigs.get('libfuse').get('attribute-expiration-sec') != None:
-            self.spinBox_libfuse_attExp.setValue(int(dictForConfigs.get('libfuse').get('attribute-expiration-sec')))
-
-        if dictForConfigs.get('libfuse').get('entry-expiration-sec') != None:
-            self.spinBox_libfuse_entExp.setValue(int(dictForConfigs.get('libfuse').get('entry-expiration-sec')))
-            
-        if dictForConfigs.get('libfuse').get('negative-entry-expiration-sec') != None:
-            self.spinBox_libfuse_negEntryExp.setValue(int(dictForConfigs.get('libfuse').get('negative-entry-expiration-sec')))
-
-        if dictForConfigs.get('read-only') == True:
-            self.checkbox_readOnly.setCheckState(Qt.CheckState.Checked)
-        elif dictForConfigs.get('read-only') == False:
-            self.checkbox_readOnly.setCheckState(Qt.CheckState.Unchecked)
-                       
-        if 'file_cache' in dictForConfigs.get('components'):
+    def populateOptions(self):
+        if self.settings.value('components')[1] == 'file_cache':
             self.dropDown_pipeline.setCurrentIndex(pipelineChoices['fileCache'])
-        elif 'stream' in dictForConfigs.get('components'):
+        else:
             self.dropDown_pipeline.setCurrentIndex(pipelineChoices['streaming'])
-            
         
-            
+        self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions[self.settings.value('libfuse')['default-permission']])
         
+        if self.settings.value('allow-other') == False:
+            self.checkbox_multiUser.setCheckState(Qt.Unchecked)
+        else:
+            self.checkbox_multiUser.setCheckState(Qt.Checked)
         
-        # if dictForConfigs.get('') == True:
-        # elif dictForConfigs.get('') == False:
-            
-        # if dictForConfigs.get('') == True:
-        # elif dictForConfigs.get('') == False:            
-        # self.checkbox_multiUser.setCheckState(dictForConfigs.get('allow-other'))
-        # self.checkbox_nonEmptyDir.setCheckState(dictForConfigs.get('nonempty'))
-        
+        if self.settings.value('nonempty') == False:
+            self.checkbox_nonEmptyDir.setCheckState(Qt.Unchecked)
+        else:
+            self.checkbox_nonEmptyDir.setCheckState(Qt.Checked)            
 
+        if self.settings.value('foreground') == False:
+            self.checkbox_daemonForeground.setCheckState(Qt.Unchecked)
+        else:
+            self.checkbox_daemonForeground.setCheckState(Qt.Checked)  
         
+        if self.settings.value('read-only') == False:
+            self.checkbox_readOnly.setCheckState(Qt.Unchecked)
+        else:
+            self.checkbox_readOnly.setCheckState(Qt.Checked)    
+
+        if self.settings.value('stream')['file-caching'] == False:
+            self.checkbox_streaming_fileCachingLevel.setCheckState(Qt.Unchecked)
+        else:
+            self.checkBox_streaming_fileCachingLevel.setCheckState(Qt.Checked)
         
         return
 
     def writeConfigFile(self):
-        configs = self.getConfigs()
+        dictForConfigs = self.getConfigs()
+        currentDir = os.getcwd()
+        
+   
+        if self.dropDown_pipeline.currentIndex() == pipelineChoices['fileCache']:
+            dictForConfigs['components'][1] = 'file_cache'
+        elif self.dropDown_pipeline.currentIndex() == pipelineChoices['streaming']:
+            dictForConfigs['components'][1] = 'stream'
+        
+        dictForConfigs['allow-other']=self.checkbox_multiUser.isChecked()
+        dictForConfigs['nonempty']=self.checkbox_nonEmptyDir.isChecked()
+        dictForConfigs['foreground']=self.checkbox_daemonForeground.isChecked()
+        dictForConfigs['read-only']=self.checkbox_readOnly.isChecked()
+       
+        # Write libfuse components
+        dictForConfigs['libfuse']['ignore-open-flags'] = self.checkbox_libfuse_ignoreAppend.isChecked()
 
-        # print(configs)
+        ###### fix this ##### -- get it to write 0444 NOT 0o444, yaml interprets 0o444 as a string, not a number
+        tempOption = oct(int(self.dropDown_libfuse_permissions.currentText(),8))
+        dictForConfigs['libfuse']['default-permission'] = tempOption
+        
+        index = self.dropDown_libfuse_permissions.currentIndex()
+        if index == libfusePermissions['0o777']:
+            dictForConfigs['libfuse']['default-permission'] = 0o777
+        elif index == libfusePermissions['0o666']:
+            dictForConfigs['libfuse']['default-permission'] = 0o666
+        elif index == libfusePermissions['0o644']:
+            dictForConfigs['libfuse']['default-permission'] = 0o644
+        elif index == libfusePermissions['0o444']:
+            dictForConfigs['libfuse']['default-permission'] = 0o444
+            
+        
+        
+        dictForConfigs['libfuse']['attribute-expiration-sec'] = self.spinBox_libfuse_attExp.value()
+        dictForConfigs['libfuse']['entry-expiration-sec'] = self.spinBox_libfuse_entExp.value()
+        dictForConfigs['libfuse']['negative-entry-expiration-sec'] = self.spinBox_libfuse_negEntryExp.value()
+        
+        # Write S3 Storage
+        dictForConfigs['s3storage']['secret-key'] = self.lineEdit_secretKey.text()
+        dictForConfigs['s3storage']['endpoint'] = self.lineEdit_endpoint.text()
+        dictForConfigs['s3storage']['key-id'] = self.lineEdit_accessKey.text()
+        dictForConfigs['s3storage']['bucket-name'] = self.lineEdit_bucketName.text()
+        
+        # File cache folder path
+        dictForConfigs['file_cache']['path'] = self.lineEdit_fileCache_path.text()
+
+        with open(currentDir+'/testing_config.yaml','w') as file:
+            yaml.safe_dump(dictForConfigs,file)
+        
         return
     
     def getConfigs(self,useDefault=False):
@@ -144,7 +181,12 @@ class lyveSettingsWidget(closeGUIEvent, Ui_Form):
         else:
             try:
                 with open(currentDir+'/config.yaml', 'r') as file:
-                    configs = yaml.safe_load(file)
+                    configs = yaml.safe_load(file,)
             except:
                 configs = self.getConfigs(True)
         return configs
+    
+    def exitWindow(self):
+        self.settings.setValue("lyc window size", self.size())
+        self.settings.setValue("lyc window position", self.pos())
+        self.close()
