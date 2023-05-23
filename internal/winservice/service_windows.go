@@ -273,6 +273,7 @@ func winFspCommand(command []byte) ([]string, error) {
 		var start int
 		buffer := ubuf[1 : bytesRead/2]
 		for i, v := range buffer {
+			// 0 indicates the end of a null-terminated string
 			if v == 0 {
 				if start != i {
 					retStrings = append(retStrings, windows.UTF16ToString(buffer[start:i]))
