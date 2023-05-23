@@ -1,6 +1,6 @@
 //go:build windows
 
-package windowsService
+package winservice
 
 import (
 	"lyvecloudfuse/common/log"
@@ -63,11 +63,7 @@ func readRegistryEntry() ([]KeyData, error) {
 	var data []KeyData
 
 	for _, k := range keys {
-		d, err := ReadRegistryInstanceEntry(k)
-		if err != nil {
-
-		}
-
+		d, _ := ReadRegistryInstanceEntry(k)
 		data = append(data, d)
 	}
 

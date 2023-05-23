@@ -1,6 +1,6 @@
 //go:build windows
 
-package windowsService
+package winservice
 
 import (
 	"bytes"
@@ -78,13 +78,22 @@ func (m *LyveCloudFuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes 
 func StartMount(mountPath string, configFile string) error {
 	cmd := uint16(startCmd)
 
-	utf16className := windows.StringToUTF16(SvcName)
-	utf16driveName := windows.StringToUTF16(mountPath)
+	utf16className, err := windows.UTF16FromString(SvcName)
+	if err != nil {
+		return err
+	}
+	utf16driveName, err := windows.UTF16FromString(mountPath)
+	if err != nil {
+		return err
+	}
 	utf16instanceName := utf16driveName
-	utf16configFile := windows.StringToUTF16(configFile)
+	utf16configFile, err := windows.UTF16FromString(configFile)
+	if err != nil {
+		return err
+	}
 
 	buf := writeToUtf16(cmd, utf16className, utf16instanceName, utf16driveName, utf16configFile)
-	_, err := winFspCommand(buf)
+	_, err = winFspCommand(buf)
 	if err != nil {
 		return err
 	}
@@ -95,12 +104,18 @@ func StartMount(mountPath string, configFile string) error {
 func StopMount(mountPath string) error {
 	cmd := uint16(stopCmd)
 
-	utf16className := windows.StringToUTF16(SvcName)
-	utf16driveName := windows.StringToUTF16(mountPath)
+	utf16className, err := windows.UTF16FromString(SvcName)
+	if err != nil {
+		return err
+	}
+	utf16driveName, err := windows.UTF16FromString(mountPath)
+	if err != nil {
+		return err
+	}
 	utf16instanceName := utf16driveName
 
 	buf := writeToUtf16(cmd, utf16className, utf16instanceName, utf16driveName)
-	_, err := winFspCommand(buf)
+	_, err = winFspCommand(buf)
 	if err != nil {
 		return err
 	}
