@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"lyvecloudfuse/common"
-	"lyvecloudfuse/internal/windowsService"
+	"lyvecloudfuse/internal/winservice"
 	"os"
 	"strings"
 
@@ -47,11 +47,11 @@ var installCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !isAdmin() {
-			return fmt.Errorf("this action requires admin rights")
-		}
 		err := installService()
 		if err != nil {
+			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+				return errors.New("this action requires admin rights")
+			}
 			return fmt.Errorf("failed to install as a Windows service [%s]", err.Error())
 		}
 
@@ -67,11 +67,11 @@ var uninstallCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service uninstall",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !isAdmin() {
-			return fmt.Errorf("this action requires admin rights")
-		}
 		err := removeService()
 		if err != nil {
+			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+				return errors.New("this action requires admin rights")
+			}
 			return fmt.Errorf("failed to remove as a Windows service [%s]", err.Error())
 		}
 
@@ -87,11 +87,11 @@ var startCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service start",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !isAdmin() {
-			return fmt.Errorf("this action requires admin rights")
-		}
 		err := startService()
 		if err != nil {
+			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+				return errors.New("this action requires admin rights")
+			}
 			return fmt.Errorf("failed to start as a Windows service [%s]", err.Error())
 		}
 
@@ -107,11 +107,11 @@ var stopCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service stop",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !isAdmin() {
-			return fmt.Errorf("this action requires admin rights")
-		}
 		err := stopService()
 		if err != nil {
+			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+				return errors.New("this action requires admin rights")
+			}
 			return fmt.Errorf("failed to stop the Windows service [%s]", err.Error())
 		}
 
@@ -128,9 +128,6 @@ var mountServiceCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service mount Z: --config-file=C:\\config.yaml",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !isAdmin() {
-			return fmt.Errorf("this action requires admin rights")
-		}
 		servOpts.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
 
 		err := validateMountOptions()
@@ -139,19 +136,28 @@ var mountServiceCmd = &cobra.Command{
 		}
 
 		// Only allow mounts if the service is running
-		running, _ := isServiceRunning()
+		running, err := isServiceRunning()
+		if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+			return errors.New("this action requires admin rights")
+		}
 		if !running {
 			return fmt.Errorf("windows service is not running")
 		}
 
 		err = mountInstance()
 		if err != nil {
+			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+				return errors.New("this action requires admin rights")
+			}
 			return fmt.Errorf("failed to mount instance [%s]", err.Error())
 		}
 
 		// Add the mount to the registry so it persists on restart.
-		err = windowsService.CreateRegistryMount(servOpts.MountPath, servOpts.ConfigFile)
+		err = winservice.CreateRegistryMount(servOpts.MountPath, servOpts.ConfigFile)
 		if err != nil {
+			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+				return errors.New("this action requires admin rights")
+			}
 			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
 		}
 
@@ -168,22 +174,25 @@ var unmountServiceCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service unmount --name=Mount1",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !isAdmin() {
-			return fmt.Errorf("this action requires admin rights")
-		}
 		servOpts.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
 
 		// Check with winfsp to see if this is currently mounted
 		ret, err := isMounted()
 		if err != nil {
+			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+				return errors.New("this action requires admin rights")
+			}
 			return fmt.Errorf("failed to validate options [%s]", err.Error())
 		} else if !ret {
 			return fmt.Errorf("nothing is mounted here")
 		}
 
 		// Remove the mount from the registry so it does not remount on restart.
-		err = windowsService.RemoveRegistryMount(servOpts.MountPath)
+		err = winservice.RemoveRegistryMount(servOpts.MountPath)
 		if err != nil {
+			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+				return errors.New("this action requires admin rights")
+			}
 			return fmt.Errorf("failed to remove registry entry [%s]", err.Error())
 		}
 
@@ -225,7 +234,7 @@ func installService() error {
 	defer service.Close()
 
 	// Create the registry for WinFsp
-	err = windowsService.CreateWinFspRegistry()
+	err = winservice.CreateWinFspRegistry()
 	if err != nil {
 		return err
 	}
@@ -249,11 +258,11 @@ func removeService() error {
 
 	// Remove the registry for WinFsp
 	// Ignore error if unable to find
-	_ = windowsService.RemoveWinFspRegistry()
+	_ = winservice.RemoveWinFspRegistry()
 
 	// Remove all registry entries for lyvecloudfuse
 	// Ignore error if registry path does not exist
-	_ = windowsService.RemoveAllRegistryMount()
+	_ = winservice.RemoveAllRegistryMount()
 
 	err = service.Delete()
 	if err != nil {
@@ -307,12 +316,12 @@ func stopService() error {
 
 // mountInstance mounts the given instance.
 func mountInstance() error {
-	return windowsService.StartMount(servOpts.MountPath, servOpts.ConfigFile)
+	return winservice.StartMount(servOpts.MountPath, servOpts.ConfigFile)
 }
 
 // unmountInstance unmounts the given instance.
 func unmountInstance() error {
-	return windowsService.StopMount(servOpts.MountPath)
+	return winservice.StopMount(servOpts.MountPath)
 }
 
 // isAdmin returns true if the current terminal is running with admin rights.
@@ -324,7 +333,7 @@ func isAdmin() bool {
 
 // isMounted returns if the current mountPath is mounted using lyvecloudfuse.
 func isMounted() (bool, error) {
-	return windowsService.IsMounted(servOpts.MountPath)
+	return winservice.IsMounted(servOpts.MountPath)
 }
 
 // isServiceRunning returns whether the lyvecloudservice is currently running.
