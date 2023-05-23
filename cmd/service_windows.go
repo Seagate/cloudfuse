@@ -149,6 +149,7 @@ var mountServiceCmd = &cobra.Command{
 			return fmt.Errorf("failed to mount instance [%s]", err.Error())
 		}
 
+		// Add the mount to the registry so it persists on restart.
 		err = windowsService.CreateRegistryMount(servOpts.MountPath, servOpts.ConfigFile)
 		if err != nil {
 			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
@@ -180,6 +181,7 @@ var unmountServiceCmd = &cobra.Command{
 			return fmt.Errorf("nothing is mounted here")
 		}
 
+		// Remove the mount from the registry so it does not remount on restart.
 		err = windowsService.RemoveRegistryMount(servOpts.MountPath)
 		if err != nil {
 			return fmt.Errorf("failed to remove registry entry [%s]", err.Error())
@@ -303,14 +305,17 @@ func stopService() error {
 	return nil
 }
 
+// mountInstance mounts the given instance.
 func mountInstance() error {
 	return windowsService.StartMount(servOpts.MountPath, servOpts.ConfigFile)
 }
 
+// unmountInstance unmounts the given instance.
 func unmountInstance() error {
 	return windowsService.StopMount(servOpts.MountPath)
 }
 
+// isAdmin returns true if the current terminal is running with admin rights.
 func isAdmin() bool {
 	token := windows.GetCurrentProcessToken()
 	isElevated := token.IsElevated()

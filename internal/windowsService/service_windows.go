@@ -199,6 +199,7 @@ func winFspCommand(command []byte) ([]string, error) {
 		return retStrings, err
 	}
 
+	// Open the named pipe for WinFSP
 	handle, err := windows.CreateFile(
 		winPipe,
 		windows.GENERIC_WRITE|windows.GENERIC_READ,
@@ -213,6 +214,7 @@ func winFspCommand(command []byte) ([]string, error) {
 	}
 	defer windows.CloseHandle(handle)
 
+	// Send the command to WinFSP
 	var overlapped windows.Overlapped
 	err = windows.WriteFile(handle, command, nil, &overlapped)
 	if err == windows.ERROR_IO_PENDING {
@@ -224,6 +226,7 @@ func winFspCommand(command []byte) ([]string, error) {
 		return retStrings, err
 	}
 
+	// Get the response from WinFSP
 	overlapped = windows.Overlapped{}
 	buf := make([]byte, 4096)
 	var bytesRead uint32
@@ -249,8 +252,8 @@ func winFspCommand(command []byte) ([]string, error) {
 		return retStrings, errors.New("winfsp launchctl tool failed with non standard return")
 	}
 
-	// If there is more to read then we are using a command with return data,
-	// so let's try to read it
+	// If there is more to read then we are using a WinFSP command that returns more data such as
+	// list, so let's try to read it.
 	if bytesRead > 2 {
 		var start int
 		buffer := ubuf[1 : bytesRead/2]
@@ -267,6 +270,7 @@ func winFspCommand(command []byte) ([]string, error) {
 	return retStrings, nil
 }
 
+// bytesToUint16 converts the byte slice to a uint16 slice
 func bytesToUint16(buf []byte) []uint16 {
 	var ubuf []uint16
 	for i := 0; i < len(buf); i += 2 {
