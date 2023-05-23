@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 	"golang.org/x/sys/windows/svc"
 )
 
@@ -106,6 +107,7 @@ func StopMount(mountPath string) error {
 	return nil
 }
 
+// IsMounted determines if the given path is mounted.
 func IsMounted(mountPath string) (bool, error) {
 	cmd := uint16(listCmd)
 
@@ -134,7 +136,10 @@ func IsMounted(mountPath string) (bool, error) {
 func startServices() error {
 	// Read registry to get names of the instances we need to start
 	instances, err := readRegistryEntry()
-	if err != nil {
+	// If there is nothing in our registry to mount then continue
+	if err == registry.ErrNotExist {
+		return nil
+	} else if err != nil {
 		return err
 	}
 
@@ -152,7 +157,10 @@ func startServices() error {
 func stopServices() error {
 	// Read registry to get names of the instances we need to stop
 	instances, err := readRegistryEntry()
-	if err != nil {
+	// If there is nothing in our registry to mount then continue
+	if err == registry.ErrNotExist {
+		return nil
+	} else if err != nil {
 		return err
 	}
 
@@ -166,6 +174,7 @@ func stopServices() error {
 	return nil
 }
 
+// writeToUtf16 writes a given cmd and arguments as a byte array in UTF16.
 func writeToUtf16(cmd uint16, args ...[]uint16) []byte {
 	var buf bytes.Buffer
 

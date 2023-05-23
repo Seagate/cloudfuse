@@ -47,6 +47,9 @@ var installCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if !isAdmin() {
+			return fmt.Errorf("this action requires admin rights")
+		}
 		err := installService()
 		if err != nil {
 			return fmt.Errorf("failed to install as a Windows service [%s]", err.Error())
@@ -64,6 +67,9 @@ var uninstallCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service uninstall",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if !isAdmin() {
+			return fmt.Errorf("this action requires admin rights")
+		}
 		err := removeService()
 		if err != nil {
 			return fmt.Errorf("failed to remove as a Windows service [%s]", err.Error())
@@ -81,6 +87,9 @@ var startCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service start",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if !isAdmin() {
+			return fmt.Errorf("this action requires admin rights")
+		}
 		err := startService()
 		if err != nil {
 			return fmt.Errorf("failed to start as a Windows service [%s]", err.Error())
@@ -98,6 +107,9 @@ var stopCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service stop",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if !isAdmin() {
+			return fmt.Errorf("this action requires admin rights")
+		}
 		err := stopService()
 		if err != nil {
 			return fmt.Errorf("failed to stop the Windows service [%s]", err.Error())
@@ -116,6 +128,9 @@ var mountServiceCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service mount Z: --config-file=C:\\config.yaml",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if !isAdmin() {
+			return fmt.Errorf("this action requires admin rights")
+		}
 		servOpts.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
 
 		err := validateMountOptions()
@@ -152,6 +167,9 @@ var unmountServiceCmd = &cobra.Command{
 	Example:           "lyvecloudfuse service unmount --name=Mount1",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if !isAdmin() {
+			return fmt.Errorf("this action requires admin rights")
+		}
 		servOpts.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
 
 		// Check with winfsp to see if this is currently mounted
@@ -227,6 +245,14 @@ func removeService() error {
 	}
 	defer service.Close()
 
+	// Remove the registry for WinFsp
+	// Ignore error if unable to find
+	_ = windowsService.RemoveWinFspRegistry()
+
+	// Remove all registry entries for lyvecloudfuse
+	// Ignore error if registry path does not exist
+	_ = windowsService.RemoveAllRegistryMount()
+
 	err = service.Delete()
 	if err != nil {
 		return err
@@ -283,6 +309,12 @@ func mountInstance() error {
 
 func unmountInstance() error {
 	return windowsService.StopMount(servOpts.MountPath)
+}
+
+func isAdmin() bool {
+	token := windows.GetCurrentProcessToken()
+	isElevated := token.IsElevated()
+	return isElevated
 }
 
 // isMounted returns if the current mountPath is mounted using lyvecloudfuse.

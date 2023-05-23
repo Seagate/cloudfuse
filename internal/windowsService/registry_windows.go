@@ -11,8 +11,9 @@ import (
 
 // Windows Registry Paths
 const (
-	lcfRegistry    = `SOFTWARE\Seagate\LyveCloudFuse\Instances\`
-	winFspRegistry = `SOFTWARE\WOW6432Node\WinFsp\Services\`
+	lcfRegistry      = `SOFTWARE\Seagate\LyveCloudFuse\`
+	instanceRegistry = lcfRegistry + `Instances\`
+	winFspRegistry   = `SOFTWARE\WOW6432Node\WinFsp\Services\`
 )
 
 // WinFsp registry contants
@@ -23,7 +24,7 @@ const (
 )
 
 func ReadRegistryInstanceEntry(name string) (KeyData, error) {
-	registryPath := lcfRegistry + name
+	registryPath := instanceRegistry + name
 
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, registryPath, registry.ALL_ACCESS)
 	if err != nil {
@@ -44,8 +45,9 @@ func ReadRegistryInstanceEntry(name string) (KeyData, error) {
 	return d, nil
 }
 
+// readRegistryEntry reads the lyvecloudfuse registry and returns all the instances to be mounted.
 func readRegistryEntry() ([]KeyData, error) {
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, lcfRegistry, registry.ALL_ACCESS)
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, instanceRegistry, registry.ALL_ACCESS)
 	if err != nil {
 		log.Err("Unable to read instance names from Windows Registry: %v", err.Error())
 		return nil, err
@@ -72,7 +74,7 @@ func readRegistryEntry() ([]KeyData, error) {
 	return data, nil
 }
 
-// createRegistryEntry creates an entry in the registry for WinFsp
+// CreateWinFspRegistry creates an entry in the registry for WinFsp
 // so the WinFsp launch tool can launch our mounts.
 func CreateWinFspRegistry() error {
 	registryPath := winFspRegistry + SvcName
@@ -107,9 +109,20 @@ func CreateWinFspRegistry() error {
 	return nil
 }
 
+// RemoveWinFspRegistry removes the entry in the registry for WinFsp.
+func RemoveWinFspRegistry() error {
+	registryPath := winFspRegistry + SvcName
+	err := registry.DeleteKey(registry.LOCAL_MACHINE, registryPath)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // CreateRegistryMount adds an entry to our registry that
 func CreateRegistryMount(mountPath string, configFile string) error {
-	registryPath := lcfRegistry + mountPath
+	registryPath := instanceRegistry + mountPath
 	key, _, err := registry.CreateKey(registry.LOCAL_MACHINE, registryPath, registry.ALL_ACCESS)
 	if err != nil {
 		return err
@@ -123,9 +136,20 @@ func CreateRegistryMount(mountPath string, configFile string) error {
 	return nil
 }
 
+// RemoveRegistryMount removes the entry from our registry
 func RemoveRegistryMount(name string) error {
-	registryPath := lcfRegistry + name
+	registryPath := instanceRegistry + name
 	err := registry.DeleteKey(registry.LOCAL_MACHINE, registryPath)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemoveRegistryMount removes the entire lyvecloudfuse registry
+func RemoveAllRegistryMount() error {
+	err := registry.DeleteKey(registry.LOCAL_MACHINE, lcfRegistry)
 	if err != nil {
 		return err
 	}
