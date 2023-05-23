@@ -30,9 +30,9 @@ class lyveSettingsWidget(settingsManager,closeGUIEvent,Ui_Form):
         self.initSettingsFromConfig()
         self.populateOptions()
         self.showModeSettings()
-                
+
         # Hide sensitive data QtWidgets.QLineEdit.EchoMode.PasswordEchoOnEdit
-        self.lineEdit_accessKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password) 
+        self.lineEdit_accessKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.lineEdit_secretKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
 
         # Set up signals for buttons
@@ -41,6 +41,8 @@ class lyveSettingsWidget(settingsManager,closeGUIEvent,Ui_Form):
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_advancedSettings.clicked.connect(self.openAdvanced)
         
+        
+                
         try:
             self.resize(self.settings.value("lyc window size"))
             self.move(self.settings.value("lyc window position"))
@@ -66,6 +68,10 @@ class lyveSettingsWidget(settingsManager,closeGUIEvent,Ui_Form):
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
         self.lineEdit_fileCache_path.setText('{}'.format(directory))
+        # Update the settings 
+        filePath = self.settings.value('file_cache')
+        filePath['path'] = '{}'.format(directory)
+        self.settings.setValue('file_cache',filePath)
         
     def hideModeBoxes(self):
         self.groupbox_fileCache.setVisible(False)
@@ -117,8 +123,21 @@ class lyveSettingsWidget(settingsManager,closeGUIEvent,Ui_Form):
         if self.settings.value('stream')['file-caching'] == False:
             self.checkbox_streaming_fileCachingLevel.setCheckState(Qt.Unchecked)
         else:
-            self.checkBox_streaming_fileCachingLevel.setCheckState(Qt.Checked)
+            self.checkbox_streaming_fileCachingLevel.setCheckState(Qt.Checked)
+            
+        self.spinBox_libfuse_attExp.setValue(self.settings.value('libfuse')['attribute-expiration-sec'])
+        self.spinBox_libfuse_entExp.setValue(self.settings.value('libfuse')['entry-expiration-sec'])
+        self.spinBox_libfuse_negEntryExp.setValue(self.settings.value('libfuse')['negative-entry-expiration-sec'])
+        self.spinBox_streaming_blockSize.setValue(self.settings.value('stream')['block-size-mb'])
+        self.spinBox_streaming_buffSize.setValue(self.settings.value('stream')['buffer-size-mb'])
+        self.spinBox_streaming_maxBuff.setValue(self.settings.value('stream')['max-buffers'])
         
+        self.lineEdit_bucketName.setText(self.settings.value('s3storage')['bucket-name'])
+        self.lineEdit_endpoint.setText(self.settings.value('s3storage')['endpoint'])
+        self.lineEdit_secretKey.setText(self.settings.value('s3storage')['secret-key'])
+        self.lineEdit_accessKey.setText(self.settings.value('s3storage')['key-id'])
+        self.lineEdit_fileCache_path.setText(self.settings.value('file_cache')['path'])
+       
         return
 
     def writeConfigFile(self):
