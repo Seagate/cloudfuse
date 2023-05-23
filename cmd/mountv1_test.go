@@ -63,6 +63,8 @@ type generateConfigTestSuite struct {
 }
 
 func (suite *generateConfigTestSuite) SetupTest() {
+	// Seed the randomizer when we start the test
+	rand.Seed(time.Now().UnixNano())
 	suite.assert = assert.New(suite.T())
 	libfuseOptions = make([]string, 0)
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
@@ -102,7 +104,6 @@ func TestGenerateConfig(t *testing.T) {
 }
 
 func randomString(length int) string {
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, length)
 	rand.Read(b)
 	return fmt.Sprintf("%x", b)[:length]
