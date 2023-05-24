@@ -3,9 +3,9 @@ from PySide6.QtWidgets import QWidget
 from PySide6 import QtWidgets
 # import the custom class made from QtDesigner
 from ui_azure_config_advanced import Ui_Form
-from common_qt_functions import closeGUIEvent
+from common_qt_functions import commonConfigFunctions
 
-class azureAdvancedSettingsWidget(closeGUIEvent, Ui_Form):
+class azureAdvancedSettingsWidget(commonConfigFunctions, Ui_Form):
     def __init__(self):
         super().__init__()
         self.setupUi(self)

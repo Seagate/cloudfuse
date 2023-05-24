@@ -6,7 +6,7 @@ import yaml
 # import the custom class made from QtDesigner
 from ui_azure_config_common import Ui_Form
 from azure_config_advanced import azureAdvancedSettingsWidget
-from common_qt_functions import closeGUIEvent
+from common_qt_functions import commonConfigFunctions
 
 pipelineChoices = {
     "fileCache" : 0,
@@ -20,7 +20,7 @@ bucketModeChoices = {
     "msi" : 3
 }
 
-class azureSettingsWidget(closeGUIEvent, Ui_Form):
+class azureSettingsWidget(commonConfigFunctions, Ui_Form):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
