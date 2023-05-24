@@ -100,9 +100,7 @@ func StopMount(mountPath string) error {
 
 // IsMounted determines if the given path is mounted.
 func IsMounted(mountPath string) (bool, error) {
-	cmd := uint16(listCmd)
-
-	buf := writeCommandToUtf16(cmd)
+	buf := writeCommandToUtf16(listCmd)
 	list, err := winFspCommand(buf)
 	if err != nil {
 		return false, err
