@@ -123,8 +123,7 @@ class defaultSettingsManager():
                 'file-count' : 10 ,                                             
                 'track-time' : False                                            
                 })
-
-class closeGUIEvent(QWidget):
+class commonConfigFunctions(QWidget):
     def __init__(self):
         super().__init__()
         
@@ -132,10 +131,10 @@ class closeGUIEvent(QWidget):
         self.close()
         
     def exitWindowCleanup(self):
-        # Insert what's necessary for exit commands. 
-        # This is needed for when the okay button is clicked, or the x is clicked on the top right of the window
-        pass
-    
+    # Save this specific window's size and position
+        self.myWindow.setValue("window size", self.size())
+        self.myWindow.setValue("window position", self.pos())
+            
     # Override the closeEvent function from parent class to enable custom behavior
     def closeEvent(self, event):
         msg = QtWidgets.QMessageBox()
@@ -156,33 +155,37 @@ class closeGUIEvent(QWidget):
             self.exitWindowCleanup()
             self.writeConfigFile()
             event.accept()
-            
-class commonConfigFunctions():
-        def __init__(self):
-            super().__init__()
-            
-        def constructDictForConfig(self):
-            optionKeys = self.settings.allKeys()
-            configDict = {}
-            for key in optionKeys:
-                configDict[key] = self.settings.value(key)
-            return configDict
+        
+    def constructDictForConfig(self):
+        optionKeys = self.settings.allKeys()
+        configDict = {}
+        for key in optionKeys:
+            configDict[key] = self.settings.value(key)
+        return configDict
 
-        def writeConfigFile(self):
-            dictForConfigs = self.constructDictForConfig()
-            currentDir = os.getcwd()
-            with open(currentDir+'/testing_config.yaml','w') as file:
-                yaml.safe_dump(dictForConfigs,file)
-                
-        def getConfigs(self,useDefault=False):
-            currentDir = os.getcwd()
-            if useDefault:
-                    with open(currentDir+'/default_config.yaml','r') as file:
-                        configs = yaml.safe_load(file)
-            else:
-                try:
-                    with open(currentDir+'/config.yaml', 'r') as file:
-                        configs = yaml.safe_load(file,)
-                except:
-                    configs = self.getConfigs(True)
-            return configs
+    def writeConfigFile(self):
+        dictForConfigs = self.constructDictForConfig()
+        currentDir = os.getcwd()
+        with open(currentDir+'/testing_config.yaml','w') as file:
+            yaml.safe_dump(dictForConfigs,file)
+            
+    def getConfigs(self,useDefault=False):
+        currentDir = os.getcwd()
+        if useDefault:
+                with open(currentDir+'/default_config.yaml','r') as file:
+                    configs = yaml.safe_load(file)
+        else:
+            try:
+                with open(currentDir+'/config.yaml', 'r') as file:
+                    configs = yaml.safe_load(file,)
+            except:
+                configs = self.getConfigs(True)
+        return configs
+    
+    
+    def initWindowSizePos(self):
+        try:
+            self.resize(self.myWindow.value("window size"))
+            self.move(self.myWindow.value("window position"))
+        except:
+            pass
