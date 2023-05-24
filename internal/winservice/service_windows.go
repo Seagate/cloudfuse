@@ -76,24 +76,10 @@ func (m *LyveCloudFuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes 
 
 // StartMount starts the mount if the name exists in our Windows registry.
 func StartMount(mountPath string, configFile string) error {
-	cmd := uint16(startCmd)
+	instanceName := mountPath
 
-	utf16className, err := windows.UTF16FromString(SvcName)
-	if err != nil {
-		return err
-	}
-	utf16driveName, err := windows.UTF16FromString(mountPath)
-	if err != nil {
-		return err
-	}
-	utf16instanceName := utf16driveName
-	utf16configFile, err := windows.UTF16FromString(configFile)
-	if err != nil {
-		return err
-	}
-
-	buf := writeToUtf16(cmd, utf16className, utf16instanceName, utf16driveName, utf16configFile)
-	_, err = winFspCommand(buf)
+	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile)
+	_, err := winFspCommand(buf)
 	if err != nil {
 		return err
 	}
@@ -102,20 +88,10 @@ func StartMount(mountPath string, configFile string) error {
 
 // StopMount stops the mount if the name exists in our Windows registry.
 func StopMount(mountPath string) error {
-	cmd := uint16(stopCmd)
+	instanceName := mountPath
 
-	utf16className, err := windows.UTF16FromString(SvcName)
-	if err != nil {
-		return err
-	}
-	utf16driveName, err := windows.UTF16FromString(mountPath)
-	if err != nil {
-		return err
-	}
-	utf16instanceName := utf16driveName
-
-	buf := writeToUtf16(cmd, utf16className, utf16instanceName, utf16driveName)
-	_, err = winFspCommand(buf)
+	buf := writeCommandToUtf16(stopCmd, SvcName, instanceName, mountPath)
+	_, err := winFspCommand(buf)
 	if err != nil {
 		return err
 	}
@@ -126,7 +102,7 @@ func StopMount(mountPath string) error {
 func IsMounted(mountPath string) (bool, error) {
 	cmd := uint16(listCmd)
 
-	buf := writeToUtf16(cmd)
+	buf := writeCommandToUtf16(cmd)
 	list, err := winFspCommand(buf)
 	if err != nil {
 		return false, err
@@ -189,8 +165,8 @@ func stopServices() error {
 	return nil
 }
 
-// writeToUtf16 writes a given cmd and arguments as a byte array in UTF16.
-func writeToUtf16(cmd uint16, args ...[]uint16) []byte {
+// writeCommandToUtf16 writes a given cmd and arguments as a byte array in UTF16.
+func writeCommandToUtf16(cmd uint16, args ...string) []byte {
 	var buf bytes.Buffer
 
 	// Write the command we are sending to WinFsp
@@ -198,7 +174,11 @@ func writeToUtf16(cmd uint16, args ...[]uint16) []byte {
 
 	// Write the arguments
 	for _, arg := range args {
-		for _, w := range arg {
+		uStr, err := windows.UTF16FromString(arg)
+		if err != nil {
+			return nil
+		}
+		for _, w := range uStr {
 			_ = binary.Write(&buf, binary.LittleEndian, w)
 		}
 	}
@@ -270,23 +250,30 @@ func winFspCommand(command []byte) ([]string, error) {
 	// If there is more to read then we are using a WinFSP command that returns more data such as
 	// list, so let's try to read it.
 	if bytesRead > 2 {
-		var start int
 		buffer := ubuf[1 : bytesRead/2]
-		for i, v := range buffer {
-			// 0 indicates the end of a null-terminated string
-			if v == 0 {
-				if start != i {
-					retStrings = append(retStrings, windows.UTF16ToString(buffer[start:i]))
-				}
-				start = i + 1
-			}
-		}
+		retStrings = winfspBytesToString(buffer)
 	}
 
 	return retStrings, nil
 }
 
-// bytesToUint16 converts the byte slice to a uint16 slice
+// winfspBytesToString takes in a utf16 formatted slices from WinFSP and returns a slice of strings.
+func winfspBytesToString(buf []uint16) []string {
+	var start int
+	var retStrings []string
+	for i, v := range buf {
+		// 0 indicates the end of a null-terminated string
+		if v == 0 {
+			if start != i {
+				retStrings = append(retStrings, windows.UTF16ToString(buf[start:i]))
+			}
+			start = i + 1
+		}
+	}
+	return retStrings
+}
+
+// bytesToUint16 converts the byte slice to a uint16 slice.
 func bytesToUint16(buf []byte) []uint16 {
 	var ubuf []uint16
 	for i := 0; i < len(buf); i += 2 {
