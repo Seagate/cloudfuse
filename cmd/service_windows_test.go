@@ -64,7 +64,7 @@ func (suite *serviceTestSuite) TestMountPathEmpty() {
 func (suite *serviceTestSuite) TestConfigFileEmpty() {
 	defer suite.cleanupTest()
 
-	mntPath := randomString(8)
+	mntPath := "mntdir" + randomString(8)
 	cfgFile := ""
 
 	op, err := executeCommandC(rootCmd, "service", "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
@@ -94,7 +94,7 @@ func (suite *serviceTestSuite) TestMountDirExist() {
 func (suite *serviceTestSuite) TestConfigFileNotExist() {
 	defer suite.cleanupTest()
 
-	mntPath := randomString(8)
+	mntPath := "mntdir" + randomString(8)
 	cfgFile := "cfgNotFound.yaml"
 
 	op, err := executeCommandC(rootCmd, "service", "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))

@@ -5,9 +5,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/internal/winservice"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -189,11 +191,13 @@ var unmountServiceCmd = &cobra.Command{
 
 		// Remove the mount from the registry so it does not remount on restart.
 		err = winservice.RemoveRegistryMount(servOpts.MountPath)
+		// If error is something else other than an access error then ignore it, as if unmount fails
+		// then the user will be unable to unmount because the registry will complain that the key
+		//  does not exist.
 		if err != nil {
 			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
 				return errors.New("this action requires admin rights")
 			}
-			return fmt.Errorf("failed to remove registry entry [%s]", err.Error())
 		}
 
 		err = unmountInstance()
@@ -324,13 +328,6 @@ func unmountInstance() error {
 	return winservice.StopMount(servOpts.MountPath)
 }
 
-// isAdmin returns true if the current terminal is running with admin rights.
-func isAdmin() bool {
-	token := windows.GetCurrentProcessToken()
-	isElevated := token.IsElevated()
-	return isElevated
-}
-
 // isMounted returns if the current mountPath is mounted using lyvecloudfuse.
 func isMounted() (bool, error) {
 	return winservice.IsMounted(servOpts.MountPath)
@@ -372,7 +369,7 @@ func validateMountOptions() error {
 		return errors.New("mmount path contains '\\' which is not allowed")
 	}
 
-	if _, err := os.Stat(servOpts.MountPath); os.IsExist(err) || err == nil {
+	if _, err := os.Stat(servOpts.MountPath); errors.Is(err, fs.ErrExist) || err == nil {
 		return errors.New("mmount path exists")
 	}
 
@@ -381,7 +378,14 @@ func validateMountOptions() error {
 		return errors.New("config file not provided")
 	}
 
-	if _, err := os.Stat(servOpts.ConfigFile); os.IsNotExist(err) {
+	// Convert the path into a full path so WinFSP can see the config file
+	configPath, err := filepath.Abs(servOpts.ConfigFile)
+	if err != nil {
+		return errors.New("config file does not exist")
+	}
+	servOpts.ConfigFile = configPath
+
+	if _, err := os.Stat(servOpts.ConfigFile); errors.Is(err, fs.ErrNotExist) {
 		return errors.New("config file does not exist")
 	}
 
