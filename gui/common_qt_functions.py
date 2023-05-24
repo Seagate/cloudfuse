@@ -2,7 +2,7 @@ from PySide6 import QtWidgets
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import QSettings
 
-class settingsManager():
+class defaultSettingsManager():
         def __init__(self):
             super().__init__()
             self.settings = QSettings("LyveFUSE", "settings")
@@ -132,6 +132,10 @@ class closeGUIEvent(QWidget):
     def exitWindow(self):
         self.close()
         
+    def exitWindowCleanup(self):
+        # Insert what's necessary for exit commands. 
+        # This is needed for when the okay button is clicked, or the x is clicked on the top right of the window
+        pass
     # Override the closeEvent function from parent class to enable custom behavior
     def closeEvent(self, event):
  
@@ -144,10 +148,12 @@ class closeGUIEvent(QWidget):
         ret = msg.exec()
         
         if ret == QtWidgets.QMessageBox.Discard:
+            self.exitWindowCleanup()
             event.accept()
         elif ret == QtWidgets.QMessageBox.Cancel:
             event.ignore()
         elif ret == QtWidgets.QMessageBox.Save:
             # Insert all settings to yaml file
+            self.exitWindowCleanup()
             self.writeConfigFile()
             event.accept()
