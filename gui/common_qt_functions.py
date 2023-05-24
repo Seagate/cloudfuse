@@ -1,6 +1,8 @@
 from PySide6 import QtWidgets
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import QSettings
+import yaml
+import os
 
 class defaultSettingsManager():
         def __init__(self):
@@ -8,7 +10,6 @@ class defaultSettingsManager():
             self.settings = QSettings("LyveFUSE", "settings")
             
             # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
-            
             self.settings.setValue('foreground',False)
             self.settings.setValue('allow-other',True)
             self.settings.setValue('read-only',False)
@@ -114,7 +115,6 @@ class defaultSettingsManager():
                     'network_profiler'
                     ]
             })
-
             self.settings.setValue('logging',{
                 'type' : 'syslog',
                 'level' : 'log_warning',        
@@ -123,7 +123,6 @@ class defaultSettingsManager():
                 'file-count' : 10 ,                                             
                 'track-time' : False                                            
                 })
-            
 
 class closeGUIEvent(QWidget):
     def __init__(self):
@@ -136,9 +135,9 @@ class closeGUIEvent(QWidget):
         # Insert what's necessary for exit commands. 
         # This is needed for when the okay button is clicked, or the x is clicked on the top right of the window
         pass
+    
     # Override the closeEvent function from parent class to enable custom behavior
     def closeEvent(self, event):
- 
         msg = QtWidgets.QMessageBox()
         msg.setWindowTitle("Are you sure?")
         msg.setInformativeText("Do you want to save you changes?")
@@ -157,3 +156,33 @@ class closeGUIEvent(QWidget):
             self.exitWindowCleanup()
             self.writeConfigFile()
             event.accept()
+            
+class commonConfigFunctions():
+        def __init__(self):
+            super().__init__()
+            
+        def constructDictForConfig(self):
+            optionKeys = self.settings.allKeys()
+            configDict = {}
+            for key in optionKeys:
+                configDict[key] = self.settings.value(key)
+            return configDict
+
+        def writeConfigFile(self):
+            dictForConfigs = self.constructDictForConfig()
+            currentDir = os.getcwd()
+            with open(currentDir+'/testing_config.yaml','w') as file:
+                yaml.safe_dump(dictForConfigs,file)
+                
+        def getConfigs(self,useDefault=False):
+            currentDir = os.getcwd()
+            if useDefault:
+                    with open(currentDir+'/default_config.yaml','r') as file:
+                        configs = yaml.safe_load(file)
+            else:
+                try:
+                    with open(currentDir+'/config.yaml', 'r') as file:
+                        configs = yaml.safe_load(file,)
+                except:
+                    configs = self.getConfigs(True)
+            return configs

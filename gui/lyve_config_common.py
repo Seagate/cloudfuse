@@ -1,13 +1,11 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from PySide6.QtWidgets import QWidget
 from PySide6 import QtWidgets
-import yaml
-import os
 
 # import the custom class made from QtDesigner
 from ui_lyve_config_common import Ui_Form
 from lyve_config_advanced import lyveAdvancedSettingsWidget
-from common_qt_functions import closeGUIEvent, defaultSettingsManager
+from common_qt_functions import closeGUIEvent, defaultSettingsManager,commonConfigFunctions
 
 pipelineChoices = {
     "fileCache" : 0,
@@ -21,11 +19,12 @@ libfusePermissions = {
     0o444 : 3
 }
 
-class lyveSettingsWidget(defaultSettingsManager,closeGUIEvent,Ui_Form): 
+class lyveSettingsWidget(defaultSettingsManager,closeGUIEvent,commonConfigFunctions,Ui_Form): 
     def __init__(self):
         super().__init__()
         self.setupUi(self)
         
+        self.initWindowSizePos()
         self.setWindowTitle("LyveCloud Config Settings")
         self.initSettingsFromConfig()
         self.populateOptions()
@@ -62,16 +61,7 @@ class lyveSettingsWidget(defaultSettingsManager,closeGUIEvent,Ui_Form):
         self.lineEdit_accessKey.editingFinished.connect(self.updateS3Storage)
         self.lineEdit_endpoint.editingFinished.connect(self.updateS3Storage)
 
-        
-        try:
-            self.resize(self.settings.value("lyc window size"))
-            self.move(self.settings.value("lyc window position"))
-        except:
-            pass
-
- 
-        
-
+       
     # Set up slots
     
     def updateMultiUser(self):
@@ -129,7 +119,6 @@ class lyveSettingsWidget(defaultSettingsManager,closeGUIEvent,Ui_Form):
         self.moreSettings.show()
 
     def showModeSettings(self):
-        
         self.hideModeBoxes()
         pipelineSelection = self.dropDown_pipeline.currentIndex()
         components = self.settings.value('components')
@@ -216,75 +205,15 @@ class lyveSettingsWidget(defaultSettingsManager,closeGUIEvent,Ui_Form):
         self.lineEdit_accessKey.setText(self.settings.value('s3storage')['key-id'])
         self.lineEdit_fileCache_path.setText(self.settings.value('file_cache')['path'])
 
-    def writeConfigFile(self):
-        dictForConfigs = self.getConfigs()
-        currentDir = os.getcwd()
-        
-   
-        if self.dropDown_pipeline.currentIndex() == pipelineChoices['fileCache']:
-            dictForConfigs['components'][1] = 'file_cache'
-        elif self.dropDown_pipeline.currentIndex() == pipelineChoices['streaming']:
-            dictForConfigs['components'][1] = 'stream'
-        
-        dictForConfigs['allow-other']=self.checkbox_multiUser.isChecked()
-        dictForConfigs['nonempty']=self.checkbox_nonEmptyDir.isChecked()
-        dictForConfigs['foreground']=self.checkbox_daemonForeground.isChecked()
-        dictForConfigs['read-only']=self.checkbox_readOnly.isChecked()
-       
-        # Write libfuse components
-        dictForConfigs['libfuse']['ignore-open-flags'] = self.checkbox_libfuse_ignoreAppend.isChecked()
-
-        ###### fix this ##### -- get it to write 0444 NOT 0o444, yaml interprets 0o444 as a string, not a number
-        tempOption = oct(int(self.dropDown_libfuse_permissions.currentText(),8))
-        dictForConfigs['libfuse']['default-permission'] = tempOption
-        
-        index = self.dropDown_libfuse_permissions.currentIndex()
-        if index == libfusePermissions['0o777']:
-            dictForConfigs['libfuse']['default-permission'] = 0o777
-        elif index == libfusePermissions['0o666']:
-            dictForConfigs['libfuse']['default-permission'] = 0o666
-        elif index == libfusePermissions['0o644']:
-            dictForConfigs['libfuse']['default-permission'] = 0o644
-        elif index == libfusePermissions['0o444']:
-            dictForConfigs['libfuse']['default-permission'] = 0o444
-            
-        
-        
-        dictForConfigs['libfuse']['attribute-expiration-sec'] = self.spinBox_libfuse_attExp.value()
-        dictForConfigs['libfuse']['entry-expiration-sec'] = self.spinBox_libfuse_entExp.value()
-        dictForConfigs['libfuse']['negative-entry-expiration-sec'] = self.spinBox_libfuse_negEntryExp.value()
-        
-        # Write S3 Storage
-        dictForConfigs['s3storage']['secret-key'] = self.lineEdit_secretKey.text()
-        dictForConfigs['s3storage']['endpoint'] = self.lineEdit_endpoint.text()
-        dictForConfigs['s3storage']['key-id'] = self.lineEdit_accessKey.text()
-        dictForConfigs['s3storage']['bucket-name'] = self.lineEdit_bucketName.text()
-        
-        # File cache folder path
-        dictForConfigs['file_cache']['path'] = self.lineEdit_fileCache_path.text()
-
-        with open(currentDir+'/testing_config.yaml','w') as file:
-            yaml.safe_dump(dictForConfigs,file)
-        
-    
-    def constructDictForConfig(self):
-        pass
-    
-    def getConfigs(self,useDefault=False):
-        currentDir = os.getcwd()
-        if useDefault:
-                with open(currentDir+'/default_config.yaml','r') as file:
-                    configs = yaml.safe_load(file)
-        else:
-            try:
-                with open(currentDir+'/config.yaml', 'r') as file:
-                    configs = yaml.safe_load(file,)
-            except:
-                configs = self.getConfigs(True)
-        return configs
-    
+    def initWindowSizePos(self):
+        self.myWindow = QSettings("LyveFUSE", "lycWindow")
+        try:
+            self.resize(self.myWindow.value("lyc window size"))
+            self.move(self.myWindow.value("lyc window position"))
+        except:
+            pass
     
     def exitWindowCleanup(self):
     # Save this specific window's size and position
-        self.settings.setValue("lyc window size", self.size())
-        self.settings.setValue("lyc window position", self.pos())
+        self.myWindow.setValue("lyc window size", self.size())
+        self.myWindow.setValue("lyc window position", self.pos())
