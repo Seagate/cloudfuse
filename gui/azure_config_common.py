@@ -28,6 +28,7 @@ class azureSettingsWidget(defaultSettingsManager,commonConfigFunctions, Ui_Form)
         # Hide the pipeline mode groupbox depending on the default select is
         self.showAzureModeSettings()
         self.showModeSettings()
+        self.populateOptions()
 
         # Set up signals
         self.dropDown_pipeline.currentIndexChanged.connect(self.showModeSettings)
@@ -38,8 +39,6 @@ class azureSettingsWidget(defaultSettingsManager,commonConfigFunctions, Ui_Form)
     
         self.lineEdit_azure_accountKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.lineEdit_azure_spnClientSecret.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
-    
-    
     
     # Set up slots
     def openAdvanced(self):

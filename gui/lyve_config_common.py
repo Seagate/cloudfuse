@@ -73,7 +73,6 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
     #   it's written this way to save on lines of code.
     def updateLibfuse(self):
         libfuse = self.settings.value('libfuse')
-        
         libfuse['default-permission'] = libfusePermissions[self.dropDown_libfuse_permissions.currentIndex()]
         libfuse['ignore-open-flags'] = self.checkbox_libfuse_ignoreAppend.isChecked()
         libfuse['attribute-expiration-sec'] = self.spinBox_libfuse_attExp.value()
@@ -151,6 +150,7 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
 
     # This widget will not display all the options in settings, only the ones written in the UI file.
     def populateOptions(self):
+        # add commnet here
         self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings.value('components')[1]))
         self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(self.settings.value('libfuse')['default-permission']))
         
