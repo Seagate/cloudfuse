@@ -1,5 +1,4 @@
 from PySide6.QtCore import Qt, QSettings
-from PySide6.QtWidgets import QWidget
 from PySide6 import QtWidgets
 
 # import the custom class made from QtDesigner
@@ -7,17 +6,8 @@ from ui_lyve_config_common import Ui_Form
 from lyve_config_advanced import lyveAdvancedSettingsWidget
 from common_qt_functions import defaultSettingsManager,commonConfigFunctions
 
-pipelineChoices = {
-    "fileCache" : 0,
-    "streaming" : 1
-}
-
-libfusePermissions = {
-    0o777 : 0,
-    0o666 : 1,
-    0o644 : 2,
-    0o444 : 3
-}
+pipelineChoices = ['file_cache','stream']
+libfusePermissions = [0o777,0o666,0o644,0o444]
 
 class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form): 
     def __init__(self):
@@ -41,6 +31,7 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
         self.button_browse.clicked.connect(self.getFileDirInput)
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_advancedSettings.clicked.connect(self.openAdvanced)
+        self.button_resetDefaultSettings.clicked.connect(self.resetDefaults)
         
         self.checkbox_multiUser.stateChanged.connect(self.updateMultiUser)
         self.checkbox_nonEmptyDir.stateChanged.connect(self.updateNonEmtpyDir)
@@ -60,7 +51,7 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
         self.lineEdit_bucketName.editingFinished.connect(self.updateS3Storage)
         self.lineEdit_accessKey.editingFinished.connect(self.updateS3Storage)
         self.lineEdit_endpoint.editingFinished.connect(self.updateS3Storage)
-
+        self.lineEdit_fileCache_path.editingFinished.connect(self.updateFileCache)
        
     # Set up slots for the signals:
     
@@ -83,17 +74,7 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
     def updateLibfuse(self):
         libfuse = self.settings.value('libfuse')
         
-        permissionState = self.dropDown_libfuse_permissions.currentIndex()
-        
-        if permissionState == libfusePermissions[0o777]:
-            libfuse['default-permission'] = 0o777
-        elif permissionState == libfusePermissions[0o666]:
-            libfuse['default-permission'] = 0o666
-        elif permissionState == libfusePermissions[0o644]:
-            libfuse['default-permission'] = 0o644
-        elif permissionState == libfusePermissions[0o444]:
-            libfuse['default-permission'] = 0o444
-            
+        libfuse['default-permission'] = libfusePermissions[self.dropDown_libfuse_permissions.currentIndex()]
         libfuse['ignore-open-flags'] = self.checkbox_libfuse_ignoreAppend.isChecked()
         libfuse['attribute-expiration-sec'] = self.spinBox_libfuse_attExp.value()
         libfuse['entry-expiration-sec'] = self.spinBox_libfuse_entExp.value()
@@ -130,13 +111,12 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
     #   There is one slot for the signal to be pointed at which is why showmodesettings is used.
     def showModeSettings(self):
         self.hideModeBoxes()
-        pipelineSelection = self.dropDown_pipeline.currentIndex()
         components = self.settings.value('components')
-        if pipelineSelection == pipelineChoices['fileCache']:
-            components[1] = 'file_cache'
+        pipelineIndex = self.dropDown_pipeline.currentIndex()
+        components[1] = pipelineChoices[pipelineIndex]
+        if pipelineChoices[pipelineIndex] == 'file_cache':
             self.groupbox_fileCache.setVisible(True)
-        elif pipelineSelection == pipelineChoices['streaming']:
-            components[1] = 'stream'
+        elif pipelineChoices[pipelineIndex] == 'stream':
             self.groupbox_streaming.setVisible(True)
         self.settings.setValue('components',components)
 
@@ -144,8 +124,11 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
         self.lineEdit_fileCache_path.setText('{}'.format(directory))
         # Update the settings 
+        self.updateFileCache()        
+        
+    def updateFileCache(self):
         filePath = self.settings.value('file_cache')
-        filePath['path'] = '{}'.format(directory)
+        filePath['path'] = self.lineEdit_fileCache_path.text()
         self.settings.setValue('file_cache',filePath)
         
     def hideModeBoxes(self):
@@ -168,12 +151,8 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
 
     # This widget will not display all the options in settings, only the ones written in the UI file.
     def populateOptions(self):
-        if self.settings.value('components')[1] == 'file_cache':
-            self.dropDown_pipeline.setCurrentIndex(pipelineChoices['fileCache'])
-        else:
-            self.dropDown_pipeline.setCurrentIndex(pipelineChoices['streaming'])
-        
-        self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions[self.settings.value('libfuse')['default-permission']])
+        self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings.value('components')[1]))
+        self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(self.settings.value('libfuse')['default-permission']))
         
         # Check for a true/false setting and set the checkbox state as appropriate. 
         #   Note, Checked/UnChecked are NOT True/False data types, hence the need to check what the values are.
@@ -222,3 +201,7 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
         self.lineEdit_secretKey.setText(self.settings.value('s3storage')['secret-key'])
         self.lineEdit_accessKey.setText(self.settings.value('s3storage')['key-id'])
         self.lineEdit_fileCache_path.setText(self.settings.value('file_cache')['path'])
+        
+    def resetDefaults(self):
+        # Reset these defaults
+        pass

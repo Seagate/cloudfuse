@@ -8,7 +8,9 @@ class defaultSettingsManager():
         def __init__(self):
             super().__init__()
             self.settings = QSettings("LyveFUSE", "settings")
+            self.setDefaultSettings()
             
+        def setDefaultSettings(self):
             # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
             self.settings.setValue('foreground',False)
             self.settings.setValue('allow-other',True)
@@ -123,6 +125,7 @@ class defaultSettingsManager():
                 'file-count' : 10 ,                                             
                 'track-time' : False                                            
                 })
+            
 class commonConfigFunctions(QWidget):
     def __init__(self):
         super().__init__()

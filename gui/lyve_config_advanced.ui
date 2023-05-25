@@ -171,24 +171,33 @@
           <item>
            <widget class="QSpinBox" name="spinBox_fileCache_evictionTimeout">
             <property name="maximum">
-             <number>3000</number>
+             <number>1000000</number>
+            </property>
+            <property name="singleStep">
+             <number>10</number>
             </property>
            </widget>
           </item>
           <item>
            <widget class="QSpinBox" name="spinBox_fileCache_maxEviction">
             <property name="maximum">
-             <number>15000</number>
+             <number>1000000</number>
+            </property>
+            <property name="singleStep">
+             <number>20</number>
             </property>
             <property name="value">
-             <number>5000</number>
+             <number>0</number>
             </property>
            </widget>
           </item>
           <item>
            <widget class="QSpinBox" name="spinBox_fileCache_maxCacheSize">
             <property name="maximum">
-             <number>3000</number>
+             <number>1000000</number>
+            </property>
+            <property name="singleStep">
+             <number>100</number>
             </property>
            </widget>
           </item>
@@ -196,6 +205,9 @@
            <widget class="QSpinBox" name="spinBox_fileCache_evictMaxThresh">
             <property name="maximum">
              <number>3000</number>
+            </property>
+            <property name="singleStep">
+             <number>5</number>
             </property>
             <property name="value">
              <number>80</number>
@@ -206,6 +218,9 @@
            <widget class="QSpinBox" name="spinBox_fileCache_evictMinThresh">
             <property name="maximum">
              <number>3000</number>
+            </property>
+            <property name="singleStep">
+             <number>5</number>
             </property>
             <property name="value">
              <number>60</number>
