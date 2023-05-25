@@ -90,9 +90,3 @@ class azureSettingsWidget(defaultSettingsManager,commonConfigFunctions, Ui_Form)
         self.groupbox_sasStorage.setVisible(False)
         self.groupbox_spn.setVisible(False)
         self.groupbox_msi.setVisible(False)
-        
-
-    def writeConfigFile(self):
-        # Add relevant code here
-        return
-        
