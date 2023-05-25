@@ -192,3 +192,18 @@ class commonConfigFunctions(QWidget):
             self.move(self.myWindow.value("window position"))
         except:
             pass
+        
+    # defaultSettingsManager has set the settings to all default, now the code needs to pull in
+    #   all the changes from the config file the user provides. This may not include all the 
+    #   settings defined in defaultSettingManager.
+    def initSettingsFromConfig(self):
+        dictForConfigs = self.getConfigs()
+        for option in dictForConfigs:
+            if type(dictForConfigs[option]) == dict:
+                tempDict = self.settings.value(option)
+                for suboption in dictForConfigs[option]:
+                    tempDict[suboption] = dictForConfigs[option][suboption]
+                self.settings.setValue(option,tempDict)
+            else:
+                self.settings.setValue(option,dictForConfigs[option])
+ 
