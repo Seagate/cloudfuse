@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from PySide6.QtWidgets import QWidget
 from PySide6 import QtWidgets
 # import the custom class made from QtDesigner
@@ -10,9 +10,6 @@ class azureAdvancedSettingsWidget(commonConfigFunctions, Ui_Form):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("More Azure Config Settings")
-        
+        self.myWindow = QSettings("LyveFUSE", "AzAdvancedWindow")
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)
-        
-    def writeConfigFile(self):
-        return

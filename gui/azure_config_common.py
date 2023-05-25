@@ -1,12 +1,10 @@
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import Qt, QSettings
 from PySide6 import QtWidgets
-import yaml
 
 # import the custom class made from QtDesigner
 from ui_azure_config_common import Ui_Form
 from azure_config_advanced import azureAdvancedSettingsWidget
-from common_qt_functions import commonConfigFunctions
+from common_qt_functions import commonConfigFunctions, defaultSettingsManager
 
 pipelineChoices = {
     "fileCache" : 0,
@@ -20,13 +18,13 @@ bucketModeChoices = {
     "msi" : 3
 }
 
-class azureSettingsWidget(commonConfigFunctions, Ui_Form):
+class azureSettingsWidget(defaultSettingsManager,commonConfigFunctions, Ui_Form):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-
         self.setWindowTitle("Azure Config Settings")
-
+        self.myWindow = QSettings("LyveFUSE", "AzcWindow")
+        self.initSettingsFromConfig()
         # Hide the pipeline mode groupbox depending on the default select is
         self.showAzureModeSettings()
         self.showModeSettings()
@@ -40,6 +38,7 @@ class azureSettingsWidget(commonConfigFunctions, Ui_Form):
     
         self.lineEdit_azure_accountKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.lineEdit_azure_spnClientSecret.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+    
     
     
     # Set up slots
