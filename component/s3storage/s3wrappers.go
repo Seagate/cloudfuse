@@ -389,7 +389,7 @@ func (cl *Client) getFile(name string) (string, bool) {
 
 	isSymLink := false
 
-	if name[len(name)-11:] == ".rclonelink" {
+	if len(name) > 11 && name[len(name)-11:] == ".rclonelink" {
 		isSymLink = true
 		name = name[:len(name)-11]
 	}
