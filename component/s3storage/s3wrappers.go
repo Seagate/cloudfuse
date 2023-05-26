@@ -59,9 +59,9 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 // Wrapper for awsS3Client.PutObject.
 // Takes an io.Reader to work with both files and byte arrays.
 // name is the path to the file.
-func (cl *Client) putObject(name string, objectData io.Reader, symLink bool) error {
+func (cl *Client) putObject(name string, objectData io.Reader, isSymLink bool) error {
 
-	key := cl.getKey(name, symLink)
+	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::putObject : putting object %s", key)
 
 	// TODO: decide when to use this higher-level API
@@ -83,8 +83,8 @@ func (cl *Client) putObject(name string, objectData io.Reader, symLink bool) err
 
 // Wrapper for awsS3Client.DeleteObject.
 // name is the path to the file.
-func (cl *Client) deleteObject(name string, symLink bool) error {
-	key := cl.getKey(name, symLink)
+func (cl *Client) deleteObject(name string, isSymLink bool) error {
+	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::deleteObject : deleting object %s", key)
 
 	_, err := cl.awsS3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
@@ -150,10 +150,10 @@ func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, er
 }
 
 // Wrapper for awsS3Client.CopyObject
-func (cl *Client) copyObject(source string, target string, symLink bool) error {
+func (cl *Client) copyObject(source string, target string, isSymLink bool) error {
 	// copy the object to its new key
-	sourceKey := cl.getKey(source, symLink)
-	targetKey := cl.getKey(target, symLink)
+	sourceKey := cl.getKey(source, isSymLink)
+	targetKey := cl.getKey(target, isSymLink)
 	_, err := cl.awsS3Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		// TODO: URL-encode CopySource
@@ -376,9 +376,9 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) {
 }
 
 // Convert file name to object getKey
-func (cl *Client) getKey(name string, isSymlink bool) string {
+func (cl *Client) getKey(name string, isSymLink bool) string {
 
-	if isSymlink == true {
+	if isSymLink == true {
 		name = name + ".rclonelink"
 	}
 

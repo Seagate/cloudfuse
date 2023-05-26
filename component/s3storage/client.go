@@ -182,9 +182,9 @@ func (cl *Client) CreateDirectory(name string) error {
 // CreateLink : Create a symlink in the bucket/virtual directory
 func (cl *Client) CreateLink(source string, target string) error {
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
-	symLink := true
+	isSymLink := true
 	data := []byte(target)
-	return cl.WriteFromBuffer(source, symLink, data)
+	return cl.WriteFromBuffer(source, isSymLink, data)
 }
 
 // DeleteFile : Delete an object.
@@ -273,10 +273,10 @@ func (cl *Client) DeleteDirectory(name string) error {
 }
 
 // RenameFile : Rename the object (copy then delete).
-func (cl *Client) RenameFile(source string, target string, symLink bool) error {
+func (cl *Client) RenameFile(source string, target string, isSymLink bool) error {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
-	err := cl.copyObject(source, target, symLink)
+	err := cl.copyObject(source, target, isSymLink)
 	if err != nil {
 		log.Err("Client::RenameFile : copyObject(%s->%s) failed. Here's why: %v", source, target, err)
 		return err
@@ -284,7 +284,7 @@ func (cl *Client) RenameFile(source string, target string, symLink bool) error {
 	// Copy of the file is done so now delete the older file
 	// in this case we don't need to check if the file exists, so we use deleteObject, not DeleteFile
 	// this is what S3's DeleteObject spec is meant for: to make sure the object doesn't exist anymore
-	err = cl.deleteObject(source, symLink)
+	err = cl.deleteObject(source, isSymLink)
 	if err != nil {
 		log.Err("Client::RenameFile : deleteObject(%s) failed. Here's why: %v", source, err)
 	}
@@ -507,14 +507,14 @@ func (cl *Client) WriteFromFile(name string, fi *os.File) error {
 
 // WriteFromBuffer : Upload from a buffer to an object.
 // name is the file path.
-func (cl *Client) WriteFromBuffer(name string, symLink bool, data []byte) error {
+func (cl *Client) WriteFromBuffer(name string, isSymLink bool, data []byte) error {
 	log.Trace("Client::WriteFromBuffer : name %s", name)
 
 	// convert byte array to io.Reader
 	dataReader := bytes.NewReader(data)
 	// upload data to object
 	// TODO: handle metadata with S3
-	err := cl.putObject(name, dataReader, symLink)
+	err := cl.putObject(name, dataReader, isSymLink)
 	log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
 	return err
 }
