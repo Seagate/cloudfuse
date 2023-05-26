@@ -391,9 +391,9 @@ func (cl *Client) getFile(name string) (string, bool) {
 
 	isSymLink := false
 
-	if len(name) > 11 && name[len(name)-11:] == symLinkStr {
+	if len(name) > 11 && name[len(name)-len(symLinkStr):] == symLinkStr {
 		isSymLink = true
-		name = name[:len(name)-11]
+		name = name[:len(name)-len(symLinkStr)]
 	}
 
 	return name, isSymLink
