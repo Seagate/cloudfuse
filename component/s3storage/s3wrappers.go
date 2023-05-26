@@ -375,11 +375,13 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) {
 	return attr
 }
 
+const symLinkStr = ".rclonelink"
+
 // Convert file name to object getKey
 func (cl *Client) getKey(name string, isSymLink bool) string {
 
-	if isSymLink == true {
-		name = name + ".rclonelink"
+	if isSymLink {
+		name = name + symLinkStr
 	}
 
 	return common.JoinUnixFilepath(cl.Config.prefixPath, name)
@@ -389,7 +391,7 @@ func (cl *Client) getFile(name string) (string, bool) {
 
 	isSymLink := false
 
-	if len(name) > 11 && name[len(name)-11:] == ".rclonelink" {
+	if len(name) > 11 && name[len(name)-11:] == symLinkStr {
 		isSymLink = true
 		name = name[:len(name)-11]
 	}
