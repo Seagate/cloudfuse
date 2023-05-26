@@ -52,7 +52,7 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 		return nil, parseS3Err(err, attemptedAction)
 	}
 
-	// return body, object
+	// return body, err
 	return result.Body, err
 }
 
