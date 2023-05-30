@@ -360,8 +360,8 @@ func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getFileAttr : name %s", name)
 	isSymlink := false
-	object, err := cl.headObject(name, isSymlink) //revisit
-	if err == syscall.ENOENT {                    
+	object, err := cl.headObject(name, isSymlink)
+	if err == syscall.ENOENT {
 		isSymlink = true
 		return cl.headObject(name, isSymlink)
 	}
