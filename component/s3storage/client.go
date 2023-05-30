@@ -182,9 +182,9 @@ func (cl *Client) CreateDirectory(name string) error {
 // CreateLink : Create a symlink in the bucket/virtual directory
 func (cl *Client) CreateLink(source string, target string) error {
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
-	isSymLink := true
+	isSymlink := true
 	data := []byte(target)
-	return cl.WriteFromBuffer(source, isSymLink, data)
+	return cl.WriteFromBuffer(source, isSymlink, data)
 }
 
 // DeleteFile : Delete an object.
