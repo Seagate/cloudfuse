@@ -359,11 +359,11 @@ func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 // name should not have a trailing slash (nothing will be found!).
 func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getFileAttr : name %s", name)
-	isSymLink := false
-	object, err := cl.headObject(name, isSymLink) //revisit
-	if err == syscall.ENOENT {                    //if object does not exist in bucket, check if it is asymlink.
-		isSymLink = true
-		return cl.headObject(name, isSymLink)
+	isSymlink := false
+	object, err := cl.headObject(name, isSymlink) //revisit
+	if err == syscall.ENOENT {                    
+		isSymlink = true
+		return cl.headObject(name, isSymlink)
 	}
 	return object, err
 }
