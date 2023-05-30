@@ -363,7 +363,7 @@ func (s3 *S3Storage) DeleteFile(options internal.DeleteFileOptions) error {
 func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("S3Storage::RenameFile : %s to %s", options.Src, options.Dst)
 
-	err := s3.storage.RenameFile(options.Src, options.Dst, false) //when is symlink true?
+	err := s3.storage.RenameFile(options.Src, options.Dst, false)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(renameFile, options.Src, map[string]interface{}{src: options.Src, dest: options.Dst})
