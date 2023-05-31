@@ -225,14 +225,11 @@ func (s *clientTestSuite) TestCreateLink() {
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(source),
 	})
-
 	s.assert.Nil(err)
 
 	// object body should match target file name
-
 	defer result.Body.Close()
 	output, err := ioutil.ReadAll(result.Body)
-
 	s.assert.Nil(err)
 	s.assert.EqualValues(target, output)
 
@@ -247,10 +244,20 @@ func (s *clientTestSuite) TestReadLink() {
 	err := s.client.CreateLink(source, target)
 	s.assert.Nil(err)
 
-	data, err := s.client.ReadBuffer(source, 0, 0, true)
+	source = s.client.getKey(source, true)
+
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(source),
+	})
 	s.assert.Nil(err)
 
-	s.assert.EqualValues(string(data), target)
+	defer result.Body.Close()
+
+	// object body should match target file name
+	output, err := io.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(target, string(output))
 
 }
 
