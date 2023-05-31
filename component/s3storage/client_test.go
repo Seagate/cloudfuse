@@ -271,12 +271,19 @@ func (s *clientTestSuite) TestDeleteLink() {
 	err := s.client.CreateLink(source, target)
 	s.assert.Nil(err)
 
-	err = s.client.DeleteFile(source)
+	source = s.client.getKey(source, true)
+
+	_, err = s.awsS3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(source),
+	})
 	s.assert.Nil(err)
 
-	_, err = s.client.getObject(source, 0, 0, true)
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(source),
+	})
 	s.assert.NotNil(err)
-
 }
 
 func (s *clientTestSuite) TestDeleteLinks() {
