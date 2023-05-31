@@ -208,26 +208,33 @@ func (s *clientTestSuite) TestCreateLink() {
 	// setup
 	target := generateFileName()
 
-	var reader io.Reader
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(target),
+	})
 
-	err := s.client.putObject(target, reader, false) //test passes without putting target object in bucket;
 	s.assert.Nil(err)
 	source := generateFileName()
 
 	err = s.client.CreateLink(source, target)
 	s.assert.Nil(err)
 
-	result, err := s.client.getObject(source, 0, 0, true)
+	source = s.client.getKey(source, true)
+
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(source),
+	})
+
 	s.assert.Nil(err)
 
 	// object body should match target file name
-	defer result.Close()
-	buffer := make([]byte, len(target))
-	_, err = result.Read(buffer)
 
-	s.assert.NotNil(err)
-	s.assert.EqualError(err, io.EOF.Error())
-	s.assert.EqualValues(target, string(buffer))
+	defer result.Body.Close()
+	output, err := ioutil.ReadAll(result.Body)
+
+	s.assert.Nil(err)
+	s.assert.EqualValues(target, output)
 
 }
 func (s *clientTestSuite) TestReadLink() {
