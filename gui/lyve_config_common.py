@@ -134,20 +134,6 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
         self.groupbox_fileCache.setVisible(False)
         self.groupbox_streaming.setVisible(False)      
 
-    # defaultSettingsManager has set the settings to all default, now the code needs to pull in
-    #   all the changes from the config file the user provides. This may not include all the 
-    #   settings defined in defaultSettingManager.
-    def initSettingsFromConfig(self):
-        dictForConfigs = self.getConfigs()
-        for option in dictForConfigs:
-            if type(dictForConfigs[option]) == dict:
-                tempDict = self.settings.value(option)
-                for suboption in dictForConfigs[option]:
-                    tempDict[suboption] = dictForConfigs[option][suboption]
-                self.settings.setValue(option,tempDict)
-            else:
-                self.settings.setValue(option,dictForConfigs[option])
-
     # This widget will not display all the options in settings, only the ones written in the UI file.
     def populateOptions(self):
         # add commnet here
