@@ -59,6 +59,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -306,25 +307,51 @@ func (s *clientTestSuite) TestDeleteLinks() {
 		err := s.client.CreateLink(folder+sources[i], targets[i])
 		s.assert.Nil(err)
 
+		sources[i] = s.client.getKey(sources[i], true)
+
 		// make sure the links are there
-		result, err := s.client.getObject(folder+sources[i], 0, 0, true)
+		result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+			Bucket: aws.String(s.client.Config.authConfig.BucketName),
+			Key:    aws.String(folder + sources[i]),
+		})
 		s.assert.Nil(err)
 
 		// object body should match target file name
-		defer result.Close()
-		buffer := make([]byte, len(targets[i]))
-		_, err = result.Read(buffer)
+		defer result.Body.Close()
+		buffer, err := ioutil.ReadAll(result.Body)
+		s.assert.Nil(err)
 
-		s.assert.NotNil(err)
-		s.assert.EqualError(err, io.EOF.Error())
-		s.assert.EqualValues(targets[i], string(buffer))
+		s.assert.EqualValues(targets[i], buffer)
 	}
 
-	// run delete directory with prefix arugment.
-
-	err := s.client.DeleteDirectory(folder)
+	//gather keylist for DeleteObjects
+	keyList := make([]types.ObjectIdentifier, len(sources))
+	for i, source := range sources {
+		key := folder + source
+		println(key)
+		keyList[i] = types.ObjectIdentifier{
+			Key: &key,
+		}
+	}
+	// send keyList for deletion
+	_, err := s.awsS3Client.DeleteObjects(context.TODO(), &s3.DeleteObjectsInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Delete: &types.Delete{
+			Objects: keyList,
+			Quiet:   true,
+		},
+	})
 	s.assert.Nil(err)
 
+	// make sure the links aren't there
+	for i := range sources {
+		_, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+			Bucket: aws.String(s.client.Config.authConfig.BucketName),
+			Key:    aws.String(folder + sources[i]),
+		})
+		s.assert.NotNil(err)
+
+	}
 }
 
 func (s *clientTestSuite) TestDeleteFile() {
