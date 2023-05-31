@@ -328,7 +328,6 @@ func (s *clientTestSuite) TestDeleteLinks() {
 	keyList := make([]types.ObjectIdentifier, len(sources))
 	for i, source := range sources {
 		key := folder + source
-		println(key)
 		keyList[i] = types.ObjectIdentifier{
 			Key: &key,
 		}
