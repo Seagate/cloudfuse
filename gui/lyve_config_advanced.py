@@ -91,7 +91,3 @@ class lyveAdvancedSettingsWidget(commonConfigFunctions, Ui_Form):
     def writeConfigFile(self):
         self.updateFileCache()
         self.updateLibfuse()
-        
-    # Save this specific window's size and position
-        self.myWindow.setValue("window size", self.size())
-        self.myWindow.setValue("window position", self.pos())
