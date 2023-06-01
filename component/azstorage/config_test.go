@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -339,6 +340,32 @@ func (s *configTestSuite) TestOtherFlags() {
 	err := ParseAndValidateConfig(az, opt)
 	assert.NotNil(err)
 	assert.Equal(err.Error(), "SAS key not provided")
+}
+
+func (s *configTestSuite) TestCompressionType() {
+	defer config.ResetConfig()
+	assert := assert.New(s.T())
+	az := &AzStorage{}
+	opt := AzStorageOptions{}
+	opt.AccountName = "abcd"
+	opt.Container = "abcd"
+
+	err := ParseAndValidateConfig(az, opt)
+	assert.Nil(err)
+	assert.Equal(az.stConfig.disableCompression, false)
+
+	opt.DisableCompression = true
+	config.SetBool(compName+".disable-compression", true)
+	err = ParseAndValidateConfig(az, opt)
+	assert.Nil(err)
+	assert.Equal(az.stConfig.disableCompression, true)
+
+	opt.DisableCompression = false
+	config.SetBool(compName+".disable-compression", false)
+	err = ParseAndValidateConfig(az, opt)
+	assert.Nil(err)
+	assert.Equal(az.stConfig.disableCompression, false)
+
 }
 
 func (s *configTestSuite) TestInvalidSASRefresh() {

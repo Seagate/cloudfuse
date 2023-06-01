@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -226,8 +227,16 @@ func testCreate(suite *libfuseTestSuite) {
 	options := internal.CreateFileOptions{Name: name, Mode: mode}
 	suite.mock.EXPECT().CreateFile(options).Return(&handlemap.Handle{}, nil)
 
-	err, _ := cfuseFS.Create(path, 0, uint32(mode))
+	err, fh := cfuseFS.Create(path, 0, uint32(mode))
 	suite.assert.Equal(0, err)
+
+	option := internal.GetAttrOptions{Name: name}
+	suite.mock.EXPECT().GetAttr(option).Return(&internal.ObjAttr{}, nil)
+	stbuf := &fuse.Stat_t{}
+	err = cfuseFS.Getattr(path, stbuf, fh)
+	suite.assert.Equal(0, err)
+	suite.assert.Equal(stbuf.Mtim.Nsec, int64(0))
+	suite.assert.NotEqual(stbuf.Mtim.Sec, int64(0))
 }
 
 func testCreateError(suite *libfuseTestSuite) {
@@ -491,7 +500,7 @@ func testFsync(suite *libfuseTestSuite) {
 	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(openOptions).Return(handle, nil)
 	_, fh := cfuseFS.Open(path, flags)
-	suite.assert.NotEqual(0, fh)
+	suite.assert.NotEqual(uint64(0), fh)
 
 	// Need to convert the ID to the correct filehandle for mocking
 	handle.ID = (handlemap.HandleID)(fh)
@@ -524,7 +533,7 @@ func testFsyncError(suite *libfuseTestSuite) {
 	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(openOptions).Return(handle, nil)
 	_, fh := cfuseFS.Open(path, flags)
-	suite.assert.NotEqual(0, fh)
+	suite.assert.NotEqual(uint64(0), fh)
 
 	// Need to convert the ID to the correct filehandle for mocking
 	handle.ID = (handlemap.HandleID)(fh)

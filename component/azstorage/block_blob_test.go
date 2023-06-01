@@ -12,6 +12,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -505,7 +506,12 @@ func (s *blockBlobTestSuite) TestDeleteSubDirPrefixPath() {
 
 	s.az.storage.SetPrefixPath(base)
 
-	err := s.az.DeleteDir(internal.DeleteDirOptions{Name: "c1"})
+	attr, err := s.az.GetAttr(internal.GetAttrOptions{Name: "c1"})
+	s.assert.Nil(err)
+	s.assert.NotNil(attr)
+	s.assert.True(attr.IsDir())
+
+	err = s.az.DeleteDir(internal.DeleteDirOptions{Name: "c1"})
 	s.assert.Nil(err)
 
 	// a paths under c1 should be deleted

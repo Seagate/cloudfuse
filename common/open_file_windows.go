@@ -16,6 +16,14 @@ const (
 	_ERROR_BAD_NETPATH = syscall.Errno(53)
 )
 
+// Open opens the named file for reading. If successful, methods on
+// the returned file can be used for reading; the associated file
+// descriptor has mode O_RDONLY.
+// If there is an error, it will be of type *PathError.
+func Open(name string) (*os.File, error) {
+	return OpenFile(name, syscall.O_RDONLY, 0)
+}
+
 // OpenFile is the generalized open call; most users will use Open
 // or Create instead. It opens the named file with specified flag
 // (O_RDONLY etc.). If the file does not exist, and the O_CREATE flag

@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -36,14 +37,35 @@ package common
 import (
 	"fmt"
 	"os/exec"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"lyvecloudfuse/common/log"
+
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 // check whether lyvecloudfuse process is running for the given pid
 func CheckProcessStatus(pid string) error {
+	if runtime.GOOS == "windows" {
+		pid, err := strconv.ParseInt(pid, 10, 32)
+		if err != nil {
+			log.Err("cpu_mem_monitor::getCpuMemoryUsage : Error parsing process id")
+			return err
+		}
+
+		// Check if the pid is a current process, if err == nil
+		// then the process is running
+		_, err = process.NewProcess(int32(pid))
+		if err != nil {
+			return fmt.Errorf("lyvecloudfuse is not running on pid %v", pid)
+		}
+		return nil
+	}
+
+	// We are running on Linux in this case
 	cmd := "ps -ef | grep " + pid
 	cliOut, err := exec.Command("bash", "-c", cmd).Output()
 	if err != nil {

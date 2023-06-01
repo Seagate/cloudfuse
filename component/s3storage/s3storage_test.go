@@ -12,7 +12,8 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -379,6 +380,12 @@ func (s *s3StorageTestSuite) TestDeleteSubDirPrefixPath() {
 
 	err := s.s3Storage.storage.SetPrefixPath(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, base))
 	s.assert.Nil(err)
+
+	attr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: "c1"})
+	s.assert.Nil(err)
+	s.assert.NotNil(attr)
+	s.assert.True(attr.IsDir())
+
 	err = s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: "c1"})
 	s.assert.Nil(err)
 

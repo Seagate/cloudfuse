@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -168,6 +169,7 @@ func (az *AzStorage) Start(ctx context.Context) error {
 
 	// create stats collector for azstorage
 	azStatsCollector = stats_manager.NewStatsCollector(az.Name())
+	log.Debug("Starting azstorage stats collector")
 
 	return nil
 }
@@ -626,6 +628,9 @@ func init() {
 
 	subDirectory := config.AddStringFlag("subdirectory", "", "Mount only this sub-directory from given container.")
 	config.BindPFlag(compName+".subdirectory", subDirectory)
+
+	disableCompression := config.AddBoolFlag("disable-compression", false, "Disable transport layer compression.")
+	config.BindPFlag(compName+".disable-compression", disableCompression)
 
 	config.RegisterFlagCompletionFunc("container-name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveNoFileComp

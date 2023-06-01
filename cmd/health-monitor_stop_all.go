@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -36,6 +37,7 @@ package cmd
 import (
 	"fmt"
 	"os/exec"
+	"runtime"
 
 	"github.com/spf13/cobra"
 )
@@ -57,6 +59,15 @@ var healthMonStopAll = &cobra.Command{
 
 // Attempts to kill all health monitors
 func stopAll() error {
+	if runtime.GOOS == "windows" {
+		cliOut := exec.Command("taskkill", "/IM", "bfusemon.exe", "/F")
+		_, err := cliOut.Output()
+		if err != nil {
+			return err
+		}
+		fmt.Println("Successfully stopped all health monitor binaries.")
+		return nil
+	}
 	cliOut := exec.Command("killall", "bfusemon")
 	_, err := cliOut.Output()
 	if err != nil {

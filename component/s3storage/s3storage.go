@@ -9,7 +9,8 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -134,6 +135,7 @@ func (s3 *S3Storage) Start(ctx context.Context) error {
 	log.Trace("S3Storage::Start : Starting component %s", s3.Name())
 	// create stats collector for s3storage
 	s3StatsCollector = stats_manager.NewStatsCollector(s3.Name())
+	log.Debug("Starting s3 stats collector")
 
 	return nil
 }
@@ -255,6 +257,10 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			options.Token = *newMarker
 			return s3.StreamDir(options)
 		}
+	}
+	if newMarker == nil {
+		blnkStr := ""
+		newMarker = &blnkStr
 	}
 
 	// if path is empty, it means it is the root, relative to the mounted directory

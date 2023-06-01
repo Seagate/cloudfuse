@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -46,7 +47,7 @@ import (
 
 // Standard config default values
 const (
-	lyvecloudfuseVersion_ = "2.0.2"
+	lyvecloudfuseVersion_ = "2.0.3"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
@@ -69,7 +70,7 @@ const (
 )
 
 func FuseIgnoredFlags() []string {
-	return []string{"default_permissions", "rw", "dev", "nodev", "suid", "nosuid", "delay_connect", "uid", "gid", "auto", "noauto", "user", "nouser", "exec", "noexec"}
+	return []string{"default_permissions", "rw", "dev", "nodev", "suid", "nosuid", "delay_connect", "auto", "noauto", "user", "nouser", "exec", "noexec"}
 }
 
 var LyvecloudfuseVersion = LyvecloudfuseVersion_()
@@ -84,8 +85,6 @@ var StatsConfigFilePath = JoinUnixFilepath(DefaultWorkDir, "stats_monitor.cfg")
 
 var EnableMonitoring = false
 var BfsDisabled = false
-var TransferPipe = "/tmp/transferPipe"
-var PollingPipe = "/tmp/pollPipe"
 
 // LogLevel enum
 type LogLevel int

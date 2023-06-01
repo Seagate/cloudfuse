@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -44,6 +45,8 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,6 +55,7 @@ import (
 )
 
 var RootMount bool
+var ForegroundMount bool
 
 // IsDirectoryMounted is a utility function that returns true if the directory is already mounted using fuse
 func IsDirectoryMounted(path string) bool {
@@ -155,6 +159,12 @@ func NormalizeObjectName(name string) string {
 
 // List all mount points which were mounted using lyvecloudfuse
 func ListMountPoints() ([]string, error) {
+	// TODO: Add support to list current mounts
+	// We cannot list mount points like we do on Linux
+	if runtime.GOOS == "windows" {
+		return nil, nil
+	}
+
 	file, err := os.Open("/etc/mtab")
 	if err != nil {
 		return nil, err
@@ -276,4 +286,12 @@ func ExpandPath(path string) string {
 	}
 
 	return os.ExpandEnv(path)
+}
+
+// IsDriveLetter returns true if the path is a drive letter on Windows, such
+// as 'D:' or 'f:'. Returns false otherwise.
+func IsDriveLetter(path string) bool {
+	pattern := `^[A-Za-z]:$`
+	match, _ := regexp.MatchString(pattern, path)
+	return match
 }

@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -67,6 +68,7 @@ type Libfuse struct {
 	entryExpiration       uint32
 	negativeTimeout       uint32
 	allowOther            bool
+	allowRoot             bool
 	ownerUID              uint32
 	ownerGID              uint32
 	traceEnable           bool
@@ -74,6 +76,7 @@ type Libfuse struct {
 	disableWritebackCache bool
 	ignoreOpenFlags       bool
 	nonEmptyMount         bool
+	networkShare          bool // Run as a network file share on Windows
 	lsFlags               common.BitMap16
 }
 
@@ -95,11 +98,15 @@ type LibfuseOptions struct {
 	NegativeEntryExpiration uint32 `config:"negative-entry-expiration-sec" yaml:"negative-entry-expiration-sec,omitempty"`
 	EnableFuseTrace         bool   `config:"fuse-trace" yaml:"fuse-trace,omitempty"`
 	allowOther              bool   `config:"allow-other" yaml:"-"`
+	allowRoot               bool   `config:"allow-root" yaml:"-"`
 	readOnly                bool   `config:"read-only" yaml:"-"`
 	ExtensionPath           string `config:"extension" yaml:"extension,omitempty"`
 	DisableWritebackCache   bool   `config:"disable-writeback-cache" yaml:"-"`
 	IgnoreOpenFlags         bool   `config:"ignore-open-flags" yaml:"ignore-open-flags,omitempty"`
 	nonEmptyMount           bool   `config:"nonempty" yaml:"nonempty,omitempty"`
+	NetworkShare            bool   `config:"network-share" yaml:"network-share,omitempty"`
+	Uid                     uint32 `config:"uid" yaml:"uid,omitempty"`
+	Gid                     uint32 `config:"gid" yaml:"uid,omitempty"`
 }
 
 const compName = "libfuse"
@@ -146,6 +153,7 @@ func (lf *Libfuse) Start(ctx context.Context) error {
 
 	// create stats collector for libfuse
 	libfuseStatsCollector = stats_manager.NewStatsCollector(lf.Name())
+	log.Debug("Starting libfuse stats collector")
 
 	lf.lsFlags = internal.NewDirBitMap()
 	lf.lsFlags.Set(internal.PropFlagModeDefault)
@@ -177,10 +185,12 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 	lf.readOnly = opt.readOnly
 	lf.traceEnable = opt.EnableFuseTrace
 	lf.allowOther = opt.allowOther
+	lf.allowRoot = opt.allowRoot
 	lf.extensionPath = opt.ExtensionPath
 	lf.disableWritebackCache = opt.DisableWritebackCache
 	lf.ignoreOpenFlags = opt.IgnoreOpenFlags
 	lf.nonEmptyMount = opt.nonEmptyMount
+	lf.networkShare = opt.NetworkShare
 
 	if opt.allowOther {
 		lf.dirPermission = uint(common.DefaultAllowOtherPermissionBits)
@@ -220,6 +230,15 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 		return nil
 	}
 
+	if config.IsSet(compName + ".uid") {
+		lf.ownerUID = opt.Uid
+	}
+
+	if config.IsSet(compName + ".gid") {
+		lf.ownerGID = opt.Gid
+	}
+	log.Info("Libfuse::Validate : UID %v, GID %v", lf.ownerUID, lf.ownerGID)
+
 	return nil
 }
 
@@ -255,6 +274,12 @@ func (lf *Libfuse) Configure(_ bool) error {
 		return err
 	}
 
+	err = config.UnmarshalKey("allow-root", &conf.allowRoot)
+	if err != nil {
+		log.Err("Libfuse::Configure : config error [unable to obtain allow-root]")
+		return err
+	}
+
 	err = config.UnmarshalKey("nonempty", &conf.nonEmptyMount)
 	if err != nil {
 		log.Err("Libfuse::Configure : config error [unable to obtain nonempty]")
@@ -264,11 +289,13 @@ func (lf *Libfuse) Configure(_ bool) error {
 	err = lf.Validate(&conf)
 	if err != nil {
 		log.Err("Libfuse::Configure : config error [invalid config settings]")
-		return fmt.Errorf("config error in %s [invalid config settings]", lf.Name())
+		return fmt.Errorf("%s config error %s", lf.Name(), err.Error())
 	}
 
-	log.Info("Libfuse::Configure : read-only %t, allow-other %t, default-perm %d, entry-timeout %d, attr-time %d, negative-timeout %d, ignore-open-flags: %t, nonempty %t",
-		lf.readOnly, lf.allowOther, lf.filePermission, lf.entryExpiration, lf.attributeExpiration, lf.negativeTimeout, lf.ignoreOpenFlags, lf.nonEmptyMount)
+	log.Info("Libfuse::Configure : read-only %t, allow-other %t, allow-root %t, default-perm %d, entry-timeout %d, attr-time %d, negative-timeout %d, "+
+		"ignore-open-flags: %t, nonempty %t, network-share %t",
+		lf.readOnly, lf.allowOther, lf.allowRoot, lf.filePermission, lf.entryExpiration, lf.attributeExpiration, lf.negativeTimeout,
+		lf.ignoreOpenFlags, lf.nonEmptyMount, lf.networkShare)
 
 	return nil
 }
@@ -312,4 +339,7 @@ func init() {
 
 	ignoreOpenFlags := config.AddBoolFlag("ignore-open-flags", true, "Ignore unsupported open flags (APPEND, WRONLY) by blobfuse when writeback caching is enabled.")
 	config.BindPFlag(compName+".ignore-open-flags", ignoreOpenFlags)
+
+	networkShareFlags := config.AddBoolFlag("network-share", false, "Run as a network share. Only supported on Windows.")
+	config.BindPFlag(compName+".network-share", networkShareFlags)
 }

@@ -11,6 +11,7 @@ package libfuse
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -126,6 +127,9 @@ func (lf *Libfuse) initFuse() error {
 	if lf.allowOther {
 		options += ",allow_other"
 	}
+	if lf.allowRoot {
+		options += ",allow_root"
+	}
 	if lf.readOnly {
 		options += ",ro"
 	}
@@ -135,6 +139,13 @@ func (lf *Libfuse) initFuse() error {
 
 	// Setup options as a slice
 	opts := []string{"-o", options}
+
+	// Runs as network file share on Windows only when mounting to drive letter.
+	if runtime.GOOS == "windows" && lf.networkShare && common.IsDriveLetter(lf.mountPath) {
+		// TODO: We can support any type of valid network share path so this path could
+		// be configurable for the config file. But this is a good default.
+		opts = append(opts, "--VolumePrefix=\\server\\share")
+	}
 
 	// Enabling trace is done by using -d rather than setting an option in fuse
 	if lf.traceEnable {
@@ -185,9 +196,13 @@ func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
 	}
 
 	stbuf.Atim = fuse.NewTimespec(attr.Atime)
+	stbuf.Atim.Nsec = 0
 	stbuf.Ctim = fuse.NewTimespec(attr.Ctime)
+	stbuf.Ctim.Nsec = 0
 	stbuf.Mtim = fuse.NewTimespec(attr.Mtime)
+	stbuf.Mtim.Nsec = 0
 	stbuf.Birthtim = fuse.NewTimespec(attr.Mtime)
+	stbuf.Birthtim.Nsec = 0
 }
 
 // NewcgofuseFS creates a new empty fuse filesystem.
@@ -196,9 +211,14 @@ func NewcgofuseFS() *CgofuseFS {
 	return cf
 }
 
-// Init does nothing here, as init is handled elsewhere
+// Init notifies the parent process once the mount is successful.
 func (cf *CgofuseFS) Init() {
 	log.Trace("Libfuse::Init : Initializing FUSE")
+
+	log.Info("Libfuse::Init : Notifying parent for successful mount")
+	if err := common.NotifyMountToParent(); err != nil {
+		log.Err("Libfuse::initFuse : Failed to notify parent, error: [%v]", err)
+	}
 }
 
 // Destroy does nothing in blobfuse, so same here.
@@ -249,6 +269,14 @@ func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::libfuse_mkdir : %s", name)
+
+	// Check if the directory already exists. On Windows we need to make this call explicitly
+	if runtime.GOOS == "windows" {
+		attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+		if (attr != nil || os.IsExist(err)) && attr.IsDir() {
+			return -fuse.EEXIST
+		}
+	}
 
 	// blobfuse uses a bitwise and trick to make sure mode is a uint32, we don't need that here
 	err := fuseFS.NextComponent().CreateDir(internal.CreateDirOptions{Name: name, Mode: fs.FileMode(mode)})

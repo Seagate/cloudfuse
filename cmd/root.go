@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -164,7 +165,7 @@ func beginDetectNewVersion() chan interface{} {
 			if hasWarnings {
 				warningsPage := common.LyvecloudfuseWarningsURL + "#" + strings.ReplaceAll(common.LyvecloudfuseVersion, ".", "")
 				fmt.Fprintf(stderr, "Visit %s to see the list of vulnerabilities associated with your current version [%s]\n", warningsPage, common.LyvecloudfuseVersion)
-				log.Warn("Vist %s to see the list of vulnerabilities associated with your current version [%s]\n", warningsPage, common.LyvecloudfuseVersion)
+				log.Warn("Visit %s to see the list of vulnerabilities associated with your current version [%s]\n", warningsPage, common.LyvecloudfuseVersion)
 			}
 			completed <- "A new version of Lyvecloudfuse is available"
 		}

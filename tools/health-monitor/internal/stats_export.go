@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -199,6 +200,7 @@ func (se *StatsExporter) checkInList(t string) int {
 }
 
 func (se *StatsExporter) addToOutputFile(op *Output) error {
+	log.Debug("stats_exporter::addToOutputFile : Writing to output file")
 	jsonData, err := json.MarshalIndent(op, "", "\t")
 	if err != nil {
 		log.Err("stats_exporter::addToOutputFile : unable to marshal [%v]", err)

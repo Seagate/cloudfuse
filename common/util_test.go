@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -153,4 +154,26 @@ func (suite *utilTestSuite) TestExpandPath() {
 	path = "/a/b/c/d"
 	expandedPath = ExpandPath(path)
 	suite.assert.Equal(expandedPath, path)
+}
+
+func (suite *utilTestSuite) TestIsDriveLetter() {
+	path := "D:"
+	match := IsDriveLetter(path)
+	suite.assert.Equal(true, match)
+
+	path = "x:"
+	match = IsDriveLetter(path)
+	suite.assert.Equal(true, match)
+
+	path = "D"
+	match = IsDriveLetter(path)
+	suite.assert.Equal(false, match)
+
+	path = "C/folder"
+	match = IsDriveLetter(path)
+	suite.assert.Equal(false, match)
+
+	path = "C:\\Users"
+	match = IsDriveLetter(path)
+	suite.assert.Equal(false, match)
 }

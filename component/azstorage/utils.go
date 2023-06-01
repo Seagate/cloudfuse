@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -99,28 +100,16 @@ func getAzBlobPipelineOptions(conf AzStorageConfig) (azblob.PipelineOptions, ste
 		SyslogDisabled: sysLogDisabled,
 	}
 	logOptions := getLogOptions(conf.sdkTrace)
-	if conf.proxyAddress == "" {
-		// If we did not set a proxy address in our config then use default settings
-		return azblob.PipelineOptions{
-				Log:        logOptions,
-				RequestLog: requestLogOptions,
-				Telemetry:  telemetryOptions,
-			},
-			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
-			retryOptions
-	} else {
-		// Else create custom HTTPClient to pass to the factory in order to set our proxy
-		var pipelineHTTPClient = newLyvecloudfuseHttpClient(conf)
-		// While creating new pipeline we need to provide the retry policy
-		return azblob.PipelineOptions{
-				Log:        logOptions,
-				RequestLog: requestLogOptions,
-				Telemetry:  telemetryOptions,
-				HTTPSender: newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient),
-			},
-			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
-			retryOptions
-	}
+	// Create custom HTTPClient to pass to the factory in order to set our proxy
+	var pipelineHTTPClient = newLyvecloudfuseHttpClient(conf)
+	return azblob.PipelineOptions{
+			Log:        logOptions,
+			RequestLog: requestLogOptions,
+			Telemetry:  telemetryOptions,
+			HTTPSender: newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient),
+		},
+		// Set RetryOptions to control how HTTP request are retried when retryable failures occur
+		retryOptions
 }
 
 // getAzBfsPipelineOptions : Create pipeline options based on the config
@@ -141,28 +130,16 @@ func getAzBfsPipelineOptions(conf AzStorageConfig) (azbfs.PipelineOptions, ste.X
 		SyslogDisabled: sysLogDisabled,
 	}
 	logOptions := getLogOptions(conf.sdkTrace)
-	if conf.proxyAddress == "" {
-		// If we did not set a proxy address in our config then use default settings
-		return azbfs.PipelineOptions{
-				Log:        logOptions,
-				RequestLog: requestLogOptions,
-				Telemetry:  telemetryOptions,
-			},
-			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
-			retryOptions
-	} else {
-		// Else create custom HTTPClient to pass to the factory in order to set our proxy
-		var pipelineHTTPClient = newLyvecloudfuseHttpClient(conf)
-		// While creating new pipeline we need to provide the retry policy
-		return azbfs.PipelineOptions{
-				Log:        logOptions,
-				RequestLog: requestLogOptions,
-				Telemetry:  telemetryOptions,
-				HTTPSender: newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient),
-			},
-			// Set RetryOptions to control how HTTP request are retried when retryable failures occur
-			retryOptions
-	}
+	// Create custom HTTPClient to pass to the factory in order to set our proxy
+	var pipelineHTTPClient = newLyvecloudfuseHttpClient(conf)
+	return azbfs.PipelineOptions{
+			Log:        logOptions,
+			RequestLog: requestLogOptions,
+			Telemetry:  telemetryOptions,
+			HTTPSender: newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient),
+		},
+		// Set RetryOptions to control how HTTP request are retried when retryable failures occur
+		retryOptions
 }
 
 // Create an HTTP Client with configured proxy
@@ -175,6 +152,11 @@ func newLyvecloudfuseHttpClient(conf AzStorageConfig) *http.Client {
 		}
 		return &proxyURL, nil
 	}
+
+	if conf.proxyAddress == "" {
+		ProxyURL = nil
+	}
+
 	return &http.Client{
 		Transport: &http.Transport{
 			Proxy: ProxyURL,
@@ -184,13 +166,15 @@ func newLyvecloudfuseHttpClient(conf AzStorageConfig) *http.Client {
 				KeepAlive: KeepAlive,
 				DualStack: DualStack,
 			}).Dial, /*Context*/
-			MaxIdleConns:           MaxIdleConns, // No limit
-			MaxIdleConnsPerHost:    MaxIdleConnsPerHost,
-			IdleConnTimeout:        IdleConnTimeout,
-			TLSHandshakeTimeout:    TLSHandshakeTimeout,
-			ExpectContinueTimeout:  ExpectContinueTimeout,
-			DisableKeepAlives:      DisableKeepAlives,
-			DisableCompression:     DisableCompression,
+			MaxIdleConns:          MaxIdleConns, // No limit
+			MaxIdleConnsPerHost:   MaxIdleConnsPerHost,
+			IdleConnTimeout:       IdleConnTimeout,
+			TLSHandshakeTimeout:   TLSHandshakeTimeout,
+			ExpectContinueTimeout: ExpectContinueTimeout,
+			DisableKeepAlives:     DisableKeepAlives,
+			// if content-encoding is set in blob then having transport layer compression will
+			// make things ugly and hence user needs to disable this feature through config
+			DisableCompression:     conf.disableCompression,
 			MaxResponseHeaderBytes: MaxResponseHeaderBytes,
 			//ResponseHeaderTimeout:  time.Duration{},
 			//ExpectContinueTimeout:  time.Duration{},
@@ -554,11 +538,17 @@ func split(prefixPath string, path string) string {
 		return path
 	}
 
-	// Split based on the unix path style in all cases
-	paths := strings.Split(path, "/")
-	if paths[0] == prefixPath {
+	// Remove prefixpath from the given path
+	paths := strings.Split(path, prefixPath)
+	if paths[0] == "" {
 		paths = paths[1:]
 	}
+
+	// If result starts with "/" then remove that
+	if paths[0][0] == '/' {
+		paths[0] = paths[0][1:]
+	}
+
 	return common.JoinUnixFilepath(paths...)
 }
 
