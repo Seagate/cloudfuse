@@ -17,6 +17,7 @@ class azureSettingsWidget(defaultSettingsManager,commonConfigFunctions, Ui_Form)
         self.setupUi(self)
         self.setWindowTitle("Azure Config Settings")
         self.myWindow = QSettings("LyveFUSE", "AzcWindow")
+        self.initWindowSizePos()
         self.initSettingsFromConfig()
         # Hide the pipeline mode groupbox depending on the default select is
         self.showAzureModeSettings()
