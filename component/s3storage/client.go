@@ -463,7 +463,12 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 
 // Upload from a file handle to an object.
 // The metadata parameter is not used.
-func (cl *Client) WriteFromFile(name string, fi *os.File) error {
+func (cl *Client) WriteFromFile(name string, fi *os.File, options internal.WriteFileOptions) error {
+	isSymLkStr := options.Metadata[symlinkKey]
+	var isSymlink bool
+	if isSymLkStr != "" && isSymLkStr == "true" { //if isSymLkStr is not empty or nil
+		isSymlink = true
+	}
 	log.Trace("Client::WriteFromFile : file %s -> name %s", fi.Name(), name)
 	// track time for performance testing
 	defer log.TimeTrack(time.Now(), "Client::WriteFromFile", name)
@@ -483,7 +488,7 @@ func (cl *Client) WriteFromFile(name string, fi *os.File) error {
 	}
 
 	// upload file data
-	err = cl.putObject(name, fi, false)
+	err = cl.putObject(name, fi, isSymlink)
 	if err != nil {
 		log.Err("Client::WriteFromFile : putObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -572,13 +577,20 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 	offset := options.Offset
 	data := options.Data
 	length := int64(len(data))
+	isSymLkStr := options.Metadata[symlinkKey]
+	isSymlink := false
 	defer log.TimeTrack(time.Now(), "Client::Write", options.Handle.Path)
 	log.Trace("Client::Write : name %s offset %v", name, offset)
 	// tracks the case where our offset is great than our current file size (appending only - not modifying pre-existing data)
 	var dataBuffer *[]byte
 
+	if isSymLkStr != "" { //if isSymLkStr is not empty or nil
+		if isSymLkStr == "true" {
+			isSymlink = true
+		}
+	}
 	// get the existing object data
-	oldData, _ := cl.ReadBuffer(name, 0, 0, false)
+	oldData, _ := cl.ReadBuffer(name, 0, 0, isSymlink)
 	// update the data with the new data
 	// if we're only overwriting existing data
 	if int64(len(oldData)) >= offset+length {
