@@ -348,11 +348,13 @@ func createObjAttr(path string, size int64, lastModified time.Time, isSymLink bo
 	// set flags
 	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
-	if isSymLink {
-		attr.Flags.Set(internal.PropFlagSymlink)
-	}
 
 	attr.Metadata = make(map[string]string)
+
+	if isSymLink {
+		attr.Flags.Set(internal.PropFlagSymlink)
+		attr.Metadata[symlinkKey] = "true"
+	}
 
 	return attr
 }
