@@ -616,7 +616,7 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		}
 	}
 	// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple blocks
-	err := cl.WriteFromBuffer(name, false, *dataBuffer) //to replace options.Metadata with an object. should I create a new object or use list?
+	err := cl.WriteFromBuffer(name, isSymlink, *dataBuffer) //to replace options.Metadata with an object. should I create a new object or use list?
 	if err != nil {
 		log.Err("Client::Write : Failed to upload to object. Here's why: %v ", name, err)
 		return err
