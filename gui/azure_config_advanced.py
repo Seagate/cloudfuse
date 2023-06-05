@@ -156,7 +156,7 @@ class azureAdvancedSettingsWidget(commonConfigFunctions, Ui_Form):
         # Fill in the default values for advanced
         pass
 
-    def writeConfigFile(self):
+    def updateSettingsFromUIChoices(self):
         self.updateAzStorage()
         self.updateFileCache()
         self.updateLibfuse()

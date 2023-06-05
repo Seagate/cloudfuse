@@ -19,6 +19,7 @@ class defaultSettingsManager():
             self.settings.setValue('dynamic-profile',False)
             self.settings.setValue('profiler-port',6060)
             self.settings.setValue('profiler-ip','localhost')
+            # This is the built pipeline name components 
             self.settings.setValue('components',['libfuse','file_cache','attr_cache','azstorage'])
             self.settings.setValue('libfuse',{
                 'default-permission' : 0o777,
@@ -165,8 +166,13 @@ class commonConfigFunctions(QWidget):
         for key in optionKeys:
             configDict[key] = self.settings.value(key)
         return configDict
+    
+    def updateSettingsFromUIChoices(self):
+        # Each individual widget will need to override this function
+        pass
 
     def writeConfigFile(self):
+        self.updateSettingsFromUIChoices()
         dictForConfigs = self.constructDictForConfig()
         currentDir = os.getcwd()
         with open(currentDir+'/testing_config.yaml','w') as file:

@@ -27,43 +27,13 @@ class azureSettingsWidget(defaultSettingsManager,commonConfigFunctions, Ui_Form)
         # Set up signals
         self.dropDown_pipeline.currentIndexChanged.connect(self.showModeSettings)
         self.dropDown_azure_modeSetting.currentIndexChanged.connect(self.showAzureModeSettings)
-        self.dropDown_azure_storageType.currentIndexChanged.connect(self.updateAzStorage)
-        self.dropDown_azure_modeSetting.currentIndexChanged.connect(self.updateAzStorage)
         self.button_browse.clicked.connect(self.getFileDirInput)
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_advancedSettings.clicked.connect(self.openAdvanced)
         self.button_resetDefaultSettings.clicked.connect(self.resetDefaults)
-    
-    
-        self.checkbox_commonConfig_multiUser.stateChanged.connect(self.updateMultiUser)
-        self.checkbox_commonConfig_nonEmptyDir.stateChanged.connect(self.updateNonEmtpyDir)
-        self.checkbox_daemonForeground.stateChanged.connect(self.updateDaemonForeground)
-        self.checkbox_commonConfig_readOnly.stateChanged.connect(self.updateReadOnly)
-        self.checkbox_libfuse_ignoreAppend.stateChanged.connect(self.updateLibfuse)
-        self.checkbox_streaming_fileCachingLevel.stateChanged.connect(self.updateStream)
-        
-        self.spinBox_libfuse_attributeExp.valueChanged.connect(self.updateLibfuse)
-        self.spinBox_libfuse_entryExp.valueChanged.connect(self.updateLibfuse)
-        self.spinBox_libfuse_negEntryExp.valueChanged.connect(self.updateLibfuse)
-        self.spinBox_streaming_blockSize.valueChanged.connect(self.updateStream)
-        self.spinBox_streaming_buffSize.valueChanged.connect(self.updateStream)
-        self.spinBox_streaming_maxBuff.valueChanged.connect(self.updateStream)
-    
         self.lineEdit_azure_accountKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.lineEdit_azure_spnClientSecret.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
-        self.lineEdit_fileCache_path.editingFinished.connect(self.updateFileCache)
-        self.lineEdit_azure_accountKey.editingFinished.connect(self.updateAzStorage)
-        self.lineEdit_azure_sasStorage.editingFinished.connect(self.updateAzStorage)
-        self.lineEdit_azure_accountName.editingFinished.connect(self.updateAzStorage)
-        self.lineEdit_azure_container.editingFinished.connect(self.updateAzStorage)
-        self.lineEdit_azure_endpoint.editingFinished.connect(self.updateAzStorage)
-        self.lineEdit_azure_msiAppID.editingFinished.connect(self.updateAzStorage)
-        self.lineEdit_azure_msiResourceID.editingFinished.connect(self.updateAzStorage)
-        self.lineEdit_azure_msiObjectID.editingFinished.connect(self.updateAzStorage)
-        self.lineEdit_azure_spnTenantID.editingFinished.connect(self.updateAzStorage)
-        self.lineEdit_azure_spnClientID.editingFinished.connect(self.updateAzStorage)
-        self.lineEdit_azure_spnClientSecret.editingFinished.connect(self.updateAzStorage)
-    
+   
     # Set up slots
     
     def updateMultiUser(self):
@@ -239,3 +209,13 @@ class azureSettingsWidget(defaultSettingsManager,commonConfigFunctions, Ui_Form)
 
     def resetDefaults(self):
         pass
+    
+    def updateSettingsFromUIChoices(self):
+        self.updateFileCache()
+        self.updateLibfuse()
+        self.updateStream()
+        self.updateAzStorage()
+        self.updateMultiUser()
+        self.updateNonEmtpyDir()
+        self.updateReadOnly()
+        self.updateDaemonForeground()

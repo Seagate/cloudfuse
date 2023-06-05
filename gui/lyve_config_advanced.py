@@ -88,6 +88,6 @@ class lyveAdvancedSettingsWidget(commonConfigFunctions, Ui_Form):
         # Fill in the default values for advanced
         pass
 
-    def writeConfigFile(self):
+    def updateSettingsFromUIChoices(self):
         self.updateFileCache()
         self.updateLibfuse()
