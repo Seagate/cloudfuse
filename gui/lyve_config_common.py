@@ -26,32 +26,10 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
 
         # Set up signals for buttons
         self.dropDown_pipeline.currentIndexChanged.connect(self.showModeSettings)
-        self.dropDown_libfuse_permissions.currentIndexChanged.connect(self.updateLibfuse)
-        
         self.button_browse.clicked.connect(self.getFileDirInput)
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_advancedSettings.clicked.connect(self.openAdvanced)
         self.button_resetDefaultSettings.clicked.connect(self.resetDefaults)
-        
-        self.checkbox_multiUser.stateChanged.connect(self.updateMultiUser)
-        self.checkbox_nonEmptyDir.stateChanged.connect(self.updateNonEmtpyDir)
-        self.checkbox_daemonForeground.stateChanged.connect(self.updateDaemonForeground)
-        self.checkbox_readOnly.stateChanged.connect(self.updateReadOnly)
-        self.checkbox_libfuse_ignoreAppend.stateChanged.connect(self.updateLibfuse)
-        self.checkbox_streaming_fileCachingLevel.stateChanged.connect(self.updateStream)
-        
-        self.spinBox_libfuse_attExp.valueChanged.connect(self.updateLibfuse)
-        self.spinBox_libfuse_entExp.valueChanged.connect(self.updateLibfuse)
-        self.spinBox_libfuse_negEntryExp.valueChanged.connect(self.updateLibfuse)
-        self.spinBox_streaming_blockSize.valueChanged.connect(self.updateStream)
-        self.spinBox_streaming_buffSize.valueChanged.connect(self.updateStream)
-        self.spinBox_streaming_maxBuff.valueChanged.connect(self.updateStream)
-        
-        self.lineEdit_secretKey.editingFinished.connect(self.updateS3Storage)
-        self.lineEdit_bucketName.editingFinished.connect(self.updateS3Storage)
-        self.lineEdit_accessKey.editingFinished.connect(self.updateS3Storage)
-        self.lineEdit_endpoint.editingFinished.connect(self.updateS3Storage)
-        self.lineEdit_fileCache_path.editingFinished.connect(self.updateFileCache)
        
     # Set up slots for the signals:
     
@@ -136,7 +114,8 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
 
     # This widget will not display all the options in settings, only the ones written in the UI file.
     def populateOptions(self):
-        # add commnet here
+        # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices and libfusePermissions reflect the 
+        #   index choices in human words without having to reference the UI. Get the value in the settings and translate that to the equivalent index in the lists.
         self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings.value('components')[1]))
         self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(self.settings.value('libfuse')['default-permission']))
         
@@ -191,3 +170,13 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
     def resetDefaults(self):
         # Reset these defaults
         pass
+    
+    def updateSettingsFromUIChoices(self):
+        self.updateFileCache()
+        self.updateLibfuse()
+        self.updateReadOnly()
+        self.updateDaemonForeground()
+        self.updateMultiUser()
+        self.updateNonEmtpyDir()
+        self.updateStream()
+        self.updateS3Storage()
