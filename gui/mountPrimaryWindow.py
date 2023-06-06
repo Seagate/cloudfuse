@@ -1,6 +1,8 @@
 # System imports
 import subprocess
 from sys import platform
+import os
+import yaml
 
 # Import QT libraries
 from PySide6.QtCore import Qt
@@ -12,10 +14,7 @@ from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
 from lyve_config_common import lyveSettingsWidget
 from azure_config_common import azureSettingsWidget
 
-bucketOptions = {
-    "Lyve" : 0,
-    "Azure" : 1
-}
+bucketOptions = ['s3storage', 'azstorage']
 
 class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def __init__(self):
@@ -37,9 +36,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     # so we must use different widgets to show the different settings
     def showSettingsWidget(self):
 
-        mountTarget = self.dropDown_bucketSelect.currentIndex()
-        
-        if mountTarget == bucketOptions['Lyve']:
+        targetIndex = self.dropDown_bucketSelect.currentIndex()
+        if bucketOptions[targetIndex] == 's3storage':
             self.settings = lyveSettingsWidget()
         else:
             self.settings = azureSettingsWidget()
@@ -55,8 +53,12 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         
         # TODO: If target is set, the pipeline needs to change the target to azure or s3, 
         #   at the moment the settings widgets change the pipeline, 
-        #   but if the user just wants to change the target and nothing else they wouldn't go into the settings. 
-
+        #   but if the user just wants to change the target and nothing else they wouldn't go into the settings.
+        targetIndex = self.dropDown_bucketSelect.currentIndex() 
+        success = self.modifyPipeline(bucketOptions[targetIndex])
+        if not success:
+            # Don't try mounting the container since the config file couldn't be modified for the pipeline setting
+            return
         try:
             directory = str(self.lineEdit_mountPoint.text())
             
@@ -68,9 +70,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 
                 # TODO: For future use to get output on Popen
                 #   for line in mount.stdout.readlines():    
-            else:            
+            else:
                 mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"])#,capture_output=True)
-                
                 # Print to the text edit window the results of the mount
                 if mount.returncode == 0:
                     self.textEdit_output.setText("Successfully mounted container\n")
@@ -99,3 +100,45 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 x = msg.exec()
         except ValueError:
             pass
+        
+        
+    # This function reads in the config file, modifies the components section, then writes the config file back
+    def modifyPipeline(self,target):
+        currentDir = os.getcwd()
+        errMsg = QtWidgets.QMessageBox()
+        
+        # Read in the configs as a dictionary. Notify user if failed
+        try:
+            with open(currentDir+'/config.yaml', 'r') as file:
+                configs = yaml.safe_load(file)
+        except:
+            errMsg.setWindowTitle("Could not read config file")
+            errMsg.setText(f"Could not read the config file in {currentDir}. Consider going through the settings for selected target.")
+            errMsg.exec()
+            return False
+        
+        # Modify the components (pipeline) in the config file. 
+        #   If the components are not present, there's a chance the configs are wrong. Notify user.
+
+        components = configs.get('components')
+        if components != None:
+            components[3] = target
+            configs['components'] = components
+        else:
+            errMsg.setWindowTitle("Components in config missing")
+            errMsg.setText(f"The components is missing in {currentDir}/config.yaml. Consider Going through the settings to create one.")
+            errMsg.exec()            
+            return False
+        
+        # Write the config file with the modified components 
+        try:
+            with open(currentDir+'/config.yaml','w') as file:
+                yaml.safe_dump(configs,file)
+        except:
+            errMsg.setWindowTitle("Could not modify config file")
+            errMsg.setText(f"Could not modify {currentDir}/config.yaml.")
+            errMsg.exec()
+            return False
+        
+        # If nothing failed so far, return true to proceed to the mount phase
+        return True
