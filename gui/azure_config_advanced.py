@@ -6,7 +6,7 @@ from ui_azure_config_advanced import Ui_Form
 from common_qt_functions import commonConfigFunctions
 
 file_cache_eviction_choices = ['lru','lfu']
-az_blob_tier = ['hot','cool','archive','none']
+az_blob_tier = ['none','hot','cool','archive']
 
 class azureAdvancedSettingsWidget(commonConfigFunctions, Ui_Form):
     def __init__(self):
@@ -20,7 +20,7 @@ class azureAdvancedSettingsWidget(commonConfigFunctions, Ui_Form):
         
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)
-        self.button_resetDefaultSettings.clicked.connect(self.resetDefaults)
+        self.button_resetDefaultSettings.clicked.connect(self.populateOptions)
         
 
     def populateOptions(self):
@@ -152,10 +152,6 @@ class azureAdvancedSettingsWidget(commonConfigFunctions, Ui_Form):
         azStorage['tier'] = az_blob_tier[self.dropDown_azure_blobTier.currentIndex()]
         self.settings.setValue('azstorage',azStorage)
     
-    def resetDefaults(self):
-        # Fill in the default values for advanced
-        pass
-
     def updateSettingsFromUIChoices(self):
         self.updateAzStorage()
         self.updateFileCache()

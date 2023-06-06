@@ -19,7 +19,7 @@ class lyveAdvancedSettingsWidget(commonConfigFunctions, Ui_Form):
         
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)
-        self.button_resetDefaultSettings.clicked.connect(self.resetDefaults)
+        self.button_resetDefaultSettings.clicked.connect(self.populateOptions)
 
     def updateLibfuse(self):
         libfuse = self.settings.value('libfuse')
@@ -83,10 +83,6 @@ class lyveAdvancedSettingsWidget(commonConfigFunctions, Ui_Form):
         self.spinBox_fileCache_maxCacheSize.setValue(self.settings.value('file_cache')['max-size-mb'])
         self.spinBox_fileCache_evictMaxThresh.setValue(self.settings.value('file_cache')['high-threshold'])
         self.spinBox_fileCache_evictMinThresh.setValue(self.settings.value('file_cache')['low-threshold'])
-
-    def resetDefaults(self):
-        # Fill in the default values for advanced
-        pass
 
     def updateSettingsFromUIChoices(self):
         self.updateFileCache()

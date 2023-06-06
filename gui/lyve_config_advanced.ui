@@ -36,7 +36,7 @@
       <enum>Qt::LeftToRight</enum>
      </property>
      <property name="text">
-      <string>Reset Default Settings</string>
+      <string>Reset Changes</string>
      </property>
      <property name="default">
       <bool>false</bool>
