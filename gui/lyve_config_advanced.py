@@ -45,9 +45,13 @@ class lyveAdvancedSettingsWidget(commonConfigFunctions, Ui_Form):
         
         
     def populateOptions(self):
+        # The index of file_cache_eviction is matched with the default 
+        #   index values in the ui code, so translate the value from settings to index number
         policyIndex = file_cache_eviction_choices.index(self.settings.value('file_cache')['policy'])
         self.dropDown_fileCache_evictionPolicy.setCurrentIndex(policyIndex)
         
+        # Checked and Unchecked are not True/False quivalent so check for True then set the relevant status.
+        #   Explicitly check for True for clarity
         if self.settings.value('libfuse')['disable-writeback-cache'] == True:
             self.checkbox_libfuse_disableWriteback.setCheckState(Qt.Checked)
         else:
