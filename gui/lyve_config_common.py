@@ -169,7 +169,11 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
         
     def resetDefaults(self):
         # Reset these defaults
-        pass
+        checkChoice = self.popupDoubleCheckReset()
+        if checkChoice == QtWidgets.QMessageBox.Yes:
+            self.setLyveSettings()
+            self.setComponentSettings()
+            self.populateOptions()
     
     def updateSettingsFromUIChoices(self):
         self.updateFileCache()
