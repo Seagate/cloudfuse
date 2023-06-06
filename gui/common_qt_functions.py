@@ -211,7 +211,7 @@ class commonConfigFunctions(QWidget):
         else:
             try:
                 with open(currentDir+'/config.yaml', 'r') as file:
-                    configs = yaml.safe_load(file,)
+                    configs = yaml.safe_load(file)
             except:
                 configs = self.getConfigs(True)
         return configs
