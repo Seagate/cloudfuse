@@ -671,7 +671,7 @@ func (s *clientTestSuite) TestWriteFromFile() {
 	s.assert.EqualValues(bodyLen, outputLen)
 	var options internal.WriteFileOptions //stub
 
-	err = s.client.WriteFromFile(name, f, options)
+	err = s.client.WriteFromFile(name, f, options.Metadata)
 	s.assert.Nil(err)
 	f.Close()
 

@@ -463,8 +463,8 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 
 // Upload from a file handle to an object.
 // The metadata parameter is not used.
-func (cl *Client) WriteFromFile(name string, fi *os.File, options internal.WriteFileOptions) error {
-	isSymLkStr := options.Metadata[symlinkKey]
+func (cl *Client) WriteFromFile(name string, fi *os.File, metadata map[string]string) error {
+	isSymLkStr := metadata[symlinkKey]
 	var isSymlink bool
 	if isSymLkStr != "" && isSymLkStr == "true" { //if isSymLkStr is not empty or nil
 		isSymlink = true

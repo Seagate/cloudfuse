@@ -432,7 +432,7 @@ func (s3 *S3Storage) CopyToFile(options internal.CopyToFileOptions) error {
 
 func (s3 *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("S3Storage::CopyFromFile : Upload file %s", options.Name)
-	return s3.storage.WriteFromFile(options.Name, options.File) // object needed here?
+	return s3.storage.WriteFromFile(options.Name, options.File, options.Metadata)
 }
 
 // Symlink operations
