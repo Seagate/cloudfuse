@@ -17,6 +17,7 @@ class defaultSettingsManager():
         self.setComponentSettings()
         
     def setLyveSettings(self):
+        # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
         self.settings.setValue('s3storage',{
             'bucket-name': '',
             'key-id': '',
@@ -27,6 +28,7 @@ class defaultSettingsManager():
         })
     
     def setAzureSettings(self):
+        # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
         self.settings.setValue('azstorage',{
             'type': 'block',
             'account-name': '',
@@ -87,7 +89,7 @@ class defaultSettingsManager():
             'block-size-mb': 0,
             'max-buffers': 0,
             'buffer-size-mb': 0,
-            'file-caching': False # false - handle level caching ON
+            'file-caching': False # false = handle level caching ON
         })
         self.settings.setValue('file_cache',{
             'path': '',
@@ -159,7 +161,7 @@ class commonConfigFunctions(QWidget):
         choice = checkMsg.exec()
         return choice
             
-    # Override the closeEvent function from parent class to enable custom behavior
+    # Overrides the closeEvent function from parent class to enable this custom behavior
     def closeEvent(self, event):
         msg = QtWidgets.QMessageBox()
         msg.setWindowTitle("Are you sure?")
