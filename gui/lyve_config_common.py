@@ -121,7 +121,8 @@ class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form):
         
         # Check for a true/false setting and set the checkbox state as appropriate. 
         #   Note, Checked/UnChecked are NOT True/False data types, hence the need to check what the values are.
-        #   The default values for True/False settings are False, which is why Unchecked is the default state.
+        #   The default values for True/False settings are False, which is why Unchecked is the default state if the value doesn't equate to True.
+        #   Explicitly check for True for clarity
         if self.settings.value('allow-other') == True:
             self.checkbox_multiUser.setCheckState(Qt.Checked)
         else:

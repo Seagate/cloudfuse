@@ -123,7 +123,9 @@ class azureSettingsWidget(defaultSettingsManager,commonConfigFunctions, Ui_Form)
             
 # This widget will not display all the options in settings, only the ones written in the UI file.
     def populateOptions(self):
-        # add commnet here
+        # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices, libfusePermissions, azStorage and bucketMode
+        #   reflect the index choices in human words without having to reference the UI. 
+        #   Get the value in the settings and translate that to the equivalent index in the lists.
         self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings.value('components')[1]))
         self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(self.settings.value('libfuse')['default-permission']))
         self.dropDown_azure_storageType.setCurrentIndex(azStorageType.index(self.settings.value('azstorage')['type']))
@@ -131,7 +133,8 @@ class azureSettingsWidget(defaultSettingsManager,commonConfigFunctions, Ui_Form)
         
         # Check for a true/false setting and set the checkbox state as appropriate. 
         #   Note, Checked/UnChecked are NOT True/False data types, hence the need to check what the values are.
-        #   The default values for True/False settings are False, which is why Unchecked is the default state.
+        #   The default values for True/False settings are False, which is why Unchecked is the default state if the value doesn't equate to True.
+        #   Explicitly check for True for clarity
         if self.settings.value('allow-other') == True:
             self.checkbox_commonConfig_multiUser.setCheckState(Qt.Checked)
         else:
