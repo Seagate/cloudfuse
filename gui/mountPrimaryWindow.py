@@ -51,9 +51,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def mountBucket(self):
         msg = QtWidgets.QMessageBox()
         
-        # TODO: If target is set, the pipeline needs to change the target to azure or s3, 
-        #   at the moment the settings widgets change the pipeline, 
-        #   but if the user just wants to change the target and nothing else they wouldn't go into the settings.
+        # Update the pipeline/components before mounting the target
         targetIndex = self.dropDown_bucketSelect.currentIndex() 
         success = self.modifyPipeline(bucketOptions[targetIndex])
         if not success:
