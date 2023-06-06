@@ -208,7 +208,12 @@ class azureSettingsWidget(defaultSettingsManager,commonConfigFunctions, Ui_Form)
         self.groupbox_msi.setVisible(False)
 
     def resetDefaults(self):
-        pass
+        # Reset these defaults
+        checkChoice = self.popupDoubleCheckReset()
+        if checkChoice == QtWidgets.QMessageBox.Yes:
+            self.setAzureSettings()
+            self.setComponentSettings()
+            self.populateOptions()
     
     def updateSettingsFromUIChoices(self):
         self.updateFileCache()
