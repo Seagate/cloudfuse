@@ -163,10 +163,10 @@ func (cl *Client) SetPrefixPath(path string) error {
 }
 
 // CreateFile : Create a new file in the bucket/virtual directory
-func (cl *Client) CreateFile(name string, mode os.FileMode) error {
+func (cl *Client) CreateFile(name string, mode os.FileMode, options internal.CreateFileOptions) error {
 	log.Trace("Client::CreateFile : name %s", name)
 	var data []byte
-	return cl.WriteFromBuffer(name, false, data)
+	return cl.WriteFromBuffer(name, options.Metadata, data)
 }
 
 // CreateDirectory : Create a new directory in the bucket/virtual directory
@@ -180,11 +180,11 @@ func (cl *Client) CreateDirectory(name string) error {
 }
 
 // CreateLink : Create a symlink in the bucket/virtual directory
-func (cl *Client) CreateLink(source string, target string) error {
+func (cl *Client) CreateLink(source string, target string, options internal.CreateLinkOptions) error {
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
-	isSymlink := true
 	data := []byte(target)
-	return cl.WriteFromBuffer(source, isSymlink, data)
+
+	return cl.WriteFromBuffer(source, options.Metadata, data)
 }
 
 // DeleteFile : Delete an object.
@@ -514,12 +514,13 @@ func (cl *Client) WriteFromFile(name string, fi *os.File, metadata map[string]st
 // name is the file path.
 func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) error {
 	log.Trace("Client::WriteFromBuffer : name %s", name)
+	isSymlink := metadata[symlinkKey] == "true"
 
 	// convert byte array to io.Reader
 	dataReader := bytes.NewReader(data)
 	// upload data to object
 	// TODO: handle metadata with S3
-	err := cl.putObject(name, dataReader, isSymLink)
+	err := cl.putObject(name, dataReader, isSymlink)
 	log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
 	return err
 }
@@ -577,13 +578,14 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 	offset := options.Offset
 	data := options.Data
 	length := int64(len(data))
-	isSymlink := options.Metadata[symlinkKey] == "true"
+
 	defer log.TimeTrack(time.Now(), "Client::Write", options.Handle.Path)
 	log.Trace("Client::Write : name %s offset %v", name, offset)
 	// tracks the case where our offset is great than our current file size (appending only - not modifying pre-existing data)
 	var dataBuffer *[]byte
 
 	// get the existing object data
+	isSymlink := options.Metadata[symlinkKey] == "true"
 	oldData, _ := cl.ReadBuffer(name, 0, 0, isSymlink)
 	// update the data with the new data
 	// if we're only overwriting existing data
@@ -610,7 +612,7 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		}
 	}
 	// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple blocks
-	err := cl.WriteFromBuffer(name, isSymlink, *dataBuffer) //to replace options.Metadata with an object. should I create a new object or use list?
+	err := cl.WriteFromBuffer(name, options.Metadata, *dataBuffer) //to replace options.Metadata with an object. should I create a new object or use list?
 	if err != nil {
 		log.Err("Client::Write : Failed to upload to object. Here's why: %v ", name, err)
 		return err

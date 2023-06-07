@@ -83,9 +83,9 @@ type S3Connection interface {
 	// This is just for test, shall not be used otherwise
 	SetPrefixPath(string) error
 
-	CreateFile(name string, mode os.FileMode) error
+	CreateFile(name string, mode os.FileMode, options internal.CreateFileOptions) error
 	CreateDirectory(name string) error
-	CreateLink(source string, target string) error
+	CreateLink(source string, target string, options internal.CreateLinkOptions) error
 
 	DeleteFile(name string) error
 	DeleteDirectory(name string) error

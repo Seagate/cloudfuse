@@ -300,7 +300,7 @@ func (s3 *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		return nil, syscall.EFAULT
 	}
 
-	err := s3.storage.CreateFile(options.Name, options.Mode)
+	err := s3.storage.CreateFile(options.Name, options.Mode, options)
 	if err != nil {
 		return nil, err
 	}
@@ -438,7 +438,7 @@ func (s3 *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
 // Symlink operations
 func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 	log.Trace("S3Storage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
-	err := s3.storage.CreateLink(options.Name, options.Target)
+	err := s3.storage.CreateLink(options.Name, options.Target, options)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(createLink, options.Name, map[string]interface{}{target: options.Target})

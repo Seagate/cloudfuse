@@ -171,7 +171,8 @@ func (s *clientTestSuite) TestSetPrefixPath() {
 
 	err := s.client.SetPrefixPath(prefix)
 	s.assert.Nil(err)
-	err = s.client.CreateFile(fileName, os.FileMode(0)) // create file uses prefix
+	var options internal.CreateFileOptions                       //stub
+	err = s.client.CreateFile(fileName, os.FileMode(0), options) // create file uses prefix
 	s.assert.Nil(err)
 
 	// object should be at prefix
@@ -186,7 +187,8 @@ func (s *clientTestSuite) TestCreateFile() {
 	// setup
 	name := generateFileName()
 
-	err := s.client.CreateFile(name, os.FileMode(0))
+	var options internal.CreateFileOptions //stub
+	err := s.client.CreateFile(name, os.FileMode(0), options)
 	s.assert.Nil(err)
 
 	// file should be in bucket
@@ -217,7 +219,9 @@ func (s *clientTestSuite) TestCreateLink() {
 	s.assert.Nil(err)
 	source := generateFileName()
 
-	err = s.client.CreateLink(source, target)
+	var options internal.CreateLinkOptions //stub
+	options.Metadata[symlinkKey] = "true"
+	err = s.client.CreateLink(source, target, options)
 	s.assert.Nil(err)
 
 	source = s.client.getKey(source, true)
@@ -242,7 +246,9 @@ func (s *clientTestSuite) TestReadLink() {
 
 	source := generateFileName()
 
-	err := s.client.CreateLink(source, target)
+	var options internal.CreateLinkOptions //stub
+	options.Metadata[symlinkKey] = "true"
+	err := s.client.CreateLink(source, target, options)
 	s.assert.Nil(err)
 
 	source = s.client.getKey(source, true)
@@ -269,7 +275,9 @@ func (s *clientTestSuite) TestDeleteLink() {
 
 	source := generateFileName()
 
-	err := s.client.CreateLink(source, target)
+	var options internal.CreateLinkOptions //stub
+	options.Metadata[symlinkKey] = "true"
+	err := s.client.CreateLink(source, target, options)
 	s.assert.Nil(err)
 
 	source = s.client.getKey(source, true)
@@ -304,7 +312,10 @@ func (s *clientTestSuite) TestDeleteLinks() {
 	for i := 0; i < 5; i++ {
 		sources[i] = generateFileName()
 		targets[i] = generateFileName()
-		err := s.client.CreateLink(folder+sources[i], targets[i])
+
+		var options internal.CreateLinkOptions //stub
+		options.Metadata[symlinkKey] = "true"
+		err := s.client.CreateLink(folder+sources[i], targets[i], options)
 		s.assert.Nil(err)
 
 		sources[i] = s.client.getKey(sources[i], true)
@@ -699,7 +710,9 @@ func (s *clientTestSuite) TestWriteFromBuffer() {
 	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 
-	err := s.client.WriteFromBuffer(name, false, body)
+	var options internal.WriteFileOptions //stub
+
+	err := s.client.WriteFromBuffer(name, options.Metadata, body)
 	s.assert.Nil(err)
 
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
