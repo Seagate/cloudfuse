@@ -466,7 +466,7 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 func (cl *Client) WriteFromFile(name string, fi *os.File, metadata map[string]string) error {
 	isSymLkStr := metadata[symlinkKey]
 	var isSymlink bool
-	if isSymLkStr != "" && isSymLkStr == "true" { //if isSymLkStr is not empty or nil
+	if isSymLkStr == "true" { //if isSymLkStr is not empty or nil
 		isSymlink = true
 	}
 	log.Trace("Client::WriteFromFile : file %s -> name %s", fi.Name(), name)
@@ -512,7 +512,7 @@ func (cl *Client) WriteFromFile(name string, fi *os.File, metadata map[string]st
 
 // WriteFromBuffer : Upload from a buffer to an object.
 // name is the file path.
-func (cl *Client) WriteFromBuffer(name string, isSymLink bool, data []byte) error {
+func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) error {
 	log.Trace("Client::WriteFromBuffer : name %s", name)
 
 	// convert byte array to io.Reader
@@ -577,18 +577,12 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 	offset := options.Offset
 	data := options.Data
 	length := int64(len(data))
-	isSymLkStr := options.Metadata[symlinkKey]
-	isSymlink := false
+	isSymlink := options.Metadata[symlinkKey] == "true"
 	defer log.TimeTrack(time.Now(), "Client::Write", options.Handle.Path)
 	log.Trace("Client::Write : name %s offset %v", name, offset)
 	// tracks the case where our offset is great than our current file size (appending only - not modifying pre-existing data)
 	var dataBuffer *[]byte
 
-	if isSymLkStr != "" { //if isSymLkStr is not empty or nil
-		if isSymLkStr == "true" {
-			isSymlink = true
-		}
-	}
 	// get the existing object data
 	oldData, _ := cl.ReadBuffer(name, 0, 0, isSymlink)
 	// update the data with the new data

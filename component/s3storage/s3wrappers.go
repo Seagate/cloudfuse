@@ -392,7 +392,7 @@ func (cl *Client) getKey(name string, isSymLink bool) string {
 func (cl *Client) getFile(name string) (string, bool) {
 
 	isSymLink := false
-
+	//todo: wrtie a test the catches the out of bounds issue.
 	if len(name) > len(symLinkStr) && name[len(name)-len(symLinkStr):] == symLinkStr {
 		isSymLink = true
 		name = name[:len(name)-len(symLinkStr)]

@@ -675,6 +675,9 @@ func (s *clientTestSuite) TestWriteFromFile() {
 	s.assert.Nil(err)
 	f.Close()
 
+	//todo: create another test like this one that does getObject here with and without the .rclonelink suffix
+	// this checks the integration between attr cache and s3storage for metadata.make sure the flag passed down is
+	// respected.
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
