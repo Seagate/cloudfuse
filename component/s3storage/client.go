@@ -166,7 +166,7 @@ func (cl *Client) SetPrefixPath(path string) error {
 func (cl *Client) CreateFile(name string, mode os.FileMode, options internal.CreateFileOptions) error {
 	log.Trace("Client::CreateFile : name %s", name)
 	var data []byte
-	return cl.WriteFromBuffer(name, options.Metadata, data)
+	return cl.WriteFromBuffer(name, nil, data)
 }
 
 // CreateDirectory : Create a new directory in the bucket/virtual directory

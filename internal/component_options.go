@@ -77,9 +77,8 @@ type RenameDirOptions struct {
 }
 
 type CreateFileOptions struct {
-	Name     string
-	Mode     os.FileMode
-	Metadata map[string]string
+	Name string
+	Mode os.FileMode
 }
 
 type DeleteFileOptions struct {
