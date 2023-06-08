@@ -164,10 +164,6 @@ func (suite *libfuseTestSuite) TestMkDirError() {
 	testMkDirError(suite)
 }
 
-func (suite *libfuseTestSuite) TestMkDirErrorExist() {
-	testMkDirErrorExist(suite)
-}
-
 func (suite *libfuseTestSuite) TestMkDirErrorAttrExist() {
 	testMkDirErrorAttrExist(suite)
 }

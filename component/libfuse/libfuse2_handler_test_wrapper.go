@@ -119,7 +119,7 @@ func testMkDir(suite *libfuseTestSuite) {
 	// On Windows we test for directory creation, so we have a call to GetAttr
 	if runtime.GOOS == "windows" {
 		option := internal.GetAttrOptions{Name: name}
-		suite.mock.EXPECT().GetAttr(option).Return(&internal.ObjAttr{}, nil)
+		suite.mock.EXPECT().GetAttr(option).Return(nil, syscall.ENOENT)
 	}
 
 	err := cfuseFS.Mkdir(path, 0775)
@@ -186,25 +186,11 @@ func testMkDirError(suite *libfuseTestSuite) {
 	// On Windows we test for directory creation, so we have a call to GetAttr
 	if runtime.GOOS == "windows" {
 		option := internal.GetAttrOptions{Name: name}
-		suite.mock.EXPECT().GetAttr(option).Return(&internal.ObjAttr{}, nil)
+		suite.mock.EXPECT().GetAttr(option).Return(nil, syscall.ENOENT)
 	}
 
 	err := cfuseFS.Mkdir(path, 0775)
 	suite.assert.Equal(-fuse.EIO, err)
-}
-
-// testMkDirErrorExist only runs on Windows to test the case that the directory already exists.
-func testMkDirErrorExist(suite *libfuseTestSuite) {
-	defer suite.cleanupTest()
-	if runtime.GOOS != "windows" {
-		return
-	}
-	name := "path"
-	path := "/" + name
-	option := internal.GetAttrOptions{Name: name}
-	suite.mock.EXPECT().GetAttr(option).Return(nil, fs.ErrExist)
-	err := cfuseFS.Mkdir(path, 0775)
-	suite.assert.Equal(-fuse.EEXIST, err)
 }
 
 // testMkDirErrorAttrExist only runs on Windows to test the case that the directory already exists
