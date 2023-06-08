@@ -12,6 +12,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -41,7 +42,6 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -465,7 +465,7 @@ func (suite *mountSuite) TestWriteBackCacheAndIgnoreOpenFlags() {
 	// write to file in the local directory
 	buff := make([]byte, 200)
 	rand.Read(buff)
-	err := ioutil.WriteFile(remoteFilePath, buff, 0777)
+	err := os.WriteFile(remoteFilePath, buff, 0777)
 	suite.Nil(err)
 
 	// unmount

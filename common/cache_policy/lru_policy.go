@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -142,7 +143,7 @@ func (cache *LRUCache) Remove(key int64) {
 		defer nodeKeyPair.value.Unlock()
 		// remove from capacity
 		cache.Occupied -= nodeKeyPair.value.EndIndex - nodeKeyPair.value.StartIndex
-		//if handle is not provided then we're on the handle cache we can just remove it from cache
+		// if handle is not provided then we're on the handle cache we can just remove it from cache
 		nodeKeyPair.value.Data = nil
 		delete(cache.Elements, key)
 		cache.List.Remove(node)
@@ -160,7 +161,7 @@ func (cache *LRUCache) Purge() {
 }
 
 func getKeyPair(node *list.Element) KeyPair {
-	//uncast the keypair
+	// uncast the keypair
 	return node.Value.(*list.Element).Value.(KeyPair)
 }
 

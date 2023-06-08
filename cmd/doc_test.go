@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -35,7 +36,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"runtime"
 	"testing"
@@ -112,7 +112,7 @@ func (suite *docTestSuite) TestDocsGenerationError() {
 func (suite *docTestSuite) TestOutputDirIsFileError() {
 	defer suite.cleanupTest()
 
-	opFile, err := ioutil.TempFile("", "docfile*")
+	opFile, err := os.CreateTemp("", "docfile*")
 	suite.assert.Nil(err)
 	opFileName := opFile.Name()
 	opFile.Close()

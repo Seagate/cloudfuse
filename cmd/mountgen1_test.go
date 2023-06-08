@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -35,7 +36,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"runtime"
 	"testing"
@@ -118,15 +118,14 @@ func (suite *genOneConfigTestSuite) TestConfigCreation() {
 		return
 	}
 	defer suite.cleanupTest()
-	confFile, err := ioutil.TempFile("", "conf*.yaml")
-	suite.assert.Nil(err)
-	outFile, err := ioutil.TempFile("", "adlsgen1fuse*.json")
-	suite.assert.Nil(err)
+	confFile, _ := os.CreateTemp("", "conf*.yaml")
+	outFile, _ := os.CreateTemp("", "adlsgen1fuse*.json")
 
 	// On Windows the mount directory must not exist, so only create it on Linux
 	var mntDir string
+	var err error
 	if runtime.GOOS != "windows" {
-		mntDir, err = ioutil.TempDir("", "mntdir")
+		mntDir, err = os.MkdirTemp("", "mntdir")
 		suite.assert.Nil(err)
 	} else {
 		mntDir = "mntdir"
@@ -164,15 +163,14 @@ func (suite *genOneConfigTestSuite) TestInvalidConfig() {
 		return
 	}
 	defer suite.cleanupTest()
-	confFile, err := ioutil.TempFile("", "conf*.yaml")
-	suite.assert.Nil(err)
-	outFile, err := ioutil.TempFile("", "adlsgen1fuse*.json")
-	suite.assert.Nil(err)
+	confFile, _ := os.CreateTemp("", "conf*.yaml")
+	outFile, _ := os.CreateTemp("", "adlsgen1fuse*.json")
 
 	// On Windows the mount directory must not exist, so only create it on Linux
 	var mntDir string
+	var err error
 	if runtime.GOOS != "windows" {
-		mntDir, err = ioutil.TempDir("", "mntdir")
+		mntDir, err = os.MkdirTemp("", "mntdir")
 		suite.assert.Nil(err)
 	} else {
 		mntDir = "mntdir"
@@ -196,15 +194,14 @@ func (suite *genOneConfigTestSuite) TestInvalidAuthMode() {
 		return
 	}
 	defer suite.cleanupTest()
-	confFile, err := ioutil.TempFile("", "conf*.yaml")
-	suite.assert.Nil(err)
-	outFile, err := ioutil.TempFile("", "adlsgen1fuse*.json")
-	suite.assert.Nil(err)
+	confFile, _ := os.CreateTemp("", "conf*.yaml")
+	outFile, _ := os.CreateTemp("", "adlsgen1fuse*.json")
 
 	// On Windows the mount directory must not exist, so only create it on Linux
 	var mntDir string
+	var err error
 	if runtime.GOOS != "windows" {
-		mntDir, err = ioutil.TempDir("", "mntdir")
+		mntDir, err = os.MkdirTemp("", "mntdir")
 		suite.assert.Nil(err)
 	} else {
 		mntDir = "mntdir"
@@ -228,15 +225,14 @@ func (suite *genOneConfigTestSuite) TestGen1FuseMount() {
 		return
 	}
 	defer suite.cleanupTest()
-	confFile, err := ioutil.TempFile("", "conf*.yaml")
-	suite.assert.Nil(err)
-	outFile, err := ioutil.TempFile("", "adlsgen1fuse*.json")
-	suite.assert.Nil(err)
+	confFile, _ := os.CreateTemp("", "conf*.yaml")
+	outFile, _ := os.CreateTemp("", "adlsgen1fuse*.json")
 
 	// On Windows the mount directory must not exist, so only create it on Linux
 	var mntDir string
+	var err error
 	if runtime.GOOS != "windows" {
-		mntDir, err = ioutil.TempDir("", "mntdir")
+		mntDir, err = os.MkdirTemp("", "mntdir")
 		suite.assert.Nil(err)
 	} else {
 		mntDir = "mntdir"
