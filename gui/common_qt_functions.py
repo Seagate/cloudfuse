@@ -140,7 +140,7 @@ class defaultSettingsManager():
             'track-time' : False                                            
             })
     
-class commonConfigFunctions(QWidget):
+class widgetCustomFunctions(QWidget):
     def __init__(self):
         super().__init__()
         

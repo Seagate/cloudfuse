@@ -4,12 +4,12 @@ from PySide6 import QtWidgets
 # import the custom class made from QtDesigner
 from ui_lyve_config_common import Ui_Form
 from lyve_config_advanced import lyveAdvancedSettingsWidget
-from common_qt_functions import defaultSettingsManager,commonConfigFunctions
+from common_qt_functions import defaultSettingsManager,widgetCustomFunctions
 
 pipelineChoices = ['file_cache','stream']
 libfusePermissions = [0o777,0o666,0o644,0o444]
 
-class lyveSettingsWidget(defaultSettingsManager,commonConfigFunctions,Ui_Form): 
+class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form): 
     def __init__(self):
         super().__init__()
         self.setupUi(self)
