@@ -184,6 +184,7 @@ func (cl *Client) CreateLink(source string, target string, options internal.Crea
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
 
+
 	return cl.WriteFromBuffer(source, options.Metadata, data)
 }
 
@@ -510,7 +511,7 @@ func (cl *Client) WriteFromFile(name string, fi *os.File, metadata map[string]st
 // name is the file path.
 func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) error {
 	log.Trace("Client::WriteFromBuffer : name %s", name)
-	isSymlink := metadata[symlinkKey] == "true"
+	isSymlink := metadata["symlinkKey"] == "true"
 
 	// convert byte array to io.Reader
 	dataReader := bytes.NewReader(data)
@@ -581,7 +582,7 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 	var dataBuffer *[]byte
 
 	// get the existing object data
-	isSymlink := options.Metadata[symlinkKey] == "true"
+	isSymlink := options.Metadata["symlinkKey"] == "true"
 	oldData, _ := cl.ReadBuffer(name, 0, 0, isSymlink)
 	// update the data with the new data
 	// if we're only overwriting existing data
