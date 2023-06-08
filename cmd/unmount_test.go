@@ -38,6 +38,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"testing"
 	"time"
 
@@ -91,6 +92,10 @@ func (suite *unmountTestSuite) cleanupTest() {
 
 // mount failure test where the mount directory does not exists
 func (suite *unmountTestSuite) TestUnmountCmd() {
+	// Skip these tests on windows since we don't run as a daemon
+	if runtime.GOOS == "windows" {
+		return
+	}
 	defer suite.cleanupTest()
 
 	mountDirectory1, _ := os.MkdirTemp("", "TestUnMountTemp")
@@ -108,6 +113,10 @@ func (suite *unmountTestSuite) TestUnmountCmd() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdFail() {
+	// Skip these tests on windows since we don't run as a daemon
+	if runtime.GOOS == "windows" {
+		return
+	}
 	defer suite.cleanupTest()
 
 	mountDirectory2, _ := os.MkdirTemp("", "TestUnMountTemp")
@@ -132,6 +141,10 @@ func (suite *unmountTestSuite) TestUnmountCmdFail() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
+	// Skip these tests on windows since we don't run as a daemon
+	if runtime.GOOS == "windows" {
+		return
+	}
 	defer suite.cleanupTest()
 
 	mountDirectory3, _ := os.MkdirTemp("", "TestUnMountTemp")
@@ -148,6 +161,10 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
+	// Skip these tests on windows since we don't run as a daemon
+	if runtime.GOOS == "windows" {
+		return
+	}
 	defer suite.cleanupTest()
 
 	mountDirectory4, _ := os.MkdirTemp("", "TestUnMountTemp")
@@ -176,6 +193,10 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
+	// Skip these tests on windows since we don't run as a daemon
+	if runtime.GOOS == "windows" {
+		return
+	}
 	defer suite.cleanupTest()
 
 	mountDirectory5, _ := os.MkdirTemp("", "TestUnMountTemp")

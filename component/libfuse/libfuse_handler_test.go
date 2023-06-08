@@ -164,6 +164,10 @@ func (suite *libfuseTestSuite) TestMkDirError() {
 	testMkDirError(suite)
 }
 
+func (suite *libfuseTestSuite) TestMkDirErrorAttrExist() {
+	testMkDirErrorAttrExist(suite)
+}
+
 // readdir
 
 func (suite *libfuseTestSuite) TestRmDir() {

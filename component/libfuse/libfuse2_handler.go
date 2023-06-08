@@ -272,8 +272,9 @@ func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 
 	// Check if the directory already exists. On Windows we need to make this call explicitly
 	if runtime.GOOS == "windows" {
-		attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
-		if (attr != nil || os.IsExist(err)) && attr.IsDir() {
+		_, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+		// If the the error is nil then a file or directory with this name exists
+		if err == nil || errors.Is(err, fs.ErrExist) {
 			return -fuse.EEXIST
 		}
 	}
