@@ -48,7 +48,7 @@ const (
 	winFspRegistry   = `SOFTWARE\WOW6432Node\WinFsp\Services\`
 )
 
-// WinFsp registry contants
+// WinFsp registry constants
 const (
 	jobControl = 1
 	mountCmd   = `mount %1 --config-file=%2`

@@ -243,7 +243,7 @@ var unmountServiceCmd = &cobra.Command{
 
 //--------------- command section ends
 
-// installService uninstall the lyvecloudfuse windows service.
+// installService adds lyvecloudfuse as a windows service.
 func installService() error {
 	exepath, err := os.Executable()
 	if err != nil {
@@ -365,7 +365,7 @@ func isMounted() (bool, error) {
 	return winservice.IsMounted(servOpts.MountPath)
 }
 
-// isServiceRunning returns whether the lyvecloudservice is currently running.
+// isServiceRunning returns whether the lyvecloudfuse service is currently running.
 func isServiceRunning() (bool, error) {
 	scm, err := mgr.Connect()
 	if err != nil {
@@ -394,15 +394,15 @@ func isServiceRunning() (bool, error) {
 func validateMountOptions() error {
 	// Mount Path
 	if servOpts.MountPath == "" {
-		return errors.New("mmount path not provided")
+		return errors.New("mount path not provided")
 	}
 
 	if strings.Contains(servOpts.MountPath, "\\") {
-		return errors.New("mmount path contains '\\' which is not allowed")
+		return errors.New("mount path contains '\\' which is not allowed")
 	}
 
 	if _, err := os.Stat(servOpts.MountPath); errors.Is(err, fs.ErrExist) || err == nil {
-		return errors.New("mmount path exists")
+		return errors.New("mount path exists")
 	}
 
 	// Config file

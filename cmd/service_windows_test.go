@@ -90,7 +90,7 @@ func (suite *serviceTestSuite) TestMountPathEmpty() {
 
 	op, err := executeCommandC(rootCmd, "service", "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
 	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "mmount path not provided]")
+	suite.assert.Contains(op, "mount path not provided]")
 }
 
 func (suite *serviceTestSuite) TestConfigFileEmpty() {
@@ -120,7 +120,7 @@ func (suite *serviceTestSuite) TestMountDirExist() {
 
 	op, err := executeCommandC(rootCmd, "service", "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
 	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "mmount path exists")
+	suite.assert.Contains(op, "mount path exists")
 }
 
 func (suite *serviceTestSuite) TestConfigFileNotExist() {
@@ -136,7 +136,7 @@ func (suite *serviceTestSuite) TestConfigFileNotExist() {
 
 // Unmount Tests
 
-func (suite *serviceTestSuite) TestUnountMountPathEmpty() {
+func (suite *serviceTestSuite) TestUnmountMountPathEmpty() {
 	defer suite.cleanupTest()
 
 	_, err := executeCommandC(rootCmd, "service", "unmount")
