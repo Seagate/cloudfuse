@@ -11,7 +11,7 @@ steps:
 
   - task: GoTool@0
     inputs:
-      version: '1.19.6'
+      version: '1.19.9'
     displayName: "Select Go Version"
     
   - task: Go@0

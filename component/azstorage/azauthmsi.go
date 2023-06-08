@@ -68,6 +68,7 @@ func (azmsi *azAuthMSI) fetchToken() (*common.OAuthTokenInfo, error) {
 			ObjectID: azmsi.config.ObjectID,
 			MSIResID: azmsi.config.ResourceID},
 	}
+
 	token, err := oAuthTokenInfo.GetNewTokenFromMSI(context.Background())
 	if err != nil {
 		return nil, err

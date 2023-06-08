@@ -40,7 +40,7 @@ package azstorage
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 
@@ -108,7 +108,7 @@ func (suite *authTestSuite) SetupTest() {
 		os.Exit(1)
 	}
 
-	cfgData, _ := ioutil.ReadAll(cfgFile)
+	cfgData, _ := io.ReadAll(cfgFile)
 	err = json.Unmarshal(cfgData, &storageTestConfigurationParameters)
 	if err != nil {
 		fmt.Println("Failed to parse the config file")

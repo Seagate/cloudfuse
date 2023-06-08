@@ -38,7 +38,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -364,7 +363,7 @@ func writeConfigFile(contConfigFile string) error {
 			return fmt.Errorf("failed to encrypt yaml content [%s]", err.Error())
 		}
 
-		err = ioutil.WriteFile(contConfigFile, cipherText, 0777)
+		err = os.WriteFile(contConfigFile, cipherText, 0777)
 		if err != nil {
 			return fmt.Errorf("failed to write encrypted file [%s]", err.Error())
 		}

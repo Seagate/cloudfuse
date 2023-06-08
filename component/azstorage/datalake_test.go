@@ -43,7 +43,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"os"
 	"strings"
@@ -93,7 +93,7 @@ func (s *datalakeTestSuite) SetupTest() {
 		os.Exit(1)
 	}
 
-	cfgData, _ := ioutil.ReadAll(cfgFile)
+	cfgData, _ := io.ReadAll(cfgFile)
 	err = json.Unmarshal(cfgData, &storageTestConfigurationParameters)
 	if err != nil {
 		fmt.Println("Failed to parse the config file")
@@ -728,7 +728,7 @@ func (s *datalakeTestSuite) TestWriteSmallFile() {
 	dataLen := len(data)
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 
 	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
@@ -753,7 +753,7 @@ func (s *datalakeTestSuite) TestOverwriteSmallFile() {
 	dataLen := len(data)
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
@@ -783,7 +783,7 @@ func (s *datalakeTestSuite) TestOverwriteAndAppendToSmallFile() {
 
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
@@ -814,7 +814,7 @@ func (s *datalakeTestSuite) TestAppendOffsetLargerThanSmallFile() {
 
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 12, Data: newTestData})
@@ -845,7 +845,7 @@ func (s *datalakeTestSuite) TestAppendToSmallFile() {
 
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("-newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 9, Data: newTestData})
@@ -885,7 +885,7 @@ func (s *datalakeTestSuite) TestAppendBlocksToSmallFile() {
 			BlockSize: 8,
 		})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("-newdata-newdata-newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 9, Data: newTestData})
@@ -925,7 +925,7 @@ func (s *datalakeTestSuite) TestOverwriteBlocks() {
 			BlockSize: 4,
 		})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("cake")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 16, Data: newTestData})
@@ -965,7 +965,7 @@ func (s *datalakeTestSuite) TestOverwriteAndAppendBlocks() {
 			BlockSize: 4,
 		})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 32, Data: newTestData})
@@ -1003,7 +1003,7 @@ func (s *datalakeTestSuite) TestAppendBlocks() {
 			BlockSize: 4,
 		})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: newTestData})
@@ -1041,7 +1041,7 @@ func (s *datalakeTestSuite) TestAppendOffsetLargerThanSize() {
 			BlockSize: 4,
 		})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 45, Data: newTestData})
@@ -1331,7 +1331,7 @@ func (s *datalakeTestSuite) TestWriteFile() {
 	file := s.containerUrl.NewRootDirectoryURL().NewFileURL(name)
 	resp, err := file.Download(ctx, 0, int64(len(data)))
 	s.assert.Nil(err)
-	output, _ := ioutil.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1353,7 +1353,7 @@ func (s *datalakeTestSuite) TestTruncateSmallFileSmaller() {
 	resp, err := file.Download(ctx, 0, int64(truncatedLength))
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
-	output, _ := ioutil.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
 	s.assert.EqualValues(testData[:truncatedLength], output)
 }
 
@@ -1380,7 +1380,7 @@ func (s *datalakeTestSuite) TestTruncateChunkedFileSmaller() {
 	resp, err := file.Download(ctx, 0, int64(truncatedLength))
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
-	output, _ := ioutil.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
 	s.assert.EqualValues(testData[:truncatedLength], output)
 }
 
@@ -1402,7 +1402,7 @@ func (s *datalakeTestSuite) TestTruncateSmallFileEqual() {
 	resp, err := file.Download(ctx, 0, int64(truncatedLength))
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
-	output, _ := ioutil.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1429,7 +1429,7 @@ func (s *datalakeTestSuite) TestTruncateChunkedFileEqual() {
 	resp, err := file.Download(ctx, 0, int64(truncatedLength))
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
-	output, _ := ioutil.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1451,7 +1451,7 @@ func (s *datalakeTestSuite) TestTruncateSmallFileBigger() {
 	resp, err := file.Download(ctx, 0, int64(truncatedLength))
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
-	output, _ := ioutil.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output[:len(data)])
 }
 
@@ -1478,7 +1478,7 @@ func (s *datalakeTestSuite) TestTruncateChunkedFileBigger() {
 	resp, err := file.Download(ctx, 0, int64(truncatedLength))
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
-	output, _ := ioutil.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output[:len(data)])
 }
 
@@ -1501,7 +1501,7 @@ func (s *datalakeTestSuite) TestCopyToFile() {
 	data := []byte(testData)
 	dataLen := len(data)
 	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 
 	err := s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
@@ -1520,7 +1520,7 @@ func (s *datalakeTestSuite) TestCopyToFileError() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 
 	err := s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
@@ -1535,7 +1535,7 @@ func (s *datalakeTestSuite) TestCopyFromFile() {
 	testData := "test data"
 	data := []byte(testData)
 	homeDir, _ := os.UserHomeDir()
-	f, _ := ioutil.TempFile(homeDir, name+".tmp")
+	f, _ := os.CreateTemp(homeDir, name+".tmp")
 	defer os.Remove(f.Name())
 	f.Write(data)
 
@@ -1547,7 +1547,7 @@ func (s *datalakeTestSuite) TestCopyFromFile() {
 	file := s.containerUrl.NewRootDirectoryURL().NewFileURL(name)
 	resp, err := file.Download(ctx, 0, int64(len(data)))
 	s.assert.Nil(err)
-	output, _ := ioutil.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1572,7 +1572,7 @@ func (s *datalakeTestSuite) TestCreateLink() {
 	s.assert.EqualValues("true", metadata["Is_symlink"])
 	resp, err := link.Download(ctx, 0, props.ContentLength())
 	s.assert.Nil(err)
-	data, _ := ioutil.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
+	data, _ := io.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
 	s.assert.EqualValues(target, data)
 }
 

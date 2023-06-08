@@ -41,7 +41,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"runtime"
@@ -137,7 +136,7 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 	_, err = os.Stat(fileName)
 	suite.Equal(nil, err)
 
-	files, err := ioutil.ReadDir(suite.testPath)
+	files, err := os.ReadDir(suite.testPath)
 	suite.Equal(nil, err)
 	suite.GreaterOrEqual(len(files), 1)
 
@@ -164,7 +163,7 @@ func (suite *fileTestSuite) TestFileCreatEncodeChar() {
 	_, err = os.Stat(fileName)
 	suite.Equal(nil, err)
 
-	files, err := ioutil.ReadDir(suite.testPath)
+	files, err := os.ReadDir(suite.testPath)
 	suite.Equal(nil, err)
 	suite.GreaterOrEqual(len(files), 1)
 
@@ -204,7 +203,7 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 	_, err = os.Stat(fileName)
 	suite.Equal(nil, err)
 
-	files, err := ioutil.ReadDir(speclDirName)
+	files, err := os.ReadDir(speclDirName)
 	suite.Equal(nil, err)
 	suite.GreaterOrEqual(len(files), 1)
 
@@ -260,7 +259,7 @@ func (suite *fileTestSuite) TestFileWriteSmall() {
 	suite.Equal(nil, err)
 	srcFile.Close()
 
-	err = ioutil.WriteFile(fileName, suite.minBuff, 0777)
+	err = os.WriteFile(fileName, suite.minBuff, 0777)
 	suite.Equal(nil, err)
 
 	suite.fileTestCleanup([]string{fileName})
@@ -273,10 +272,10 @@ func (suite *fileTestSuite) TestFileReadSmall() {
 	suite.Equal(nil, err)
 	srcFile.Close()
 
-	err = ioutil.WriteFile(fileName, suite.minBuff, 0777)
+	err = os.WriteFile(fileName, suite.minBuff, 0777)
 	suite.Equal(nil, err)
 
-	data, err := ioutil.ReadFile(fileName)
+	data, err := os.ReadFile(fileName)
 	suite.Equal(nil, err)
 	suite.Equal(len(data), len(suite.minBuff))
 
@@ -307,7 +306,7 @@ func (suite *fileTestSuite) TestFileTruncate() {
 	err = os.Truncate(fileName, 2)
 	suite.Equal(nil, err)
 
-	data, err := ioutil.ReadFile(fileName)
+	data, err := os.ReadFile(fileName)
 	suite.Equal(nil, err)
 	suite.LessOrEqual(2, len(data))
 
@@ -403,7 +402,7 @@ func (suite *fileTestSuite) TestFileCreateMulti() {
 	fileName := dirName + "/multi"
 	for i := 0; i < 10; i++ {
 		newFile := fileName + strconv.Itoa(i)
-		err := ioutil.WriteFile(newFile, suite.medBuff, 0777)
+		err := os.WriteFile(newFile, suite.medBuff, 0777)
 		suite.Equal(nil, err)
 	}
 	suite.fileTestCleanup([]string{dirName})
@@ -428,7 +427,7 @@ func (suite *fileTestSuite) TestLinkCreate() {
 	suite.Equal(nil, err)
 	f.Close()
 	symName := suite.testPath + "/small.lnk"
-	err = ioutil.WriteFile(fileName, suite.minBuff, 0777)
+	err = os.WriteFile(fileName, suite.minBuff, 0777)
 	suite.Equal(nil, err)
 
 	err = os.Symlink(fileName, symName)
@@ -449,9 +448,9 @@ func (suite *fileTestSuite) TestLinkRead() {
 	err = os.Symlink(fileName, symName)
 	suite.Equal(nil, err)
 
-	err = ioutil.WriteFile(fileName, suite.minBuff, 0777)
+	err = os.WriteFile(fileName, suite.minBuff, 0777)
 	suite.Equal(nil, err)
-	data, err := ioutil.ReadFile(fileName)
+	data, err := os.ReadFile(fileName)
 	suite.Equal(nil, err)
 	suite.Equal(len(data), len(suite.minBuff))
 	suite.fileTestCleanup([]string{fileName})
@@ -492,7 +491,7 @@ func (suite *fileTestSuite) TestLinkRenameTarget() {
 	err = os.Rename(fileName, fileNameNew)
 	suite.Equal(nil, err)
 
-	_, err = ioutil.ReadFile(symName)
+	_, err = os.ReadFile(symName)
 	// we expect that to fail
 	suite.NotEqual(nil, err)
 
@@ -514,13 +513,13 @@ func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
 	f.Close()
 	err = os.Symlink(fileName, symName)
 	suite.Equal(nil, err)
-	err = ioutil.WriteFile(fileName, suite.minBuff, 0777)
+	err = os.WriteFile(fileName, suite.minBuff, 0777)
 	suite.Equal(nil, err)
 
 	err = os.Remove(symName)
 	suite.Equal(nil, err)
 
-	data, err := ioutil.ReadFile(fileName)
+	data, err := os.ReadFile(fileName)
 	suite.Equal(nil, err)
 	suite.Equal(len(data), len(suite.minBuff))
 

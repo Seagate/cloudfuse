@@ -39,7 +39,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -212,7 +211,7 @@ func parseConfig() error {
 			return fmt.Errorf("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in LYVECLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
 		}
 
-		cipherText, err := ioutil.ReadFile(options.ConfigFile)
+		cipherText, err := os.ReadFile(options.ConfigFile)
 		if err != nil {
 			return fmt.Errorf("failed to read encrypted config file %s [%s]", options.ConfigFile, err.Error())
 		}
