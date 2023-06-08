@@ -85,7 +85,7 @@ type S3Connection interface {
 
 	CreateFile(name string, mode os.FileMode, options internal.CreateFileOptions) error
 	CreateDirectory(name string) error
-	CreateLink(source string, target string, options internal.CreateLinkOptions) error
+	CreateLink(source string, target string, isSymlink bool) error
 
 	DeleteFile(name string) error
 	DeleteDirectory(name string) error

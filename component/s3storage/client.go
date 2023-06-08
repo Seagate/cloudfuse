@@ -180,12 +180,15 @@ func (cl *Client) CreateDirectory(name string) error {
 }
 
 // CreateLink : Create a symlink in the bucket/virtual directory
-func (cl *Client) CreateLink(source string, target string, options internal.CreateLinkOptions) error {
+func (cl *Client) CreateLink(source string, target string, isSymlink bool) error {
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
 
-
-	return cl.WriteFromBuffer(source, options.Metadata, data)
+	symlinkMap := map[string]string{"symlinkKey": "false"}
+	if isSymlink {
+		symlinkMap["symlinkKey"] = "true"
+	}
+	return cl.WriteFromBuffer(source, symlinkMap, data)
 }
 
 // DeleteFile : Delete an object.

@@ -502,8 +502,6 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 	log.Trace("AttrCache::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
 
-	options.Metadata["symlinkKey"] = "true"
-
 	err := ac.NextComponent().CreateLink(options)
 
 	if err == nil {

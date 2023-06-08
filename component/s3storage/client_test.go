@@ -219,10 +219,7 @@ func (s *clientTestSuite) TestCreateLink() {
 	s.assert.Nil(err)
 	source := generateFileName()
 
-	symlinkMap := map[string]string{"symlinkKey": "true"}
-	options := internal.CreateLinkOptions{Name: source, Target: target, Metadata: symlinkMap} //stub
-
-	err = s.client.CreateLink(source, target, options)
+	err = s.client.CreateLink(source, target, true)
 	s.assert.Nil(err)
 
 	source = s.client.getKey(source, true)
@@ -247,10 +244,7 @@ func (s *clientTestSuite) TestReadLink() {
 
 	source := generateFileName()
 
-	symlinkMap := map[string]string{"symlinkKey": "true"}
-	options := internal.CreateLinkOptions{Name: source, Target: target, Metadata: symlinkMap} //stub
-
-	err := s.client.CreateLink(source, target, options)
+	err := s.client.CreateLink(source, target, true)
 	s.assert.Nil(err)
 
 	source = s.client.getKey(source, true)
@@ -277,10 +271,7 @@ func (s *clientTestSuite) TestDeleteLink() {
 
 	source := generateFileName()
 
-	symlinkMap := map[string]string{"symlinkKey": "true"}
-	options := internal.CreateLinkOptions{Name: source, Target: target, Metadata: symlinkMap} //stub
-
-	err := s.client.CreateLink(source, target, options)
+	err := s.client.CreateLink(source, target, true)
 	s.assert.Nil(err)
 
 	source = s.client.getKey(source, true)
@@ -316,10 +307,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 		sources[i] = generateFileName()
 		targets[i] = generateFileName()
 
-		symlinkMap := map[string]string{"symlinkKey": "true"}
-		options := internal.CreateLinkOptions{Name: sources[i], Target: targets[i], Metadata: symlinkMap} //stub
-
-		err := s.client.CreateLink(folder+sources[i], targets[i], options)
+		err := s.client.CreateLink(sources[i], targets[i], true)
 		s.assert.Nil(err)
 
 		sources[i] = s.client.getKey(sources[i], true)

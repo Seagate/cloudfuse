@@ -160,9 +160,8 @@ type UnlinkFileOptions struct {
 }
 
 type CreateLinkOptions struct {
-	Name     string
-	Target   string
-	Metadata map[string]string
+	Name   string
+	Target string
 }
 
 type ReadLinkOptions struct {
