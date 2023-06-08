@@ -4,14 +4,14 @@ from PySide6 import QtWidgets
 # import the custom class made from QtDesigner
 from ui_azure_config_common import Ui_Form
 from azure_config_advanced import azureAdvancedSettingsWidget
-from common_qt_functions import commonConfigFunctions, defaultSettingsManager
+from common_qt_functions import widgetCustomFunctions, defaultSettingsManager
 
 pipelineChoices = ['file_cache','stream']
 bucketModeChoices = ["key", "sas", "spn", "msi"]
 azStorageType = ["block", "adls"]
 libfusePermissions = [0o777,0o666,0o644,0o444]
 
-class azureSettingsWidget(defaultSettingsManager,commonConfigFunctions, Ui_Form):
+class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form):
     def __init__(self):
         super().__init__()
         self.setupUi(self)

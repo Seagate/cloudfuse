@@ -1,11 +1,11 @@
 from PySide6.QtCore import Qt, QSettings
 # import the custom class made from QtDesigner
 from ui_lyve_config_advanced import Ui_Form
-from common_qt_functions import commonConfigFunctions
+from common_qt_functions import widgetCustomFunctions
 
 file_cache_eviction_choices = ['lru','lfu']
 
-class lyveAdvancedSettingsWidget(commonConfigFunctions, Ui_Form):
+class lyveAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
