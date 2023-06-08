@@ -42,7 +42,6 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -466,7 +465,7 @@ func (suite *mountSuite) TestWriteBackCacheAndIgnoreOpenFlags() {
 	// write to file in the local directory
 	buff := make([]byte, 200)
 	rand.Read(buff)
-	err := ioutil.WriteFile(remoteFilePath, buff, 0777)
+	err := os.WriteFile(remoteFilePath, buff, 0777)
 	suite.Nil(err)
 
 	// unmount

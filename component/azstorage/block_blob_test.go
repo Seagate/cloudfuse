@@ -46,7 +46,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"strings"
@@ -118,7 +117,7 @@ func uploadReaderAtToBlockBlob(ctx context.Context, reader io.ReaderAt, readerSi
 		if o.Progress != nil {
 			body = pipeline.NewRequestBodyProgress(body, o.Progress)
 		}
-		return blockBlobURL.Upload(ctx, body, o.BlobHTTPHeaders, o.Metadata, o.AccessConditions, o.BlobAccessTier, o.BlobTagsMap, o.ClientProvidedKeyOptions)
+		return blockBlobURL.Upload(ctx, body, o.BlobHTTPHeaders, o.Metadata, o.AccessConditions, o.BlobAccessTier, o.BlobTagsMap, o.ClientProvidedKeyOptions, azblob.ImmutabilityPolicyOptions{})
 	}
 
 	var numBlocks = uint16(((readerSize - 1) / o.BlockSize) + 1)
@@ -162,7 +161,7 @@ func uploadReaderAtToBlockBlob(ctx context.Context, reader io.ReaderAt, readerSi
 		return nil, err
 	}
 	// All put blocks were successful, call Put Block List to finalize the blob
-	return blockBlobURL.CommitBlockList(ctx, blockIDList, o.BlobHTTPHeaders, o.Metadata, o.AccessConditions, o.BlobAccessTier, o.BlobTagsMap, o.ClientProvidedKeyOptions)
+	return blockBlobURL.CommitBlockList(ctx, blockIDList, o.BlobHTTPHeaders, o.Metadata, o.AccessConditions, o.BlobAccessTier, o.BlobTagsMap, o.ClientProvidedKeyOptions, azblob.ImmutabilityPolicyOptions{})
 }
 
 type blockBlobTestSuite struct {
@@ -207,7 +206,7 @@ func (s *blockBlobTestSuite) SetupTest() {
 		os.Exit(1)
 	}
 
-	cfgData, _ := ioutil.ReadAll(cfgFile)
+	cfgData, _ := io.ReadAll(cfgFile)
 	err = json.Unmarshal(cfgData, &storageTestConfigurationParameters)
 	if err != nil {
 		fmt.Println("Failed to parse the config file")
@@ -1216,7 +1215,7 @@ func (s *blockBlobTestSuite) TestWriteFile() {
 	file := s.containerUrl.NewBlobURL(name)
 	resp, err := file.Download(ctx, 0, int64(len(data)), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
 	s.assert.Nil(err)
-	output, _ := ioutil.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1238,7 +1237,7 @@ func (s *blockBlobTestSuite) TestTruncateSmallFileSmaller() {
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
-	output, _ := ioutil.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData[:truncatedLength], output)
 }
 
@@ -1264,7 +1263,7 @@ func (s *blockBlobTestSuite) TestTruncateChunkedFileSmaller() {
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
-	output, _ := ioutil.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData[:truncatedLength], output)
 }
 
@@ -1286,7 +1285,7 @@ func (s *blockBlobTestSuite) TestTruncateSmallFileEqual() {
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
-	output, _ := ioutil.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1312,7 +1311,7 @@ func (s *blockBlobTestSuite) TestTruncateChunkedFileEqual() {
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
-	output, _ := ioutil.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1334,7 +1333,7 @@ func (s *blockBlobTestSuite) TestTruncateSmallFileBigger() {
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
-	output, _ := ioutil.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output[:len(data)])
 }
 
@@ -1360,7 +1359,7 @@ func (s *blockBlobTestSuite) TestTruncateChunkedFileBigger() {
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
-	output, _ := ioutil.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output[:len(data)])
 }
 
@@ -1384,7 +1383,7 @@ func (s *blockBlobTestSuite) TestWriteSmallFile() {
 	dataLen := len(data)
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 
 	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
@@ -1409,7 +1408,7 @@ func (s *blockBlobTestSuite) TestOverwriteSmallFile() {
 	dataLen := len(data)
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
@@ -1439,7 +1438,7 @@ func (s *blockBlobTestSuite) TestOverwriteAndAppendToSmallFile() {
 
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
@@ -1470,7 +1469,7 @@ func (s *blockBlobTestSuite) TestAppendToSmallFile() {
 
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("-newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 9, Data: newTestData})
@@ -1501,7 +1500,7 @@ func (s *blockBlobTestSuite) TestAppendOffsetLargerThanSmallFile() {
 
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 12, Data: newTestData})
@@ -1536,7 +1535,7 @@ func (s *blockBlobTestSuite) TestAppendBlocksToSmallFile() {
 		BlockSize: 8,
 	})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("-newdata-newdata-newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 9, Data: newTestData})
@@ -1570,7 +1569,7 @@ func (s *blockBlobTestSuite) TestOverwriteBlocks() {
 		BlockSize: 4,
 	})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("cake")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 16, Data: newTestData})
@@ -1604,7 +1603,7 @@ func (s *blockBlobTestSuite) TestOverwriteAndAppendBlocks() {
 		BlockSize: 4,
 	})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 32, Data: newTestData})
@@ -1637,7 +1636,7 @@ func (s *blockBlobTestSuite) TestAppendBlocks() {
 		BlockSize: 4,
 	})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: newTestData})
@@ -1670,7 +1669,7 @@ func (s *blockBlobTestSuite) TestAppendOffsetLargerThanSize() {
 		BlockSize: 4,
 	})
 	s.assert.Nil(err)
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 45, Data: newTestData})
@@ -1694,7 +1693,7 @@ func (s *blockBlobTestSuite) TestCopyToFileError() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	f, _ := ioutil.TempFile("", name+".tmp")
+	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 
 	err := s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
@@ -1709,7 +1708,7 @@ func (s *blockBlobTestSuite) TestCopyFromFile() {
 	testData := "test data"
 	data := []byte(testData)
 	homeDir, _ := os.UserHomeDir()
-	f, _ := ioutil.TempFile(homeDir, name+".tmp")
+	f, _ := os.CreateTemp(homeDir, name+".tmp")
 	defer os.Remove(f.Name())
 	f.Write(data)
 
@@ -1721,7 +1720,7 @@ func (s *blockBlobTestSuite) TestCopyFromFile() {
 	file := s.containerUrl.NewBlobURL(name)
 	resp, err := file.Download(ctx, 0, int64(len(data)), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
 	s.assert.Nil(err)
-	output, _ := ioutil.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1745,7 +1744,7 @@ func (s *blockBlobTestSuite) TestCreateLink() {
 	s.assert.EqualValues("true", props.NewMetadata()[symlinkKey])
 	resp, err := link.Download(ctx, 0, props.ContentLength(), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
 	s.assert.Nil(err)
-	data, _ := ioutil.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	data, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(target, data)
 }
 

@@ -42,7 +42,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"os"
 	"path"
@@ -119,7 +119,7 @@ func (s *clientTestSuite) SetupTest() {
 		os.Exit(1)
 	}
 
-	cfgData, _ := ioutil.ReadAll(cfgFile)
+	cfgData, _ := io.ReadAll(cfgFile)
 	err = json.Unmarshal(cfgData, &storageTestConfigurationParameters)
 	if err != nil {
 		fmt.Println("Failed to parse the config file")
@@ -225,7 +225,7 @@ func (s *clientTestSuite) TestCreateLink() {
 
 	// object body should match target file name
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(target, output)
 
@@ -560,7 +560,7 @@ func (s *clientTestSuite) TestWriteFromFile() {
 
 	// object body should match generated body written to file
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(body, output)
 }
@@ -584,7 +584,7 @@ func (s *clientTestSuite) TestWriteFromBuffer() {
 
 	// object body should match generated body
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(body, output)
 }
@@ -615,7 +615,7 @@ func (s *clientTestSuite) TestTruncateFile() {
 
 	// object body should match truncated initial body
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(body[:size], output)
 }
@@ -648,7 +648,7 @@ func (s *clientTestSuite) TestWrite() {
 
 	// object body should match generated combo of old and new data
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(oldBody[:offset], output[:offset])
 	s.assert.EqualValues(newData, output[offset:])

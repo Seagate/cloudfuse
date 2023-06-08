@@ -36,7 +36,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"testing"
@@ -94,7 +93,7 @@ func (suite *unmountTestSuite) cleanupTest() {
 func (suite *unmountTestSuite) TestUnmountCmd() {
 	defer suite.cleanupTest()
 
-	mountDirectory1, _ := ioutil.TempDir("", "TestUnMountTemp")
+	mountDirectory1, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory1, 0777)
 	defer os.RemoveAll(mountDirectory1)
 
@@ -111,7 +110,7 @@ func (suite *unmountTestSuite) TestUnmountCmd() {
 func (suite *unmountTestSuite) TestUnmountCmdFail() {
 	defer suite.cleanupTest()
 
-	mountDirectory2, _ := ioutil.TempDir("", "TestUnMountTemp")
+	mountDirectory2, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory2, 0777)
 	defer os.RemoveAll(mountDirectory2)
 
@@ -135,7 +134,7 @@ func (suite *unmountTestSuite) TestUnmountCmdFail() {
 func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
 	defer suite.cleanupTest()
 
-	mountDirectory3, _ := ioutil.TempDir("", "TestUnMountTemp")
+	mountDirectory3, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory3, 0777)
 	defer os.RemoveAll(mountDirectory3)
 
@@ -151,7 +150,7 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
 func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
 	defer suite.cleanupTest()
 
-	mountDirectory4, _ := ioutil.TempDir("", "TestUnMountTemp")
+	mountDirectory4, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory4, 0777)
 	defer os.RemoveAll(mountDirectory4)
 
@@ -179,7 +178,7 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
 func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
 	defer suite.cleanupTest()
 
-	mountDirectory5, _ := ioutil.TempDir("", "TestUnMountTemp")
+	mountDirectory5, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory5, 0777)
 	defer os.RemoveAll(mountDirectory5)
 
@@ -202,13 +201,13 @@ func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
 }
 
 func TestUnMountCommand(t *testing.T) {
-	confFile, err := ioutil.TempFile("", "conf*.yaml")
+	confFile, err := os.CreateTemp("", "conf*.yaml")
 	if err != nil {
 		t.Error("Failed to create config file")
 	}
 
 	currentDir, _ = os.Getwd()
-	tempDir, _ := ioutil.TempDir("", "TestUnMountTemp")
+	tempDir, _ := os.MkdirTemp("", "TestUnMountTemp")
 
 	confFileUnMntTest = confFile.Name()
 	defer os.Remove(confFileUnMntTest)
