@@ -11,6 +11,7 @@ package libfuse
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -118,10 +119,10 @@ func (lf *Libfuse) initFuse() error {
 	}
 
 	// While reading a file let kernel do readahed for better perf
-	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)
+	options += fmt.Sprintf(",max_readahead=%d", 8*1024*1024)
 
 	// Max background thread on the fuse layer for high parallelism
-	options += fmt.Sprintf(",max_background=%d", 128)
+	options += fmt.Sprintf(",max_background=%d", lf.maxFuseThreads)
 
 	if lf.allowOther {
 		options += ",allow_other"
