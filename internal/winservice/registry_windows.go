@@ -48,12 +48,19 @@ const (
 	winFspRegistry   = `SOFTWARE\WOW6432Node\WinFsp\Services\`
 )
 
-// WinFsp registry constants
+// WinFsp registry constants. JobControl is specified to be 1 by default in WinFsp. The security
+// string is a Windows SDDL string which specifies access control and this is the default given by WinFsp.
+// Here is syntax for SDDL
+// https://web.archive.org/web/20160320065614/http://www.netid.washington.edu/documentation/domains/sddl.aspx
 const (
 	jobControl = 1
-	mountCmd   = `mount %1 --config-file=%2`
 	security   = `D:P(A;;RPWPLC;;;WD)`
 )
+
+// Specific mount command used in lyvecloudfuse. This is the command that is executed when WinFsp launches our service.
+// %1 and %2 are strings that are added when mounting where %1 represents the mount directory and %2 the location of the
+// config file.
+const mountCmd = `mount %1 --config-file=%2`
 
 func ReadRegistryInstanceEntry(name string) (KeyData, error) {
 	registryPath := instanceRegistry + name
