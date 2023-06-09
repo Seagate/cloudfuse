@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -86,13 +87,14 @@ func newTestFileCache(next internal.Component) *FileCache {
 }
 
 func randomString(length int) string {
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, length)
 	rand.Read(b)
 	return fmt.Sprintf("%x", b)[:length]
 }
 
 func (suite *fileCacheTestSuite) SetupTest() {
+	// Seed the randomizer when we start the test
+	rand.Seed(time.Now().UnixNano())
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
 		panic("Unable to set silent logger as default.")

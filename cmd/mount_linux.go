@@ -1,11 +1,44 @@
 //go:build linux
 
+/*
+    _____           _____   _____   ____          ______  _____  ------
+   |     |  |      |     | |     | |     |     | |       |            |
+   |     |  |      |     | |     | |     |     | |       |            |
+   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
+   |     |  |      |     | |     | |     |     |       | |       |
+   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
+
+
+   Licensed under the MIT License <http://opensource.org/licenses/MIT>.
+
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Author : <blobfusedev@microsoft.com>
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE
+*/
+
 package cmd
 
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"lyvecloudfuse/common/config"
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
@@ -66,7 +99,7 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 			// Get error string from the child, stderr or child was redirected to a file
 			log.Info("mount: Child [%v] terminated from %s", child.Pid, options.MountPath)
 
-			buff, err := ioutil.ReadFile(dmnCtx.LogFileName)
+			buff, err := os.ReadFile(dmnCtx.LogFileName)
 			if err != nil {
 				log.Err("mount: failed to read child [%v] failure logs [%s]", child.Pid, err.Error())
 				return Destroy(fmt.Sprintf("failed to mount, please check logs [%s]", err.Error()))

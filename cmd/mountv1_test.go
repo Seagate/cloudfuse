@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -36,7 +37,6 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"testing"
@@ -63,6 +63,8 @@ type generateConfigTestSuite struct {
 }
 
 func (suite *generateConfigTestSuite) SetupTest() {
+	// Seed the randomizer when we start the test
+	rand.Seed(time.Now().UnixNano())
 	suite.assert = assert.New(suite.T())
 	libfuseOptions = make([]string, 0)
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
@@ -102,7 +104,6 @@ func TestGenerateConfig(t *testing.T) {
 }
 
 func randomString(length int) string {
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, length)
 	rand.Read(b)
 	return fmt.Sprintf("%x", b)[:length]
@@ -115,8 +116,8 @@ func generateFileName() string {
 func (suite *generateConfigTestSuite) TestConfigFileInvalid() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName myOtherAccountName")
@@ -128,8 +129,8 @@ func (suite *generateConfigTestSuite) TestConfigFileInvalid() {
 func (suite *generateConfigTestSuite) TestConfigFileKey() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\naccountKey myAccountKey\nauthType Key\ncontainerName myContainerName\n")
@@ -154,8 +155,8 @@ func (suite *generateConfigTestSuite) TestConfigFileKey() {
 func (suite *generateConfigTestSuite) TestConfigFileSas() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\nsasToken mySasToken\nauthType SAS\ncontainerName myContainerName\n")
@@ -180,8 +181,8 @@ func (suite *generateConfigTestSuite) TestConfigFileSas() {
 func (suite *generateConfigTestSuite) TestConfigFileSPN() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\nservicePrincipalClientId clientId\nservicePrincipalTenantId tenantId\nservicePrincipalClientSecret clientSecret\naadEndpoint aadEndpoint\nauthType SPN\ncontainerName myContainerName\n")
@@ -208,8 +209,8 @@ func (suite *generateConfigTestSuite) TestConfigFileSPN() {
 func (suite *generateConfigTestSuite) TestConfigFileMSI() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\nidentityClientId clientId\nidentityObjectId objectId\nidentityResourceId resourceId\nauthType MSI\ncontainerName myContainerName\n")
@@ -236,8 +237,8 @@ func (suite *generateConfigTestSuite) TestConfigFileMSI() {
 func (suite *generateConfigTestSuite) TestConfigFileProxy() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\nhttpProxy httpProxy\nhttpsProxy httpsProxy\n")
@@ -259,8 +260,8 @@ func (suite *generateConfigTestSuite) TestConfigFileProxy() {
 func (suite *generateConfigTestSuite) TestConfigFileBlobEndpoint() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\nblobEndpoint blobEndpoint\n")
@@ -281,8 +282,8 @@ func (suite *generateConfigTestSuite) TestConfigFileBlobEndpoint() {
 func (suite *generateConfigTestSuite) TestConfigFileAccountType() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\naccountType adls\n")
@@ -304,8 +305,8 @@ func (suite *generateConfigTestSuite) TestConfigFileAccountType() {
 func (suite *generateConfigTestSuite) TestConfigFileAuthMode() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\nauthType Key\n")
@@ -326,8 +327,8 @@ func (suite *generateConfigTestSuite) TestConfigFileAuthMode() {
 func (suite *generateConfigTestSuite) TestConfigFileLogLevel() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\nlogLevel LOG_ERROR\n")
@@ -348,8 +349,8 @@ func (suite *generateConfigTestSuite) TestConfigFileLogLevel() {
 func (suite *generateConfigTestSuite) TestConfigFileIgnoreCommentsNewLine() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\nlogLevel LOG_ERROR\n# accountName myAccountName\n")
@@ -370,8 +371,8 @@ func (suite *generateConfigTestSuite) TestConfigFileIgnoreCommentsNewLine() {
 func (suite *generateConfigTestSuite) TestConfigFileIgnoreCommentsSameLine() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\nlogLevel LOG_ERROR #LOG_DEBUG\n")
@@ -392,8 +393,8 @@ func (suite *generateConfigTestSuite) TestConfigFileIgnoreCommentsSameLine() {
 func (suite *generateConfigTestSuite) TestConfigFileCaCertFileError() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\ncaCertFile caCertFile\n")
@@ -405,8 +406,8 @@ func (suite *generateConfigTestSuite) TestConfigFileCaCertFileError() {
 func (suite *generateConfigTestSuite) TestConfigFileDnsTypeError() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\ndnsType dnsType\n")
@@ -418,8 +419,8 @@ func (suite *generateConfigTestSuite) TestConfigFileDnsTypeError() {
 func (suite *generateConfigTestSuite) TestConfigCLILogLevel() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v1ConfigFile.Name())
 	defer os.Remove(v2ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\nlogLevel LOG_ERROR\n")
@@ -440,11 +441,11 @@ func (suite *generateConfigTestSuite) TestConfigCLILogLevel() {
 func (suite *generateConfigTestSuite) TestCLIParamLogging() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
 
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -467,10 +468,10 @@ func (suite *generateConfigTestSuite) TestCLIParamFileCache() {
 	defer suite.cleanupTest()
 	name := generateFileName()
 
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -504,10 +505,10 @@ func (suite *generateConfigTestSuite) TestCLIParamFileCache() {
 func (suite *generateConfigTestSuite) TestAddStreamAndFileCache() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -532,10 +533,10 @@ func (suite *generateConfigTestSuite) TestAddStreamAndFileCache() {
 func (suite *generateConfigTestSuite) TestComponentCorrectOrder() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -560,10 +561,10 @@ func (suite *generateConfigTestSuite) TestComponentCorrectOrder() {
 func (suite *generateConfigTestSuite) TestCLIParamFileCacheUploadModifiedOnlyError() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -576,10 +577,10 @@ func (suite *generateConfigTestSuite) TestCLIParamFileCacheUploadModifiedOnlyErr
 func (suite *generateConfigTestSuite) TestCLIParamFileCachePollTimeoutError() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -592,10 +593,10 @@ func (suite *generateConfigTestSuite) TestCLIParamFileCachePollTimeoutError() {
 func (suite *generateConfigTestSuite) TestCLIParamStreaming() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -622,10 +623,10 @@ func (suite *generateConfigTestSuite) TestCLIParamStreaming() {
 func (suite *generateConfigTestSuite) TestCLIParamAttrCache() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -650,10 +651,10 @@ func (suite *generateConfigTestSuite) TestCLIParamAttrCache() {
 func (suite *generateConfigTestSuite) TestCLIParamStorage() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -693,10 +694,10 @@ func (suite *generateConfigTestSuite) TestCLIParamStorage() {
 func (suite *generateConfigTestSuite) TestCLIParamStorageCaCertFileError() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -709,10 +710,10 @@ func (suite *generateConfigTestSuite) TestCLIParamStorageCaCertFileError() {
 func (suite *generateConfigTestSuite) TestCLIParamStorageContentTypeError() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -725,10 +726,10 @@ func (suite *generateConfigTestSuite) TestCLIParamStorageContentTypeError() {
 func (suite *generateConfigTestSuite) TestCLIParamStorageBackgroundDownloadError() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -741,10 +742,10 @@ func (suite *generateConfigTestSuite) TestCLIParamStorageBackgroundDownloadError
 func (suite *generateConfigTestSuite) TestCLIParamStorageInvalidateOnSyncNoError() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -757,10 +758,10 @@ func (suite *generateConfigTestSuite) TestCLIParamStorageInvalidateOnSyncNoError
 func (suite *generateConfigTestSuite) TestCLIParamPreMountValidateNoError() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -774,10 +775,10 @@ func (suite *generateConfigTestSuite) TestCLIParamPreMountValidateNoError() {
 func (suite *generateConfigTestSuite) TestInvalidLibfuseOption() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -794,10 +795,10 @@ func (suite *generateConfigTestSuite) TestInvalidLibfuseOption() {
 func (suite *generateConfigTestSuite) TestUndefinedLibfuseOption() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -814,10 +815,10 @@ func (suite *generateConfigTestSuite) TestUndefinedLibfuseOption() {
 func (suite *generateConfigTestSuite) TestInvalidUmaskValue() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -834,10 +835,10 @@ func (suite *generateConfigTestSuite) TestInvalidUmaskValue() {
 func (suite *generateConfigTestSuite) TestInvalidAttrTimeout() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -855,10 +856,10 @@ func (suite *generateConfigTestSuite) TestInvalidAttrTimeout() {
 func (suite *generateConfigTestSuite) TestInvalidEntryTimeout() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -876,10 +877,10 @@ func (suite *generateConfigTestSuite) TestInvalidEntryTimeout() {
 func (suite *generateConfigTestSuite) TestInvalidNegativeTimeout() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -896,7 +897,7 @@ func (suite *generateConfigTestSuite) TestInvalidNegativeTimeout() {
 func (suite *generateConfigTestSuite) TestEnvVarAccountName() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -915,7 +916,7 @@ func (suite *generateConfigTestSuite) TestEnvVarAccountName() {
 func (suite *generateConfigTestSuite) TestAEnvVarAccountNameError() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())
@@ -929,10 +930,10 @@ func (suite *generateConfigTestSuite) TestAEnvVarAccountNameError() {
 func (suite *generateConfigTestSuite) TestInvalidAccountType() {
 	defer suite.cleanupTest()
 	name := generateFileName()
-	v1ConfigFile, _ := ioutil.TempFile("", name+".tmp.cfg")
+	v1ConfigFile, _ := os.CreateTemp("", name+".tmp.cfg")
 	defer os.Remove(v1ConfigFile.Name())
 	v1ConfigFile.WriteString("accountName myAccountName\naccountType random")
-	v2ConfigFile, _ := ioutil.TempFile("", name+".tmp.yaml")
+	v2ConfigFile, _ := os.CreateTemp("", name+".tmp.yaml")
 	defer os.Remove(v2ConfigFile.Name())
 
 	outputFile := fmt.Sprintf("--output-file=%s", v2ConfigFile.Name())

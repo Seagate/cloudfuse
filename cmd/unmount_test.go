@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -35,9 +36,9 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
+	"runtime"
 	"testing"
 	"time"
 
@@ -91,9 +92,13 @@ func (suite *unmountTestSuite) cleanupTest() {
 
 // mount failure test where the mount directory does not exists
 func (suite *unmountTestSuite) TestUnmountCmd() {
+	// Skip these tests on windows since we don't run as a daemon
+	if runtime.GOOS == "windows" {
+		return
+	}
 	defer suite.cleanupTest()
 
-	mountDirectory1, _ := ioutil.TempDir("", "TestUnMountTemp")
+	mountDirectory1, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory1, 0777)
 	defer os.RemoveAll(mountDirectory1)
 
@@ -108,9 +113,13 @@ func (suite *unmountTestSuite) TestUnmountCmd() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdFail() {
+	// Skip these tests on windows since we don't run as a daemon
+	if runtime.GOOS == "windows" {
+		return
+	}
 	defer suite.cleanupTest()
 
-	mountDirectory2, _ := ioutil.TempDir("", "TestUnMountTemp")
+	mountDirectory2, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory2, 0777)
 	defer os.RemoveAll(mountDirectory2)
 
@@ -132,9 +141,13 @@ func (suite *unmountTestSuite) TestUnmountCmdFail() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
+	// Skip these tests on windows since we don't run as a daemon
+	if runtime.GOOS == "windows" {
+		return
+	}
 	defer suite.cleanupTest()
 
-	mountDirectory3, _ := ioutil.TempDir("", "TestUnMountTemp")
+	mountDirectory3, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory3, 0777)
 	defer os.RemoveAll(mountDirectory3)
 
@@ -148,9 +161,13 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
+	// Skip these tests on windows since we don't run as a daemon
+	if runtime.GOOS == "windows" {
+		return
+	}
 	defer suite.cleanupTest()
 
-	mountDirectory4, _ := ioutil.TempDir("", "TestUnMountTemp")
+	mountDirectory4, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory4, 0777)
 	defer os.RemoveAll(mountDirectory4)
 
@@ -176,9 +193,13 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
+	// Skip these tests on windows since we don't run as a daemon
+	if runtime.GOOS == "windows" {
+		return
+	}
 	defer suite.cleanupTest()
 
-	mountDirectory5, _ := ioutil.TempDir("", "TestUnMountTemp")
+	mountDirectory5, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory5, 0777)
 	defer os.RemoveAll(mountDirectory5)
 
@@ -201,13 +222,13 @@ func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
 }
 
 func TestUnMountCommand(t *testing.T) {
-	confFile, err := ioutil.TempFile("", "conf*.yaml")
+	confFile, err := os.CreateTemp("", "conf*.yaml")
 	if err != nil {
 		t.Error("Failed to create config file")
 	}
 
 	currentDir, _ = os.Getwd()
-	tempDir, _ := ioutil.TempDir("", "TestUnMountTemp")
+	tempDir, _ := os.MkdirTemp("", "TestUnMountTemp")
 
 	confFileUnMntTest = confFile.Name()
 	defer os.Remove(confFileUnMntTest)

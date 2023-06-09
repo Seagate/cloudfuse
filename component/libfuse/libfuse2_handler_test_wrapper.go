@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -36,6 +37,7 @@ package libfuse
 import (
 	"errors"
 	"io/fs"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -114,6 +116,12 @@ func testMkDir(suite *libfuseTestSuite) {
 	options := internal.CreateDirOptions{Name: name, Mode: mode}
 	suite.mock.EXPECT().CreateDir(options).Return(nil)
 
+	// On Windows we test for directory creation, so we have a call to GetAttr
+	if runtime.GOOS == "windows" {
+		option := internal.GetAttrOptions{Name: name}
+		suite.mock.EXPECT().GetAttr(option).Return(nil, syscall.ENOENT)
+	}
+
 	err := cfuseFS.Mkdir(path, 0775)
 	suite.assert.Equal(0, err)
 }
@@ -175,8 +183,29 @@ func testMkDirError(suite *libfuseTestSuite) {
 	options := internal.CreateDirOptions{Name: name, Mode: mode}
 	suite.mock.EXPECT().CreateDir(options).Return(errors.New("failed to create directory"))
 
+	// On Windows we test for directory creation, so we have a call to GetAttr
+	if runtime.GOOS == "windows" {
+		option := internal.GetAttrOptions{Name: name}
+		suite.mock.EXPECT().GetAttr(option).Return(nil, syscall.ENOENT)
+	}
+
 	err := cfuseFS.Mkdir(path, 0775)
 	suite.assert.Equal(-fuse.EIO, err)
+}
+
+// testMkDirErrorAttrExist only runs on Windows to test the case that the directory already exists
+// and the attributes state it is a directory.
+func testMkDirErrorAttrExist(suite *libfuseTestSuite) {
+	defer suite.cleanupTest()
+	if runtime.GOOS != "windows" {
+		return
+	}
+	name := "path"
+	path := "/" + name
+	option := internal.GetAttrOptions{Name: name}
+	suite.mock.EXPECT().GetAttr(option).Return(&internal.ObjAttr{Flags: internal.NewDirBitMap()}, nil)
+	err := cfuseFS.Mkdir(path, 0775)
+	suite.assert.Equal(-fuse.EEXIST, err)
 }
 
 // TODO: ReadDir test

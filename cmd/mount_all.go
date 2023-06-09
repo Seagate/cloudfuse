@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -37,7 +38,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -363,7 +363,7 @@ func writeConfigFile(contConfigFile string) error {
 			return fmt.Errorf("failed to encrypt yaml content [%s]", err.Error())
 		}
 
-		err = ioutil.WriteFile(contConfigFile, cipherText, 0777)
+		err = os.WriteFile(contConfigFile, cipherText, 0777)
 		if err != nil {
 			return fmt.Errorf("failed to write encrypted file [%s]", err.Error())
 		}
