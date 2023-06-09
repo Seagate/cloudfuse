@@ -295,7 +295,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 
 	// generate folder / prefix name
 
-	prefix := generateFileName()
+	prefix := generateDirectoryName()
 
 	folder := internal.ExtendDirName(prefix)
 
@@ -303,11 +303,11 @@ func (s *clientTestSuite) TestDeleteLinks() {
 	// create link for all file names with prefix name
 	var sources [5]string
 	var targets [5]string
-	for i := 0; i <= 5; i++ {
+	for i := 0; i < 5; i++ {
 		sources[i] = generateFileName()
 		targets[i] = generateFileName()
 
-		err := s.client.CreateLink(sources[i], targets[i], true)
+		err := s.client.CreateLink(folder+sources[i], targets[i], true)
 		s.assert.Nil(err)
 
 		sources[i] = s.client.getKey(sources[i], true)
