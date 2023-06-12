@@ -160,7 +160,7 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
         self.spinBox_streaming_blockSize.setValue(self.settings.value('stream')['block-size-mb'])
         self.spinBox_streaming_buffSize.setValue(self.settings.value('stream')['buffer-size-mb'])
         self.spinBox_streaming_maxBuff.setValue(self.settings.value('stream')['max-buffers'])
-        
+        # TODO:
         # There is no sanitizing for lineEdit at the moment, the GUI depends on the user being correc.
         self.lineEdit_bucketName.setText(self.settings.value('s3storage')['bucket-name'])
         self.lineEdit_endpoint.setText(self.settings.value('s3storage')['endpoint'])

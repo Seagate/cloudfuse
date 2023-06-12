@@ -62,6 +62,7 @@ class defaultSettingsManager():
             'update-md5': False,
             'validate-md5': False,
             'virtual-directory': False
+            # TODO: disable-compression flag is missing
         })
     
     def setComponentSettings(self):
@@ -84,6 +85,7 @@ class defaultSettingsManager():
             'extension' : '', 
             'disable-writeback-cache' : False,
             'ignore-open-flags' : True
+            # TODO: max-fuse-threads and network-share are missing
         })
         self.settings.setValue('stream',{
             'block-size-mb': 0,
@@ -104,6 +106,7 @@ class defaultSettingsManager():
             'cleanup-on-start': False,
             'policy-trace': False,
             'offload-io': False
+            # TODO: sync-to-flush is missing
         })
         self.settings.setValue('attr_cache',{
             'timeout-sec': 120,
@@ -162,6 +165,8 @@ class widgetCustomFunctions(QWidget):
         return choice
             
     # Overrides the closeEvent function from parent class to enable this custom behavior
+    # TODO: Nice to have - keep track of changes to user makes and only trigger the 'are you sure?' message 
+    #   when changes have been made
     def closeEvent(self, event):
         msg = QtWidgets.QMessageBox()
         msg.setWindowTitle("Are you sure?")
