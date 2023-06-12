@@ -565,7 +565,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	}
 	// overwrite the object with the truncated data
 	truncatedDataReader := bytes.NewReader(objectData)
-	err = cl.putObject(name, truncatedDataReader, false) //because I have to pass along the symLink bool, I have to go get it from getObject()
+	err = cl.putObject(name, truncatedDataReader, false)
 	if err != nil {
 		log.Err("Client::TruncateFile : Failed to write truncated data to object %s", name)
 	}
