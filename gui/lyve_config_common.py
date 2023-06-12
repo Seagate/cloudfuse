@@ -149,9 +149,9 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
             self.checkbox_streaming_fileCachingLevel.setCheckState(Qt.Unchecked)
             
         if self.settings.value('libfuse')['ignore-open-flags'] == True:
-            self.checkbox_streaming_fileCachingLevel.setCheckState(Qt.Checked)
+            self.checkbox_libfuse_ignoreAppend.setCheckState(Qt.Checked)
         else:
-            self.checkbox_streaming_fileCachingLevel.setCheckState(Qt.Unchecked)
+            self.checkbox_libfuse_ignoreAppend.setCheckState(Qt.Unchecked)
         
         # Spinbox automatically sanitizes intputs for decimal values only, so no need to check for the appropriate data type. 
         self.spinBox_libfuse_attExp.setValue(self.settings.value('libfuse')['attribute-expiration-sec'])
