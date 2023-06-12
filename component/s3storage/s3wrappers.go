@@ -53,7 +53,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-const symLinkStr = ".rclonelink"
+const symlinkStr = ".rclonelink"
 
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
@@ -413,18 +413,21 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) {
 func (cl *Client) getKey(name string, isSymLink bool) string {
 
 	if isSymLink {
-		name = name + symLinkStr
+		name = name + symlinkStr
 	}
 
 	return common.JoinUnixFilepath(cl.Config.prefixPath, name)
 }
 
+// take the string argument and checks if it has a ".rclonelink" suffix.
+// If so, it stripps the suffix and returns the new string and true
 func (cl *Client) getFile(name string) (string, bool) {
 	isSymLink := false
+
 	//todo: wrtie a test the catches the out of bounds issue.
-	if len(name) > len(symLinkStr) && name[len(name)-len(symLinkStr):] == symLinkStr {
+	if strings.HasSuffix(name, symlinkStr) {
 		isSymLink = true
-		name = name[:len(name)-len(symLinkStr)]
+		name = name[:len(name)-len(symlinkStr)]
 	}
 
 	return name, isSymLink

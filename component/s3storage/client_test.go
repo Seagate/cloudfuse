@@ -170,9 +170,8 @@ func (s *clientTestSuite) TestSetPrefixPath() {
 	fileName := generateFileName()
 
 	err := s.client.SetPrefixPath(prefix)
-	s.assert.Nil(err)
-	var options internal.CreateFileOptions                       //stub
-	err = s.client.CreateFile(fileName, os.FileMode(0), options) // create file uses prefix
+	s.assert.Nil(err)                                   //stub
+	err = s.client.CreateFile(fileName, os.FileMode(0)) // create file uses prefix
 	s.assert.Nil(err)
 
 	// object should be at prefix
@@ -187,8 +186,7 @@ func (s *clientTestSuite) TestCreateFile() {
 	// setup
 	name := generateFileName()
 
-	var options internal.CreateFileOptions //stub
-	err := s.client.CreateFile(name, os.FileMode(0), options)
+	err := s.client.CreateFile(name, os.FileMode(0))
 	s.assert.Nil(err)
 
 	// file should be in bucket
