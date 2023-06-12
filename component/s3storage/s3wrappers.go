@@ -132,7 +132,6 @@ func (cl *Client) deleteObject(name string, isSymLink bool) error {
 
 // Wrapper for awsS3Client.DeleteObjects.
 // names is a list of paths to the objects.
-// how will []bool be provided here?
 func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 	log.Trace("Client::deleteObjects : deleting %d objects", len(objects))
 	// build list to send to DeleteObjects
