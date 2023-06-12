@@ -301,7 +301,7 @@ func (s3 *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		return nil, syscall.EFAULT
 	}
 
-	err := s3.storage.CreateFile(options.Name, options.Mode, options)
+	err := s3.storage.CreateFile(options.Name, options.Mode)
 	if err != nil {
 		return nil, err
 	}
