@@ -96,7 +96,6 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 // Takes an io.Reader to work with both files and byte arrays.
 // name is the path to the file.
 func (cl *Client) putObject(name string, objectData io.Reader, isSymLink bool) error {
-
 	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::putObject : putting object %s", key)
 
@@ -167,7 +166,6 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 // So this is used to get metadata / attributes for an object.
 // name is the path to the file.
 func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, error) {
-
 	key := cl.getKey(name, isSymlink)
 	log.Trace("Client::headObject : object %s", key)
 
@@ -285,7 +283,6 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// fetch and process result pages
 
 	if paginator.HasMorePages() {
-
 		output, err := paginator.NextPage(context.TODO())
 		if err != nil {
 			log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
@@ -423,7 +420,6 @@ func (cl *Client) getKey(name string, isSymLink bool) string {
 }
 
 func (cl *Client) getFile(name string) (string, bool) {
-
 	isSymLink := false
 	//todo: wrtie a test the catches the out of bounds issue.
 	if len(name) > len(symLinkStr) && name[len(name)-len(symLinkStr):] == symLinkStr {
