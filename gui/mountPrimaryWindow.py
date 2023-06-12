@@ -15,7 +15,7 @@ from lyve_config_common import lyveSettingsWidget
 from azure_config_common import azureSettingsWidget
 
 bucketOptions = ['s3storage', 'azstorage']
-
+mountTargetComponent = 3
 class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def __init__(self):
         super().__init__()
@@ -120,7 +120,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
         components = configs.get('components')
         if components != None:
-            components[3] = target
+            components[mountTargetComponent] = target
             configs['components'] = components
         else:
             errMsg.setWindowTitle("Components in config missing")
