@@ -185,9 +185,9 @@ func (cl *Client) CreateLink(source string, target string, isSymlink bool) error
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
 
-	symlinkMap := map[string]string{"symlinkKey": "false"}
+	symlinkMap := map[string]string{symlinkKey: "false"}
 	if isSymlink {
-		symlinkMap["symlinkKey"] = "true"
+		symlinkMap[symlinkKey] = "true"
 	}
 	return cl.WriteFromBuffer(source, symlinkMap, data)
 }
@@ -469,7 +469,7 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 // Upload from a file handle to an object.
 // The metadata parameter is not used.
 func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.File) error {
-	isSymlink := metadata["symlinkKey"] == "true"
+	isSymlink := metadata[symlinkKey] == "true"
 	log.Trace("Client::WriteFromFile : file %s -> name %s", fi.Name(), name)
 	// track time for performance testing
 	defer log.TimeTrack(time.Now(), "Client::WriteFromFile", name)
@@ -515,7 +515,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 // name is the file path.
 func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) error {
 	log.Trace("Client::WriteFromBuffer : name %s", name)
-	isSymlink := metadata["symlinkKey"] == "true"
+	isSymlink := metadata[symlinkKey] == "true"
 
 	// convert byte array to io.Reader
 	dataReader := bytes.NewReader(data)
@@ -586,7 +586,7 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 	var dataBuffer *[]byte
 
 	// get the existing object data
-	isSymlink := options.Metadata["symlinkKey"] == "true"
+	isSymlink := options.Metadata[symlinkKey] == "true"
 	oldData, _ := cl.ReadBuffer(name, 0, 0, isSymlink)
 	// update the data with the new data
 	// if we're only overwriting existing data
