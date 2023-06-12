@@ -53,6 +53,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
+const symLinkStr = ".rclonelink"
+
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
 // name is the path to the file.
@@ -409,8 +411,6 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) {
 
 	return attr
 }
-
-const symLinkStr = ".rclonelink"
 
 // Convert file name to object getKey
 func (cl *Client) getKey(name string, isSymLink bool) string {
