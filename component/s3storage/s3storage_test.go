@@ -57,6 +57,7 @@ import (
 	"lyvecloudfuse/internal"
 	"lyvecloudfuse/internal/handlemap"
 
+	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/assert"
@@ -1548,6 +1549,53 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 		Key:    aws.String(dstKey),
 	})
 	s.assert.NotNil(err)
+}
+
+func (s *blockBlobTestSuite) TestCreateLink() {
+	defer s.cleanupTest()
+	// Setup
+	target := generateFileName()
+	s.az.CreateFile(internal.CreateFileOptions{Name: target})
+	name := generateFileName()
+
+	err := s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+	s.assert.Nil(err)
+
+	// Link should be in the account
+	link := s.containerUrl.NewBlobURL(name)
+	props, err := link.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
+	s.assert.Nil(err)
+	s.assert.NotNil(props)
+	s.assert.NotEmpty(props.NewMetadata())
+	s.assert.Contains(props.NewMetadata(), symlinkKey)
+	s.assert.EqualValues("true", props.NewMetadata()[symlinkKey])
+	resp, err := link.Download(ctx, 0, props.ContentLength(), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
+	s.assert.Nil(err)
+	data, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	s.assert.EqualValues(target, data)
+}
+
+func (s *blockBlobTestSuite) TestReadLink() {
+	defer s.cleanupTest()
+	// Setup
+	target := generateFileName()
+	s.az.CreateFile(internal.CreateFileOptions{Name: target})
+	name := generateFileName()
+	s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+
+	read, err := s.az.ReadLink(internal.ReadLinkOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.EqualValues(target, read)
+}
+
+func (s *blockBlobTestSuite) TestReadLinkError() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+
+	_, err := s.az.ReadLink(internal.ReadLinkOptions{Name: name})
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
 func (s *s3StorageTestSuite) TestGetAttrDir() {
