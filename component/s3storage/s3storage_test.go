@@ -1568,23 +1568,10 @@ func (s *s3StorageTestSuite) TestCreateLink() {
 	s.assert.Contains(attr.Metadata, symlinkKey)
 	s.assert.Equal("true", attr.Metadata[symlinkKey])
 
-	f, err := os.CreateTemp("", name+".tmp")
-	s.assert.Nil(err)
 	//download and make sure the data is correct
-	defer os.Remove(f.Name())
-	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name + symlinkStr, File: f})
+	result, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
 	s.assert.Nil(err)
-
-	dataLen := len(target)
-	output := make([]byte, dataLen)
-
-	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
-	len, err := f.Read(output)
-	s.assert.Nil(err)
-	s.assert.EqualValues(dataLen, len)
-	s.assert.EqualValues(target, output)
-
+	s.assert.Equal(target, result)
 }
 
 func (s *s3StorageTestSuite) TestReadLink() {
