@@ -1732,35 +1732,35 @@ func (s *s3StorageTestSuite) TestGetAttrFile() {
 	}
 }
 
-// func (s *s3StorageTestSuite) TestGetAttrLink() {
-// 	defer s.cleanupTest()
-// 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-// 	configs := []string{"", vdConfig}
-// 	for _, c := range configs {
-// 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-// 		s.tearDownTestHelper(false)
-// 		s.setupTestHelper(c, s.container, true)
-// 		testName := ""
-// 		if c != "" {
-// 			testName = "virtual-directory"
-// 		}
-// 		s.Run(testName, func() {
-// 			// Setup
-// 			target := generateFileName()
-// 			s.s3.CreateFile(internal.CreateFileOptions{Name: target})
-// 			name := generateFileName()
-// 			s.s3.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+func (s *s3StorageTestSuite) TestGetAttrLink() {
+	defer s.cleanupTest()
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	configs := []string{"", vdConfig}
+	for _, c := range configs {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		s.tearDownTestHelper(false)
+		s.setupTestHelper(c, s.bucket, true)
+		testName := ""
+		if c != "" {
+			testName = "virtual-directory"
+		}
+		s.Run(testName, func() {
+			// Setup
+			target := generateFileName()
+			s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
+			name := generateFileName()
+			s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
 
-// 			props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
-// 			s.assert.Nil(err)
-// 			s.assert.NotNil(props)
-// 			s.assert.True(props.IsSymlink())
-// 			s.assert.NotEmpty(props.Metadata)
-// 			s.assert.Contains(props.Metadata, symlinkKey)
-// 			s.assert.EqualValues("true", props.Metadata[symlinkKey])
-// 		})
-// 	}
-// }
+			props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+			s.assert.Nil(err)
+			s.assert.NotNil(props)
+			s.assert.True(props.IsSymlink())
+			s.assert.NotEmpty(props.Metadata)
+			s.assert.Contains(props.Metadata, symlinkKey)
+			s.assert.EqualValues("true", props.Metadata[symlinkKey])
+		})
+	}
+}
 
 func (s *s3StorageTestSuite) TestGetAttrFileSize() {
 	defer s.cleanupTest()
