@@ -123,6 +123,11 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
             
 # This widget will not display all the options in settings, only the ones written in the UI file.
     def populateOptions(self):
+        fileCache = self.settings.value('file_cache')
+        azStorage = self.settings.value('azstorage')
+        libfuse = self.settings.value('libfuse')
+        stream = self.settings.value('stream')
+        
         # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices, libfusePermissions, azStorage and bucketMode
         #   reflect the index choices in human words without having to reference the UI. 
         #   Get the value in the settings and translate that to the equivalent index in the lists.
@@ -131,62 +136,35 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         self.dropDown_azure_storageType.setCurrentIndex(azStorageType.index(self.settings.value('azstorage')['type']))
         self.dropDown_azure_modeSetting.setCurrentIndex(bucketModeChoices.index(self.settings.value('azstorage')['mode']))
         
-        # Check for a true/false setting and set the checkbox state as appropriate. 
-        #   Note, Checked/UnChecked are NOT True/False data types, hence the need to check what the values are.
-        #   The default values for True/False settings are False, which is why Unchecked is the default state if the value doesn't equate to True.
-        #   Explicitly check for True for clarity
-        if self.settings.value('allow-other') == True:
-            self.checkbox_commonConfig_multiUser.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_commonConfig_multiUser.setCheckState(Qt.Unchecked)
-        
-        if self.settings.value('nonempty') == True:
-            self.checkbox_commonConfig_nonEmptyDir.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_commonConfig_nonEmptyDir.setCheckState(Qt.Unchecked)            
-
-        if self.settings.value('foreground') == True:
-            self.checkbox_daemonForeground.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_daemonForeground.setCheckState(Qt.Unchecked)  
-        
-        if self.settings.value('read-only') == True:
-            self.checkbox_commonConfig_readOnly.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_commonConfig_readOnly.setCheckState(Qt.Unchecked)    
-
-        if self.settings.value('stream')['file-caching'] == True:
-            self.checkbox_streaming_fileCachingLevel.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_streaming_fileCachingLevel.setCheckState(Qt.Unchecked)
-            
-        if self.settings.value('libfuse')['ignore-open-flags'] == True:
-            self.checkbox_streaming_fileCachingLevel.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_streaming_fileCachingLevel.setCheckState(Qt.Unchecked)
-        
+        self.setCheckboxFromSetting(self.checkbox_commonConfig_multiUser,self.settings.value('allow-other'))
+        self.setCheckboxFromSetting(self.checkbox_commonConfig_nonEmptyDir,self.settings.value('nonempty'))
+        self.setCheckboxFromSetting(self.checkbox_daemonForeground,self.settings.value('foreground'))
+        self.setCheckboxFromSetting(self.checkbox_commonConfig_readOnly,self.settings.value('read-only'))
+        self.setCheckboxFromSetting(self.checkbox_streaming_fileCachingLevel,stream['file-caching'])
+        self.setCheckboxFromSetting(self.checkbox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
+       
         # Spinbox automatically sanitizes intputs for decimal values only, so no need to check for the appropriate data type.
-        self.spinBox_libfuse_attributeExp.setValue(self.settings.value('libfuse')['attribute-expiration-sec'])
-        self.spinBox_libfuse_entryExp.setValue(self.settings.value('libfuse')['entry-expiration-sec'])
-        self.spinBox_libfuse_negEntryExp.setValue(self.settings.value('libfuse')['negative-entry-expiration-sec'])
-        self.spinBox_streaming_blockSize.setValue(self.settings.value('stream')['block-size-mb'])
-        self.spinBox_streaming_buffSize.setValue(self.settings.value('stream')['buffer-size-mb'])
-        self.spinBox_streaming_maxBuff.setValue(self.settings.value('stream')['max-buffers'])
+        self.spinBox_libfuse_attributeExp.setValue(libfuse['attribute-expiration-sec'])
+        self.spinBox_libfuse_entryExp.setValue(libfuse['entry-expiration-sec'])
+        self.spinBox_libfuse_negEntryExp.setValue(libfuse['negative-entry-expiration-sec'])
+        self.spinBox_streaming_blockSize.setValue(stream['block-size-mb'])
+        self.spinBox_streaming_buffSize.setValue(stream['buffer-size-mb'])
+        self.spinBox_streaming_maxBuff.setValue(stream['max-buffers'])
         
         # There is no sanitizing for lineEdit at the moment, the GUI depends on the user being correc.
 
-        self.lineEdit_azure_accountKey.setText(self.settings.value('azstorage')['account-key'])
-        self.lineEdit_azure_sasStorage.setText(self.settings.value('azstorage')['sas'])
-        self.lineEdit_azure_accountName.setText(self.settings.value('azstorage')['account-name'])
-        self.lineEdit_azure_container.setText(self.settings.value('azstorage')['container'])
-        self.lineEdit_azure_endpoint.setText(self.settings.value('azstorage')['endpoint'])
-        self.lineEdit_azure_msiAppID.setText(self.settings.value('azstorage')['appid'])
-        self.lineEdit_azure_msiResourceID.setText(self.settings.value('azstorage')['resid'])
-        self.lineEdit_azure_msiObjectID.setText(self.settings.value('azstorage')['objid'])
-        self.lineEdit_azure_spnTenantID.setText(self.settings.value('azstorage')['tenantid'])
-        self.lineEdit_azure_spnClientID.setText(self.settings.value('azstorage')['clientid'])
-        self.lineEdit_azure_spnClientSecret.setText(self.settings.value('azstorage')['clientsecret'])
-        self.lineEdit_fileCache_path.setText(self.settings.value('file_cache')['path'])
+        self.lineEdit_azure_accountKey.setText(azStorage['account-key'])
+        self.lineEdit_azure_sasStorage.setText(azStorage['sas'])
+        self.lineEdit_azure_accountName.setText(azStorage['account-name'])
+        self.lineEdit_azure_container.setText(azStorage['container'])
+        self.lineEdit_azure_endpoint.setText(azStorage['endpoint'])
+        self.lineEdit_azure_msiAppID.setText(azStorage['appid'])
+        self.lineEdit_azure_msiResourceID.setText(azStorage['resid'])
+        self.lineEdit_azure_msiObjectID.setText(azStorage['objid'])
+        self.lineEdit_azure_spnTenantID.setText(azStorage['tenantid'])
+        self.lineEdit_azure_spnClientID.setText(azStorage['clientid'])
+        self.lineEdit_azure_spnClientSecret.setText(azStorage['clientsecret'])
+        self.lineEdit_fileCache_path.setText(fileCache['path'])
     
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
