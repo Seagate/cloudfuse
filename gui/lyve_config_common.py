@@ -114,59 +114,37 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
 
     # This widget will not display all the options in settings, only the ones written in the UI file.
     def populateOptions(self):
+        fileCache = self.settings.value('file_cache')
+        s3storage = self.settings.value('s3storage')
+        libfuse = self.settings.value('libfuse')
+        stream = self.settings.value('stream')
+                
         # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices and libfusePermissions reflect the 
         #   index choices in human words without having to reference the UI. Get the value in the settings and translate that to the equivalent index in the lists.
         self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings.value('components')[1]))
-        self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(self.settings.value('libfuse')['default-permission']))
+        self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(libfuse['default-permission']))
         
-        # Check for a true/false setting and set the checkbox state as appropriate. 
-        #   Note, Checked/UnChecked are NOT True/False data types, hence the need to check what the values are.
-        #   The default values for True/False settings are False, which is why Unchecked is the default state if the value doesn't equate to True.
-        #   Explicitly check for True for clarity
-        if self.settings.value('allow-other') == True:
-            self.checkbox_multiUser.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_multiUser.setCheckState(Qt.Unchecked)
-        
-        if self.settings.value('nonempty') == True:
-            self.checkbox_nonEmptyDir.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_nonEmptyDir.setCheckState(Qt.Unchecked)            
+        self.setCheckboxFromSetting(self.checkbox_multiUser, self.settings.value('allow-other'))
+        self.setCheckboxFromSetting(self.checkbox_nonEmptyDir,self.settings.value('nonempty'))
+        self.setCheckboxFromSetting(self.checkbox_daemonForeground,self.settings.value('foreground'))
+        self.setCheckboxFromSetting(self.checkbox_readOnly,self.settings.value('read-only'))
+        self.setCheckboxFromSetting(self.checkbox_streaming_fileCachingLevel,stream['file-caching'])
+        self.setCheckboxFromSetting(self.checkbox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
 
-        if self.settings.value('foreground') == True:
-            self.checkbox_daemonForeground.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_daemonForeground.setCheckState(Qt.Unchecked)  
-        
-        if self.settings.value('read-only') == True:
-            self.checkbox_readOnly.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_readOnly.setCheckState(Qt.Unchecked)    
-
-        if self.settings.value('stream')['file-caching'] == True:
-            self.checkbox_streaming_fileCachingLevel.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_streaming_fileCachingLevel.setCheckState(Qt.Unchecked)
-            
-        if self.settings.value('libfuse')['ignore-open-flags'] == True:
-            self.checkbox_libfuse_ignoreAppend.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_libfuse_ignoreAppend.setCheckState(Qt.Unchecked)
-        
         # Spinbox automatically sanitizes intputs for decimal values only, so no need to check for the appropriate data type. 
-        self.spinBox_libfuse_attExp.setValue(self.settings.value('libfuse')['attribute-expiration-sec'])
-        self.spinBox_libfuse_entExp.setValue(self.settings.value('libfuse')['entry-expiration-sec'])
-        self.spinBox_libfuse_negEntryExp.setValue(self.settings.value('libfuse')['negative-entry-expiration-sec'])
-        self.spinBox_streaming_blockSize.setValue(self.settings.value('stream')['block-size-mb'])
-        self.spinBox_streaming_buffSize.setValue(self.settings.value('stream')['buffer-size-mb'])
-        self.spinBox_streaming_maxBuff.setValue(self.settings.value('stream')['max-buffers'])
+        self.spinBox_libfuse_attExp.setValue(libfuse['attribute-expiration-sec'])
+        self.spinBox_libfuse_entExp.setValue(libfuse['entry-expiration-sec'])
+        self.spinBox_libfuse_negEntryExp.setValue(libfuse['negative-entry-expiration-sec'])
+        self.spinBox_streaming_blockSize.setValue(stream['block-size-mb'])
+        self.spinBox_streaming_buffSize.setValue(stream['buffer-size-mb'])
+        self.spinBox_streaming_maxBuff.setValue(stream['max-buffers'])
         # TODO:
         # There is no sanitizing for lineEdit at the moment, the GUI depends on the user being correc.
-        self.lineEdit_bucketName.setText(self.settings.value('s3storage')['bucket-name'])
-        self.lineEdit_endpoint.setText(self.settings.value('s3storage')['endpoint'])
-        self.lineEdit_secretKey.setText(self.settings.value('s3storage')['secret-key'])
-        self.lineEdit_accessKey.setText(self.settings.value('s3storage')['key-id'])
-        self.lineEdit_fileCache_path.setText(self.settings.value('file_cache')['path'])
+        self.lineEdit_bucketName.setText(s3storage['bucket-name'])
+        self.lineEdit_endpoint.setText(s3storage['endpoint'])
+        self.lineEdit_secretKey.setText(s3storage['secret-key'])
+        self.lineEdit_accessKey.setText(s3storage['key-id'])
+        self.lineEdit_fileCache_path.setText(fileCache['path'])
         
     def resetDefaults(self):
         # Reset these defaults

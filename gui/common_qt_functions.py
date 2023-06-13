@@ -1,6 +1,6 @@
 from PySide6 import QtWidgets
 from PySide6.QtWidgets import QWidget
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import Qt, QSettings
 import yaml
 import os
 
@@ -244,4 +244,13 @@ class widgetCustomFunctions(QWidget):
                 self.settings.setValue(option,tempDict)
             else:
                 self.settings.setValue(option,dictForConfigs[option])
- 
+
+    # Check for a true/false setting and set the checkbox state as appropriate. 
+    #   Note, Checked/UnChecked are NOT True/False data types, hence the need to check what the values are.
+    #   The default values for True/False settings are False, which is why Unchecked is the default state if the value doesn't equate to True.
+    #   Explicitly check for True for clarity
+    def setCheckboxFromSetting(self, checkbox, settingName):
+        if settingName == True:
+            checkbox.setCheckState(Qt.Checked)
+        else:
+            checkbox.setCheckState(Qt.Unchecked)

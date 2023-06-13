@@ -45,48 +45,26 @@ class lyveAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         
         
     def populateOptions(self):
+        fileCache = self.settings.value('file_cache')
+        libfuse = self.settings.value('libfuse')
+        
         # The index of file_cache_eviction is matched with the default 
         #   index values in the ui code, so translate the value from settings to index number
-        policyIndex = file_cache_eviction_choices.index(self.settings.value('file_cache')['policy'])
+        policyIndex = file_cache_eviction_choices.index(fileCache['policy'])
         self.dropDown_fileCache_evictionPolicy.setCurrentIndex(policyIndex)
-        
-        # Checked and Unchecked are not True/False quivalent so check for True then set the relevant status.
-        #   Explicitly check for True for clarity
-        if self.settings.value('libfuse')['disable-writeback-cache'] == True:
-            self.checkbox_libfuse_disableWriteback.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_libfuse_disableWriteback.setCheckState(Qt.Unchecked)    
-        
-        if self.settings.value('file_cache')['allow-non-empty-temp'] == True:
-            self.checkbox_fileCache_allowNonEmptyTmp.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_fileCache_allowNonEmptyTmp.setCheckState(Qt.Unchecked)
-        
-        if self.settings.value('file_cache')['policy-trace'] == True:
-            self.checkbox_fileCache_policyLogs.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_fileCache_policyLogs.setCheckState(Qt.Unchecked)
-        
-        if self.settings.value('file_cache')['create-empty-file'] == True:
-            self.checkbox_fileCache_createEmptyFile.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_fileCache_createEmptyFile.setCheckState(Qt.Unchecked)    
-            
-        if self.settings.value('file_cache')['cleanup-on-start'] == True:
-            self.checkbox_fileCache_cleanupStart.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_fileCache_cleanupStart.setCheckState(Qt.Unchecked)
-        
-        if self.settings.value('file_cache')['offload-io'] == True:
-            self.checkbox_fileCache_offloadIO.setCheckState(Qt.Checked)
-        else:
-            self.checkbox_fileCache_offloadIO.setCheckState(Qt.Unchecked)
 
-        self.spinBox_fileCache_evictionTimeout.setValue(self.settings.value('file_cache')['timeout-sec'])
-        self.spinBox_fileCache_maxEviction.setValue(self.settings.value('file_cache')['max-eviction'])
-        self.spinBox_fileCache_maxCacheSize.setValue(self.settings.value('file_cache')['max-size-mb'])
-        self.spinBox_fileCache_evictMaxThresh.setValue(self.settings.value('file_cache')['high-threshold'])
-        self.spinBox_fileCache_evictMinThresh.setValue(self.settings.value('file_cache')['low-threshold'])
+        self.setCheckboxFromSetting(self.checkbox_libfuse_disableWriteback, libfuse['disable-writeback-cache'])
+        self.setCheckboxFromSetting(self.checkbox_fileCache_allowNonEmptyTmp,fileCache['allow-non-empty-temp'])
+        self.setCheckboxFromSetting(self.checkbox_fileCache_policyLogs,fileCache['policy-trace'])
+        self.setCheckboxFromSetting(self.checkbox_fileCache_createEmptyFile,fileCache['create-empty-file'])
+        self.setCheckboxFromSetting(self.checkbox_fileCache_cleanupStart,fileCache['cleanup-on-start'])
+        self.setCheckboxFromSetting(self.checkbox_fileCache_offloadIO,fileCache['offload-io'])
+        
+        self.spinBox_fileCache_evictionTimeout.setValue(fileCache['timeout-sec'])
+        self.spinBox_fileCache_maxEviction.setValue(fileCache['max-eviction'])
+        self.spinBox_fileCache_maxCacheSize.setValue(fileCache['max-size-mb'])
+        self.spinBox_fileCache_evictMaxThresh.setValue(fileCache['high-threshold'])
+        self.spinBox_fileCache_evictMinThresh.setValue(fileCache['low-threshold'])
 
     def updateSettingsFromUIChoices(self):
         self.updateFileCache()
