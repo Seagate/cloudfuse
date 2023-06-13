@@ -1565,14 +1565,14 @@ func (s *s3StorageTestSuite) TestCreateLink() {
 	s.assert.Nil(err)
 	s.assert.NotNil(attr)
 	s.assert.NotEmpty(attr.Metadata)
-	s.assert.Contains(attr.Metadata, "is_symlink")
-	s.assert.Equal("true", attr.Metadata["is_symlink"])
+	s.assert.Contains(attr.Metadata, symlinkKey)
+	s.assert.Equal("true", attr.Metadata[symlinkKey])
 
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.Nil(err)
 	//download and make sure the data is correct
 	defer os.Remove(f.Name())
-	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name + ".rclonelink", File: f})
+	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name + symlinkStr, File: f})
 	s.assert.Nil(err)
 
 	dataLen := len(target)
