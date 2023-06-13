@@ -1603,15 +1603,15 @@ func (s *s3StorageTestSuite) TestReadLink() {
 	s.assert.EqualValues(target, read)
 }
 
-// func (s *blockBlobTestSuite) TestReadLinkError() {
-// 	defer s.cleanupTest()
-// 	// Setup
-// 	name := generateFileName()
+func (s *s3StorageTestSuite) TestReadLinkError() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
 
-// 	_, err := s.az.ReadLink(internal.ReadLinkOptions{Name: name})
-// 	s.assert.NotNil(err)
-// 	s.assert.EqualValues(syscall.ENOENT, err)
-// }
+	_, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
+}
 
 func (s *s3StorageTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
