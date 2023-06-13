@@ -1587,18 +1587,21 @@ func (s *s3StorageTestSuite) TestCreateLink() {
 
 }
 
-// func (s *blockBlobTestSuite) TestReadLink() {
-// 	defer s.cleanupTest()
-// 	// Setup
-// 	target := generateFileName()
-// 	s.az.CreateFile(internal.CreateFileOptions{Name: target})
-// 	name := generateFileName()
-// 	s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+func (s *s3StorageTestSuite) TestReadLink() {
+	defer s.cleanupTest()
+	// Setup
+	target := generateFileName()
 
-// 	read, err := s.az.ReadLink(internal.ReadLinkOptions{Name: name})
-// 	s.assert.Nil(err)
-// 	s.assert.EqualValues(target, read)
-// }
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
+
+	name := generateFileName()
+
+	s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+
+	read, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.EqualValues(target, read)
+}
 
 // func (s *blockBlobTestSuite) TestReadLinkError() {
 // 	defer s.cleanupTest()
