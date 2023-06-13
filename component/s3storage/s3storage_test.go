@@ -1571,6 +1571,7 @@ func (s *s3StorageTestSuite) TestCreateLink() {
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.Nil(err)
 	//download and make sure the data is correct
+	defer os.Remove(f.Name())
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name + ".rclonelink", File: f})
 	s.assert.Nil(err)
 
