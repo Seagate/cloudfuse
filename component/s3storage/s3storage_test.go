@@ -1550,6 +1550,56 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 	s.assert.NotNil(err)
 }
 
+func (s *s3StorageTestSuite) TestCreateLink() {
+	defer s.cleanupTest()
+	// Setup
+	target := generateFileName()
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
+	name := generateFileName()
+
+	err := s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+	s.assert.Nil(err)
+
+	// now we check the link exists
+	attr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.NotNil(attr)
+	s.assert.NotEmpty(attr.Metadata)
+	s.assert.Contains(attr.Metadata, symlinkKey)
+	s.assert.Equal("true", attr.Metadata[symlinkKey])
+
+	//download and make sure the data is correct
+	result, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.Equal(target, result)
+}
+
+func (s *s3StorageTestSuite) TestReadLink() {
+	defer s.cleanupTest()
+	// Setup
+	target := generateFileName()
+
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
+
+	name := generateFileName()
+
+	s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+
+	read, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.EqualValues(target, read)
+}
+
+func (s *s3StorageTestSuite) TestReadLinkError() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+
+	_, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
+}
+
 func (s *s3StorageTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
@@ -1669,35 +1719,35 @@ func (s *s3StorageTestSuite) TestGetAttrFile() {
 	}
 }
 
-// func (s *s3StorageTestSuite) TestGetAttrLink() {
-// 	defer s.cleanupTest()
-// 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-// 	configs := []string{"", vdConfig}
-// 	for _, c := range configs {
-// 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-// 		s.tearDownTestHelper(false)
-// 		s.setupTestHelper(c, s.container, true)
-// 		testName := ""
-// 		if c != "" {
-// 			testName = "virtual-directory"
-// 		}
-// 		s.Run(testName, func() {
-// 			// Setup
-// 			target := generateFileName()
-// 			s.s3.CreateFile(internal.CreateFileOptions{Name: target})
-// 			name := generateFileName()
-// 			s.s3.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+func (s *s3StorageTestSuite) TestGetAttrLink() {
+	defer s.cleanupTest()
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	configs := []string{"", vdConfig}
+	for _, c := range configs {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		s.tearDownTestHelper(false)
+		s.setupTestHelper(c, s.bucket, true)
+		testName := ""
+		if c != "" {
+			testName = "virtual-directory"
+		}
+		s.Run(testName, func() {
+			// Setup
+			target := generateFileName()
+			s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
+			name := generateFileName()
+			s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
 
-// 			props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
-// 			s.assert.Nil(err)
-// 			s.assert.NotNil(props)
-// 			s.assert.True(props.IsSymlink())
-// 			s.assert.NotEmpty(props.Metadata)
-// 			s.assert.Contains(props.Metadata, symlinkKey)
-// 			s.assert.EqualValues("true", props.Metadata[symlinkKey])
-// 		})
-// 	}
-// }
+			props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+			s.assert.Nil(err)
+			s.assert.NotNil(props)
+			s.assert.True(props.IsSymlink())
+			s.assert.NotEmpty(props.Metadata)
+			s.assert.Contains(props.Metadata, symlinkKey)
+			s.assert.EqualValues("true", props.Metadata[symlinkKey])
+		})
+	}
+}
 
 func (s *s3StorageTestSuite) TestGetAttrFileSize() {
 	defer s.cleanupTest()
