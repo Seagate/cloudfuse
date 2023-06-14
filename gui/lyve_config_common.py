@@ -33,48 +33,8 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
        
     # Set up slots for the signals:
     
-    def updateMultiUser(self):
-        self.settings.setValue('allow-other',self.checkbox_multiUser.isChecked())
-        
-    def updateNonEmtpyDir(self):
-        self.settings.setValue('nonempty',self.checkbox_nonEmptyDir.isChecked())        
-    
-    def updateDaemonForeground(self):
-        self.settings.setValue('foreground',self.checkbox_daemonForeground.isChecked())
-    
-    def updateReadOnly(self):
-        self.settings.setValue('read-only',self.checkbox_readOnly.isChecked())
-    
-    # Update Libfuse re-writes everything in the Libfuse because of how setting.setValue works - 
-    #   it will not append, so the code makes a copy of the dictionary and updates the sub-keys. 
-    #   When the user updates the sub-option through the GUI, it will trigger Libfuse to update;
-    #   it's written this way to save on lines of code.
-    def updateLibfuse(self):
-        libfuse = self.settings.value('libfuse')
-        libfuse['default-permission'] = libfusePermissions[self.dropDown_libfuse_permissions.currentIndex()]
-        libfuse['ignore-open-flags'] = self.checkbox_libfuse_ignoreAppend.isChecked()
-        libfuse['attribute-expiration-sec'] = self.spinBox_libfuse_attExp.value()
-        libfuse['entry-expiration-sec'] = self.spinBox_libfuse_entExp.value()
-        libfuse['negative-entry-expiration-sec'] = self.spinBox_libfuse_negEntryExp.value()
-        self.settings.setValue('libfuse',libfuse)
 
-    # Update stream re-writes everything in the stream dictionary for the same reason update libfuse does.
-    def updateStream(self):
-        stream = self.settings.value('stream')
-        stream['file-caching'] = self.checkbox_streaming_fileCachingLevel.isChecked()
-        stream['block-size-mb'] = self.spinBox_streaming_blockSize.value()
-        stream['buffer-size-mb'] = self.spinBox_streaming_buffSize.value()
-        stream['max-buffers'] = self.spinBox_streaming_maxBuff.value()
-        self.settings.setValue('stream',stream)
-       
-    # Update S3Storage re-writes everything in the S3Storage dictionary for the same reason update libfuse does.
-    def updateS3Storage(self):
-        s3Storage = self.settings.value('s3storage')
-        s3Storage['bucket-name'] = self.lineEdit_bucketName.text()
-        s3Storage['key-id'] = self.lineEdit_accessKey.text()
-        s3Storage['secret-key'] = self.lineEdit_secretKey.text()
-        s3Storage['endpoint'] = self.lineEdit_endpoint.text()
-        self.settings.setValue('s3storage',s3Storage)
+
         
     # To open the advanced widget, make an instance, so self.moresettings was chosen.
     #   self.moresettings does not have anything to do with the QSettings package that is seen throughout this code
@@ -100,17 +60,19 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
         self.lineEdit_fileCache_path.setText('{}'.format(directory))
-        # Update the settings 
-        self.updateFileCache()        
-        
-    def updateFileCache(self):
-        filePath = self.settings.value('file_cache')
-        filePath['path'] = self.lineEdit_fileCache_path.text()
-        self.settings.setValue('file_cache',filePath)
         
     def hideModeBoxes(self):
         self.groupbox_fileCache.setVisible(False)
         self.groupbox_streaming.setVisible(False)      
+
+        # Update S3Storage re-writes everything in the S3Storage dictionary for the same reason update libfuse does.
+    def updateS3Storage(self):
+        s3Storage = self.settings.value('s3storage')
+        s3Storage['bucket-name'] = self.lineEdit_bucketName.text()
+        s3Storage['key-id'] = self.lineEdit_accessKey.text()
+        s3Storage['secret-key'] = self.lineEdit_secretKey.text()
+        s3Storage['endpoint'] = self.lineEdit_endpoint.text()
+        self.settings.setValue('s3storage',s3Storage) 
 
     # This widget will not display all the options in settings, only the ones written in the UI file.
     def populateOptions(self):
@@ -155,7 +117,7 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
             self.populateOptions()
     
     def updateSettingsFromUIChoices(self):
-        self.updateFileCache()
+        self.updateFileCachePath()
         self.updateLibfuse()
         self.updateReadOnly()
         self.updateDaemonForeground()
