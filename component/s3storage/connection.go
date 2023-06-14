@@ -86,12 +86,12 @@ type S3Connection interface {
 
 	CreateFile(name string, mode os.FileMode) error
 	CreateDirectory(name string) error
-	CreateLink(source string, target string) error
+	CreateLink(source string, target string, isSymlink bool) error
 
 	DeleteFile(name string) error
 	DeleteDirectory(name string) error
 
-	RenameFile(string, string) error
+	RenameFile(string, string, bool) error
 	RenameDirectory(string, string) error
 
 	GetAttr(name string) (attr *internal.ObjAttr, err error)
@@ -100,7 +100,7 @@ type S3Connection interface {
 	List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error)
 
 	ReadToFile(name string, offset int64, count int64, fi *os.File) error
-	ReadBuffer(name string, offset int64, len int64) ([]byte, error)
+	ReadBuffer(name string, offset int64, len int64, isSymlink bool) ([]byte, error)
 	ReadInBuffer(name string, offset int64, len int64, data []byte) error
 
 	WriteFromFile(name string, metadata map[string]string, fi *os.File) error
