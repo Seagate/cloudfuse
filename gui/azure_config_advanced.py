@@ -41,7 +41,7 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.setCheckboxFromSetting(self.checkbox_azure_sdkTrace,azStorage['sdk-trace'])
         self.setCheckboxFromSetting(self.checkbox_azure_virtualDirectory,azStorage['virtual-directory'])
         
-        self.spinBox_fileCache_timeout.setValue(fileCache['timeout-sec'])
+        self.spinBox_fileCache_evictionTimeout.setValue(fileCache['timeout-sec'])
         self.spinBox_fileCache_maxEviction.setValue(fileCache['max-eviction'])
         self.spinBox_fileCache_maxCacheSize.setValue(fileCache['max-size-mb'])
         self.spinBox_fileCache_evictMaxThresh.setValue(fileCache['high-threshold'])
@@ -63,27 +63,7 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.dropDown_azure_blobTier.setCurrentIndex(az_blob_tier.index(azStorage['tier']))
         self.dropDown_fileCache_evictionPolicy.setCurrentIndex(file_cache_eviction_choices.index(fileCache['policy']))
 
-    def updateLibfuse(self):
-        libfuse = self.settings.value('libfuse')
-        libfuse['disable-writeback-cache'] = self.checkbox_libfuse_disableWriteback.isChecked()
-        self.settings.setValue('libfuse',libfuse)
-        
-    def updateFileCache(self):
-        fileCache = self.settings.value('file_cache')
-        fileCache['allow-non-empty-temp'] = self.checkbox_fileCache_allowNonEmptyTmp.isChecked()
-        fileCache['policy-trace'] = self.checkbox_fileCache_policyLogs.isChecked()
-        fileCache['create-empty-file'] = self.checkbox_fileCache_createEmptyFile.isChecked()
-        fileCache['cleanup-on-start'] = self.checkbox_fileCache_cleanupStart.isChecked()
-        fileCache['offload-io'] = self.checkbox_fileCache_offloadIO.isChecked()
-        fileCache['timeout-sec'] = self.spinBox_fileCache_timeout.value()
-        fileCache['max-eviction'] = self.spinBox_fileCache_maxEviction.value()
-        fileCache['max-size-mb'] = self.spinBox_fileCache_maxCacheSize.value()
-        fileCache['high-threshold'] = self.spinBox_fileCache_evictMaxThresh.value()
-        fileCache['low-threshold'] = self.spinBox_fileCache_evictMinThresh.value()
-        fileCache['policy'] = file_cache_eviction_choices[self.dropDown_fileCache_evictionPolicy.currentIndex()]
-        self.settings.setValue('file_cache',fileCache)
-
-    def updateAzStorage(self):
+    def updateOptionalAzStorage(self):
         azStorage = self.settings.value('azstorage')
         azStorage['block-size-mb'] = self.spinBox_azure_blockSize.value()
         azStorage['max-concurrency'] = self.spinBox_azure_maxConcurrency.value()
@@ -107,6 +87,6 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.settings.setValue('azstorage',azStorage)
     
     def updateSettingsFromUIChoices(self):
-        self.updateAzStorage()
-        self.updateFileCache()
-        self.updateLibfuse()
+        self.updateOptionalAzStorage()
+        self.updateOptionalFileCache()
+        self.updateOptionalLibfuse()

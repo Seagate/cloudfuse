@@ -36,41 +36,6 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
    
     # Set up slots
     
-    def updateMultiUser(self):
-        self.settings.setValue('allow-other',self.checkbox_commonConfig_multiUser.isChecked())
-        
-    def updateNonEmtpyDir(self):
-        self.settings.setValue('nonempty',self.checkbox_commonConfig_nonEmptyDir.isChecked())        
-        
-    def updateReadOnly(self):
-        self.settings.setValue('read-only',self.checkbox_commonConfig_readOnly.isChecked())
-
-    def updateDaemonForeground(self):
-        self.settings.setValue('foreground',self.checkbox_daemonForeground.isChecked())    
-    
-    # Update Libfuse re-writes everything in the Libfuse because of how setting.setValue works - 
-    #   it will not append, so the code makes a copy of the dictionary and updates the sub-keys. 
-    #   When the user updates the sub-option through the GUI, it will trigger Libfuse to update;
-    #   it's written this way to save on lines of code.
-    def updateLibfuse(self):
-        libfuse = self.settings.value('libfuse')
-        libfuse['default-permission'] = libfusePermissions[self.dropDown_libfuse_permissions.currentIndex()]
-        libfuse['ignore-open-flags'] = self.checkbox_libfuse_ignoreAppend.isChecked()
-        libfuse['attribute-expiration-sec'] = self.spinBox_libfuse_attributeExp.value()
-        libfuse['entry-expiration-sec'] = self.spinBox_libfuse_entryExp.value()
-        libfuse['negative-entry-expiration-sec'] = self.spinBox_libfuse_negEntryExp.value()
-        self.settings.setValue('libfuse',libfuse)
-    
-    
-    # Update stream re-writes everything in the stream dictionary for the same reason update libfuse does.
-    def updateStream(self):
-        stream = self.settings.value('stream')
-        stream['file-caching'] = self.checkbox_streaming_fileCachingLevel.isChecked()
-        stream['block-size-mb'] = self.spinBox_streaming_blockSize.value()
-        stream['buffer-size-mb'] = self.spinBox_streaming_buffSize.value()
-        stream['max-buffers'] = self.spinBox_streaming_maxBuff.value()
-        self.settings.setValue('stream',stream)
-        
     def updateAzStorage(self):
         azStorage = self.settings.value('azstorage')
         azStorage['account-key'] = self.lineEdit_azure_accountKey.text()
@@ -108,7 +73,6 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         self.settings.setValue('components',components)
     
     def showAzureModeSettings(self):
-
         self.hideAzureBoxes()
         modeSelectionIndex = self.dropDown_azure_modeSetting.currentIndex()
         # Azure mode group boxes
@@ -144,8 +108,8 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         self.setCheckboxFromSetting(self.checkbox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
        
         # Spinbox automatically sanitizes intputs for decimal values only, so no need to check for the appropriate data type.
-        self.spinBox_libfuse_attributeExp.setValue(libfuse['attribute-expiration-sec'])
-        self.spinBox_libfuse_entryExp.setValue(libfuse['entry-expiration-sec'])
+        self.spinBox_libfuse_attExp.setValue(libfuse['attribute-expiration-sec'])
+        self.spinBox_libfuse_entExp.setValue(libfuse['entry-expiration-sec'])
         self.spinBox_libfuse_negEntryExp.setValue(libfuse['negative-entry-expiration-sec'])
         self.spinBox_streaming_blockSize.setValue(stream['block-size-mb'])
         self.spinBox_streaming_buffSize.setValue(stream['buffer-size-mb'])
@@ -171,11 +135,6 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         self.lineEdit_fileCache_path.setText('{}'.format(directory))
         # Update the settings 
         self.updateFileCache()
-       
-    def updateFileCache(self):
-        filePath = self.settings.value('file_cache')
-        filePath['path'] = self.lineEdit_fileCache_path.text()
-        self.settings.setValue('file_cache',filePath)
  
     def hideModeBoxes(self):
         self.groupbox_fileCache.setVisible(False)
@@ -197,7 +156,7 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
             self.populateOptions()
     
     def updateSettingsFromUIChoices(self):
-        self.updateFileCache()
+        self.updateFileCachePath()
         self.updateLibfuse()
         self.updateStream()
         self.updateAzStorage()

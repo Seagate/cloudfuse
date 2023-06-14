@@ -21,29 +21,6 @@ class lyveAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_resetDefaultSettings.clicked.connect(self.populateOptions)
 
-    def updateLibfuse(self):
-        libfuse = self.settings.value('libfuse')
-        libfuse['disable-writeback-cache'] = self.checkbox_libfuse_disableWriteback.isChecked()
-        self.settings.setValue('libfuse',libfuse)
-        
-    def updateFileCache(self):
-        fileCache = self.settings.value('file_cache')
-        fileCache['allow-non-empty-temp'] = self.checkbox_fileCache_allowNonEmptyTmp.isChecked()
-        fileCache['policy-trace'] = self.checkbox_fileCache_policyLogs.isChecked()
-        fileCache['create-empty-file'] = self.checkbox_fileCache_createEmptyFile.isChecked()
-        fileCache['cleanup-on-start'] = self.checkbox_fileCache_cleanupStart.isChecked()
-        fileCache['offload-io'] = self.checkbox_fileCache_offloadIO.isChecked()
-        
-        fileCache['timeout-sec'] = self.spinBox_fileCache_evictionTimeout.value()
-        fileCache['max-eviction'] = self.spinBox_fileCache_maxEviction.value()
-        fileCache['max-size-mb'] = self.spinBox_fileCache_maxCacheSize.value()
-        fileCache['high-threshold'] = self.spinBox_fileCache_evictMaxThresh.value()
-        fileCache['low-threshold'] = self.spinBox_fileCache_evictMinThresh.value()
-        
-        fileCache['policy'] = file_cache_eviction_choices[self.dropDown_fileCache_evictionPolicy.currentIndex()]
-        self.settings.setValue('file_cache',fileCache)
-        
-        
     def populateOptions(self):
         fileCache = self.settings.value('file_cache')
         libfuse = self.settings.value('libfuse')
@@ -67,5 +44,5 @@ class lyveAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.spinBox_fileCache_evictMinThresh.setValue(fileCache['low-threshold'])
 
     def updateSettingsFromUIChoices(self):
-        self.updateFileCache()
-        self.updateLibfuse()
+        self.updateOptionalFileCache()
+        self.updateOptionalLibfuse()
