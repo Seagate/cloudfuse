@@ -321,7 +321,7 @@
       <enum>Qt::RightToLeft</enum>
      </property>
      <property name="text">
-      <string>okay</string>
+      <string>Save</string>
      </property>
     </widget>
    </item>
