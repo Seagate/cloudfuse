@@ -50,16 +50,16 @@ func (suite *conversionTestSuite) SetupTest() {
 }
 
 func (suite *conversionTestSuite) TestCloudToFile() {
-	filename := "test\"*:<>?\\|"
-	cloudname := "test＂＊：＜＞？＼｜"
-	result := CloudToFile(filename)
+	filename := "test\"*:<>?|"
+	cloudname := "test＂＊：＜＞？｜"
+	result := WindowsCloudToFile(filename)
 	suite.assert.EqualValues(cloudname, result)
 }
 
 func (suite *conversionTestSuite) TestFileToCloud() {
-	filename := "test＂＊：＜＞？＼｜"
-	cloudname := "test\"*:<>?\\|"
-	result := FileToCloud(filename)
+	filename := "test＂＊：＜＞？｜"
+	cloudname := "test\"*:<>?|"
+	result := WindowsFileToCloud(filename)
 	suite.assert.EqualValues(cloudname, result)
 }
 

@@ -46,6 +46,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -745,6 +746,34 @@ func (s *s3StorageTestSuite) TestCreateFile() {
 	s.assert.NotNil(result)
 }
 
+func (s *s3StorageTestSuite) TestCreateFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
+	defer s.cleanupTest()
+	// Setup
+	// Test with characters in folder and filepath
+	name := generateFileName()
+	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
+	objectName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
+
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: windowsName})
+
+	s.assert.Nil(err)
+	s.assert.NotNil(h)
+	s.assert.EqualValues(windowsName, h.Path)
+	s.assert.EqualValues(0, h.Size)
+	// File should be in the account with the correct object key
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, objectName)
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+	s.assert.Nil(err)
+	s.assert.NotNil(result)
+}
+
 func (s *s3StorageTestSuite) TestOpenFile() {
 	defer s.cleanupTest()
 	// Setup
@@ -827,6 +856,29 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
 	// File should not be in the account
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+
+	s.assert.NotNil(err)
+}
+
+func (s *s3StorageTestSuite) TestDeleteFileWindowsNameConvert() {
+	defer s.cleanupTest()
+	// Setup
+	// Test with characters in folder and filepath
+	name := generateFileName()
+	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
+	objectName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
+	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: windowsName})
+	s.assert.Nil(err)
+
+	err = s.s3Storage.DeleteFile(internal.DeleteFileOptions{Name: windowsName})
+	s.assert.Nil(err)
+
+	// File should not be in the account
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, objectName)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -1008,6 +1060,39 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, err := io.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(testData, output)
+}
+
+func (s *s3StorageTestSuite) TestWriteFileConvertWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
+	defer s.cleanupTest()
+	// Setup
+	// Test with characters in folder and filepath
+	name := generateFileName()
+	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
+	objectName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: windowsName})
+	s.assert.Nil(err)
+
+	testData := "test data"
+	data := []byte(testData)
+	count, err := s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	s.assert.EqualValues(len(data), count)
+
+	// Object should have updated data
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, objectName)
 	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
@@ -1518,6 +1603,37 @@ func (s *s3StorageTestSuite) TestRenameFile() {
 	s.assert.NotNil(err)
 	// Dst should be in the account
 	dstKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, dst)
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(dstKey),
+	})
+	s.assert.Nil(err)
+}
+
+func (s *s3StorageTestSuite) TestRenameFileWindowsNameConvert() {
+	defer s.cleanupTest()
+	// Setup
+	src := generateFileName()
+	srcWindowsName := src + "＂＊：＜＞？｜"
+	srcObjectName := src + "\"*:<>?|"
+	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: srcWindowsName})
+	s.assert.Nil(err)
+	dst := generateFileName()
+	dstWindowsName := dst + "＂＊：＜＞？｜"
+	dstObjectName := dst + "\"*:<>?|"
+
+	err = s.s3Storage.RenameFile(internal.RenameFileOptions{Src: srcWindowsName, Dst: dstWindowsName})
+	s.assert.Nil(err)
+
+	// Src should not be in the account
+	srcKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, srcObjectName)
+	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(srcKey),
+	})
+	s.assert.NotNil(err)
+	// Dst should be in the account
+	dstKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, dstObjectName)
 	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(dstKey),
