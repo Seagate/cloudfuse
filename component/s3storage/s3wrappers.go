@@ -415,15 +415,15 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) {
 // .rclonelink. If it is set to convert names from Linux to Windows then it allows
 // special characters like "*:<>?| to be displayed on Windows.
 func (cl *Client) getKey(name string, isSymLink bool) string {
-	if runtime.GOOS == "windows" {
-		name = convertname.WindowsFileToCloud(name)
-	}
-
 	if isSymLink {
 		name = name + symlinkStr
 	}
 
-	return common.JoinUnixFilepath(cl.Config.prefixPath, name)
+	name = common.JoinUnixFilepath(cl.Config.prefixPath, name)
+	if runtime.GOOS == "windows" {
+		name = convertname.WindowsFileToCloud(name)
+	}
+	return name
 }
 
 // getFile converts an object name to a file name. If the name has a ".rclonelink" suffix.
@@ -431,16 +431,16 @@ func (cl *Client) getKey(name string, isSymLink bool) string {
 // convert names from Linux to Windows then it converts special ASCII characters back to the
 // original special characters.
 func (cl *Client) getFile(name string) (string, bool) {
-	if runtime.GOOS == "windows" {
-		name = convertname.WindowsCloudToFile(name)
-	}
-
 	isSymLink := false
 
 	//todo: wrtie a test the catches the out of bounds issue.
 	if strings.HasSuffix(name, symlinkStr) {
 		isSymLink = true
 		name = name[:len(name)-len(symlinkStr)]
+	}
+
+	if runtime.GOOS == "windows" {
+		name = convertname.WindowsCloudToFile(name)
 	}
 
 	return name, isSymLink
