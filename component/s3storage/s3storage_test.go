@@ -1113,7 +1113,7 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 	s.assert.EqualValues(testData, output)
 }
 
-func (s *s3StorageTestSuite) TestWriteFileConvertWindowsNameConvert() {
+func (s *s3StorageTestSuite) TestWriteFileWindowsNameConvert() {
 	// Skip test if not running on Windows
 	if runtime.GOOS != "windows" {
 		return
