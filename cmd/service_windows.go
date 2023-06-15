@@ -66,10 +66,9 @@ var serviceCmd = &cobra.Command{
 	Long:              "Manage lyvecloudfuse as a Windows service. This requires Administrator rights to run.",
 	SuggestFor:        []string{"ser", "serv"},
 	Example:           "lyvecloudfuse service install",
-	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return nil
+		return errors.New("missing command options\n\nDid you mean this?\n\tlyvecloudfuse service mount\n\nRun 'lyvecloudfuse service --help' for usage")
 	},
 }
 
