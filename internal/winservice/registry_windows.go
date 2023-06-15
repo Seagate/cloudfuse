@@ -160,7 +160,8 @@ func RemoveWinFspRegistry() error {
 	return nil
 }
 
-// CreateRegistryMount adds an entry to our registry that
+// CreateRegistryMount adds an entry to our registry with the mount path and config
+// file location.
 func CreateRegistryMount(mountPath string, configFile string) error {
 	registryPath := instanceRegistry + mountPath
 	key, _, err := registry.CreateKey(registry.LOCAL_MACHINE, registryPath, registry.ALL_ACCESS)
