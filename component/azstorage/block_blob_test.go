@@ -48,6 +48,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -945,6 +946,31 @@ func (s *blockBlobTestSuite) TestCreateFile() {
 	s.assert.Empty(props.NewMetadata())
 }
 
+func (s *blockBlobTestSuite) TestCreateFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
+	blobName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
+
+	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: windowsName})
+
+	s.assert.Nil(err)
+	s.assert.NotNil(h)
+	s.assert.EqualValues(windowsName, h.Path)
+	s.assert.EqualValues(0, h.Size)
+	// File should be in the account
+	file := s.containerUrl.NewBlobURL(blobName)
+	props, err := file.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
+	s.assert.Nil(err)
+	s.assert.NotNil(props)
+	s.assert.Empty(props.NewMetadata())
+}
+
 func (s *blockBlobTestSuite) TestOpenFile() {
 	defer s.cleanupTest()
 	// Setup
@@ -1021,6 +1047,27 @@ func (s *blockBlobTestSuite) TestDeleteFile() {
 	s.assert.NotNil(err)
 }
 
+func (s *blockBlobTestSuite) TestDeleteFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
+	blobName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
+	s.az.CreateFile(internal.CreateFileOptions{Name: windowsName})
+
+	err := s.az.DeleteFile(internal.DeleteFileOptions{Name: windowsName})
+	s.assert.Nil(err)
+
+	// File should not be in the account
+	file := s.containerUrl.NewBlobURL(blobName)
+	_, err = file.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
+	s.assert.NotNil(err)
+}
+
 func (s *blockBlobTestSuite) TestDeleteFileError() {
 	defer s.cleanupTest()
 	// Setup
@@ -1052,6 +1099,35 @@ func (s *blockBlobTestSuite) TestRenameFile() {
 	s.assert.NotNil(err)
 	// Dst should be in the account
 	destination := s.containerUrl.NewBlobURL(dst)
+	_, err = destination.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
+	s.assert.Nil(err)
+}
+
+func (s *blockBlobTestSuite) TestRenameFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
+	defer s.cleanupTest()
+	// Setup
+	src := generateFileName()
+	srcWindowsName := src + "＂＊：＜＞？｜"
+	srcBlobName := src + "\"*:<>?|"
+	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: srcWindowsName})
+	s.assert.Nil(err)
+	dst := generateFileName()
+	dstWindowsName := dst + "＂＊：＜＞？｜"
+	dstBlobName := dst + "\"*:<>?|"
+
+	err = s.az.RenameFile(internal.RenameFileOptions{Src: srcWindowsName, Dst: dstWindowsName})
+	s.assert.Nil(err)
+
+	// Src should not be in the account
+	source := s.containerUrl.NewBlobURL(srcBlobName)
+	_, err = source.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
+	s.assert.NotNil(err)
+	// Dst should be in the account
+	destination := s.containerUrl.NewBlobURL(dstBlobName)
 	_, err = destination.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
 	s.assert.Nil(err)
 }
@@ -1213,6 +1289,28 @@ func (s *blockBlobTestSuite) TestWriteFile() {
 
 	// Blob should have updated data
 	file := s.containerUrl.NewBlobURL(name)
+	resp, err := file.Download(ctx, 0, int64(len(data)), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
+	s.assert.Nil(err)
+	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	s.assert.EqualValues(testData, output)
+}
+
+func (s *blockBlobTestSuite) TestWriteFileWindowsNameConvert() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
+	blobName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: windowsName})
+
+	testData := "test data"
+	data := []byte(testData)
+	count, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	s.assert.EqualValues(len(data), count)
+
+	// Blob should have updated data
+	file := s.containerUrl.NewBlobURL(blobName)
 	resp, err := file.Download(ctx, 0, int64(len(data)), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
 	s.assert.Nil(err)
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
@@ -1718,6 +1816,36 @@ func (s *blockBlobTestSuite) TestCopyFromFile() {
 
 	// Blob should have updated data
 	file := s.containerUrl.NewBlobURL(name)
+	resp, err := file.Download(ctx, 0, int64(len(data)), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
+	s.assert.Nil(err)
+	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	s.assert.EqualValues(testData, output)
+}
+
+func (s *blockBlobTestSuite) TestCopyFromFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	windowsName := name + "＂＊：＜＞？｜"
+	blobName := name + "\"*:<>?|"
+	s.az.CreateFile(internal.CreateFileOptions{Name: windowsName})
+	testData := "test data"
+	data := []byte(testData)
+	homeDir, _ := os.UserHomeDir()
+	f, _ := os.CreateTemp(homeDir, windowsName+".tmp")
+	defer os.Remove(f.Name())
+	f.Write(data)
+
+	err := s.az.CopyFromFile(internal.CopyFromFileOptions{Name: windowsName, File: f})
+
+	s.assert.Nil(err)
+
+	// Blob should have updated data
+	file := s.containerUrl.NewBlobURL(blobName)
 	resp, err := file.Download(ctx, 0, int64(len(data)), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
 	s.assert.Nil(err)
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
