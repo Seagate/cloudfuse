@@ -41,6 +41,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -48,6 +49,7 @@ import (
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/convertname"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 
@@ -264,7 +266,7 @@ func (dl *Datalake) CreateFile(name string, mode os.FileMode) error {
 func (dl *Datalake) CreateDirectory(name string) error {
 	log.Trace("Datalake::CreateDirectory : name %s", name)
 
-	directoryURL := dl.Filesystem.NewDirectoryURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
+	directoryURL := dl.getDirectoryURL(name)
 	_, err := directoryURL.Create(context.Background(), false)
 
 	if err != nil {
@@ -285,7 +287,7 @@ func (dl *Datalake) CreateLink(source string, target string) error {
 func (dl *Datalake) DeleteFile(name string) (err error) {
 	log.Trace("Datalake::DeleteFile : name %s", name)
 
-	fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
+	fileURL := dl.getRootDirectoryURL(name)
 	_, err = fileURL.Delete(context.Background())
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
@@ -308,7 +310,7 @@ func (dl *Datalake) DeleteFile(name string) (err error) {
 func (dl *Datalake) DeleteDirectory(name string) (err error) {
 	log.Trace("Datalake::DeleteDirectory : name %s", name)
 
-	directoryURL := dl.Filesystem.NewDirectoryURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
+	directoryURL := dl.getDirectoryURL(name)
 	_, err = directoryURL.Delete(context.Background(), nil, true)
 	// TODO : There is an ability to pass a continuation token here for recursive delete, should we implement this logic to follow continuation token? The SDK does not currently do this.
 	if err != nil {
@@ -329,11 +331,11 @@ func (dl *Datalake) DeleteDirectory(name string) (err error) {
 func (dl *Datalake) RenameFile(source string, target string) error {
 	log.Trace("Datalake::RenameFile : %s -> %s", source, target)
 
-	fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(url.PathEscape(common.JoinUnixFilepath(dl.Config.prefixPath, source)))
+	fileURL := dl.getRootDirectoryURLPathEscape(source)
 
 	_, err := fileURL.Rename(context.Background(),
 		azbfs.RenameFileOptions{
-			DestinationPath: common.JoinUnixFilepath(dl.Config.prefixPath, target),
+			DestinationPath: dl.getFormattedPath(target),
 		})
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
@@ -353,11 +355,11 @@ func (dl *Datalake) RenameFile(source string, target string) error {
 func (dl *Datalake) RenameDirectory(source string, target string) error {
 	log.Trace("Datalake::RenameDirectory : %s -> %s", source, target)
 
-	directoryURL := dl.Filesystem.NewDirectoryURL(url.PathEscape(common.JoinUnixFilepath(dl.Config.prefixPath, source)))
+	directoryURL := dl.getDirectoryURLPathEscape(source)
 
 	_, err := directoryURL.Rename(context.Background(),
 		azbfs.RenameDirectoryOptions{
-			DestinationPath: common.JoinUnixFilepath(dl.Config.prefixPath, target),
+			DestinationPath: dl.getFormattedPath(target),
 		})
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
@@ -377,7 +379,7 @@ func (dl *Datalake) RenameDirectory(source string, target string) error {
 func (dl *Datalake) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	log.Trace("Datalake::GetAttr : name %s", name)
 
-	pathURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
+	pathURL := dl.getRootDirectoryURL(name)
 	prop, err := pathURL.GetProperties(context.Background())
 
 	if err != nil {
@@ -442,7 +444,7 @@ func (dl *Datalake) List(prefix string, marker *string, count int32) ([]*interna
 		count = common.MaxDirListCount
 	}
 
-	prefixPath := common.JoinUnixFilepath(dl.Config.prefixPath, prefix)
+	prefixPath := dl.getFormattedPath(prefix)
 	if prefix != "" && prefix[len(prefix)-1] == '/' {
 		prefixPath += "/"
 	}
@@ -559,7 +561,7 @@ func (dl *Datalake) TruncateFile(name string, size int64) error {
 // ChangeMod : Change mode of a path
 func (dl *Datalake) ChangeMod(name string, mode os.FileMode) error {
 	log.Trace("Datalake::ChangeMod : Change mode of file %s to %s", name, mode)
-	fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
+	fileURL := dl.getRootDirectoryURL(name)
 
 	/*
 		// If we need to call the ACL set api then we need to get older acl string here
@@ -612,4 +614,37 @@ func (dl *Datalake) ChangeOwner(name string, _ int, _ int) error {
 	// 	return err
 	// }
 	return syscall.ENOTSUP
+}
+
+func (dl *Datalake) getDirectoryURL(name string) azbfs.DirectoryURL {
+	return dl.Filesystem.NewDirectoryURL(dl.getFormattedPath(name))
+}
+
+func (dl *Datalake) getDirectoryURLPathEscape(name string) azbfs.DirectoryURL {
+	return dl.Filesystem.NewDirectoryURL(url.PathEscape(dl.getFormattedPath(name)))
+}
+
+func (dl *Datalake) getRootDirectoryURL(name string) azbfs.FileURL {
+	return dl.Filesystem.NewRootDirectoryURL().NewFileURL(dl.getFormattedPath(name))
+}
+
+func (dl *Datalake) getRootDirectoryURLPathEscape(name string) azbfs.FileURL {
+	return dl.Filesystem.NewRootDirectoryURL().NewFileURL(url.PathEscape(dl.getFormattedPath(name)))
+}
+
+func (dl *Datalake) getFileName(name string) string {
+	if runtime.GOOS == "windows" {
+		name = convertname.WindowsCloudToFile(name)
+	}
+	return name
+}
+
+// getFormattedPath accepts a string and then converts special characters to the original ASCII
+// on Windows and adds the prefixPath.
+func (dl *Datalake) getFormattedPath(name string) string {
+	name = common.JoinUnixFilepath(dl.Config.prefixPath, name)
+	if runtime.GOOS == "windows" {
+		name = convertname.WindowsFileToCloud(name)
+	}
+	return name
 }

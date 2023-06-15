@@ -46,6 +46,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -718,6 +719,31 @@ func (s *datalakeTestSuite) TestCreateFile() {
 	s.assert.Empty(props.XMsProperties())
 }
 
+func (s *datalakeTestSuite) TestCreateFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
+	blobName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
+
+	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: windowsName})
+
+	s.assert.Nil(err)
+	s.assert.NotNil(h)
+	s.assert.EqualValues(windowsName, h.Path)
+	s.assert.EqualValues(0, h.Size)
+	// File should be in the account
+	file := s.containerUrl.NewDirectoryURL(blobName)
+	props, err := file.GetProperties(ctx)
+	s.assert.Nil(err)
+	s.assert.NotNil(props)
+	s.assert.Empty(props.XMsProperties())
+}
+
 func (s *datalakeTestSuite) TestWriteSmallFile() {
 	defer s.cleanupTest()
 	// Setup
@@ -1137,6 +1163,27 @@ func (s *datalakeTestSuite) TestDeleteFile() {
 	s.assert.NotNil(err)
 }
 
+func (s *datalakeTestSuite) TestDeleteFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
+	blobName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
+	s.az.CreateFile(internal.CreateFileOptions{Name: windowsName})
+
+	err := s.az.DeleteFile(internal.DeleteFileOptions{Name: windowsName})
+	s.assert.Nil(err)
+
+	// File should not be in the account
+	file := s.containerUrl.NewDirectoryURL(blobName)
+	_, err = file.GetProperties(ctx)
+	s.assert.NotNil(err)
+}
+
 func (s *datalakeTestSuite) TestDeleteFileError() {
 	defer s.cleanupTest()
 	// Setup
@@ -1168,6 +1215,30 @@ func (s *datalakeTestSuite) TestRenameFile() {
 	s.assert.NotNil(err)
 	// Dst should be in the account
 	destination := s.containerUrl.NewDirectoryURL(dst)
+	_, err = destination.GetProperties(ctx)
+	s.assert.Nil(err)
+}
+
+func (s *datalakeTestSuite) TestRenameFileWindowsNameConvert() {
+	defer s.cleanupTest()
+	// Setup
+	src := generateFileName()
+	srcWindowsName := "＂＊：＜＞？｜" + "/" + src + "＂＊：＜＞？｜"
+	srcBlobName := "\"*:<>?|" + "/" + src + "\"*:<>?|"
+	s.az.CreateFile(internal.CreateFileOptions{Name: srcWindowsName})
+	dst := generateFileName()
+	dstWindowsName := "＂＊：＜＞？｜" + "/" + dst + "＂＊：＜＞？｜"
+	dstBlobName := "\"*:<>?|" + "/" + dst + "\"*:<>?|"
+
+	err := s.az.RenameFile(internal.RenameFileOptions{Src: srcWindowsName, Dst: dstWindowsName})
+	s.assert.Nil(err)
+
+	// Src should not be in the account
+	source := s.containerUrl.NewDirectoryURL(srcBlobName)
+	_, err = source.GetProperties(ctx)
+	s.assert.NotNil(err)
+	// Dst should be in the account
+	destination := s.containerUrl.NewDirectoryURL(dstBlobName)
 	_, err = destination.GetProperties(ctx)
 	s.assert.Nil(err)
 }
@@ -1335,6 +1406,28 @@ func (s *datalakeTestSuite) TestWriteFile() {
 	s.assert.EqualValues(testData, output)
 }
 
+func (s *datalakeTestSuite) TestWriteFileWindowsNameConvert() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
+	blobName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: windowsName})
+
+	testData := "test data"
+	data := []byte(testData)
+	count, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	s.assert.EqualValues(len(data), count)
+
+	// Blob should have updated data
+	file := s.containerUrl.NewRootDirectoryURL().NewFileURL(blobName)
+	resp, err := file.Download(ctx, 0, int64(len(data)))
+	s.assert.Nil(err)
+	output, _ := io.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
+	s.assert.EqualValues(testData, output)
+}
+
 func (s *datalakeTestSuite) TestTruncateSmallFileSmaller() {
 	defer s.cleanupTest()
 	// Setup
@@ -1350,6 +1443,30 @@ func (s *datalakeTestSuite) TestTruncateSmallFileSmaller() {
 
 	// Blob should have updated data
 	file := s.containerUrl.NewRootDirectoryURL().NewFileURL(name)
+	resp, err := file.Download(ctx, 0, int64(truncatedLength))
+	s.assert.Nil(err)
+	s.assert.EqualValues(truncatedLength, resp.ContentLength())
+	output, _ := io.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
+	s.assert.EqualValues(testData[:truncatedLength], output)
+}
+
+func (s *datalakeTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
+	blobName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: windowsName})
+	testData := "test data"
+	data := []byte(testData)
+	truncatedLength := 5
+	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+
+	err := s.az.TruncateFile(internal.TruncateFileOptions{Name: windowsName, Size: int64(truncatedLength)})
+	s.assert.Nil(err)
+
+	// Blob should have updated data
+	file := s.containerUrl.NewRootDirectoryURL().NewFileURL(blobName)
 	resp, err := file.Download(ctx, 0, int64(truncatedLength))
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
@@ -1545,6 +1662,36 @@ func (s *datalakeTestSuite) TestCopyFromFile() {
 
 	// Blob should have updated data
 	file := s.containerUrl.NewRootDirectoryURL().NewFileURL(name)
+	resp, err := file.Download(ctx, 0, int64(len(data)))
+	s.assert.Nil(err)
+	output, _ := io.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
+	s.assert.EqualValues(testData, output)
+}
+
+func (s *datalakeTestSuite) TestCopyFromFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	windowsName := name + "＂＊：＜＞？｜"
+	blobName := name + "\"*:<>?|"
+	s.az.CreateFile(internal.CreateFileOptions{Name: windowsName})
+	testData := "test data"
+	data := []byte(testData)
+	homeDir, _ := os.UserHomeDir()
+	f, _ := os.CreateTemp(homeDir, windowsName+".tmp")
+	defer os.Remove(f.Name())
+	f.Write(data)
+
+	err := s.az.CopyFromFile(internal.CopyFromFileOptions{Name: windowsName, File: f})
+
+	s.assert.Nil(err)
+
+	// Blob should have updated data
+	file := s.containerUrl.NewRootDirectoryURL().NewFileURL(blobName)
 	resp, err := file.Download(ctx, 0, int64(len(data)))
 	s.assert.Nil(err)
 	output, _ := io.ReadAll(resp.Body(azbfs.RetryReaderOptions{}))
