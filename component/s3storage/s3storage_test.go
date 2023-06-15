@@ -865,6 +865,10 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 }
 
 func (s *s3StorageTestSuite) TestDeleteFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
 	defer s.cleanupTest()
 	// Setup
 	// Test with characters in folder and filepath
@@ -936,7 +940,45 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output)
+}
 
+func (s *s3StorageTestSuite) TestCopyFromFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	windowsName := name + "＂＊：＜＞？｜"
+	objectName := name + "\"*:<>?|"
+	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: windowsName})
+	s.assert.Nil(err)
+	testData := "test data"
+	data := []byte(testData)
+	homeDir, err := os.UserHomeDir()
+	s.assert.Nil(err)
+	f, err := os.CreateTemp(homeDir, windowsName+".tmp")
+	s.assert.Nil(err)
+	defer os.Remove(f.Name())
+	_, err = f.Write(data)
+	s.assert.Nil(err)
+
+	err = s.s3Storage.CopyFromFile(internal.CopyFromFileOptions{Name: windowsName, File: f})
+
+	s.assert.Nil(err)
+
+	// Object will be updated with new data
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, objectName)
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, err := io.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(testData, output)
 }
 
 func (s *s3StorageTestSuite) TestReadFile() {
@@ -1611,6 +1653,10 @@ func (s *s3StorageTestSuite) TestRenameFile() {
 }
 
 func (s *s3StorageTestSuite) TestRenameFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
 	defer s.cleanupTest()
 	// Setup
 	src := generateFileName()
