@@ -1691,13 +1691,14 @@ func (s *s3StorageTestSuite) TestRenameFileWindowsNameConvert() {
 	defer s.cleanupTest()
 	// Setup
 	src := generateFileName()
-	srcWindowsName := src + "＂＊：＜＞？｜"
-	srcObjectName := src + "\"*:<>?|"
+	srcWindowsName := "＂＊：＜＞？｜" + "/" + src + "＂＊：＜＞？｜"
+	srcObjectName := "\"*:<>?|" + "/" + src + "\"*:<>?|"
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: srcWindowsName})
 	s.assert.Nil(err)
+
 	dst := generateFileName()
-	dstWindowsName := dst + "＂＊：＜＞？｜"
-	dstObjectName := dst + "\"*:<>?|"
+	dstWindowsName := "＂＊：＜＞？｜" + "/" + dst + "＂＊：＜＞？｜"
+	dstObjectName := "\"*:<>?|" + "/" + dst + "\"*:<>?|"
 
 	err = s.s3Storage.RenameFile(internal.RenameFileOptions{Src: srcWindowsName, Dst: dstWindowsName})
 	s.assert.Nil(err)

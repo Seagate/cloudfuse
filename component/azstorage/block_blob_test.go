@@ -1111,13 +1111,13 @@ func (s *blockBlobTestSuite) TestRenameFileWindowsNameConvert() {
 	defer s.cleanupTest()
 	// Setup
 	src := generateFileName()
-	srcWindowsName := src + "＂＊：＜＞？｜"
-	srcBlobName := src + "\"*:<>?|"
+	srcWindowsName := "＂＊：＜＞？｜" + "/" + src + "＂＊：＜＞？｜"
+	srcBlobName := "\"*:<>?|" + "/" + src + "\"*:<>?|"
 	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: srcWindowsName})
 	s.assert.Nil(err)
 	dst := generateFileName()
-	dstWindowsName := dst + "＂＊：＜＞？｜"
-	dstBlobName := dst + "\"*:<>?|"
+	dstWindowsName := "＂＊：＜＞？｜" + "/" + dst + "＂＊：＜＞？｜"
+	dstBlobName := "\"*:<>?|" + "/" + dst + "\"*:<>?|"
 
 	err = s.az.RenameFile(internal.RenameFileOptions{Src: srcWindowsName, Dst: dstWindowsName})
 	s.assert.Nil(err)
