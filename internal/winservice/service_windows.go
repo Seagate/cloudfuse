@@ -58,11 +58,6 @@ const (
 
 type LyveCloudFuse struct{}
 
-type KeyData struct {
-	MountPath  string
-	ConfigFile string
-}
-
 func (m *LyveCloudFuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
 	// Notify the Service Control Manager that the service is starting
 	changes <- svc.Status{State: svc.StartPending}
