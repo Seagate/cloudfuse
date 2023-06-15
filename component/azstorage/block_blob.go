@@ -323,7 +323,7 @@ func (bb *BlockBlob) DeleteDirectory(name string) (err error) {
 	for marker := (azblob.Marker{}); marker.NotDone(); {
 		listBlob, err := bb.Container.ListBlobsFlatSegment(context.Background(), marker,
 			azblob.ListBlobsSegmentOptions{MaxResults: common.MaxDirListCount,
-				Prefix: common.JoinUnixFilepath(bb.Config.prefixPath, name) + "/",
+				Prefix: bb.getFormattedPath(name) + "/",
 			})
 
 		if err != nil {
@@ -409,7 +409,7 @@ func (bb *BlockBlob) RenameDirectory(source string, target string) error {
 	for marker := (azblob.Marker{}); marker.NotDone(); {
 		listBlob, err := bb.Container.ListBlobsFlatSegment(context.Background(), marker,
 			azblob.ListBlobsSegmentOptions{MaxResults: common.MaxDirListCount,
-				Prefix: common.JoinUnixFilepath(bb.Config.prefixPath, source) + "/",
+				Prefix: bb.getFormattedPath(source) + "/",
 			})
 
 		if err != nil {
@@ -551,7 +551,7 @@ func (bb *BlockBlob) List(prefix string, marker *string, count int32) ([]*intern
 		count = common.MaxDirListCount
 	}
 
-	listPath := common.JoinUnixFilepath(bb.Config.prefixPath, prefix)
+	listPath := bb.getFormattedPath(prefix)
 	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && bb.Config.prefixPath != "") {
 		listPath += "/"
 	}
@@ -1292,22 +1292,26 @@ func (bb *BlockBlob) ChangeOwner(name string, _ int, _ int) error {
 }
 
 func (bb *BlockBlob) getBlobURL(name string) azblob.BlobURL {
-	if runtime.GOOS == "windows" {
-		name = convertname.WindowsFileToCloud(name)
-	}
-	return bb.Container.NewBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, name))
+	return bb.Container.NewBlobURL(bb.getFormattedPath(name))
 }
 
 func (bb *BlockBlob) getBlockBlobURL(name string) azblob.BlockBlobURL {
-	if runtime.GOOS == "windows" {
-		name = convertname.WindowsFileToCloud(name)
-	}
-	return bb.Container.NewBlockBlobURL(common.JoinUnixFilepath(bb.Config.prefixPath, name))
+	return bb.Container.NewBlockBlobURL(bb.getFormattedPath(name))
 }
 
 func (bb *BlockBlob) getFileName(name string) string {
 	if runtime.GOOS == "windows" {
 		name = convertname.WindowsCloudToFile(name)
+	}
+	return name
+}
+
+// getFormattedPath accepts a string and then converts special characters to the original ASCII
+// on Windows and adds the prefixPath.
+func (bb *BlockBlob) getFormattedPath(name string) string {
+	name = common.JoinUnixFilepath(bb.Config.prefixPath, name)
+	if runtime.GOOS == "windows" {
+		name = convertname.WindowsFileToCloud(name)
 	}
 	return name
 }

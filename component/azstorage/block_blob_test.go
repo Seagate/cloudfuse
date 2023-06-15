@@ -1339,6 +1339,30 @@ func (s *blockBlobTestSuite) TestTruncateSmallFileSmaller() {
 	s.assert.EqualValues(testData[:truncatedLength], output)
 }
 
+func (s *blockBlobTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
+	blobName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: windowsName})
+	testData := "test data"
+	data := []byte(testData)
+	truncatedLength := 5
+	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+
+	err := s.az.TruncateFile(internal.TruncateFileOptions{Name: windowsName, Size: int64(truncatedLength)})
+	s.assert.Nil(err)
+
+	// Blob should have updated data
+	file := s.containerUrl.NewBlobURL(blobName)
+	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
+	s.assert.Nil(err)
+	s.assert.EqualValues(truncatedLength, resp.ContentLength())
+	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
+	s.assert.EqualValues(testData[:truncatedLength], output)
+}
+
 func (s *blockBlobTestSuite) TestTruncateChunkedFileSmaller() {
 	defer s.cleanupTest()
 	// Setup
