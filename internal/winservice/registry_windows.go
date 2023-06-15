@@ -57,6 +57,11 @@ const (
 	security   = `D:P(A;;RPWPLC;;;WD)`
 )
 
+type KeyData struct {
+	MountPath  string
+	ConfigFile string
+}
+
 // Specific mount command used in lyvecloudfuse. This is the command that is executed when WinFsp launches our service.
 // %1 and %2 are strings that are added when mounting where %1 represents the mount directory and %2 the location of the
 // config file.
