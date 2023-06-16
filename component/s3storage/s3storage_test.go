@@ -1176,6 +1176,10 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmaller() {
 }
 
 func (s *s3StorageTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()

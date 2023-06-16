@@ -1220,6 +1220,10 @@ func (s *datalakeTestSuite) TestRenameFile() {
 }
 
 func (s *datalakeTestSuite) TestRenameFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
 	defer s.cleanupTest()
 	// Setup
 	src := generateFileName()
@@ -1407,6 +1411,10 @@ func (s *datalakeTestSuite) TestWriteFile() {
 }
 
 func (s *datalakeTestSuite) TestWriteFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -1451,6 +1459,10 @@ func (s *datalakeTestSuite) TestTruncateSmallFileSmaller() {
 }
 
 func (s *datalakeTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()

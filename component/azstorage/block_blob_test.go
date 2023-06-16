@@ -1296,6 +1296,10 @@ func (s *blockBlobTestSuite) TestWriteFile() {
 }
 
 func (s *blockBlobTestSuite) TestWriteFileWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -1340,6 +1344,10 @@ func (s *blockBlobTestSuite) TestTruncateSmallFileSmaller() {
 }
 
 func (s *blockBlobTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
