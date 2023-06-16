@@ -632,6 +632,9 @@ func init() {
 	disableCompression := config.AddBoolFlag("disable-compression", false, "Disable transport layer compression.")
 	config.BindPFlag(compName+".disable-compression", disableCompression)
 
+	restrictedCharsWin := config.AddBoolFlag("restricted-characters-windows", false, "Enable support for displaying restricted characters on Windows.")
+	config.BindPFlag(compName+".restricted-characters-windows", restrictedCharsWin)
+
 	config.RegisterFlagCompletionFunc("container-name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	})

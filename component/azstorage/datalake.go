@@ -633,7 +633,7 @@ func (dl *Datalake) getRootDirectoryURLPathEscape(name string) azbfs.FileURL {
 }
 
 func (dl *Datalake) getFileName(name string) string {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" && dl.Config.restrictedCharsWin {
 		name = convertname.WindowsCloudToFile(name)
 	}
 	return name
@@ -643,7 +643,7 @@ func (dl *Datalake) getFileName(name string) string {
 // on Windows and adds the prefixPath.
 func (dl *Datalake) getFormattedPath(name string) string {
 	name = common.JoinUnixFilepath(dl.Config.prefixPath, name)
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" && dl.Config.restrictedCharsWin {
 		name = convertname.WindowsFileToCloud(name)
 	}
 	return name

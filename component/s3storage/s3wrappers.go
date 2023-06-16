@@ -420,7 +420,7 @@ func (cl *Client) getKey(name string, isSymLink bool) string {
 	}
 
 	name = common.JoinUnixFilepath(cl.Config.prefixPath, name)
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" && cl.Config.restrictedCharsWin {
 		name = convertname.WindowsFileToCloud(name)
 	}
 	return name
@@ -439,7 +439,7 @@ func (cl *Client) getFile(name string) (string, bool) {
 		name = name[:len(name)-len(symlinkStr)]
 	}
 
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" && cl.Config.restrictedCharsWin {
 		name = convertname.WindowsCloudToFile(name)
 	}
 

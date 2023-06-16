@@ -119,6 +119,7 @@ func (s *s3wrapperTestSuite) TestGetFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
+	s.client.Config.restrictedCharsWin = true
 	fileName := "test\"*:<>?|"
 	expectedName := "test＂＊：＜＞？｜"
 	newName, isSymLink := s.client.getFile(fileName)
@@ -131,6 +132,7 @@ func (s *s3wrapperTestSuite) TestGetKeyWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
+	s.client.Config.restrictedCharsWin = true
 	fileName := "test＂＊：＜＞？｜"
 	expectedName := "test\"*:<>?|"
 	isSymLink := false

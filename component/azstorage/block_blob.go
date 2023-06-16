@@ -1300,7 +1300,7 @@ func (bb *BlockBlob) getBlockBlobURL(name string) azblob.BlockBlobURL {
 }
 
 func (bb *BlockBlob) getFileName(name string) string {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" && bb.Config.restrictedCharsWin {
 		name = convertname.WindowsCloudToFile(name)
 	}
 	return name
@@ -1310,7 +1310,7 @@ func (bb *BlockBlob) getFileName(name string) string {
 // on Windows and adds the prefixPath.
 func (bb *BlockBlob) getFormattedPath(name string) string {
 	name = common.JoinUnixFilepath(bb.Config.prefixPath, name)
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" && bb.Config.restrictedCharsWin {
 		name = convertname.WindowsFileToCloud(name)
 	}
 	return name

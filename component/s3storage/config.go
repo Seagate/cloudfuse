@@ -41,12 +41,13 @@ import (
 )
 
 type Options struct {
-	BucketName string `config:"bucket-name" yaml:"bucket-name,omitempty"`
-	KeyID      string `config:"key-id" yaml:"key-id,omitempty"`
-	SecretKey  string `config:"secret-key" yaml:"secret-key,omitempty"`
-	Region     string `config:"region" yaml:"region,omitempty"`
-	Endpoint   string `config:"endpoint" yaml:"endpoint,omitempty"`
-	PrefixPath string `config:"subdirectory" yaml:"subdirectory,omitempty"`
+	BucketName         string `config:"bucket-name" yaml:"bucket-name,omitempty"`
+	KeyID              string `config:"key-id" yaml:"key-id,omitempty"`
+	SecretKey          string `config:"secret-key" yaml:"secret-key,omitempty"`
+	Region             string `config:"region" yaml:"region,omitempty"`
+	Endpoint           string `config:"endpoint" yaml:"endpoint,omitempty"`
+	PrefixPath         string `config:"subdirectory" yaml:"subdirectory,omitempty"`
+	RestrictedCharsWin bool   `config:"restricted-characters-windows" yaml:"restricted-characters-windows"`
 }
 
 // ParseAndValidateConfig : Parse and validate config
@@ -62,6 +63,8 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	s3.stConfig.authConfig.SecretKey = opt.SecretKey
 	s3.stConfig.authConfig.Region = opt.Region
 	s3.stConfig.authConfig.Endpoint = opt.Endpoint
+
+	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
 
 	// If subdirectory is mounted, take the prefix path
 	s3.stConfig.prefixPath = opt.PrefixPath

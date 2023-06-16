@@ -76,6 +76,7 @@ type AzStorageConfig struct {
 	validateMD5        bool
 	virtualDirectory   bool
 	disableCompression bool
+	restrictedCharsWin bool
 }
 
 type AzStorageConnection struct {

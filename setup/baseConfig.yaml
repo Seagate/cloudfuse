@@ -147,6 +147,7 @@ azstorage:
   validate-md5: true|false <validate md5 on download. Impacts performance. works only when file-cache component is part of the pipeline>
   virtual-directory: true|false <support virtual directories without existence of a special marker blob>
   disable-compression: true|false <disable transport layer content encoding like gzip, set this flag to true if blobs have content-encoding set in container>
+  restricted-characters-windows: true|false <allows filenames with restricted characters to appear on Windows>
 
 # S3 storage configuration
 s3storage:
@@ -158,6 +159,7 @@ s3storage:
   region: <S3 region. Default - us-east-1>
   endpoint: <S3 endpoint URL. Default - https://s3.[region].lyvecloud.seagate.com>
   subdirectory: <name of subdirectory to be mounted instead of whole bucket>
+  restricted-characters-windows: true|false <allows filenames with restricted characters to appear on Windows>
 
 # Mount all configuration
 mountall:

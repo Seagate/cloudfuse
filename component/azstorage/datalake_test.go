@@ -169,6 +169,7 @@ func (s *datalakeTestSuite) TestDefault() {
 	s.assert.EqualValues(60, s.az.stConfig.maxRetryDelay)
 
 	s.assert.Empty(s.az.stConfig.proxyAddress)
+	s.assert.False(s.az.stConfig.restrictedCharsWin)
 }
 
 func (s *datalakeTestSuite) TestModifyEndpoint() {
@@ -724,6 +725,9 @@ func (s *datalakeTestSuite) TestCreateFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
+	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -1168,6 +1172,9 @@ func (s *datalakeTestSuite) TestDeleteFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
+	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -1224,6 +1231,9 @@ func (s *datalakeTestSuite) TestRenameFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
+	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
 	// Setup
 	src := generateFileName()
@@ -1415,6 +1425,9 @@ func (s *datalakeTestSuite) TestWriteFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
+	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -1463,6 +1476,9 @@ func (s *datalakeTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
+	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -1685,6 +1701,9 @@ func (s *datalakeTestSuite) TestCopyFromFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
+	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
