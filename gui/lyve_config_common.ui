@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>540</width>
-    <height>519</height>
+    <height>522</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -358,17 +358,10 @@
         <item>
          <layout class="QVBoxLayout" name="verticalLayout_5">
           <item>
-           <widget class="QComboBox" name="dropDown_streaming_fileCachingLevel">
-            <item>
-             <property name="text">
-              <string>Handle level</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>File level</string>
-             </property>
-            </item>
+           <widget class="QCheckBox" name="checkbox_streaming_fileCachingLevel">
+            <property name="text">
+             <string/>
+            </property>
            </widget>
           </item>
           <item>
@@ -411,7 +404,7 @@
       <enum>Qt::RightToLeft</enum>
      </property>
      <property name="text">
-      <string>Okay</string>
+      <string>Save</string>
      </property>
     </widget>
    </item>

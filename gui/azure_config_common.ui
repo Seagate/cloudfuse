@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>993</width>
-    <height>392</height>
+    <height>395</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -101,7 +101,7 @@
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
-        <widget class="QSpinBox" name="spinBox_libfuse_attributeExp">
+        <widget class="QSpinBox" name="spinBox_libfuse_attExp">
          <property name="maximum">
           <number>3000</number>
          </property>
@@ -111,7 +111,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QSpinBox" name="spinBox_libfuse_entryExp">
+        <widget class="QSpinBox" name="spinBox_libfuse_entExp">
          <property name="maximum">
           <number>3000</number>
          </property>
@@ -302,17 +302,10 @@
         <item>
          <layout class="QVBoxLayout" name="verticalLayout_5">
           <item>
-           <widget class="QComboBox" name="dropDown_streaming_fileCachingLevel">
-            <item>
-             <property name="text">
-              <string>Handle level</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>File level</string>
-             </property>
-            </item>
+           <widget class="QCheckBox" name="checkbox_streaming_fileCachingLevel">
+            <property name="text">
+             <string/>
+            </property>
            </widget>
           </item>
           <item>
@@ -618,7 +611,7 @@
       <enum>Qt::RightToLeft</enum>
      </property>
      <property name="text">
-      <string>Okay</string>
+      <string>Save</string>
      </property>
     </widget>
    </item>
