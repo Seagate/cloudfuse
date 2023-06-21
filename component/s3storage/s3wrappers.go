@@ -346,10 +346,11 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 
 		// now let's add attributes for all the directories in dirList
 		for dir := range dirList {
-			if dir == listPath {
+			dirName, _ := cl.getFile(dir)
+			if dirName == listPath {
 				continue
 			}
-			path := split(cl.Config.prefixPath, dir)
+			path := split(cl.Config.prefixPath, dirName)
 			attr := createObjAttrDir(path)
 			objectAttrList = append(objectAttrList, attr)
 		}
