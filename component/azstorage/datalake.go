@@ -466,6 +466,10 @@ func (dl *Datalake) List(prefix string, marker *string, count int32) ([]*interna
 
 	// Process the paths returned in this result segment (if the segment is empty, the loop body won't execute)
 	for _, pathInfo := range listPath.Paths {
+		// convert path name
+		conv_name := dl.getFileName(*pathInfo.Name)
+		pathInfo.Name = &conv_name
+
 		var mode fs.FileMode
 		if pathInfo.Permissions != nil {
 			mode, err = getFileMode(*pathInfo.Permissions)
@@ -616,22 +620,30 @@ func (dl *Datalake) ChangeOwner(name string, _ int, _ int) error {
 	return syscall.ENOTSUP
 }
 
+// getDirectoryURL returns a new directory url. On Windows this will also convert special characters.
 func (dl *Datalake) getDirectoryURL(name string) azbfs.DirectoryURL {
 	return dl.Filesystem.NewDirectoryURL(dl.getFormattedPath(name))
 }
 
+// getDirectoryURL returns a new directory url that is properly escaped. On Windows this will also convert
+// special characters.
 func (dl *Datalake) getDirectoryURLPathEscape(name string) azbfs.DirectoryURL {
 	return dl.Filesystem.NewDirectoryURL(url.PathEscape(dl.getFormattedPath(name)))
 }
 
+// getDirectoryURL returns a new root directory url. On Windows this will also convert special characters.
 func (dl *Datalake) getRootDirectoryURL(name string) azbfs.FileURL {
 	return dl.Filesystem.NewRootDirectoryURL().NewFileURL(dl.getFormattedPath(name))
 }
 
+// getDirectoryURL returns a new root directory url that is properly escaped. On Windows this will also convert
+// special characters.
 func (dl *Datalake) getRootDirectoryURLPathEscape(name string) azbfs.FileURL {
 	return dl.Filesystem.NewRootDirectoryURL().NewFileURL(url.PathEscape(dl.getFormattedPath(name)))
 }
 
+// getFileName takes a blob name and will convert the special characters into similar unicode characters
+// on Windows.
 func (dl *Datalake) getFileName(name string) string {
 	if runtime.GOOS == "windows" && dl.Config.restrictedCharsWin {
 		name = convertname.WindowsCloudToFile(name)
@@ -639,7 +651,7 @@ func (dl *Datalake) getFileName(name string) string {
 	return name
 }
 
-// getFormattedPath accepts a string and then converts special characters to the original ASCII
+// getFormattedPath takes a file name and converts special characters to the original ASCII
 // on Windows and adds the prefixPath.
 func (dl *Datalake) getFormattedPath(name string) string {
 	name = common.JoinUnixFilepath(dl.Config.prefixPath, name)

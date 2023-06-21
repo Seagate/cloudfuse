@@ -1291,14 +1291,18 @@ func (bb *BlockBlob) ChangeOwner(name string, _ int, _ int) error {
 	return syscall.ENOTSUP
 }
 
+// getBlobURL returns a new blob url. On Windows this will also convert special characters.
 func (bb *BlockBlob) getBlobURL(name string) azblob.BlobURL {
 	return bb.Container.NewBlobURL(bb.getFormattedPath(name))
 }
 
+// getBlockBlobURL returns a new block blob url. On Windows this will also convert special characters.
 func (bb *BlockBlob) getBlockBlobURL(name string) azblob.BlockBlobURL {
 	return bb.Container.NewBlockBlobURL(bb.getFormattedPath(name))
 }
 
+// getFileName takes a blob name and will convert the special characters into similar unicode characters
+// on Windows.
 func (bb *BlockBlob) getFileName(name string) string {
 	if runtime.GOOS == "windows" && bb.Config.restrictedCharsWin {
 		name = convertname.WindowsCloudToFile(name)
@@ -1306,7 +1310,7 @@ func (bb *BlockBlob) getFileName(name string) string {
 	return name
 }
 
-// getFormattedPath accepts a string and then converts special characters to the original ASCII
+// getFormattedPath takes a file name and converts special characters to the original ASCII
 // on Windows and adds the prefixPath.
 func (bb *BlockBlob) getFormattedPath(name string) string {
 	name = common.JoinUnixFilepath(bb.Config.prefixPath, name)
