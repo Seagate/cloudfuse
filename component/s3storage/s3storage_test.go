@@ -667,12 +667,10 @@ func (s *s3StorageTestSuite) TestRenameDir() {
 
 			// Src should not be in the account
 			_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: input.src})
-			fmt.Println(err)
 			s.assert.NotNil(err)
 
 			// Dst should be in the account
 			_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: input.dst})
-			fmt.Println(err)
 			s.assert.Nil(err)
 		})
 	}
