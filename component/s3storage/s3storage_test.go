@@ -69,7 +69,6 @@ var ctx = context.Background()
 const MB = 1024 * 1024
 
 func randomString(length int) string {
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, length)
 	rand.Read(b)
 	return fmt.Sprintf("%x", b)[:length]
@@ -121,6 +120,7 @@ func newTestS3Storage(configuration string) (*S3Storage, error) {
 }
 
 func (s *s3StorageTestSuite) SetupTest() {
+	rand.Seed(time.Now().UnixNano())
 	// Logging config
 	cfg := common.LogConfig{
 		FilePath:    "./logfile.txt",
@@ -596,6 +596,38 @@ func (s *s3StorageTestSuite) TestReadDirSubDirPrefixPath() {
 	s.assert.True(entries[0].IsModeDefault())
 }
 
+func (s *s3StorageTestSuite) TestReadDirWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
+	storageTestConfigurationParameters.RestrictedCharsWin = true
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(vdConfig, s.bucket, true)
+	defer s.cleanupTest()
+	// Setup
+	name := generateDirectoryName()
+	windowsDirName := "＂＊：＜＞？｜" + name
+	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: windowsDirName})
+	s.assert.Nil(err)
+	childName := generateFileName()
+	windowsChildName := windowsDirName + "/" + childName + "＂＊：＜＞？｜"
+	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: windowsChildName})
+	s.assert.Nil(err)
+
+	// Testing dir and dir/
+	var paths = []string{windowsDirName, windowsDirName + "/"}
+	for _, path := range paths {
+		log.Debug(path)
+		s.Run(path, func() {
+			entries, err := s.s3Storage.ReadDir(internal.ReadDirOptions{Name: path})
+			s.assert.Nil(err)
+			s.assert.EqualValues(1, len(entries))
+			s.assert.Equal(windowsChildName, entries[0].Path)
+		})
+	}
+}
+
 func (s *s3StorageTestSuite) TestReadDirError() {
 	defer s.cleanupTest()
 	// Setup
@@ -635,10 +667,12 @@ func (s *s3StorageTestSuite) TestRenameDir() {
 
 			// Src should not be in the account
 			_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: input.src})
+			fmt.Println(err)
 			s.assert.NotNil(err)
 
 			// Dst should be in the account
 			_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: input.dst})
+			fmt.Println(err)
 			s.assert.Nil(err)
 		})
 	}
