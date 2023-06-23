@@ -33,7 +33,7 @@
 
 package convertname
 
-// Map of characters and their similar looking counterpart.
+// Map of characters and their similar looking unicode.
 var cloudToFileMap = map[rune]rune{
 	'"': '＂',
 	'*': '＊',
@@ -54,28 +54,24 @@ func reverseMap(inMap map[rune]rune) map[rune]rune {
 	return reverseMap
 }
 
-// WindowsFileToCloud converts a filename on Windows that includes special unicode
-// characters such as ＂＊：＜＞？｜ to the original characters "*:<>?|.
-func WindowsFileToCloud(filename string) string {
-	runes := []rune(filename)
-	for i, v := range runes {
-		val := fileToCloudMap[v]
-		if val != 0 {
+func replaceWithMap(s string, m map[rune]rune) string {
+	runes := []rune(s)
+	for i, r := range runes {
+		if val, ok := m[r]; ok {
 			runes[i] = val
 		}
 	}
 	return string(runes)
 }
 
+// WindowsFileToCloud converts a filename on Windows that includes special unicode
+// characters such as ＂＊：＜＞？｜ to the original characters "*:<>?|.
+func WindowsFileToCloud(filename string) string {
+	return replaceWithMap(filename, fileToCloudMap)
+}
+
 // WindowsCloudToFile converts an object name to a filename that converts the characters
 // "*:<>?| to the similar unicode characters ＂＊：＜＞？｜.
 func WindowsCloudToFile(cloudname string) string {
-	runes := []rune(cloudname)
-	for i, v := range runes {
-		val := cloudToFileMap[v]
-		if val != 0 {
-			runes[i] = val
-		}
-	}
-	return string(runes)
+	return replaceWithMap(cloudname, cloudToFileMap)
 }
