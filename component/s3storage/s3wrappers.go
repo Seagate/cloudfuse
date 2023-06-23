@@ -192,7 +192,7 @@ func (cl *Client) copyObject(source string, target string, isSymLink bool) error
 	targetKey := cl.getKey(target, isSymLink)
 	_, err := cl.awsS3Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
 		Bucket:     aws.String(cl.Config.authConfig.BucketName),
-		CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, url.QueryEscape(sourceKey))),
+		CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, url.PathEscape(sourceKey))),
 		Key:        aws.String(targetKey),
 	})
 	// check for errors on copy
