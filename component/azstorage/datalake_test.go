@@ -542,6 +542,36 @@ func (s *datalakeTestSuite) TestReadDirSubDirPrefixPath() {
 	s.assert.False(entries[0].IsModeDefault())
 }
 
+func (s *datalakeTestSuite) TestReadDirWindowsNameConvert() {
+	// Skip test if not running on Windows
+	if runtime.GOOS != "windows" {
+		return
+	}
+	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	s.setupTestHelper(config, s.container, true)
+	defer s.cleanupTest()
+	// Setup
+	name := generateDirectoryName()
+	windowsDirName := "＂＊：＜＞？｜" + name
+	s.az.CreateDir(internal.CreateDirOptions{Name: windowsDirName})
+	childName := generateFileName()
+	windowsChildName := windowsDirName + "/" + childName + "＂＊：＜＞？｜"
+	s.az.CreateFile(internal.CreateFileOptions{Name: windowsChildName})
+
+	// Testing dir and dir/
+	var paths = []string{windowsDirName, windowsDirName + "/"}
+	for _, path := range paths {
+		log.Debug(path)
+		s.Run(path, func() {
+			entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: path})
+			s.assert.Nil(err)
+			s.assert.EqualValues(1, len(entries))
+			s.assert.Equal(windowsChildName, entries[0].Path)
+		})
+	}
+}
+
 func (s *datalakeTestSuite) TestReadDirError() {
 	defer s.cleanupTest()
 	// Setup
