@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
     _____           _____   _____   ____          ______  _____  ------
    |     |  |      |     | |     | |     |     | |       |            |
@@ -35,50 +37,68 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
+	"os/exec"
+	"regexp"
+	"strings"
 
 	"lyvecloudfuse/common"
 
 	"github.com/spf13/cobra"
 )
 
-var umntAllCmd = &cobra.Command{
-	Use:               "all",
-	Short:             "Unmount all instances of Lyvecloudfuse",
-	Long:              "Unmount all instances of Lyvecloudfuse",
-	SuggestFor:        []string{"al", "all"},
+var unmountCmd = &cobra.Command{
+	Use:               "unmount <mount path>",
+	Short:             "Unmount Lyvecloudfuse",
+	Long:              "Unmount Lyvecloudfuse",
+	SuggestFor:        []string{"unmount", "unmnt"},
+	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(_ *cobra.Command, _ []string) error {
-		lstMnt, err := common.ListMountPoints()
-		if err != nil {
-			return fmt.Errorf("failed to list mount points [%s]", err.Error())
-		}
+	RunE: func(_ *cobra.Command, args []string) error {
+		if strings.Contains(args[0], "*") {
+			mntPathPrefix := args[0]
 
-		mountfound := 0
-		unmounted := 0
-		errMsg := "failed to unmount - \n"
-
-		for _, mntPath := range lstMnt {
-			mountfound += 1
-			err := unmountLyvecloudfuse(mntPath)
-			if err == nil {
-				unmounted += 1
-			} else {
-				errMsg += " " + mntPath + " - [" + err.Error() + "]\n"
+			lstMnt, _ := common.ListMountPoints()
+			for _, mntPath := range lstMnt {
+				match, _ := regexp.MatchString(mntPathPrefix, mntPath)
+				if match {
+					err := unmountLyvecloudfuse(mntPath)
+					if err != nil {
+						return fmt.Errorf("failed to unmount %s [%s]", mntPath, err.Error())
+					}
+				}
 			}
-		}
-
-		if mountfound == 0 {
-			fmt.Println("Nothing to unmount")
 		} else {
-			fmt.Printf("%d of %d mounts were successfully unmounted\n", unmounted, mountfound)
-		}
-
-		if unmounted < mountfound {
-			return errors.New(errMsg)
+			err := unmountLyvecloudfuse(args[0])
+			if err != nil {
+				return fmt.Errorf("failed to unmount %s [%s]", args[0], err.Error())
+			}
 		}
 
 		return nil
 	},
+	ValidArgsFunction: func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if toComplete == "" {
+			mntPts, _ := common.ListMountPoints()
+			return mntPts, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveDefault
+	},
+}
+
+// Attempts to unmount the directory and returns true if the operation succeeded
+func unmountLyvecloudfuse(mntPath string) error {
+	cliOut := exec.Command("fusermount", "-u", mntPath)
+	_, err := cliOut.Output()
+	if err != nil {
+		return err
+	} else {
+		fmt.Println("Successfully unmounted", mntPath)
+		return nil
+	}
+}
+
+func init() {
+	rootCmd.AddCommand(unmountCmd)
+	unmountCmd.AddCommand(umntAllCmd)
 }
