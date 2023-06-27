@@ -294,6 +294,11 @@ func ExpandPath(path string) string {
 		path = JoinUnixFilepath(homeDir, path[7:])
 	}
 
+	// If it is a drive letter don't add a trailing slash
+	if IsDriveLetter(path) {
+		return path
+	}
+
 	path = os.ExpandEnv(path)
 	path, _ = filepath.Abs(path)
 	path = JoinUnixFilepath(path)

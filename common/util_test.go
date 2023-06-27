@@ -195,6 +195,16 @@ func (suite *utilTestSuite) TestExpandPath() {
 	suite.assert.Equal(expandedPath, path)
 }
 
+func (suite *utilTestSuite) TestExpandPathDriveLetter() {
+	path := "D:"
+	expandedPath := ExpandPath(path)
+	suite.assert.Equal(path, expandedPath)
+
+	path = "x:"
+	expandedPath = ExpandPath(path)
+	suite.assert.Equal(path, expandedPath)
+}
+
 func (suite *utilTestSuite) TestIsDriveLetter() {
 	path := "D:"
 	match := IsDriveLetter(path)
