@@ -38,7 +38,7 @@ package main
 
 import (
 	"lyvecloudfuse/cmd"
-	_ "lyvecloudfuse/common/log"
+	"lyvecloudfuse/common/log"
 )
 
 //go:generate ./cmd/componentGenerator.sh $NAME
