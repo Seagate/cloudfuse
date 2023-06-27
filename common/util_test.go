@@ -39,6 +39,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -136,8 +137,13 @@ func (suite *utilTestSuite) TestExpandPath() {
 	if err != nil {
 		return
 	}
-
 	homeDir = JoinUnixFilepath(homeDir)
+
+	pwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	pwd = JoinUnixFilepath(pwd)
 
 	path := "~/a/b/c/d"
 	expandedPath := ExpandPath(path)
@@ -152,6 +158,39 @@ func (suite *utilTestSuite) TestExpandPath() {
 	suite.assert.Contains(expandedPath, homeDir)
 
 	path = "/a/b/c/d"
+	expandedPath = ExpandPath(path)
+	if runtime.GOOS == "windows" {
+		suite.assert.Equal(expandedPath, "c:"+path)
+	} else {
+		suite.assert.Equal(expandedPath, path)
+	}
+
+	path = "./a"
+	expandedPath = ExpandPath(path)
+	suite.assert.NotEqual(expandedPath, path)
+	suite.assert.Contains(expandedPath, pwd)
+
+	path = "./a/../a/b/c/d/../../../a/b/c/d/.././a"
+	expandedPath = ExpandPath(path)
+	suite.assert.NotEqual(expandedPath, path)
+	suite.assert.Contains(expandedPath, pwd)
+
+	path = "~/a/../$HOME/a/b/c/d/../../../a/b/c/d/.././a"
+	expandedPath = ExpandPath(path)
+	suite.assert.NotEqual(expandedPath, path)
+	suite.assert.Contains(expandedPath, homeDir)
+
+	path = "$HOME/a/b/c/d/../../../a/b/c/d/.././a"
+	expandedPath = ExpandPath(path)
+	suite.assert.NotEqual(expandedPath, path)
+	suite.assert.Contains(expandedPath, homeDir)
+
+	path = "/$HOME/a/b/c/d/../../../a/b/c/d/.././a"
+	expandedPath = ExpandPath(path)
+	suite.assert.NotEqual(expandedPath, path)
+	suite.assert.Contains(expandedPath, homeDir)
+
+	path = ""
 	expandedPath = ExpandPath(path)
 	suite.assert.Equal(expandedPath, path)
 }

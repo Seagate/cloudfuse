@@ -41,6 +41,7 @@ import (
 	"io/fs"
 	"os"
 	"runtime"
+	"syscall"
 	"time"
 
 	"lyvecloudfuse/common"
@@ -135,6 +136,12 @@ func (lf *Libfuse) initFuse() error {
 	}
 	if lf.nonEmptyMount {
 		options += ",nonempty"
+	}
+
+	// direct_io option is used to bypass the kernel cache. It disables the use of
+	// page cache (file content cache) in the kernel for the filesystem.
+	if lf.directIO {
+		options += ",direct_io"
 	}
 
 	// Setup options as a slice
@@ -256,7 +263,13 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 	attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
 	if err != nil {
 		log.Err("Libfuse::Getattr : Failed to get attributes of %s [%s]", name, err.Error())
-		return -fuse.ENOENT
+		if err == syscall.ENOENT {
+			return -fuse.ENOENT
+		} else if err == syscall.EACCES {
+			return -fuse.EACCES
+		} else {
+			return -fuse.EIO
+		}
 	}
 
 	// Populate stat
@@ -268,7 +281,7 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
-	log.Trace("Libfuse::libfuse_mkdir : %s", name)
+	log.Trace("Libfuse::Mkdir : %s", name)
 
 	// Check if the directory already exists. On Windows we need to make this call explicitly
 	if runtime.GOOS == "windows" {
@@ -282,8 +295,12 @@ func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 	// blobfuse uses a bitwise and trick to make sure mode is a uint32, we don't need that here
 	err := fuseFS.NextComponent().CreateDir(internal.CreateDirOptions{Name: name, Mode: fs.FileMode(mode)})
 	if err != nil {
-		log.Err("Libfuse::libfuse_mkdir : Failed to create %s [%s]", name, err.Error())
-		return -fuse.EIO
+		log.Err("Libfuse::Mkdir : Failed to create %s [%s]", name, err.Error())
+		if os.IsPermission(err) {
+			return -fuse.EACCES
+		} else {
+			return -fuse.EIO
+		}
 	}
 
 	libfuseStatsCollector.PushEvents(createDir, name, map[string]interface{}{md: fs.FileMode(mode)})
@@ -367,6 +384,8 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 			log.Err("Libfuse::Readdir : Path %s, handle: %d, offset %d. Error in retrieval", handle.Path, handle.ID, ofst64)
 			if os.IsNotExist(err) {
 				return -fuse.ENOENT
+			} else if os.IsPermission(err) {
+				return -fuse.EACCES
 			}
 
 			return -fuse.EIO
@@ -433,11 +452,11 @@ func (cf *CgofuseFS) Rmdir(path string) int {
 func (cf *CgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
-	log.Trace("Libfuse::libfuse_create : %s", name)
+	log.Trace("Libfuse::Create : %s", name)
 
 	handle, err := fuseFS.NextComponent().CreateFile(internal.CreateFileOptions{Name: name, Mode: fs.FileMode(mode)})
 	if err != nil {
-		log.Err("Libfuse::libfuse_create : Failed to create %s [%s]", name, err.Error())
+		log.Err("Libfuse::Create : Failed to create %s [%s]", name, err.Error())
 		if os.IsExist(err) {
 			return -fuse.EEXIST, 0
 		}
@@ -451,7 +470,7 @@ func (cf *CgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
 	// if !handle.Cached() {
 	// 	ret_val.fd = 0
 	// }
-	log.Trace("Libfuse::libfuse_create : %s, handle %d", name, fh)
+	log.Trace("Libfuse::Create : %s, handle %d", name, fh)
 	//fi.fh = C.ulong(uintptr(unsafe.Pointer(ret_val)))
 
 	libfuseStatsCollector.PushEvents(createFile, name, map[string]interface{}{md: fs.FileMode(mode)})
@@ -466,7 +485,7 @@ func (cf *CgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
 func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
-	log.Trace("Libfuse:: Open : %s", name)
+	log.Trace("Libfuse::Open : %s", name)
 
 	handle, err := fuseFS.NextComponent().OpenFile(
 		internal.OpenFileOptions{
@@ -476,9 +495,11 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 		})
 
 	if err != nil {
-		log.Err("Libfuse::libfuse_open : Failed to open %s [%s]", name, err.Error())
+		log.Err("Libfuse::Open : Failed to open %s [%s]", name, err.Error())
 		if os.IsNotExist(err) {
 			return -fuse.ENOENT, 0
+		} else if os.IsPermission(err) {
+			return -fuse.EACCES, 0
 		}
 
 		return -fuse.EIO, 0
@@ -490,7 +511,7 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 	// if !handle.Cached() {
 	// 	ret_val.fd = 0
 	// }
-	log.Trace("Libfuse::libfuse_open : %s, handle %d", name, fh)
+	log.Trace("Libfuse::Open : %s, handle %d", name, fh)
 	// fi.fh = C.ulong(uintptr(unsafe.Pointer(ret_val)))
 
 	// increment open file handles count
@@ -586,7 +607,13 @@ func (cf *CgofuseFS) Flush(path string, fh uint64) int {
 	err := fuseFS.NextComponent().FlushFile(internal.FlushFileOptions{Handle: handle})
 	if err != nil {
 		log.Err("Libfuse::Flush : error flushing file %s, handle: %d [%s]", handle.Path, handle.ID, err.Error())
-		return -fuse.EIO
+		if err == syscall.ENOENT {
+			return -fuse.ENOENT
+		} else if err == syscall.EACCES {
+			return -fuse.EACCES
+		} else {
+			return -fuse.EIO
+		}
 	}
 
 	return 0
@@ -632,7 +659,13 @@ func (cf *CgofuseFS) Release(path string, fh uint64) int {
 	err := fuseFS.NextComponent().CloseFile(internal.CloseFileOptions{Handle: handle})
 	if err != nil {
 		log.Err("Libfuse::Release : error closing file %s, handle: %d [%s]", handle.Path, handle.ID, err.Error())
-		return -fuse.EIO
+		if err == syscall.ENOENT {
+			return -fuse.ENOENT
+		} else if err == syscall.EACCES {
+			return -fuse.EACCES
+		} else {
+			return -fuse.EIO
+		}
 	}
 
 	handlemap.Delete(handle.ID)
@@ -654,8 +687,11 @@ func (cf *CgofuseFS) Unlink(path string) int {
 		log.Err("Libfuse::Unlink : error deleting file %s [%s]", name, err.Error())
 		if os.IsNotExist(err) {
 			return -fuse.ENOENT
+		} else if os.IsPermission(err) {
+			return -fuse.EACCES
 		}
 		return -fuse.EIO
+
 	}
 
 	libfuseStatsCollector.PushEvents(deleteFile, name, nil)
@@ -847,6 +883,8 @@ func (cf *CgofuseFS) Chmod(path string, mode uint32) int {
 		log.Err("Libfuse::Chmod : error in chmod of %s [%s]", name, err.Error())
 		if os.IsNotExist(err) {
 			return -fuse.ENOENT
+		} else if os.IsPermission(err) {
+			return -fuse.EACCES
 		}
 		return -fuse.EIO
 	}

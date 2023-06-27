@@ -702,7 +702,7 @@ stages:
             - script: |
                 echo 'mode: count' > ./lyvecloudfuse_coverage_raw.rpt
                 tail -q -n +2 ./*.cov >> ./lyvecloudfuse_coverage_raw.rpt
-                cat ./lyvecloudfuse_coverage_raw.rpt | grep -v mock_component | grep -v base_component | grep -v loopback | grep -v tools | grep -v "common/log" | grep -v "common/exectime" | grep -v "internal/stats_manager" > ./lyvecloudfuse_coverage.rpt 
+                cat ./lyvecloudfuse_coverage_raw.rpt | grep -v mock_component | grep -v base_component | grep -v loopback | grep -v tools | grep -v "common/log" | grep -v "common/exectime" | grep -v "internal/stats_manager" | grep -v "main.go" > ./lyvecloudfuse_coverage.rpt 
                 go tool cover -func lyvecloudfuse_coverage.rpt  > ./lyvecloudfuse_func_cover.rpt
                 go tool cover -html=./lyvecloudfuse_coverage.rpt -o ./lyvecloudfuse_coverage.html
                 go tool cover -html=./lyvecloudfuse_ut.cov -o ./lyvecloudfuse_ut.html

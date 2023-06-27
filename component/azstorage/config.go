@@ -113,6 +113,9 @@ func (a *AccountType) Parse(s string) error {
 	return err
 }
 
+// default value for maximum results returned by a list API call
+const DefaultMaxResultsForList int32 = 2
+
 // Environment variable names
 // Here we are not reading MSI_ENDPOINT and MSI_SECRET as they are read by go-sdk directly
 // https://github.com/Azure/go-autorest/blob/a46566dfcbdc41e736295f94e9f690ceaf50094a/autorest/adal/token.go#L788
@@ -134,6 +137,7 @@ const (
 	EnvHttpProxy                   = "http_proxy"
 	EnvHttpsProxy                  = "https_proxy"
 	EnvAzStorageAccountContainer   = "AZURE_STORAGE_ACCOUNT_CONTAINER"
+	EnvAzAuthResource              = "AZURE_STORAGE_AUTH_RESOURCE"
 )
 
 type AzStorageOptions struct {
@@ -169,6 +173,7 @@ type AzStorageOptions struct {
 	UpdateMD5               bool   `config:"update-md5" yaml:"update-md5"`
 	ValidateMD5             bool   `config:"validate-md5" yaml:"validate-md5"`
 	VirtualDirectory        bool   `config:"virtual-directory" yaml:"virtual-directory"`
+	MaxResultsForList       int32  `config:"max-results-for-list" yaml:"max-results-for-list"`
 	DisableCompression      bool   `config:"disable-compression" yaml:"disable-compression"`
 
 	// v1 support
@@ -205,6 +210,8 @@ func RegisterEnvVariables() {
 	config.BindEnv("azstorage.https-proxy", EnvHttpsProxy)
 
 	config.BindEnv("azstorage.container", EnvAzStorageAccountContainer)
+
+	config.BindEnv("azstorage.auth-resource", EnvAzAuthResource)
 }
 
 //    ----------- Config Parsing and Validation  ---------------
@@ -306,7 +313,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 
 	if opt.BlockSize != 0 {
 		if opt.BlockSize > azblob.BlockBlobMaxStageBlockBytes {
-			log.Err("block size is too large. Block size has to be smaller than %s Bytes", azblob.BlockBlobMaxStageBlockBytes)
+			log.Err("ParseAndValidateConfig : Block size is too large. Block size has to be smaller than %s Bytes", azblob.BlockBlobMaxStageBlockBytes)
 			return errors.New("block size is too large")
 		}
 		az.stConfig.blockSize = opt.BlockSize * 1024 * 1024
@@ -345,7 +352,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	az.stConfig.authConfig.ActiveDirectoryEndpoint = formatEndpointProtocol(az.stConfig.authConfig.ActiveDirectoryEndpoint, false)
 
 	// If subdirectory is mounted, take the prefix path
-	az.stConfig.prefixPath = opt.PrefixPath
+	az.stConfig.prefixPath = removeLeadingSlashes(opt.PrefixPath)
 
 	// Block list call on mount for given amount of time
 	az.stConfig.cancelListForSeconds = opt.CancelListForSeconds
@@ -466,9 +473,9 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		log.Warn("unsupported v1 CLI parameter: debug-libcurl is not applicable in lyvecloudfuse.")
 	}
 
-	log.Info("ParseAndValidateConfig : Account: %s, Container: %s, AccountType: %s, Auth: %s, Prefix: %s, Endpoint: %s, ListBlock: %d, MD5 : %v %v, Virtual Directory: %v, Disable Compression: %v",
+	log.Info("ParseAndValidateConfig : Account: %s, Container: %s, AccountType: %s, Auth: %s, Prefix: %s, Endpoint: %s, ListBlock: %d, MD5 : %v %v, Virtual Directory: %v, Max Results For List %v, Disable Compression: %v",
 		az.stConfig.authConfig.AccountName, az.stConfig.container, az.stConfig.authConfig.AccountType, az.stConfig.authConfig.AuthMode,
-		az.stConfig.prefixPath, az.stConfig.authConfig.Endpoint, az.stConfig.cancelListForSeconds, az.stConfig.validateMD5, az.stConfig.updateMD5, az.stConfig.virtualDirectory, az.stConfig.disableCompression)
+		az.stConfig.prefixPath, az.stConfig.authConfig.Endpoint, az.stConfig.cancelListForSeconds, az.stConfig.validateMD5, az.stConfig.updateMD5, az.stConfig.virtualDirectory, az.stConfig.maxResultsForList, az.stConfig.disableCompression)
 
 	log.Info("ParseAndValidateConfig : Retry Config: Retry count %d, Max Timeout %d, BackOff Time %d, Max Delay %d",
 		az.stConfig.maxRetries, az.stConfig.maxTimeout, az.stConfig.backoffTime, az.stConfig.maxRetryDelay)
@@ -503,6 +510,12 @@ func ParseAndReadDynamicConfig(az *AzStorage, opt AzStorageOptions, reload bool)
 		az.stConfig.virtualDirectory = opt.VirtualDirectory
 	} else {
 		az.stConfig.virtualDirectory = true
+	}
+
+	if config.IsSet(compName+".max-results-for-list") && opt.MaxResultsForList > 0 {
+		az.stConfig.maxResultsForList = opt.MaxResultsForList
+	} else {
+		az.stConfig.maxResultsForList = DefaultMaxResultsForList
 	}
 
 	if config.IsSet(compName + ".disable-compression") {
