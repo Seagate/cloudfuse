@@ -48,7 +48,7 @@ import (
 var umntAllCmd = &cobra.Command{
 	Use:               "all",
 	Short:             "Unmount all instances of Lyvecloudfuse",
-	Long:              "Unmount all instances of Lyvecloudfuse",
+	Long:              "Unmount all instances of Lyvecloudfuse. Only available on Linux",
 	SuggestFor:        []string{"al", "all"},
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, _ []string) error {
