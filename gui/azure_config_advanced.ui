@@ -6,14 +6,184 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>937</width>
-    <height>530</height>
+    <width>943</width>
+    <height>632</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
+   <item row="1" column="0">
+    <widget class="QGroupBox" name="groupbox_fileCache">
+     <property name="title">
+      <string>File Caching</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_2">
+      <item row="0" column="0">
+       <layout class="QVBoxLayout" name="verticalLayout_9">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_7">
+          <item>
+           <layout class="QVBoxLayout" name="verticalLayout_8">
+            <item>
+             <widget class="QLabel" name="label_14">
+              <property name="text">
+               <string>Eviction Policy</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_15">
+              <property name="text">
+               <string>Eviction timeout (s)</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_16">
+              <property name="text">
+               <string>Max Eviction</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_17">
+              <property name="text">
+               <string>Max cache size (MB)</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_18">
+              <property name="text">
+               <string>Eviction max threshold (%)</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_19">
+              <property name="text">
+               <string>Eviction min threshold (%)</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QVBoxLayout" name="verticalLayout_7">
+            <item>
+             <widget class="QComboBox" name="dropDown_fileCache_evictionPolicy">
+              <item>
+               <property name="text">
+                <string>lru - least recently used</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>lfu - least frequently used</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="spinBox_fileCache_evictionTimeout">
+              <property name="maximum">
+               <number>1000000</number>
+              </property>
+              <property name="value">
+               <number>120</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="spinBox_fileCache_maxEviction">
+              <property name="maximum">
+               <number>1000000</number>
+              </property>
+              <property name="value">
+               <number>5000</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="spinBox_fileCache_maxCacheSize">
+              <property name="maximum">
+               <number>1000000</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="spinBox_fileCache_evictMaxThresh">
+              <property name="maximum">
+               <number>3000</number>
+              </property>
+              <property name="value">
+               <number>80</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="spinBox_fileCache_evictMinThresh">
+              <property name="maximum">
+               <number>3000</number>
+              </property>
+              <property name="value">
+               <number>60</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkBox_fileCache_allowNonEmptyTmp">
+          <property name="text">
+           <string>Allow non-empty temp</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkBox_fileCache_policyLogs">
+          <property name="text">
+           <string>Policy logs</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkBox_fileCache_createEmptyFile">
+          <property name="text">
+           <string>Create empty file</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkBox_fileCache_cleanupStart">
+          <property name="text">
+           <string>Cleanup on start</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkBox_fileCache_offloadIO">
+          <property name="text">
+           <string>Offload io</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkBox_fileCache_syncToFlush">
+          <property name="text">
+           <string>Sync to flush</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
    <item row="1" column="2">
     <widget class="QGroupBox" name="groupbox_azure">
      <property name="title">
@@ -238,7 +408,7 @@
       <item row="0" column="1">
        <layout class="QVBoxLayout" name="verticalLayout_18">
         <item>
-         <widget class="QCheckBox" name="checkbox_azure_useHttp">
+         <widget class="QCheckBox" name="checkBox_azure_useHttp">
           <property name="toolTip">
            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use http instead of https&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
           </property>
@@ -248,43 +418,113 @@
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="checkbox_azure_validateMd5">
+         <widget class="QCheckBox" name="checkBox_azure_validateMd5">
           <property name="text">
            <string>Validate md5 (file cache only)</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="checkbox_azure_updateMd5">
+         <widget class="QCheckBox" name="checkBox_azure_updateMd5">
           <property name="text">
            <string>Update md5 (file cache only)</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="checkbox_azure_failUnsupportedOps">
+         <widget class="QCheckBox" name="checkBox_azure_failUnsupportedOps">
           <property name="text">
            <string>Fail Unsupported Ops</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="checkbox_azure_sdkTrace">
+         <widget class="QCheckBox" name="checkBox_azure_sdkTrace">
           <property name="text">
            <string>Sdk trace</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="checkbox_azure_virtualDirectory">
+         <widget class="QCheckBox" name="checkBox_azure_virtualDirectory">
           <property name="text">
            <string>Virtual directory</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkBox_azure_disableCompression">
+          <property name="text">
+           <string>Disable compression</string>
           </property>
          </widget>
         </item>
        </layout>
       </item>
      </layout>
+    </widget>
+   </item>
+   <item row="2" column="0" colspan="3">
+    <widget class="QGroupBox" name="groupBox">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>125</height>
+      </size>
+     </property>
+     <property name="title">
+      <string>LibFuse</string>
+     </property>
+     <widget class="QWidget" name="verticalLayoutWidget">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>30</y>
+        <width>901</width>
+        <height>91</height>
+       </rect>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout">
+         <item>
+          <widget class="QLabel" name="label">
+           <property name="text">
+            <string>Maximum Fuse Threads</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="spinBox">
+           <property name="maximum">
+            <number>3000</number>
+           </property>
+           <property name="singleStep">
+            <number>20</number>
+           </property>
+           <property name="value">
+            <number>128</number>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="checkBox_libfuse_disableWriteback">
+         <property name="text">
+          <string>Disable write-back cache</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="checkBox_libfuse_networkshare">
+         <property name="text">
+          <string>Enable network-share</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
     </widget>
    </item>
    <item row="3" column="0">
@@ -299,7 +539,7 @@
       </size>
      </property>
      <property name="layoutDirection">
-      <enum>Qt::RightToLeft</enum>
+      <enum>Qt::LeftToRight</enum>
      </property>
      <property name="text">
       <string>Reset Changes</string>
@@ -322,176 +562,6 @@
      </property>
      <property name="text">
       <string>Save</string>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="0">
-    <widget class="QGroupBox" name="groupbox_fileCache">
-     <property name="title">
-      <string>File Caching</string>
-     </property>
-     <layout class="QGridLayout" name="gridLayout_2">
-      <item row="0" column="0">
-       <layout class="QVBoxLayout" name="verticalLayout_9">
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_7">
-          <item>
-           <layout class="QVBoxLayout" name="verticalLayout_8">
-            <item>
-             <widget class="QLabel" name="label_14">
-              <property name="text">
-               <string>Eviction Policy</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLabel" name="label_15">
-              <property name="text">
-               <string>Eviction timeout (s)</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLabel" name="label_16">
-              <property name="text">
-               <string>Max Eviction</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLabel" name="label_17">
-              <property name="text">
-               <string>Max cache size (MB)</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLabel" name="label_18">
-              <property name="text">
-               <string>Eviction max threshold (%)</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLabel" name="label_19">
-              <property name="text">
-               <string>Eviction min threshold (%)</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <layout class="QVBoxLayout" name="verticalLayout_7">
-            <item>
-             <widget class="QComboBox" name="dropDown_fileCache_evictionPolicy">
-              <item>
-               <property name="text">
-                <string>lru - least recently used</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>lfu - least frequently used</string>
-               </property>
-              </item>
-             </widget>
-            </item>
-            <item>
-             <widget class="QSpinBox" name="spinBox_fileCache_evictionTimeout">
-              <property name="maximum">
-               <number>1000000</number>
-              </property>
-              <property name="value">
-               <number>120</number>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QSpinBox" name="spinBox_fileCache_maxEviction">
-              <property name="maximum">
-               <number>1000000</number>
-              </property>
-              <property name="value">
-               <number>5000</number>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QSpinBox" name="spinBox_fileCache_maxCacheSize">
-              <property name="maximum">
-               <number>1000000</number>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QSpinBox" name="spinBox_fileCache_evictMaxThresh">
-              <property name="maximum">
-               <number>3000</number>
-              </property>
-              <property name="value">
-               <number>80</number>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QSpinBox" name="spinBox_fileCache_evictMinThresh">
-              <property name="maximum">
-               <number>3000</number>
-              </property>
-              <property name="value">
-               <number>60</number>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <widget class="QCheckBox" name="checkbox_fileCache_allowNonEmptyTmp">
-          <property name="text">
-           <string>Allow non-empty temp</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QCheckBox" name="checkbox_fileCache_policyLogs">
-          <property name="text">
-           <string>Policy logs</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QCheckBox" name="checkbox_fileCache_createEmptyFile">
-          <property name="text">
-           <string>Create empty file</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QCheckBox" name="checkbox_fileCache_cleanupStart">
-          <property name="text">
-           <string>Cleanup on start</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QCheckBox" name="checkbox_fileCache_offloadIO">
-          <property name="text">
-           <string>Offload io</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item row="2" column="0">
-    <widget class="QCheckBox" name="checkbox_libfuse_disableWriteback">
-     <property name="text">
-      <string>Disable write-back cache</string>
      </property>
     </widget>
    </item>
