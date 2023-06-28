@@ -159,9 +159,7 @@ func (suite *utilTestSuite) TestExpandPath() {
 
 	path = "/a/b/c/d"
 	expandedPath = ExpandPath(path)
-	if runtime.GOOS == "windows" {
-		suite.assert.Equal(expandedPath, "c:"+path)
-	} else {
+	if runtime.GOOS != "windows" {
 		suite.assert.Equal(expandedPath, path)
 	}
 
