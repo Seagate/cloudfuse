@@ -1,11 +1,48 @@
+/*
+    _____           _____   _____   ____          ______  _____  ------
+   |     |  |      |     | |     | |     |     | |       |            |
+   |     |  |      |     | |     | |     |     | |       |            |
+   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
+   |     |  |      |     | |     | |     |     |       | |       |
+   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
+
+
+   Licensed under the MIT License <http://opensource.org/licenses/MIT>.
+
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Author : <blobfusedev@microsoft.com>
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE
+*/
+
 package s3storage
 
 import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sort" // to sort List() results
 	"strings"
+	"time"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
@@ -16,11 +53,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
+const symlinkStr = ".rclonelink"
+
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
 // name is the path to the file.
-func (cl *Client) getObject(name string, offset int64, count int64) (io.ReadCloser, error) {
-	key := cl.getKey(name)
+func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bool) (io.ReadCloser, error) {
+	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::getObject : get object %s (%d+%d)", key, offset, count)
 
 	// deal with the range
@@ -49,15 +88,15 @@ func (cl *Client) getObject(name string, offset int64, count int64) (io.ReadClos
 		return nil, parseS3Err(err, attemptedAction)
 	}
 
-	// return body
+	// return body, err
 	return result.Body, err
 }
 
 // Wrapper for awsS3Client.PutObject.
 // Takes an io.Reader to work with both files and byte arrays.
 // name is the path to the file.
-func (cl *Client) putObject(name string, objectData io.Reader) error {
-	key := cl.getKey(name)
+func (cl *Client) putObject(name string, objectData io.Reader, isSymLink bool) error {
+	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::putObject : putting object %s", key)
 
 	// TODO: decide when to use this higher-level API
@@ -79,8 +118,8 @@ func (cl *Client) putObject(name string, objectData io.Reader) error {
 
 // Wrapper for awsS3Client.DeleteObject.
 // name is the path to the file.
-func (cl *Client) deleteObject(name string) error {
-	key := cl.getKey(name)
+func (cl *Client) deleteObject(name string, isSymLink bool) error {
+	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::deleteObject : deleting object %s", key)
 
 	_, err := cl.awsS3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
@@ -94,12 +133,12 @@ func (cl *Client) deleteObject(name string) error {
 
 // Wrapper for awsS3Client.DeleteObjects.
 // names is a list of paths to the objects.
-func (cl *Client) deleteObjects(names []string) error {
-	log.Trace("Client::deleteObjects : deleting %d objects", len(names))
+func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
+	log.Trace("Client::deleteObjects : deleting %d objects", len(objects))
 	// build list to send to DeleteObjects
-	keyList := make([]types.ObjectIdentifier, len(names))
-	for i, name := range names {
-		key := cl.getKey(name)
+	keyList := make([]types.ObjectIdentifier, len(objects))
+	for i, object := range objects {
+		key := cl.getKey(object.Path, object.IsSymlink())
 		keyList[i] = types.ObjectIdentifier{
 			Key: &key,
 		}
@@ -113,7 +152,7 @@ func (cl *Client) deleteObjects(names []string) error {
 		},
 	})
 	if err != nil {
-		log.Err("Client::DeleteDirectory : Failed to delete %d files. Here's why: %v", len(names), err)
+		log.Err("Client::DeleteDirectory : Failed to delete %d files. Here's why: %v", len(objects), err)
 		for i := 0; i < len(result.Errors); i++ {
 			log.Err("Client::DeleteDirectory : Failed to delete key %s. Here's why: %s", result.Errors[i].Key, result.Errors[i].Message)
 		}
@@ -126,8 +165,8 @@ func (cl *Client) deleteObjects(names []string) error {
 // HeadObject() acts just like GetObject, except no contents are returned.
 // So this is used to get metadata / attributes for an object.
 // name is the path to the file.
-func (cl *Client) headObject(name string) (*internal.ObjAttr, error) {
-	key := cl.getKey(name)
+func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, error) {
+	key := cl.getKey(name, isSymlink)
 	log.Trace("Client::headObject : object %s", key)
 
 	result, err := cl.awsS3Client.HeadObject(context.TODO(), &s3.HeadObjectInput{
@@ -139,14 +178,15 @@ func (cl *Client) headObject(name string) (*internal.ObjAttr, error) {
 		return nil, parseS3Err(err, attemptedAction)
 	}
 
-	return internal.CreateObjAttr(name, result.ContentLength, *result.LastModified), nil
+	object := createObjAttr(name, result.ContentLength, *result.LastModified, isSymlink)
+	return object, nil
 }
 
 // Wrapper for awsS3Client.CopyObject
-func (cl *Client) copyObject(source string, target string) error {
+func (cl *Client) copyObject(source string, target string, isSymLink bool) error {
 	// copy the object to its new key
-	sourceKey := cl.getKey(source)
-	targetKey := cl.getKey(target)
+	sourceKey := cl.getKey(source, isSymLink)
+	targetKey := cl.getKey(target, isSymLink)
 	_, err := cl.awsS3Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		// TODO: URL-encode CopySource
@@ -204,7 +244,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	}
 
 	// combine the configured prefix and the prefix being given to List to get a full listPath
-	listPath := cl.getKey(prefix)
+	listPath := cl.getKey(prefix, false)
 	// replace any trailing forward slash stripped by common.JoinUnixFilepath
 	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
 		listPath += "/"
@@ -243,7 +283,6 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// fetch and process result pages
 
 	if paginator.HasMorePages() {
-
 		output, err := paginator.NextPage(context.TODO())
 		if err != nil {
 			log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
@@ -260,8 +299,10 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
 		for _, value := range output.Contents {
 			// push object info into the list
-			path := split(cl.Config.prefixPath, *value.Key)
-			attr := internal.CreateObjAttr(path, value.Size, *value.LastModified)
+			name, isSymLink := cl.getFile(*value.Key)
+
+			path := split(cl.Config.prefixPath, name)
+			attr := createObjAttr(path, value.Size, *value.LastModified, isSymLink)
 			objectAttrList = append(objectAttrList, attr)
 		}
 
@@ -323,7 +364,71 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 
 }
 
+// create an object attributes struct
+func createObjAttr(path string, size int64, lastModified time.Time, isSymLink bool) (attr *internal.ObjAttr) {
+	attr = &internal.ObjAttr{
+		Path:   path,
+		Name:   filepath.Base(path),
+		Size:   size,
+		Mode:   0,
+		Mtime:  lastModified,
+		Atime:  lastModified,
+		Ctime:  lastModified,
+		Crtime: lastModified,
+		Flags:  internal.NewFileBitMap(),
+	}
+	// set flags
+	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
+	attr.Flags.Set(internal.PropFlagModeDefault)
+
+	attr.Metadata = make(map[string]string)
+
+	if isSymLink {
+		attr.Flags.Set(internal.PropFlagSymlink)
+		attr.Metadata[symlinkKey] = "true"
+	}
+
+	return attr
+}
+
+// create an object attributes struct for a directory
+func createObjAttrDir(path string) (attr *internal.ObjAttr) {
+	// strip any trailing slash
+	path = internal.TruncateDirName(path)
+	// For these dirs we get only the name and no other properties so hardcoding time to current time
+	currentTime := time.Now()
+
+	attr = createObjAttr(path, 4096, currentTime, false)
+	// Change the relevant fields for a directory
+	attr.Mode = os.ModeDir
+	// set flags
+	attr.Flags = internal.NewDirBitMap()
+	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
+	attr.Flags.Set(internal.PropFlagModeDefault)
+
+	return attr
+}
+
 // Convert file name to object getKey
-func (cl *Client) getKey(name string) string {
+func (cl *Client) getKey(name string, isSymLink bool) string {
+
+	if isSymLink {
+		name = name + symlinkStr
+	}
+
 	return common.JoinUnixFilepath(cl.Config.prefixPath, name)
+}
+
+// take the string argument and checks if it has a ".rclonelink" suffix.
+// If so, it stripps the suffix and returns the new string and true
+func (cl *Client) getFile(name string) (string, bool) {
+	isSymLink := false
+
+	//todo: wrtie a test the catches the out of bounds issue.
+	if strings.HasSuffix(name, symlinkStr) {
+		isSymLink = true
+		name = name[:len(name)-len(symlinkStr)]
+	}
+
+	return name, isSymLink
 }

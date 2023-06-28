@@ -12,6 +12,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -39,7 +40,6 @@ package e2e_tests
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -137,7 +137,7 @@ func (suite *dataValidationTestSuite) TestSmallFileData() {
 	srcFile.Close()
 
 	// write to file in the local directory
-	err = ioutil.WriteFile(localFilePath, minBuff, 0777)
+	err = os.WriteFile(localFilePath, minBuff, 0777)
 	suite.Equal(nil, err)
 
 	suite.copyToMountDir(localFilePath, remoteFilePath)
@@ -166,7 +166,7 @@ func (suite *dataValidationTestSuite) TestMediumFileData() {
 	srcFile.Close()
 
 	// write to file in the local directory
-	err = ioutil.WriteFile(localFilePath, medBuff, 0777)
+	err = os.WriteFile(localFilePath, medBuff, 0777)
 	suite.Equal(nil, err)
 
 	suite.copyToMountDir(localFilePath, remoteFilePath)
@@ -195,7 +195,7 @@ func (suite *dataValidationTestSuite) TestLargeFileData() {
 	srcFile.Close()
 
 	// write to file in the local directory
-	err = ioutil.WriteFile(localFilePath, largeBuff, 0777)
+	err = os.WriteFile(localFilePath, largeBuff, 0777)
 	suite.Equal(nil, err)
 
 	suite.copyToMountDir(localFilePath, remoteFilePath)
@@ -220,7 +220,7 @@ func (suite *dataValidationTestSuite) TestDataValidationNegative() {
 	srcFile.Close()
 
 	// write to file in the local directory
-	err = ioutil.WriteFile(localFilePath, minBuff, 0777)
+	err = os.WriteFile(localFilePath, minBuff, 0777)
 	suite.Equal(nil, err)
 
 	// copy local file to mounted directory
@@ -261,17 +261,17 @@ func validateMultipleFilesData(jobs <-chan int, results chan<- string, fileSize 
 
 		// write to file in the local directory
 		if fileSize == "huge" {
-			err = ioutil.WriteFile(localFilePath, hugeBuff, 0777)
+			err = os.WriteFile(localFilePath, hugeBuff, 0777)
 		} else if fileSize == "large" {
 			if strings.ToLower(quickTest) == "true" {
-				err = ioutil.WriteFile(localFilePath, hugeBuff, 0777)
+				err = os.WriteFile(localFilePath, hugeBuff, 0777)
 			} else {
-				err = ioutil.WriteFile(localFilePath, largeBuff, 0777)
+				err = os.WriteFile(localFilePath, largeBuff, 0777)
 			}
 		} else if fileSize == "medium" {
-			err = ioutil.WriteFile(localFilePath, medBuff, 0777)
+			err = os.WriteFile(localFilePath, medBuff, 0777)
 		} else {
-			err = ioutil.WriteFile(localFilePath, minBuff, 0777)
+			err = os.WriteFile(localFilePath, minBuff, 0777)
 		}
 		suite.Equal(nil, err)
 

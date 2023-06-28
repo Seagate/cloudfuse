@@ -9,7 +9,8 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -191,12 +192,15 @@ func (cl *Client) CreateDirectory(name string) error {
 }
 
 // CreateLink : Create a symlink in the bucket/virtual directory
-func (cl *Client) CreateLink(source string, target string) error {
+func (cl *Client) CreateLink(source string, target string, isSymlink bool) error {
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
-	metadata := make(map[string]string)
-	metadata[symlinkKey] = "true"
-	return cl.WriteFromBuffer(source, metadata, data)
+
+	symlinkMap := map[string]string{symlinkKey: "false"}
+	if isSymlink {
+		symlinkMap[symlinkKey] = "true"
+	}
+	return cl.WriteFromBuffer(source, symlinkMap, data)
 }
 
 // DeleteFile : Delete an object.
@@ -204,7 +208,7 @@ func (cl *Client) CreateLink(source string, target string) error {
 func (cl *Client) DeleteFile(name string) error {
 	log.Trace("Client::DeleteFile : name %s", name)
 	// first check if the object exists
-	_, err := cl.getFileAttr(name)
+	attr, err := cl.getFileAttr(name)
 	if err == syscall.ENOENT {
 		log.Err("Client::DeleteFile : %s does not exist", name)
 		return syscall.ENOENT
@@ -212,8 +216,11 @@ func (cl *Client) DeleteFile(name string) error {
 		log.Err("Client::DeleteFile : Failed to getFileAttr for object %s. Here's why: %v", name, err)
 		return err
 	}
+
+	isSymLink := attr.IsSymlink()
+
 	// delete the object
-	err = cl.deleteObject(name)
+	err = cl.deleteObject(name, isSymLink)
 	if err != nil {
 		log.Err("Client::DeleteFile : Failed to delete object %s. Here's why: %v", name, err)
 		return err
@@ -255,7 +262,7 @@ func (cl *Client) DeleteDirectory(name string) error {
 		// Delete all found objects *and prefixes ("directories")*.
 		// For improved performance, we'll use one call to delete all objects in this directory.
 		// 	To make one call, we need to make a list of objects to delete first.
-		var filesToDelete []string
+		var objectsToDelete []*internal.ObjAttr
 		for _, object := range objects {
 			if object.IsDir() {
 				err = cl.DeleteDirectory(object.Path)
@@ -263,13 +270,13 @@ func (cl *Client) DeleteDirectory(name string) error {
 					log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", object.Path, err)
 				}
 			} else {
-				filesToDelete = append(filesToDelete, object.Path)
+				objectsToDelete = append(objectsToDelete, object) //consider just object instead of object.path to pass down attributes that come from list.
 			}
 		}
 		// Delete the collected files
-		err = cl.deleteObjects(filesToDelete)
+		err = cl.deleteObjects(objectsToDelete)
 		if err != nil {
-			log.Err("Client::DeleteDirectory : deleteObjects() failed when called with %d objects. Here's why: %v", len(filesToDelete), err)
+			log.Err("Client::DeleteDirectory : deleteObjects() failed when called with %d objects. Here's why: %v", len(objectsToDelete), err)
 		}
 
 		if marker == nil {
@@ -282,10 +289,10 @@ func (cl *Client) DeleteDirectory(name string) error {
 }
 
 // RenameFile : Rename the object (copy then delete).
-func (cl *Client) RenameFile(source string, target string) error {
+func (cl *Client) RenameFile(source string, target string, isSymLink bool) error {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
-	err := cl.copyObject(source, target)
+	err := cl.copyObject(source, target, isSymLink)
 	if err != nil {
 		log.Err("Client::RenameFile : copyObject(%s->%s) failed. Here's why: %v", source, target, err)
 		return err
@@ -293,7 +300,7 @@ func (cl *Client) RenameFile(source string, target string) error {
 	// Copy of the file is done so now delete the older file
 	// in this case we don't need to check if the file exists, so we use deleteObject, not DeleteFile
 	// this is what S3's DeleteObject spec is meant for: to make sure the object doesn't exist anymore
-	err = cl.deleteObject(source)
+	err = cl.deleteObject(source, isSymLink)
 	if err != nil {
 		log.Err("Client::RenameFile : deleteObject(%s) failed. Here's why: %v", source, err)
 	}
@@ -328,7 +335,7 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 			if srcObject.IsDir() {
 				err = cl.RenameDirectory(srcPath, dstPath)
 			} else {
-				err = cl.RenameFile(srcPath, dstPath)
+				err = cl.RenameFile(srcPath, dstPath, srcObject.IsSymlink()) //use sourceObjects to pass along symLink bool
 			}
 			if err != nil {
 				log.Err("Client::RenameDirectory : Failed to rename %s -> %s. Here's why: %v", srcPath, dstPath, err)
@@ -372,7 +379,13 @@ func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 // name should not have a trailing slash (nothing will be found!).
 func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getFileAttr : name %s", name)
-	return cl.headObject(name)
+	isSymlink := false
+	object, err := cl.headObject(name, isSymlink)
+	if err == syscall.ENOENT {
+		isSymlink = true
+		return cl.headObject(name, isSymlink)
+	}
+	return object, err
 }
 
 func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
@@ -400,7 +413,7 @@ func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
 func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File) error {
 	log.Trace("Client::ReadToFile : name %s, offset : %d, count %d -> file %s", name, offset, count, fi.Name())
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, count)
+	objectDataReader, err := cl.getObject(name, offset, count, false)
 	if err != nil {
 		log.Err("Client::ReadToFile : getObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -426,10 +439,10 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 // Reads starting at a byte offset from the start of the object, with length in bytes = len.
 // len = 0 reads to the end of the object.
 // name is the file path
-func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
+func (cl *Client) ReadBuffer(name string, offset int64, len int64, isSymlink bool) ([]byte, error) {
 	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, len)
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, len)
+	objectDataReader, err := cl.getObject(name, offset, len, isSymlink)
 	if err != nil {
 		log.Err("Client::ReadBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return nil, err
@@ -452,7 +465,7 @@ func (cl *Client) ReadBuffer(name string, offset int64, len int64) ([]byte, erro
 func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
 	log.Trace("Client::ReadInBuffer : name %s", name)
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, len)
+	objectDataReader, err := cl.getObject(name, offset, len, false)
 	if err != nil {
 		log.Err("Client::ReadInBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -471,6 +484,7 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 // Upload from a file handle to an object.
 // The metadata parameter is not used.
 func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.File) error {
+	isSymlink := metadata[symlinkKey] == "true"
 	log.Trace("Client::WriteFromFile : file %s -> name %s", fi.Name(), name)
 	// track time for performance testing
 	defer log.TimeTrack(time.Now(), "Client::WriteFromFile", name)
@@ -490,7 +504,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	}
 
 	// upload file data
-	err = cl.putObject(name, fi)
+	err = cl.putObject(name, fi, isSymlink)
 	if err != nil {
 		log.Err("Client::WriteFromFile : putObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -516,12 +530,13 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 // name is the file path.
 func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) error {
 	log.Trace("Client::WriteFromBuffer : name %s", name)
+	isSymlink := metadata[symlinkKey] == "true"
 
 	// convert byte array to io.Reader
 	dataReader := bytes.NewReader(data)
 	// upload data to object
 	// TODO: handle metadata with S3
-	err := cl.putObject(name, dataReader)
+	err := cl.putObject(name, dataReader, isSymlink)
 	log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
 	return err
 }
@@ -539,7 +554,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	log.Trace("Client::TruncateFile : Truncating %s to %dB.", name, size)
 
 	// get object data
-	objectDataReader, err := cl.getObject(name, 0, 0)
+	objectDataReader, err := cl.getObject(name, 0, 0, false)
 	if err != nil {
 		log.Err("Client::TruncateFile : getObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -565,7 +580,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	}
 	// overwrite the object with the truncated data
 	truncatedDataReader := bytes.NewReader(objectData)
-	err = cl.putObject(name, truncatedDataReader)
+	err = cl.putObject(name, truncatedDataReader, false)
 	if err != nil {
 		log.Err("Client::TruncateFile : Failed to write truncated data to object %s", name)
 	}
@@ -579,13 +594,15 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 	offset := options.Offset
 	data := options.Data
 	length := int64(len(data))
+
 	defer log.TimeTrack(time.Now(), "Client::Write", options.Handle.Path)
 	log.Trace("Client::Write : name %s offset %v", name, offset)
 	// tracks the case where our offset is great than our current file size (appending only - not modifying pre-existing data)
 	var dataBuffer *[]byte
 
 	// get the existing object data
-	oldData, _ := cl.ReadBuffer(name, 0, 0)
+	isSymlink := options.Metadata[symlinkKey] == "true"
+	oldData, _ := cl.ReadBuffer(name, 0, 0, isSymlink)
 	// update the data with the new data
 	// if we're only overwriting existing data
 	if int64(len(oldData)) >= offset+length {

@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -38,7 +39,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -211,7 +211,7 @@ func parseConfig() error {
 			return fmt.Errorf("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in LYVECLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
 		}
 
-		cipherText, err := ioutil.ReadFile(options.ConfigFile)
+		cipherText, err := os.ReadFile(options.ConfigFile)
 		if err != nil {
 			return fmt.Errorf("failed to read encrypted config file %s [%s]", options.ConfigFile, err.Error())
 		}

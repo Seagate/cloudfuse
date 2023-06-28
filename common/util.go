@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -40,7 +41,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -58,7 +58,7 @@ var ForegroundMount bool
 
 // IsDirectoryMounted is a utility function that returns true if the directory is already mounted using fuse
 func IsDirectoryMounted(path string) bool {
-	mntList, err := ioutil.ReadFile("/etc/mtab")
+	mntList, err := os.ReadFile("/etc/mtab")
 	if err != nil {
 		//fmt.Println("failed to read mount points : ", err.Error())
 		return false

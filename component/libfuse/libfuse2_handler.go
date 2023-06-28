@@ -11,6 +11,7 @@ package libfuse
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -118,10 +119,10 @@ func (lf *Libfuse) initFuse() error {
 	}
 
 	// While reading a file let kernel do readahed for better perf
-	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)
+	options += fmt.Sprintf(",max_readahead=%d", 8*1024*1024)
 
 	// Max background thread on the fuse layer for high parallelism
-	options += fmt.Sprintf(",max_background=%d", 128)
+	options += fmt.Sprintf(",max_background=%d", lf.maxFuseThreads)
 
 	if lf.allowOther {
 		options += ",allow_other"
@@ -271,8 +272,9 @@ func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 
 	// Check if the directory already exists. On Windows we need to make this call explicitly
 	if runtime.GOOS == "windows" {
-		attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
-		if (attr != nil || os.IsExist(err)) && attr.IsDir() {
+		_, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+		// If the the error is nil then a file or directory with this name exists
+		if err == nil || errors.Is(err, fs.ErrExist) {
 			return -fuse.EEXIST
 		}
 	}

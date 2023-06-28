@@ -9,7 +9,8 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -361,7 +362,7 @@ func (s3 *S3Storage) DeleteFile(options internal.DeleteFileOptions) error {
 func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("S3Storage::RenameFile : %s to %s", options.Src, options.Dst)
 
-	err := s3.storage.RenameFile(options.Src, options.Dst)
+	err := s3.storage.RenameFile(options.Src, options.Dst, false)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(renameFile, options.Src, map[string]interface{}{src: options.Src, dest: options.Dst})
@@ -373,7 +374,7 @@ func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 // Read and return file data as a buffer.
 func (s3 *S3Storage) ReadFile(options internal.ReadFileOptions) ([]byte, error) {
 	//log.Trace("S3Storage::ReadFile : Read %s", h.Path)
-	return s3.storage.ReadBuffer(options.Handle.Path, 0, 0)
+	return s3.storage.ReadBuffer(options.Handle.Path, 0, 0, false)
 }
 
 // Read file data into the buffer given in options.Data.
@@ -436,7 +437,7 @@ func (s3 *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
 // Symlink operations
 func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 	log.Trace("S3Storage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
-	err := s3.storage.CreateLink(options.Name, options.Target)
+	err := s3.storage.CreateLink(options.Name, options.Target, true)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(createLink, options.Name, map[string]interface{}{target: options.Target})
@@ -448,7 +449,8 @@ func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 
 func (s3 *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) {
 	log.Trace("S3Storage::ReadLink : Read symlink %s", options.Name)
-	data, err := s3.storage.ReadBuffer(options.Name, 0, 0)
+
+	data, err := s3.storage.ReadBuffer(options.Name, 0, 0, true)
 
 	if err != nil {
 		s3StatsCollector.PushEvents(readLink, options.Name, nil)

@@ -12,6 +12,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -39,7 +40,6 @@ package benchmark_test
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -65,7 +65,7 @@ func createSingleFile(size float32, path string) (float64, error) {
 
 	start := time.Now()
 
-	err := ioutil.WriteFile(path, buffer, os.FileMode(0755))
+	err := os.WriteFile(path, buffer, os.FileMode(0755))
 	if err != nil {
 		return 0, err
 	}

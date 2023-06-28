@@ -9,6 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -80,8 +81,16 @@ func getPid(lyvecloudfusePid string) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		strOutput := string(output)
 
-		lines := strings.Split(strings.TrimSpace(string(output)), "\n")[1:]
+		if strings.Contains(strOutput, "No Instance") {
+			return "", fmt.Errorf("failed to process PID from %s", lyvecloudfusePid)
+		}
+		lines := strings.Split(strings.TrimSpace(strOutput), "\n")[1:]
+
+		if len(lines) == 0 {
+			return "", fmt.Errorf("failed to process PID from %s", lyvecloudfusePid)
+		}
 		pid := strings.TrimSpace(lines[0])
 		return pid, nil
 	}

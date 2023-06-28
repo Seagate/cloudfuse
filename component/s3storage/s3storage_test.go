@@ -12,7 +12,8 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -41,7 +42,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"os"
 	"path"
@@ -141,7 +142,7 @@ func (s *s3StorageTestSuite) SetupTest() {
 		os.Exit(1)
 	}
 
-	cfgData, err := ioutil.ReadAll(cfgFile)
+	cfgData, err := io.ReadAll(cfgFile)
 	if err != nil {
 		fmt.Println("Failed to read config file")
 	}
@@ -880,7 +881,7 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output)
 
@@ -1013,7 +1014,7 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output)
 }
@@ -1042,7 +1043,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmaller() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData[:truncatedLength], output)
 }
@@ -1071,7 +1072,7 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileSmaller() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData[:truncatedLength], output)
 }
@@ -1100,7 +1101,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileEqual() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output)
 }
@@ -1129,7 +1130,7 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileEqual() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output)
 }
@@ -1158,7 +1159,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileBigger() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output[:len(data)])
 }
@@ -1182,7 +1183,7 @@ func (s *s3StorageTestSuite) TestTruncateEmptyFileBigger() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(truncatedLength, len(output))
 	s.assert.EqualValues(make([]byte, truncatedLength), output[:])
@@ -1212,7 +1213,7 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileBigger() {
 	})
 	s.assert.Nil(err)
 	defer result.Body.Close()
-	output, err := ioutil.ReadAll(result.Body)
+	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(testData, output[:len(data)])
 }
@@ -1549,6 +1550,56 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 	s.assert.NotNil(err)
 }
 
+func (s *s3StorageTestSuite) TestCreateLink() {
+	defer s.cleanupTest()
+	// Setup
+	target := generateFileName()
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
+	name := generateFileName()
+
+	err := s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+	s.assert.Nil(err)
+
+	// now we check the link exists
+	attr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.NotNil(attr)
+	s.assert.NotEmpty(attr.Metadata)
+	s.assert.Contains(attr.Metadata, symlinkKey)
+	s.assert.Equal("true", attr.Metadata[symlinkKey])
+
+	//download and make sure the data is correct
+	result, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.Equal(target, result)
+}
+
+func (s *s3StorageTestSuite) TestReadLink() {
+	defer s.cleanupTest()
+	// Setup
+	target := generateFileName()
+
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
+
+	name := generateFileName()
+
+	s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+
+	read, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.EqualValues(target, read)
+}
+
+func (s *s3StorageTestSuite) TestReadLinkError() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+
+	_, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
+	s.assert.NotNil(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
+}
+
 func (s *s3StorageTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
@@ -1668,35 +1719,35 @@ func (s *s3StorageTestSuite) TestGetAttrFile() {
 	}
 }
 
-// func (s *s3StorageTestSuite) TestGetAttrLink() {
-// 	defer s.cleanupTest()
-// 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-// 	configs := []string{"", vdConfig}
-// 	for _, c := range configs {
-// 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-// 		s.tearDownTestHelper(false)
-// 		s.setupTestHelper(c, s.container, true)
-// 		testName := ""
-// 		if c != "" {
-// 			testName = "virtual-directory"
-// 		}
-// 		s.Run(testName, func() {
-// 			// Setup
-// 			target := generateFileName()
-// 			s.s3.CreateFile(internal.CreateFileOptions{Name: target})
-// 			name := generateFileName()
-// 			s.s3.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+func (s *s3StorageTestSuite) TestGetAttrLink() {
+	defer s.cleanupTest()
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	configs := []string{"", vdConfig}
+	for _, c := range configs {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		s.tearDownTestHelper(false)
+		s.setupTestHelper(c, s.bucket, true)
+		testName := ""
+		if c != "" {
+			testName = "virtual-directory"
+		}
+		s.Run(testName, func() {
+			// Setup
+			target := generateFileName()
+			s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
+			name := generateFileName()
+			s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
 
-// 			props, err := s.s3.GetAttr(internal.GetAttrOptions{Name: name})
-// 			s.assert.Nil(err)
-// 			s.assert.NotNil(props)
-// 			s.assert.True(props.IsSymlink())
-// 			s.assert.NotEmpty(props.Metadata)
-// 			s.assert.Contains(props.Metadata, symlinkKey)
-// 			s.assert.EqualValues("true", props.Metadata[symlinkKey])
-// 		})
-// 	}
-// }
+			props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+			s.assert.Nil(err)
+			s.assert.NotNil(props)
+			s.assert.True(props.IsSymlink())
+			s.assert.NotEmpty(props.Metadata)
+			s.assert.Contains(props.Metadata, symlinkKey)
+			s.assert.EqualValues("true", props.Metadata[symlinkKey])
+		})
+	}
+}
 
 func (s *s3StorageTestSuite) TestGetAttrFileSize() {
 	defer s.cleanupTest()
