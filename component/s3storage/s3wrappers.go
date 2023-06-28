@@ -72,7 +72,7 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 			rangeString = "bytes=" + fmt.Sprint(offset) + "-"
 		}
 	} else {
-		endRange := offset + count
+		endRange := offset + count - 1
 		rangeString = "bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)
 	}
 

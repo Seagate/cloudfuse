@@ -457,8 +457,8 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 	}
 	// read object data
 	defer objectDataReader.Close()
-	_, err = objectDataReader.Read(data)
-	if err == io.EOF {
+	_, err = io.ReadFull(objectDataReader, data)
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		// If we reached the EOF then all the data was correctly read
 		return nil
 	}

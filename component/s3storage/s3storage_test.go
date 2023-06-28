@@ -936,6 +936,46 @@ func (s *s3StorageTestSuite) TestReadInBuffer() {
 	s.assert.EqualValues(testData[:5], output)
 }
 
+func (s *s3StorageTestSuite) TestReadInBufferRange() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.Nil(err)
+	testData := "test data test data "
+	data := []byte(testData)
+	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	h, err = s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
+	s.assert.Nil(err)
+
+	output := make([]byte, 15)
+	len, err := s.s3Storage.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 5, Data: output})
+	s.assert.Nil(err)
+	s.assert.EqualValues(15, len)
+	s.assert.EqualValues(testData[5:], output)
+}
+
+func (s *s3StorageTestSuite) TestReadInBufferRange1Byte() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.Nil(err)
+	testData := "test data test data "
+	data := []byte(testData)
+	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	h, err = s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
+	s.assert.Nil(err)
+
+	output := make([]byte, 1)
+	len, err := s.s3Storage.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+	s.assert.Nil(err)
+	s.assert.EqualValues(1, len)
+	s.assert.EqualValues(testData[:1], output)
+}
+
 func (s *s3StorageTestSuite) TestReadInBufferLargeBuffer() {
 	defer s.cleanupTest()
 	// Setup
