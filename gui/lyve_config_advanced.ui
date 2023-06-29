@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>625</width>
-    <height>524</height>
+    <width>633</width>
+    <height>556</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -208,6 +208,13 @@
             </property>
            </widget>
           </item>
+          <item>
+           <widget class="QLabel" name="label_3">
+            <property name="text">
+             <string>Cache update file timeout(s)</string>
+            </property>
+           </widget>
+          </item>
          </layout>
         </item>
         <item>
@@ -279,6 +286,19 @@
             </property>
             <property name="singleStep">
              <number>5</number>
+            </property>
+            <property name="value">
+             <number>60</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spinBox_fileCache_refreshSec">
+            <property name="maximum">
+             <number>4000</number>
+            </property>
+            <property name="singleStep">
+             <number>20</number>
             </property>
             <property name="value">
              <number>60</number>

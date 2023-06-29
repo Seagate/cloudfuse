@@ -72,6 +72,7 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
         s3Storage['key-id'] = self.lineEdit_accessKey.text()
         s3Storage['secret-key'] = self.lineEdit_secretKey.text()
         s3Storage['endpoint'] = self.lineEdit_endpoint.text()
+        s3Storage['region'] = self.lineEdit_region.text()
         self.settings.setValue('s3storage',s3Storage) 
 
     # This widget will not display all the options in settings, only the ones written in the UI file.
@@ -86,12 +87,12 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
         self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings.value('components')[1]))
         self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(libfuse['default-permission']))
         
-        self.setCheckboxFromSetting(self.checkbox_multiUser, self.settings.value('allow-other'))
-        self.setCheckboxFromSetting(self.checkbox_nonEmptyDir,self.settings.value('nonempty'))
-        self.setCheckboxFromSetting(self.checkbox_daemonForeground,self.settings.value('foreground'))
-        self.setCheckboxFromSetting(self.checkbox_readOnly,self.settings.value('read-only'))
-        self.setCheckboxFromSetting(self.checkbox_streaming_fileCachingLevel,stream['file-caching'])
-        self.setCheckboxFromSetting(self.checkbox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
+        self.setCheckboxFromSetting(self.checkBox_multiUser, self.settings.value('allow-other'))
+        self.setCheckboxFromSetting(self.checkBox_nonEmptyDir,self.settings.value('nonempty'))
+        self.setCheckboxFromSetting(self.checkBox_daemonForeground,self.settings.value('foreground'))
+        self.setCheckboxFromSetting(self.checkBox_readOnly,self.settings.value('read-only'))
+        self.setCheckboxFromSetting(self.checkBox_streaming_fileCachingLevel,stream['file-caching'])
+        self.setCheckboxFromSetting(self.checkBox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
 
         # Spinbox automatically sanitizes intputs for decimal values only, so no need to check for the appropriate data type. 
         self.spinBox_libfuse_attExp.setValue(libfuse['attribute-expiration-sec'])
@@ -106,6 +107,7 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
         self.lineEdit_endpoint.setText(s3storage['endpoint'])
         self.lineEdit_secretKey.setText(s3storage['secret-key'])
         self.lineEdit_accessKey.setText(s3storage['key-id'])
+        self.lineEdit_region.setText(s3storage['region'])
         self.lineEdit_fileCache_path.setText(fileCache['path'])
         
     def resetDefaults(self):

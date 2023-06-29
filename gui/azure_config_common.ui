@@ -214,7 +214,7 @@
       <enum>QLayout::SetMinimumSize</enum>
      </property>
      <item>
-      <widget class="QCheckBox" name="checkBox_commonConfig_multiUser">
+      <widget class="QCheckBox" name="checkBox_multiUser">
        <property name="toolTip">
         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select to allow multiple users to access the container&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
@@ -227,14 +227,14 @@
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="checkBox_commonConfig_nonEmptyDir">
+      <widget class="QCheckBox" name="checkBox_nonEmptyDir">
        <property name="text">
         <string>Non-empty directory mount</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="checkBox_commonConfig_readOnly">
+      <widget class="QCheckBox" name="checkBox_readOnly">
        <property name="text">
         <string>Read-only mount</string>
        </property>
