@@ -37,6 +37,7 @@ package s3storage
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -448,7 +449,7 @@ func (cl *Client) ReadBuffer(name string, offset int64, len int64, isSymlink boo
 // len = 0 reads to the end of the object.
 // name is the file path.
 func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
-	log.Trace("Client::ReadInBuffer : name %s", name)
+	log.Trace("Client::ReadInBuffer : name %s offset %d len %d", name, offset, len)
 	// get object data
 	objectDataReader, err := cl.getObject(name, offset, len, false)
 	if err != nil {
@@ -522,15 +523,53 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data 
 	// upload data to object
 	// TODO: handle metadata with S3
 	err := cl.putObject(name, dataReader, isSymlink)
-	log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
+	if err != nil {
+		log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
+	}
 	return err
 }
 
 // GetFileBlockOffsets: store blocks ids and corresponding offsets.
 func (cl *Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, error) {
-	// TODO: decide whether we have any use for this function
-	// if not, we can just skip this and return nil, nil in s3storage.go:GetFileBlockOffsets()
-	return nil, nil
+	log.Trace("Client::GetFileBlockOffsets : name %s", name)
+	blockList := common.BlockOffsetList{}
+	result, err := cl.headObject(name, false)
+	if err != nil {
+		return &blockList, err
+	}
+
+	var objectSize int64
+	var offset int64 = 8 * common.MbToBytes
+
+	// if file is smaller than block size then it is a small file
+	if result.Size <= offset {
+		blockList.Flags.Set(common.SmallFile)
+		return &blockList, nil
+	}
+
+	for objectSize <= result.Size {
+		if objectSize+offset >= result.Size {
+			// This is the last block to add
+			blk := &common.Block{
+				Id:         base64.StdEncoding.EncodeToString(common.NewUUID().Bytes()),
+				StartIndex: objectSize,
+				EndIndex:   result.Size,
+			}
+			blockList.BlockList = append(blockList.BlockList, blk)
+			break
+		}
+
+		blk := &common.Block{
+			Id:         base64.StdEncoding.EncodeToString(common.NewUUID().Bytes()),
+			StartIndex: objectSize,
+			EndIndex:   objectSize + offset,
+		}
+		blockList.BlockList = append(blockList.BlockList, blk)
+		objectSize += offset
+	}
+	blockList.BlockIdLength = common.GetIdLength(blockList.BlockList[0].Id)
+
+	return &blockList, nil
 }
 
 // Truncate object to size in bytes.
