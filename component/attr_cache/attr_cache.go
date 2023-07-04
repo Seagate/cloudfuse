@@ -205,31 +205,57 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	// When we delete directory a, we only want to delete a/, a/b, and a/c.
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
-	// Add a trailing / so that we only delete child paths under the directory and not paths that have the same prefix
+	// get the path to the parent of the directory being deleted
+	// so that we can keep track of whether it becomes empty after this deletion
+	parentDir := ac.getParentDir(path)
+	// Add a trailing '/' so that we only delete child paths under the directory and not paths that have the same prefix
+	parentPrefix := internal.ExtendDirName(parentDir)
 	prefix := internal.ExtendDirName(path)
 	// remember whether we actually found any contents
 	foundCachedContents := false
+	parentContainsOtherObjects := false
 	for key, value := range ac.cacheMap {
 		if strings.HasPrefix(key, prefix) {
 			foundCachedContents = true
 			value.markDeleted(time)
+		} else if strings.HasPrefix(key, parentPrefix) {
+			// this could be skipped if we already know the parent contains no objects
+			// but doing this regardless is simpler
+			if !value.attr.IsDir() && value.valid() && value.exists() {
+				parentContainsOtherObjects = true
+			}
 		}
 	}
 
 	// check if the directory to be deleted exists
 	if !foundCachedContents && !ac.pathExistsInCache(path) {
-		log.Err("AttrCache::deleteCachedDirectory : directory %s does not exist.", path)
+		log.Err("AttrCache::deleteCachedDirectory : directory %s does not exist in attr cache.", path)
 		return syscall.ENOENT
 	}
 
-	// cache the parent directory's existence, just in case this deletion leaves it empty
-	// we check if the directory exists first to avoid adding a bogus parent directory to the cache
-	ac.cacheParent(path, time)
+	// if this leaves the parent directory empty, record that
+	if !parentContainsOtherObjects {
+		ac.setParentContainsNoObjects(parentDir, time)
+	}
 
 	// We need to delete the path itself since we only handle children above.
 	ac.deletePath(path, time)
 
 	return nil
+}
+
+func (ac *AttrCache) setParentContainsNoObjects(parentDir string, time time.Time) {
+	parentDir = internal.TruncateDirName(parentDir)
+	if len(parentDir) == 0 {
+		return
+	}
+	parentDirCacheItem, found := ac.cacheMap[parentDir]
+	if !found {
+		parentObjAttr := internal.CreateObjAttrDir(parentDir)
+		parentDirCacheItem = newAttrCacheItem(parentObjAttr, true, time)
+		ac.cacheMap[parentDir] = parentDirCacheItem
+	}
+	parentDirCacheItem.markContainsObjects(false)
 }
 
 // pathExistsInCache: check if path is in cache, is valid, and not marked deleted
@@ -238,12 +264,25 @@ func (ac *AttrCache) pathExistsInCache(path string) bool {
 	return (found && value.valid() && value.exists())
 }
 
+func (ac *attrCacheItem) cacheItemExists(item attrCacheItem) bool {
+	return item.valid() && item.exists()
+}
+
 // cacheParent: add the parent directory of the given entity to the cache
 func (ac *AttrCache) cacheParent(childPath string, cacheAt time.Time) {
-	parentDir := path.Dir(internal.TruncateDirName(childPath))
-	if parentDir != "." && !ac.pathExistsInCache(parentDir) {
-		ac.cacheMap[parentDir] = newAttrCacheItem(internal.CreateObjAttrDir(parentDir), true, cacheAt)
+	parentDir := ac.getParentDir(childPath)
+	if parentDir != "" && !ac.pathExistsInCache(parentDir) {
+		parentObjAttr := internal.CreateObjAttrDir(parentDir)
+		ac.cacheMap[parentDir] = newAttrCacheItem(parentObjAttr, true, cacheAt)
 	}
+}
+
+func (ac *AttrCache) getParentDir(childPath string) string {
+	parentDir := path.Dir(internal.TruncateDirName(childPath))
+	if parentDir == "." {
+		parentDir = ""
+	}
+	return parentDir
 }
 
 // invalidateDirectory: recursively marks a directory invalid
@@ -292,6 +331,10 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	// When we rename directory a, we only want to rename a/, a/b, and a/c.
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
+	// We also need to keep track of whether this move leaves an empty parent directory
+	srcParentDir := ac.getParentDir(srcDir)
+	parentPrefix := internal.ExtendDirName(srcParentDir)
+
 	// Add a trailing / so that we only rename child paths under the directory,
 	// and not paths that have the same prefix
 	srcDir = internal.ExtendDirName(srcDir)
@@ -299,22 +342,35 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	dstDir = internal.ExtendDirName(dstDir)
 	// remember whether we actually found any contents
 	foundCachedContents := false
+	movedObjects := false
+	// remember whether the parent directory is left empty by this move
+	parentContainsOtherObjects := false
 	for key, value := range ac.cacheMap {
 		if strings.HasPrefix(key, srcDir) {
 			foundCachedContents = true
 			dstKey := strings.Replace(key, srcDir, dstDir, 1)
+			// track whether the destination is gaining objects
+			movedObjects = movedObjects || (!value.attr.IsDir() && value.exists() && value.valid())
 			// to keep the directory cache coherent,
 			// any renamed directories need a new cache entry
 			if value.attr.IsDir() && value.valid() && value.exists() {
 				// add the destination directory to our cache
 				dstDirAttr := internal.CreateObjAttrDir(dstKey)
-				ac.cacheMap[dstKey] = newAttrCacheItem(dstDirAttr, true, time)
+				dstDirCacheItem := newAttrCacheItem(dstDirAttr, true, time)
+				dstDirCacheItem.markContainsObjects(value.containsObjects())
+				ac.cacheMap[dstKey] = dstDirCacheItem
 			} else {
 				// invalidate files so attributes get refreshed from the backend
 				ac.invalidatePath(dstKey)
 			}
 			// either way, mark the old cache entry deleted
 			value.markDeleted(time)
+		} else if !parentContainsOtherObjects && strings.HasPrefix(key, parentPrefix) {
+			// this could be skipped if we already know the parent contains no objects
+			// but doing this regardless is simpler
+			if !value.attr.IsDir() && value.valid() && value.exists() {
+				parentContainsOtherObjects = true
+			}
 		}
 	}
 
@@ -324,9 +380,21 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 		return syscall.ENOENT
 	}
 
-	// cache the parent directory's existence, just in case this rename left it empty
-	// we check if the source directory exists first to avoid adding a bogus parent directory to the cache
-	ac.cacheParent(srcDir, time)
+	// if this leaves the parent directory empty, record that
+	if !parentContainsOtherObjects && srcParentDir != "" {
+		parentDirCacheItem, found := ac.cacheMap[srcParentDir]
+		if !found {
+			parentObjAttr := internal.CreateObjAttrDir(srcParentDir)
+			parentDirCacheItem = newAttrCacheItem(parentObjAttr, true, time)
+			ac.cacheMap[srcParentDir] = parentDirCacheItem
+		}
+		parentDirCacheItem.markContainsObjects(parentContainsOtherObjects)
+	}
+
+	// record whether the destination directory's parent tree now contains objects
+	if movedObjects {
+		ac.markTreeContainsObjects(dstDir, time)
+	}
 
 	// delete the source directory from our cache
 	ac.deletePath(srcDir, time)
@@ -337,6 +405,21 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	ac.cacheMap[dstDir] = newAttrCacheItem(dstDirAttr, true, time)
 
 	return nil
+}
+
+func (ac *AttrCache) markTreeContainsObjects(dirPath string, time time.Time) {
+	dirPath = internal.TruncateDirName(dirPath)
+	if len(dirPath) != 0 {
+		dirCacheItem, found := ac.cacheMap[dirPath]
+		if !found {
+			dirObjAttr := internal.CreateObjAttrDir(dirPath)
+			dirCacheItem = newAttrCacheItem(dirObjAttr, true, time)
+			ac.cacheMap[dirPath] = dirCacheItem
+		}
+		dirCacheItem.markContainsObjects(true)
+		// recurse
+		ac.markTreeContainsObjects(ac.getParentDir(dirPath), time)
+	}
 }
 
 // ------------------------- Methods implemented by this component -------------------------------------------
@@ -355,7 +438,9 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 				return syscall.EEXIST
 			}
 			newDirAttr := internal.CreateObjAttrDir(newDirPath)
-			ac.cacheMap[newDirPath] = newAttrCacheItem(newDirAttr, true, time.Now())
+			newDirAttrCacheItem := newAttrCacheItem(newDirAttr, true, time.Now())
+			newDirAttrCacheItem.markContainsObjects(false)
+			ac.cacheMap[newDirPath] = newDirAttrCacheItem
 		} else {
 			ac.invalidatePath(options.Name)
 		}
@@ -397,34 +482,26 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 		ac.cacheAttributes(pathList)
 		// merge directory cache into the results
 		if ac.cacheDirs {
-			// move the pathList into a map for faster lookups
-			pathMap := make(map[string]*internal.ObjAttr)
-			for _, objAttr := range pathList {
-				pathMap[objAttr.Path] = objAttr
-			}
 			// merge results from our cache into pathMap
-			numAdded := 0
 			prefix := internal.ExtendDirName(options.Name)
+			numAdded := 0
 			ac.cacheLock.RLock()
 			for key, value := range ac.cacheMap {
+				// the only entries missing are the directories with no objects
+				if !value.attr.IsDir() || value.containsObjects() {
+					continue
+				}
 				if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
-					if pathMap[key] == nil {
-						// exclude entries in subdirectories
-						pathInsideDirectory := strings.TrimPrefix(key, prefix)
-						if strings.Contains(pathInsideDirectory, "/") {
-							continue
-						}
-						pathMap[key] = value.attr
-						numAdded++
+					// exclude entries in subdirectories
+					pathInsideDirectory := strings.TrimPrefix(key, prefix)
+					if strings.Contains(pathInsideDirectory, "/") {
+						continue
 					}
+					pathList = append(pathList, value.attr)
+					numAdded++
 				}
 			}
 			ac.cacheLock.RUnlock()
-			// move the map back into a slice to return
-			pathList = []*internal.ObjAttr{}
-			for _, value := range pathMap {
-				pathList = append(pathList, value)
-			}
 			// values should be returned in ascending order by key
 			// sort the list before returning it
 			sort.Slice(pathList, func(i, j int) bool {
@@ -443,73 +520,35 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	log.Trace("AttrCache::StreamDir : %s", options.Name)
 
 	pathList, token, err := ac.NextComponent().StreamDir(options)
-	if err == nil && options.Offset < maxFilesPerDir {
-		ac.cacheAttributes(pathList)
-		// merge directory cache into the results
-		if ac.cacheDirs {
-			log.Trace("AttrCache::StreamDir : %s - merging cache into %d results from %s...",
+	if err == nil {
+		// TODO: will limiting the number of items cached cause bugs when cacheDirs is enabled?
+		if options.Offset < maxFilesPerDir {
+			ac.cacheAttributes(pathList)
+		}
+		// merge missing directory cache into the last page of results
+		if ac.cacheDirs && token == "" {
+			log.Trace("AttrCache::StreamDir : %s - merging cache into last %d results from %s...",
 				options.Name, len(pathList), ac.NextComponent().Name())
-			// move the pathList into a map for faster lookups
-			pathMap := make(map[string]*internal.ObjAttr)
-			for _, objAttr := range pathList {
-				pathMap[objAttr.Path] = objAttr
-			}
-			// respect the marker
-			startingToken := options.Token
-			endingToken := token
-			firstPath := ""
-			lastPath := ""
-			if len(pathList) > 0 {
-				firstPath = pathList[0].Path
-				lastPath = pathList[len(pathList)-1].Path
-			}
 			numAdded := 0
 			prefix := internal.ExtendDirName(options.Name)
-			// We don't want to miss cached directories that fall between pages.
-			// To avoid missing them, we need to find the last file from the previous page,
-			// so we can use that as a starting marker.
-			// The simplest approach is to search through the whole cache twice
-			// (once to find that last file, and again to get the directories).
-			// Instead, we can do both in one loop by getting a larger list of directories
-			// which we can later whittle down to the ones we want to insert into the results.
-			// So in this loop we will:
-			// 1. Collect cached directories that we may want to add to the results, and
-			// 2. Find the last cached file from the previous page of results.
-			cachedDirCandidates := make(map[string]*internal.ObjAttr)
-			prevPageLastKey := ""
+			// collect cached directories that we may want to add to the results
 			ac.cacheLock.RLock()
 			for key, value := range ac.cacheMap {
-				if strings.HasPrefix(key, prefix) && value.valid() && value.exists() &&
-					pathMap[key] == nil && (endingToken == "" || key < lastPath) {
-
+				// the only entries missing are the directories with no objects
+				if !value.attr.IsDir() || value.containsObjects() {
+					continue
+				}
+				if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
 					// exclude entries in subdirectories
 					pathInsideDirectory := strings.TrimPrefix(key, prefix)
 					if strings.Contains(pathInsideDirectory, "/") {
 						continue
 					}
-
-					if value.attr.IsDir() {
-						// add cached directory to the list of candidates
-						cachedDirCandidates[key] = value.attr
-					} else if startingToken != "" && key < firstPath && key > prevPageLastKey {
-						// look for the last key in the previous page
-						prevPageLastKey = key
-					}
-				}
-			}
-			// now loop over the candidates and add the ones that come after prevPageLastKey
-			for key, value := range cachedDirCandidates {
-				if key > prevPageLastKey {
-					pathMap[key] = value
+					pathList = append(pathList, value.attr)
 					numAdded++
 				}
 			}
 			ac.cacheLock.RUnlock()
-			// move the map back into a slice to return
-			pathList = []*internal.ObjAttr{}
-			for _, value := range pathMap {
-				pathList = append(pathList, value)
-			}
 			// values should be returned in ascending order by key
 			// sort the list before returning it
 			sort.Slice(pathList, func(i, j int) bool {
@@ -528,7 +567,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 // this will lock and release the mutex for writing
 func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 	// Check whether or not we are supposed to cache on list
-	if ac.cacheOnList && len(pathList) > 0 {
+	if (ac.cacheDirs || ac.cacheOnList) && len(pathList) > 0 {
 		// Putting this inside loop is heavy as for each item we will do a kernel call to get current time
 		// If there are millions of blobs then cost of this is very high.
 		currTime := time.Now()
@@ -536,6 +575,7 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 		for _, attr := range pathList {
+			// TODO: will this cause a bug when cacheDirs is enabled?
 			if len(ac.cacheMap) > maxTotalFiles {
 				break
 			}
@@ -622,8 +662,16 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	h, err := ac.NextComponent().CreateFile(options)
 
 	if err == nil {
+		// TODO: the cache locks are used incorrectly here
+		// They routinely lock the cache for reading, but then write to it
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
+		if ac.cacheDirs {
+			// record that the parent directory tree contains at least one object
+			ac.markTreeContainsObjects(ac.getParentDir(options.Name), time.Now())
+		}
+		// TODO: we assume that the OS will call GetAttr after this.
+		// 		if it doesn't, will invalidating this entry cause problems?
 		ac.invalidatePath(options.Name)
 	}
 
@@ -637,19 +685,29 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 	err := ac.NextComponent().DeleteFile(options)
 	if err == nil {
 		deletionTime := time.Now()
-		if ac.cacheDirs {
-			// cache the parent directory's existence, just in case this deletion leaves it empty
-			ac.cacheLock.Lock()
-			ac.cacheParent(options.Name, deletionTime)
-			ac.cacheLock.Unlock()
-
-		}
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
+		if ac.cacheDirs {
+			parentDir := ac.getParentDir(options.Name)
+			// if this leaves the parent directory object-less, record that
+			if parentDir != "" && !ac.foundObjectContents(parentDir) {
+				ac.setParentContainsNoObjects(parentDir, deletionTime)
+			}
+		}
 		ac.deletePath(options.Name, deletionTime)
 	}
 
 	return err
+}
+
+func (ac *AttrCache) foundObjectContents(dirPath string) bool {
+	prefix := internal.ExtendDirName(dirPath)
+	for key, value := range ac.cacheMap {
+		if strings.HasPrefix(key, prefix) && !value.attr.IsDir() {
+			return true
+		}
+	}
+	return false
 }
 
 // RenameFile : Mark the source file deleted. Invalidate the destination file.
@@ -660,9 +718,14 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 	if err == nil {
 		renameTime := time.Now()
 		if ac.cacheDirs {
-			// cache the parent directory's existence, just in case this rename leaves it empty
 			ac.cacheLock.Lock()
-			ac.cacheParent(options.Src, renameTime)
+			srcParentDir := ac.getParentDir(options.Src)
+			// if this leaves the parent directory object-less, record that
+			if srcParentDir != "" && !ac.foundObjectContents(srcParentDir) {
+				ac.setParentContainsNoObjects(srcParentDir, renameTime)
+			}
+			// mark the destination parent directory tree as containing objects
+			ac.markTreeContainsObjects(options.Dst, renameTime)
 			ac.cacheLock.Unlock()
 		}
 		ac.cacheLock.RLock()
@@ -804,8 +867,14 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	if err == nil {
 		// Retrieved attributes so cache them
+		// TODO: will this size cap cause problems when cacheDirs is enabled?
+		// TODO: shouldn't this be an LRU? This sure looks like the opposite...
 		if len(ac.cacheMap) < maxTotalFiles {
 			ac.cacheMap[truncatedPath] = newAttrCacheItem(pathAttr, true, time.Now())
+		}
+		// TODO: what are the use-cases for this?
+		if ac.cacheDirs {
+			ac.markTreeContainsObjects(ac.getParentDir(options.Name), time.Now())
 		}
 	} else if err == syscall.ENOENT {
 		// Path does not exist so cache a no-entry item
@@ -825,6 +894,9 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		ac.invalidatePath(options.Name)
+		if ac.cacheDirs {
+			ac.markTreeContainsObjects(ac.getParentDir(options.Name), time.Now())
+		}
 	}
 
 	return err

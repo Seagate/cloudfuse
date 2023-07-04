@@ -47,6 +47,7 @@ const (
 	AttrFlagUnknown uint16 = iota
 	AttrFlagExists
 	AttrFlagValid
+	AttrFlagDirContainsNoObjects
 )
 
 // attrCacheItem : Structure of each item in attr cache
@@ -79,6 +80,10 @@ func (value *attrCacheItem) exists() bool {
 	return value.attrFlag.IsSet(AttrFlagExists)
 }
 
+func (value *attrCacheItem) containsObjects() bool {
+	return value.attr.IsDir() && !value.attrFlag.IsSet(AttrFlagDirContainsNoObjects)
+}
+
 func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
 	value.attrFlag.Clear(AttrFlagExists)
 	value.attrFlag.Set(AttrFlagValid)
@@ -89,6 +94,16 @@ func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
 func (value *attrCacheItem) invalidate() {
 	value.attrFlag.Clear(AttrFlagValid)
 	value.attr = &internal.ObjAttr{}
+}
+
+func (value *attrCacheItem) markContainsObjects(containsObjects bool) {
+	if value.attr.IsDir() {
+		if containsObjects {
+			value.attrFlag.Clear(AttrFlagDirContainsNoObjects)
+		} else {
+			value.attrFlag.Set(AttrFlagDirContainsNoObjects)
+		}
+	}
 }
 
 func (value *attrCacheItem) getAttr() *internal.ObjAttr {
