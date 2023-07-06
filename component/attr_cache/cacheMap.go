@@ -47,7 +47,8 @@ const (
 	AttrFlagUnknown uint16 = iota
 	AttrFlagExists
 	AttrFlagValid
-	AttrFlagDirContainsNoObjects
+	// when using S3, directories with no objects are not represented in cloud storage
+	AttrFlagNotInCloud
 )
 
 // attrCacheItem : Structure of each item in attr cache
@@ -80,8 +81,10 @@ func (value *attrCacheItem) exists() bool {
 	return value.attrFlag.IsSet(AttrFlagExists)
 }
 
-func (value *attrCacheItem) containsObjects() bool {
-	return value.attr.IsDir() && !value.attrFlag.IsSet(AttrFlagDirContainsNoObjects)
+func (value *attrCacheItem) isInCloud() bool {
+	isObject := !value.attr.IsDir()
+	isDirInCloud := value.attr.IsDir() && !value.attrFlag.IsSet(AttrFlagNotInCloud)
+	return isObject || isDirInCloud
 }
 
 func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
@@ -96,12 +99,12 @@ func (value *attrCacheItem) invalidate() {
 	value.attr = &internal.ObjAttr{}
 }
 
-func (value *attrCacheItem) markContainsObjects(containsObjects bool) {
+func (value *attrCacheItem) markInCloud(inCloud bool) {
 	if value.attr.IsDir() {
-		if containsObjects {
-			value.attrFlag.Clear(AttrFlagDirContainsNoObjects)
+		if inCloud {
+			value.attrFlag.Clear(AttrFlagNotInCloud)
 		} else {
-			value.attrFlag.Set(AttrFlagDirContainsNoObjects)
+			value.attrFlag.Set(AttrFlagNotInCloud)
 		}
 	}
 }

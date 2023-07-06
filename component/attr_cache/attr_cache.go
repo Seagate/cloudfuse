@@ -235,7 +235,7 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 
 	// if this leaves the parent directory empty, record that
 	if !parentContainsOtherObjects {
-		ac.setParentContainsNoObjects(parentDir, time)
+		ac.markNotInCloud(parentDir, time)
 	}
 
 	// We need to delete the path itself since we only handle children above.
@@ -244,18 +244,18 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	return nil
 }
 
-func (ac *AttrCache) setParentContainsNoObjects(parentDir string, time time.Time) {
-	parentDir = internal.TruncateDirName(parentDir)
-	if len(parentDir) == 0 {
+func (ac *AttrCache) markNotInCloud(dir string, time time.Time) {
+	dir = internal.TruncateDirName(dir)
+	if len(dir) == 0 {
 		return
 	}
-	parentDirCacheItem, found := ac.cacheMap[parentDir]
+	dirCacheItem, found := ac.cacheMap[dir]
 	if !found {
-		parentObjAttr := internal.CreateObjAttrDir(parentDir)
-		parentDirCacheItem = newAttrCacheItem(parentObjAttr, true, time)
-		ac.cacheMap[parentDir] = parentDirCacheItem
+		dirObjAttr := internal.CreateObjAttrDir(dir)
+		dirCacheItem = newAttrCacheItem(dirObjAttr, true, time)
+		ac.cacheMap[dir] = dirCacheItem
 	}
-	parentDirCacheItem.markContainsObjects(false)
+	dirCacheItem.markInCloud(false)
 }
 
 // pathExistsInCache: check if path is in cache, is valid, and not marked deleted
@@ -357,7 +357,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 				// add the destination directory to our cache
 				dstDirAttr := internal.CreateObjAttrDir(dstKey)
 				dstDirCacheItem := newAttrCacheItem(dstDirAttr, true, time)
-				dstDirCacheItem.markContainsObjects(value.containsObjects())
+				dstDirCacheItem.markInCloud(value.isInCloud())
 				ac.cacheMap[dstKey] = dstDirCacheItem
 			} else {
 				// invalidate files so attributes get refreshed from the backend
@@ -388,12 +388,12 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 			parentDirCacheItem = newAttrCacheItem(parentObjAttr, true, time)
 			ac.cacheMap[srcParentDir] = parentDirCacheItem
 		}
-		parentDirCacheItem.markContainsObjects(parentContainsOtherObjects)
+		parentDirCacheItem.markInCloud(parentContainsOtherObjects)
 	}
 
 	// record whether the destination directory's parent tree now contains objects
 	if movedObjects {
-		ac.markTreeContainsObjects(dstDir, time)
+		ac.markAncestorsInCloud(dstDir, time)
 	}
 
 	// delete the source directory from our cache
@@ -407,7 +407,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	return nil
 }
 
-func (ac *AttrCache) markTreeContainsObjects(dirPath string, time time.Time) {
+func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 	dirPath = internal.TruncateDirName(dirPath)
 	if len(dirPath) != 0 {
 		dirCacheItem, found := ac.cacheMap[dirPath]
@@ -416,9 +416,9 @@ func (ac *AttrCache) markTreeContainsObjects(dirPath string, time time.Time) {
 			dirCacheItem = newAttrCacheItem(dirObjAttr, true, time)
 			ac.cacheMap[dirPath] = dirCacheItem
 		}
-		dirCacheItem.markContainsObjects(true)
+		dirCacheItem.markInCloud(true)
 		// recurse
-		ac.markTreeContainsObjects(ac.getParentDir(dirPath), time)
+		ac.markAncestorsInCloud(ac.getParentDir(dirPath), time)
 	}
 }
 
@@ -439,7 +439,7 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 			}
 			newDirAttr := internal.CreateObjAttrDir(newDirPath)
 			newDirAttrCacheItem := newAttrCacheItem(newDirAttr, true, time.Now())
-			newDirAttrCacheItem.markContainsObjects(false)
+			newDirAttrCacheItem.markInCloud(false)
 			ac.cacheMap[newDirPath] = newDirAttrCacheItem
 		} else {
 			ac.invalidatePath(options.Name)
@@ -488,7 +488,7 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 			ac.cacheLock.RLock()
 			for key, value := range ac.cacheMap {
 				// the only entries missing are the directories with no objects
-				if !value.attr.IsDir() || value.containsObjects() {
+				if !value.attr.IsDir() || value.isInCloud() {
 					continue
 				}
 				if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
@@ -535,7 +535,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			ac.cacheLock.RLock()
 			for key, value := range ac.cacheMap {
 				// the only entries missing are the directories with no objects
-				if !value.attr.IsDir() || value.containsObjects() {
+				if !value.attr.IsDir() || value.isInCloud() {
 					continue
 				}
 				if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
@@ -668,7 +668,7 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		defer ac.cacheLock.RUnlock()
 		if ac.cacheDirs {
 			// record that the parent directory tree contains at least one object
-			ac.markTreeContainsObjects(ac.getParentDir(options.Name), time.Now())
+			ac.markAncestorsInCloud(ac.getParentDir(options.Name), time.Now())
 		}
 		// TODO: we assume that the OS will call GetAttr after this.
 		// 		if it doesn't, will invalidating this entry cause problems?
@@ -691,7 +691,7 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 			parentDir := ac.getParentDir(options.Name)
 			// if this leaves the parent directory object-less, record that
 			if parentDir != "" && !ac.foundObjectContents(parentDir) {
-				ac.setParentContainsNoObjects(parentDir, deletionTime)
+				ac.markNotInCloud(parentDir, deletionTime)
 			}
 		}
 		ac.deletePath(options.Name, deletionTime)
@@ -710,6 +710,60 @@ func (ac *AttrCache) foundObjectContents(dirPath string) bool {
 	return false
 }
 
+// Given the path to a directory, search its contents,
+// and search the contents of all of its ancestors,
+// to record which of them contain objects in their subtrees
+func (ac *AttrCache) updateAncestorsInCloud(dirPath string) {
+	// first gather a list of ancestors
+	var ancestorCacheItems []*attrCacheItem
+	ancestorPath := internal.TruncateDirName(dirPath)
+	for ancestorPath != "" {
+		ancestorCacheItem, found := ac.cacheMap[ancestorPath]
+		if !found {
+			ancestorObjAttr := internal.CreateObjAttrDir(ancestorPath)
+			ancestorCacheItem = newAttrCacheItem(ancestorObjAttr, true, time.Now())
+			ac.cacheMap[ancestorPath] = ancestorCacheItem
+		}
+		ancestorCacheItems = append(ancestorCacheItems, ancestorCacheItem)
+		// speculatively set all ancestors as not in cloud storage
+		// all will be set correctly in the loop below
+		ancestorCacheItem.markInCloud(false)
+	}
+	// search the cache to check whether each ancestor is in cloud storage
+cacheSearch:
+	for key, value := range ac.cacheMap {
+		// ignore items that are deleted, invalid, or directories that are not in cloud storage
+		if !value.exists() || !value.valid() || !value.isInCloud() {
+			continue
+		}
+		// iterate over ancestors, from the deepest up
+		prefixMatchFound := false
+		for ancestorIndex, ancestor := range ancestorCacheItems {
+			// don't visit ancestors that have already been updated
+			if ancestor.isInCloud() {
+				// if all ancestors have been updated, the entire search is done
+				if ancestorIndex == 0 {
+					break cacheSearch
+				}
+				break
+			}
+			// we already found that one ancestor is in the cloud
+			// so its ancestors are too
+			if prefixMatchFound {
+				ancestor.markInCloud(true)
+				continue
+			}
+			// check for a prefix match
+			prefix := internal.ExtendDirName(ancestor.attr.Path)
+			if strings.HasPrefix(key, prefix) {
+				prefixMatchFound = true
+				// update this ancestor
+				ancestor.markInCloud(true)
+			}
+		}
+	}
+}
+
 // RenameFile : Mark the source file deleted. Invalidate the destination file.
 func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("AttrCache::RenameFile : %s -> %s", options.Src, options.Dst)
@@ -722,10 +776,10 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 			srcParentDir := ac.getParentDir(options.Src)
 			// if this leaves the parent directory object-less, record that
 			if srcParentDir != "" && !ac.foundObjectContents(srcParentDir) {
-				ac.setParentContainsNoObjects(srcParentDir, renameTime)
+				ac.markNotInCloud(srcParentDir, renameTime)
 			}
 			// mark the destination parent directory tree as containing objects
-			ac.markTreeContainsObjects(options.Dst, renameTime)
+			ac.markAncestorsInCloud(options.Dst, renameTime)
 			ac.cacheLock.Unlock()
 		}
 		ac.cacheLock.RLock()
@@ -874,7 +928,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		}
 		// TODO: what are the use-cases for this?
 		if ac.cacheDirs {
-			ac.markTreeContainsObjects(ac.getParentDir(options.Name), time.Now())
+			ac.markAncestorsInCloud(ac.getParentDir(options.Name), time.Now())
 		}
 	} else if err == syscall.ENOENT {
 		// Path does not exist so cache a no-entry item
@@ -895,7 +949,7 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 		defer ac.cacheLock.RUnlock()
 		ac.invalidatePath(options.Name)
 		if ac.cacheDirs {
-			ac.markTreeContainsObjects(ac.getParentDir(options.Name), time.Now())
+			ac.markAncestorsInCloud(ac.getParentDir(options.Name), time.Now())
 		}
 	}
 
