@@ -738,6 +738,7 @@ cacheSearch:
 		}
 		// iterate over ancestors, from the deepest up
 		prefixMatchFound := false
+	matchAncestors:
 		for ancestorIndex, ancestor := range ancestorCacheItems {
 			// don't visit ancestors that have already been updated
 			if ancestor.isInCloud() {
@@ -745,13 +746,13 @@ cacheSearch:
 				if ancestorIndex == 0 {
 					break cacheSearch
 				}
-				break
+				break matchAncestors
 			}
 			// we already found that one ancestor is in the cloud
 			// so its ancestors are too
 			if prefixMatchFound {
 				ancestor.markInCloud(true)
-				continue
+				continue matchAncestors
 			}
 			// check for a prefix match
 			prefix := internal.ExtendDirName(ancestor.attr.Path)
