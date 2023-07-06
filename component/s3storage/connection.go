@@ -109,6 +109,7 @@ type S3Connection interface {
 	GetFileBlockOffsets(name string) (*common.BlockOffsetList, error)
 
 	TruncateFile(string, int64) error
+	StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 	NewCredentialKey(_, _ string) error
 }

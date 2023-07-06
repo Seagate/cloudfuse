@@ -484,11 +484,7 @@ func (s3 *S3Storage) Chown(options internal.ChownOptions) error {
 
 func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("S3Storage::FlushFile : Flush file %s", options.Handle.Path)
-	// S3 does not expose blocks the way Azure blob storage does.
-	// S3 has object "parts", but they are not meant to be accessed independently of each other.
-	// So unless we find a way to bend over backwards to abuse the multi-part upload and download interface, flush has no meaning here.
-	// S3 multi-part upload guide: https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html
-	return nil
+	return s3.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
 }
 
 // TODO: decide if the TODO below is relevant and delete if not
