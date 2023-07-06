@@ -75,21 +75,38 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 exec('mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "install"], capture_output=True))')         
                 
 
+
                 if (mount.retiurncode == 1 or mount.stderr.decode().find("lyvecloudfuse service already exists") != -1): #we found this message
                     exec('mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "start"]))')
                     #TODO: Chech for service start errors
 
                     exec('mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "mount", directory, "--config-file=./config.yaml"]))')
                     #TODO: if mount successfull or not
+                    if mount.returncode == 0:
+                        self.textEdit_output.setText("Successfully mounted container\n")
+                    else:
+                        self.textEdit_output.setText("!!Error mounting container!!\n")# + mount.stdout.decode())
+                        # Get the users attention by popping open a new window on an error
+                        msg.setWindowTitle("Error")
+                        msg.setText("Error mounting container - check the settings and try again")
+                        # Show the message box
+                        x = msg.exec()
                 else:
                     pass
                     #this is the failing to install service case. we can just spit out the error here.
                     #should we display the error on the GUI?
+                    self.textEdit_output.setText("!!Error starting service to mount container!!\n")# + mount.stdout.decode())
+                    # Get the users attention by popping open a new window on an error
+                    msg.setWindowTitle("Error")
+                    msg.setText("Error starting service to mount container - check the settings and try again")
+                    # Show the message box
+                    x = msg.exec()
                 
                 # TODO: For future use to get output on Popen
                 #   for line in mount.stdout.readlines():    
             else:
-                exec('mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"])')#,capture_output=True)
+
+                exec('mount = subprocess.run(["./lyvecloudfuse", "service", "install"])')#,capture_output=True)
                 # Print to the text edit window the results of the mount
                 if mount.returncode == 0:
                     self.textEdit_output.setText("Successfully mounted container\n")
