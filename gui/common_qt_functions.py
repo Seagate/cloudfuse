@@ -10,7 +10,7 @@ libfusePermissions = [0o777,0o666,0o644,0o444]
 class defaultSettingsManager():
     def __init__(self):
         super().__init__()
-        self.settings = QSettings("LyveFUSE", "settings")
+        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"LyveFUSE", "settings")
         self.setAllDefaultSettings()
         
         
