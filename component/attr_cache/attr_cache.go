@@ -687,27 +687,13 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 		deletionTime := time.Now()
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		if ac.cacheDirs {
-			parentDir := ac.getParentDir(options.Name)
-			// if this leaves the parent directory object-less, record that
-			if parentDir != "" && !ac.foundObjectContents(parentDir) {
-				ac.markNotInCloud(parentDir, deletionTime)
-			}
-		}
 		ac.deletePath(options.Name, deletionTime)
+		if ac.cacheDirs {
+			ac.updateAncestorsInCloud(ac.getParentDir(options.Name))
+		}
 	}
 
 	return err
-}
-
-func (ac *AttrCache) foundObjectContents(dirPath string) bool {
-	prefix := internal.ExtendDirName(dirPath)
-	for key, value := range ac.cacheMap {
-		if strings.HasPrefix(key, prefix) && !value.attr.IsDir() {
-			return true
-		}
-	}
-	return false
 }
 
 // Given the path to a directory, search its contents,
@@ -774,11 +760,7 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 		renameTime := time.Now()
 		if ac.cacheDirs {
 			ac.cacheLock.Lock()
-			srcParentDir := ac.getParentDir(options.Src)
-			// if this leaves the parent directory object-less, record that
-			if srcParentDir != "" && !ac.foundObjectContents(srcParentDir) {
-				ac.markNotInCloud(srcParentDir, renameTime)
-			}
+			ac.updateAncestorsInCloud(options.Src)
 			// mark the destination parent directory tree as containing objects
 			ac.markAncestorsInCloud(options.Dst, renameTime)
 			ac.cacheLock.Unlock()
