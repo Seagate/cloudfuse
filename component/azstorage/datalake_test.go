@@ -547,7 +547,7 @@ func (s *datalakeTestSuite) TestReadDirWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
 		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
@@ -755,7 +755,7 @@ func (s *datalakeTestSuite) TestCreateFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
 		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
@@ -1202,7 +1202,7 @@ func (s *datalakeTestSuite) TestDeleteFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
 		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
@@ -1261,7 +1261,7 @@ func (s *datalakeTestSuite) TestRenameFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
 		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
@@ -1455,7 +1455,7 @@ func (s *datalakeTestSuite) TestWriteFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
 		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
@@ -1506,7 +1506,7 @@ func (s *datalakeTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
 		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
@@ -1731,7 +1731,7 @@ func (s *datalakeTestSuite) TestCopyFromFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  restricted-characters-windows: true",
+	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
 		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()

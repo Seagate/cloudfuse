@@ -170,7 +170,7 @@ type AzStorageOptions struct {
 	ValidateMD5             bool   `config:"validate-md5" yaml:"validate-md5"`
 	VirtualDirectory        bool   `config:"virtual-directory" yaml:"virtual-directory"`
 	DisableCompression      bool   `config:"disable-compression" yaml:"disable-compression"`
-	RestrictedCharsWin      bool   `config:"restricted-characters-windows" yaml:"restricted-characters-windows"`
+	RestrictedCharsWin      bool   `config:"restricted-characters-windows" yaml:"-"`
 
 	// v1 support
 	UseAdls        bool   `config:"use-adls" yaml:"-"`

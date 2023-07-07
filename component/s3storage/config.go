@@ -47,7 +47,7 @@ type Options struct {
 	Region             string `config:"region" yaml:"region,omitempty"`
 	Endpoint           string `config:"endpoint" yaml:"endpoint,omitempty"`
 	PrefixPath         string `config:"subdirectory" yaml:"subdirectory,omitempty"`
-	RestrictedCharsWin bool   `config:"restricted-characters-windows" yaml:"restricted-characters-windows"`
+	RestrictedCharsWin bool   `config:"restricted-characters-windows" yaml:"-"`
 }
 
 // ParseAndValidateConfig : Parse and validate config
