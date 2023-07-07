@@ -425,37 +425,48 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 		ac.cacheAttributes(pathList)
 		// merge directory cache into the results
 		if ac.cacheDirs {
-			// merge results from our cache into pathMap
-			prefix := internal.ExtendDirName(options.Name)
-			numAdded := 0
-			ac.cacheLock.RLock()
-			for key, value := range ac.cacheMap {
-				// the only entries missing are the directories with no objects
-				if !value.attr.IsDir() || value.isInCloud() {
-					continue
-				}
-				if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
-					// exclude entries in subdirectories
-					pathInsideDirectory := strings.TrimPrefix(key, prefix)
-					if strings.Contains(pathInsideDirectory, "/") {
-						continue
-					}
-					pathList = append(pathList, value.attr)
-					numAdded++
-				}
-			}
-			ac.cacheLock.RUnlock()
-			// values should be returned in ascending order by key
-			// sort the list before returning it
-			sort.Slice(pathList, func(i, j int) bool {
-				return pathList[i].Path < pathList[j].Path
-			})
-
+			numAdded := ac.addDirsNotInCloudToListing(options.Name, pathList)
 			log.Trace("AttrCache::ReadDir : %s +%d from cache = %d",
 				options.Name, numAdded, len(pathList))
 		}
 	}
 	return pathList, err
+}
+
+// merge results from our cache into pathMap
+func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*internal.ObjAttr) int {
+	prefix := internal.ExtendDirName(listPath)
+	numAdded := 0
+	ac.cacheLock.RLock()
+	for key, value := range ac.cacheMap {
+		// ignore invalid and deleted items
+		if !value.valid() || !value.exists() {
+			continue
+		}
+		// the only entries missing are the directories with no objects
+		if !value.attr.IsDir() || value.isInCloud() {
+			continue
+		}
+		// look for matches
+		if strings.HasPrefix(key, prefix) {
+			// exclude entries in subdirectories
+			pathInsideDirectory := strings.TrimPrefix(key, prefix)
+			if strings.Contains(pathInsideDirectory, "/") {
+				continue
+			}
+
+			pathList = append(pathList, value.attr)
+			numAdded++
+		}
+	}
+	ac.cacheLock.RUnlock()
+	// values should be returned in ascending order by key
+	// sort the list before returning it
+	sort.Slice(pathList, func(i, j int) bool {
+		return pathList[i].Path < pathList[j].Path
+	})
+
+	return numAdded
 }
 
 // StreamDir : Optionally cache attributes of paths returned by next component
@@ -470,34 +481,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		}
 		// merge missing directory cache into the last page of results
 		if ac.cacheDirs && token == "" {
-			log.Trace("AttrCache::StreamDir : %s - merging cache into last %d results from %s...",
-				options.Name, len(pathList), ac.NextComponent().Name())
-			numAdded := 0
-			prefix := internal.ExtendDirName(options.Name)
-			// collect cached directories that we may want to add to the results
-			ac.cacheLock.RLock()
-			for key, value := range ac.cacheMap {
-				// the only entries missing are the directories with no objects
-				if !value.attr.IsDir() || value.isInCloud() {
-					continue
-				}
-				if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
-					// exclude entries in subdirectories
-					pathInsideDirectory := strings.TrimPrefix(key, prefix)
-					if strings.Contains(pathInsideDirectory, "/") {
-						continue
-					}
-					pathList = append(pathList, value.attr)
-					numAdded++
-				}
-			}
-			ac.cacheLock.RUnlock()
-			// values should be returned in ascending order by key
-			// sort the list before returning it
-			sort.Slice(pathList, func(i, j int) bool {
-				return pathList[i].Path < pathList[j].Path
-			})
-
+			numAdded := ac.addDirsNotInCloudToListing(options.Name, pathList)
 			log.Trace("AttrCache::StreamDir : %s +%d from cache = %d",
 				options.Name, numAdded, len(pathList))
 		}
