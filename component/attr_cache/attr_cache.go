@@ -423,8 +423,12 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 	pathList, err = ac.NextComponent().ReadDir(options)
 	if err == nil {
 		ac.cacheAttributes(pathList)
-		// merge directory cache into the results
 		if ac.cacheDirs {
+			// remember that this directory is in cloud storage
+			if len(pathList) > 0 {
+				ac.markAncestorsInCloud(options.Name, time.Now())
+			}
+			// merge directory cache into the results
 			numAdded := ac.addDirsNotInCloudToListing(options.Name, pathList)
 			log.Trace("AttrCache::ReadDir : %s +%d from cache = %d",
 				options.Name, numAdded, len(pathList))
@@ -494,7 +498,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 // this will lock and release the mutex for writing
 func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 	// Check whether or not we are supposed to cache on list
-	if (ac.cacheDirs || ac.cacheOnList) && len(pathList) > 0 {
+	if ac.cacheOnList && len(pathList) > 0 {
 		// Putting this inside loop is heavy as for each item we will do a kernel call to get current time
 		// If there are millions of blobs then cost of this is very high.
 		currTime := time.Now()
@@ -831,12 +835,11 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	if err == nil {
 		// Retrieved attributes so cache them
-		// TODO: will this size cap cause problems when cacheDirs is enabled?
+		// TODO: bug: when cacheDirs is true, the cache limit will cause some directories to be double-listed
 		// TODO: shouldn't this be an LRU? This sure looks like the opposite...
 		if len(ac.cacheMap) < maxTotalFiles {
 			ac.cacheMap[truncatedPath] = newAttrCacheItem(pathAttr, true, time.Now())
 		}
-		// TODO: what are the use-cases for this?
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}

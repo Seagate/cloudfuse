@@ -571,6 +571,31 @@ func (suite *attrCacheTestSuite) TestReadDirNoCacheOnList() {
 	suite.assert.Nil(err)
 	suite.assert.Equal(aAttr, returnedAttr)
 
+	suite.assert.EqualValues(1, len(suite.attrCache.cacheMap)) // cacheMap should only have one item after call
+}
+
+func (suite *attrCacheTestSuite) TestReadDirNoCacheOnListNoCacheDirs() {
+	defer suite.cleanupTest()
+	suite.cleanupTest() // clean up the default attr cache generated
+	cacheOnList := false
+	cacheDirs := false
+	config := fmt.Sprintf("attr_cache:\n  no-cache-on-list: %t\n  no-cache-dirs: %t", !cacheOnList, !cacheDirs)
+	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
+	suite.assert.EqualValues(cacheOnList, suite.attrCache.cacheOnList)
+	suite.assert.EqualValues(cacheDirs, suite.attrCache.cacheDirs)
+	path := "a"
+	size := int64(1024)
+	mode := os.FileMode(0)
+	aAttr := generateNestedPathAttr(path, size, mode)
+
+	options := internal.ReadDirOptions{Name: path}
+	suite.mock.EXPECT().ReadDir(options).Return(aAttr, nil)
+
+	suite.assert.Empty(suite.attrCache.cacheMap) // cacheMap should be empty before call
+	returnedAttr, err := suite.attrCache.ReadDir(options)
+	suite.assert.Nil(err)
+	suite.assert.Equal(aAttr, returnedAttr)
+
 	suite.assert.Empty(suite.attrCache.cacheMap) // cacheMap should be empty after call
 }
 
@@ -1193,7 +1218,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithMetadata() {
 		suite.SetupTest()
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
-			addDirectoryToCache(suite.assert, suite.attrCache, "a", true) // add the paths to the cache with IsMetadataRetrived=true
+			addDirectoryToCache(suite.assert, suite.attrCache, "a", true) // add the paths to the cache with IsMetadataRetrieved=true
 
 			options := internal.GetAttrOptions{Name: path}
 			// no call to mock component since attributes are accessible
@@ -1219,7 +1244,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadataNoSymlinks() {
 		suite.assert.EqualValues(noSymlinks, suite.attrCache.cacheOnList)
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
-			addDirectoryToCache(suite.assert, suite.attrCache, "a", true) // add the paths to the cache with IsMetadataRetrived=true
+			addDirectoryToCache(suite.assert, suite.attrCache, "a", true) // add the paths to the cache with IsMetadataRetrieved=true
 
 			options := internal.GetAttrOptions{Name: path}
 			// no call to mock component since metadata is not needed in noSymlinks mode
@@ -1241,7 +1266,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadata() {
 		suite.SetupTest()
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
-			addDirectoryToCache(suite.assert, suite.attrCache, "a", false) // add the paths to the cache with IsMetadataRetrived=false
+			addDirectoryToCache(suite.assert, suite.attrCache, "a", false) // add the paths to the cache with IsMetadataRetrieved=false
 
 			options := internal.GetAttrOptions{Name: path}
 			// attributes should not be accessible so call the mock
@@ -1299,7 +1324,7 @@ func (suite *attrCacheTestSuite) TestGetAttrOtherError() {
 	}
 }
 
-func (suite *attrCacheTestSuite) TestGetAttrEnonetError() {
+func (suite *attrCacheTestSuite) TestGetAttrEnoentError() {
 	defer suite.cleanupTest()
 	var paths = []string{"a", "a/"}
 
