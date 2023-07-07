@@ -205,25 +205,14 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	// When we delete directory a, we only want to delete a/, a/b, and a/c.
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
-	// get the path to the parent of the directory being deleted
-	// so that we can keep track of whether it becomes empty after this deletion
-	parentDir := ac.getParentDir(path)
 	// Add a trailing '/' so that we only delete child paths under the directory and not paths that have the same prefix
-	parentPrefix := internal.ExtendDirName(parentDir)
 	prefix := internal.ExtendDirName(path)
 	// remember whether we actually found any contents
 	foundCachedContents := false
-	parentContainsOtherObjects := false
 	for key, value := range ac.cacheMap {
 		if strings.HasPrefix(key, prefix) {
 			foundCachedContents = true
 			value.markDeleted(time)
-		} else if strings.HasPrefix(key, parentPrefix) {
-			// this could be skipped if we already know the parent contains no objects
-			// but doing this regardless is simpler
-			if !value.attr.IsDir() && value.valid() && value.exists() {
-				parentContainsOtherObjects = true
-			}
 		}
 	}
 
@@ -233,29 +222,15 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 		return syscall.ENOENT
 	}
 
-	// if this leaves the parent directory empty, record that
-	if !parentContainsOtherObjects {
-		ac.markNotInCloud(parentDir, time)
-	}
-
 	// We need to delete the path itself since we only handle children above.
 	ac.deletePath(path, time)
 
-	return nil
-}
+	// If this leaves the parent or any ancestor directory empty, record that.
+	// Although this involves an unnecessary second traversal through the cache,
+	// because of the code complexity, I think it's worth the readability gained.
+	ac.updateAncestorsInCloud(getParentDir(path), time)
 
-func (ac *AttrCache) markNotInCloud(dir string, time time.Time) {
-	dir = internal.TruncateDirName(dir)
-	if len(dir) == 0 {
-		return
-	}
-	dirCacheItem, found := ac.cacheMap[dir]
-	if !found {
-		dirObjAttr := internal.CreateObjAttrDir(dir)
-		dirCacheItem = newAttrCacheItem(dirObjAttr, true, time)
-		ac.cacheMap[dir] = dirCacheItem
-	}
-	dirCacheItem.markInCloud(false)
+	return nil
 }
 
 // pathExistsInCache: check if path is in cache, is valid, and not marked deleted
@@ -264,20 +239,7 @@ func (ac *AttrCache) pathExistsInCache(path string) bool {
 	return (found && value.valid() && value.exists())
 }
 
-func (ac *attrCacheItem) cacheItemExists(item attrCacheItem) bool {
-	return item.valid() && item.exists()
-}
-
-// cacheParent: add the parent directory of the given entity to the cache
-func (ac *AttrCache) cacheParent(childPath string, cacheAt time.Time) {
-	parentDir := ac.getParentDir(childPath)
-	if parentDir != "" && !ac.pathExistsInCache(parentDir) {
-		parentObjAttr := internal.CreateObjAttrDir(parentDir)
-		ac.cacheMap[parentDir] = newAttrCacheItem(parentObjAttr, true, cacheAt)
-	}
-}
-
-func (ac *AttrCache) getParentDir(childPath string) string {
+func getParentDir(childPath string) string {
 	parentDir := path.Dir(internal.TruncateDirName(childPath))
 	if parentDir == "." {
 		parentDir = ""
@@ -317,8 +279,7 @@ func (ac *AttrCache) invalidatePath(path string) {
 	}
 }
 
-// renameCachedDirectory: recursively renames a cached directory
-// this should only be called when ac.noCacheDirs is false.
+// renameCachedDirectory: recursively renames a cached directory for when ac.cacheDirs is true.
 func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time time.Time) error {
 
 	// First, check if the destination directory already exists
@@ -331,10 +292,6 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	// When we rename directory a, we only want to rename a/, a/b, and a/c.
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
-	// We also need to keep track of whether this move leaves an empty parent directory
-	srcParentDir := ac.getParentDir(srcDir)
-	parentPrefix := internal.ExtendDirName(srcParentDir)
-
 	// Add a trailing / so that we only rename child paths under the directory,
 	// and not paths that have the same prefix
 	srcDir = internal.ExtendDirName(srcDir)
@@ -343,8 +300,6 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	// remember whether we actually found any contents
 	foundCachedContents := false
 	movedObjects := false
-	// remember whether the parent directory is left empty by this move
-	parentContainsOtherObjects := false
 	for key, value := range ac.cacheMap {
 		if strings.HasPrefix(key, srcDir) {
 			foundCachedContents = true
@@ -365,12 +320,6 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 			}
 			// either way, mark the old cache entry deleted
 			value.markDeleted(time)
-		} else if !parentContainsOtherObjects && strings.HasPrefix(key, parentPrefix) {
-			// this could be skipped if we already know the parent contains no objects
-			// but doing this regardless is simpler
-			if !value.attr.IsDir() && value.valid() && value.exists() {
-				parentContainsOtherObjects = true
-			}
 		}
 	}
 
@@ -378,17 +327,6 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	if !foundCachedContents && !ac.pathExistsInCache(srcDir) {
 		log.Err("AttrCache::renameCachedDirectory : Source directory %s does not exist.", srcDir)
 		return syscall.ENOENT
-	}
-
-	// if this leaves the parent directory empty, record that
-	if !parentContainsOtherObjects && srcParentDir != "" {
-		parentDirCacheItem, found := ac.cacheMap[srcParentDir]
-		if !found {
-			parentObjAttr := internal.CreateObjAttrDir(srcParentDir)
-			parentDirCacheItem = newAttrCacheItem(parentObjAttr, true, time)
-			ac.cacheMap[srcParentDir] = parentDirCacheItem
-		}
-		parentDirCacheItem.markInCloud(parentContainsOtherObjects)
 	}
 
 	// record whether the destination directory's parent tree now contains objects
@@ -404,6 +342,11 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	dstDirAttr := internal.CreateObjAttrDir(dstDir)
 	ac.cacheMap[dstDir] = newAttrCacheItem(dstDirAttr, true, time)
 
+	// If this leaves the parent or ancestor directories empty, record that.
+	// Although this involves an unnecessary second traversal through the cache,
+	// because of the code complexity, I think it's worth the readability gained.
+	ac.updateAncestorsInCloud(getParentDir(srcDir), time)
+
 	return nil
 }
 
@@ -418,7 +361,7 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 		}
 		dirCacheItem.markInCloud(true)
 		// recurse
-		ac.markAncestorsInCloud(ac.getParentDir(dirPath), time)
+		ac.markAncestorsInCloud(getParentDir(dirPath), time)
 	}
 }
 
@@ -668,7 +611,7 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		defer ac.cacheLock.RUnlock()
 		if ac.cacheDirs {
 			// record that the parent directory tree contains at least one object
-			ac.markAncestorsInCloud(ac.getParentDir(options.Name), time.Now())
+			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
 		// TODO: we assume that the OS will call GetAttr after this.
 		// 		if it doesn't, will invalidating this entry cause problems?
@@ -689,7 +632,7 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 		defer ac.cacheLock.RUnlock()
 		ac.deletePath(options.Name, deletionTime)
 		if ac.cacheDirs {
-			ac.updateAncestorsInCloud(ac.getParentDir(options.Name))
+			ac.updateAncestorsInCloud(getParentDir(options.Name), deletionTime)
 		}
 	}
 
@@ -699,7 +642,7 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 // Given the path to a directory, search its contents,
 // and search the contents of all of its ancestors,
 // to record which of them contain objects in their subtrees
-func (ac *AttrCache) updateAncestorsInCloud(dirPath string) {
+func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 	// first gather a list of ancestors
 	var ancestorCacheItems []*attrCacheItem
 	ancestorPath := internal.TruncateDirName(dirPath)
@@ -707,7 +650,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string) {
 		ancestorCacheItem, found := ac.cacheMap[ancestorPath]
 		if !found {
 			ancestorObjAttr := internal.CreateObjAttrDir(ancestorPath)
-			ancestorCacheItem = newAttrCacheItem(ancestorObjAttr, true, time.Now())
+			ancestorCacheItem = newAttrCacheItem(ancestorObjAttr, true, time)
 			ac.cacheMap[ancestorPath] = ancestorCacheItem
 		}
 		ancestorCacheItems = append(ancestorCacheItems, ancestorCacheItem)
@@ -760,7 +703,7 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 		renameTime := time.Now()
 		if ac.cacheDirs {
 			ac.cacheLock.Lock()
-			ac.updateAncestorsInCloud(options.Src)
+			ac.updateAncestorsInCloud(options.Src, renameTime)
 			// mark the destination parent directory tree as containing objects
 			ac.markAncestorsInCloud(options.Dst, renameTime)
 			ac.cacheLock.Unlock()
@@ -880,19 +823,19 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	// Try to serve the request from the attribute cache
 	if found && value.valid() && time.Since(value.cachedAt).Seconds() < float64(ac.cacheTimeout) {
+		// Is the entry marked deleted?
 		if value.isDeleted() {
 			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
-			// no entry if path does not exist
 			return &internal.ObjAttr{}, syscall.ENOENT
-		} else {
-			// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
-			// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
-			// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
-			if value.getAttr().IsMetadataRetrieved() || (ac.noSymlinks && !options.RetrieveMetadata) {
-				// path exists and we have all the metadata required or we do not care about metadata
-				log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
-				return value.getAttr(), nil
-			}
+		}
+
+		// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
+		// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
+		// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
+		if value.getAttr().IsMetadataRetrieved() || (ac.noSymlinks && !options.RetrieveMetadata) {
+			// path exists and we have all the metadata required or we do not care about metadata
+			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
+			return value.getAttr(), nil
 		}
 	}
 
@@ -911,7 +854,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		}
 		// TODO: what are the use-cases for this?
 		if ac.cacheDirs {
-			ac.markAncestorsInCloud(ac.getParentDir(options.Name), time.Now())
+			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
 	} else if err == syscall.ENOENT {
 		// Path does not exist so cache a no-entry item
@@ -932,7 +875,7 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 		defer ac.cacheLock.RUnlock()
 		ac.invalidatePath(options.Name)
 		if ac.cacheDirs {
-			ac.markAncestorsInCloud(ac.getParentDir(options.Name), time.Now())
+			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
 	}
 
