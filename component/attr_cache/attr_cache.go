@@ -441,7 +441,8 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 				ac.markAncestorsInCloud(options.Name, time.Now())
 			}
 			// merge directory cache into the results
-			numAdded := ac.addDirsNotInCloudToListing(options.Name, pathList)
+			var numAdded int // prevent shadowing pathList in following line
+			pathList, numAdded = ac.addDirsNotInCloudToListing(options.Name, pathList)
 			log.Trace("AttrCache::ReadDir : %s +%d from cache = %d",
 				options.Name, numAdded, len(pathList))
 		}
@@ -450,7 +451,7 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 }
 
 // merge results from our cache into pathMap
-func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*internal.ObjAttr) int {
+func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*internal.ObjAttr) ([]*internal.ObjAttr, int) {
 	prefix := dirToPrefix(listPath)
 	if prefix == "/" {
 		prefix = ""
@@ -485,7 +486,7 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 		return pathList[i].Path < pathList[j].Path
 	})
 
-	return numAdded
+	return pathList, numAdded
 }
 
 // StreamDir : Optionally cache attributes of paths returned by next component
@@ -500,7 +501,8 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		}
 		// merge missing directory cache into the last page of results
 		if ac.cacheDirs && token == "" {
-			numAdded := ac.addDirsNotInCloudToListing(options.Name, pathList)
+			var numAdded int // prevent shadowing pathList in following line
+			pathList, numAdded = ac.addDirsNotInCloudToListing(options.Name, pathList)
 			log.Trace("AttrCache::StreamDir : %s +%d from cache = %d",
 				options.Name, numAdded, len(pathList))
 		}
