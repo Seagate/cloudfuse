@@ -260,14 +260,18 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 
 	for key, value := range ac.cacheMap {
 		if strings.HasPrefix(key, prefix) {
-			if !(ac.cacheDirs && value.attr.IsDir()) {
-				value.invalidate()
+			// don't invalidate directories when cacheDirs is true
+			if ac.cacheDirs && value.attr.IsDir() {
+				continue
 			}
+			value.invalidate()
 		}
 	}
 
 	// We need to invalidate the path itself since we only handle children above.
-	ac.invalidatePath(path)
+	if !ac.cacheDirs {
+		ac.invalidatePath(path)
+	}
 }
 
 // invalidatePath: invalidates a path
@@ -645,6 +649,8 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		// speculatively set all ancestors as not in cloud storage
 		// all will be set correctly in the loop below
 		ancestorCacheItem.markInCloud(false)
+		// move on to the next ancestor
+		ancestorPath = getParentDir(ancestorPath)
 	}
 	// search the cache to check whether each ancestor is in cloud storage
 cacheSearch:
@@ -691,9 +697,9 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 		renameTime := time.Now()
 		if ac.cacheDirs {
 			ac.cacheLock.Lock()
-			ac.updateAncestorsInCloud(options.Src, renameTime)
+			ac.updateAncestorsInCloud(getParentDir(options.Src), renameTime)
 			// mark the destination parent directory tree as containing objects
-			ac.markAncestorsInCloud(options.Dst, renameTime)
+			ac.markAncestorsInCloud(getParentDir(options.Dst), renameTime)
 			ac.cacheLock.Unlock()
 		}
 		ac.cacheLock.RLock()

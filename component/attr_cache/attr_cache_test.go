@@ -146,6 +146,22 @@ func assertExists(suite *attrCacheTestSuite, path string) {
 	suite.assert.True(suite.attrCache.cacheMap[path].exists())
 }
 
+func assertInCloud(suite *attrCacheTestSuite, path string) {
+	suite.assert.Contains(suite.attrCache.cacheMap, path)
+	suite.assert.NotEqualValues(suite.attrCache.cacheMap[path].attr, &internal.ObjAttr{})
+	suite.assert.True(suite.attrCache.cacheMap[path].valid())
+	suite.assert.True(suite.attrCache.cacheMap[path].exists())
+	suite.assert.True(suite.attrCache.cacheMap[path].isInCloud())
+}
+
+func assertNotInCloud(suite *attrCacheTestSuite, path string) {
+	suite.assert.Contains(suite.attrCache.cacheMap, path)
+	suite.assert.NotEqualValues(suite.attrCache.cacheMap[path].attr, &internal.ObjAttr{})
+	suite.assert.True(suite.attrCache.cacheMap[path].valid())
+	suite.assert.True(suite.attrCache.cacheMap[path].exists())
+	suite.assert.False(suite.attrCache.cacheMap[path].isInCloud())
+}
+
 // Directory structure
 // a/
 //
@@ -551,6 +567,37 @@ func (suite *attrCacheTestSuite) TestReadDirExists() {
 	}
 }
 
+// Test whether the attribute cache correctly tracks which directories are in cloud storage
+func (suite *attrCacheTestSuite) TestDirInCloud() {
+	defer suite.cleanupTest()
+	// build up the attribute cache
+	addDirectoryToCache(suite.assert, suite.attrCache, "a", true)
+	deepPath := "a/b/c/d"
+	addPathToCache(suite.assert, suite.attrCache, deepPath, true)
+
+	// delete file a/b/c/d and make sure a/b/ and a/b/c/ are marked not in cloud storage
+	delOptions := internal.DeleteFileOptions{Name: deepPath}
+	suite.mock.EXPECT().DeleteFile(delOptions).Return(nil)
+
+	err := suite.attrCache.DeleteFile(delOptions)
+	suite.assert.Nil(err)
+	assertDeleted(suite, deepPath)
+	assertNotInCloud(suite, "a/b/c")
+	assertNotInCloud(suite, "a/b")
+	assertInCloud(suite, "a")
+
+	// add file a/b/c/d back in and make sure all its ancestors are marked in cloud storage
+	createOptions := internal.CreateFileOptions{Name: deepPath}
+	suite.mock.EXPECT().CreateFile(createOptions).Return(&handlemap.Handle{}, nil)
+
+	_, err = suite.attrCache.CreateFile(createOptions)
+	suite.assert.Nil(err)
+	assertInvalid(suite, deepPath)
+	assertInCloud(suite, "a/b/c")
+	assertInCloud(suite, "a/b")
+	assertInCloud(suite, "a")
+}
+
 func (suite *attrCacheTestSuite) TestReadDirNoCacheOnList() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default attr cache generated
@@ -571,7 +618,9 @@ func (suite *attrCacheTestSuite) TestReadDirNoCacheOnList() {
 	suite.assert.Nil(err)
 	suite.assert.Equal(aAttr, returnedAttr)
 
-	suite.assert.EqualValues(1, len(suite.attrCache.cacheMap)) // cacheMap should only have one item after call
+	// cacheMap should only have the listed after the call
+	suite.assert.EqualValues(1, len(suite.attrCache.cacheMap))
+	assertExists(suite, path)
 }
 
 func (suite *attrCacheTestSuite) TestReadDirNoCacheOnListNoCacheDirs() {
@@ -945,8 +994,14 @@ func (suite *attrCacheTestSuite) TestSyncDir() {
 			suite.assert.Nil(err)
 			// directory cache is enabled, so a paths should NOT be deleted
 			for p := a.Front(); p != nil; p = p.Next() {
-				truncatedPath = internal.TruncateDirName(p.Value.(string))
-				assertUntouched(suite, truncatedPath)
+				path := p.Value.(string)
+				isDir := path[len(path)-1] == '/'
+				truncatedPath = internal.TruncateDirName(path)
+				if isDir {
+					assertUntouched(suite, truncatedPath)
+				} else {
+					assertInvalid(suite, truncatedPath)
+				}
 			}
 			ab.PushBackList(ac) // ab and ac paths should be untouched
 			for p := ab.Front(); p != nil; p = p.Next() {
@@ -1415,7 +1470,7 @@ func (suite *attrCacheTestSuite) TestCreateLink() {
 	err = suite.attrCache.CreateLink(options)
 	suite.assert.Nil(err)
 	assertInvalid(suite, link)
-	assertInvalid(suite, path)
+	assertUntouched(suite, path)
 }
 
 // Tests Chmod
