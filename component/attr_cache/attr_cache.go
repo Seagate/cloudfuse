@@ -173,7 +173,7 @@ func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
 	// Add a trailing / so that we only delete child paths under the directory and not paths that have the same prefix
-	prefix := internal.ExtendDirName(path)
+	prefix := dirToPrefix(path)
 
 	for key, value := range ac.cacheMap {
 		if strings.HasPrefix(key, prefix) {
@@ -183,6 +183,14 @@ func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 
 	// We need to delete the path itself since we only handle children above.
 	ac.deletePath(path, time)
+}
+
+func dirToPrefix(dir string) string {
+	prefix := internal.ExtendDirName(dir)
+	if prefix == "/" {
+		prefix = ""
+	}
+	return prefix
 }
 
 // deletePath: deletes a path
@@ -206,7 +214,7 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
 	// Add a trailing '/' so that we only delete child paths under the directory and not paths that have the same prefix
-	prefix := internal.ExtendDirName(path)
+	prefix := dirToPrefix(path)
 	// remember whether we actually found any contents
 	foundCachedContents := false
 	for key, value := range ac.cacheMap {
@@ -256,7 +264,7 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 	// If we do not conditionally extend a, we would accidentally invalidate aa/ and ab
 
 	// Add a trailing / so that we only invalidate child paths under the directory and not paths that have the same prefix
-	prefix := internal.ExtendDirName(path)
+	prefix := dirToPrefix(path)
 
 	for key, value := range ac.cacheMap {
 		if strings.HasPrefix(key, prefix) {
@@ -298,9 +306,9 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 
 	// Add a trailing / so that we only rename child paths under the directory,
 	// and not paths that have the same prefix
-	srcDir = internal.ExtendDirName(srcDir)
+	srcDir = dirToPrefix(srcDir)
 	// Add a trailing / to destination (for string replacement)
-	dstDir = internal.ExtendDirName(dstDir)
+	dstDir = dirToPrefix(dstDir)
 	// remember whether we actually found any contents
 	foundCachedContents := false
 	movedObjects := false
@@ -443,7 +451,10 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 
 // merge results from our cache into pathMap
 func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*internal.ObjAttr) int {
-	prefix := internal.ExtendDirName(listPath)
+	prefix := dirToPrefix(listPath)
+	if prefix == "/" {
+		prefix = ""
+	}
 	numAdded := 0
 	ac.cacheLock.RLock()
 	for key, value := range ac.cacheMap {
@@ -551,7 +562,7 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 
 func (ac *AttrCache) anyContentsInCache(prefix string) bool {
 	// Add a trailing / so that we only find child paths under the directory and not paths that have the same prefix
-	prefix = internal.ExtendDirName(prefix)
+	prefix = dirToPrefix(prefix)
 	ac.cacheLock.RLock()
 	defer ac.cacheLock.RUnlock()
 	for key, value := range ac.cacheMap {
@@ -678,7 +689,7 @@ cacheSearch:
 				continue matchAncestors
 			}
 			// check for a prefix match
-			prefix := internal.ExtendDirName(ancestor.attr.Path)
+			prefix := dirToPrefix(ancestor.attr.Path)
 			if strings.HasPrefix(key, prefix) {
 				prefixMatchFound = true
 				// update this ancestor
