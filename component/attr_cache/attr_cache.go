@@ -345,15 +345,17 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	// record whether the destination directory's parent tree now contains objects
 	if movedObjects {
 		ac.markAncestorsInCloud(dstDir, time)
+	} else {
+		// add the destination directory to our cache
+		dstDir = internal.TruncateDirName(dstDir)
+		dstDirAttr := internal.CreateObjAttrDir(dstDir)
+		dstDirAttrCacheItem := newAttrCacheItem(dstDirAttr, true, time)
+		dstDirAttrCacheItem.markInCloud(false)
+		ac.cacheMap[dstDir] = dstDirAttrCacheItem
 	}
 
 	// delete the source directory from our cache
 	ac.deletePath(srcDir, time)
-
-	// add the destination directory to our cache
-	dstDir = internal.TruncateDirName(dstDir)
-	dstDirAttr := internal.CreateObjAttrDir(dstDir)
-	ac.cacheMap[dstDir] = newAttrCacheItem(dstDirAttr, true, time)
 
 	// If this leaves the parent or ancestor directories empty, record that.
 	// Although this involves an unnecessary second traversal through the cache,
