@@ -163,11 +163,11 @@ func (ac *AttrCache) OnConfigChange() {
 }
 
 // Helper Methods
-// deleteDirectory: recursively marks a directory deleted
-// The deleteDir method marks deleted instead of invalidating so that if a request came in for a non-existent previously cached
-// file/dir we can directly serve that it is non-existent
+// deleteDirectory: Marks a directory and all its contents deleted.
+// This marks items deleted instead of invalidating them.
+// That way if a request came in for a deleted item, we can respond from the cache.
 func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
-	// Recursively delete the children of the path, then delete the path
+	// Delete all descendants of the path, then delete the path
 	// For example, filesystem: a/, a/b, a/c, aa/, ab.
 	// When we delete directory a, we only want to delete a/, a/b, and a/c.
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
@@ -202,13 +202,14 @@ func (ac *AttrCache) deletePath(path string, time time.Time) {
 	}
 }
 
-// deleteCachedDirectory: recursively marks a directory deleted while keeping directory cache coherent
-// this should only be called when ac.noCacheDirs is false.
-// This marks deleted instead of invalidating so that if a request came in for a non-existent previously cached
-// file/dir we can directly serve that it is non-existent
+// deleteCachedDirectory: marks a directory and all its contents deleted
+// while keeping directory cache coherent.
+// This should only be called when ac.cacheDirs is true.
+// This marks items deleted instead of invalidating their entries.
+// That way if a request comes in for a deleted item, it's still a cache hit.
 func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 
-	// Recursively delete the children of the path, then delete the path
+	// Delete all descendants of the path, then delete the path
 	// For example, filesystem: a/, a/b, a/c, aa/, ab.
 	// When we delete directory a, we only want to delete a/, a/b, and a/c.
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
@@ -255,10 +256,10 @@ func getParentDir(childPath string) string {
 	return parentDir
 }
 
-// invalidateDirectory: recursively marks a directory invalid
+// invalidateDirectory: Marks a directory and all its contents invalid
 // Do not use this with ac.cacheDirs set
 func (ac *AttrCache) invalidateDirectory(path string) {
-	// Recursively invalidate the children of the path, then invalidate the path
+	// Invalidate all descendants of the path, then invalidate the path
 	// For example, filesystem: a/, a/b, a/c, aa/, ab.
 	// When we invalidate directory a, we only want to invalidate a/, a/b, and a/c.
 	// If we do not conditionally extend a, we would accidentally invalidate aa/ and ab
@@ -291,7 +292,7 @@ func (ac *AttrCache) invalidatePath(path string) {
 	}
 }
 
-// renameCachedDirectory: recursively renames a cached directory for when ac.cacheDirs is true.
+// renameCachedDirectory: Renames a cached directory and all its contents when ac.cacheDirs is true.
 func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time time.Time) error {
 
 	// First, check if the destination directory already exists
@@ -299,7 +300,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 		return syscall.EEXIST
 	}
 
-	// "Recursively" rename the children of the srcDir, then rename the srcDir itself
+	// Rename all descendants of srcDir, then rename the srcDir itself
 	// For example, filesystem: a/, a/b, a/c, aa/, ab.
 	// When we rename directory a, we only want to rename a/, a/b, and a/c.
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
@@ -403,7 +404,7 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 	return err
 }
 
-// DeleteDir: Mark the directory deleted and recursively mark all it's children deleted
+// DeleteDir: Mark the directory deleted and mark all it's children deleted
 func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("AttrCache::DeleteDir : %s", options.Name)
 
@@ -575,7 +576,7 @@ func (ac *AttrCache) anyContentsInCache(prefix string) bool {
 	return false
 }
 
-// RenameDir : Mark the source directory deleted and recursively mark all it's children deleted.
+// RenameDir : Mark the source directory and all its contents deleted.
 // Invalidate the destination since we may have overwritten it.
 func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("AttrCache::RenameDir : %s -> %s", options.Src, options.Dst)
