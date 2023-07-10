@@ -38,9 +38,12 @@
 package s3storage
 
 import (
+	"bytes"
 	"container/list"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -59,6 +62,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -104,6 +108,119 @@ type s3StorageTestSuite struct {
 	s3Storage   *S3Storage
 	config      string
 	bucket      string
+}
+
+// s.uploadReaderAtToObject uploads a buffer in parts to an object.
+func (s *s3StorageTestSuite) uploadReaderAtToObject(ctx context.Context, reader io.ReaderAt, readerSize int64, singleUploadSize int64,
+	key string, partSize int64) error {
+	if partSize == 0 {
+		// If bufferSize > (BlockBlobMaxStageBlockBytes * BlockBlobMaxBlocks), then error
+		if readerSize > 5*1024*common.MbToBytes*10000 {
+			return errors.New("buffer is too large to upload to a block blob")
+		}
+		// If bufferSize <= singleUploadSize, then Upload should be used with just 1 I/O request
+		if readerSize <= singleUploadSize {
+			partSize = singleUploadSize // Default if unspecified
+		} else {
+			partSize = readerSize / 10000      // buffer / max blocks = block size to use all 50,000 blocks
+			if partSize < 5*common.MbToBytes { // If the block size is smaller than 5MB, round up to 5MB
+				partSize = 5 * common.MbToBytes
+			}
+			// StageBlock will be called with blockSize blocks and a Parallelism of (BufferSize / BlockSize).
+		}
+	}
+
+	if readerSize <= singleUploadSize {
+		// If the size can fit in 1 Upload call, do it this way
+		var body io.ReadSeeker = io.NewSectionReader(reader, 0, readerSize)
+		_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+			Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+			Key:    aws.String(key),
+			Body:   body,
+		})
+		return err
+	}
+
+	var numBlocks = int32(((readerSize - 1) / partSize) + 1)
+
+	//send command to start copy and get the upload id as it is needed later
+	var uploadID string
+	createOutput, err := s.awsS3Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return err
+	}
+	if createOutput != nil {
+		if createOutput.UploadId != nil {
+			uploadID = *createOutput.UploadId
+		}
+	}
+	if uploadID == "" {
+		return err
+	}
+
+	var partNumber int32 = 1
+	parts := make([]types.CompletedPart, 0)
+	for partNumber <= numBlocks {
+		endSize := partSize
+		if partNumber == numBlocks {
+			endSize = readerSize - int64(partNumber-1)*partSize
+		}
+		partResp, err := s.awsS3Client.UploadPart(context.TODO(), &s3.UploadPartInput{
+			Bucket:     aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+			Key:        aws.String(key),
+			PartNumber: partNumber,
+			UploadId:   &uploadID,
+			Body:       io.NewSectionReader(reader, int64(partNumber-1)*partSize, endSize),
+		})
+
+		if err != nil {
+			//ignoring any errors with aborting the copy
+			s.awsS3Client.AbortMultipartUpload(context.TODO(), &s3.AbortMultipartUploadInput{
+				Bucket:   aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+				Key:      aws.String(key),
+				UploadId: &uploadID,
+			})
+			// TODO: Verify that the abort was successful
+			return err
+		}
+
+		// copy etag and part number to verify later
+		if partResp != nil {
+			partNum := partNumber
+			etag := strings.Trim(*partResp.ETag, "\"")
+			cPart := types.CompletedPart{
+				ETag:       &etag,
+				PartNumber: partNum,
+			}
+			parts = append(parts, cPart)
+		}
+		partNumber++
+	}
+
+	// complete the upload
+	_, err = s.awsS3Client.CompleteMultipartUpload(context.TODO(), &s3.CompleteMultipartUploadInput{
+		Bucket:   aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:      aws.String(key),
+		UploadId: &uploadID,
+		MultipartUpload: &types.CompletedMultipartUpload{
+			Parts: parts,
+		},
+	})
+	if err != nil {
+		//ignoring any errors with aborting the copy
+		s.awsS3Client.AbortMultipartUpload(context.TODO(), &s3.AbortMultipartUploadInput{
+			Bucket:   aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+			Key:      aws.String(key),
+			UploadId: &uploadID,
+		})
+		// TODO: Verify that the abort was successful
+		return err
+	}
+
+	return nil
 }
 
 func newTestS3Storage(configuration string) (*S3Storage, error) {
@@ -1884,10 +2001,6 @@ func (s *s3StorageTestSuite) TestGetAttrError() {
 	}
 }
 
-func TestS3Storage(t *testing.T) {
-	suite.Run(t, new(s3StorageTestSuite))
-}
-
 // uploads data from a temp file and downloads the full object and tests the correct data was received
 func (s *s3StorageTestSuite) TestFullRangedDownload() {
 	defer s.cleanupTest()
@@ -2022,4 +2135,510 @@ func (s *s3StorageTestSuite) TestOffsetToEndDownload() {
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 
+}
+
+func (s *s3StorageTestSuite) TestGetFileBlockOffsetsSmallFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "testdatates1dat1tes2dat2tes3dat3tes4dat4"
+	data := []byte(testData)
+
+	s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+
+	// GetFileBlockOffsets
+	offsetList, err := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.Len(offsetList.BlockList, 0)
+	s.assert.True(offsetList.SmallFile())
+	s.assert.EqualValues(0, offsetList.BlockIdLength)
+}
+
+func (s *s3StorageTestSuite) TestGetFileBlockOffsetsChunkedFile() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "testdatates1dat1tes2dat2tes3dat3tes4dat4"
+	data := []byte(testData)
+
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)),
+		Body:   bytes.NewReader(data),
+	})
+	s.assert.Nil(err)
+
+	// GetFileBlockOffsets
+	offsetList, err := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.Len(offsetList.BlockList, 10)
+	s.assert.Zero(offsetList.Flags)
+	s.assert.EqualValues(16, offsetList.BlockIdLength)
+}
+
+func (s *s3StorageTestSuite) TestGetFileBlockOffsetsError() {
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+
+	// GetFileBlockOffsets
+	_, err := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	s.assert.NotNil(err)
+}
+
+func (s *s3StorageTestSuite) TestFlushFileEmptyFile() {
+	defer s.cleanupTest()
+
+	// Setup
+	name := generateFileName()
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+
+	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	handlemap.CreateCacheObject(int64(16*MB), h)
+	h.CacheObj.BlockOffsetList = bol
+
+	err := s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
+	s.assert.Nil(err)
+
+	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
+	s.assert.Nil(err)
+	s.assert.EqualValues("", output)
+}
+
+func (s *s3StorageTestSuite) TestFlushFileChunkedFile() {
+	defer s.cleanupTest()
+
+	// Setup
+	name := generateFileName()
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	data := make([]byte, 15*MB)
+	rand.Read(data)
+
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), 5*MB, key, 5*MB)
+	s.assert.Nil(err)
+	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	handlemap.CreateCacheObject(int64(15*MB), h)
+	h.CacheObj.BlockOffsetList = bol
+	s.assert.Len(bol.BlockList, 3)
+
+	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
+	s.assert.Nil(err)
+
+	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
+	s.assert.Nil(err)
+	s.assert.EqualValues(data, output)
+}
+
+func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
+	defer s.cleanupTest()
+
+	// Setup
+	name := generateFileName()
+	blockSize := 5 * MB
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	data := make([]byte, 15*MB)
+	rand.Read(data)
+
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), 5*MB, key, int64(blockSize))
+	s.assert.Nil(err)
+	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	handlemap.CreateCacheObject(int64(15*MB), h)
+	h.CacheObj.BlockOffsetList = bol
+
+	updatedBlock := make([]byte, 2*MB)
+	rand.Read(updatedBlock)
+	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize)
+	s.s3Storage.storage.ReadInBuffer(name, int64(blockSize), int64(blockSize), h.CacheObj.BlockOffsetList.BlockList[1].Data)
+	copy(h.CacheObj.BlockOffsetList.BlockList[1].Data[MB:2*MB+MB], updatedBlock)
+	h.CacheObj.BlockOffsetList.BlockList[1].Flags.Set(common.DirtyBlock)
+
+	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
+	s.assert.Nil(err)
+
+	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
+	s.assert.Nil(err)
+	s.assert.NotEqualValues(data, output)
+	s.assert.EqualValues(data[:6*MB], output[:6*MB])
+	s.assert.EqualValues(updatedBlock, output[6*MB:6*MB+2*MB])
+	s.assert.EqualValues(data[8*MB:], output[8*MB:])
+}
+
+func (s *s3StorageTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
+	defer s.cleanupTest()
+
+	// Setup
+	name := generateFileName()
+	blockSize := 5 * MB
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	data := make([]byte, 15*MB)
+	rand.Read(data)
+
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), 5*MB, key, int64(blockSize))
+	s.assert.Nil(err)
+	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	handlemap.CreateCacheObject(int64(15*MB), h)
+	h.CacheObj.BlockOffsetList = bol
+
+	// truncate block
+	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize/2)
+	h.CacheObj.BlockOffsetList.BlockList[1].EndIndex = int64(blockSize + blockSize/2)
+	s.s3Storage.storage.ReadInBuffer(name, int64(blockSize), int64(blockSize)/2, h.CacheObj.BlockOffsetList.BlockList[1].Data)
+	h.CacheObj.BlockOffsetList.BlockList[1].Flags.Set(common.DirtyBlock)
+
+	// remove 1 block
+	h.CacheObj.BlockOffsetList.BlockList = h.CacheObj.BlockOffsetList.BlockList[:2]
+
+	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
+	s.assert.Nil(err)
+
+	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
+	s.assert.Nil(err)
+	s.assert.NotEqualValues(data, output)
+	s.assert.EqualValues(data[:7.5*MB], output[:7.5*MB])
+}
+
+func (s *s3StorageTestSuite) TestFlushFileAppendBlocksEmptyFile() {
+	defer s.cleanupTest()
+
+	// Setup
+	name := generateFileName()
+	blockSize := 5 * MB
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+
+	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	handlemap.CreateCacheObject(int64(30*MB), h)
+	h.CacheObj.BlockOffsetList = bol
+	h.CacheObj.BlockIdLength = 16
+
+	data1 := make([]byte, blockSize)
+	rand.Read(data1)
+	blk1 := &common.Block{
+		StartIndex: 0,
+		EndIndex:   int64(blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Data:       data1,
+	}
+	blk1.Flags.Set(common.DirtyBlock)
+
+	data2 := make([]byte, blockSize)
+	rand.Read(data2)
+	blk2 := &common.Block{
+		StartIndex: int64(blockSize),
+		EndIndex:   2 * int64(blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Data:       data2,
+	}
+	blk2.Flags.Set(common.DirtyBlock)
+
+	data3 := make([]byte, blockSize)
+	rand.Read(data3)
+	blk3 := &common.Block{
+		StartIndex: 2 * int64(blockSize),
+		EndIndex:   3 * int64(blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Data:       data3,
+	}
+	blk3.Flags.Set(common.DirtyBlock)
+	h.CacheObj.BlockOffsetList.BlockList = append(h.CacheObj.BlockOffsetList.BlockList, blk1, blk2, blk3)
+	bol.Flags.Clear(common.SmallFile)
+
+	err := s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
+	s.assert.Nil(err)
+
+	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
+	s.assert.Nil(err)
+	s.assert.EqualValues(blk1.Data, output[0:blockSize])
+	s.assert.EqualValues(blk2.Data, output[blockSize:2*blockSize])
+	s.assert.EqualValues(blk3.Data, output[2*blockSize:3*blockSize])
+}
+
+func (s *s3StorageTestSuite) TestFlushFileAppendBlocksChunkedFile() {
+	defer s.cleanupTest()
+
+	// Setup
+	name := generateFileName()
+	blockSize := 5 * MB
+	fileSize := 30 * MB
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	data := make([]byte, fileSize)
+	rand.Read(data)
+
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), 5*MB, key, int64(blockSize))
+	s.assert.Nil(err)
+	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	handlemap.CreateCacheObject(int64(30*MB), h)
+	h.CacheObj.BlockOffsetList = bol
+	h.CacheObj.BlockIdLength = 16
+
+	data1 := make([]byte, blockSize)
+	rand.Read(data1)
+	blk1 := &common.Block{
+		StartIndex: int64(fileSize),
+		EndIndex:   int64(fileSize + blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Data:       data1,
+	}
+	blk1.Flags.Set(common.DirtyBlock)
+
+	data2 := make([]byte, blockSize)
+	rand.Read(data2)
+	blk2 := &common.Block{
+		StartIndex: int64(fileSize + blockSize),
+		EndIndex:   int64(fileSize + 2*blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Data:       data2,
+	}
+	blk2.Flags.Set(common.DirtyBlock)
+
+	data3 := make([]byte, blockSize)
+	rand.Read(data3)
+	blk3 := &common.Block{
+		StartIndex: int64(fileSize + 2*blockSize),
+		EndIndex:   int64(fileSize + 3*blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Data:       data3,
+	}
+	blk3.Flags.Set(common.DirtyBlock)
+	h.CacheObj.BlockOffsetList.BlockList = append(h.CacheObj.BlockOffsetList.BlockList, blk1, blk2, blk3)
+	bol.Flags.Clear(common.SmallFile)
+
+	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
+	s.assert.Nil(err)
+
+	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
+	s.assert.Nil(err)
+	s.assert.EqualValues(data, output[0:fileSize])
+	s.assert.EqualValues(blk1.Data, output[fileSize:fileSize+blockSize])
+	s.assert.EqualValues(blk2.Data, output[fileSize+blockSize:fileSize+2*blockSize])
+	s.assert.EqualValues(blk3.Data, output[fileSize+2*blockSize:fileSize+3*blockSize])
+}
+
+func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
+	defer s.cleanupTest()
+
+	// Setup
+	name := generateFileName()
+	blockSize := 5 * MB
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+
+	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	handlemap.CreateCacheObject(int64(15*MB), h)
+	h.CacheObj.BlockOffsetList = bol
+	h.CacheObj.BlockIdLength = 16
+
+	blk1 := &common.Block{
+		StartIndex: 0,
+		EndIndex:   int64(blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+	}
+	blk1.Flags.Set(common.TruncatedBlock)
+	blk1.Flags.Set(common.DirtyBlock)
+
+	blk2 := &common.Block{
+		StartIndex: int64(blockSize),
+		EndIndex:   2 * int64(blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+	}
+	blk2.Flags.Set(common.TruncatedBlock)
+	blk2.Flags.Set(common.DirtyBlock)
+
+	blk3 := &common.Block{
+		StartIndex: 2 * int64(blockSize),
+		EndIndex:   3 * int64(blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+	}
+	blk3.Flags.Set(common.TruncatedBlock)
+	blk3.Flags.Set(common.DirtyBlock)
+	h.CacheObj.BlockOffsetList.BlockList = append(h.CacheObj.BlockOffsetList.BlockList, blk1, blk2, blk3)
+	bol.Flags.Clear(common.SmallFile)
+
+	err := s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
+	s.assert.Nil(err)
+
+	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
+	s.assert.Nil(err)
+	data := make([]byte, 3*blockSize)
+	s.assert.EqualValues(data, output)
+}
+
+func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
+	defer s.cleanupTest()
+
+	// Setup
+	name := generateFileName()
+	blockSize := 5 * MB
+	fileSize := 30 * MB
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	data := make([]byte, fileSize)
+	rand.Read(data)
+
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), 5*MB, key, int64(blockSize))
+	s.assert.Nil(err)
+	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	handlemap.CreateCacheObject(int64(30*MB), h)
+	h.CacheObj.BlockOffsetList = bol
+	h.CacheObj.BlockIdLength = 16
+
+	blk1 := &common.Block{
+		StartIndex: int64(fileSize),
+		EndIndex:   int64(fileSize + blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+	}
+	blk1.Flags.Set(common.TruncatedBlock)
+	blk1.Flags.Set(common.DirtyBlock)
+
+	blk2 := &common.Block{
+		StartIndex: int64(fileSize + blockSize),
+		EndIndex:   int64(fileSize + 2*blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+	}
+	blk2.Flags.Set(common.TruncatedBlock)
+	blk2.Flags.Set(common.DirtyBlock)
+
+	blk3 := &common.Block{
+		StartIndex: int64(fileSize + 2*blockSize),
+		EndIndex:   int64(fileSize + 3*blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+	}
+	blk3.Flags.Set(common.TruncatedBlock)
+	blk3.Flags.Set(common.DirtyBlock)
+	h.CacheObj.BlockOffsetList.BlockList = append(h.CacheObj.BlockOffsetList.BlockList, blk1, blk2, blk3)
+	bol.Flags.Clear(common.SmallFile)
+
+	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
+	s.assert.Nil(err)
+
+	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
+	s.assert.Nil(err)
+	s.assert.EqualValues(data, output[:fileSize])
+	emptyData := make([]byte, 3*blockSize)
+	s.assert.EqualValues(emptyData, output[fileSize:])
+}
+
+func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
+	defer s.cleanupTest()
+
+	// Setup
+	name := generateFileName()
+	blockSize := 7 * MB
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+
+	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	handlemap.CreateCacheObject(int64(12*MB), h)
+	h.CacheObj.BlockOffsetList = bol
+	h.CacheObj.BlockIdLength = 16
+
+	data1 := make([]byte, blockSize)
+	rand.Read(data1)
+	blk1 := &common.Block{
+		StartIndex: 0,
+		EndIndex:   int64(blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Data:       data1,
+	}
+	blk1.Flags.Set(common.DirtyBlock)
+
+	blk2 := &common.Block{
+		StartIndex: int64(blockSize),
+		EndIndex:   2 * int64(blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+	}
+	blk2.Flags.Set(common.DirtyBlock)
+	blk2.Flags.Set(common.TruncatedBlock)
+
+	blk3 := &common.Block{
+		StartIndex: 2 * int64(blockSize),
+		EndIndex:   3 * int64(blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+	}
+	blk3.Flags.Set(common.DirtyBlock)
+	blk3.Flags.Set(common.TruncatedBlock)
+	h.CacheObj.BlockOffsetList.BlockList = append(h.CacheObj.BlockOffsetList.BlockList, blk1, blk2, blk3)
+	bol.Flags.Clear(common.SmallFile)
+
+	err := s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
+	s.assert.Nil(err)
+
+	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
+	s.assert.Nil(err)
+	data := make([]byte, blockSize)
+	s.assert.EqualValues(blk1.Data, output[0:blockSize])
+	s.assert.EqualValues(data, output[blockSize:2*blockSize])
+	s.assert.EqualValues(data, output[2*blockSize:3*blockSize])
+}
+
+// TODO: Fix this test
+// This test can be fixed once I address combining new parts to an object
+// where the current end part is smaller than the smallest part on AWS
+// We will then need to do an upload and change all of the later part sizes
+// to address this.
+func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
+	defer s.cleanupTest()
+
+	// Setup
+	name := generateFileName()
+	blockSize := 7 * MB
+	fileSize := 16 * MB
+	h, _ := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	data := make([]byte, fileSize)
+	rand.Read(data)
+
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), 7*MB, key, int64(blockSize))
+	s.assert.Nil(err)
+	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
+	handlemap.CreateCacheObject(int64(16*MB), h)
+	h.CacheObj.BlockOffsetList = bol
+	h.CacheObj.BlockIdLength = 16
+
+	data1 := make([]byte, blockSize)
+	rand.Read(data1)
+	blk1 := &common.Block{
+		StartIndex: int64(fileSize),
+		EndIndex:   int64(fileSize + blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Data:       data1,
+	}
+	blk1.Flags.Set(common.DirtyBlock)
+
+	blk2 := &common.Block{
+		StartIndex: int64(fileSize + blockSize),
+		EndIndex:   int64(fileSize + 2*blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+	}
+	blk2.Flags.Set(common.DirtyBlock)
+	blk2.Flags.Set(common.TruncatedBlock)
+
+	blk3 := &common.Block{
+		StartIndex: int64(fileSize + 2*blockSize),
+		EndIndex:   int64(fileSize + 3*blockSize),
+		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+	}
+	blk3.Flags.Set(common.DirtyBlock)
+	blk3.Flags.Set(common.TruncatedBlock)
+	h.CacheObj.BlockOffsetList.BlockList = append(h.CacheObj.BlockOffsetList.BlockList, blk1, blk2, blk3)
+	bol.Flags.Clear(common.SmallFile)
+
+	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
+	s.assert.Nil(err)
+
+	// file should be empty
+	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
+	s.assert.Nil(err)
+	s.assert.EqualValues(data, output[:fileSize])
+	emptyData := make([]byte, blockSize)
+	s.assert.EqualValues(blk1.Data, output[fileSize:fileSize+blockSize])
+	s.assert.EqualValues(emptyData, output[fileSize+blockSize:fileSize+2*blockSize])
+	s.assert.EqualValues(emptyData, output[fileSize+2*blockSize:fileSize+3*blockSize])
+}
+
+func TestS3Storage(t *testing.T) {
+	suite.Run(t, new(s3StorageTestSuite))
 }
