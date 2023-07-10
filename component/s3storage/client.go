@@ -175,19 +175,11 @@ func (cl *Client) CreateDirectory(name string) error {
 	log.Trace("Client::CreateDirectory : name %s", name)
 	// Lyve Cloud does not support creating an empty file to indicate a directory
 	// directories will be represented only as object prefixes
-	// we have no way of representing an empty directory, so do nothing
-	// but we do need to return an error if the directory already exists
-	name = internal.ExtendDirName(name)
-	list, _, err := cl.List(name, nil, 1)
-	if err != nil {
-		log.Err("Client::CreateDirectory : Failed to List %s. Here's why: %v", name, err)
-		// return the error (this prevents the attribute cache from creating a bogus cache entry)
-		return err
-	}
-	if len(list) > 0 {
-		// directory already exists
-		return syscall.EEXIST
-	}
+	// we have no way of representing an empty directory, so do nothing.
+	// Note: we could try to list the directory and return EEXIST if it has contents,
+	// but that would be a performance penalty for a check that the OS already does.
+	// So, let's make it clear: we expect the OS to call GetAttr() on the directory
+	// to make sure it doesn't exist before trying to create it.
 	return nil
 }
 
