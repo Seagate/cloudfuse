@@ -13,8 +13,6 @@ from PySide6.QtWidgets import QMainWindow
 from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
 from lyve_config_common import lyveSettingsWidget
 from azure_config_common import azureSettingsWidget
-import sys
-from io import StringIO
 
 bucketOptions = ['s3storage', 'azstorage']
 mountTargetComponent = 3
