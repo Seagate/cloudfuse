@@ -81,10 +81,10 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     msg.exec()
                 else:
                     isRunning = True
-                    return True #started just fine
+                    return isRunning #started just fine
             else:
-                if isRunning == True:
-                    return True
+                if isRunning:
+                    return isRunning
                 self.textEdit_output.setText("!!Error starting service to mount container!!\n")# + mount.stdout.decode())
                 # Get the users attention by popping open a new window on an error
                 msg.setWindowTitle("Error")
@@ -106,8 +106,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     isRunning = True
                     return True #installed just fine or is already installed.
             else:
-                if isRunning == True:
-                    return True
+                if isRunning:
+                    return isRunning
                 self.textEdit_output.setText("!!Error starting service to mount container!!\n")# + mount.stdout.decode())
                 # Get the users attention by popping open a new window on an error
                 msg.setWindowTitle("Error")
