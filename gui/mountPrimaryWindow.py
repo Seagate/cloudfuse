@@ -61,9 +61,9 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             #if service already installed, run lyvecloudfuse.exe service start
             #if start successful, run lyvecloudfuse.exe service mount
             
-            exec('mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "install"], capture_output=True))', globals())         
+            mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "install"], capture_output=True))      
             if (mount.returncode == 0 or mount.stderr.decode().find("lyvecloudfuse service already exists") != -1): #we found this message
-                exec('mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "start"], capture_output=True))', globals())
+                mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "start"], capture_output=True))
                 if mount.stderr.decode().find("An instance of the service is already running.") != -1:
                     isRunning = True
                     self.textEdit_output.setText("!!The container is already mounted!!\n")# + mount.stdout.decode())
@@ -71,7 +71,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     msg.setWindowTitle("Error")
                     msg.setText("This container is already mounted at this directory.")
                     # Show the message box
-                    x = msg.exec()
+                    msg.exec()
                 
                 elif mount.returncode == 1: 
 
@@ -80,7 +80,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     msg.setWindowTitle("Error")
                     msg.setText("Error mounting container - uninstall the service and try again")
                     # Show the message box
-                    x = msg.exec()
+                    msg.exec()
                 else:
                     isRunning = True
                     return True #started just fine
@@ -92,18 +92,18 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 msg.setWindowTitle("Error")
                 msg.setText("Error starting service to mount container - check the settings and try again")
                 # Show the message box
-                x = msg.exec()
+                msg.exec()
         else: 
-            exec('mount = subprocess.run(["./lyvecloudfuse", "service", "install"], capture_output=True)', globals())#,capture_output=True)
+            mount = subprocess.run(["./lyvecloudfuse", "service", "install"], capture_output=True)
             if (mount.returncode == 1 or mount.stderr.decode().find("lyvecloudfuse service already exists") != -1): #we found this message
-                exec('mount = subprocess.run(["./lyvecloudfuse", "service", "install"], capture_output=True)', globals())#,capture_output=True)
+                mount = subprocess.run(["./lyvecloudfuse", "service", "install"], capture_output=True)
                 if mount.returncode != 0:
                     self.textEdit_output.setText("!!Error starting service before mounting container!!\n")# + mount.stdout.decode())
                     # Get the users attention by popping open a new window on an error
                     msg.setWindowTitle("Error")
                     msg.setText("Error mounting container - uninstall the service and try again")
                     # Show the message box
-                    x = msg.exec() 
+                    msg.exec() 
                 else:
                     isRunning = True
                     return True #installed just fine or is already installed.
@@ -115,7 +115,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 msg.setWindowTitle("Error")
                 msg.setText("Error starting service to mount container - check the settings and try again")
                 # Show the message box
-                x = msg.exec()
+                msg.exec()
 
     def mountBucket(self):
         msg = QtWidgets.QMessageBox()
@@ -135,7 +135,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 directory = directory+'/lyveCloudFuse'
                 
                 isRunning = self.serviceInstall(platform) #install and start the service
-                exec('mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "mount", directory, "--config-file=./config.yaml"], capture_output=True))', globals(), locals())
+                mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "mount", directory, "--config-file=./config.yaml"], capture_output=True))
                 if mount.returncode == 0:
                     self.textEdit_output.setText("Successfully mounted container\n")
                 else:
@@ -146,13 +146,13 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     msg.setWindowTitle("Error")
                     msg.setText("Error mounting container - check the settings and try again")
                     # Show the message box
-                    x = msg.exec()
+                    msg.exec()
 
                 # TODO: For future use to get output on Popen
                 #   for line in mount.stdout.readlines():    
             else:
                 isRunning = self.serviceInstall(platform) #install and start the service
-                exec('mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"], capture_output=True)', globals(), locals())
+                mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"], capture_output=True)
                 # Print to the text edit window the results of the mount
                 if mount.returncode == 0:
                     self.textEdit_output.setText("Successfully mounted container\n")
@@ -164,14 +164,14 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     msg.setWindowTitle("Error")
                     msg.setText("Error mounting container - check the settings and try again")
                     # Show the message box
-                    x = msg.exec()
+                    msg.exec()
         except ValueError:
             pass
 
     def unmountBucket(self):
         msg = QtWidgets.QMessageBox()
-        try:
-            exec('unmount = subprocess.run(["./lyvecloudfuse", "service", "stop"], capture_output=True)', globals())
+        try:#TODO: umount instaed of stopping the service
+            unmount = subprocess.run(["./lyvecloudfuse", "service", "stop"], capture_output=True)
             # Print to the text edit window the results of the unmount
             if unmount.returncode == 0:
                 self.textEdit_output.setText("Successfully unmounted container\n" + unmount.stdout.decode())
@@ -180,7 +180,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 msg.setWindowTitle("Error")
                 msg.setText("Error unmounting container - check the logs")
                 # Show the message box
-                x = msg.exec()
+                msg.exec()
         except ValueError:
             pass
         
