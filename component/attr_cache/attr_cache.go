@@ -318,7 +318,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 			foundCachedContents = true
 			dstKey := strings.Replace(key, srcDir, dstDir, 1)
 			// track whether the destination is gaining objects
-			movedObjects = movedObjects || (!value.attr.IsDir() && value.exists() && value.valid())
+			movedObjects = movedObjects || (value.isInCloud() && value.exists() && value.valid())
 			// to keep the directory cache coherent,
 			// any renamed directories need a new cache entry
 			if value.attr.IsDir() && value.valid() && value.exists() {
@@ -369,7 +369,7 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 	dirPath = internal.TruncateDirName(dirPath)
 	if len(dirPath) != 0 {
 		dirCacheItem, found := ac.cacheMap[dirPath]
-		if !found {
+		if !(found && dirCacheItem.valid() && dirCacheItem.exists()) {
 			dirObjAttr := internal.CreateObjAttrDir(dirPath)
 			dirCacheItem = newAttrCacheItem(dirObjAttr, true, time)
 			ac.cacheMap[dirPath] = dirCacheItem
@@ -656,7 +656,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 	ancestorPath := internal.TruncateDirName(dirPath)
 	for ancestorPath != "" {
 		ancestorCacheItem, found := ac.cacheMap[ancestorPath]
-		if !found {
+		if !(found && ancestorCacheItem.valid() && ancestorCacheItem.exists()) {
 			ancestorObjAttr := internal.CreateObjAttrDir(ancestorPath)
 			ancestorCacheItem = newAttrCacheItem(ancestorObjAttr, true, time)
 			ac.cacheMap[ancestorPath] = ancestorCacheItem
@@ -667,6 +667,10 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		ancestorCacheItem.markInCloud(false)
 		// move on to the next ancestor
 		ancestorPath = getParentDir(ancestorPath)
+	}
+	// if we're at the root, no need to search (the root is always in the cloud)
+	if len(ancestorCacheItems) == 0 {
+		return
 	}
 	// search the cache to check whether each ancestor is in cloud storage
 cacheSearch:
