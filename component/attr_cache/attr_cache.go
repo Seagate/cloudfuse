@@ -791,6 +791,11 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 	if err == nil {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
+		if ac.cacheDirs {
+			// This call needs to be treated like it's creating a new file
+			// Mark ancestors as existing in cloud storage now
+			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
+		}
 		// TODO: Could we just update the size and mod time of the file here? Or can other attributes change here?
 		// TODO: we're RLocking the cache but we need to also lock this attr item because another thread could be reading this attr item
 		ac.invalidatePath(options.Name)
