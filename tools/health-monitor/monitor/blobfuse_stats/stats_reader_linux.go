@@ -39,11 +39,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"syscall"
 	"time"
 
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal/stats_manager"
+
+	"golang.org/x/sys/unix"
 )
 
 func (bfs *BlobfuseStats) statsReader() error {
@@ -114,7 +115,7 @@ func (bfs *BlobfuseStats) statsPoll() {
 func createPipe(pipe string) error {
 	_, err := os.Stat(pipe)
 	if os.IsNotExist(err) {
-		err = syscall.Mkfifo(pipe, 0666)
+		err = unix.Mkfifo(pipe, 0666)
 		if err != nil {
 			log.Err("StatsReader::createPipe : unable to create pipe [%v]", err)
 			return err

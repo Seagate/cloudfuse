@@ -37,12 +37,14 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os/exec"
 	"regexp"
 	"strings"
 
 	"lyvecloudfuse/common"
+	"lyvecloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 )
@@ -89,9 +91,12 @@ var unmountCmd = &cobra.Command{
 // Attempts to unmount the directory and returns true if the operation succeeded
 func unmountLyvecloudfuse(mntPath string) error {
 	cliOut := exec.Command("fusermount", "-u", mntPath)
+	var errb bytes.Buffer
+	cliOut.Stderr = &errb
 	_, err := cliOut.Output()
 	if err != nil {
-		return err
+		log.Err("unmountLyvecloudfuse : failed to unmount (%s : %s)", err.Error(), errb.String())
+		return fmt.Errorf("%s", errb.String())
 	} else {
 		fmt.Println("Successfully unmounted", mntPath)
 		return nil
