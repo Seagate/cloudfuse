@@ -321,7 +321,7 @@ func (suite *attrCacheTestSuite) TestCreateDir() {
 			suite.mock.EXPECT().CreateDir(options).Return(nil)
 
 			err = suite.attrCache.CreateDir(options)
-			suite.assert.Equal(syscall.EEXIST, err)
+			suite.assert.Equal(os.ErrExist, err)
 			suite.assert.Contains(suite.attrCache.cacheMap, truncatedPath)
 		})
 	}

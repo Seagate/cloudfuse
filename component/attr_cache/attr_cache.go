@@ -297,7 +297,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 
 	// First, check if the destination directory already exists
 	if ac.pathExistsInCache(dstDir) {
-		return syscall.EEXIST
+		return os.ErrExist
 	}
 
 	// Rename all descendants of srcDir, then rename the srcDir itself
@@ -393,7 +393,7 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 			// check if directory already exists
 			newDirPath := internal.TruncateDirName(options.Name)
 			if ac.pathExistsInCache(newDirPath) {
-				return syscall.EEXIST
+				return os.ErrExist
 			}
 			newDirAttr := internal.CreateObjAttrDir(newDirPath)
 			newDirAttrCacheItem := newAttrCacheItem(newDirAttr, true, time.Now())
