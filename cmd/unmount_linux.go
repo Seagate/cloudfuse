@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
     _____           _____   _____   ____          ______  _____  ------
    |     |  |      |     | |     | |     |     | |       |            |
@@ -50,7 +52,7 @@ import (
 var unmountCmd = &cobra.Command{
 	Use:               "unmount <mount path>",
 	Short:             "Unmount Lyvecloudfuse",
-	Long:              "Unmount Lyvecloudfuse",
+	Long:              "Unmount Lyvecloudfuse. Only available on Linux",
 	SuggestFor:        []string{"unmount", "unmnt"},
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
