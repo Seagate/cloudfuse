@@ -188,8 +188,8 @@ func newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient *http.Client) pipeline
 		return func(ctx context.Context, request pipeline.Request) (pipeline.Response, error) {
 			r, err := pipelineHTTPClient.Do(request.WithContext(ctx))
 			if err != nil {
+				log.Err("BlockBlob::newLyvecloudfuseHTTPClientFactory : HTTP request failed [%s]", err.Error())
 				err = pipeline.NewError(err, "HTTP request failed")
-				log.Err("BlockBlob::newLyvecloudfuseHTTPClientFactory : HTTP request failed")
 			}
 			return pipeline.NewHTTPResponse(r), err
 		}
@@ -292,6 +292,8 @@ func storeBlobErrToErr(err error) uint16 {
 			return BlobIsUnderLease
 		case azblob.ServiceCodeInsufficientAccountPermissions:
 			return InvalidPermission
+		case "AuthorizationPermissionMismatch":
+			return InvalidPermission
 		default:
 			return ErrUnknown
 		}
@@ -311,6 +313,8 @@ func storeDatalakeErrToErr(err error) uint16 {
 			return ErrFileNotFound
 		case "LeaseIdMissing":
 			return BlobIsUnderLease
+		case "AuthorizationPermissionMismatch":
+			return InvalidPermission
 		default:
 			return ErrUnknown
 		}
@@ -587,4 +591,11 @@ func autoDetectAuthMode(opt AzStorageOptions) string {
 	}
 
 	return "msi"
+}
+
+func removeLeadingSlashes(s string) string {
+	for strings.HasPrefix(s, "/") {
+		s = strings.TrimLeft(s, "/")
+	}
+	return s
 }

@@ -38,7 +38,7 @@ package main
 
 import (
 	"lyvecloudfuse/cmd"
-	_ "lyvecloudfuse/common/log"
+	"lyvecloudfuse/common/log"
 )
 
 //go:generate ./cmd/componentGenerator.sh $NAME
@@ -46,4 +46,10 @@ import (
 
 func main() {
 	_ = cmd.Execute()
+	defer func() {
+		if panicErr := recover(); panicErr != nil {
+			log.Err("PANIC: %v", panicErr)
+			panic(panicErr)
+		}
+	}()
 }
