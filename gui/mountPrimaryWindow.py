@@ -100,7 +100,6 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             
                 if isRunning:
                     mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "mount", directory, "--config-file=.\config.yaml"], capture_output=True))
-                    print(mount)
                     if mount.returncode == 0:
                         self.textEdit_output.setText("Successfully mounted container\n")
                     elif mount.stderr.decode().find("mount path exists") != -1:
