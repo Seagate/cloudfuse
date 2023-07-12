@@ -47,7 +47,7 @@ import (
 
 // Standard config default values
 const (
-	lyvecloudfuseVersion_ = "2.0.3"
+	lyvecloudfuseVersion_ = "2.0.4"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10

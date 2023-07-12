@@ -61,6 +61,7 @@ type AttrCache struct {
 	cacheOnList  bool
 	noSymlinks   bool
 	cacheDirs    bool
+	maxFiles     int
 	cacheMap     map[string]*attrCacheItem
 	cacheLock    sync.RWMutex
 }
@@ -72,16 +73,18 @@ type AttrCacheOptions struct {
 	NoSymlinks    bool   `config:"no-symlinks" yaml:"no-symlinks,omitempty"`
 	NoCacheDirs   bool   `config:"no-cache-dirs" yaml:"no-cache-dirs,omitempty"`
 
+	//maximum file attributes overall to be cached
+	MaxFiles int `config:"max-files" yaml:"max-files,omitempty"`
+
 	// support v1
 	CacheOnList bool `config:"cache-on-list"`
 }
 
 const compName = "attr_cache"
 
-// for now caching only first 1 mil files in a directory
+// caching only first 5 mil files by default
 // caching more means increased memory usage of the process
-const maxFilesPerDir = 1000000 // 1 million max files to be cached per directory
-const maxTotalFiles = 10000000 // 10 million max files overall to be cached
+const defaultMaxFiles = 5000000 // 5 million max files overall to be cached
 
 // Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &AttrCache{}
@@ -145,6 +148,12 @@ func (ac *AttrCache) Configure(_ bool) error {
 		ac.cacheOnList = conf.CacheOnList
 	} else {
 		ac.cacheOnList = !conf.NoCacheOnList
+	}
+
+	if config.IsSet(compName + ".max-files") {
+		ac.maxFiles = conf.MaxFiles
+	} else {
+		ac.maxFiles = defaultMaxFiles
 	}
 
 	ac.noSymlinks = conf.NoSymlinks
@@ -499,9 +508,8 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	pathList, token, err := ac.NextComponent().StreamDir(options)
 	if err == nil {
 		// TODO: will limiting the number of items cached cause bugs when cacheDirs is enabled?
-		if options.Offset < maxFilesPerDir {
-			ac.cacheAttributes(pathList)
-		}
+		ac.cacheAttributes(pathList)
+
 		// merge missing directory cache into the last page of results
 		if ac.cacheDirs && token == "" {
 			var numAdded int // prevent shadowing pathList in following line
@@ -527,7 +535,8 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 		defer ac.cacheLock.Unlock()
 		for _, attr := range pathList {
 			// TODO: will this cause a bug when cacheDirs is enabled?
-			if len(ac.cacheMap) > maxTotalFiles {
+			if len(ac.cacheMap) > ac.maxFiles {
+				log.Debug("AttrCache::cacheAttributes : %s skipping adding path to attribute cache because it is full", pathList)
 				break
 			}
 			ac.cacheMap[internal.TruncateDirName(attr.Path)] = newAttrCacheItem(attr, true, currTime)
@@ -868,8 +877,10 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// Retrieved attributes so cache them
 		// TODO: bug: when cacheDirs is true, the cache limit will cause some directories to be double-listed
 		// TODO: shouldn't this be an LRU? This sure looks like the opposite...
-		if len(ac.cacheMap) < maxTotalFiles {
+		if len(ac.cacheMap) < ac.maxFiles {
 			ac.cacheMap[truncatedPath] = newAttrCacheItem(pathAttr, true, time.Now())
+		} else {
+			log.Debug("AttrCache::GetAttr : %s skipping adding to attribute cache because it is full", options.Name)
 		}
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
@@ -957,8 +968,10 @@ func NewAttrCacheComponent() internal.Component {
 // On init register this component to pipeline and supply your constructor
 func init() {
 	internal.AddComponent(compName, NewAttrCacheComponent)
+
 	attrCacheTimeout := config.AddUint32Flag("attr-cache-timeout", defaultAttrCacheTimeout, "attribute cache timeout")
 	config.BindPFlag(compName+".timeout-sec", attrCacheTimeout)
+
 	noSymlinks := config.AddBoolFlag("no-symlinks", false, "whether or not symlinks should be supported")
 	config.BindPFlag(compName+".no-symlinks", noSymlinks)
 	noCacheDirs := config.AddBoolFlag("no-cache-dirs", false, "whether or not empty directories should be cached")

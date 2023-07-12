@@ -130,10 +130,10 @@ func (opt *mountOptions) validate(skipEmptyMount bool) error {
 		if opt.Logging.LogFilePath == common.DefaultLogFilePath {
 			// If default-working-dir is set then default log path shall be set to that path
 			// Ignore if specific log-path is provided by user
-			opt.Logging.LogFilePath = filepath.Join(common.DefaultWorkDir, "blobfuse2.log")
+			opt.Logging.LogFilePath = common.JoinUnixFilepath(common.DefaultWorkDir, "lyvecloudfuse.log")
 		}
 
-		common.DefaultLogFilePath = filepath.Join(common.DefaultWorkDir, "blobfuse2.log")
+		common.DefaultLogFilePath = common.JoinUnixFilepath(common.DefaultWorkDir, "lyvecloudfuse.log")
 	}
 
 	f, err := os.Stat(common.ExpandPath(common.DefaultWorkDir))
@@ -342,6 +342,8 @@ var mountCmd = &cobra.Command{
 						return fmt.Errorf("failed to parse gid [%s]", err.Error())
 					}
 					config.Set("libfuse.gid", fmt.Sprint(val))
+				} else if v == "direct_io" || v == "direct_io=true" {
+					config.Set("libfuse.direct-io", "true")
 				} else {
 					return errors.New(common.FuseAllowedFlags)
 				}

@@ -237,3 +237,10 @@ func split(prefixPath string, path string) string {
 	// prefix not found - return the path unaltered
 	return path
 }
+
+func removeLeadingSlashes(s string) string {
+	for strings.HasPrefix(s, "/") {
+		s = strings.TrimLeft(s, "/")
+	}
+	return s
+}
