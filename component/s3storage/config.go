@@ -67,7 +67,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
 
 	// If subdirectory is mounted, take the prefix path
-	s3.stConfig.prefixPath = opt.PrefixPath
+	s3.stConfig.prefixPath = removeLeadingSlashes(opt.PrefixPath)
 	// TODO: add more config options to customize AWS SDK behavior and import them here
 
 	return nil

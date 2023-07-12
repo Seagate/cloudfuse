@@ -60,12 +60,13 @@ func (suite *libfuseTestSuite) TestDefault() {
 	suite.assert.Equal(suite.libfuse.negativeTimeout, uint32(120))
 	suite.assert.False(suite.libfuse.disableWritebackCache)
 	suite.assert.True(suite.libfuse.ignoreOpenFlags)
+	suite.assert.False(suite.libfuse.directIO)
 }
 
 func (suite *libfuseTestSuite) TestConfig() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default libfuse generated
-	config := "allow-other: true\nread-only: true\nlibfuse:\n  attribute-expiration-sec: 60\n  entry-expiration-sec: 60\n  negative-entry-expiration-sec: 60\n  fuse-trace: true\n  disable-writeback-cache: true\n  ignore-open-flags: false\n  network-share: true\n"
+	config := "allow-other: true\nread-only: true\nlibfuse:\n  attribute-expiration-sec: 60\n  entry-expiration-sec: 60\n  negative-entry-expiration-sec: 60\n  fuse-trace: true\n  disable-writeback-cache: true\n  ignore-open-flags: false\n  direct-io: true\n  network-share: true\n"
 	suite.setupTestHelper(config) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal(suite.libfuse.Name(), "libfuse")
@@ -82,12 +83,13 @@ func (suite *libfuseTestSuite) TestConfig() {
 	suite.assert.Equal(suite.libfuse.entryExpiration, uint32(60))
 	suite.assert.Equal(suite.libfuse.attributeExpiration, uint32(60))
 	suite.assert.Equal(suite.libfuse.negativeTimeout, uint32(60))
+	suite.assert.True(suite.libfuse.directIO)
 }
 
 func (suite *libfuseTestSuite) TestConfigZero() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default libfuse generated
-	config := "read-only: true\nlibfuse:\n  attribute-expiration-sec: 0\n  entry-expiration-sec: 0\n  negative-entry-expiration-sec: 0\n  fuse-trace: true\n"
+	config := "read-only: true\nlibfuse:\n  attribute-expiration-sec: 0\n  entry-expiration-sec: 0\n  negative-entry-expiration-sec: 0\n  fuse-trace: true\n  direct-io: false\n"
 	suite.setupTestHelper(config) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal(suite.libfuse.Name(), "libfuse")
@@ -102,12 +104,13 @@ func (suite *libfuseTestSuite) TestConfigZero() {
 	suite.assert.Equal(suite.libfuse.entryExpiration, uint32(0))
 	suite.assert.Equal(suite.libfuse.attributeExpiration, uint32(0))
 	suite.assert.Equal(suite.libfuse.negativeTimeout, uint32(0))
+	suite.assert.False(suite.libfuse.directIO)
 }
 
 func (suite *libfuseTestSuite) TestConfigDefaultPermission() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default libfuse generated
-	config := "read-only: true\nlibfuse:\n  default-permission: 0555\n  attribute-expiration-sec: 0\n  entry-expiration-sec: 0\n  negative-entry-expiration-sec: 0\n  fuse-trace: true\n"
+	config := "read-only: true\nlibfuse:\n  default-permission: 0555\n  attribute-expiration-sec: 0\n  entry-expiration-sec: 0\n  negative-entry-expiration-sec: 0\n  fuse-trace: true\n  direct-io: true\n"
 	suite.setupTestHelper(config) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal(suite.libfuse.Name(), "libfuse")
@@ -122,6 +125,7 @@ func (suite *libfuseTestSuite) TestConfigDefaultPermission() {
 	suite.assert.Equal(suite.libfuse.entryExpiration, uint32(0))
 	suite.assert.Equal(suite.libfuse.attributeExpiration, uint32(0))
 	suite.assert.Equal(suite.libfuse.negativeTimeout, uint32(0))
+	suite.assert.True(suite.libfuse.directIO)
 }
 
 func (suite *libfuseTestSuite) TestDisableWritebackCache() {

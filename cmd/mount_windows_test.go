@@ -321,6 +321,7 @@ func (suite *mountTestSuite) TestFuseOptions() {
 		{opt: "umask=777", ignore: false},
 		{opt: "uid=1000", ignore: false},
 		{opt: "gid=1000", ignore: false},
+		{opt: "direct_io", ignore: false},
 	}
 
 	for _, val := range opts {
@@ -376,6 +377,7 @@ func (suite *mountTestSuite) TestMountOptionVaildate() {
 	suite.assert.Empty(opts.Logging.LogFilePath)
 
 	opts.DefaultWorkingDir, _ = os.UserHomeDir()
+	opts.DefaultWorkingDir = common.JoinUnixFilepath(opts.DefaultWorkingDir)
 	err = opts.validate(true)
 	suite.assert.Nil(err)
 	suite.assert.Empty(opts.Logging.LogFilePath)
