@@ -90,6 +90,12 @@ func (az *AzStorage) Configure(isParent bool) error {
 		return fmt.Errorf("config error in %s [%s]", az.Name(), err.Error())
 	}
 
+	err = config.UnmarshalKey("restricted-characters-windows", &conf.RestrictedCharsWin)
+	if err != nil {
+		log.Err("AzStorage::Configure : config error [unable to obtain restricted-characters-windows]")
+		return err
+	}
+
 	err = ParseAndValidateConfig(az, conf)
 	if err != nil {
 		log.Err("AzStorage::Configure : Config validation failed [%s]", err.Error())
@@ -631,6 +637,9 @@ func init() {
 
 	disableCompression := config.AddBoolFlag("disable-compression", false, "Disable transport layer compression.")
 	config.BindPFlag(compName+".disable-compression", disableCompression)
+
+	restrictedCharsWin := config.AddBoolFlag("restricted-characters-windows", false, "Enable support for displaying restricted characters on Windows.")
+	config.BindPFlag("restricted-characters-windows", restrictedCharsWin)
 
 	config.RegisterFlagCompletionFunc("container-name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveNoFileComp
