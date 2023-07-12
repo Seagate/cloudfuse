@@ -51,7 +51,6 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     #wrapper/helper for the service install and start.
     def windowsServiceInstall(self):
         msg = QtWidgets.QMessageBox()
-        isRunning = False
 
         #use the completedProcess object in mount var to determine next steps 
         #if service already installed, run lyvecloudfuse.exe service start
@@ -61,16 +60,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         if (mount.returncode == 0 or mount.stderr.decode().find("lyvecloudfuse service already exists") != -1): #we found this message
             mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "start"], capture_output=True))
             if mount.stderr.decode().find("An instance of the service is already running.") != -1:
-                isRunning = True
-                self.textEdit_output.setText("!!The container is already mounted!!\n")# + mount.stdout.decode())
-                # Get the users attention by popping open a new window on an error
-                msg.setWindowTitle("Error")
-                msg.setText("This container is already mounted at this directory.")
-                # Show the message box
-                msg.exec()
-            
+                return True
             elif mount.returncode == 1: 
-
                 self.textEdit_output.setText("!!Error starting service before mounting container!!\n")# + mount.stdout.decode())
                 # Get the users attention by popping open a new window on an error
                 msg.setWindowTitle("Error")
@@ -79,8 +70,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 msg.exec()
                 return False
             else:
-                isRunning = True
-                return isRunning #started just fine
+                return True #started just fine
         else:
             self.textEdit_output.setText("!!Error installing service to mount container!!\n")# + mount.stdout.decode())
             # Get the users attention by popping open a new window on an error
@@ -113,6 +103,13 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     print(mount)
                     if mount.returncode == 0:
                         self.textEdit_output.setText("Successfully mounted container\n")
+                    elif mount.stderr.decode().find("mount path exists") != -1:
+                        self.textEdit_output.setText("!!The container is already mounted!!\n")# + mount.stdout.decode())
+                        # Get the users attention by popping open a new window on an error
+                        msg.setWindowTitle("Error")
+                        msg.setText("This container is already mounted at this directory.")
+                        # Show the message box
+                        msg.exec()       
                 else:
                     self.textEdit_output.setText("!!Error mounting container!!\n")# + mount.stdout.decode())
                     # Get the users attention by popping open a new window on an error
