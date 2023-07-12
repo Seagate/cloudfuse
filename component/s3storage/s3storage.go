@@ -86,6 +86,12 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 		return fmt.Errorf("config error in %s [%s]", s3.Name(), err.Error())
 	}
 
+	err = config.UnmarshalKey("restricted-characters-windows", &conf.RestrictedCharsWin)
+	if err != nil {
+		log.Err("AzStorage::Configure : config error [unable to obtain restricted-characters-windows]")
+		return err
+	}
+
 	err = ParseAndValidateConfig(s3, conf)
 	if err != nil {
 		log.Err("S3Storage::Configure : Config validation failed [%s]", err.Error())
