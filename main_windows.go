@@ -62,5 +62,11 @@ func main() {
 		}
 	} else {
 		_ = cmd.Execute()
+		defer func() {
+			if panicErr := recover(); panicErr != nil {
+				log.Err("PANIC: %v", panicErr)
+				panic(panicErr)
+			}
+		}()
 	}
 }
