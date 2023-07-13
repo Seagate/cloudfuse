@@ -192,9 +192,6 @@
        </item>
        <item>
         <widget class="QComboBox" name="dropDown_libfuse_permissions">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
          <item>
           <property name="text">
            <string>0777</string>
@@ -219,9 +216,6 @@
        </item>
        <item>
         <widget class="QComboBox" name="dropDown_pipeline">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
          <item>
           <property name="text">
            <string>File Caching</string>
