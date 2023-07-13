@@ -38,8 +38,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort" // to sort List() results
 	"strings"
 	"time"
@@ -47,6 +49,7 @@ import (
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/convertname"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -188,9 +191,8 @@ func (cl *Client) copyObject(source string, target string, isSymLink bool) error
 	sourceKey := cl.getKey(source, isSymLink)
 	targetKey := cl.getKey(target, isSymLink)
 	_, err := cl.awsS3Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
-		Bucket: aws.String(cl.Config.authConfig.BucketName),
-		// TODO: URL-encode CopySource
-		CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, sourceKey)),
+		Bucket:     aws.String(cl.Config.authConfig.BucketName),
+		CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, url.PathEscape(sourceKey))),
 		Key:        aws.String(targetKey),
 	})
 	// check for errors on copy
@@ -344,11 +346,12 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 
 		// now let's add attributes for all the directories in dirList
 		for dir := range dirList {
-			if dir == listPath {
+			dirName, _ := cl.getFile(dir)
+			if dirName == listPath {
 				continue
 			}
-			path := split(cl.Config.prefixPath, dir)
-			attr := createObjAttrDir(path)
+			path := split(cl.Config.prefixPath, dirName)
+			attr := internal.CreateObjAttrDir(path)
 			objectAttrList = append(objectAttrList, attr)
 		}
 
@@ -409,18 +412,25 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) {
 	return attr
 }
 
-// Convert file name to object getKey
+// getKey converts a file name to an object name. If it is a symlink it prepends
+// .rclonelink. If it is set to convert names from Linux to Windows then it allows
+// special characters like "*:<>?| to be displayed on Windows.
 func (cl *Client) getKey(name string, isSymLink bool) string {
-
 	if isSymLink {
 		name = name + symlinkStr
 	}
 
-	return common.JoinUnixFilepath(cl.Config.prefixPath, name)
+	name = common.JoinUnixFilepath(cl.Config.prefixPath, name)
+	if runtime.GOOS == "windows" && cl.Config.restrictedCharsWin {
+		name = convertname.WindowsFileToCloud(name)
+	}
+	return name
 }
 
-// take the string argument and checks if it has a ".rclonelink" suffix.
-// If so, it stripps the suffix and returns the new string and true
+// getFile converts an object name to a file name. If the name has a ".rclonelink" suffix.
+// then it removes the suffix and returns true to indicate a symbolic link. If it is set to
+// convert names from Linux to Windows then it converts special ASCII characters back to the
+// original special characters.
 func (cl *Client) getFile(name string) (string, bool) {
 	isSymLink := false
 
@@ -428,6 +438,10 @@ func (cl *Client) getFile(name string) (string, bool) {
 	if strings.HasSuffix(name, symlinkStr) {
 		isSymLink = true
 		name = name[:len(name)-len(symlinkStr)]
+	}
+
+	if runtime.GOOS == "windows" && cl.Config.restrictedCharsWin {
+		name = convertname.WindowsCloudToFile(name)
 	}
 
 	return name, isSymLink

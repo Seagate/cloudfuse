@@ -40,10 +40,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"syscall"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
+
+	"golang.org/x/sys/unix"
 )
 
 func (sc *StatsCollector) statsDumper() {
@@ -231,7 +232,7 @@ func createPipe(pipe string) error {
 
 	_, err := os.Stat(pipe)
 	if os.IsNotExist(err) {
-		err = syscall.Mkfifo(pipe, 0666)
+		err = unix.Mkfifo(pipe, 0666)
 		if err != nil {
 			log.Err("stats_manager::createPipe : unable to create pipe %v [%v]", pipe, err)
 			return err

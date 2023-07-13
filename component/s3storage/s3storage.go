@@ -86,6 +86,12 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 		return fmt.Errorf("config error in %s [%s]", s3.Name(), err.Error())
 	}
 
+	err = config.UnmarshalKey("restricted-characters-windows", &conf.RestrictedCharsWin)
+	if err != nil {
+		log.Err("AzStorage::Configure : config error [unable to obtain restricted-characters-windows]")
+		return err
+	}
+
 	err = ParseAndValidateConfig(s3, conf)
 	if err != nil {
 		log.Err("S3Storage::Configure : Config validation failed [%s]", err.Error())
@@ -199,10 +205,8 @@ func (s3 *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 		log.Err("S3Storage::IsDirEmpty : error listing [%s]", err)
 		return false
 	}
-	if len(list) == 0 {
-		return true
-	}
-	return false
+
+	return len(list) == 0
 }
 
 func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
@@ -232,20 +236,20 @@ func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 }
 
 func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
-	log.Trace("S3Storage::StreamDir : Path %s, offset %d, count %d", options.Name, options.Offset, options.Count)
+	log.Trace("S3Storage::StreamDir : %s, offset %d, count %d", options.Name, options.Offset, options.Count)
 
 	path := formatListDirName(options.Name)
 
 	newList, newMarker, err := s3.storage.List(path, &options.Token, options.Count)
 	if err != nil {
-		log.Err("S3Storage::StreamDir : Failed to read dir [%s]", err)
+		log.Err("S3Storage::StreamDir : %s Failed to read dir [%s]", options.Name, err)
 		return newList, "", err
 	}
 
-	log.Debug("S3Storage::StreamDir : Retrieved %d objects with %s marker for Path %s", len(newList), options.Token, path)
+	log.Debug("S3Storage::StreamDir : %s Retrieved %d objects with marker %s", options.Name, len(newList), options.Token)
 
 	if newMarker != nil && *newMarker != "" {
-		log.Debug("S3Storage::StreamDir : next-marker %s for Path %s", *newMarker, path)
+		log.Debug("S3Storage::StreamDir : %s next-marker %s", options.Name, *newMarker)
 		if len(newList) == 0 {
 			/* In some customer scenario we have seen that newList is empty but marker is not empty
 			   which means backend has not returned any items this time but there are more left.
@@ -253,7 +257,7 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			   and will terminate the readdir call. As there are more items left on the server side we
 			   need to retry getting a list here.
 			*/
-			log.Warn("S3Storage::StreamDir : next-marker %s but current list is empty. Need to retry listing", *newMarker)
+			log.Warn("S3Storage::StreamDir : %s next-marker %s but current list is empty. Need to retry listing", options.Name, *newMarker)
 			options.Token = *newMarker
 			return s3.StreamDir(options)
 		}

@@ -1,5 +1,13 @@
 //go:build windows
 
+// The following code is copied and modified from the Go source
+// code and is covered by the copyright below.
+
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+// https://github.com/golang/go/blob/master/LICENSE
+
 package common
 
 import (

@@ -1,5 +1,3 @@
-//go:build linux
-
 /*
     _____           _____   _____   ____          ______  _____  ------
    |     |  |      |     | |     | |     |     | |       |            |
@@ -12,8 +10,6 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -34,26 +30,38 @@
    SOFTWARE
 */
 
-package common
+package convertname
 
 import (
-	"fmt"
+	"testing"
 
-	"golang.org/x/sys/unix"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-// NotifyMountToParent : Send a signal to parent process about successful mount
-func NotifyMountToParent() error {
-	if !ForegroundMount {
-		ppid := unix.Getppid()
-		if ppid > 1 {
-			if err := unix.Kill(ppid, unix.SIGUSR2); err != nil {
-				return err
-			}
-		} else {
-			return fmt.Errorf("failed to get parent pid, received : %v", ppid)
-		}
-	}
+type conversionTestSuite struct {
+	suite.Suite
+	assert *assert.Assertions
+}
 
-	return nil
+func (suite *conversionTestSuite) SetupTest() {
+	suite.assert = assert.New(suite.T())
+}
+
+func (suite *conversionTestSuite) TestCloudToFile() {
+	filename := "test\"*:<>?|"
+	cloudname := "test＂＊：＜＞？｜"
+	result := WindowsCloudToFile(filename)
+	suite.assert.EqualValues(cloudname, result)
+}
+
+func (suite *conversionTestSuite) TestFileToCloud() {
+	filename := "test＂＊：＜＞？｜"
+	cloudname := "test\"*:<>?|"
+	result := WindowsFileToCloud(filename)
+	suite.assert.EqualValues(cloudname, result)
+}
+
+func TestConversionTestSuite(t *testing.T) {
+	suite.Run(t, new(conversionTestSuite))
 }

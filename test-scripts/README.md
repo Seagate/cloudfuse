@@ -4,7 +4,7 @@ running on the CI/CD pipeline.
 
 To run on Linux follow the following steps:
 
-1. First go into the directory in the helper folder and run
+1. First go into the helper folder and run
    ./setup.sh
    
    This will create a file that stores environment variables for the
@@ -20,7 +20,7 @@ To run on Linux follow the following steps:
 2. Ensure that you have a config.yaml file in the lyvecloudfuse 
    repository. These tests will run with that config file.
 
-3. Run the tesst by running the scripts. You must be in the test-scripts
+3. Run the test by running the scripts. You must be in the test-scripts
    directory to execute them. You can run them like
 
    ./benchmark-test.sh
