@@ -118,7 +118,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     msg.exec()
 
                 # TODO: For future use to get output on Popen
-                #   for line in mount.stdout.readlines():    
+                # for line in mount.stdout.readlines():    
             else:
                 mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"], capture_output=True)
                 # Print to the text edit window the results of the mount
