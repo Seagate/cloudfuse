@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>540</width>
-    <height>522</height>
+    <height>543</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -25,7 +25,7 @@
      <item>
       <widget class="QCheckBox" name="checkBox_multiUser">
        <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select to allow multiple users to access the container&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Allow users to access the mounted directory - used for FUSE and File Cache&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
        <property name="text">
         <string>Multiple Users</string>
@@ -37,6 +37,9 @@
      </item>
      <item>
       <widget class="QCheckBox" name="checkBox_nonEmptyDir">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Allow mounting on non-empty directory - used for FUSE&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
        <property name="text">
         <string>Non-empty directory mount</string>
        </property>
@@ -44,6 +47,9 @@
      </item>
      <item>
       <widget class="QCheckBox" name="checkBox_readOnly">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Mount in read only mode - used for Streaming and FUSE&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
        <property name="text">
         <string>Read-only mount</string>
        </property>
@@ -51,6 +57,9 @@
      </item>
      <item>
       <widget class="QCheckBox" name="checkBox_daemonForeground">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Run CloudFuse in the foreground of background. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
        <property name="text">
         <string>Run in foreground</string>
        </property>
@@ -58,6 +67,9 @@
      </item>
      <item>
       <widget class="QCheckBox" name="checkBox_libfuse_ignoreAppend">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Ignore the append and write only flag since append and write only is not supported with writeback caching. Alternatively, disable the write-back cache.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
        <property name="text">
         <string>Ignore append/write only flags</string>
        </property>
@@ -87,6 +99,9 @@
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
         <widget class="QLabel" name="label_4">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The amount of time (seconds) the kernal can cache inode attributes&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
           <string>Attribute expiration (s)</string>
          </property>
@@ -94,6 +109,9 @@
        </item>
        <item>
         <widget class="QLabel" name="label_5">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The amount of time (seconds) the kernel can cache directory listings attributes&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
           <string>Entry expiration (s)</string>
          </property>
@@ -101,6 +119,9 @@
        </item>
        <item>
         <widget class="QLabel" name="label_6">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The amount of time (seconds) the kernel can cache attributes for non-existent paths&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
           <string>Negative entry exp (s)</string>
          </property>
@@ -108,6 +129,9 @@
        </item>
        <item>
         <widget class="QLabel" name="label_3">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Default permissions to be presented - full read/write permissions, read only, etc&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
           <string>Permissions</string>
          </property>
@@ -115,6 +139,9 @@
        </item>
        <item>
         <widget class="QLabel" name="label_2">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Set the pipeline mode for CloudFuse&lt;/p&gt;&lt;p&gt;Choose either File caching or Streaming&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
           <string>Mode</string>
          </property>
@@ -166,7 +193,7 @@
        <item>
         <widget class="QComboBox" name="dropDown_libfuse_permissions">
          <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Default permissions to be presented for block blobs&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <item>
           <property name="text">
@@ -193,7 +220,7 @@
        <item>
         <widget class="QComboBox" name="dropDown_pipeline">
          <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Set up the pipeline for LyveFuse. &lt;/p&gt;&lt;p&gt;Choose streaming or file caching&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <item>
           <property name="text">
@@ -221,16 +248,26 @@
        <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
          <widget class="QLabel" name="fileCache_label">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The path to the local disk cache - the directory must already exist&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
           <property name="text">
            <string>File cache path</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="lineEdit_fileCache_path"/>
+         <widget class="QLineEdit" name="lineEdit_fileCache_path">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The path to the local disk cache - the directory must already exist&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QPushButton" name="button_browse">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Browse to a directory for the file cache to be stored - choose a pre-existing directory.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
           <property name="text">
            <string>Browse</string>
           </property>
@@ -247,6 +284,9 @@
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
         <widget class="QLabel" name="label_9">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Name of the bucket to be mounted - example: MyBucket&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
           <string>Bucket name</string>
          </property>
@@ -254,6 +294,9 @@
        </item>
        <item>
         <widget class="QLabel" name="label_8">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;S3 access key ID - Example: OCEANANIMALEMAPLE&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
           <string>Access Key</string>
          </property>
@@ -261,6 +304,9 @@
        </item>
        <item>
         <widget class="QLabel" name="label_7">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;S3 Secret access key - Example: WalRus/MAMMAL/oceanEXAMPLEKEY&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
           <string>Secret Key</string>
          </property>
@@ -268,6 +314,9 @@
        </item>
        <item>
         <widget class="QLabel" name="label">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;S3 endpoint URL. Example: https://s3.[region].lyvecloud.seagate.com&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
           <string>Endpoint</string>
          </property>
@@ -275,6 +324,9 @@
        </item>
        <item>
         <widget class="QLabel" name="label_10">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;S3 region - example: us-east-1&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
           <string>Region</string>
          </property>
@@ -314,6 +366,9 @@
        <height>16777215</height>
       </size>
      </property>
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Set all the settings to the pre-programmed defaults, INCLUDING advanced options. The changes will not be made permanent unless they are saved. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
      <property name="layoutDirection">
       <enum>Qt::LeftToRight</enum>
      </property>
@@ -337,6 +392,9 @@
          <layout class="QVBoxLayout" name="verticalLayout_4">
           <item>
            <widget class="QLabel" name="fileLevelCaching_label">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Read/Write mode for file level caching or handle level caching. False means handle level caching is ON&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>File level caching</string>
             </property>
@@ -344,6 +402,9 @@
           </item>
           <item>
            <widget class="QLabel" name="blockSize_label">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The size (MB) of each block to be cached in memory while read-only mode streaming &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; text-decoration: underline;&quot;&gt;OR&lt;/span&gt;&lt;/p&gt;&lt;p&gt;The the size (MB) for newly created blocks in read/write mode&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>Block size (MB)</string>
             </property>
@@ -351,6 +412,9 @@
           </item>
           <item>
            <widget class="QLabel" name="maxBuffer_label">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The total number of buffers to store blocks in&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>Max buffer (MB)</string>
             </property>
@@ -358,6 +422,9 @@
           </item>
           <item>
            <widget class="QLabel" name="bufferSize_label">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The size (MB) of each buffer&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>Buffer size (MB)</string>
             </property>

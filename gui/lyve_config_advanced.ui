@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>633</width>
+    <width>640</width>
     <height>556</height>
    </rect>
   </property>
@@ -24,6 +24,9 @@
        <width>165</width>
        <height>16777215</height>
       </size>
+     </property>
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Reset to previous settings - does not take effect until changes are saved&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="layoutDirection">
       <enum>Qt::LeftToRight</enum>
@@ -78,6 +81,9 @@
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
         <widget class="QLabel" name="label">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The name of the subdirectory to be mounted instead of the whole bucket&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
           <string>Sub-directory</string>
          </property>
@@ -120,6 +126,9 @@
        <layout class="QVBoxLayout" name="verticalLayout_9">
         <item>
          <widget class="QCheckBox" name="checkBox_fileCache_allowNonEmptyTmp">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Allow a non-empty temp directory at startup&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
           <property name="text">
            <string>Allow Non-empty Tmp</string>
           </property>
@@ -127,6 +136,9 @@
         </item>
         <item>
          <widget class="QCheckBox" name="checkBox_fileCache_policyLogs">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generate eviction policy logs showing which files will expire soon&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
           <property name="text">
            <string>Policy Logs</string>
           </property>
@@ -134,6 +146,9 @@
         </item>
         <item>
          <widget class="QCheckBox" name="checkBox_fileCache_createEmptyFile">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Create an empty file on the container when create call is received from the kernel&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
           <property name="text">
            <string>Create Empty File</string>
           </property>
@@ -141,6 +156,9 @@
         </item>
         <item>
          <widget class="QCheckBox" name="checkBox_fileCache_cleanupStart">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Clean the temp directory on startup if it is not empty already&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
           <property name="text">
            <string>Cleanup on Start</string>
           </property>
@@ -148,6 +166,9 @@
         </item>
         <item>
          <widget class="QCheckBox" name="checkBox_fileCache_offloadIO">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;By default, libfuse will service reads/writes to files for better performance. Check the box to  make file-cache component service read/write calls as well&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
           <property name="text">
            <string>Offload IO</string>
           </property>
@@ -155,6 +176,9 @@
         </item>
         <item>
          <widget class="QCheckBox" name="checkBox_fileCache_syncToFlush">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Sync call to a file will force upload of the contents to the storage account&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
           <property name="text">
            <string>Sync to Flush</string>
           </property>
@@ -168,6 +192,9 @@
          <layout class="QVBoxLayout" name="verticalLayout_8">
           <item>
            <widget class="QLabel" name="label_14">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Eviction policy to be engaged for cache eviction:&lt;/p&gt;&lt;p&gt;LRU = Clear the &lt;span style=&quot; text-decoration: underline;&quot;&gt;L&lt;/span&gt;east &lt;span style=&quot; text-decoration: underline;&quot;&gt;R&lt;/span&gt;ecently &lt;span style=&quot; text-decoration: underline;&quot;&gt;U&lt;/span&gt;sed file next&lt;/p&gt;&lt;p&gt;LFU = Cear the &lt;span style=&quot; text-decoration: underline;&quot;&gt;L&lt;/span&gt;east &lt;span style=&quot; text-decoration: underline;&quot;&gt;F&lt;/span&gt;requently &lt;span style=&quot; text-decoration: underline;&quot;&gt;U&lt;/span&gt;sed file next&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>Eviction Policy</string>
             </property>
@@ -175,6 +202,9 @@
           </item>
           <item>
            <widget class="QLabel" name="label_15">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The amount of time (seconds) set to for eviction in the cache &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>Eviction Timeout (s)</string>
             </property>
@@ -182,6 +212,9 @@
           </item>
           <item>
            <widget class="QLabel" name="label_16">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The number of files that can be evicted at once - default 5,000&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>Max Eviction</string>
             </property>
@@ -189,6 +222,9 @@
           </item>
           <item>
            <widget class="QLabel" name="label_17">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The maximum cache size allowed in MB - set to zero for unlimited&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>Max Cache Size (MB)</string>
             </property>
@@ -196,6 +232,9 @@
           </item>
           <item>
            <widget class="QLabel" name="label_18">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The percentage of disk space consumed when the eviction is triggers. This parameter overrides the eviction timeout parameter and cached files will be removed even if they have not expired. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>Eviction Max Threshold (%)</string>
             </property>
@@ -203,6 +242,9 @@
           </item>
           <item>
            <widget class="QLabel" name="label_19">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The percentage of disk space consumed which triggers the eviction to STOP evicting files when previously triggered by the high-threshold setting.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>Eviction Min Threshold (%)</string>
             </property>
@@ -210,8 +252,11 @@
           </item>
           <item>
            <widget class="QLabel" name="label_3">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The number of seconds after which compare file in local cache and container and refresh the file if container has the latest copy&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
-             <string>Cache update file timeout(s)</string>
+             <string>Cache Update File Timeout(s)</string>
             </property>
            </widget>
           </item>
@@ -337,6 +382,9 @@
         <layout class="QHBoxLayout" name="horizontalLayout_2">
          <item>
           <widget class="QLabel" name="label_2">
+           <property name="toolTip">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The number of threads allowed at the libfuse layer for highly parallel operations&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
            <property name="text">
             <string>Maximum Fuse Threads</string>
            </property>
@@ -359,6 +407,9 @@
        </item>
        <item>
         <widget class="QCheckBox" name="checkBox_libfuse_disableWriteback">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Dis-allow libfuse to buffer write requests if one must stricty open files in write only or append mode. Alternatively, just set ignore open flags in general settings&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
           <string>Disable Write-back Cache</string>
          </property>
@@ -366,6 +417,9 @@
        </item>
        <item>
         <widget class="QCheckBox" name="checkBox_libfuse_networkshare">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Runs as a network share - may improve performance when latency to cloud is high. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;ONLY supported on Windows.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
          <property name="text">
           <string>Enable Network-share</string>
          </property>
