@@ -10,8 +10,6 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -32,53 +30,47 @@
    SOFTWARE
 */
 
-package cmd
+package convertname
 
-import (
-	"errors"
-	"fmt"
+// Map of characters and their similar looking unicode.
+var cloudToFileMap = map[rune]rune{
+	'"': '＂',
+	'*': '＊',
+	':': '：',
+	'<': '＜',
+	'>': '＞',
+	'?': '？',
+	'|': '｜',
+}
 
-	"lyvecloudfuse/common"
+var fileToCloudMap = reverseMap(cloudToFileMap)
 
-	"github.com/spf13/cobra"
-)
+func reverseMap(inMap map[rune]rune) map[rune]rune {
+	var reverseMap = make(map[rune]rune)
+	for k, v := range inMap {
+		reverseMap[v] = k
+	}
+	return reverseMap
+}
 
-var umntAllCmd = &cobra.Command{
-	Use:               "all",
-	Short:             "Unmount all instances of Lyvecloudfuse",
-	Long:              "Unmount all instances of Lyvecloudfuse",
-	SuggestFor:        []string{"al", "all"},
-	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(_ *cobra.Command, _ []string) error {
-		lstMnt, err := common.ListMountPoints()
-		if err != nil {
-			return fmt.Errorf("failed to list mount points [%s]", err.Error())
+func replaceWithMap(s string, m map[rune]rune) string {
+	runes := []rune(s)
+	for i, r := range runes {
+		if val, ok := m[r]; ok {
+			runes[i] = val
 		}
+	}
+	return string(runes)
+}
 
-		mountfound := 0
-		unmounted := 0
-		errMsg := "failed to unmount - \n"
+// WindowsFileToCloud converts a filename on Windows that includes special unicode
+// characters such as ＂＊：＜＞？｜ to the original characters "*:<>?|.
+func WindowsFileToCloud(filename string) string {
+	return replaceWithMap(filename, fileToCloudMap)
+}
 
-		for _, mntPath := range lstMnt {
-			mountfound += 1
-			err := unmountLyvecloudfuse(mntPath)
-			if err == nil {
-				unmounted += 1
-			} else {
-				errMsg += " " + mntPath + " - [" + err.Error() + "]\n"
-			}
-		}
-
-		if mountfound == 0 {
-			fmt.Println("Nothing to unmount")
-		} else {
-			fmt.Printf("%d of %d mounts were successfully unmounted\n", unmounted, mountfound)
-		}
-
-		if unmounted < mountfound {
-			return errors.New(errMsg)
-		}
-
-		return nil
-	},
+// WindowsCloudToFile converts an object name to a filename that converts the characters
+// "*:<>?| to the similar unicode characters ＂＊：＜＞？｜.
+func WindowsCloudToFile(cloudname string) string {
+	return replaceWithMap(cloudname, cloudToFileMap)
 }

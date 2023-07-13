@@ -41,6 +41,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -48,6 +49,7 @@ import (
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
+	"lyvecloudfuse/internal/convertname"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 
@@ -264,12 +266,18 @@ func (dl *Datalake) CreateFile(name string, mode os.FileMode) error {
 func (dl *Datalake) CreateDirectory(name string) error {
 	log.Trace("Datalake::CreateDirectory : name %s", name)
 
-	directoryURL := dl.Filesystem.NewDirectoryURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
+	directoryURL := dl.getDirectoryURL(name)
 	_, err := directoryURL.Create(context.Background(), false)
 
 	if err != nil {
-		log.Err("Datalake::CreateDirectory : Failed to create directory %s [%s]", name, err.Error())
-		return err
+		serr := storeDatalakeErrToErr(err)
+		if serr == InvalidPermission {
+			log.Err("Datalake::CreateDirectory : Insufficient permissions for %s [%s]", name, err.Error())
+			return syscall.EACCES
+		} else {
+			log.Err("Datalake::CreateDirectory : Failed to create directory %s [%s]", name, err.Error())
+			return err
+		}
 	}
 
 	return nil
@@ -285,7 +293,7 @@ func (dl *Datalake) CreateLink(source string, target string) error {
 func (dl *Datalake) DeleteFile(name string) (err error) {
 	log.Trace("Datalake::DeleteFile : name %s", name)
 
-	fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
+	fileURL := dl.getRootDirectoryURL(name)
 	_, err = fileURL.Delete(context.Background())
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
@@ -295,6 +303,9 @@ func (dl *Datalake) DeleteFile(name string) (err error) {
 		} else if serr == BlobIsUnderLease {
 			log.Err("Datalake::DeleteFile : %s is under lease [%s]", name, err.Error())
 			return syscall.EIO
+		} else if serr == InvalidPermission {
+			log.Err("Datalake::DeleteFile : Insufficient permissions for %s [%s]", name, err.Error())
+			return syscall.EACCES
 		} else {
 			log.Err("Datalake::DeleteFile : Failed to delete file %s [%s]", name, err.Error())
 			return err
@@ -308,7 +319,7 @@ func (dl *Datalake) DeleteFile(name string) (err error) {
 func (dl *Datalake) DeleteDirectory(name string) (err error) {
 	log.Trace("Datalake::DeleteDirectory : name %s", name)
 
-	directoryURL := dl.Filesystem.NewDirectoryURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
+	directoryURL := dl.getDirectoryURL(name)
 	_, err = directoryURL.Delete(context.Background(), nil, true)
 	// TODO : There is an ability to pass a continuation token here for recursive delete, should we implement this logic to follow continuation token? The SDK does not currently do this.
 	if err != nil {
@@ -329,11 +340,11 @@ func (dl *Datalake) DeleteDirectory(name string) (err error) {
 func (dl *Datalake) RenameFile(source string, target string) error {
 	log.Trace("Datalake::RenameFile : %s -> %s", source, target)
 
-	fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(url.PathEscape(common.JoinUnixFilepath(dl.Config.prefixPath, source)))
+	fileURL := dl.getRootDirectoryURLPathEscape(source)
 
 	_, err := fileURL.Rename(context.Background(),
 		azbfs.RenameFileOptions{
-			DestinationPath: common.JoinUnixFilepath(dl.Config.prefixPath, target),
+			DestinationPath: dl.getFormattedPath(target),
 		})
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
@@ -353,11 +364,11 @@ func (dl *Datalake) RenameFile(source string, target string) error {
 func (dl *Datalake) RenameDirectory(source string, target string) error {
 	log.Trace("Datalake::RenameDirectory : %s -> %s", source, target)
 
-	directoryURL := dl.Filesystem.NewDirectoryURL(url.PathEscape(common.JoinUnixFilepath(dl.Config.prefixPath, source)))
+	directoryURL := dl.getDirectoryURLPathEscape(source)
 
 	_, err := directoryURL.Rename(context.Background(),
 		azbfs.RenameDirectoryOptions{
-			DestinationPath: common.JoinUnixFilepath(dl.Config.prefixPath, target),
+			DestinationPath: dl.getFormattedPath(target),
 		})
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
@@ -377,13 +388,16 @@ func (dl *Datalake) RenameDirectory(source string, target string) error {
 func (dl *Datalake) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	log.Trace("Datalake::GetAttr : name %s", name)
 
-	pathURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
+	pathURL := dl.getRootDirectoryURL(name)
 	prop, err := pathURL.GetProperties(context.Background())
 
 	if err != nil {
 		e := storeDatalakeErrToErr(err)
 		if e == ErrFileNotFound {
 			return attr, syscall.ENOENT
+		} else if e == InvalidPermission {
+			log.Err("Datalake::GetAttr : Insufficient permissions for %s [%s]", name, err.Error())
+			return attr, syscall.EACCES
 		} else {
 			log.Err("Datalake::GetAttr : Failed to get path properties for %s [%s]", name, err.Error())
 			return attr, err
@@ -442,7 +456,7 @@ func (dl *Datalake) List(prefix string, marker *string, count int32) ([]*interna
 		count = common.MaxDirListCount
 	}
 
-	prefixPath := common.JoinUnixFilepath(dl.Config.prefixPath, prefix)
+	prefixPath := dl.getFormattedPath(prefix)
 	if prefix != "" && prefix[len(prefix)-1] == '/' {
 		prefixPath += "/"
 	}
@@ -457,13 +471,24 @@ func (dl *Datalake) List(prefix string, marker *string, count int32) ([]*interna
 		})
 
 	if err != nil {
-		log.Err("Datalake::List : Failed to validate account with given auth %s", err.Error)
+		log.Err("Datalake::List : Failed to validate account with given auth %s", err.Error())
 		m := ""
-		return pathList, &m, err
+		e := storeDatalakeErrToErr(err)
+		if e == ErrFileNotFound { // TODO: should this be checked for list calls
+			return pathList, &m, syscall.ENOENT
+		} else if e == InvalidPermission {
+			return pathList, &m, syscall.EACCES
+		} else {
+			return pathList, &m, err
+		}
 	}
 
 	// Process the paths returned in this result segment (if the segment is empty, the loop body won't execute)
 	for _, pathInfo := range listPath.Paths {
+		// convert path name
+		conv_name := dl.getFileName(*pathInfo.Name)
+		pathInfo.Name = &conv_name
+
 		var mode fs.FileMode
 		if pathInfo.Permissions != nil {
 			mode, err = getFileMode(*pathInfo.Permissions)
@@ -559,7 +584,7 @@ func (dl *Datalake) TruncateFile(name string, size int64) error {
 // ChangeMod : Change mode of a path
 func (dl *Datalake) ChangeMod(name string, mode os.FileMode) error {
 	log.Trace("Datalake::ChangeMod : Change mode of file %s to %s", name, mode)
-	fileURL := dl.Filesystem.NewRootDirectoryURL().NewFileURL(common.JoinUnixFilepath(dl.Config.prefixPath, name))
+	fileURL := dl.getRootDirectoryURL(name)
 
 	/*
 		// If we need to call the ACL set api then we need to get older acl string here
@@ -578,12 +603,16 @@ func (dl *Datalake) ChangeMod(name string, mode os.FileMode) error {
 
 	newPerm := getACLPermissions(mode)
 	_, err := fileURL.SetAccessControl(context.Background(), azbfs.BlobFSAccessControl{Permissions: newPerm})
-	e := storeDatalakeErrToErr(err)
-	if e == ErrFileNotFound {
-		return syscall.ENOENT
-	} else if err != nil {
+	if err != nil {
 		log.Err("Datalake::ChangeMod : Failed to change mode of file %s to %s [%s]", name, mode, err.Error())
-		return err
+		e := storeDatalakeErrToErr(err)
+		if e == ErrFileNotFound {
+			return syscall.ENOENT
+		} else if e == InvalidPermission {
+			return syscall.EACCES
+		} else {
+			return err
+		}
 	}
 
 	return nil
@@ -612,4 +641,45 @@ func (dl *Datalake) ChangeOwner(name string, _ int, _ int) error {
 	// 	return err
 	// }
 	return syscall.ENOTSUP
+}
+
+// getDirectoryURL returns a new directory url. On Windows this will also convert special characters.
+func (dl *Datalake) getDirectoryURL(name string) azbfs.DirectoryURL {
+	return dl.Filesystem.NewDirectoryURL(dl.getFormattedPath(name))
+}
+
+// getDirectoryURL returns a new directory url that is properly escaped. On Windows this will also convert
+// special characters.
+func (dl *Datalake) getDirectoryURLPathEscape(name string) azbfs.DirectoryURL {
+	return dl.Filesystem.NewDirectoryURL(url.PathEscape(dl.getFormattedPath(name)))
+}
+
+// getDirectoryURL returns a new root directory url. On Windows this will also convert special characters.
+func (dl *Datalake) getRootDirectoryURL(name string) azbfs.FileURL {
+	return dl.Filesystem.NewRootDirectoryURL().NewFileURL(dl.getFormattedPath(name))
+}
+
+// getDirectoryURL returns a new root directory url that is properly escaped. On Windows this will also convert
+// special characters.
+func (dl *Datalake) getRootDirectoryURLPathEscape(name string) azbfs.FileURL {
+	return dl.Filesystem.NewRootDirectoryURL().NewFileURL(url.PathEscape(dl.getFormattedPath(name)))
+}
+
+// getFileName takes a blob name and will convert the special characters into similar unicode characters
+// on Windows.
+func (dl *Datalake) getFileName(name string) string {
+	if runtime.GOOS == "windows" && dl.Config.restrictedCharsWin {
+		name = convertname.WindowsCloudToFile(name)
+	}
+	return name
+}
+
+// getFormattedPath takes a file name and converts special characters to the original ASCII
+// on Windows and adds the prefixPath.
+func (dl *Datalake) getFormattedPath(name string) string {
+	name = common.JoinUnixFilepath(dl.Config.prefixPath, name)
+	if runtime.GOOS == "windows" && dl.Config.restrictedCharsWin {
+		name = convertname.WindowsFileToCloud(name)
+	}
+	return name
 }

@@ -44,10 +44,10 @@ import (
 	"lyvecloudfuse/internal"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/sevlyar/go-daemon"
+	"golang.org/x/sys/unix"
 )
 
 func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName string, pidFilePerm os.FileMode, umask int, fname string) error {
@@ -62,12 +62,12 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 	var sigusr2, sigchild chan os.Signal
 	if !daemon.WasReborn() { // execute in parent only
 		sigusr2 = make(chan os.Signal, 1)
-		signal.Notify(sigusr2, syscall.SIGUSR2)
+		signal.Notify(sigusr2, unix.SIGUSR2)
 
 		sigchild = make(chan os.Signal, 1)
-		signal.Notify(sigchild, syscall.SIGCHLD)
+		signal.Notify(sigchild, unix.SIGCHLD)
 	} else { // execute in child only
-		daemon.SetSigHandler(sigusrHandler(pipeline, ctx), syscall.SIGUSR1, syscall.SIGUSR2)
+		daemon.SetSigHandler(sigusrHandler(pipeline, ctx), unix.SIGUSR1, unix.SIGUSR2)
 		go func() {
 			_ = daemon.ServeSignals()
 		}()
@@ -121,7 +121,7 @@ func sigusrHandler(pipeline *internal.Pipeline, ctx context.Context) daemon.Sign
 		log.Crit("Mount::sigusrHandler : Signal %d received", sig)
 
 		var err error
-		if sig == syscall.SIGUSR1 {
+		if sig == unix.SIGUSR1 {
 			log.Crit("Mount::sigusrHandler : SIGUSR1 received")
 			config.OnConfigChange()
 		}

@@ -270,6 +270,10 @@ func MonitorBfs() bool {
 
 // convert ~ to $HOME in path
 func ExpandPath(path string) string {
+	if path == "" {
+		return path
+	}
+
 	if strings.HasPrefix(path, "~/") {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
@@ -282,9 +286,23 @@ func ExpandPath(path string) string {
 			return path
 		}
 		path = JoinUnixFilepath(homeDir, path[6:])
+	} else if strings.HasPrefix(path, "/$HOME/") {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		path = JoinUnixFilepath(homeDir, path[7:])
 	}
 
-	return os.ExpandEnv(path)
+	// If it is a drive letter don't add a trailing slash
+	if IsDriveLetter(path) {
+		return path
+	}
+
+	path = os.ExpandEnv(path)
+	path, _ = filepath.Abs(path)
+	path = JoinUnixFilepath(path)
+	return path
 }
 
 // IsDriveLetter returns true if the path is a drive letter on Windows, such

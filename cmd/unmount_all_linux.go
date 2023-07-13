@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
     _____           _____   _____   ____          ______  _____  ------
    |     |  |      |     | |     | |     |     | |       |            |
@@ -9,6 +11,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
+   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
    Author : <blobfusedev@microsoft.com>
 
@@ -31,89 +34,53 @@
    SOFTWARE
 */
 
-package common
+package cmd
 
 import (
-	"sync"
-	"time"
+	"errors"
+	"fmt"
+
+	"lyvecloudfuse/common"
+
+	"github.com/spf13/cobra"
 )
 
-// Lock item for each file
-type LockMapItem struct {
-	handleCount  uint32
-	exLocked     bool
-	mtx          sync.Mutex
-	downloadTime time.Time
-}
+var umntAllCmd = &cobra.Command{
+	Use:               "all",
+	Short:             "Unmount all instances of Lyvecloudfuse",
+	Long:              "Unmount all instances of Lyvecloudfuse. Only available on Linux",
+	SuggestFor:        []string{"al", "all"},
+	FlagErrorHandling: cobra.ExitOnError,
+	RunE: func(_ *cobra.Command, _ []string) error {
+		lstMnt, err := common.ListMountPoints()
+		if err != nil {
+			return fmt.Errorf("failed to list mount points [%s]", err.Error())
+		}
 
-// Map holding locks for all the files
-type LockMap struct {
-	locks sync.Map
-}
+		mountfound := 0
+		unmounted := 0
+		errMsg := "failed to unmount - \n"
 
-func NewLockMap() *LockMap {
-	return &LockMap{}
-}
+		for _, mntPath := range lstMnt {
+			mountfound += 1
+			err := unmountLyvecloudfuse(mntPath)
+			if err == nil {
+				unmounted += 1
+			} else {
+				errMsg += " " + mntPath + " - [" + err.Error() + "]\n"
+			}
+		}
 
-// Map level operations
+		if mountfound == 0 {
+			fmt.Println("Nothing to unmount")
+		} else {
+			fmt.Printf("%d of %d mounts were successfully unmounted\n", unmounted, mountfound)
+		}
 
-// Get the lock item based on file name, if item does not exists create it
-func (l *LockMap) Get(name string) *LockMapItem {
-	lockIntf, _ := l.locks.LoadOrStore(name, &LockMapItem{handleCount: 0, exLocked: false})
-	item := lockIntf.(*LockMapItem)
-	return item
-}
+		if unmounted < mountfound {
+			return errors.New(errMsg)
+		}
 
-// Delete item from file lock map
-func (l *LockMap) Delete(name string) {
-	l.locks.Delete(name)
-}
-
-// Check if this file is already exLocked or not
-func (l *LockMap) Locked(name string) bool {
-	lockIntf, ok := l.locks.Load(name)
-	if ok {
-		item := lockIntf.(*LockMapItem)
-		return item.exLocked
-	}
-
-	return false
-}
-
-// Lock Item level operation
-// Lock this file exclusively
-func (l *LockMapItem) Lock() {
-	l.mtx.Lock()
-	l.exLocked = true
-}
-
-// UnLock this file exclusively
-func (l *LockMapItem) Unlock() {
-	l.exLocked = false
-	l.mtx.Unlock()
-}
-
-// Increment the handle count
-func (l *LockMapItem) Inc() {
-	l.handleCount++
-}
-
-// Decrement the handle count
-func (l *LockMapItem) Dec() {
-	l.handleCount--
-}
-
-// Get the current handle count
-func (l *LockMapItem) Count() uint32 {
-	return l.handleCount
-}
-
-// Set the download time of the file
-func (l *LockMapItem) SetDownloadTime() {
-	l.downloadTime = time.Now()
-}
-
-// Get the download time of the file
-func (l *LockMapItem) DownloadTime() time.Time {
-	return l.downloadTime
+		return nil
+	},
 }
