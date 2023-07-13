@@ -214,7 +214,7 @@
       <enum>QLayout::SetMinimumSize</enum>
      </property>
      <item>
-      <widget class="QCheckBox" name="checkbox_commonConfig_multiUser">
+      <widget class="QCheckBox" name="checkBox_multiUser">
        <property name="toolTip">
         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select to allow multiple users to access the container&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
@@ -227,28 +227,28 @@
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="checkbox_commonConfig_nonEmptyDir">
+      <widget class="QCheckBox" name="checkBox_nonEmptyDir">
        <property name="text">
         <string>Non-empty directory mount</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="checkbox_commonConfig_readOnly">
+      <widget class="QCheckBox" name="checkBox_readOnly">
        <property name="text">
         <string>Read-only mount</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="checkbox_daemonForeground">
+      <widget class="QCheckBox" name="checkBox_daemonForeground">
        <property name="text">
         <string>Run in foreground</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="checkbox_libfuse_ignoreAppend">
+      <widget class="QCheckBox" name="checkBox_libfuse_ignoreAppend">
        <property name="text">
         <string>Ignore append/write only flags</string>
        </property>
@@ -302,7 +302,7 @@
         <item>
          <layout class="QVBoxLayout" name="verticalLayout_5">
           <item>
-           <widget class="QCheckBox" name="checkbox_streaming_fileCachingLevel">
+           <widget class="QCheckBox" name="checkBox_streaming_fileCachingLevel">
             <property name="text">
              <string/>
             </property>
