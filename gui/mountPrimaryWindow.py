@@ -56,7 +56,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         #if service already installed, run lyvecloudfuse.exe service start
         #if start successful, run lyvecloudfuse.exe service mount
         
-        mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "install"], capture_output=True))      
+        mount = subprocess.run([".\lyvecloudfuse.exe", "service", "install"], capture_output=True)    
         if (mount.returncode == 0 or mount.stderr.decode().find("lyvecloudfuse service already exists") != -1): #we found this message
             mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "start"], capture_output=True))
             if mount.stderr.decode().find("An instance of the service is already running.") != -1:
@@ -108,7 +108,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                         msg.setWindowTitle("Error")
                         msg.setText("This container is already mounted at this directory.")
                         # Show the message box
-                        msg.exec() 
+                        msg.exec()
                 else:
                     self.textEdit_output.setText("!!Error mounting container!!\n")# + mount.stdout.decode())
                     # Get the users attention by popping open a new window on an error
