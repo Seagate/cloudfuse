@@ -175,8 +175,11 @@ func (cl *Client) CreateDirectory(name string) error {
 	log.Trace("Client::CreateDirectory : name %s", name)
 	// Lyve Cloud does not support creating an empty file to indicate a directory
 	// directories will be represented only as object prefixes
-	// we have no way of representing an empty directory, so do nothing
-	// TODO: research: is this supposed to throw an error if the directory already exists?
+	// we have no way of representing an empty directory, so do nothing.
+	// Note: we could try to list the directory and return EEXIST if it has contents,
+	// but that would be a performance penalty for a check that the OS already does.
+	// So, let's make it clear: we expect the OS to call GetAttr() on the directory
+	// to make sure it doesn't exist before trying to create it.
 	return nil
 }
 
@@ -301,6 +304,10 @@ func (cl *Client) RenameFile(source string, target string, isSymLink bool) error
 func (cl *Client) RenameDirectory(source string, target string) error {
 	log.Trace("Client::RenameDirectory : %s -> %s", source, target)
 
+	// TODO: should this fail when the target directory exists?
+	// current behavior merges into the target directory
+	// best to check and see what the azstorage code does
+
 	// first we need a list of all the object's we'll be moving
 	// make sure to pass source with a trailing forward slash
 
@@ -383,7 +390,7 @@ func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
 		return nil, err
 	} else if len(objects) > 0 {
 		// create and return an objAttr for the directory
-		attr := createObjAttrDir(dirName)
+		attr := internal.CreateObjAttrDir(dirName)
 		return attr, nil
 	}
 

@@ -106,6 +106,7 @@ attr_cache:
   no-cache-on-list: true|false <do not cache attributes during listing, to optimize performance>
   no-symlinks: true|false <to improve performance disable symlink support. symlinks will be treated like regular files.>
   max-files: <maximum number of files in the attribute cache at a time. Default - 5000000>
+  no-cache-dirs: true|false <to prevent double-listing directories and to make timestamps accurate, disable caching directories. Breaks s3storage.>
   
 # Loopback configuration
 loopbackfs:
