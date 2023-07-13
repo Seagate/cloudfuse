@@ -351,7 +351,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 				continue
 			}
 			path := split(cl.Config.prefixPath, dirName)
-			attr := createObjAttrDir(path)
+			attr := internal.CreateObjAttrDir(path)
 			objectAttrList = append(objectAttrList, attr)
 		}
 
