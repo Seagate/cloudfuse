@@ -20,15 +20,20 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-
         self.setWindowTitle("LyveCloud FUSE")
-
 
         # Set up the signals for all the interactable intities
         self.button_browse.clicked.connect(self.getFileDirInput)
         self.button_config.clicked.connect(self.showSettingsWidget)
         self.button_mount.clicked.connect(self.mountBucket)
         self.button_unmount.clicked.connect(self.unmountBucket)
+        
+        if platform == "win32":
+            self.lineEdit_mountPoint.setToolTip("Designate a new location to mount the bucket, do not create the directory")
+            self.button_browse.setToolTip("Browse to a new location but don't create a new directory")
+        else:
+            self.lineEdit_mountPoint.setToolTip("Designate a location to mount the bucket - the directory must already exist")
+            self.button_browse.setToolTip("Browse to a pre-existing directory")
 
     # Define the slots that will be triggered when the signals in Qt are activated
 

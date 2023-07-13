@@ -1,3 +1,4 @@
+from sys import platform
 from PySide6.QtCore import Qt, QSettings
 # import the custom class made from QtDesigner
 from ui_lyve_config_advanced import Ui_Form
@@ -49,6 +50,12 @@ class lyveAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.spinBox_libfuse_maxFuseThreads.setValue(libfuse['max-fuse-threads'])
         
         self.lineEdit_subdirectory.setText(s3Storage['subdirectory'])
+        
+        if platform == "win32":
+            self.checkBox_libfuse_networkshare.setToolTip("Runs as a network share - may improve performance when latency to cloud is high.")
+        else:
+            self.checkBox_libfuse_networkshare.setEnabled(False)
+            self.checkBox_libfuse_networkshare.setToolTip("Network share is only supported on Windows")
 
     def updateOptionalS3Storage(self):
         s3Storage = self.settings.value('s3storage')

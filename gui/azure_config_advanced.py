@@ -1,3 +1,4 @@
+from sys import platform
 from PySide6.QtCore import Qt, QSettings
 from PySide6.QtWidgets import QWidget
 from PySide6 import QtWidgets
@@ -67,6 +68,12 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         
         self.dropDown_azure_blobTier.setCurrentIndex(az_blob_tier.index(azStorage['tier']))
         self.dropDown_fileCache_evictionPolicy.setCurrentIndex(file_cache_eviction_choices.index(fileCache['policy']))
+        
+        if platform == "win32":
+            self.checkBox_libfuse_networkshare.setToolTip("Runs as a network share - may improve performance when latency to cloud is high.")
+        else:
+            self.checkBox_libfuse_networkshare.setEnabled(False)
+            self.checkBox_libfuse_networkshare.setToolTip("Network share is only supported on Windows")
 
     def updateOptionalAzStorage(self):
         azStorage = self.settings.value('azstorage')
