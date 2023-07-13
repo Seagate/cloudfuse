@@ -125,8 +125,6 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 if mount.returncode == 0:
                     self.textEdit_output.setText("Successfully mounted container\n")
                 else:
-                    if isRunning:
-                        return
                     self.textEdit_output.setText("!!Error mounting container!!\n")# + mount.stdout.decode())
                     # Get the users attention by popping open a new window on an error
                     msg.setWindowTitle("Error")
