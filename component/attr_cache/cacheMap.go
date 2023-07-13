@@ -47,6 +47,8 @@ const (
 	AttrFlagUnknown uint16 = iota
 	AttrFlagExists
 	AttrFlagValid
+	// when using S3, directories with no objects are not represented in cloud storage
+	AttrFlagNotInCloud
 )
 
 // attrCacheItem : Structure of each item in attr cache
@@ -79,6 +81,12 @@ func (value *attrCacheItem) exists() bool {
 	return value.attrFlag.IsSet(AttrFlagExists)
 }
 
+func (value *attrCacheItem) isInCloud() bool {
+	isObject := !value.attr.IsDir()
+	isDirInCloud := value.attr.IsDir() && !value.attrFlag.IsSet(AttrFlagNotInCloud)
+	return isObject || isDirInCloud
+}
+
 func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
 	value.attrFlag.Clear(AttrFlagExists)
 	value.attrFlag.Set(AttrFlagValid)
@@ -89,6 +97,16 @@ func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
 func (value *attrCacheItem) invalidate() {
 	value.attrFlag.Clear(AttrFlagValid)
 	value.attr = &internal.ObjAttr{}
+}
+
+func (value *attrCacheItem) markInCloud(inCloud bool) {
+	if value.attr.IsDir() {
+		if inCloud {
+			value.attrFlag.Clear(AttrFlagNotInCloud)
+		} else {
+			value.attrFlag.Set(AttrFlagNotInCloud)
+		}
+	}
 }
 
 func (value *attrCacheItem) getAttr() *internal.ObjAttr {

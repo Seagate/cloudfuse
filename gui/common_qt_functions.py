@@ -10,7 +10,7 @@ libfusePermissions = [0o777,0o666,0o644,0o444]
 class defaultSettingsManager():
     def __init__(self):
         super().__init__()
-        self.settings = QSettings("LyveFUSE", "settings")
+        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"LyveFUSE", "settings")
         self.setAllDefaultSettings()
         
         
@@ -64,8 +64,8 @@ class defaultSettingsManager():
             'auth-resource': '',
             'update-md5': False,
             'validate-md5': False,
-            'virtual-directory': False
-            # TODO: disable-compression flag is missing
+            'virtual-directory': False,
+            'disable-compression': False
         })
     
     def setComponentSettings(self):
@@ -87,8 +87,9 @@ class defaultSettingsManager():
             'fuse-trace' : False,
             'extension' : '', 
             'disable-writeback-cache' : False,
-            'ignore-open-flags' : True
-            # TODO: max-fuse-threads and network-share are missing
+            'ignore-open-flags' : True,
+            'max-fuse-threads': 128,
+            'network-share': False
         })
         self.settings.setValue('stream',{
             'block-size-mb': 0,
@@ -108,8 +109,9 @@ class defaultSettingsManager():
             'allow-non-empty-temp': False,
             'cleanup-on-start': False,
             'policy-trace': False,
-            'offload-io': False
-            # TODO: sync-to-flush is missing
+            'offload-io': False,
+            'sync-to-flush': False,
+            'refresh-sec': 60
         })
         self.settings.setValue('attr_cache',{
             'timeout-sec': 120,
@@ -259,16 +261,16 @@ class widgetCustomFunctions(QWidget):
             checkbox.setCheckState(Qt.Unchecked)
 
     def updateMultiUser(self):
-        self.settings.setValue('allow-other',self.checkbox_multiUser.isChecked())
+        self.settings.setValue('allow-other',self.checkBox_multiUser.isChecked())
         
     def updateNonEmtpyDir(self):
-        self.settings.setValue('nonempty',self.checkbox_nonEmptyDir.isChecked())        
+        self.settings.setValue('nonempty',self.checkBox_nonEmptyDir.isChecked())        
     
     def updateDaemonForeground(self):
-        self.settings.setValue('foreground',self.checkbox_daemonForeground.isChecked())
+        self.settings.setValue('foreground',self.checkBox_daemonForeground.isChecked())
     
     def updateReadOnly(self):
-        self.settings.setValue('read-only',self.checkbox_readOnly.isChecked())
+        self.settings.setValue('read-only',self.checkBox_readOnly.isChecked())
     
     # Update Libfuse re-writes everything in the Libfuse because of how setting.setValue works - 
     #   it will not append, so the code makes a copy of the dictionary and updates the sub-keys. 
@@ -277,7 +279,7 @@ class widgetCustomFunctions(QWidget):
     def updateLibfuse(self):
         libfuse = self.settings.value('libfuse')
         libfuse['default-permission'] = libfusePermissions[self.dropDown_libfuse_permissions.currentIndex()]
-        libfuse['ignore-open-flags'] = self.checkbox_libfuse_ignoreAppend.isChecked()
+        libfuse['ignore-open-flags'] = self.checkBox_libfuse_ignoreAppend.isChecked()
         libfuse['attribute-expiration-sec'] = self.spinBox_libfuse_attExp.value()
         libfuse['entry-expiration-sec'] = self.spinBox_libfuse_entExp.value()
         libfuse['negative-entry-expiration-sec'] = self.spinBox_libfuse_negEntryExp.value()
@@ -285,13 +287,15 @@ class widgetCustomFunctions(QWidget):
 
     def updateOptionalLibfuse(self):
         libfuse = self.settings.value('libfuse')
-        libfuse['disable-writeback-cache'] = self.checkbox_libfuse_disableWriteback.isChecked()
+        libfuse['disable-writeback-cache'] = self.checkBox_libfuse_disableWriteback.isChecked()
+        libfuse['network-share'] = self.checkBox_libfuse_networkshare.isChecked()
+        libfuse['max-fuse-threads'] = self.spinBox_libfuse_maxFuseThreads.value()
         self.settings.setValue('libfuse',libfuse)
 
     # Update stream re-writes everything in the stream dictionary for the same reason update libfuse does.
     def updateStream(self):
         stream = self.settings.value('stream')
-        stream['file-caching'] = self.checkbox_streaming_fileCachingLevel.isChecked()
+        stream['file-caching'] = self.checkBox_streaming_fileCachingLevel.isChecked()
         stream['block-size-mb'] = self.spinBox_streaming_blockSize.value()
         stream['buffer-size-mb'] = self.spinBox_streaming_buffSize.value()
         stream['max-buffers'] = self.spinBox_streaming_maxBuff.value()
@@ -304,17 +308,19 @@ class widgetCustomFunctions(QWidget):
         
     def updateOptionalFileCache(self):
         fileCache = self.settings.value('file_cache')
-        fileCache['allow-non-empty-temp'] = self.checkbox_fileCache_allowNonEmptyTmp.isChecked()
-        fileCache['policy-trace'] = self.checkbox_fileCache_policyLogs.isChecked()
-        fileCache['create-empty-file'] = self.checkbox_fileCache_createEmptyFile.isChecked()
-        fileCache['cleanup-on-start'] = self.checkbox_fileCache_cleanupStart.isChecked()
-        fileCache['offload-io'] = self.checkbox_fileCache_offloadIO.isChecked()
+        fileCache['allow-non-empty-temp'] = self.checkBox_fileCache_allowNonEmptyTmp.isChecked()
+        fileCache['policy-trace'] = self.checkBox_fileCache_policyLogs.isChecked()
+        fileCache['create-empty-file'] = self.checkBox_fileCache_createEmptyFile.isChecked()
+        fileCache['cleanup-on-start'] = self.checkBox_fileCache_cleanupStart.isChecked()
+        fileCache['offload-io'] = self.checkBox_fileCache_offloadIO.isChecked()
+        fileCache['sync-to-flush'] = self.checkBox_fileCache_syncToFlush.isChecked()
         
         fileCache['timeout-sec'] = self.spinBox_fileCache_evictionTimeout.value()
         fileCache['max-eviction'] = self.spinBox_fileCache_maxEviction.value()
         fileCache['max-size-mb'] = self.spinBox_fileCache_maxCacheSize.value()
         fileCache['high-threshold'] = self.spinBox_fileCache_evictMaxThresh.value()
         fileCache['low-threshold'] = self.spinBox_fileCache_evictMinThresh.value()
+        fileCache['refresh-sec'] = self.spinBox_fileCache_refreshSec.value()
         
         fileCache['policy'] = file_cache_eviction_choices[self.dropDown_fileCache_evictionPolicy.currentIndex()]
         self.settings.setValue('file_cache',fileCache)
