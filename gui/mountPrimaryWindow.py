@@ -108,7 +108,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                         msg.setWindowTitle("Error")
                         msg.setText("This container is already mounted at this directory.")
                         # Show the message box
-                        msg.exec()       
+                        msg.exec() 
                 else:
                     self.textEdit_output.setText("!!Error mounting container!!\n")# + mount.stdout.decode())
                     # Get the users attention by popping open a new window on an error
