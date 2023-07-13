@@ -139,7 +139,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def unmountBucket(self):
         msg = QtWidgets.QMessageBox()
         directory = str(self.lineEdit_mountPoint.text())
-        try:#TODO: umount instaed of stopping the service
+        try:#TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
             directory = directory+'/lyveCloudFuse'
             unmount = (subprocess.run([".\lyvecloudfuse.exe", "service", "unmount", directory], capture_output=True))      
             # Print to the text edit window the results of the unmount
