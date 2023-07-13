@@ -100,12 +100,12 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         self.dropDown_azure_storageType.setCurrentIndex(azStorageType.index(self.settings.value('azstorage')['type']))
         self.dropDown_azure_modeSetting.setCurrentIndex(bucketModeChoices.index(self.settings.value('azstorage')['mode']))
         
-        self.setCheckboxFromSetting(self.checkbox_commonConfig_multiUser,self.settings.value('allow-other'))
-        self.setCheckboxFromSetting(self.checkbox_commonConfig_nonEmptyDir,self.settings.value('nonempty'))
-        self.setCheckboxFromSetting(self.checkbox_daemonForeground,self.settings.value('foreground'))
-        self.setCheckboxFromSetting(self.checkbox_commonConfig_readOnly,self.settings.value('read-only'))
-        self.setCheckboxFromSetting(self.checkbox_streaming_fileCachingLevel,stream['file-caching'])
-        self.setCheckboxFromSetting(self.checkbox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
+        self.setCheckboxFromSetting(self.checkBox_multiUser,self.settings.value('allow-other'))
+        self.setCheckboxFromSetting(self.checkBox_nonEmptyDir,self.settings.value('nonempty'))
+        self.setCheckboxFromSetting(self.checkBox_daemonForeground,self.settings.value('foreground'))
+        self.setCheckboxFromSetting(self.checkBox_readOnly,self.settings.value('read-only'))
+        self.setCheckboxFromSetting(self.checkBox_streaming_fileCachingLevel,stream['file-caching'])
+        self.setCheckboxFromSetting(self.checkBox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
        
         # Spinbox automatically sanitizes intputs for decimal values only, so no need to check for the appropriate data type.
         self.spinBox_libfuse_attExp.setValue(libfuse['attribute-expiration-sec'])
