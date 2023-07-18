@@ -53,6 +53,37 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
         self.lineEdit_mountPoint.setText('{}'.format(directory))
 
+    #wrapper/helper for the service install and start.
+    def windowsServiceInstall(self):
+        msg = QtWidgets.QMessageBox()
+
+        # use the completedProcess object in mount var to determine next steps 
+        # if service already installed, run lyvecloudfuse.exe service start
+        # if start successful, run lyvecloudfuse.exe service mount
+        
+        mount = subprocess.run([".\lyvecloudfuse.exe", "service", "install"], capture_output=True, check=False)    
+        if mount.returncode == 0 or mount.stderr.decode().find("lyvecloudfuse service already exists") != -1: #we found this message
+            mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "start"], capture_output=True))
+            if mount.stderr.decode().find("An instance of the service is already running.") != -1:
+                return True
+            elif mount.returncode == 1: 
+                self.textEdit_output.setText("!!Error starting service before mounting container!!\n")# + mount.stdout.decode())
+                # Get the users attention by popping open a new window on an error
+                msg.setWindowTitle("Error")
+                msg.setText("Error mounting container - Run this application as administrator. uninstall the service and try again")
+                # Show the message box
+                msg.exec()
+                return False
+            else:
+                return True #started just fine
+        else:
+            self.textEdit_output.setText("!!Error installing service to mount container!!\n")# + mount.stdout.decode())
+            # Get the users attention by popping open a new window on an error
+            msg.setWindowTitle("Error")
+            msg.setText("Error installing service to mount container - Run application as administrator and try again")
+            # Show the message box
+            msg.exec()
+            return False
     def mountBucket(self):
         msg = QtWidgets.QMessageBox()
         
@@ -69,12 +100,32 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 # Windows mount has a quirk where the folder shouldn't exist yet,
                 # add lyveCloudFuse at the end of the directory 
                 directory = directory+'/lyveCloudFuse'
-                mount = subprocess.Popen([".\lyvecloudfuse.exe", "mount", directory, "--config-file=.\config.yaml"], stdout=subprocess.PIPE)
                 
+                isRunning = self.windowsServiceInstall()  #install and start the service
+            
+                if isRunning:
+                    mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "mount", directory, "--config-file=.\config.yaml"], capture_output=True))
+                    if mount.returncode == 0:
+                        self.textEdit_output.setText("Successfully mounted container\n")
+                    elif mount.stderr.decode().find("mount path exists") != -1:
+                        self.textEdit_output.setText("!!The container is already mounted!!\n")# + mount.stdout.decode())
+                        # Get the users attention by popping open a new window on an error
+                        msg.setWindowTitle("Error")
+                        msg.setText("This container is already mounted at this directory.")
+                        # Show the message box
+                        msg.exec()
+                else:
+                    self.textEdit_output.setText("!!Error mounting container!!\n")# + mount.stdout.decode())
+                    # Get the users attention by popping open a new window on an error
+                    msg.setWindowTitle("Error")
+                    msg.setText("Error mounting container - check the settings and try again")
+                    # Show the message box
+                    msg.exec()
+
                 # TODO: For future use to get output on Popen
-                #   for line in mount.stdout.readlines():    
+                # for line in mount.stdout.readlines():    
             else:
-                mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"])#,capture_output=True)
+                mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"], capture_output=True)
                 # Print to the text edit window the results of the mount
                 if mount.returncode == 0:
                     self.textEdit_output.setText("Successfully mounted container\n")
@@ -84,14 +135,16 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     msg.setWindowTitle("Error")
                     msg.setText("Error mounting container - check the settings and try again")
                     # Show the message box
-                    x = msg.exec()
+                    msg.exec()
         except ValueError:
             pass
 
     def unmountBucket(self):
         msg = QtWidgets.QMessageBox()
-        try:
-            unmount = subprocess.run(["./lyvecloudfuse", "unmount", "all"],capture_output=True)
+        directory = str(self.lineEdit_mountPoint.text())
+        try:#TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
+            directory = directory+'/lyveCloudFuse'
+            unmount = (subprocess.run([".\lyvecloudfuse.exe", "service", "unmount", directory], capture_output=True))      
             # Print to the text edit window the results of the unmount
             if unmount.returncode == 0:
                 self.textEdit_output.setText("Successfully unmounted container\n" + unmount.stdout.decode())
@@ -100,7 +153,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 msg.setWindowTitle("Error")
                 msg.setText("Error unmounting container - check the logs")
                 # Show the message box
-                x = msg.exec()
+                msg.exec()
         except ValueError:
             pass
         
