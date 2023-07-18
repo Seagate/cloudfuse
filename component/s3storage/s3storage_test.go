@@ -2485,6 +2485,22 @@ func (s *s3StorageTestSuite) TestFlushFileChunkedFile() {
 	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.Nil(err)
 
+	res, err := s.awsS3Client.HeadObject(context.TODO(), &s3.HeadObjectInput{
+		Bucket:     aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:        aws.String(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)),
+		PartNumber: 1,
+	})
+	fmt.Println(res.PartsCount)
+
+	res1, err := s.awsS3Client.GetObjectAttributes(context.TODO(), &s3.GetObjectAttributesInput{
+		Bucket:           aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:              aws.String(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)),
+		ObjectAttributes: []types.ObjectAttributes{types.ObjectAttributesChecksum},
+		MaxParts:         10000,
+	})
+	fmt.Println(err)
+	fmt.Println(res1)
+
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
 	s.assert.Nil(err)
 	s.assert.EqualValues(data, output)
@@ -2832,11 +2848,6 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	s.assert.EqualValues(data, output[2*blockSize:3*blockSize])
 }
 
-// TODO: Fix this test
-// This test can be fixed once I address combining new parts to an object
-// where the current end part is smaller than the smallest part on AWS
-// We will then need to do an upload and change all of the later part sizes
-// to address this.
 func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	defer s.cleanupTest()
 

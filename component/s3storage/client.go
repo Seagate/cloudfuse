@@ -887,12 +887,13 @@ func (cl *Client) stageAndCommitSmallBlocks(name string, bol *common.BlockOffset
 		}
 		if blk.Truncated() {
 			data = make([]byte, blk.EndIndex-blk.StartIndex)
+			blk.Data = data
 			blk.Flags.Clear(common.TruncatedBlock)
 		} else {
 			data = blk.Data
 		}
 
-		if blk.Dirty() {
+		if blk.Dirty() || len(blk.Data) > 0 {
 			// This block has data that is not yet in the bucket
 			partResp, err := cl.awsS3Client.UploadPart(context.TODO(), &s3.UploadPartInput{
 				Bucket:     aws.String(cl.Config.authConfig.BucketName),
@@ -928,7 +929,9 @@ func (cl *Client) stageAndCommitSmallBlocks(name string, bol *common.BlockOffset
 			blk.Flags.Clear(common.DirtyBlock)
 		} else {
 			// This block is already in the bucket, so we need to copy this part
-			if blk.EndIndex-blk.StartIndex-1 < 5*common.MbToBytes {
+
+			// If the next block is too small, then we need to combine the two blocks unless it is the last block
+			if blk.EndIndex-blk.StartIndex-1 < 5*common.MbToBytes && i != len(bol.BlockList)-1 {
 				skipNext = true
 				result, err := cl.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
 					Bucket: aws.String(cl.Config.authConfig.BucketName),
@@ -945,14 +948,23 @@ func (cl *Client) stageAndCommitSmallBlocks(name string, bol *common.BlockOffset
 					// TODO
 				}
 
-				newData := append(output, bol.BlockList[i+1].Data...)
+				// Combine these two blocks
+				blk.Data = append(output, bol.BlockList[i+1].Data...)
+				blk.EndIndex = bol.BlockList[i+1].EndIndex
+
+				// Delete the next block as we will combine it with this block
+				if i+2 > len(bol.BlockList)-1 {
+					bol.BlockList = bol.BlockList[:i+1]
+				} else {
+					bol.BlockList = append(bol.BlockList[:i+1], bol.BlockList[i+2:]...)
+				}
 
 				partResp, err := cl.awsS3Client.UploadPart(context.TODO(), &s3.UploadPartInput{
 					Bucket:     aws.String(cl.Config.authConfig.BucketName),
 					Key:        aws.String(key),
 					PartNumber: partNumber,
 					UploadId:   &uploadID,
-					Body:       bytes.NewReader(newData),
+					Body:       bytes.NewReader(blk.Data),
 				})
 
 				if err != nil {
@@ -978,42 +990,39 @@ func (cl *Client) stageAndCommitSmallBlocks(name string, bol *common.BlockOffset
 					}
 					parts = append(parts, cPart)
 				}
-				bol.BlockList[i+1].Flags.Clear(common.DirtyBlock)
-				partNumber++
-				continue
-			}
-			partResp, err := cl.awsS3Client.UploadPartCopy(context.TODO(), &s3.UploadPartCopyInput{
-				Bucket:          aws.String(cl.Config.authConfig.BucketName),
-				Key:             aws.String(key),
-				CopySource:      aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, key)),
-				CopySourceRange: aws.String("bytes=" + fmt.Sprint(blk.StartIndex) + "-" + fmt.Sprint(blk.EndIndex-1)),
-				PartNumber:      partNumber,
-				UploadId:        &uploadID,
-			})
-
-			if err != nil {
-				log.Info("Client::StageAndCommit : Attempting to abort upload due to error: ", err.Error())
-				fmt.Println(err.Error())
-
-				//ignoring any errors with aborting the copy
-				cl.awsS3Client.AbortMultipartUpload(context.TODO(), &s3.AbortMultipartUploadInput{
-					Bucket:   aws.String(cl.Config.authConfig.BucketName),
-					Key:      aws.String(key),
-					UploadId: &uploadID,
+			} else {
+				partResp, err := cl.awsS3Client.UploadPartCopy(context.TODO(), &s3.UploadPartCopyInput{
+					Bucket:          aws.String(cl.Config.authConfig.BucketName),
+					Key:             aws.String(key),
+					CopySource:      aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, key)),
+					CopySourceRange: aws.String("bytes=" + fmt.Sprint(blk.StartIndex) + "-" + fmt.Sprint(blk.EndIndex-1)),
+					PartNumber:      partNumber,
+					UploadId:        &uploadID,
 				})
-				// TODO: Verify that the abort was successful
-				return err
-			}
 
-			// copy etag and part number to verify later
-			if partResp != nil {
-				partNum := partNumber
-				etag := strings.Trim(*partResp.CopyPartResult.ETag, "\"")
-				cPart := types.CompletedPart{
-					ETag:       &etag,
-					PartNumber: partNum,
+				if err != nil {
+					log.Info("Client::StageAndCommit : Attempting to abort upload due to error: ", err.Error())
+
+					//ignoring any errors with aborting the copy
+					cl.awsS3Client.AbortMultipartUpload(context.TODO(), &s3.AbortMultipartUploadInput{
+						Bucket:   aws.String(cl.Config.authConfig.BucketName),
+						Key:      aws.String(key),
+						UploadId: &uploadID,
+					})
+					// TODO: Verify that the abort was successful
+					return err
 				}
-				parts = append(parts, cPart)
+
+				// copy etag and part number to verify later
+				if partResp != nil {
+					partNum := partNumber
+					etag := strings.Trim(*partResp.CopyPartResult.ETag, "\"")
+					cPart := types.CompletedPart{
+						ETag:       &etag,
+						PartNumber: partNum,
+					}
+					parts = append(parts, cPart)
+				}
 			}
 		}
 		partNumber++
