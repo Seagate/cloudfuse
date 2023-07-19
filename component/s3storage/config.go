@@ -37,6 +37,7 @@ package s3storage
 import (
 	"errors"
 
+	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
 )
 
@@ -48,6 +49,7 @@ type Options struct {
 	Endpoint           string `config:"endpoint" yaml:"endpoint,omitempty"`
 	PrefixPath         string `config:"subdirectory" yaml:"subdirectory,omitempty"`
 	RestrictedCharsWin bool   `config:"restricted-characters-windows" yaml:"-"`
+	PartSize           int64  `config:"part-size" yaml:"part-size,omitempty"`
 }
 
 // ParseAndValidateConfig : Parse and validate config
@@ -65,6 +67,12 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	s3.stConfig.authConfig.Endpoint = opt.Endpoint
 
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
+
+	if opt.PartSize == 0 {
+		s3.stConfig.partSize = 8 * common.MbToBytes
+	} else {
+		s3.stConfig.partSize = opt.PartSize
+	}
 
 	// If subdirectory is mounted, take the prefix path
 	s3.stConfig.prefixPath = removeLeadingSlashes(opt.PrefixPath)
