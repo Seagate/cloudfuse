@@ -25,7 +25,7 @@
      <item>
       <widget class="QCheckBox" name="checkBox_multiUser">
        <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Allow users to access the mounted directory - used for FUSE and File Cache&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Allow other users to access the mounted directory - used for FUSE and File Cache&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
        <property name="text">
         <string>Multiple Users</string>
@@ -68,7 +68,7 @@
      <item>
       <widget class="QCheckBox" name="checkBox_libfuse_ignoreAppend">
        <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Ignore the append and write only flag since append and write only is not supported with writeback caching. Alternatively, disable the write-back cache.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Ignore the append and write only flag since append and write only is not supported with writeback caching. Alternatively, disable the write-back cache in advanced settings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
        <property name="text">
         <string>Ignore append/write only flags</string>

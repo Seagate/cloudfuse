@@ -167,7 +167,7 @@
         <item>
          <widget class="QCheckBox" name="checkBox_fileCache_offloadIO">
           <property name="toolTip">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;By default, libfuse will service reads/writes to files for better performance. Check the box to  make file-cache component service read/write calls as well&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;By default, the libfuse component will service reads/writes to files for better performance. Check the box to make the file-cache component service read/write calls as well.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
           </property>
           <property name="text">
            <string>Offload IO</string>
@@ -253,7 +253,7 @@
           <item>
            <widget class="QLabel" name="label_3">
             <property name="toolTip">
-             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The number of seconds after which compare file in local cache and container and refresh the file if container has the latest copy&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The time (in seconds) between checks to see if a file in the local cache is up to date with the container's latest copy. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
             <property name="text">
              <string>Cache Update File Timeout(s)</string>
@@ -406,24 +406,28 @@
         </layout>
        </item>
        <item>
-        <widget class="QCheckBox" name="checkBox_libfuse_disableWriteback">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Dis-allow libfuse to buffer write requests if one must stricty open files in write only or append mode. Alternatively, just set ignore open flags in general settings&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="text">
-          <string>Disable Write-back Cache</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="checkBox_libfuse_networkshare">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Runs as a network share - may improve performance when latency to cloud is high. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;ONLY supported on Windows.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="text">
-          <string>Enable Network-share</string>
-         </property>
-        </widget>
+        <layout class="QHBoxLayout" name="horizontalLayout_3">
+         <item>
+          <widget class="QCheckBox" name="checkBox_libfuse_networkshare">
+           <property name="toolTip">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Runs as a network share - may improve performance when latency to cloud is high. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;ONLY supported on Windows.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+           <property name="text">
+            <string>Enable Network-share</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkBox_libfuse_disableWriteback">
+           <property name="toolTip">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Dis-allow libfuse to buffer write requests if one must stricty open files in write only or append mode. Alternatively, just set ignore open flags in general settings&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+           <property name="text">
+            <string>Disable Write-back Cache</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
       </layout>
      </widget>
