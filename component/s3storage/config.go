@@ -49,7 +49,7 @@ type Options struct {
 	Endpoint           string `config:"endpoint" yaml:"endpoint,omitempty"`
 	PrefixPath         string `config:"subdirectory" yaml:"subdirectory,omitempty"`
 	RestrictedCharsWin bool   `config:"restricted-characters-windows" yaml:"-"`
-	PartSize           int64  `config:"part-size" yaml:"part-size,omitempty"`
+	PartSize           int64  `config:"part-size-mb" yaml:"part-size-mb,omitempty"`
 }
 
 // ParseAndValidateConfig : Parse and validate config
@@ -71,7 +71,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	if opt.PartSize == 0 {
 		s3.stConfig.partSize = 8 * common.MbToBytes
 	} else {
-		s3.stConfig.partSize = opt.PartSize
+		s3.stConfig.partSize = opt.PartSize * common.MbToBytes
 	}
 
 	// If subdirectory is mounted, take the prefix path

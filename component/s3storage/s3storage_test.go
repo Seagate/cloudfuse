@@ -98,7 +98,7 @@ type storageTestConfiguration struct {
 	Region             string `json:"region"`
 	Prefix             string `json:"prefix"`
 	RestrictedCharsWin bool   `json:"restricted-characters-windows"`
-	PartSize           int64  `json:"part-size"`
+	PartSize           int64  `json:"part-size-mb"`
 }
 
 var storageTestConfigurationParameters storageTestConfiguration
@@ -316,7 +316,7 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, bucket string
 
 func generateConfigYaml(testParams storageTestConfiguration) string {
 	return fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n"+
-		"  endpoint: %s\n  region: %s\n  subdirectory: %s\n  restricted-characters-windows: %t\n  part-size: %d",
+		"  endpoint: %s\n  region: %s\n  subdirectory: %s\n  restricted-characters-windows: %t\n  part-size-mb: %d",
 		testParams.BucketName, testParams.KeyID, testParams.SecretKey,
 		testParams.Endpoint, testParams.Region, testParams.Prefix, testParams.RestrictedCharsWin, testParams.PartSize)
 }
