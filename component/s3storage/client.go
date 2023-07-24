@@ -556,6 +556,7 @@ func (cl *Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, err
 		return &blockList, nil
 	}
 
+	// Create a list of blocks that are the partSize except for the last block
 	for objectSize <= result.Size {
 		if objectSize+partSize >= result.Size {
 			// This is the last block to add
@@ -681,29 +682,26 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	}
 
 	// Return early if there are no dirty blocks
-	staged := false
 	for _, blk := range bol.BlockList {
 		if blk.Dirty() {
-			staged = true
-			break
+			return nil
 		}
 	}
 
-	if !staged {
-		return nil
-	}
-
-	// For loop to determine if interior blocks are too small for AWS multipart upload and we need to do a read/mod/write
-	needToUseReadModWrite := false
+	// For loop to determine if interior blocks are too small for AWS multipart upload and we need to change
+	// the size of interior blocks
+	combineBlocks := false
 	for i, blk := range bol.BlockList {
+		// If an interior block is small and not the last block, then we cannot upload using multipart upload
+		// so we need to combine blocks
 		if len(blk.Data) < 5*common.MbToBytes && i < len(bol.BlockList)-1 {
-			needToUseReadModWrite = true
+			combineBlocks = true
 			break
 		}
 	}
 
 	var err error
-	if needToUseReadModWrite {
+	if combineBlocks {
 		bol.BlockList, err = cl.combineSmallBlocks(name, bol.BlockList)
 		if err != nil {
 			log.Err("Client::StageAndCommit : Failed to combine small blocks: %v ", name, err)
@@ -781,13 +779,27 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 		if err != nil {
 			log.Info("Client::StageAndCommit : Attempting to abort upload due to error: ", err.Error())
 
-			//ignoring any errors with aborting the copy
-			cl.awsS3Client.AbortMultipartUpload(context.TODO(), &s3.AbortMultipartUploadInput{
+			_, abortErr := cl.awsS3Client.AbortMultipartUpload(context.TODO(), &s3.AbortMultipartUploadInput{
 				Bucket:   aws.String(cl.Config.authConfig.BucketName),
 				Key:      aws.String(key),
 				UploadId: &uploadID,
 			})
-			// TODO: Verify that the abort was successful
+			if abortErr != nil {
+				log.Err("Client::StageAndCommit : Error aborting multipart upload: ", abortErr.Error())
+			}
+
+			// AWS states you need to call listparts to verify that multipart upload was properly aborted
+			resp, listErr := cl.awsS3Client.ListParts(context.TODO(), &s3.ListPartsInput{
+				Bucket:   aws.String(cl.Config.authConfig.BucketName),
+				Key:      aws.String(key),
+				UploadId: &uploadID,
+			})
+			if len(resp.Parts) != 0 {
+				log.Err("Client::StageAndCommit : Error aborting multipart upload. There are parts remaining in the object with key: %s, uploadId %s: ", key, uploadID)
+			}
+			if listErr != nil {
+				log.Err("Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted. ", abortErr.Error())
+			}
 			return err
 		}
 
@@ -817,19 +829,36 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	if err != nil {
 		log.Info("Client::StageAndCommit : Attempting to abort upload due to error: ", err.Error())
 
-		//ignoring any errors with aborting the copy
-		cl.awsS3Client.AbortMultipartUpload(context.TODO(), &s3.AbortMultipartUploadInput{
+		_, abortErr := cl.awsS3Client.AbortMultipartUpload(context.TODO(), &s3.AbortMultipartUploadInput{
 			Bucket:   aws.String(cl.Config.authConfig.BucketName),
 			Key:      aws.String(key),
 			UploadId: &uploadID,
 		})
-		// TODO: Verify that the abort was successful
+		if abortErr != nil {
+			log.Err("Client::StageAndCommit : Error aborting multipart upload: ", abortErr.Error())
+		}
+
+		// AWS states you need to call listparts to verify that multipart upload was properly aborted
+		resp, listErr := cl.awsS3Client.ListParts(context.TODO(), &s3.ListPartsInput{
+			Bucket:   aws.String(cl.Config.authConfig.BucketName),
+			Key:      aws.String(key),
+			UploadId: &uploadID,
+		})
+		if len(resp.Parts) != 0 {
+			log.Err("Client::StageAndCommit : Error aborting multipart upload. There are parts remaining in the object with key: %s, uploadId %s: ", key, uploadID)
+		}
+		if listErr != nil {
+			log.Err("Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted. ", abortErr.Error())
+		}
 		return err
 	}
 
 	return nil
 }
 
+// combineSmallBlocks will combine blocks in a blocklist, except for the last block, if the block is smaller
+// than the smallest size for a part in AWS, which is 5 MB. Blocks smaller than 5MB will be combined with the
+// next block in the list.
 func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]*common.Block, error) {
 	newBlockList := []*common.Block{}
 	newBlockList = append(newBlockList, &common.Block{})
@@ -853,14 +882,14 @@ func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]
 			if len(blk.Data) == 0 && !blk.Truncated() {
 				result, err := cl.getObject(name, blk.StartIndex, blk.EndIndex-blk.StartIndex, false)
 				if err != nil {
-					// TODO
+					log.Err("Client::combineSmallBlocks : Unable to get object with error: ", err.Error())
 					return nil, err
 				}
 
 				defer result.Close()
 				addData, err = io.ReadAll(result)
 				if err != nil {
-					// TODO
+					log.Err("Client::combineSmallBlocks : Unable to read bytes from object with error: ", err.Error())
 					return nil, err
 				}
 			} else {

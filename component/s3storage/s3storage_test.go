@@ -113,26 +113,22 @@ type s3StorageTestSuite struct {
 }
 
 // s.uploadReaderAtToObject uploads a buffer in parts to an object.
-func (s *s3StorageTestSuite) uploadReaderAtToObject(ctx context.Context, reader io.ReaderAt, readerSize int64, singleUploadSize int64,
-	key string, partSize int64) error {
-	if partSize == 0 {
+func (s *s3StorageTestSuite) uploadReaderAtToObject(ctx context.Context, reader io.ReaderAt, readerSize int64,
+	key string, partSizeMB int64) error {
+	if partSizeMB == 0 {
 		// If bufferSize > (BlockBlobMaxStageBlockBytes * BlockBlobMaxBlocks), then error
 		if readerSize > 5*1024*common.MbToBytes*10000 {
 			return errors.New("buffer is too large to upload to a block blob")
 		}
-		// If bufferSize <= singleUploadSize, then Upload should be used with just 1 I/O request
-		if readerSize <= singleUploadSize {
-			partSize = singleUploadSize // Default if unspecified
-		} else {
-			partSize = readerSize / 10000      // buffer / max blocks = block size to use all 50,000 blocks
-			if partSize < 5*common.MbToBytes { // If the block size is smaller than 5MB, round up to 5MB
-				partSize = 5 * common.MbToBytes
-			}
-			// StageBlock will be called with blockSize blocks and a Parallelism of (BufferSize / BlockSize).
+
+		if partSizeMB < 5 { // If the block size is smaller than 5MB, round up to 5MB
+			partSizeMB = 5
 		}
 	}
 
-	if readerSize <= singleUploadSize {
+	partSizeBytes := partSizeMB * common.MbToBytes
+
+	if readerSize <= partSizeBytes {
 		// If the size can fit in 1 Upload call, do it this way
 		var body io.ReadSeeker = io.NewSectionReader(reader, 0, readerSize)
 		_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
@@ -143,7 +139,7 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(ctx context.Context, reader 
 		return err
 	}
 
-	var numBlocks = int32(((readerSize - 1) / partSize) + 1)
+	var numBlocks = int32(((readerSize - 1) / partSizeBytes) + 1)
 
 	//send command to start copy and get the upload id as it is needed later
 	var uploadID string
@@ -166,16 +162,16 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(ctx context.Context, reader 
 	var partNumber int32 = 1
 	parts := make([]types.CompletedPart, 0)
 	for partNumber <= numBlocks {
-		endSize := partSize
+		endSize := partSizeBytes
 		if partNumber == numBlocks {
-			endSize = readerSize - int64(partNumber-1)*partSize
+			endSize = readerSize - int64(partNumber-1)*partSizeBytes
 		}
 		partResp, err := s.awsS3Client.UploadPart(context.TODO(), &s3.UploadPartInput{
 			Bucket:     aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 			Key:        aws.String(key),
 			PartNumber: partNumber,
 			UploadId:   &uploadID,
-			Body:       io.NewSectionReader(reader, int64(partNumber-1)*partSize, endSize),
+			Body:       io.NewSectionReader(reader, int64(partNumber-1)*partSizeBytes, endSize),
 		})
 
 		if err != nil {
@@ -2398,8 +2394,8 @@ func (s *s3StorageTestSuite) TestOffsetToEndDownload() {
 
 func (s *s3StorageTestSuite) TestGetFileBlockOffsetsSmallFile() {
 	defer s.cleanupTest()
-	blockSize := 5 * MB
-	storageTestConfigurationParameters.PartSize = int64(blockSize)
+	blockSizeMB := 5
+	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2421,8 +2417,8 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsSmallFile() {
 
 func (s *s3StorageTestSuite) TestGetFileBlockOffsetsChunkedFile() {
 	defer s.cleanupTest()
-	blockSize := 5 * MB
-	storageTestConfigurationParameters.PartSize = int64(blockSize)
+	blockSizeMB := 5
+	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2449,8 +2445,8 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsChunkedFile() {
 
 func (s *s3StorageTestSuite) TestGetFileBlockOffsetsError() {
 	defer s.cleanupTest()
-	blockSize := 5 * MB
-	storageTestConfigurationParameters.PartSize = int64(blockSize)
+	blockSizeMB := 5
+	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 	// Setup
@@ -2463,8 +2459,8 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsError() {
 
 func (s *s3StorageTestSuite) TestFlushFileEmptyFile() {
 	defer s.cleanupTest()
-	blockSize := 5 * MB
-	storageTestConfigurationParameters.PartSize = int64(blockSize)
+	blockSizeMB := 5
+	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2486,8 +2482,8 @@ func (s *s3StorageTestSuite) TestFlushFileEmptyFile() {
 
 func (s *s3StorageTestSuite) TestFlushFileChunkedFile() {
 	defer s.cleanupTest()
-	blockSize := 5 * MB
-	storageTestConfigurationParameters.PartSize = int64(blockSize)
+	blockSizeMB := 5
+	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2498,7 +2494,7 @@ func (s *s3StorageTestSuite) TestFlushFileChunkedFile() {
 	rand.Read(data)
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), int64(blockSize), key, int64(blockSize))
+	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
 	s.assert.Nil(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(15*MB), h)
@@ -2515,8 +2511,9 @@ func (s *s3StorageTestSuite) TestFlushFileChunkedFile() {
 
 func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
 	defer s.cleanupTest()
-	blockSize := 5 * MB
-	storageTestConfigurationParameters.PartSize = int64(blockSize)
+	blockSizeMB := 5
+	blockSizeBytes := blockSizeMB * common.MbToBytes
+	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2527,7 +2524,7 @@ func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
 	rand.Read(data)
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), int64(blockSize), key, int64(blockSize))
+	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
 	s.assert.Nil(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(15*MB), h)
@@ -2535,8 +2532,8 @@ func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
 
 	updatedBlock := make([]byte, 2*MB)
 	rand.Read(updatedBlock)
-	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize)
-	s.s3Storage.storage.ReadInBuffer(name, int64(blockSize), int64(blockSize), h.CacheObj.BlockOffsetList.BlockList[1].Data)
+	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSizeBytes)
+	s.s3Storage.storage.ReadInBuffer(name, int64(blockSizeBytes), int64(blockSizeBytes), h.CacheObj.BlockOffsetList.BlockList[1].Data)
 	copy(h.CacheObj.BlockOffsetList.BlockList[1].Data[MB:2*MB+MB], updatedBlock)
 	h.CacheObj.BlockOffsetList.BlockList[1].Flags.Set(common.DirtyBlock)
 
@@ -2553,8 +2550,9 @@ func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
 
 func (s *s3StorageTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	defer s.cleanupTest()
-	blockSize := 5 * MB
-	storageTestConfigurationParameters.PartSize = int64(blockSize)
+	blockSizeMB := 5
+	blockSizeBytes := blockSizeMB * common.MbToBytes
+	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2565,16 +2563,16 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	rand.Read(data)
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), 5*MB, key, int64(blockSize))
+	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
 	s.assert.Nil(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(15*MB), h)
 	h.CacheObj.BlockOffsetList = bol
 
 	// truncate block
-	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize/2)
-	h.CacheObj.BlockOffsetList.BlockList[1].EndIndex = int64(blockSize + blockSize/2)
-	s.s3Storage.storage.ReadInBuffer(name, int64(blockSize), int64(blockSize)/2, h.CacheObj.BlockOffsetList.BlockList[1].Data)
+	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSizeBytes/2)
+	h.CacheObj.BlockOffsetList.BlockList[1].EndIndex = int64(blockSizeBytes + blockSizeBytes/2)
+	s.s3Storage.storage.ReadInBuffer(name, int64(blockSizeBytes), int64(blockSizeBytes)/2, h.CacheObj.BlockOffsetList.BlockList[1].Data)
 	h.CacheObj.BlockOffsetList.BlockList[1].Flags.Set(common.DirtyBlock)
 
 	// remove 1 block
@@ -2591,8 +2589,9 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 
 func (s *s3StorageTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	defer s.cleanupTest()
-	blockSize := 5 * MB
-	storageTestConfigurationParameters.PartSize = int64(blockSize)
+	blockSizeMB := 5
+	blockSizeBytes := blockSizeMB * common.MbToBytes
+	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2605,31 +2604,31 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	h.CacheObj.BlockOffsetList = bol
 	h.CacheObj.BlockIdLength = 16
 
-	data1 := make([]byte, blockSize)
+	data1 := make([]byte, blockSizeBytes)
 	rand.Read(data1)
 	blk1 := &common.Block{
 		StartIndex: 0,
-		EndIndex:   int64(blockSize),
+		EndIndex:   int64(blockSizeMB * MB),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 		Data:       data1,
 	}
 	blk1.Flags.Set(common.DirtyBlock)
 
-	data2 := make([]byte, blockSize)
+	data2 := make([]byte, blockSizeBytes)
 	rand.Read(data2)
 	blk2 := &common.Block{
-		StartIndex: int64(blockSize),
-		EndIndex:   2 * int64(blockSize),
+		StartIndex: int64(blockSizeMB * MB),
+		EndIndex:   2 * int64(blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 		Data:       data2,
 	}
 	blk2.Flags.Set(common.DirtyBlock)
 
-	data3 := make([]byte, blockSize)
+	data3 := make([]byte, blockSizeBytes)
 	rand.Read(data3)
 	blk3 := &common.Block{
-		StartIndex: 2 * int64(blockSize),
-		EndIndex:   3 * int64(blockSize),
+		StartIndex: 2 * int64(blockSizeBytes),
+		EndIndex:   3 * int64(blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 		Data:       data3,
 	}
@@ -2642,15 +2641,16 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
 	s.assert.Nil(err)
-	s.assert.EqualValues(blk1.Data, output[0:blockSize])
-	s.assert.EqualValues(blk2.Data, output[blockSize:2*blockSize])
-	s.assert.EqualValues(blk3.Data, output[2*blockSize:3*blockSize])
+	s.assert.EqualValues(blk1.Data, output[0:blockSizeBytes])
+	s.assert.EqualValues(blk2.Data, output[blockSizeBytes:2*blockSizeBytes])
+	s.assert.EqualValues(blk3.Data, output[2*blockSizeBytes:3*blockSizeBytes])
 }
 
 func (s *s3StorageTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	defer s.cleanupTest()
-	blockSize := 5 * MB
-	storageTestConfigurationParameters.PartSize = int64(blockSize)
+	blockSizeMB := 5
+	blockSizeBytes := blockSizeMB * common.MbToBytes
+	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2662,38 +2662,38 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	rand.Read(data)
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), 5*MB, key, int64(blockSize))
+	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
 	s.assert.Nil(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(30*MB), h)
 	h.CacheObj.BlockOffsetList = bol
 	h.CacheObj.BlockIdLength = 16
 
-	data1 := make([]byte, blockSize)
+	data1 := make([]byte, blockSizeBytes)
 	rand.Read(data1)
 	blk1 := &common.Block{
 		StartIndex: int64(fileSize),
-		EndIndex:   int64(fileSize + blockSize),
+		EndIndex:   int64(fileSize + blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 		Data:       data1,
 	}
 	blk1.Flags.Set(common.DirtyBlock)
 
-	data2 := make([]byte, blockSize)
+	data2 := make([]byte, blockSizeBytes)
 	rand.Read(data2)
 	blk2 := &common.Block{
-		StartIndex: int64(fileSize + blockSize),
-		EndIndex:   int64(fileSize + 2*blockSize),
+		StartIndex: int64(fileSize + blockSizeBytes),
+		EndIndex:   int64(fileSize + 2*blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 		Data:       data2,
 	}
 	blk2.Flags.Set(common.DirtyBlock)
 
-	data3 := make([]byte, blockSize)
+	data3 := make([]byte, blockSizeBytes)
 	rand.Read(data3)
 	blk3 := &common.Block{
-		StartIndex: int64(fileSize + 2*blockSize),
-		EndIndex:   int64(fileSize + 3*blockSize),
+		StartIndex: int64(fileSize + 2*blockSizeBytes),
+		EndIndex:   int64(fileSize + 3*blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 		Data:       data3,
 	}
@@ -2707,15 +2707,16 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
 	s.assert.Nil(err)
 	s.assert.EqualValues(data, output[0:fileSize])
-	s.assert.EqualValues(blk1.Data, output[fileSize:fileSize+blockSize])
-	s.assert.EqualValues(blk2.Data, output[fileSize+blockSize:fileSize+2*blockSize])
-	s.assert.EqualValues(blk3.Data, output[fileSize+2*blockSize:fileSize+3*blockSize])
+	s.assert.EqualValues(blk1.Data, output[fileSize:fileSize+blockSizeBytes])
+	s.assert.EqualValues(blk2.Data, output[fileSize+blockSizeBytes:fileSize+2*blockSizeBytes])
+	s.assert.EqualValues(blk3.Data, output[fileSize+2*blockSizeBytes:fileSize+3*blockSizeBytes])
 }
 
 func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	defer s.cleanupTest()
-	blockSize := 5 * MB
-	storageTestConfigurationParameters.PartSize = int64(blockSize)
+	blockSizeMB := 5
+	blockSizeBytes := blockSizeMB * common.MbToBytes
+	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2730,23 +2731,23 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 
 	blk1 := &common.Block{
 		StartIndex: 0,
-		EndIndex:   int64(blockSize),
+		EndIndex:   int64(blockSizeMB * MB),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 	}
 	blk1.Flags.Set(common.TruncatedBlock)
 	blk1.Flags.Set(common.DirtyBlock)
 
 	blk2 := &common.Block{
-		StartIndex: int64(blockSize),
-		EndIndex:   2 * int64(blockSize),
+		StartIndex: int64(blockSizeMB * MB),
+		EndIndex:   2 * int64(blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 	}
 	blk2.Flags.Set(common.TruncatedBlock)
 	blk2.Flags.Set(common.DirtyBlock)
 
 	blk3 := &common.Block{
-		StartIndex: 2 * int64(blockSize),
-		EndIndex:   3 * int64(blockSize),
+		StartIndex: 2 * int64(blockSizeBytes),
+		EndIndex:   3 * int64(blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 	}
 	blk3.Flags.Set(common.TruncatedBlock)
@@ -2759,14 +2760,15 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
 	s.assert.Nil(err)
-	data := make([]byte, 3*blockSize)
+	data := make([]byte, 3*blockSizeBytes)
 	s.assert.EqualValues(data, output)
 }
 
 func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	defer s.cleanupTest()
-	blockSize := 5 * MB
-	storageTestConfigurationParameters.PartSize = int64(blockSize)
+	blockSizeMB := 5
+	blockSizeBytes := blockSizeMB * common.MbToBytes
+	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2778,7 +2780,7 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	rand.Read(data)
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), 5*MB, key, int64(blockSize))
+	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
 	s.assert.Nil(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(30*MB), h)
@@ -2787,23 +2789,23 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 
 	blk1 := &common.Block{
 		StartIndex: int64(fileSize),
-		EndIndex:   int64(fileSize + blockSize),
+		EndIndex:   int64(fileSize + blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 	}
 	blk1.Flags.Set(common.TruncatedBlock)
 	blk1.Flags.Set(common.DirtyBlock)
 
 	blk2 := &common.Block{
-		StartIndex: int64(fileSize + blockSize),
-		EndIndex:   int64(fileSize + 2*blockSize),
+		StartIndex: int64(fileSize + blockSizeBytes),
+		EndIndex:   int64(fileSize + 2*blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 	}
 	blk2.Flags.Set(common.TruncatedBlock)
 	blk2.Flags.Set(common.DirtyBlock)
 
 	blk3 := &common.Block{
-		StartIndex: int64(fileSize + 2*blockSize),
-		EndIndex:   int64(fileSize + 3*blockSize),
+		StartIndex: int64(fileSize + 2*blockSizeBytes),
+		EndIndex:   int64(fileSize + 3*blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 	}
 	blk3.Flags.Set(common.TruncatedBlock)
@@ -2817,14 +2819,15 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
 	s.assert.Nil(err)
 	s.assert.EqualValues(data, output[:fileSize])
-	emptyData := make([]byte, 3*blockSize)
+	emptyData := make([]byte, 3*blockSizeBytes)
 	s.assert.EqualValues(emptyData, output[fileSize:])
 }
 
 func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	defer s.cleanupTest()
-	blockSize := 7 * MB
-	storageTestConfigurationParameters.PartSize = int64(blockSize)
+	blockSizeMB := 7
+	blockSizeBytes := blockSizeMB * common.MbToBytes
+	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2837,27 +2840,27 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	h.CacheObj.BlockOffsetList = bol
 	h.CacheObj.BlockIdLength = 16
 
-	data1 := make([]byte, blockSize)
+	data1 := make([]byte, blockSizeBytes)
 	rand.Read(data1)
 	blk1 := &common.Block{
 		StartIndex: 0,
-		EndIndex:   int64(blockSize),
+		EndIndex:   int64(blockSizeMB * MB),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 		Data:       data1,
 	}
 	blk1.Flags.Set(common.DirtyBlock)
 
 	blk2 := &common.Block{
-		StartIndex: int64(blockSize),
-		EndIndex:   2 * int64(blockSize),
+		StartIndex: int64(blockSizeMB * MB),
+		EndIndex:   2 * int64(blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 	}
 	blk2.Flags.Set(common.DirtyBlock)
 	blk2.Flags.Set(common.TruncatedBlock)
 
 	blk3 := &common.Block{
-		StartIndex: 2 * int64(blockSize),
-		EndIndex:   3 * int64(blockSize),
+		StartIndex: 2 * int64(blockSizeBytes),
+		EndIndex:   3 * int64(blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 	}
 	blk3.Flags.Set(common.DirtyBlock)
@@ -2870,16 +2873,17 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
 	s.assert.Nil(err)
-	data := make([]byte, blockSize)
-	s.assert.EqualValues(blk1.Data, output[0:blockSize])
-	s.assert.EqualValues(data, output[blockSize:2*blockSize])
-	s.assert.EqualValues(data, output[2*blockSize:3*blockSize])
+	data := make([]byte, blockSizeBytes)
+	s.assert.EqualValues(blk1.Data, output[0:blockSizeBytes])
+	s.assert.EqualValues(data, output[blockSizeBytes:2*blockSizeBytes])
+	s.assert.EqualValues(data, output[2*blockSizeBytes:3*blockSizeBytes])
 }
 
 func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	defer s.cleanupTest()
-	blockSize := 7 * MB
-	storageTestConfigurationParameters.PartSize = int64(blockSize)
+	blockSizeMB := 7
+	blockSizeBytes := blockSizeMB * common.MbToBytes
+	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2891,34 +2895,34 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	rand.Read(data)
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), 7*MB, key, int64(blockSize))
+	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
 	s.assert.Nil(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
 	h.CacheObj.BlockIdLength = 16
 
-	data1 := make([]byte, blockSize)
+	data1 := make([]byte, blockSizeBytes)
 	rand.Read(data1)
 	blk1 := &common.Block{
 		StartIndex: int64(fileSize),
-		EndIndex:   int64(fileSize + blockSize),
+		EndIndex:   int64(fileSize + blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 		Data:       data1,
 	}
 	blk1.Flags.Set(common.DirtyBlock)
 
 	blk2 := &common.Block{
-		StartIndex: int64(fileSize + blockSize),
-		EndIndex:   int64(fileSize + 2*blockSize),
+		StartIndex: int64(fileSize + blockSizeBytes),
+		EndIndex:   int64(fileSize + 2*blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 	}
 	blk2.Flags.Set(common.DirtyBlock)
 	blk2.Flags.Set(common.TruncatedBlock)
 
 	blk3 := &common.Block{
-		StartIndex: int64(fileSize + 2*blockSize),
-		EndIndex:   int64(fileSize + 3*blockSize),
+		StartIndex: int64(fileSize + 2*blockSizeBytes),
+		EndIndex:   int64(fileSize + 3*blockSizeBytes),
 		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
 	}
 	blk3.Flags.Set(common.DirtyBlock)
@@ -2933,10 +2937,10 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
 	s.assert.Nil(err)
 	s.assert.EqualValues(data, output[:fileSize])
-	emptyData := make([]byte, blockSize)
-	s.assert.EqualValues(blk1.Data, output[fileSize:fileSize+blockSize])
-	s.assert.EqualValues(emptyData, output[fileSize+blockSize:fileSize+2*blockSize])
-	s.assert.EqualValues(emptyData, output[fileSize+2*blockSize:fileSize+3*blockSize])
+	emptyData := make([]byte, blockSizeBytes)
+	s.assert.EqualValues(blk1.Data, output[fileSize:fileSize+blockSizeBytes])
+	s.assert.EqualValues(emptyData, output[fileSize+blockSizeBytes:fileSize+2*blockSizeBytes])
+	s.assert.EqualValues(emptyData, output[fileSize+2*blockSizeBytes:fileSize+3*blockSizeBytes])
 }
 
 func TestS3Storage(t *testing.T) {
