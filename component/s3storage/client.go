@@ -720,8 +720,9 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	//send command to start copy and get the upload id as it is needed later
 	var uploadID string
 	createOutput, err := cl.awsS3Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
-		Bucket: aws.String(cl.Config.authConfig.BucketName),
-		Key:    aws.String(key),
+		Bucket:      aws.String(cl.Config.authConfig.BucketName),
+		Key:         aws.String(key),
+		ContentType: aws.String(getContentType(key)),
 	})
 	if err != nil {
 		log.Err("Client::StageAndCommit : Failed to create multipart upload. Here's why: %v ", name, err)
