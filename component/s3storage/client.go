@@ -682,10 +682,15 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	}
 
 	// Return early if there are no dirty blocks
+	staged := false
 	for _, blk := range bol.BlockList {
 		if blk.Dirty() {
-			return nil
+			staged = true
+			break
 		}
+	}
+	if !staged {
+		return nil
 	}
 
 	// For loop to determine if interior blocks are too small for AWS multipart upload and we need to change
