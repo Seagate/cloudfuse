@@ -122,7 +122,11 @@ func (s3 *S3Storage) OnConfigChange() {
 		return
 	}
 
-	// TODO: re-parse config here (ParseAndReadDynamicConfig)
+	err = ParseAndReadDynamicConfig(s3, conf, true)
+	if err != nil {
+		log.Err("S3Storage::OnConfigChange : failed to reparse config", err.Error())
+		return
+	}
 
 	err = s3.storage.UpdateConfig(s3.stConfig)
 	if err != nil {

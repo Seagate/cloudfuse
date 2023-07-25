@@ -49,7 +49,7 @@ type Options struct {
 	Endpoint           string `config:"endpoint" yaml:"endpoint,omitempty"`
 	PrefixPath         string `config:"subdirectory" yaml:"subdirectory,omitempty"`
 	RestrictedCharsWin bool   `config:"restricted-characters-windows" yaml:"-"`
-	PartSize           int64  `config:"part-size-mb" yaml:"part-size-mb,omitempty"`
+	PartSizeMb         int64  `config:"part-size-mb" yaml:"part-size-mb,omitempty"`
 }
 
 // ParseAndValidateConfig : Parse and validate config
@@ -69,10 +69,10 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
 
 	// Part size must be at least 5 MB. Otherwise, set to default of 8 MB.
-	if opt.PartSize < 5 {
-		s3.stConfig.partSize = 8 * common.MbToBytes
+	if opt.PartSizeMb < 5 {
+		s3.stConfig.partSize = DefaultPartSize
 	} else {
-		s3.stConfig.partSize = opt.PartSize * common.MbToBytes
+		s3.stConfig.partSize = opt.PartSizeMb * common.MbToBytes
 	}
 
 	// If subdirectory is mounted, take the prefix path
@@ -82,5 +82,18 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	return nil
 }
 
-// TODO: allow dynamic config changes to affect SDK behavior?
+// ParseAndReadDynamicConfig : On config change read only the required config
+func ParseAndReadDynamicConfig(s3 *S3Storage, opt Options, reload bool) error {
+	log.Trace("ParseAndReadDynamicConfig : Reparsing config")
+
+	// Part size must be at least 5 MB. Otherwise, set to default of 8 MB.
+	if opt.PartSizeMb < 5 {
+		s3.stConfig.partSize = DefaultPartSize
+	} else {
+		s3.stConfig.partSize = opt.PartSizeMb * common.MbToBytes
+	}
+
+	return nil
+}
+
 // TODO: write config_test.go with unit tests
