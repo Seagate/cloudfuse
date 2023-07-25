@@ -68,7 +68,8 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
 
-	if opt.PartSize == 0 {
+	// Part size must be at least 5 MB. Otherwise, set to default of 8 MB.
+	if opt.PartSize < 5 {
 		s3.stConfig.partSize = 8 * common.MbToBytes
 	} else {
 		s3.stConfig.partSize = opt.PartSize * common.MbToBytes

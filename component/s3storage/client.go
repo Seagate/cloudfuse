@@ -38,6 +38,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -142,9 +143,8 @@ func (cl *Client) Configure(cfg Config) error {
 }
 
 // For dynamic configuration, update the config here.
-// Not implemented.
 func (cl *Client) UpdateConfig(cfg Config) error {
-	log.Trace("Client::UpdateConfig : no dynamic config update support")
+	cl.Config.partSize = cfg.partSize
 	return nil
 }
 
@@ -778,29 +778,8 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 		if err != nil {
 			log.Info("Client::StageAndCommit : Attempting to abort upload due to error: ", err.Error())
-
-			_, abortErr := cl.awsS3Client.AbortMultipartUpload(context.TODO(), &s3.AbortMultipartUploadInput{
-				Bucket:   aws.String(cl.Config.authConfig.BucketName),
-				Key:      aws.String(key),
-				UploadId: &uploadID,
-			})
-			if abortErr != nil {
-				log.Err("Client::StageAndCommit : Error aborting multipart upload: ", abortErr.Error())
-			}
-
-			// AWS states you need to call listparts to verify that multipart upload was properly aborted
-			resp, listErr := cl.awsS3Client.ListParts(context.TODO(), &s3.ListPartsInput{
-				Bucket:   aws.String(cl.Config.authConfig.BucketName),
-				Key:      aws.String(key),
-				UploadId: &uploadID,
-			})
-			if len(resp.Parts) != 0 {
-				log.Err("Client::StageAndCommit : Error aborting multipart upload. There are parts remaining in the object with key: %s, uploadId %s: ", key, uploadID)
-			}
-			if listErr != nil {
-				log.Err("Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted. ", abortErr.Error())
-			}
-			return err
+			abortErr := cl.abortMultipartUpload(key, uploadID)
+			return errors.Join(err, abortErr)
 		}
 
 		// copy etag and part number to verify later
@@ -828,29 +807,8 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	})
 	if err != nil {
 		log.Info("Client::StageAndCommit : Attempting to abort upload due to error: ", err.Error())
-
-		_, abortErr := cl.awsS3Client.AbortMultipartUpload(context.TODO(), &s3.AbortMultipartUploadInput{
-			Bucket:   aws.String(cl.Config.authConfig.BucketName),
-			Key:      aws.String(key),
-			UploadId: &uploadID,
-		})
-		if abortErr != nil {
-			log.Err("Client::StageAndCommit : Error aborting multipart upload: ", abortErr.Error())
-		}
-
-		// AWS states you need to call listparts to verify that multipart upload was properly aborted
-		resp, listErr := cl.awsS3Client.ListParts(context.TODO(), &s3.ListPartsInput{
-			Bucket:   aws.String(cl.Config.authConfig.BucketName),
-			Key:      aws.String(key),
-			UploadId: &uploadID,
-		})
-		if len(resp.Parts) != 0 {
-			log.Err("Client::StageAndCommit : Error aborting multipart upload. There are parts remaining in the object with key: %s, uploadId %s: ", key, uploadID)
-		}
-		if listErr != nil {
-			log.Err("Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted. ", abortErr.Error())
-		}
-		return err
+		abortErr := cl.abortMultipartUpload(key, uploadID)
+		return errors.Join(err, abortErr)
 	}
 
 	return nil
