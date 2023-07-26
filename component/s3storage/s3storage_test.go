@@ -3035,7 +3035,8 @@ func (s *s3StorageTestSuite) TestUpdateConfig() {
 	defer s.cleanupTest()
 
 	s.s3Storage.storage.UpdateConfig(Config{
-		partSize: 7 * MB,
+		partSize:     7 * MB,
+		uploadCutoff: 15 * MB,
 	})
 
 	s.assert.EqualValues(7*MB, s.s3Storage.storage.(*Client).Config.partSize)

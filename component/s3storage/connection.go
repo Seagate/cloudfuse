@@ -52,6 +52,7 @@ type Config struct {
 	prefixPath         string
 	restrictedCharsWin bool
 	partSize           int64
+	uploadCutoff       int64
 }
 
 // TODO: move s3AuthConfig to s3auth.go

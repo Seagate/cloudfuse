@@ -53,6 +53,7 @@ import (
 	"lyvecloudfuse/internal/convertname"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -99,22 +100,32 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 // Wrapper for awsS3Client.PutObject.
 // Takes an io.Reader to work with both files and byte arrays.
 // name is the path to the file.
-func (cl *Client) putObject(name string, objectData io.Reader, isSymLink bool) error {
+func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSymLink bool) error {
 	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::putObject : putting object %s", key)
+	var err error
 
-	// TODO: decide when to use this higher-level API
-	// uploader := manager.NewUploader(cl.Client, func(u *manager.Uploader) {
-	//  // TODO: Move this variable into the config file
-	// 	u.PartSize = partMiBs * 1024 * 1024
-	// })
+	// If the object is small, just do a normal put object.
+	// If not, then use a multipart upload
+	if size < cl.Config.uploadCutoff {
+		_, err = cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+			Bucket:      aws.String(cl.Config.authConfig.BucketName),
+			Key:         aws.String(key),
+			Body:        objectData,
+			ContentType: aws.String(getContentType(key)),
+		})
+	} else {
+		uploader := manager.NewUploader(cl.awsS3Client, func(u *manager.Uploader) {
+			u.PartSize = cl.Config.partSize
+		})
 
-	_, err := cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket:      aws.String(cl.Config.authConfig.BucketName),
-		Key:         aws.String(key),
-		Body:        objectData,
-		ContentType: aws.String(getContentType(key)),
-	})
+		_, err = uploader.Upload(context.TODO(), &s3.PutObjectInput{
+			Bucket:      aws.String(cl.Config.authConfig.BucketName),
+			Key:         aws.String(key),
+			Body:        objectData,
+			ContentType: aws.String(getContentType(key)),
+		})
+	}
 
 	attemptedAction := fmt.Sprintf("upload object %s", key)
 	return parseS3Err(err, attemptedAction)

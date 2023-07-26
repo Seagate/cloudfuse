@@ -50,6 +50,7 @@ type Options struct {
 	PrefixPath         string `config:"subdirectory" yaml:"subdirectory,omitempty"`
 	RestrictedCharsWin bool   `config:"restricted-characters-windows" yaml:"-"`
 	PartSizeMb         int64  `config:"part-size-mb" yaml:"part-size-mb,omitempty"`
+	UploadCutoffMb     int64  `config:"upload-cutoff-mb" yaml:"upload-cutoff-mb,omitempty"`
 }
 
 // ParseAndValidateConfig : Parse and validate config
@@ -75,6 +76,13 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 		s3.stConfig.partSize = opt.PartSizeMb * common.MbToBytes
 	}
 
+	// Cutoff size must not be less than 5 MB. Otherwise, set to default of 200 MB.
+	if opt.UploadCutoffMb < 5 {
+		s3.stConfig.uploadCutoff = DefaultUploadCutoff
+	} else {
+		s3.stConfig.uploadCutoff = opt.UploadCutoffMb * common.MbToBytes
+	}
+
 	// If subdirectory is mounted, take the prefix path
 	s3.stConfig.prefixPath = removeLeadingSlashes(opt.PrefixPath)
 	// TODO: add more config options to customize AWS SDK behavior and import them here
@@ -91,6 +99,13 @@ func ParseAndReadDynamicConfig(s3 *S3Storage, opt Options, reload bool) error {
 		s3.stConfig.partSize = DefaultPartSize
 	} else {
 		s3.stConfig.partSize = opt.PartSizeMb * common.MbToBytes
+	}
+
+	// Cutoff size must not be less than 5 MB. Otherwise, set to default of 200 MB.
+	if opt.UploadCutoffMb < 5 {
+		s3.stConfig.uploadCutoff = DefaultUploadCutoff
+	} else {
+		s3.stConfig.uploadCutoff = opt.UploadCutoffMb * common.MbToBytes
 	}
 
 	return nil

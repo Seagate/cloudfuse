@@ -499,7 +499,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	}
 
 	// upload file data
-	err = cl.putObject(name, fi, isSymlink)
+	err = cl.putObject(name, fi, stat.Size(), isSymlink)
 	if err != nil {
 		log.Err("Client::WriteFromFile : putObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -531,7 +531,7 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data 
 	dataReader := bytes.NewReader(data)
 	// upload data to object
 	// TODO: handle metadata with S3
-	err := cl.putObject(name, dataReader, isSymlink)
+	err := cl.putObject(name, dataReader, int64(len(data)), isSymlink)
 	if err != nil {
 		log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
 	}
@@ -614,7 +614,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	}
 	// overwrite the object with the truncated data
 	truncatedDataReader := bytes.NewReader(objectData)
-	err = cl.putObject(name, truncatedDataReader, false)
+	err = cl.putObject(name, truncatedDataReader, int64(len(objectData)), false)
 	if err != nil {
 		log.Err("Client::TruncateFile : Failed to write truncated data to object %s", name)
 	}
