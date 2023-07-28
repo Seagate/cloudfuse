@@ -60,6 +60,28 @@ import (
 
 const symlinkStr = ".rclonelink"
 
+// getObjectMultipartDownload downloads an object to a file using multipart download
+// which can be much faster for large objects.
+func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
+	key := cl.getKey(name, false)
+	log.Trace("Client::getObjectMultipartDownload : get object %s", key)
+	downloader := manager.NewDownloader(cl.awsS3Client, func(u *manager.Downloader) {
+		u.PartSize = cl.Config.partSize
+		u.Concurrency = cl.Config.concurrency
+	})
+
+	_, err := downloader.Download(context.TODO(), fi, &s3.GetObjectInput{
+		Bucket: aws.String(cl.Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+	// check for errors
+	if err != nil {
+		attemptedAction := fmt.Sprintf("GetObject(%s)", key)
+		return parseS3Err(err, attemptedAction)
+	}
+	return nil
+}
+
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
 // name is the path to the file.

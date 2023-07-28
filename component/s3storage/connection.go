@@ -53,6 +53,7 @@ type Config struct {
 	restrictedCharsWin bool
 	partSize           int64
 	uploadCutoff       int64
+	concurrency        int
 }
 
 // TODO: move s3AuthConfig to s3auth.go

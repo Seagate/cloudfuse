@@ -760,7 +760,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 				internal.CopyToFileOptions{
 					Name:   options.Name,
 					Offset: 0,
-					Count:  fileSize,
+					Count:  0,
 					File:   f,
 				})
 			if err != nil {

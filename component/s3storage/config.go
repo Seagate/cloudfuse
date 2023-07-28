@@ -51,6 +51,7 @@ type Options struct {
 	RestrictedCharsWin bool   `config:"restricted-characters-windows" yaml:"-"`
 	PartSizeMb         int64  `config:"part-size-mb" yaml:"part-size-mb,omitempty"`
 	UploadCutoffMb     int64  `config:"upload-cutoff-mb" yaml:"upload-cutoff-mb,omitempty"`
+	Concurrency        int    `config:"concurrency" yaml:"concurrency,omitempty"`
 }
 
 // ParseAndValidateConfig : Parse and validate config
@@ -82,6 +83,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	} else {
 		s3.stConfig.uploadCutoff = opt.UploadCutoffMb * common.MbToBytes
 	}
+	s3.stConfig.concurrency = opt.Concurrency
 
 	// If subdirectory is mounted, take the prefix path
 	s3.stConfig.prefixPath = removeLeadingSlashes(opt.PrefixPath)
@@ -107,6 +109,7 @@ func ParseAndReadDynamicConfig(s3 *S3Storage, opt Options, reload bool) error {
 	} else {
 		s3.stConfig.uploadCutoff = opt.UploadCutoffMb * common.MbToBytes
 	}
+	s3.stConfig.concurrency = opt.Concurrency
 
 	return nil
 }
