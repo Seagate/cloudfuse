@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt, QSettings
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtGui
 
 # import the custom class made from QtDesigner
 from ui_azure_config_common import Ui_Form
@@ -31,6 +31,15 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_advancedSettings.clicked.connect(self.openAdvanced)
         self.button_resetDefaultSettings.clicked.connect(self.resetDefaults)
+
+        # Allow alphanumeric characters plus [\,/,.,-]
+        self.lineEdit_azure_container.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-.\\\/]*$",self))
+        self.lineEdit_azure_accountName.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-.\\\/]*$",self))
+        # Allow alphanumeric characters plus [\,/,.,-,:]
+        self.lineEdit_azure_endpoint.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-.\:\\\/]*$",self))
+        # Allow alphanumeric characters plus [\,/,-,_]
+        self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-_\\\/]*$",self))
+        
         self.lineEdit_azure_accountKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.lineEdit_azure_spnClientSecret.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
    

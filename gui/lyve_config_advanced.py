@@ -1,4 +1,5 @@
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import QSettings
+from PySide6 import QtGui
 # import the custom class made from QtDesigner
 from ui_lyve_config_advanced import Ui_Form
 from common_qt_functions import widgetCustomFunctions
@@ -16,6 +17,9 @@ class lyveAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.initWindowSizePos()
         self.setWindowTitle("Advanced LyveCloud Config Settings")
         self.populateOptions()
+        
+        # Allow alphanumeric characters plus [\,/,-,_]
+        self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-_\\\/]*$",self))
         
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)

@@ -1,6 +1,5 @@
-from PySide6.QtCore import Qt, QSettings
-from PySide6.QtWidgets import QWidget
-from PySide6 import QtWidgets
+from PySide6.QtCore import QSettings
+from PySide6 import QtGui
 # import the custom class made from QtDesigner
 from ui_azure_config_advanced import Ui_Form
 from common_qt_functions import widgetCustomFunctions
@@ -17,6 +16,13 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.myWindow = QSettings("LyveFUSE", "AzAdvancedWindow")
         self.initWindowSizePos()
         self.populateOptions()
+        
+        # Allow alphanumeric characters plus [\,/,.,-,:]
+        self.lineEdit_azure_aadEndpoint.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-.\:\\\/]*$",self))
+        self.lineEdit_azure_httpProxy.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-.\:\\\/]*$",self))
+        self.lineEdit_azure_httpsProxy.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-.\:\\\/]*$",self))
+        # Allow alphanumeric characters plus [\,/,-,_]
+        self.lineEdit_azure_subDirectory.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-_\\\/]*$",self))
         
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)

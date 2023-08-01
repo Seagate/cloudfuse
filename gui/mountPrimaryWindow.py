@@ -6,7 +6,7 @@ import yaml
 
 # Import QT libraries
 from PySide6.QtCore import Qt
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtGui
 from PySide6.QtWidgets import QMainWindow
 
 # Import the custom class created with QtDesigner 
@@ -20,10 +20,11 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-
         self.setWindowTitle("LyveCloud FUSE")
 
-
+        # Allow alphanumeric characters plus [\,/,-,_]
+        self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-_\\\/]*$",self))
+       
         # Set up the signals for all the interactable intities
         self.button_browse.clicked.connect(self.getFileDirInput)
         self.button_config.clicked.connect(self.showSettingsWidget)
