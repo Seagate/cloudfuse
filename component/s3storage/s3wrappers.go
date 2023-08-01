@@ -139,6 +139,7 @@ func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSym
 	} else {
 		uploader := manager.NewUploader(cl.awsS3Client, func(u *manager.Uploader) {
 			u.PartSize = cl.Config.partSize
+			u.Concurrency = cl.Config.concurrency
 		})
 
 		_, err = uploader.Upload(context.TODO(), &s3.PutObjectInput{
