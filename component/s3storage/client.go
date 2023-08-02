@@ -544,6 +544,7 @@ func (cl *Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, err
 	blockList := common.BlockOffsetList{}
 	result, err := cl.headObject(name, false)
 	if err != nil {
+		log.Err("Client::GetFileBlockOffsets : Unable to headObject with name %v", name)
 		return &blockList, err
 	}
 
