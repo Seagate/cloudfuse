@@ -72,14 +72,15 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
 	s3.stConfig.disableConcurrentDownload = opt.DisableConcurrentDownload
 
-	// Part size must be at least 5 MB. Otherwise, set to default of 8 MB.
-	if opt.PartSizeMb < 5 {
+	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
+	if opt.PartSizeMb < 5 || opt.PartSizeMb > MaxPartSizeMb {
+		log.Warn("ParseAndValidateConfig : Part size must be between 5MB and 5GB. Default to default size")
 		s3.stConfig.partSize = DefaultPartSize
 	} else {
 		s3.stConfig.partSize = opt.PartSizeMb * common.MbToBytes
 	}
 
-	// Cutoff size must not be less than 5 MB. Otherwise, set to default of 200 MB.
+	// Cutoff size must not be less than 5 MB. Otherwise, set to default.
 	if opt.UploadCutoffMb < 5 {
 		s3.stConfig.uploadCutoff = DefaultUploadCutoff
 	} else {

@@ -56,6 +56,7 @@ const (
 	DefaultPartSize     = 8 * common.MbToBytes
 	DefaultUploadCutoff = 100 * common.MbToBytes
 	DefaultConcurrency  = 10
+	MaxPartSizeMb       = 5 * 1024
 )
 
 // ----------- Cloud Storage error code handling ---------------
