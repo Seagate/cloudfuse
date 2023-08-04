@@ -756,6 +756,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 
 		if fileSize > 0 {
 			// Download/Copy the file from storage to the local file.
+			// We pass a count of 0 to get the entire object
 			err = fc.NextComponent().CopyToFile(
 				internal.CopyToFileOptions{
 					Name:   options.Name,
