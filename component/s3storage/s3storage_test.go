@@ -117,7 +117,7 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(ctx context.Context, reader 
 	key string, partSizeMB int64) error {
 
 	// If bufferSize > 5TB, then error
-	if readerSize > 5*common.GbToBytes*10000 {
+	if readerSize > 5*1024*common.GbToBytes {
 		return errors.New("buffer is too large to upload to an object")
 	}
 
