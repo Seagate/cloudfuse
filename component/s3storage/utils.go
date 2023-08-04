@@ -54,7 +54,8 @@ import (
 
 const (
 	DefaultPartSize     = 8 * common.MbToBytes
-	DefaultUploadCutoff = 200 * common.MbToBytes
+	DefaultUploadCutoff = 100 * common.MbToBytes
+	DefaultConcurrency  = 10
 )
 
 // ----------- Cloud Storage error code handling ---------------

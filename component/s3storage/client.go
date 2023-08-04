@@ -409,13 +409,15 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 	log.Trace("Client::ReadToFile : name %s, offset : %d, count %d -> file %s", name, offset, count, fi.Name())
 
 	// If we are reading the entire object, then we can use a multipart download
-	if offset == 0 && count == 0 {
+	if !cl.Config.disableConcurrentDownload && offset == 0 && count == 0 {
 		err := cl.getObjectMultipartDownload(name, fi)
 		if err != nil {
 			log.Err("Client::ReadToFile : getObjectMultipartDownload(%s) failed. Here's why: %v", name, err)
 			return err
 		}
+		return nil
 	}
+
 	// get object data
 	objectDataReader, err := cl.getObject(name, offset, count, false)
 	if err != nil {

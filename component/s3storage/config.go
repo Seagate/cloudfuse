@@ -42,16 +42,17 @@ import (
 )
 
 type Options struct {
-	BucketName         string `config:"bucket-name" yaml:"bucket-name,omitempty"`
-	KeyID              string `config:"key-id" yaml:"key-id,omitempty"`
-	SecretKey          string `config:"secret-key" yaml:"secret-key,omitempty"`
-	Region             string `config:"region" yaml:"region,omitempty"`
-	Endpoint           string `config:"endpoint" yaml:"endpoint,omitempty"`
-	PrefixPath         string `config:"subdirectory" yaml:"subdirectory,omitempty"`
-	RestrictedCharsWin bool   `config:"restricted-characters-windows" yaml:"-"`
-	PartSizeMb         int64  `config:"part-size-mb" yaml:"part-size-mb,omitempty"`
-	UploadCutoffMb     int64  `config:"upload-cutoff-mb" yaml:"upload-cutoff-mb,omitempty"`
-	Concurrency        int    `config:"concurrency" yaml:"concurrency,omitempty"`
+	BucketName                string `config:"bucket-name" yaml:"bucket-name,omitempty"`
+	KeyID                     string `config:"key-id" yaml:"key-id,omitempty"`
+	SecretKey                 string `config:"secret-key" yaml:"secret-key,omitempty"`
+	Region                    string `config:"region" yaml:"region,omitempty"`
+	Endpoint                  string `config:"endpoint" yaml:"endpoint,omitempty"`
+	PrefixPath                string `config:"subdirectory" yaml:"subdirectory,omitempty"`
+	RestrictedCharsWin        bool   `config:"restricted-characters-windows" yaml:"-"`
+	PartSizeMb                int64  `config:"part-size-mb" yaml:"part-size-mb,omitempty"`
+	UploadCutoffMb            int64  `config:"upload-cutoff-mb" yaml:"upload-cutoff-mb,omitempty"`
+	Concurrency               int    `config:"concurrency" yaml:"concurrency,omitempty"`
+	DisableConcurrentDownload bool   `config:"disable-concurrent-download" yaml:"disable-concurrent-download,omitempty"`
 }
 
 // ParseAndValidateConfig : Parse and validate config
@@ -69,6 +70,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	s3.stConfig.authConfig.Endpoint = opt.Endpoint
 
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
+	s3.stConfig.disableConcurrentDownload = opt.DisableConcurrentDownload
 
 	// Part size must be at least 5 MB. Otherwise, set to default of 8 MB.
 	if opt.PartSizeMb < 5 {
@@ -83,7 +85,12 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	} else {
 		s3.stConfig.uploadCutoff = opt.UploadCutoffMb * common.MbToBytes
 	}
-	s3.stConfig.concurrency = opt.Concurrency
+
+	if opt.Concurrency != 0 {
+		s3.stConfig.concurrency = opt.Concurrency
+	} else {
+		s3.stConfig.concurrency = DefaultConcurrency
+	}
 
 	// If subdirectory is mounted, take the prefix path
 	s3.stConfig.prefixPath = removeLeadingSlashes(opt.PrefixPath)

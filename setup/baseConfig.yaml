@@ -165,8 +165,9 @@ s3storage:
   endpoint: <S3 endpoint URL. Default - https://s3.[region].lyvecloud.seagate.com>
   subdirectory: <name of subdirectory to be mounted instead of whole bucket>
   part-size-mb: <size of each part for multipart uploads (in MB). Default - 8 MB>
-  upload-cutoff-mb: <files exceeding this size will use be uploaded in parts (in MB). Default - 200 MB>
-  concurrency: <number of parallel upload/download threads. Default - 32>
+  upload-cutoff-mb: <files exceeding this size will use be uploaded in parts (in MB). Default - 100 MB>
+  concurrency: <number of parallel upload/download threads. Default - 10>
+  disable-concurrent-download: <disables concurrent downloads. Can improve performance with small files at the cost of slow downloads for large objects>
 
 # Mount all configuration
 mountall:
