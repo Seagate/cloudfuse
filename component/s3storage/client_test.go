@@ -91,7 +91,8 @@ func newTestClient(configuration string) (*Client, error) {
 			Region:     conf.Region,
 			Endpoint:   conf.Endpoint,
 		},
-		prefixPath: conf.PrefixPath,
+		prefixPath:                conf.PrefixPath,
+		disableConcurrentDownload: conf.DisableConcurrentDownload,
 	}
 	// create a Client
 	client := NewConnection(configForS3Client)
@@ -612,6 +613,76 @@ func (s *clientTestSuite) TestReadToFile() {
 	s.assert.EqualValues(body, output)
 	f.Close()
 }
+
+func (s *clientTestSuite) TestReadToFileMultipart() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	body := []byte(randomString(bodyLen))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	f, err := os.CreateTemp("", name+".tmp")
+	s.assert.Nil(err)
+	defer os.Remove(f.Name())
+
+	err = s.client.ReadToFile(name, 0, 0, f)
+	s.assert.Nil(err)
+
+	// file content should match generated body
+	output := make([]byte, bodyLen)
+	f, err = os.Open(f.Name())
+	s.assert.Nil(err)
+	outputLen, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(bodyLen, outputLen)
+	s.assert.EqualValues(body, output)
+	f.Close()
+}
+
+func (s *clientTestSuite) TestReadToFileNoMultipart() {
+	storageTestConfigurationParameters.DisableConcurrentDownload = true
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(vdConfig, true)
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	body := []byte(randomString(bodyLen))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	f, err := os.CreateTemp("", name+".tmp")
+	s.assert.Nil(err)
+	defer os.Remove(f.Name())
+
+	err = s.client.ReadToFile(name, 0, 0, f)
+	s.assert.Nil(err)
+
+	// file content should match generated body
+	output := make([]byte, bodyLen)
+	f, err = os.Open(f.Name())
+	s.assert.Nil(err)
+	outputLen, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(bodyLen, outputLen)
+	s.assert.EqualValues(body, output)
+	f.Close()
+}
+
 func (s *clientTestSuite) TestReadBuffer() {
 	defer s.cleanupTest()
 	// setup

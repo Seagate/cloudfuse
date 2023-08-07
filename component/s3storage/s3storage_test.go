@@ -91,14 +91,16 @@ func generateFileName() string {
 }
 
 type storageTestConfiguration struct {
-	BucketName         string `json:"bucket-name"`
-	KeyID              string `json:"access-key"`
-	SecretKey          string `json:"secret-key"`
-	Endpoint           string `json:"endpoint"`
-	Region             string `json:"region"`
-	Prefix             string `json:"prefix"`
-	RestrictedCharsWin bool   `json:"restricted-characters-windows"`
-	PartSize           int64  `json:"part-size-mb"`
+	BucketName                string `json:"bucket-name"`
+	KeyID                     string `json:"access-key"`
+	SecretKey                 string `json:"secret-key"`
+	Endpoint                  string `json:"endpoint"`
+	Region                    string `json:"region"`
+	Prefix                    string `json:"prefix"`
+	RestrictedCharsWin        bool   `json:"restricted-characters-windows"`
+	PartSizeMb                int64  `json:"part-size-mb"`
+	UploadCutoffMb            int64  `json:"upload-cutoff-mb"`
+	DisableConcurrentDownload bool   `json:"disable-concurrent-download"`
 }
 
 var storageTestConfigurationParameters storageTestConfiguration
@@ -329,9 +331,11 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, bucket string
 
 func generateConfigYaml(testParams storageTestConfiguration) string {
 	return fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n"+
-		"  endpoint: %s\n  region: %s\n  subdirectory: %s\n  restricted-characters-windows: %t\n  part-size-mb: %d",
+		"  endpoint: %s\n  region: %s\n  subdirectory: %s\n  restricted-characters-windows: %t\n  part-size-mb: %d\n"+
+		"  upload-cutoff-mb: %d\n  disable-concurrent-download: %t",
 		testParams.BucketName, testParams.KeyID, testParams.SecretKey,
-		testParams.Endpoint, testParams.Region, testParams.Prefix, testParams.RestrictedCharsWin, testParams.PartSize)
+		testParams.Endpoint, testParams.Region, testParams.Prefix, testParams.RestrictedCharsWin, testParams.PartSizeMb,
+		testParams.UploadCutoffMb, testParams.DisableConcurrentDownload)
 }
 
 func (s *s3StorageTestSuite) tearDownTestHelper(delete bool) {
@@ -1326,6 +1330,39 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 	s.assert.EqualValues(testData, output)
 }
 
+func (s *s3StorageTestSuite) TestWriteFileMultipartUpload() {
+	defer s.cleanupTest()
+	blockSizeMB := 5
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = 5
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(vdConfig, s.bucket, true)
+
+	// Setup
+	name := generateFileName()
+	fileSize := 5 * MB
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.Nil(err)
+	data := make([]byte, fileSize)
+	rand.Read(data)
+
+	count, err := s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+	s.assert.EqualValues(len(data), count)
+
+	// Object should have updated data
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, err := io.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(data, output)
+}
+
 func (s *s3StorageTestSuite) TestWriteFileWindowsNameConvert() {
 	// Skip test if not running on Windows
 	if runtime.GOOS != "windows" {
@@ -1775,7 +1812,7 @@ func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSmallFile() {
 func (s *s3StorageTestSuite) TestOverwriteBlocks() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -1816,7 +1853,7 @@ func (s *s3StorageTestSuite) TestOverwriteBlocks() {
 func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocks() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2483,7 +2520,7 @@ func (s *s3StorageTestSuite) TestOffsetToEndDownload() {
 func (s *s3StorageTestSuite) TestGetFileBlockOffsetsSmallFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2506,7 +2543,7 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsSmallFile() {
 func (s *s3StorageTestSuite) TestGetFileBlockOffsetsChunkedFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2534,7 +2571,7 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsChunkedFile() {
 func (s *s3StorageTestSuite) TestGetFileBlockOffsetsError() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 	// Setup
@@ -2548,7 +2585,7 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsError() {
 func (s *s3StorageTestSuite) TestFlushFileEmptyFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2571,7 +2608,7 @@ func (s *s3StorageTestSuite) TestFlushFileEmptyFile() {
 func (s *s3StorageTestSuite) TestFlushFileChunkedFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2601,7 +2638,7 @@ func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2640,7 +2677,7 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2679,7 +2716,7 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2738,7 +2775,7 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2804,7 +2841,7 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2856,7 +2893,7 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2915,7 +2952,7 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 7
 	blockSizeBytes := blockSizeMB * common.MbToBytes
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -2971,7 +3008,7 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 7
 	blockSizeBytes := blockSizeMB * common.MbToBytes
-	storageTestConfigurationParameters.PartSize = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
