@@ -1,20 +1,20 @@
 from PySide6.QtCore import Qt, QSettings
 # import the custom class made from QtDesigner
-from ui_lyve_config_advanced import Ui_Form
+from ui_s3_config_advanced import Ui_Form
 from common_qt_functions import widgetCustomFunctions
 
 file_cache_eviction_choices = ['lru','lfu']
 
-class lyveAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
+class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.myWindow = QSettings("LyveFUSE", "lycAdvancedWindow")
+        self.myWindow = QSettings("CloudFUSE", "S3AdvancedWindow")
         # Get the config settings from the QSettings repo - do not inherit from defaultManager, it resets the settings to default
-        self.settings = QSettings("LyveFUSE", "settings")
+        self.settings = QSettings("CloudFUSE", "settings")
         
         self.initWindowSizePos()
-        self.setWindowTitle("Advanced LyveCloud Config Settings")
+        self.setWindowTitle("Advanced S3Cloud Config Settings")
         self.populateOptions()
         
         # Set up the signals

@@ -10,16 +10,16 @@ libfusePermissions = [0o777,0o666,0o644,0o444]
 class defaultSettingsManager():
     def __init__(self):
         super().__init__()
-        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"LyveFUSE", "settings")
+        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "settings")
         self.setAllDefaultSettings()
         
         
     def setAllDefaultSettings(self):
-        self.setLyveSettings()
+        self.setS3Settings()
         self.setAzureSettings()
         self.setComponentSettings()
         
-    def setLyveSettings(self):
+    def setS3Settings(self):
         # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
         self.settings.setValue('s3storage',{
             'bucket-name': '',

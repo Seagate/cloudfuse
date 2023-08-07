@@ -3,19 +3,19 @@ from PySide6 import QtWidgets
 
 # import the custom class made from QtDesigner
 from ui_lyve_config_common import Ui_Form
-from lyve_config_advanced import lyveAdvancedSettingsWidget
+from lyve_config_advanced import s3AdvancedSettingsWidget
 from common_qt_functions import defaultSettingsManager,widgetCustomFunctions
 
 pipelineChoices = ['file_cache','stream']
 libfusePermissions = [0o777,0o666,0o644,0o444]
 
-class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form): 
+class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form): 
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.myWindow = QSettings("LyveFUSE", "lycWindow")
+        self.myWindow = QSettings("CloudFUSE", "lycWindow")
         self.initWindowSizePos()
-        self.setWindowTitle("LyveCloud Config Settings")
+        self.setWindowTitle("S3Cloud Config Settings")
         self.initSettingsFromConfig()
         self.populateOptions()
         self.showModeSettings()
@@ -39,7 +39,7 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
     # To open the advanced widget, make an instance, so self.moresettings was chosen.
     #   self.moresettings does not have anything to do with the QSettings package that is seen throughout this code
     def openAdvanced(self):
-        self.moreSettings = lyveAdvancedSettingsWidget()
+        self.moreSettings = s3AdvancedSettingsWidget()
         self.moreSettings.setWindowModality(Qt.ApplicationModal)
         self.moreSettings.show()
 
@@ -114,7 +114,7 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
         # Reset these defaults
         checkChoice = self.popupDoubleCheckReset()
         if checkChoice == QtWidgets.QMessageBox.Yes:
-            self.setLyveSettings()
+            self.setS3Settings()
             self.setComponentSettings()
             self.populateOptions()
     

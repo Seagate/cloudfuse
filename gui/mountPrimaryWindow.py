@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QMainWindow
 
 # Import the custom class created with QtDesigner 
 from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
-from lyve_config_common import lyveSettingsWidget
+from lyve_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
 
 bucketOptions = ['s3storage', 'azstorage']
@@ -21,7 +21,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         super().__init__()
         self.setupUi(self)
 
-        self.setWindowTitle("LyveCloud FUSE")
+        self.setWindowTitle("Cloud FUSE")
 
 
         # Set up the signals for all the interactable intities
@@ -38,7 +38,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
         targetIndex = self.dropDown_bucketSelect.currentIndex()
         if bucketOptions[targetIndex] == 's3storage':
-            self.settings = lyveSettingsWidget()
+            self.settings = s3SettingsWidget()
         else:
             self.settings = azureSettingsWidget()
         self.settings.setWindowModality(Qt.ApplicationModal)
