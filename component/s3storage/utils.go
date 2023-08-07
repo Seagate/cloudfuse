@@ -55,7 +55,7 @@ import (
 const (
 	DefaultPartSize     = 8 * common.MbToBytes
 	DefaultUploadCutoff = 100 * common.MbToBytes
-	DefaultConcurrency  = 10
+	DefaultConcurrency  = 5
 	MaxPartSizeMb       = 5 * 1024
 )
 

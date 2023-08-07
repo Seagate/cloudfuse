@@ -166,7 +166,7 @@ s3storage:
   subdirectory: <name of subdirectory to be mounted instead of whole bucket>
   part-size-mb: <size of each part for multipart uploads (in MB). Valid range is 5MB to 5120MB. Default - 8 MB>
   upload-cutoff-mb: <files exceeding this size will use be uploaded in parts (in MB). Default - 100 MB>
-  concurrency: <number of parallel upload/download threads. Default - 10>
+  concurrency: <number of parallel upload/download threads. Default - 5>
   disable-concurrent-download: <disables concurrent downloads. Can improve performance with small files at the cost of slow downloads for large objects>
 
 # Mount all configuration
