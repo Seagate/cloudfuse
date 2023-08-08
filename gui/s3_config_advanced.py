@@ -11,7 +11,7 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.setupUi(self)
         self.myWindow = QSettings("CloudFUSE", "S3AdvancedWindow")
         # Get the config settings from the QSettings repo - do not inherit from defaultManager, it resets the settings to default
-        self.settings = QSettings("CloudFUSE", "settings")
+        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "settings")
         
         self.initWindowSizePos()
         self.setWindowTitle("Advanced S3Cloud Config Settings")

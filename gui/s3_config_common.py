@@ -13,7 +13,7 @@ class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.myWindow = QSettings("CloudFUSE", "lycWindow")
+        self.myWindow = QSettings("CloudFUSE", "s3Window")
         self.initWindowSizePos()
         self.setWindowTitle("S3Cloud Config Settings")
         self.initSettingsFromConfig()

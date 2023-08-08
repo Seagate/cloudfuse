@@ -13,7 +13,7 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("Advanced Azure Config Settings")
-        self.settings = QSettings("CloudFUSE", "settings")
+        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "settings")
         self.myWindow = QSettings("CloudFUSE", "AzAdvancedWindow")
         self.initWindowSizePos()
         self.populateOptions()
