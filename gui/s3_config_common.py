@@ -2,8 +2,8 @@ from PySide6.QtCore import Qt, QSettings
 from PySide6 import QtWidgets
 
 # import the custom class made from QtDesigner
-from ui_lyve_config_common import Ui_Form
-from lyve_config_advanced import s3AdvancedSettingsWidget
+from ui_s3_config_common import Ui_Form
+from s3_config_advanced import s3AdvancedSettingsWidget
 from common_qt_functions import defaultSettingsManager,widgetCustomFunctions
 
 pipelineChoices = ['file_cache','stream']
