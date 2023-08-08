@@ -1,3 +1,4 @@
+from sys import platform
 from PySide6.QtCore import QSettings
 from PySide6 import QtGui
 # import the custom class made from QtDesigner
@@ -18,8 +19,16 @@ class lyveAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.setWindowTitle("Advanced LyveCloud Config Settings")
         self.populateOptions()
         
-        # Allow alphanumeric characters plus [\,/,-,_]
-        self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-_\\\/]*$",self))
+       
+        if platform == 'win32':
+            # Windows directory and filename conventions:
+            #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
+            # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
+            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator('^[^<>."|?\0*]*$',self))
+        else:
+            # Allow anything BUT Nul
+            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator('^[^\0]*$',self))
+        
         
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)

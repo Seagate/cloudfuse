@@ -1,3 +1,4 @@
+from sys import platform
 from PySide6.QtCore import Qt, QSettings
 from PySide6 import QtWidgets, QtGui
 
@@ -32,13 +33,22 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         self.button_advancedSettings.clicked.connect(self.openAdvanced)
         self.button_resetDefaultSettings.clicked.connect(self.resetDefaults)
 
-        # Allow alphanumeric characters plus [\,/,.,-]
-        self.lineEdit_azure_container.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-.\\\/]*$",self))
-        self.lineEdit_azure_accountName.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-.\\\/]*$",self))
-        # Allow alphanumeric characters plus [\,/,.,-,:]
-        self.lineEdit_azure_endpoint.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-.\:\\\/]*$",self))
-        # Allow alphanumeric characters plus [\,/,-,_]
-        self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-_\\\/]*$",self))
+
+        # Documentation for the allowed characters for azure:
+        #   https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftstorage
+        # Allow lowercase alphanumeric characters plus [-]
+        self.lineEdit_azure_container.setValidator(QtGui.QRegularExpressionValidator("^[a-z0-9-]*$",self))
+        # Allow alphanumeric characters plus [.,-,_]
+        self.lineEdit_azure_accountName.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-._]*$",self))
+
+        if platform == 'win32':
+            # Windows directory and filename conventions:
+            #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
+            # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
+            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator('^[^<>."|?\0*]*$',self))
+        else:
+            # Allow anything BUT Nul
+            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator('^[^\0]*$',self))
         
         self.lineEdit_azure_accountKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.lineEdit_azure_spnClientSecret.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
@@ -143,7 +153,7 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
         self.lineEdit_fileCache_path.setText('{}'.format(directory))
         # Update the settings 
-        self.updateFileCache()
+        self.updateFileCachePath()
  
     def hideModeBoxes(self):
         self.groupbox_fileCache.setVisible(False)
