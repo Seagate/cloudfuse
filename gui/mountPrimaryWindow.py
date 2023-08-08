@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QMainWindow
 
 # Import the custom class created with QtDesigner 
 from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
-from lyve_config_common import s3SettingsWidget
+from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
 
 bucketOptions = ['s3storage', 'azstorage']
