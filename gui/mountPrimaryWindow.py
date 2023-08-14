@@ -6,7 +6,7 @@ import yaml
 
 # Import QT libraries
 from PySide6.QtCore import Qt
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtGui
 from PySide6.QtWidgets import QMainWindow
 
 # Import the custom class created with QtDesigner 
@@ -21,7 +21,16 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("LyveCloud FUSE")
-
+        
+        if platform == 'win32':
+            # Windows directory and filename conventions:
+            #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
+            # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
+            self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator('^[^<>."|?\0*]*$',self))
+        else:
+            # Allow anything BUT Nul
+            self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator('^[^\0]*$',self))
+       
         # Set up the signals for all the interactable intities
         self.button_browse.clicked.connect(self.getFileDirInput)
         self.button_config.clicked.connect(self.showSettingsWidget)
