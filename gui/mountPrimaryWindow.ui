@@ -40,10 +40,17 @@
        </widget>
       </item>
       <item>
-       <widget class="QLineEdit" name="lineEdit_mountPoint"/>
+       <widget class="QLineEdit" name="lineEdit_mountPoint">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Designate a location to mount the bucket - the directory must exist on Linux, but not on Windows&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+       </widget>
       </item>
       <item>
        <widget class="QPushButton" name="button_browse">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Choose a location to mount the bucket - the directory must exist on Linux, but not on Windows&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
         <property name="text">
          <string>Browse</string>
         </property>
@@ -63,14 +70,14 @@
       <item>
        <widget class="QComboBox" name="dropDown_bucketSelect">
         <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Set up the pipeline for LyveFuse. &lt;/p&gt;&lt;p&gt;Choose streaming or file caching&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Choose which bucket to mount.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="currentText">
-         <string>Lyve</string>
+         <string>S3</string>
         </property>
         <item>
          <property name="text">
-          <string>Lyve</string>
+          <string>S3</string>
          </property>
         </item>
         <item>
@@ -82,6 +89,9 @@
       </item>
       <item>
        <widget class="QPushButton" name="button_config">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Click config to modify the pipeline settings associated with the selected bucket.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
         <property name="text">
          <string>Config</string>
         </property>
