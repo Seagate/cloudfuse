@@ -1,6 +1,6 @@
-from PySide6.QtCore import Qt, QSettings
-from PySide6.QtWidgets import QWidget
-from PySide6 import QtWidgets
+from sys import platform
+from PySide6.QtCore import QSettings
+from PySide6 import QtGui
 # import the custom class made from QtDesigner
 from ui_azure_config_advanced import Ui_Form
 from common_qt_functions import widgetCustomFunctions
@@ -17,6 +17,15 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.myWindow = QSettings("LyveFUSE", "AzAdvancedWindow")
         self.initWindowSizePos()
         self.populateOptions()
+        
+        if platform == 'win32':
+            # Windows directory and filename conventions:
+            #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
+            # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
+            self.lineEdit_azure_subDirectory.setValidator(QtGui.QRegularExpressionValidator('^[^<>."|?\0*]*$',self))
+        else:
+            # Allow anything BUT Nul
+            self.lineEdit_azure_subDirectory.setValidator(QtGui.QRegularExpressionValidator('^[^\0]*$',self))
         
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)
