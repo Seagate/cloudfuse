@@ -51,9 +51,7 @@ type Config struct {
 	authConfig         s3AuthConfig
 	prefixPath         string
 	restrictedCharsWin bool
-	// TODO: performance:
-	// 	use a fake block size to improve streaming performance
-	// 	even though S3 doesn't expose a block size
+	partSize           int64
 }
 
 // TODO: move s3AuthConfig to s3auth.go
@@ -110,6 +108,7 @@ type S3Connection interface {
 	GetFileBlockOffsets(name string) (*common.BlockOffsetList, error)
 
 	TruncateFile(string, int64) error
+	StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 	NewCredentialKey(_, _ string) error
 }

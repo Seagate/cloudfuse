@@ -37,6 +37,8 @@ package s3storage
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -53,6 +55,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 const (
@@ -62,6 +65,7 @@ const (
 type Client struct {
 	Connection
 	awsS3Client *s3.Client // S3 client library supplied by AWS
+	blockLocks  common.KeyedMutex
 }
 
 // Verify that Client implements S3Connection interface
@@ -139,9 +143,8 @@ func (cl *Client) Configure(cfg Config) error {
 }
 
 // For dynamic configuration, update the config here.
-// Not implemented.
 func (cl *Client) UpdateConfig(cfg Config) error {
-	log.Trace("Client::UpdateConfig : no dynamic config update support")
+	cl.Config.partSize = cfg.partSize
 	return nil
 }
 
@@ -455,7 +458,7 @@ func (cl *Client) ReadBuffer(name string, offset int64, len int64, isSymlink boo
 // len = 0 reads to the end of the object.
 // name is the file path.
 func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
-	log.Trace("Client::ReadInBuffer : name %s", name)
+	log.Trace("Client::ReadInBuffer : name %s offset %d len %d", name, offset, len)
 	// get object data
 	objectDataReader, err := cl.getObject(name, offset, len, false)
 	if err != nil {
@@ -464,8 +467,8 @@ func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte
 	}
 	// read object data
 	defer objectDataReader.Close()
-	_, err = objectDataReader.Read(data)
-	if err == io.EOF {
+	_, err = io.ReadFull(objectDataReader, data)
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		// If we reached the EOF then all the data was correctly read
 		return nil
 	}
@@ -529,15 +532,55 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data 
 	// upload data to object
 	// TODO: handle metadata with S3
 	err := cl.putObject(name, dataReader, isSymlink)
-	log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
+	if err != nil {
+		log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
+	}
 	return err
 }
 
 // GetFileBlockOffsets: store blocks ids and corresponding offsets.
 func (cl *Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, error) {
-	// TODO: decide whether we have any use for this function
-	// if not, we can just skip this and return nil, nil in s3storage.go:GetFileBlockOffsets()
-	return nil, nil
+	log.Trace("Client::GetFileBlockOffsets : name %s", name)
+	blockList := common.BlockOffsetList{}
+	result, err := cl.headObject(name, false)
+	if err != nil {
+		log.Err("Client::GetFileBlockOffsets : Unable to headObject with name %v", name)
+		return &blockList, err
+	}
+
+	partSize := cl.Config.partSize
+	var objectSize int64
+
+	// if file is smaller than block size then it is a small file
+	if result.Size < partSize {
+		blockList.Flags.Set(common.SmallFile)
+		return &blockList, nil
+	}
+
+	// Create a list of blocks that are the partSize except for the last block
+	for objectSize <= result.Size {
+		if objectSize+partSize >= result.Size {
+			// This is the last block to add
+			blk := &common.Block{
+				Id:         base64.StdEncoding.EncodeToString(common.NewUUID().Bytes()),
+				StartIndex: objectSize,
+				EndIndex:   result.Size,
+			}
+			blockList.BlockList = append(blockList.BlockList, blk)
+			break
+		}
+
+		blk := &common.Block{
+			Id:         base64.StdEncoding.EncodeToString(common.NewUUID().Bytes()),
+			StartIndex: objectSize,
+			EndIndex:   objectSize + partSize,
+		}
+		blockList.BlockList = append(blockList.BlockList, blk)
+		objectSize += partSize
+	}
+	blockList.BlockIdLength = common.GetIdLength(blockList.BlockList[0].Id)
+
+	return &blockList, nil
 }
 
 // Truncate object to size in bytes.
@@ -626,4 +669,208 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		return err
 	}
 	return nil
+}
+
+func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error {
+	// lock on the object name so that no stage and commit race condition occur causing failure
+	objectMtx := cl.blockLocks.GetLock(name)
+	objectMtx.Lock()
+	defer objectMtx.Unlock()
+
+	// Return early if blocklist is empty
+	if len(bol.BlockList) == 0 {
+		return nil
+	}
+
+	// Return early if there are no dirty blocks
+	staged := false
+	for _, blk := range bol.BlockList {
+		if blk.Dirty() {
+			staged = true
+			break
+		}
+	}
+	if !staged {
+		return nil
+	}
+
+	// For loop to determine if interior blocks are too small for AWS multipart upload and we need to change
+	// the size of interior blocks
+	combineBlocks := false
+	for i, blk := range bol.BlockList {
+		// If an interior block is small and not the last block, then we cannot upload using multipart upload
+		// so we need to combine blocks
+		if len(blk.Data) < 5*common.MbToBytes && i < len(bol.BlockList)-1 {
+			combineBlocks = true
+			break
+		}
+	}
+
+	var err error
+	if combineBlocks {
+		bol.BlockList, err = cl.combineSmallBlocks(name, bol.BlockList)
+		if err != nil {
+			log.Err("Client::StageAndCommit : Failed to combine small blocks: %v ", name, err)
+			return err
+		}
+	}
+
+	//struct for starting a multipart upload
+	ctx, cancelFn := context.WithTimeout(context.TODO(), 10*time.Minute)
+	defer cancelFn()
+
+	key := cl.getKey(name, false)
+
+	//send command to start copy and get the upload id as it is needed later
+	var uploadID string
+	createOutput, err := cl.awsS3Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
+		Bucket:      aws.String(cl.Config.authConfig.BucketName),
+		Key:         aws.String(key),
+		ContentType: aws.String(getContentType(key)),
+	})
+	if err != nil {
+		log.Err("Client::StageAndCommit : Failed to create multipart upload. Here's why: %v ", name, err)
+		return err
+	}
+	if createOutput != nil {
+		if createOutput.UploadId != nil {
+			uploadID = *createOutput.UploadId
+		}
+	}
+	if uploadID == "" {
+		log.Err("Client::StageAndCommit : No upload id found in start upload request. Here's why: %v ", name, err)
+		return err
+	}
+
+	var partNumber int32 = 1
+	parts := make([]types.CompletedPart, 0)
+	var data []byte
+
+	for _, blk := range bol.BlockList {
+		if blk.Truncated() {
+			data = make([]byte, blk.EndIndex-blk.StartIndex)
+			blk.Flags.Clear(common.TruncatedBlock)
+		} else {
+			data = blk.Data
+		}
+
+		var err error
+		var eTag *string
+		if blk.Dirty() || len(data) > 0 {
+			// This block has data that is not yet in the bucket
+			var partResp *s3.UploadPartOutput
+			partResp, err = cl.awsS3Client.UploadPart(context.TODO(), &s3.UploadPartInput{
+				Bucket:     aws.String(cl.Config.authConfig.BucketName),
+				Key:        aws.String(key),
+				PartNumber: partNumber,
+				UploadId:   &uploadID,
+				Body:       bytes.NewReader(data),
+			})
+			eTag = partResp.ETag
+			blk.Flags.Clear(common.DirtyBlock)
+		} else {
+			// This block is already in the bucket, so we need to copy this part
+			var partResp *s3.UploadPartCopyOutput
+			partResp, err = cl.awsS3Client.UploadPartCopy(context.TODO(), &s3.UploadPartCopyInput{
+				Bucket:          aws.String(cl.Config.authConfig.BucketName),
+				Key:             aws.String(key),
+				CopySource:      aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, key)),
+				CopySourceRange: aws.String("bytes=" + fmt.Sprint(blk.StartIndex) + "-" + fmt.Sprint(blk.EndIndex-1)),
+				PartNumber:      partNumber,
+				UploadId:        &uploadID,
+			})
+			eTag = partResp.CopyPartResult.ETag
+		}
+
+		if err != nil {
+			log.Info("Client::StageAndCommit : Attempting to abort upload due to error: ", err.Error())
+			abortErr := cl.abortMultipartUpload(key, uploadID)
+			return errors.Join(err, abortErr)
+		}
+
+		// copy etag and part number to verify later
+		if eTag != nil {
+			partNum := partNumber
+			etag := strings.Trim(*eTag, "\"")
+			cPart := types.CompletedPart{
+				ETag:       &etag,
+				PartNumber: partNum,
+			}
+			parts = append(parts, cPart)
+		}
+
+		partNumber++
+	}
+
+	// complete the upload
+	_, err = cl.awsS3Client.CompleteMultipartUpload(context.TODO(), &s3.CompleteMultipartUploadInput{
+		Bucket:   aws.String(cl.Config.authConfig.BucketName),
+		Key:      aws.String(key),
+		UploadId: &uploadID,
+		MultipartUpload: &types.CompletedMultipartUpload{
+			Parts: parts,
+		},
+	})
+	if err != nil {
+		log.Info("Client::StageAndCommit : Attempting to abort upload due to error: ", err.Error())
+		abortErr := cl.abortMultipartUpload(key, uploadID)
+		return errors.Join(err, abortErr)
+	}
+
+	return nil
+}
+
+// combineSmallBlocks will combine blocks in a blocklist, except for the last block, if the block is smaller
+// than the smallest size for a part in AWS, which is 5 MB. Blocks smaller than 5MB will be combined with the
+// next block in the list.
+func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]*common.Block, error) {
+	newBlockList := []*common.Block{}
+	newBlockList = append(newBlockList, &common.Block{})
+	addIndex := 0
+	beginNewBlock := true
+	for i, blk := range blockList {
+		if beginNewBlock && blk.EndIndex-blk.StartIndex >= 5*common.MbToBytes {
+			// This block is large enough so we copy the whole block
+			newBlockList[addIndex] = blk
+		} else {
+			// We have a small block and need to keep adding data to the block
+			if beginNewBlock {
+				newBlockList[addIndex].StartIndex = blk.StartIndex
+				newBlockList[addIndex].Flags.Set(common.DirtyBlock)
+				newBlockList[addIndex].Id = blk.Id
+				beginNewBlock = false
+			}
+
+			var addData []byte
+			// If there is no data in the block and it is not truncated, we need to get it from the cloud. Otherwise we can just copy it.
+			if len(blk.Data) == 0 && !blk.Truncated() {
+				result, err := cl.getObject(name, blk.StartIndex, blk.EndIndex-blk.StartIndex, false)
+				if err != nil {
+					log.Err("Client::combineSmallBlocks : Unable to get object with error: ", err.Error())
+					return nil, err
+				}
+
+				defer result.Close()
+				addData, err = io.ReadAll(result)
+				if err != nil {
+					log.Err("Client::combineSmallBlocks : Unable to read bytes from object with error: ", err.Error())
+					return nil, err
+				}
+			} else {
+				addData = blk.Data
+			}
+
+			// Combine these two blocks
+			newBlockList[addIndex].Data = append(newBlockList[addIndex].Data, addData...)
+			newBlockList[addIndex].EndIndex = blk.EndIndex
+		}
+
+		// If our current block is large enough and it is not the last block
+		if newBlockList[addIndex].EndIndex-newBlockList[addIndex].StartIndex >= 5*common.MbToBytes && i < len(blockList)-1 {
+			beginNewBlock = true
+			newBlockList = append(newBlockList, &common.Block{})
+			addIndex++
+		}
+	}
+	return newBlockList, nil
 }

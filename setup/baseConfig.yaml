@@ -164,6 +164,7 @@ s3storage:
   region: <S3 region. Default - us-east-1>
   endpoint: <S3 endpoint URL. Default - https://s3.[region].lyvecloud.seagate.com>
   subdirectory: <name of subdirectory to be mounted instead of whole bucket>
+  part-size-mb: <size of each part for multipart uploads (in MB). Valid range is 5MB to 5120MB. Default - 8 MB>
 
 # Mount all configuration
 mountall:
