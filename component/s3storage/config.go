@@ -36,9 +36,14 @@ package s3storage
 
 import (
 	"errors"
+	"fmt"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
+)
+
+var (
+	errConfigFieldEmpty = errors.New("config field empty")
 )
 
 type Options struct {
@@ -59,16 +64,29 @@ type Options struct {
 func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	log.Trace("ParseAndValidateConfig : Parsing config")
 
-	// Validate account name is present or not
+	// Validate bucket name
 	if opt.BucketName == "" {
-		return errors.New("bucket name not provided")
+		return fmt.Errorf("%w: bucket name not provided", errConfigFieldEmpty)
 	}
+
+	// Validate key id
+	if opt.KeyID == "" {
+		return fmt.Errorf("%w: key id not provided", errConfigFieldEmpty)
+	}
+
+	// Validate secret key
+	if opt.SecretKey == "" {
+		return fmt.Errorf("%w: bucket name not provided", errConfigFieldEmpty)
+	}
+
+	// Set authentication config
 	s3.stConfig.authConfig.BucketName = opt.BucketName
 	s3.stConfig.authConfig.KeyID = opt.KeyID
 	s3.stConfig.authConfig.SecretKey = opt.SecretKey
 	s3.stConfig.authConfig.Region = opt.Region
 	s3.stConfig.authConfig.Endpoint = opt.Endpoint
 
+	// Set restricted characters
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
 	s3.stConfig.disableConcurrentDownload = opt.DisableConcurrentDownload
 
@@ -93,8 +111,16 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 		s3.stConfig.concurrency = DefaultConcurrency
 	}
 
+	// Part size must be at least 5 MB. Otherwise, set to default of 8 MB.
+	if opt.PartSizeMb < 5 {
+		s3.stConfig.partSize = DefaultPartSize
+	} else {
+		s3.stConfig.partSize = opt.PartSizeMb * common.MbToBytes
+	}
+
 	// If subdirectory is mounted, take the prefix path
 	s3.stConfig.prefixPath = removeLeadingSlashes(opt.PrefixPath)
+
 	// TODO: add more config options to customize AWS SDK behavior and import them here
 
 	return nil
@@ -123,3 +149,4 @@ func ParseAndReadDynamicConfig(s3 *S3Storage, opt Options, reload bool) error {
 }
 
 // TODO: write config_test.go with unit tests
+// TODO: allow dynamic config changes to affect SDK behavior?

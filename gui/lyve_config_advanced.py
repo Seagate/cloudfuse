@@ -1,4 +1,6 @@
-from PySide6.QtCore import Qt, QSettings
+from sys import platform
+from PySide6.QtCore import QSettings
+from PySide6 import QtGui
 # import the custom class made from QtDesigner
 from ui_lyve_config_advanced import Ui_Form
 from common_qt_functions import widgetCustomFunctions
@@ -16,6 +18,17 @@ class lyveAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.initWindowSizePos()
         self.setWindowTitle("Advanced LyveCloud Config Settings")
         self.populateOptions()
+        
+       
+        if platform == 'win32':
+            # Windows directory and filename conventions:
+            #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
+            # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
+            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator('^[^<>."|?\0*]*$',self))
+        else:
+            # Allow anything BUT Nul
+            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator('^[^\0]*$',self))
+        
         
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)
@@ -49,6 +62,12 @@ class lyveAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.spinBox_libfuse_maxFuseThreads.setValue(libfuse['max-fuse-threads'])
         
         self.lineEdit_subdirectory.setText(s3Storage['subdirectory'])
+        
+        if platform == "win32":
+            self.checkBox_libfuse_networkshare.setToolTip("Runs as a network share - may improve performance when latency to cloud is high.")
+        else:
+            self.checkBox_libfuse_networkshare.setEnabled(False)
+            self.checkBox_libfuse_networkshare.setToolTip("Network share is only supported on Windows")
 
     def updateOptionalS3Storage(self):
         s3Storage = self.settings.value('s3storage')
