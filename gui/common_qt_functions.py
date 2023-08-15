@@ -142,7 +142,7 @@ class defaultSettingsManager():
         self.settings.setValue('logging',{
             'type' : 'syslog',
             'level' : 'log_warning',        
-            'file-path' : '$HOME/.lyvecloudfuse/lyvecloudfuse.log',         
+            'file-path' : '$HOME/.cloudfuse/cloudfuse.log',         
             'max-file-size-mb' : 512,                                       
             'file-count' : 10 ,                                             
             'track-time' : False                                            
