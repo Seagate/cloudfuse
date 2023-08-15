@@ -29,6 +29,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
         else:
             # Allow anything BUT Nul
+            # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
             self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
        
         # Set up the signals for all the interactable intities

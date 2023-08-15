@@ -27,6 +27,7 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
             self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
         else:
             # Allow anything BUT Nul
+            # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
             self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
         
         

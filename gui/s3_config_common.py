@@ -34,6 +34,7 @@ class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
             self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
         else:
             # Allow anything BUT Nul
+            # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
             self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
         
         # Hide sensitive data QtWidgets.QLineEdit.EchoMode.PasswordEchoOnEdit
