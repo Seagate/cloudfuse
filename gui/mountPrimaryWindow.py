@@ -26,10 +26,10 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
             # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator('^[^<>."|?\0*]*$',self))
+            self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
         else:
             # Allow anything BUT Nul
-            self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator('^[^\0]*$',self))
+            self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
        
         # Set up the signals for all the interactable intities
         self.button_browse.clicked.connect(self.getFileDirInput)
@@ -153,7 +153,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         directory = str(self.lineEdit_mountPoint.text())
         try:#TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
             directory = directory+'/cloudFuse'
-            unmount = (subprocess.run([".\cloudfuse.exe", "service", "unmount", directory], capture_output=True))      
+            unmount = (subprocess.run([".\cloudfuse", "service", "unmount", directory], capture_output=True))      
             # Print to the text edit window the results of the unmount
             if unmount.returncode == 0:
                 self.textEdit_output.setText("Successfully unmounted container\n" + unmount.stdout.decode())

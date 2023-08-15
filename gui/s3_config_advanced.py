@@ -24,10 +24,10 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
             # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator('^[^<>."|?\0*]*$',self))
+            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
         else:
             # Allow anything BUT Nul
-            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator('^[^\0]*$',self))
+            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
         
         
         # Set up the signals
