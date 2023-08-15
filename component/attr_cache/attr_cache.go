@@ -62,7 +62,8 @@ type AttrCache struct {
 	noSymlinks   bool
 	cacheDirs    bool
 	maxFiles     int
-	cacheMap     map[string]*attrCacheItem
+	cacheItem    []*attrCacheItem
+	cacheMap     map[string]*AttrCache
 	cacheLock    sync.RWMutex
 }
 
