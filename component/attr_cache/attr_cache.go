@@ -327,7 +327,6 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 			foundCachedContents = true
 			dstKey := strings.Replace(key, srcDir, dstDir, 1)
 
-
 			// track whether the destination is gaining objects
 			movedObjects = movedObjects || (value.isInCloud() && value.exists() && value.valid())
 			// to keep the directory cache coherent,
@@ -343,11 +342,10 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 				ac.invalidatePath(dstKey)
 			}
 			// either way, mark the old cache entry deleted
-			item.markDeleted(time)
-
-			}
+			value.markDeleted(time)
 
 		}
+
 	}
 
 	// if there were no cached entries to move, does this directory even exist?
