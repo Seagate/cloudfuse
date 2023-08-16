@@ -56,6 +56,7 @@ type attrCacheItem struct {
 	attr     *internal.ObjAttr
 	cachedAt time.Time
 	attrFlag common.BitMap16
+	children map[string]*attrCacheItem
 }
 
 func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {

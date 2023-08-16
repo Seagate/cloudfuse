@@ -62,8 +62,7 @@ type AttrCache struct {
 	noSymlinks   bool
 	cacheDirs    bool
 	maxFiles     int
-	cacheItem    []*attrCacheItem
-	cacheMap     map[string]*AttrCache
+	cacheMap     map[string]*attrCacheItem
 	cacheLock    sync.RWMutex
 }
 
@@ -113,7 +112,7 @@ func (ac *AttrCache) Start(ctx context.Context) error {
 	log.Trace("AttrCache::Start : Starting component %s", ac.Name())
 
 	// AttrCache : start code goes here
-	ac.cacheMap = make(map[string]*AttrCache)
+	ac.cacheMap = make(map[string]*attrCacheItem)
 
 	return nil
 }
@@ -328,24 +327,23 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 			foundCachedContents = true
 			dstKey := strings.Replace(key, srcDir, dstDir, 1)
 
-			for num, item := range value.cacheItem {
 
-				// track whether the destination is gaining objects
-				movedObjects = movedObjects || (item.isInCloud() && item.exists() && item.valid())
-				// to keep the directory cache coherent,
-				// any renamed directories need a new cache entry
-				if item.attr.IsDir() && item.valid() && item.exists() {
-					// add the destination directory to our cache
-					dstDirAttr := internal.CreateObjAttrDir(dstKey)
-					dstDirCacheItem := newAttrCacheItem(dstDirAttr, true, time)
-					dstDirCacheItem.markInCloud(item.isInCloud())
-					ac.cacheMap[dstKey].cacheItem[num] = dstDirCacheItem //am I using num correctly here?
-				} else {
-					// invalidate files so attributes get refreshed from the backend
-					ac.invalidatePath(dstKey)
-				}
-				// either way, mark the old cache entry deleted
-				item.markDeleted(time)
+			// track whether the destination is gaining objects
+			movedObjects = movedObjects || (value.isInCloud() && value.exists() && value.valid())
+			// to keep the directory cache coherent,
+			// any renamed directories need a new cache entry
+			if value.attr.IsDir() && value.valid() && value.exists() {
+				// add the destination directory to our cache
+				dstDirAttr := internal.CreateObjAttrDir(dstKey)
+				dstDirCacheItem := newAttrCacheItem(dstDirAttr, true, time)
+				dstDirCacheItem.markInCloud(value.isInCloud())
+				ac.cacheMap[dstKey] = dstDirCacheItem
+			} else {
+				// invalidate files so attributes get refreshed from the backend
+				ac.invalidatePath(dstKey)
+			}
+			// either way, mark the old cache entry deleted
+			item.markDeleted(time)
 
 			}
 
