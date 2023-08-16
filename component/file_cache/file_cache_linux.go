@@ -162,7 +162,8 @@ func (c *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	if maxCacheSize == 0 {
 		return nil, false, nil
 	}
-	usage := getUsage(c.tmpPath) * MB
+	usage, _ := getUsage(c.tmpPath)
+	usage *= MB
 
 	available := maxCacheSize - usage
 	statfs := &unix.Statfs_t{}

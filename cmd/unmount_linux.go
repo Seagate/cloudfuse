@@ -73,7 +73,7 @@ var unmountCmd = &cobra.Command{
 		} else {
 			err := unmountLyvecloudfuse(args[0])
 			if err != nil {
-				return fmt.Errorf("failed to unmount %s [%s]", args[0], err.Error())
+				return err
 			}
 		}
 
@@ -90,17 +90,27 @@ var unmountCmd = &cobra.Command{
 
 // Attempts to unmount the directory and returns true if the operation succeeded
 func unmountLyvecloudfuse(mntPath string) error {
-	cliOut := exec.Command("fusermount", "-u", mntPath)
+	unmountCmd := []string{"fusermount3", "fusermount"}
+
 	var errb bytes.Buffer
-	cliOut.Stderr = &errb
-	_, err := cliOut.Output()
-	if err != nil {
-		log.Err("unmountLyvecloudfuse : failed to unmount (%s : %s)", err.Error(), errb.String())
-		return fmt.Errorf("%s", errb.String())
-	} else {
-		fmt.Println("Successfully unmounted", mntPath)
-		return nil
+	var err error
+	for _, umntCmd := range unmountCmd {
+		cliOut := exec.Command(umntCmd, "-u", mntPath)
+		cliOut.Stderr = &errb
+		_, err = cliOut.Output()
+
+		if err == nil {
+			fmt.Println("Successfully unmounted", mntPath)
+			return nil
+		}
+
+		if !strings.Contains(err.Error(), "executable file not found") {
+			log.Err("unmountLyvecloudfuse : failed to unmount (%s : %s)", err.Error(), errb.String())
+			break
+		}
 	}
+
+	return fmt.Errorf("%s", errb.String()+" "+err.Error())
 }
 
 func init() {

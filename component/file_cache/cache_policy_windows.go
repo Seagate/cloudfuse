@@ -69,11 +69,11 @@ func totalSectors(path string) int64 {
 }
 
 // getUsage providse an estimate of the size on disk in MB for provided directory path string
-func getUsage(path string) float64 {
+func getUsage(path string) (float64, error) {
 	totalSectors := totalSectors(path)
 
 	totalBytes := float64(totalSectors * sectorSize)
 	totalBytes = totalBytes / MB
 
-	return totalBytes
+	return totalBytes, nil
 }

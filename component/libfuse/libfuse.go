@@ -108,7 +108,7 @@ type LibfuseOptions struct {
 	nonEmptyMount           bool   `config:"nonempty" yaml:"nonempty,omitempty"`
 	NetworkShare            bool   `config:"network-share" yaml:"network-share,omitempty"`
 	Uid                     uint32 `config:"uid" yaml:"uid,omitempty"`
-	Gid                     uint32 `config:"gid" yaml:"uid,omitempty"`
+	Gid                     uint32 `config:"gid" yaml:"gid,omitempty"`
 	MaxFuseThreads          uint32 `config:"max-fuse-threads" yaml:"max-fuse-threads,omitempty"`
 	DirectIO                bool   `config:"direct-io" yaml:"direct-io,omitempty"`
 }
@@ -148,6 +148,10 @@ func (lf *Libfuse) SetName(name string) {
 // SetNextComponent sets the next component in the pipeline.
 func (lf *Libfuse) SetNextComponent(nc internal.Component) {
 	lf.BaseComponent.SetNextComponent(nc)
+}
+
+func (lf *Libfuse) Priority() internal.ComponentPriority {
+	return internal.EComponentPriority.Producer()
 }
 
 // Start : Pipeline calls this method to start the component functionality
@@ -311,10 +315,6 @@ func (lf *Libfuse) Configure(_ bool) error {
 		lf.ignoreOpenFlags, lf.nonEmptyMount, lf.networkShare)
 
 	return nil
-}
-
-// OnConfigChange : If component has registered, on config file change this method is called
-func (lf *Libfuse) OnConfigChange() {
 }
 
 // ------------------------- Factory -------------------------------------------
