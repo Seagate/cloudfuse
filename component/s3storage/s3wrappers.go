@@ -36,6 +36,7 @@ package s3storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -75,7 +76,7 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 			rangeString = "bytes=" + fmt.Sprint(offset) + "-"
 		}
 	} else {
-		endRange := offset + count
+		endRange := offset + count - 1
 		rangeString = "bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)
 	}
 
@@ -202,6 +203,32 @@ func (cl *Client) copyObject(source string, target string, isSymLink bool) error
 	}
 
 	return err
+}
+
+// abortMultipartUpload stops a multipart upload and verifys that the parts are deleted.
+func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
+	_, abortErr := cl.awsS3Client.AbortMultipartUpload(context.TODO(), &s3.AbortMultipartUploadInput{
+		Bucket:   aws.String(cl.Config.authConfig.BucketName),
+		Key:      aws.String(key),
+		UploadId: &uploadID,
+	})
+	if abortErr != nil {
+		log.Err("Client::StageAndCommit : Error aborting multipart upload: ", abortErr.Error())
+	}
+
+	// AWS states you need to call listparts to verify that multipart upload was properly aborted
+	resp, listErr := cl.awsS3Client.ListParts(context.TODO(), &s3.ListPartsInput{
+		Bucket:   aws.String(cl.Config.authConfig.BucketName),
+		Key:      aws.String(key),
+		UploadId: &uploadID,
+	})
+	if len(resp.Parts) != 0 {
+		log.Err("Client::StageAndCommit : Error aborting multipart upload. There are parts remaining in the object with key: %s, uploadId: %s ", key, uploadID)
+	}
+	if listErr != nil {
+		log.Err("Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted with key: %s, uploadId: %s, error: ", key, uploadID, abortErr.Error())
+	}
+	return errors.Join(abortErr, listErr)
 }
 
 // Wrapper for awsS3Client.ListBuckets

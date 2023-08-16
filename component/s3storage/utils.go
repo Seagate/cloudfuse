@@ -42,6 +42,7 @@ import (
 	"strings"
 	"syscall"
 
+	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
 
@@ -50,6 +51,10 @@ import (
 
 // TODO: add AWS SDK customization options and helper functions here to write any relevant SDK-specific structures
 // TODO: add AWS SDK logging function code here (like getLogOptions)
+
+const (
+	DefaultPartSize = 8 * common.MbToBytes
+)
 
 // ----------- Cloud Storage error code handling ---------------
 
