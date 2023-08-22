@@ -62,7 +62,7 @@ type AttrCache struct {
 	noSymlinks   bool
 	cacheDirs    bool
 	maxFiles     int
-	cacheMap     map[string]*attrCacheItem
+	cacheMap     attrCacheItem
 	cacheLock    sync.RWMutex
 }
 
@@ -228,6 +228,10 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	// remember whether we actually found any contents
 	foundCachedContents := false
 	for key, value := range ac.cacheMap {
+		if value.attr.IsDir() {
+			value.children = make(map[string]*attrCacheItem)
+			value.children[key] = value
+		}
 		if strings.HasPrefix(key, prefix) {
 			foundCachedContents = true
 			value.markDeleted(time)
@@ -537,11 +541,15 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 		for _, attr := range pathList {
+
+			// TODO: call the insert in cacheMap.go to guild out a nested map tree.
+
 			// TODO: will this cause a bug when cacheDirs is enabled?
 			if len(ac.cacheMap) > ac.maxFiles {
 				log.Debug("AttrCache::cacheAttributes : %s skipping adding path to attribute cache because it is full", pathList)
 				break
 			}
+
 			ac.cacheMap[internal.TruncateDirName(attr.Path)] = newAttrCacheItem(attr, true, currTime)
 		}
 

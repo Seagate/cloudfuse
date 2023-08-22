@@ -36,6 +36,7 @@ package attr_cache
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"lyvecloudfuse/common"
@@ -71,7 +72,43 @@ func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *
 		item.attrFlag.Set(AttrFlagExists)
 	}
 
+	if item.attr.IsDir() {
+		item.children = make(map[string]*attrCacheItem)
+
+	}
+
 	return item
+}
+
+func (value *attrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) {
+
+	//TODO: truncate last trailing slash '/' from path. internal.truncatedirname()
+	path := value.attr.Path // home/user/folder/file
+
+	//start recursion
+	value.insertHelper(attr, exists, cachedAt, path)
+
+}
+
+// get paths
+func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string) {
+
+	paths := strings.SplitN(path, "/", 2) // paths[0] is home paths[1] is user/folder/file
+
+	if value.children == nil {
+		value.children = make(map[string]*attrCacheItem)
+	}
+
+	if len(paths) < 2 {
+		// this is a leaf
+		value.children[paths[0]] = newAttrCacheItem(attr, exists, cachedAt)
+	} else {
+		//paths[0]
+		//TODO: we don't know if the child exists, so it may need to be created..
+		// lets find out wher we are in the path with paths[0] and recursivly insert folders.
+		// "find path[0] in the children and insert into that."
+		value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1])
+	}
 }
 
 func (value *attrCacheItem) valid() bool {
