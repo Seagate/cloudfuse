@@ -174,7 +174,14 @@
     <addaction name="action_debugHealthMonitor"/>
     <addaction name="action_debugTesting"/>
    </widget>
+   <widget class="QMenu" name="menu_Help">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionAbout"/>
+   </widget>
    <addaction name="menu_Debug"/>
+   <addaction name="menu_Help"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionReset_Default_Settings">
@@ -205,6 +212,11 @@
   <action name="setup_action">
    <property name="text">
     <string>Setup</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>About</string>
    </property>
   </action>
  </widget>
