@@ -1,5 +1,5 @@
-//go:build !authtest && !unittest
-// +build !authtest,!unittest
+//go:build !authtest
+// +build !authtest
 
 /*
     _____           _____   _____   ____          ______  _____  ------
