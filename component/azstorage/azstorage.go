@@ -41,13 +41,14 @@ import (
 	"syscall"
 	"time"
 
-	azcopyCommon "github.com/Azure/azure-storage-azcopy/v10/common"
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/config"
 	"lyvecloudfuse/common/log"
 	"lyvecloudfuse/internal"
 	"lyvecloudfuse/internal/handlemap"
 	"lyvecloudfuse/internal/stats_manager"
+
+	azcopyCommon "github.com/Azure/azure-storage-azcopy/v10/common"
 
 	"github.com/spf13/cobra"
 )
@@ -180,6 +181,7 @@ func (az *AzStorage) Start(ctx context.Context) error {
 
 	// This is a workaround right now to disable the input watcher thread which continuously monitors below config to change
 	// Running this thread continuously increases the CPU usage by 5% even when there is no activity on blobfuse2 mount path
+	// Lifecycle manager init is commented in the "blobfuse2-cpu-usage" branch. Blobfuse2 imports azcopy from this branch.
 	azcopyCommon.GetLifecycleMgr().EnableInputWatcher()
 
 	return nil
@@ -642,6 +644,14 @@ func init() {
 
 	disableCompression := config.AddBoolFlag("disable-compression", false, "Disable transport layer compression.")
 	config.BindPFlag(compName+".disable-compression", disableCompression)
+
+	telemetry := config.AddStringFlag("telemetry", "", "Additional telemetry information.")
+	config.BindPFlag(compName+".telemetry", telemetry)
+	telemetry.Hidden = true
+
+	honourACL := config.AddBoolFlag("honour-acl", false, "Match ObjectID in ACL against the one used for authentication.")
+	config.BindPFlag(compName+".honour-acl", honourACL)
+	honourACL.Hidden = true
 
 	restrictedCharsWin := config.AddBoolFlag("restricted-characters-windows", false, "Enable support for displaying restricted characters on Windows.")
 	config.BindPFlag("restricted-characters-windows", restrictedCharsWin)

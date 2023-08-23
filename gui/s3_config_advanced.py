@@ -2,21 +2,21 @@ from sys import platform
 from PySide6.QtCore import QSettings
 from PySide6 import QtGui
 # import the custom class made from QtDesigner
-from ui_lyve_config_advanced import Ui_Form
+from ui_s3_config_advanced import Ui_Form
 from common_qt_functions import widgetCustomFunctions
 
 file_cache_eviction_choices = ['lru','lfu']
 
-class lyveAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
+class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.myWindow = QSettings("LyveFUSE", "lycAdvancedWindow")
+        self.myWindow = QSettings("CloudFUSE", "S3AdvancedWindow")
         # Get the config settings from the QSettings repo - do not inherit from defaultManager, it resets the settings to default
-        self.settings = QSettings("LyveFUSE", "settings")
+        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "settings")
         
         self.initWindowSizePos()
-        self.setWindowTitle("Advanced LyveCloud Config Settings")
+        self.setWindowTitle("Advanced S3Cloud Config Settings")
         self.populateOptions()
         
        
@@ -24,10 +24,11 @@ class lyveAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
             # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator('^[^<>."|?\0*]*$',self))
+            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
         else:
             # Allow anything BUT Nul
-            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator('^[^\0]*$',self))
+            # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
+            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
         
         
         # Set up the signals

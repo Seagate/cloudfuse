@@ -83,7 +83,23 @@ jobs:
         echo "\"proxy-address\"": "\"\"" >> $cnfFile
         echo "}" >> $cnfFile
         cat $cnfFile
-      displayName: "Create Configuration File"
+      displayName: "Create Azure Configuration File"
+      continueOnError: false
+      workingDirectory: ./
+
+    - script: |
+        cnfFile=$HOME/s3test.json
+        echo $cnfFile
+        touch $cnfFile
+        echo "{" > $cnfFile
+        echo "\"bucket-name\"": "\"$(S3TEST_BUCKET_NAME)\"", >> $cnfFile
+        echo "\"access-key\"": "\"$(S3TEST_ACCESS_KEY)\"", >> $cnfFile
+        echo "\"secret-key\"": "\"$(S3TEST_SECRET_KEY)\"", >> $cnfFile
+        echo "\"endpoint\"": "\"$(S3TEST_ENDPOINT)\"", >> $cnfFile
+        echo "\"region\"": "\"$(S3TEST_REGION)\"" >> $cnfFile
+        echo "}" >> $cnfFile
+        cat $cnfFile
+      displayName: "Create S3 Configuration File"
       continueOnError: false
       workingDirectory: ./
 

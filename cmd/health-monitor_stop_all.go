@@ -39,6 +39,8 @@ import (
 	"os/exec"
 	"runtime"
 
+	hmcommon "lyvecloudfuse/tools/health-monitor/common"
+
 	"github.com/spf13/cobra"
 )
 
@@ -68,7 +70,7 @@ func stopAll() error {
 		fmt.Println("Successfully stopped all health monitor binaries.")
 		return nil
 	}
-	cliOut := exec.Command("killall", "bfusemon")
+	cliOut := exec.Command("killall", hmcommon.BfuseMon)
 	_, err := cliOut.Output()
 	if err != nil {
 		return err

@@ -71,7 +71,7 @@ func (suite *fileCacheLinuxTestSuite) SetupTest() {
 	rand := randomString(8)
 	suite.cache_path = common.JoinUnixFilepath(home_dir, "file_cache"+rand)
 	suite.fake_storage_path = common.JoinUnixFilepath(home_dir, "fake_storage"+rand)
-	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
+	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 0\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
 	log.Debug(defaultConfig)
 
 	// Delete the temp directories created

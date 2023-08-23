@@ -3,20 +3,20 @@ from PySide6.QtCore import Qt, QSettings
 from PySide6 import QtWidgets, QtGui
 
 # import the custom class made from QtDesigner
-from ui_lyve_config_common import Ui_Form
-from lyve_config_advanced import lyveAdvancedSettingsWidget
+from ui_s3_config_common import Ui_Form
+from s3_config_advanced import s3AdvancedSettingsWidget
 from common_qt_functions import defaultSettingsManager,widgetCustomFunctions
 
 pipelineChoices = ['file_cache','stream']
 libfusePermissions = [0o777,0o666,0o644,0o444]
 
-class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form): 
+class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form): 
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.myWindow = QSettings("LyveFUSE", "lycWindow")
+        self.myWindow = QSettings("CloudFUSE", "s3Window")
         self.initWindowSizePos()
-        self.setWindowTitle("LyveCloud Config Settings")
+        self.setWindowTitle("S3Cloud Config Settings")
         self.initSettingsFromConfig()
         self.populateOptions()
         self.showModeSettings()
@@ -24,17 +24,18 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
         # S3 naming conventions:
         #   https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
         # Allow lowercase alphanumeric characters plus [.,-]
-        self.lineEdit_bucketName.setValidator(QtGui.QRegularExpressionValidator("^[a-z0-9-.]*$",self))
+        self.lineEdit_bucketName.setValidator(QtGui.QRegularExpressionValidator(r"^[a-z0-9-.]*$",self))
         # Allow alphanumeric characters plus [-,_]
-        self.lineEdit_region.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-_]*$",self))
+        self.lineEdit_region.setValidator(QtGui.QRegularExpressionValidator(r"^[a-zA-Z0-9-_]*$",self))
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
             # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator('^[^<>."|?\0*]*$',self))
+            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
         else:
             # Allow anything BUT Nul
-            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator('^[^\0]*$',self))
+            # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
+            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
         
         # Hide sensitive data QtWidgets.QLineEdit.EchoMode.PasswordEchoOnEdit
         self.lineEdit_accessKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
@@ -52,7 +53,7 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
     # To open the advanced widget, make an instance, so self.moresettings was chosen.
     #   self.moresettings does not have anything to do with the QSettings package that is seen throughout this code
     def openAdvanced(self):
-        self.moreSettings = lyveAdvancedSettingsWidget()
+        self.moreSettings = s3AdvancedSettingsWidget()
         self.moreSettings.setWindowModality(Qt.ApplicationModal)
         self.moreSettings.show()
 
@@ -127,7 +128,7 @@ class lyveSettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
         # Reset these defaults
         checkChoice = self.popupDoubleCheckReset()
         if checkChoice == QtWidgets.QMessageBox.Yes:
-            self.setLyveSettings()
+            self.setS3Settings()
             self.setComponentSettings()
             self.populateOptions()
     

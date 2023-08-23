@@ -321,6 +321,8 @@ func (c *FileCache) Configure(_ bool) error {
 
 // OnConfigChange : If component has registered, on config file change this method is called
 func (c *FileCache) OnConfigChange() {
+	log.Trace("FileCache::OnConfigChange : %s", c.Name())
+
 	conf := FileCacheOptions{}
 	err := config.UnmarshalKey(compName, &conf)
 	if err != nil {
@@ -352,7 +354,7 @@ func (c *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 		maxEviction:   conf.MaxEviction,
 		highThreshold: float64(conf.HighThreshold),
 		lowThreshold:  float64(conf.LowThreshold),
-		cacheTimeout:  uint32(conf.Timeout),
+		cacheTimeout:  uint32(c.cacheTimeout),
 		maxSizeMB:     conf.MaxSizeMB,
 		fileLocks:     c.fileLocks,
 		policyTrace:   conf.EnablePolicyTrace,
@@ -1364,6 +1366,10 @@ func init() {
 	uploadModifiedOnly := config.AddBoolFlag("upload-modified-only", false, "Flag to turn off unnecessary uploads to storage.")
 	config.BindPFlag(compName+".upload-modified-only", uploadModifiedOnly)
 	uploadModifiedOnly.Hidden = true
+
+	cachePolicy := config.AddStringFlag("file-cache-policy", "lru", "Cache eviction policy.")
+	config.BindPFlag(compName+".policy", cachePolicy)
+	cachePolicy.Hidden = true
 
 	syncToFlush := config.AddBoolFlag("sync-to-flush", false, "Sync call on file will force a upload of the file.")
 	config.BindPFlag(compName+".sync-to-flush", syncToFlush)

@@ -17,7 +17,7 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("Azure Config Settings")
-        self.myWindow = QSettings("LyveFUSE", "AzcWindow")
+        self.myWindow = QSettings("CloudFUSE", "AzcWindow")
         self.initWindowSizePos()
         self.initSettingsFromConfig()
         # Hide the pipeline mode groupbox depending on the default select is
@@ -37,18 +37,19 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         # Documentation for the allowed characters for azure:
         #   https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftstorage
         # Allow lowercase alphanumeric characters plus [-]
-        self.lineEdit_azure_container.setValidator(QtGui.QRegularExpressionValidator("^[a-z0-9-]*$",self))
+        self.lineEdit_azure_container.setValidator(QtGui.QRegularExpressionValidator(r"^[a-z0-9-]*$",self))
         # Allow alphanumeric characters plus [.,-,_]
-        self.lineEdit_azure_accountName.setValidator(QtGui.QRegularExpressionValidator("^[a-zA-Z0-9-._]*$",self))
+        self.lineEdit_azure_accountName.setValidator(QtGui.QRegularExpressionValidator(r"^[a-zA-Z0-9-._]*$",self))
 
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
             # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator('^[^<>."|?\0*]*$',self))
+            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
         else:
             # Allow anything BUT Nul
-            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator('^[^\0]*$',self))
+            # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
+            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
         
         self.lineEdit_azure_accountKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.lineEdit_azure_spnClientSecret.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
