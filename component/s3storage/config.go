@@ -105,7 +105,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 		s3.stConfig.uploadCutoff = opt.UploadCutoffMb * common.MbToBytes
 	}
 
-	if opt.Concurrency != 0 {
+	if opt.Concurrency > 0 {
 		s3.stConfig.concurrency = opt.Concurrency
 	} else {
 		s3.stConfig.concurrency = DefaultConcurrency
