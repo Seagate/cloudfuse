@@ -600,7 +600,7 @@ func (s *clientTestSuite) TestReadToFile() {
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 
-	err = s.client.ReadToFile(name, 0, int64(bodyLen), f)
+	err = s.client.ReadToFile(name, 0, 0, f)
 	s.assert.Nil(err)
 
 	// file content should match generated body
@@ -614,7 +614,7 @@ func (s *clientTestSuite) TestReadToFile() {
 	f.Close()
 }
 
-func (s *clientTestSuite) TestReadToFileMultipart() {
+func (s *clientTestSuite) TestReadToFileRanged() {
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
@@ -633,7 +633,7 @@ func (s *clientTestSuite) TestReadToFileMultipart() {
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 
-	err = s.client.ReadToFile(name, 0, 0, f)
+	err = s.client.ReadToFile(name, 0, int64(bodyLen), f)
 	s.assert.Nil(err)
 
 	// file content should match generated body
