@@ -50,6 +50,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -1332,15 +1333,14 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 
 func (s *s3StorageTestSuite) TestWriteFileMultipartUpload() {
 	defer s.cleanupTest()
-	blockSizeMB := 5
-	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.PartSizeMb = 5
 	storageTestConfigurationParameters.UploadCutoffMb = 5
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
-	fileSize := 5 * MB
+	fileSize := 6 * MB
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
 	s.assert.Nil(err)
 	data := make([]byte, fileSize)
@@ -1361,6 +1361,18 @@ func (s *s3StorageTestSuite) TestWriteFileMultipartUpload() {
 	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
 	s.assert.EqualValues(data, output)
+
+	// The etag in AWS indicates if it was uploaded as a multipart upload
+	// After the etag there is a dash with the number of parts in the object
+	res, err := s.awsS3Client.HeadObject(context.TODO(), &s3.HeadObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+	s.assert.Nil(err)
+	etag := strings.Split(*res.ETag, "-")
+	numParts, err := strconv.Atoi(strings.Trim(etag[1], "\""))
+	s.assert.Nil(err)
+	s.assert.Equal(2, numParts)
 }
 
 func (s *s3StorageTestSuite) TestWriteFileWindowsNameConvert() {
