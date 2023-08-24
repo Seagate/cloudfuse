@@ -1,12 +1,12 @@
-# Blobfuse2 - A Microsoft supported Azure Storage FUSE driver
+# Cloudfuse - An S3 and Azure Storage FUSE driver
 ## About
-Blobfuse2 is an open source project developed to provide a virtual filesystem backed by the Azure Storage. It uses the libfuse open source library (fuse3) to communicate with the Linux FUSE kernel module, and implements the filesystem operations using the Azure Storage REST APIs.
-This is the next generation [blobfuse](https://github.com/Azure/azure-storage-fuse)
+Cloudfuse is a fork of the open source project [blobfuse2](https://github.com/Azure/azure-storage-fuse) from Microsoft that adds support for S3 storage, a GUI for configuration and mounting, and Windows support. It provides a virtual filesystem backed by either S3 or Azure Storage. It uses the libfuse open source library (fuse) to communicate with the Linux FUSE kernel module and uses WinFSP to support running on Windows. It implements the filesystem operations using the S3 and Azure Storage REST APIs.
 
-Blobfuse2 is stable, and is ***supported by Microsoft*** provided that it is used within its limits documented here. Blobfuse2 supports both reads and writes however, it does not guarantee continuous sync of data written to storage using other APIs or other mounts of Blobfuse2. For data integrity it is recommended that multiple sources do not modify the same blob/file. Please submit an issue [here](https://github.com/azure/azure-storage-fuse/issues) for any issues/feature requests/questions.
+<!---TODO Add our github link for issues--->
+Cloudfuse is stable, provided that it is used within its limits documented here. Cloudfuse supports both reads and writes however, it does not guarantee continuous sync of data written to storage using other APIs or other mounts of Cloudfuse. For data integrity it is recommended that multiple sources do not modify the same blob/object/file. Please submit an issue [here]() for any issues/feature requests/questions.
 
 ## Features
-- Mount an Azure storage blob container or datalake file system on Linux.
+- Mount an S3 bucket or Azure storage container or datalake file system on Linux and Windows.
 - Basic file system operations such as mkdir, opendir, readdir, rmdir, open, 
    read, create, write, close, unlink, truncate, stat, rename
 - Local caching to improve subsequent access times
@@ -14,78 +14,65 @@ Blobfuse2 is stable, and is ***supported by Microsoft*** provided that it is use
 - Parallel downloads and uploads to improve access time for large files
 - Multiple mounts to the same container for read-only workloads
 
-## _New BlobFuse2 Health Monitor_
-One of the biggest BlobFuse2 features is our brand new health monitor. It allows customers gain more insight into how their BlobFuse2 instance is behaving with the rest of their machine. Visit [here](https://github.com/Azure/azure-storage-fuse/blob/main/tools/health-monitor/README.md) to set it up.
+## Health Monitor
+Cloudfuse also supports a health monitor. It allows customers gain more insight into how their Cloudfuse instance is behaving with the rest of their machine. Visit [here](tools/health-monitor/README.md) to set it up.
 
-## Distinctive features compared to blobfuse (v1.x)
-- Blobfuse2 is fuse3 compatible (other than Ubuntu-18 and Debian-9, where it still runs with fuse2)
-- Support for higher service version offering latest and greatest of azure storage features (supported by azure go-sdk)
-- Set blob tier while uploading the data to storage
-- Attribute cache invalidation based on timeout
-- For flat namesepce accounts, user can configure default permissions for files and folders
-- Improved cache eviction algorithm for file cache to control disk footprint of blobfuse2
-- Improved cache eviction algorithm for streamed buffers to control memory footprint of blobfuse2
-- Utility to convert blobfuse CLI and config parameters to a blobfuse2 compatible config for easy migration
-- CLI to mount Blobfuse2 with legacy Blobfuse config and CLI parameters (Refer to Migration guide for this)
-- Version check and upgrade prompting 
-- Option to mount a sub-directory from a container 
-- CLI to mount all containers (with a allowlist and denylist) in a given storage account
-- CLI to list all blobfuse2 mount points
-- CLI to unmount one, multiple or all blobfuse2 mountpoints
-- Option to dump logs to syslog or a file on disk
-- Support for config file encryption and mounting with an encrypted config file via a passphrase (CLI or environment variable) to decrypt the config file
-- CLI to check or update a parameter in the encrypted config
-- Set MD5 sum of a blob while uploading
-- Validate MD5 sum on download and fail file open on mismatch
-- Large file writing through write streaming
+## Features compared to blobfuse2
+- Supports any S3 compatable storage
+- Adds a GUI to configure and start mounts
+- Runs on Windows using WinFSP in foreground or as a Windows service
 
- ## Blobfuse2 performance compared to blobfuse(v1.x.x)
-- 'git clone' operation is 25% faster (tested with vscode repo cloning)
-- ResNet50 image classification job is 7-8% faster (tested with 1.3 million images)
-- Regular file uploads are 10% faster
-- Verified listing of 1-Billion files in a directory (which v1.x does not support)
+## Download Cloudfuse
+You can install Cloudfuse by cloning this repository. In the workspace execute the build script `./build.sh` to build the binary. 
 
+### Linux
+Cloudfuse currently only supports libfuse2. On Linux, you need to install the libfuse2 package, for example on Ubuntu:
+    
+    sudo apt install libfuse2
 
-## Download Blobfuse2
-You can install Blobfuse2 by cloning this repository. In the workspace root execute `go build` to build the binary. 
+### Windows
+On Windows, you also need to install the third party utility [WinFsp](https://winfsp.dev/). To download WinFsp, please see
+run the WinFsp installer found [here](https://winfsp.dev/rel/).
+
 
 <!-- ## Find Help
 For complete guidance, visit any of these articles
 * Blobfuse2 Wiki -->
 
 ## Supported Operations
-The general format of the Blobfuse2 commands is `blobfuse2 [command] [arguments] --[flag-name]=[flag-value]`
+The general format of the Cloudfuse commands is `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
 * `help` - Help about any command
 * `mount` - Mounts an Azure container as a filesystem. The supported containers include
+  - S3 Bucket
   - Azure Blob Container
   - Azure Datalake Gen2 Container
-* `mount all` - Mounts all the containers in an Azure account or buckets in an S3 account as a filesystem. The supported storage services include
+* `mount all` - Mounts all the containers in an Azure account as a filesystem. The supported storage services include
+  - [S3 Storage](https://aws.amazon.com/s3/)
   - [Blob Storage](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction)
   - [Datalake Storage Gen2](https://docs.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction)
-  - S3 Storage
-* `mount list` - Lists all Blobfuse2 filesystems.
+* `mount list` - Lists all Cloudfuse filesystems.
 * `secure decrypt` - Decrypts a config file.
 * `secure encrypt` - Encrypts a config file.
 * `secure get` - Gets value of a config parameter from an encrypted config file.
 * `secure set` - Updates value of a config parameter.
-* `unmount` - Unmounts the Blobfuse2 filesystem.
-* `unmount all` - Unmounts all Blobfuse2 filesystems.
+* `unmount` - Unmounts the Cloudfuse filesystem.
+* `unmount all` - Unmounts all Cloudfuse filesystems.
 
 ## Find help from your command prompt
-To see a list of commands, type `blobfuse2 -h` and then press the ENTER key.
-To learn about a specific command, just include the name of the command (For example: `blobfuse2 mount -h`).
+To see a list of commands, type `cloudfuse -h` and then press the ENTER key.
+To learn about a specific command, just include the name of the command (For example: `cloudfuse mount -h`).
 
 ## Usage
-- Mount with blobfuse2
-    * blobfuse2 mount <mount path> --config-file=<config file>
+- Mount with cloudfuse
+    * cloudfuse mount <mount path> --config-file=<config file>
 - Mount all containers in your storage account
-    * blobfuse2 mount all <mount path> --config-file=<config file>
-- List all mount instances of blobfuse2
-    * blobfuse2 mount list
-- Unmount blobfuse2
+    * cloudfuse mount all <mount path> --config-file=<config file>
+- List all mount instances of cloudfuse
+    * cloudfuse mount list
+- Unmount cloudfuse on Linux
     * sudo fusermount3 -u <mount path>
-- Unmount all blobfuse2 instances
-    * blobfuse2 unmount all 
+- Unmount all cloudfuse instances on Linux
+    * cloudfuse unmount all 
 
 <!---TODO Add Usage for mount, unmount, etc--->
 ## CLI parameters
@@ -158,7 +145,7 @@ To learn about a specific command, just include the name of the command (For exa
 
 ## Config file
 - See [this](./sampleFileCacheConfig.yaml) sample config file.
-- See [this](./setup/baseConfig.yaml) config file for a list and description of all possible configurable options in blobfuse2. 
+- See [this](./setup/baseConfig.yaml) config file for a list and description of all possible configurable options in cloudfuse. 
 
 ***Please note: do not use quotations `""` for any of the config parameters***
 
@@ -167,36 +154,36 @@ To learn about a specific command, just include the name of the command (For exa
 az cli has a command to generate a sas token. Open a command prompt and make sure you are logged in to az cli. Run the following command and the sas token will be displayed in the command prompt.
 az storage container generate-sas --account-name <account name ex:myadlsaccount> --account-key <accountKey> -n <container name> --permissions dlrwac --start <today's date ex: 2021-03-26> --expiry <date greater than the current time ex:2021-03-28>
 - Why do I get EINVAL on opening a file with WRONLY or APPEND flags?
-To improve performance, Blobfuse2 by default enables writeback caching, which can produce unexpected behavior for files opened with WRONLY or APPEND flags, so Blobfuse2 returns EINVAL on open of a file with those flags. Either use disable-writeback-caching to turn off writeback caching (can potentially result in degraded performance) or ignore-open-flags (replace WRONLY with RDWR and ignore APPEND) based on your workload. 
-- How to mount blobfuse2 inside a container?
+To improve performance, Cloudfuse by default enables writeback caching, which can produce unexpected behavior for files opened with WRONLY or APPEND flags, so Cloudfuse returns EINVAL on open of a file with those flags. Either use disable-writeback-caching to turn off writeback caching (can potentially result in degraded performance) or ignore-open-flags (replace WRONLY with RDWR and ignore APPEND) based on your workload. 
+- How to mount Cloudfuse inside a container?
 Refer to 'docker' folder in this repo. It contains a sample 'Dockerfile'. If you wish to create your own container image, try 'buildandruncontainer.sh' script, it will create a container image and launch the container using current environment variables holding your storage account credentials.
-- Why am I not able to see the updated contents of file(s), which were updated through means other than Blobfuse2 mount?
-If your use-case involves updating/uploading file(s) through other means and you wish to see the updated contents on Blobfuse2 mount then you need to disable kernel page-cache. `-o direct_io` CLI parameter is the option you need to use while mounting. Along with this, set `file-cache-timeout=0` and all other libfuse caching parameters should also be set to 0. User shall be aware that disabling kernel cache can result into more calls to Azure Storage which will have cost and performance implications. 
+- Why am I not able to see the updated contents of file(s), which were updated through means other than Cloudfuse mount?
+If your use-case involves updating/uploading file(s) through other means and you wish to see the updated contents on Cloudfuse mount then you need to disable kernel page-cache. `-o direct_io` CLI parameter is the option you need to use while mounting. Along with this, set `file-cache-timeout=0` and all other libfuse caching parameters should also be set to 0. User shall be aware that disabling kernel cache can result into more calls to S3 or Azure Storage which will have cost and performance implications. 
 
 ## Un-Supported File system operations
-- mkfifo : fifo creation is not supported by blobfuse2 and this will result in "function not implemented" error
-- chown  : Change of ownership is not supported by Azure Storage hence Blobfuse2 does not support this.
-- Creation of device files or pipes is not supported by Blobfuse2.
-- Blobfuse2 does not support extended-attributes (x-attrs) operations
+- mkfifo : fifo creation is not supported by cloudfuse and this will result in "function not implemented" error
+- chown  : Change of ownership is not supported by Azure Storage hence Cloudfuse does not support this.
+- Creation of device files or pipes is not supported by Cloudfuse.
+- Cloudfuse does not support extended-attributes (x-attrs) operations
 
 ## Un-Supported Scenarios
-- Blobfuse2 does not support overlapping mount paths. While running multiple instances of Blobfuse2 make sure each instance has a unique and non-overlapping mount point.
-- Blobfuse2 does not support co-existance with NFS on same mount path. Behaviour in this case is undefined.
-- For block blob accounts, where data is uploaded through other means, Blobfuse2 expects special directory marker files to exist in container. In absence of this
+- Cloudfuse does not support overlapping mount paths. While running multiple instances of Cloudfuse make sure each instance has a unique and non-overlapping mount point.
+- Cloudfuse does not support co-existance with NFS on same mount path. Behaviour in this case is undefined.
+- For Azure block blob accounts, where data is uploaded through other means, Cloudfuse expects special directory marker files to exist in container. In absence of this
   few file operations might not work. For e.g. if you have a blob 'A/B/c.txt' then special marker files shall exists for 'A' and 'A/B', otherwise opening of 'A/B/c.txt' will fail.
   Once a 'ls' operation is done on these directories 'A' and 'A/B' you will be able to open 'A/B/c.txt' as well. Possible workaround to resolve this from your container is to either
 
-  create the directory marker files manually through portal or run 'mkdir' command for 'A' and 'A/B' from blobfuse. Refer [me](https://github.com/Azure/azure-storage-fuse/issues/866) 
+  create the directory marker files manually through portal or run 'mkdir' command for 'A' and 'A/B' from cloudfuse. Refer [me](https://github.com/Azure/azure-storage-fuse/issues/866) 
   for details on this.
 
 ## Limitations
-- In case of BlockBlob accounts, ACLs are not supported by Azure Storage so Blobfuse2 will by default return success for 'chmod' operation. However it will work fine for Gen2 (DataLake) accounts.
-- When Blobfuse2 is mounted on a container, SYS_ADMIN privileges are required for it to interact with the fuse driver. If container is created without the privilege, mount will fail. Sample command to spawn a docker container is 
+- In case of Azure BlockBlob accounts, ACLs are not supported by Azure Storage so Cloudfuse will by default return success for 'chmod' operation. However it will work fine for Gen2 (DataLake) accounts.
+- When Cloudfuse is mounted on a container, SYS_ADMIN privileges are required for it to interact with the fuse driver. If container is created without the privilege, mount will fail. Sample command to spawn a docker container is 
 
     `docker run -it --rm --cap-add=SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined <environment variables> <docker image>`
         
 ### Syslog security warning
-By default, Blobfuse2 will log to syslog. The default settings will, in some cases, log relevant file paths to syslog. 
+By default, Cloudfuse will log to syslog. The default settings will, in some cases, log relevant file paths to syslog. 
 If this is sensitive information, turn off logging or set log-level to LOG_ERR.  
 
 
@@ -204,17 +191,6 @@ If this is sensitive information, turn off logging or set log-level to LOG_ERR.
 This project is licensed under MIT.
  
 ## Contributing
-This project welcomes contributions and suggestions.  Most contributions 
-require you to agree to a Contributor License Agreement (CLA) declaring 
-that you have the right to, and actually do, grant us the rights to use 
-your contribution. For details, visit https://cla.microsoft.com.
+This project welcomes contributions and suggestions.
 
-When you submit a pull request, a CLA-bot will automatically determine 
-whether you need to provide a CLA and decorate the PR appropriately 
-(e.g., label, comment). Simply follow the instructions provided by the 
-bot. You will only need to do this once across all repos using our CLA.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
+This project is governed by the [code of conduct](CODE_OF_CONDUCT.md). You are expected to follow this as you contribute to the project. Please report all unacceptable behavior to [opensource@seagate.com](mailto:opensource@seagate.com).

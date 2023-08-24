@@ -1,10 +1,10 @@
-# Blobfuse2 Stream (Preview)
+# Cloudfuse Stream (Preview)
 
-_**If you're experiencing slow performance, please ensure your config file parameters are up to date as they have changed from preview to GA, please refer to the [base config file](https://github.com/Azure/azure-storage-fuse/blob/main/setup/baseConfig.yaml).**_
+_**If you're experiencing slow performance, please ensure your config file parameters are up to date. Please refer to the [base config file](setup/baseConfig.yaml).**_
 
 ## About
 
-Blobfuse2 Stream is a feature which helps support reading and writing large files that will not fit in the file cache on the local disk. It also provides performance optimization for scenarios where only small portions of a file are accessed since the file does not have to be downloaded in full before reading or writing to it. It supports the following modes
+Cloudfuse Stream is a feature which helps support reading and writing large files that will not fit in the file cache on the local disk. It also provides performance optimization for scenarios where only small portions of a file are accessed since the file does not have to be downloaded in full before reading or writing to it. It supports the following modes
 
 1. **File-Handle based Caching**
     - Separate file handles have separate buffers irrespective of whether or not they point to the same file
@@ -15,7 +15,6 @@ Blobfuse2 Stream is a feature which helps support reading and writing large file
 
 2. **File-Name based Caching**
     - Separate file handles pointing to the same file share buffers
-    - Behaves most closely to the file cache in Blobfuse
     - Ideal for scenarios where multiple handles are reading from close by parts of a file and multiple writer or single writer multiple reader
 
 ## Enable Stream
@@ -29,16 +28,24 @@ components:
     - attr_cache
     - azstorage
 ```
+or
+```yaml
+components:
+    - libfuse
+    - stream
+    - attr_cache
+    - s3storage
+```
 
 The different configuration options for stream are,
-- `block-size-mb: 16`: Integer parameter that specifies the size of each block to be cached in memory (in MB). 
+- `block-size-mb: 16`: Integer parameter that specifies the size of each block to be cached in memory (in MB). When using S3 storage, the parameter part-size-mb in s3storage should be set to the same value as this one.
 - `max-buffers: 16`: Integer parameter that specifies the total number of buffers to be cached in memory (in MB). 
 - `buffer-size-mb: 16`: Integer parameter that specifies the size of each buffer to be cached in memory (in MB). 
 - `file-caching: true|false`: Boolean parameter to specify file name based caching. Default is false which specifies file handle based caching.
 
 ### Sample Config
 
-After adding the components, add the following section to your blobfuse2 config file. The following example enables Blobfuse2 to use up to 64 * 128 MB of memory to cache data buffers with file handle based caching
+After adding the components, add the following section to your Cloudfuse config file. The following example enables Cloudfuse to use up to 64 * 128 MB of memory to cache data buffers with file handle based caching
 ```yaml
 stream:
   block-size-mb: 64
@@ -49,4 +56,4 @@ stream:
 
 ### Disable Caching
 
-To disable caching and stream straight from Azure Storage, set all stream buffer configuration options to 0. 
+To disable caching and stream straight from S3 or Azure Storage, set all stream buffer configuration options to 0. 
