@@ -1,10 +1,10 @@
 ## lyvecloudfuse mount all
 
-Mounts all azure blob container for a given account as a filesystem
+Mounts all azure blob container or s3 bucket for a given account as a filesystem
 
 ### Synopsis
 
-Mounts all azure blob container for a given account as a filesystem
+Mounts all azure blob container or s3 bucket for a given account as a filesystem
 
 ```
 lyvecloudfuse mount all [path] <flags> [flags]

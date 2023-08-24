@@ -59,9 +59,10 @@ The general format of the Blobfuse2 commands is `blobfuse2 [command] [arguments]
 * `mount` - Mounts an Azure container as a filesystem. The supported containers include
   - Azure Blob Container
   - Azure Datalake Gen2 Container
-* `mount all` - Mounts all the containers in an Azure account as a filesystem. The supported storage services include
+* `mount all` - Mounts all the containers in an Azure account or buckets in an S3 account as a filesystem. The supported storage services include
   - [Blob Storage](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction)
   - [Datalake Storage Gen2](https://docs.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction)
+  - S3 Storage
 * `mount list` - Lists all Blobfuse2 filesystems.
 * `secure decrypt` - Decrypts a config file.
 * `secure encrypt` - Encrypts a config file.

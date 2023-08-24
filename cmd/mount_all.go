@@ -48,9 +48,11 @@ import (
 	"lyvecloudfuse/common/log"
 
 	"lyvecloudfuse/component/azstorage"
+	"lyvecloudfuse/component/s3storage"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v2"
 )
 
@@ -64,8 +66,8 @@ var mountAllOpts containerListingOptions
 
 var mountAllCmd = &cobra.Command{
 	Use:               "all [path] <flags>",
-	Short:             "Mounts all azure blob container for a given account as a filesystem",
-	Long:              "Mounts all azure blob container for a given account as a filesystem",
+	Short:             "Mounts all azure blob container or s3 bucket for a given account as a filesystem",
+	Long:              "Mounts all azure blob container or s3 bucket for a given account as a filesystem",
 	SuggestFor:        []string{"mnta", "mout"},
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
@@ -170,9 +172,17 @@ func processCommand() error {
 		return fmt.Errorf("key not provided to decrypt config file")
 	}
 
-	containerList, err := getContainerList()
-	if err != nil {
-		return err
+	var containerList []string
+	if slices.Contains(options.Components, "azstorage") {
+		containerList, err = getContainerListAzure()
+		if err != nil {
+			return err
+		}
+	} else if slices.Contains(options.Components, "s3storage") {
+		containerList, err = getBucketListS3()
+		if err != nil {
+			return err
+		}
 	}
 
 	if len(containerList) > 0 {
@@ -187,8 +197,8 @@ func processCommand() error {
 	return nil
 }
 
-// getContainerList : Get list of containers from storage account
-func getContainerList() ([]string, error) {
+// getContainerListAzure : Get list of containers from storage account
+func getContainerListAzure() ([]string, error) {
 	var containerList []string
 
 	// Create AzStorage component to get container list
@@ -216,6 +226,38 @@ func getContainerList() ([]string, error) {
 
 	// Stop the azStorage component as its no more needed now
 	_ = azComponent.Stop()
+	return containerList, nil
+}
+
+// getBucketListS3 : Get list of buckets from storage account
+func getBucketListS3() ([]string, error) {
+	var containerList []string
+
+	// Create S3Storage component to get container list
+	s3Component := &s3storage.S3Storage{}
+	s3Component.SetName("s3storage")
+	s3Component.SetNextComponent(nil)
+
+	// Configure S3Storage component
+	err := s3Component.Configure(true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure S3Storage object [%s]", err.Error())
+	}
+
+	//  Start S3Storage the component so that credentials are verified
+	err = s3Component.Start(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize S3Storage object [%s]", err.Error())
+	}
+
+	// Get the list of containers from the component
+	containerList, err = s3Component.ListBuckets()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bucket list from storage [%s]", err.Error())
+	}
+
+	// Stop the S3Storage component as its no more needed now
+	_ = s3Component.Stop()
 	return containerList, nil
 }
 
@@ -306,7 +348,11 @@ func mountAllContainers(containerList []string, configFile string, mountPath str
 		if configFileExists {
 			viper.Set("mount-path", contMountPath)
 			viper.Set("foreground", false)
-			viper.Set("azstorage.container", container)
+			if slices.Contains(options.Components, "azstorage") {
+				viper.Set("azstorage.container", container)
+			} else if slices.Contains(options.Components, "s3storage") {
+				viper.Set("s3storage.bucket-name", container)
+			}
 			viper.Set("file_cache.path", filepath.Join(fileCachePath, container))
 
 			// Create config file with container specific configs
