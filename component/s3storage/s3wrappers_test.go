@@ -36,11 +36,11 @@
 package s3storage
 
 import (
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 	"encoding/json"
 	"fmt"
 	"io"
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
 	"os"
 	"runtime"
 	"testing"

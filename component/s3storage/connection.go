@@ -38,8 +38,8 @@ import (
 	"net/url"
 	"os"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/internal"
+	"cloudfuse/common"
+	"cloudfuse/internal"
 )
 
 type Connection struct {

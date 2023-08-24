@@ -41,10 +41,10 @@ import (
 	"strings"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	hmcommon "lyvecloudfuse/tools/health-monitor/common"
-	hminternal "lyvecloudfuse/tools/health-monitor/internal"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	hmcommon "cloudfuse/tools/health-monitor/common"
+	hminternal "cloudfuse/tools/health-monitor/internal"
 
 	"github.com/radovskyb/watcher"
 )
@@ -95,7 +95,7 @@ func (fc *FileCache) ExportStats(timestamp string, st interface{}) {
 
 func (fc *FileCache) Validate() error {
 	if len(fc.pid) == 0 {
-		return fmt.Errorf("pid of lyvecloudfuse is not given")
+		return fmt.Errorf("pid of cloudfuse is not given")
 	}
 
 	if len(fc.tmpPath) == 0 {

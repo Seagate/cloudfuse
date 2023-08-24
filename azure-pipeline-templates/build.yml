@@ -65,7 +65,7 @@ steps:
   - task: Go@0
     inputs:
       command: 'build'
-      arguments: "-tags ${{ parameters.tags }} -o lyvecloudfuse"
+      arguments: "-tags ${{ parameters.tags }} -o cloudfuse"
       workingDirectory: ${{ parameters.working_directory }}
     displayName: "Go Build"
 
@@ -73,14 +73,14 @@ steps:
   - task: Go@0
     inputs:
       command: 'build'
-      arguments: "-tags ${{ parameters.tags }} -o bfusemon ./tools/health-monitor/"
+      arguments: "-tags ${{ parameters.tags }} -o cfusemon ./tools/health-monitor/"
       workingDirectory: ${{ parameters.working_directory }}
-    displayName: "Go Build bfusemon"
+    displayName: "Go Build cfusemon"
     
   #Verification of built binary
   - script: |
-      sudo chmod +x ${working_directory}/lyvecloudfuse
-      ${working_directory}/lyvecloudfuse --version
+      sudo chmod +x ${working_directory}/cloudfuse
+      ${working_directory}/cloudfuse --version
     displayName: 'Test binary'
     env:
       working_directory: ${{ parameters.working_directory }}

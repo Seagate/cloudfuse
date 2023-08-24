@@ -46,12 +46,12 @@ import (
 	"sync"
 	"syscall"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
-	"lyvecloudfuse/internal/stats_manager"
+	"cloudfuse/common"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
+	"cloudfuse/internal/stats_manager"
 
 	"github.com/spf13/cobra"
 )
@@ -301,13 +301,13 @@ func (c *FileCache) Configure(_ bool) error {
 	}
 
 	if config.IsSet(compName + ".background-download") {
-		log.Warn("unsupported v1 CLI parameter: background-download is not supported in lyvecloudfuse. Consider using the streaming component.")
+		log.Warn("unsupported v1 CLI parameter: background-download is not supported in cloudfuse. Consider using the streaming component.")
 	}
 	if config.IsSet(compName + ".cache-poll-timeout-msec") {
-		log.Warn("unsupported v1 CLI parameter: cache-poll-timeout-msec is not supported in lyvecloudfuse. Polling occurs every timeout interval.")
+		log.Warn("unsupported v1 CLI parameter: cache-poll-timeout-msec is not supported in cloudfuse. Polling occurs every timeout interval.")
 	}
 	if config.IsSet(compName + ".upload-modified-only") {
-		log.Warn("unsupported v1 CLI parameter: upload-modified-only is always true in lyvecloudfuse.")
+		log.Warn("unsupported v1 CLI parameter: upload-modified-only is always true in cloudfuse.")
 	}
 	if config.IsSet(compName + ".sync-to-flush") {
 		log.Warn("Sync will upload current contents of file.")

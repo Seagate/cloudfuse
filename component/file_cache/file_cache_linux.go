@@ -45,9 +45,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
 )
 
 // Creates a new object attribute

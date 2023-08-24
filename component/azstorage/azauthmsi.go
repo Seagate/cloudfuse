@@ -38,7 +38,7 @@ import (
 	"context"
 	"time"
 
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common/log"
 
 	"github.com/Azure/azure-storage-azcopy/v10/azbfs"
 	"github.com/Azure/azure-storage-azcopy/v10/common"

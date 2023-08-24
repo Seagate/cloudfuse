@@ -47,10 +47,10 @@ import (
 	"strings"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/convertname"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/convertname"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -93,7 +93,7 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 	var rangeString string //string to be used to specify range of object to download from S3
 	//TODO: add handle if the offset+count is greater than the end of Object.
 	if count == 0 {
-		// sending Range:"bytes=0-" gives errors from Lyve Cloud ("InvalidRange: The requested range is not satisfiable")
+		// sending Range:"bytes=0-" gives errors from MinIO ("InvalidRange: The requested range is not satisfiable")
 		// so if offset is 0 too, leave rangeString empty
 		if offset != 0 {
 			rangeString = "bytes=" + fmt.Sprint(offset) + "-"

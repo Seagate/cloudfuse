@@ -41,8 +41,8 @@ import (
 	"os"
 	"strings"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 
 	"golang.org/x/sys/unix"
 )

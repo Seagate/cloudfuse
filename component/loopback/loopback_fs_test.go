@@ -40,14 +40,14 @@ import (
 	"os"
 	"testing"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/internal"
+	"cloudfuse/common"
+	"cloudfuse/internal"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
-const testPath = "/tmp/lyvecloudfuselfstests"
+const testPath = "/tmp/cloudfuselfstests"
 const dirOne = "one"
 const dirTwo = "two"
 const dirEmpty = "empty"

@@ -37,17 +37,17 @@ package cmd
 import (
 	"fmt"
 
-	"lyvecloudfuse/common"
+	"cloudfuse/common"
 
 	"github.com/spf13/cobra"
 )
 
 var mountListCmd = &cobra.Command{
 	Use:               "list",
-	Short:             "List all lyvecloudfuse mountpoints",
-	Long:              "List all lyvecloudfuse mountpoints",
+	Short:             "List all cloudfuse mountpoints",
+	Long:              "List all cloudfuse mountpoints",
 	SuggestFor:        []string{"lst", "list"},
-	Example:           "lyvecloudfuse mount list",
+	Example:           "cloudfuse mount list",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		lstMnt, err := common.ListMountPoints()

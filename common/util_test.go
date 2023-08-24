@@ -127,8 +127,8 @@ func (suite *typesTestSuite) TestEncryptDecrypt() {
 	suite.assert.EqualValues(data, d)
 }
 
-func (suite *utilTestSuite) TestMonitorBfs() {
-	monitor := MonitorBfs()
+func (suite *utilTestSuite) TestMonitorCfs() {
+	monitor := MonitorCfs()
 	suite.assert.False(monitor)
 }
 

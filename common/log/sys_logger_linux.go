@@ -44,7 +44,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"lyvecloudfuse/common"
+	"cloudfuse/common"
 )
 
 type SysLogger struct {

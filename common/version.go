@@ -40,8 +40,8 @@ import (
 	"strings"
 )
 
-const LyvecloudfuseListContainerURL = "https://blobfuse2.blob.core.windows.net/release"
-const LyvecloudfuseWarningsURL = "https://aka.ms/blobfuse2warnings"
+const CloudfuseListContainerURL = "https://blobfuse2.blob.core.windows.net/release"
+const CloudfuseWarningsURL = "https://aka.ms/blobfuse2warnings"
 
 type Version struct {
 	segments []int64

@@ -1,17 +1,17 @@
 #!/bin/bash
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     # Build Health Monitor binary
-    rm -rf bfusemon
-    go build -o bfusemon ./tools/health-monitor/
+    rm -rf cfusemon
+    go build -o cfusemon ./tools/health-monitor/
 
-    # Build lyvecloudfuse
-    rm -rf lyvecloudfuse
-    go build -o lyvecloudfuse
+    # Build cloudfuse
+    rm -rf cloudfuse
+    go build -o cloudfuse
 else
-    rm -rf bfusemon
-    go build -o bfusemon.exe ./tools/health-monitor/
+    rm -rf cfusemon
+    go build -o cfusemon.exe ./tools/health-monitor/
 
-    # Build lyvecloudfuse
-    rm -rf lyvecloudfuse.exe
-    go build -o lyvecloudfuse.exe
+    # Build cloudfuse
+    rm -rf cloudfuse.exe
+    go build -o cloudfuse.exe
 fi

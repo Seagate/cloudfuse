@@ -35,14 +35,14 @@
 package common
 
 const (
-	BlobfuseStats     = "blobfuse_stats"
+	CloudfuseStats    = "cloudfuse_stats"
 	FileCacheMon      = "file_cache_monitor"
 	CpuProfiler       = "cpu_profiler"
 	MemoryProfiler    = "memory_profiler"
 	CpuMemoryProfiler = "cpu_mem_profiler"
 	NetworkProfiler   = "network_profiler"
 
-	BfuseMon = "bfusemon"
+	CfuseMon = "cfusemon"
 
 	OutputFileName      = "monitor"
 	OutputFileExtension = "json"
@@ -52,10 +52,10 @@ const (
 
 var (
 	Pid             string
-	BfsPollInterval int
+	CfsPollInterval int
 	ProcMonInterval int
 
-	NoBfsMon       bool
+	NoCfsMon       bool
 	NoCpuProf      bool
 	NoMemProf      bool
 	NoNetProf      bool
@@ -68,10 +68,10 @@ var (
 	CheckVersion bool
 )
 
-const BfuseMonitorVersion = "1.0.0-preview.1"
+const CfuseMonitorVersion = "1.0.0-preview.1"
 
-var DefaultWorkDir = "$HOME/.lyvecloudfuse"
-var DefaultLogFile = DefaultWorkDir + "/bfuseMonitor.log"
+var DefaultWorkDir = "$HOME/.cloudfuse"
+var DefaultLogFile = DefaultWorkDir + "/CfuseMonitor.log"
 
 type CacheEvent struct {
 	CacheEvent      string            `json:"cacheEvent"`

@@ -16,10 +16,10 @@ fi
 
 # Mount step
 echo "Mounting into mount directory"
-$WORK_DIR/lyvecloudfuse mount $MOUNT_DIR --config-file=$WORK_DIR/config.yaml
+$WORK_DIR/cloudfuse mount $MOUNT_DIR --config-file=$WORK_DIR/config.yaml
 
 sleep 5s
 
 # Check for mount
 echo "Checking for mount"
-sudo ps -aux | grep lyvecloudfuse
+sudo ps -aux | grep cloudfuse

@@ -40,10 +40,10 @@ import (
 	"runtime"
 	"testing"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/component/file_cache"
-	hmcommon "lyvecloudfuse/tools/health-monitor/common"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/component/file_cache"
+	hmcommon "cloudfuse/tools/health-monitor/common"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -59,7 +59,7 @@ health_monitor:
   process-monitor-interval-sec: 30
   output-path: /tmp/monitor
   monitor-disable-list:
-    - blobfuse_stats
+    - cloudfuse_stats
     - file_cache_monitor
     - cpu_profiler
     - memory_profiler
@@ -93,7 +93,7 @@ func (suite *hmonTestSuite) TestValidateHmonOptions() {
 
 	err := validateHMonOptions()
 	suite.assert.NotNil(err)
-	suite.assert.Contains(err.Error(), "pid of lyvecloudfuse process not given")
+	suite.assert.Contains(err.Error(), "pid of cloudfuse process not given")
 	suite.assert.Contains(err.Error(), "config file not given")
 
 	pid = "12345"
@@ -108,8 +108,8 @@ func (suite *hmonTestSuite) TestBuildHmonCliParams() {
 	options = mountOptions{}
 	options.MonitorOpt = monitorOptions{
 		EnableMon:       true,
-		DisableList:     []string{hmcommon.BlobfuseStats, hmcommon.CpuProfiler, hmcommon.MemoryProfiler, hmcommon.NetworkProfiler, hmcommon.FileCacheMon, "invalid_monitor"},
-		BfsPollInterval: 10,
+		DisableList:     []string{hmcommon.CloudfuseStats, hmcommon.CpuProfiler, hmcommon.MemoryProfiler, hmcommon.NetworkProfiler, hmcommon.FileCacheMon, "invalid_monitor"},
+		CfsPollInterval: 10,
 		ProcMonInterval: 10,
 		OutputPath:      "/tmp/health_monitor",
 	}
@@ -127,7 +127,7 @@ func (suite *hmonTestSuite) TestHmonInvalidOptions() {
 
 	op, err := executeCommandC(rootCmd, "health-monitor", "--pid=", "--config-file=")
 	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "pid of lyvecloudfuse process not given")
+	suite.assert.Contains(op, "pid of cloudfuse process not given")
 	suite.assert.Contains(op, "config file not given")
 }
 
@@ -171,7 +171,7 @@ func (suite *hmonTestSuite) TestHmonStopAllFailure() {
 func (suite *hmonTestSuite) TestHmonStopPidEmpty() {
 	op, err := executeCommandC(rootCmd, "health-monitor", "stop", "--pid=")
 	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "pid of lyvecloudfuse process not given")
+	suite.assert.Contains(op, "pid of cloudfuse process not given")
 }
 
 func (suite *hmonTestSuite) TestHmonStopPidInvalid() {

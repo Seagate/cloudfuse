@@ -14,13 +14,13 @@ cnt=1
 sed_line=3
 while IFS=, read -r thread count size; do
 
-	echo "Lyvecloudfuse | $cnt ($thread threads: $count files : $size MB) |"
-	./lyvecloudfuse mount $mntPath --config-file=$config &
+	echo "Cloudfuse | $cnt ($thread threads: $count files : $size MB) |"
+	./cloudfuse mount $mntPath --config-file=$config &
 	if [ $? -ne 0 ]; then
     	exit 1
 	fi
 	sleep 3
-	ps -aux | grep lyvecloudfuse
+	ps -aux | grep cloudfuse
 
 	./test/scripts/pwrite.sh $thread $count $size $mntPath $outputPath $sed_line
 	sudo rm -rf $tmpPath/*

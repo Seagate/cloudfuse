@@ -39,7 +39,7 @@ import (
 	"path"
 	"time"
 
-	"lyvecloudfuse/common"
+	"cloudfuse/common"
 )
 
 // create an object attributes struct

@@ -1,6 +1,6 @@
 logging:
   level: log_debug
-  file-path: "lyvecloudfuse-logs.txt"
+  file-path: "cloudfuse-logs.txt"
   type: base
 
 account-name: { NIGHTLY_STO_BLOB_ACC_NAME }

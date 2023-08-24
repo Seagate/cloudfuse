@@ -39,8 +39,8 @@ import (
 	"sync"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/cache_policy"
+	"cloudfuse/common"
+	"cloudfuse/common/cache_policy"
 
 	"go.uber.org/atomic"
 )
@@ -54,7 +54,7 @@ const (
 	HandleFlagUnknown uint16 = iota
 	HandleFlagDirty          // File has been modified with write operation or is a new file
 	HandleFlagFSynced        // User has called fsync on the file explicitly
-	HandleFlagCached         // File is cached in the local system by lyvecloudfuse
+	HandleFlagCached         // File is cached in the local system by cloudfuse
 )
 
 // Structure to hold in memory cache for streaming layer

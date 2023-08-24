@@ -15,11 +15,11 @@ parameters:
 
 steps:
   - script: |
-      blobfuse2 version
+      cloudfuse version
     displayName: 'Check Version'
 
   - script: |
-      blobfuse2 --help
+      cloudfuse --help
     displayName: 'Check Help'
 
   - script: |
@@ -30,7 +30,7 @@ steps:
     displayName: 'Prepare Blobfuse Directories'
 
   - script: |
-      blobfuse2 gen-test-config --config-file=${{ parameters.root_dir }}/azure-storage-fuse/testdata/config/azure_key.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.root_dir }}/block_blob_config.yaml
+      cloudfuse gen-test-config --config-file=${{ parameters.root_dir }}/azure-storage-fuse/testdata/config/azure_key.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.root_dir }}/block_blob_config.yaml
     displayName: 'Create Blob Config File'
     env:
       NIGHTLY_STO_ACC_NAME: $(NIGHTLY_STO_BLOB_ACC_NAME)
@@ -46,10 +46,10 @@ steps:
     displayName: 'Print Block Blob Config File'
 
   - script: |
-      blobfuse2 unmount all 
-      sudo kill -9 `pidof blobfuse2`
+      cloudfuse unmount all 
+      sudo kill -9 `pidof cloudfuse`
       sudo fusermount -u ${{ parameters.mount_dir }}
-      blobfuse2 mount ${{ parameters.mount_dir }} --config-file=${{ parameters.root_dir }}/block_blob_config.yaml ${{ parameters.extras}}
+      cloudfuse mount ${{ parameters.mount_dir }} --config-file=${{ parameters.root_dir }}/block_blob_config.yaml ${{ parameters.extras}}
     displayName: 'Mount Block Blob'
     
     # Wait for some time to let the container come up
@@ -60,7 +60,7 @@ steps:
   - script: |
       df
       echo "-------------------------------------------------------------------"
-      df | grep blobfuse2
+      df | grep cloudfuse
       exit $?
     displayName: 'Verify Mount'
 
@@ -75,21 +75,21 @@ steps:
 
   - script: |
       sleep 10s
-      blobfuse2 unmount ${{ parameters.mount_dir }}
+      cloudfuse unmount ${{ parameters.mount_dir }}
     displayName: 'Unmount Blob'
 
   - script: |
-      cat blobfuse2-logs.txt
+      cat cloudfuse-logs.txt
     displayName: 'View Logs'
     condition: always()
 
   - script: |
-      > blobfuse2-logs.txt
+      > cloudfuse-logs.txt
     displayName: 'Clear Logs'
     condition: always()
 
   - script: |
-      blobfuse2 gen-test-config --config-file=${{ parameters.root_dir }}/azure-storage-fuse/testdata/config/azure_key.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.root_dir }}/adls_config.yaml
+      cloudfuse gen-test-config --config-file=${{ parameters.root_dir }}/azure-storage-fuse/testdata/config/azure_key.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.root_dir }}/adls_config.yaml
     displayName: 'Create ADLS Config File'
     env:
       NIGHTLY_STO_ACC_NAME: $(AZTEST_ADLS_ACC_NAME)
@@ -105,9 +105,9 @@ steps:
     displayName: 'Print ADLS Config File'
     
   - script: |
-      blobfuse2 unmount all 
+      cloudfuse unmount all 
       sudo fusermount -u ${{ parameters.mount_dir }}
-      blobfuse2 mount ${{ parameters.mount_dir }} --config-file=${{ parameters.root_dir }}/adls_config.yaml
+      cloudfuse mount ${{ parameters.mount_dir }} --config-file=${{ parameters.root_dir }}/adls_config.yaml
     displayName: 'Mount ADLS'
     
     # Wait for some time to let the container come up
@@ -118,7 +118,7 @@ steps:
   - script: |
       df
       echo "-------------------------------------------------------------------"
-      df | grep blobfuse2
+      df | grep cloudfuse
       exit $?
     displayName: 'Verify Mount'
 
@@ -133,15 +133,15 @@ steps:
 
   - script: |
       sleep 10s
-      blobfuse2 unmount ${{ parameters.mount_dir }}
+      cloudfuse unmount ${{ parameters.mount_dir }}
     displayName: 'Unmount ADLS'
 
   - script: |
-      cat blobfuse2-logs.txt
+      cat cloudfuse-logs.txt
     displayName: 'View Logs'
     condition: always()
 
   - script: |
-      > blobfuse2-logs.txt
+      > cloudfuse-logs.txt
     displayName: 'Clear Logs'
     condition: always()

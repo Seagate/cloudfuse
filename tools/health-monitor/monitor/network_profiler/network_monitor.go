@@ -37,9 +37,9 @@ package network_monitor
 import (
 	"fmt"
 
-	"lyvecloudfuse/common/log"
-	hmcommon "lyvecloudfuse/tools/health-monitor/common"
-	hminternal "lyvecloudfuse/tools/health-monitor/internal"
+	"cloudfuse/common/log"
+	hmcommon "cloudfuse/tools/health-monitor/common"
+	hminternal "cloudfuse/tools/health-monitor/internal"
 )
 
 type NetworkProfiler struct {
@@ -78,7 +78,7 @@ func (nw *NetworkProfiler) ExportStats(timestamp string, st interface{}) {
 
 func (nw *NetworkProfiler) Validate() error {
 	if len(nw.pid) == 0 {
-		return fmt.Errorf("pid of lyvecloudfuse is not given")
+		return fmt.Errorf("pid of cloudfuse is not given")
 	}
 
 	if nw.pollInterval == 0 {

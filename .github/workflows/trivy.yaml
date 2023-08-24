@@ -31,17 +31,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Build Blobfuse2
+      - name: Build Cloudfuse
         run: | 
           sudo apt-get install fuse3 libfuse3-dev -y
-          go build -o blobfuse2
+          go build -o cloudfuse
           ls -l
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
-          scan-ref: './blobfuse2'
+          scan-ref: './cloudfuse'
           ignore-unfixed: true
           format: 'sarif'
           output: 'trivy-results-binary.sarif'

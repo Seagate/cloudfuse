@@ -46,10 +46,10 @@ import (
 	"syscall"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/stats_manager"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/stats_manager"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -176,7 +176,7 @@ func (cl *Client) CreateFile(name string, mode os.FileMode) error {
 // CreateDirectory : Create a new directory in the bucket/virtual directory
 func (cl *Client) CreateDirectory(name string) error {
 	log.Trace("Client::CreateDirectory : name %s", name)
-	// Lyve Cloud does not support creating an empty file to indicate a directory
+	// MinIO does not support creating an empty file to indicate a directory
 	// directories will be represented only as object prefixes
 	// we have no way of representing an empty directory, so do nothing.
 	// Note: we could try to list the directory and return EEXIST if it has contents,
@@ -517,7 +517,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	}
 
 	// TODO: Add monitor tracking
-	// if common.MonitorBfs() && stat.Size() > 0 {
+	// if common.MonitorCfs() && stat.Size() > 0 {
 	// 	uploadOptions.Progress = func(bytesTransferred int64) {
 	// 		trackUpload(name, bytesTransferred, stat.Size(), uploadPtr)
 	// 	}

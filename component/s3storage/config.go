@@ -38,8 +38,8 @@ import (
 	"errors"
 	"fmt"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 )
 
 var (

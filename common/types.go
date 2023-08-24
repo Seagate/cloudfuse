@@ -47,11 +47,11 @@ import (
 
 // Standard config default values
 const (
-	lyvecloudfuseVersion_ = "2.0.5"
+	cloudfuseVersion_ = "2.0.5"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
-	FileSystemName        = "lyvecloudfuse"
+	FileSystemName        = "cloudfuse"
 
 	DefaultConfigFilePath = "config.yaml"
 
@@ -65,7 +65,7 @@ const (
 
 	MbToBytes  = 1024 * 1024
 	GbToBytes  = 1024 * 1024 * 1024
-	BfuseStats = "blobfuse_stats"
+	CfuseStats = "cloudfuse_stats"
 
 	FuseAllowedFlags = "invalid FUSE options. Allowed FUSE configurations are: `-o attr_timeout=TIMEOUT`, `-o negative_timeout=TIMEOUT`, `-o entry_timeout=TIMEOUT` `-o allow_other`, `-o allow_root`, `-o umask=PERMISSIONS -o default_permissions`, `-o ro`"
 )
@@ -74,18 +74,18 @@ func FuseIgnoredFlags() []string {
 	return []string{"default_permissions", "rw", "dev", "nodev", "suid", "nosuid", "delay_connect", "auto", "noauto", "user", "nouser", "exec", "noexec"}
 }
 
-var LyvecloudfuseVersion = LyvecloudfuseVersion_()
+var CloudfuseVersion = CloudfuseVersion_()
 
-func LyvecloudfuseVersion_() string {
-	return lyvecloudfuseVersion_
+func CloudfuseVersion_() string {
+	return cloudfuseVersion_
 }
 
-var DefaultWorkDir = "$HOME/.lyvecloudfuse"
-var DefaultLogFilePath = JoinUnixFilepath(DefaultWorkDir, "lyvecloudfuse.log")
+var DefaultWorkDir = "$HOME/.cloudfuse"
+var DefaultLogFilePath = JoinUnixFilepath(DefaultWorkDir, "cloudfuse.log")
 var StatsConfigFilePath = JoinUnixFilepath(DefaultWorkDir, "stats_monitor.cfg")
 
 var EnableMonitoring = false
-var BfsDisabled = false
+var CfsDisabled = false
 
 // LogLevel enum
 type LogLevel int
@@ -142,7 +142,7 @@ type LogConfig struct {
 	FileCount   uint64
 	FilePath    string
 	TimeTracker bool
-	Tag         string // logging tag which can be either lyvecloudfuse or bfusemon
+	Tag         string // logging tag which can be either cloudfuse or cfusemon
 }
 
 // Flags for blocks

@@ -35,9 +35,9 @@
 package <component>
 
 import (
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
 	"context"
 	"fmt"
 )

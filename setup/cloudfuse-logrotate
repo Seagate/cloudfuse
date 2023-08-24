@@ -1,0 +1,18 @@
+/var/log/cloudfuse.log 
+/var/log/blobfuse2.log 
+/var/log/cfusemon.log
+/var/log/cloudfuse-rest.log {
+    rotate 10
+	maxsize 100M
+	daily
+	missingok
+	notifempty
+	compress
+	dateext
+	delaycompress
+	sharedscripts
+	postrotate
+		systemctl kill -s HUP rsyslog.service
+	endscript
+}
+

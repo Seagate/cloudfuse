@@ -26,20 +26,20 @@ rm -rf $tmpPath
 mkdir -p $mntPath
 mkdir -p $tmpPath
 
-# Mount Lyvecloudfuse
+# Mount Cloudfuse
 rm -rf $mntPath/*
-./lyvecloudfuse mount $mntPath --config-file=$v2configPath &
+./cloudfuse mount $mntPath --config-file=$v2configPath &
 if [ $? -ne 0 ]; then
     exit 1
 fi
 sleep 3
-ps -aux | grep lyvecloudfuse
+ps -aux | grep cloudfuse
 
 sed_line=3
-lyvecloudfuse_average=0
+cloudfuse_average=0
 for i in {1..3}; 
 do 
-	echo "Lyvecloudfuse Run $i"
+	echo "Cloudfuse Run $i"
 
 	start_time=`date +%s`
 	time (git clone https://github.com/Azure/azure-storage-fuse.git $mntPath/fuse$i > /dev/null)
@@ -57,7 +57,7 @@ do
 	rm -rf $mntPath/fuse$i
 
 	(( sed_line++ ))
-	lyvecloudfuse_average=$(( $lyvecloudfuse_average + $time_diff ))
+	cloudfuse_average=$(( $cloudfuse_average + $time_diff ))
 	echo "========================================================="
 done
 sudo fusermount3 -u $mntPath
@@ -97,13 +97,13 @@ do
 done
 sudo fusermount3 -u $mntPath
 
-lyvecloudfuse_average=$(( $lyvecloudfuse_average / 3 ))
+cloudfuse_average=$(( $cloudfuse_average / 3 ))
 blobfuse_average=$(( $blobfuse_average / 3 ))
 
-sed -i "6s/$/ ${lyvecloudfuse_average} | ${blobfuse_average} |/" $outputPath
+sed -i "6s/$/ ${cloudfuse_average} | ${blobfuse_average} |/" $outputPath
 
 # Calculate the % difference
-diff=$(( $blobfuse_average - $lyvecloudfuse_average ))
+diff=$(( $blobfuse_average - $cloudfuse_average ))
 percent=`echo "scale=2; $diff * 100 / $blobfuse_average" | bc`
 
 sed -i "7s/$/ ${percent} | |/" $outputPath

@@ -38,9 +38,9 @@ import (
 	"fmt"
 	"os"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal/stats_manager"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal/stats_manager"
 )
 
 const DefaultEvictTime = 10

@@ -43,8 +43,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -54,7 +54,7 @@ import (
 var configMountTest string = `
 logging:
   type: syslog
-default-working-dir: /tmp/lyvecloudfuse
+default-working-dir: /tmp/cloudfuse
 file_cache:
   path: /tmp/fileCachePath
 libfuse:
@@ -74,13 +74,13 @@ components:
 health_monitor:
   monitor-disable-list:
     - network_profiler
-    - blobfuse_stats
+    - cloudfuse_stats
 `
 
 var configMountLoopback string = `
 logging:
   type: syslog
-default-working-dir: /tmp/lyvecloudfuse
+default-working-dir: /tmp/cloudfuse
 components:
   - libfuse
   - loopbackfs
@@ -134,8 +134,8 @@ func (suite *mountTestSuite) cleanupTest() {
 	resetCLIFlags(*mountAllCmd)
 	viper.Reset()
 
-	common.DefaultWorkDir = "$HOME/.lyvecloudfuse"
-	common.DefaultLogFilePath = filepath.Join(common.DefaultWorkDir, "lyvecloudfuse.log")
+	common.DefaultWorkDir = "$HOME/.cloudfuse"
+	common.DefaultLogFilePath = filepath.Join(common.DefaultWorkDir, "cloudfuse.log")
 }
 
 // mount failure test where the mount directory does not exists
@@ -310,7 +310,7 @@ func (suite *mountTestSuite) TestCliParamsV1() {
 	defer os.RemoveAll(tempLogDir)
 
 	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest),
-		fmt.Sprintf("--log-file-path=%s", tempLogDir+"/lyvecloudfuse.log"), "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check")
+		fmt.Sprintf("--log-file-path=%s", tempLogDir+"/cloudfuse.log"), "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check")
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "failed to initialize new pipeline")
 }
@@ -325,7 +325,7 @@ func (suite *mountTestSuite) TestStreamAttrCacheOptionsV1() {
 	tempLogDir := "/tmp/templogs_" + randomString(6)
 	defer os.RemoveAll(tempLogDir)
 
-	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--log-file-path=%s", tempLogDir+"/lyvecloudfuse.log"),
+	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--log-file-path=%s", tempLogDir+"/cloudfuse.log"),
 		"--streaming", "--use-attr-cache", "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check")
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "failed to initialize new pipeline")
@@ -427,7 +427,7 @@ func (suite *mountTestSuite) TestFuseOptions() {
 func (suite *mountTestSuite) TestUpdateCliParams() {
 	defer suite.cleanupTest()
 
-	cliParams := []string{"lyvecloudfuse", "mount", "~/mntdir/", "--foreground=false"}
+	cliParams := []string{"cloudfuse", "mount", "~/mntdir/", "--foreground=false"}
 
 	updateCliParams(&cliParams, "tmp-path", "tmpPath1")
 	suite.assert.Equal(len(cliParams), 5)

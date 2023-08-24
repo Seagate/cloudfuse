@@ -40,8 +40,8 @@ import (
 	"os"
 	"testing"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -101,7 +101,7 @@ allow-other: true
 logging:  
   type: base
   level: log_debug
-  file-path: /home/lyvecloudfuse.log
+  file-path: /home/cloudfuse.log
   max-file-size: 100
   file-count: 300
   track-time: true

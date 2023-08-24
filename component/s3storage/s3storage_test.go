@@ -56,11 +56,11 @@ import (
 	"testing"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
+	"cloudfuse/common"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -1006,7 +1006,6 @@ func (s *s3StorageTestSuite) TestOpenFileSize() {
 
 	// TODO: There is a sort of bug in S3 where writing zeros to the object causes it to be unreadable.
 	// I think it's related to this link, but this discussion is about the key, whereas this is the value...
-	// Is this another Lyve Cloud bug?
 	h, err := s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
 	s.assert.Nil(err)
 	s.assert.NotNil(h)

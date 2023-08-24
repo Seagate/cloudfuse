@@ -38,8 +38,8 @@ import (
 	"sync"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 )
 
 const (
@@ -98,7 +98,7 @@ var stMgrOpt statsManagerOpt
 func NewStatsCollector(componentName string) *StatsCollector {
 	sc := &StatsCollector{}
 
-	if common.MonitorBfs() {
+	if common.MonitorCfs() {
 		sc.channel = make(chan ChannelMsg, 10000)
 
 		stMgrOpt.statsMtx.Lock()
@@ -136,14 +136,14 @@ func (sc *StatsCollector) Init() {
 }
 
 func (sc *StatsCollector) Destroy() {
-	if common.MonitorBfs() {
+	if common.MonitorCfs() {
 		close(sc.channel)
 		sc.workerDone.Wait()
 	}
 }
 
 func (sc *StatsCollector) PushEvents(op string, path string, mp map[string]interface{}) {
-	if common.MonitorBfs() {
+	if common.MonitorCfs() {
 		event := Events{
 			Timestamp: time.Now().Format(time.RFC3339),
 			Operation: op,
@@ -171,7 +171,7 @@ func (sc *StatsCollector) PushEvents(op string, path string, mp map[string]inter
 }
 
 func (sc *StatsCollector) UpdateStats(op string, key string, val interface{}) {
-	if common.MonitorBfs() {
+	if common.MonitorCfs() {
 		st := Stats{
 			Timestamp: time.Now().Format(time.RFC3339),
 			Operation: op,

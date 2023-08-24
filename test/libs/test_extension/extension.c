@@ -75,7 +75,7 @@ int register_fuse_callbacks(struct fuse_operations *opts)
     return 0;
 }
 
-// Call this method to populate callbacks to communicate with blobfuse / lyvecloudfuse
+// Call this method to populate callbacks to communicate with blobfuse / cloudfuse
 int register_storage_callbacks(struct fuse_operations *opts)
 {
     syslog(LOG_INFO, "EXT : Populating storage callbacks");

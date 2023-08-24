@@ -13,5 +13,5 @@ export MOUNT_DIR=~/e2e-test
 export MOUNT_TMP=~/e2e-temp
 
 # This is the directory where you cloned the repo
-export WORK_DIR=~/lyvecloudfuse
+export WORK_DIR=~/cloudfuse
 EOF

@@ -51,11 +51,11 @@ import (
 	"testing"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
+	"cloudfuse/common"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -158,8 +158,6 @@ func (s *clientTestSuite) cleanupTest() {
 func (s *clientTestSuite) TestListBuckets() {
 	defer s.cleanupTest()
 	// TODO: generalize this test by creating, listing, then destroying a bucket
-	// 	We need to get permissions to create buckets in Lyve Cloud, or implement this against AWS S3.
-	// 	For now, the bucket parameter has been removed from the test suite for tidiness sake
 	buckets, err := s.client.ListBuckets()
 	s.assert.Nil(err)
 	s.assert.Equal(buckets, []string{"stxe1-srg-lens-lab1"})

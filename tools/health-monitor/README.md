@@ -4,8 +4,8 @@
 
 Cloudfuse Health Monitor is a tool which will help in monitoring Cloudfuse mounts. It supports the following types of monitors:
 
-1. **Cloudfuse Stats Monitor:** Monitor the different statistics of Cloudfuse components like:
-    - Total bytes uploaded and downloaded via Cloudfuse
+1. **Cloudfuse Stats Monitor:** Monitor the different statistics of cloudfuse components like,
+    - Total bytes uploaded and downloaded via cloudfuse
     - Events like create, delete, rename, synchronize, truncate, etc. on files or directories in the mounted directory
     - Progress of uploads or downloads of large files to/from Azure Storage
     - Keep track of number of calls that were made to Azure Storage for operations like create, delete, rename, chmod, etc. in the mounted directory
@@ -18,7 +18,7 @@ Cloudfuse Health Monitor is a tool which will help in monitoring Cloudfuse mount
     - Monitor the different events like create, delete, rename, chmod, etc. of files and directories in the cache
     - Keep track of the cache consumption with respect to the cache size specified during mounting
 
-> **Note:** Health Monitor runs as a separate process where one health monitor process is associated with monitoring one Cloudfuse mounted directory.
+> **Note:** Health Monitor runs as a separate process where one health monitor process is associated with monitoring one cloudfuse mounted directory.
 
 ## On Windows
 
@@ -32,14 +32,14 @@ The different configuration options for the health monitor are,
 - `process-monitor-interval-sec: <TIME IN SECONDS>`: CPU and memory usage polling interval (in sec). Default is 30 sec
 - `output-path: <PATH>`: Path where health monitor will generate its output file. It takes the current directory as default, if not specified. Output file name will be `monitor_<pid>.json`
 - `monitor-disable-list: <LIST OF MONITORS>`: List of monitors to be disabled. To disable a monitor, add its corresponding name in the list
-    - `blobfuse_stats` - Disable Cloudfuse stats polling
-    - `cpu_profiler` - Disable CPU monitoring on Cloudfuse process
-    - `memory_profiler` - Disable memory monitoring on Cloudfuse process
+    - `cloudfuse_stats` - Disable cloudfuse stats polling
+    - `cpu_profiler` - Disable CPU monitoring on cloudfuse process
+    - `memory_profiler` - Disable memory monitoring on cloudfuse process
     - `file_cache_monitor` - Disable file cache directory monitor
 
 ### Sample Config
 
-Add the following section to your Cloudfuse config file. Here file cache and memory monitors are disabled. If you want to enable all monitors simply remove the monitor-disable-list section.
+Add the following section to your cloudfuse config file. Here file cache and memory monitors are disabled. If you want to enable all monitors simply remove the monitor-disable-list section.
 ```yaml
 health_monitor:
   enable-monitoring: true

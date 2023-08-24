@@ -41,8 +41,8 @@ import (
 	"strings"
 	"testing"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -131,7 +131,7 @@ func (suite *rootCmdSuite) TestCheckVersionExistsInvalidURL() {
 
 func (suite *rootCmdSuite) TestNoSecurityWarnings() {
 	defer suite.cleanupTest()
-	warningsUrl := common.LyvecloudfuseListContainerURL + "/securitywarnings/" + common.LyvecloudfuseVersion
+	warningsUrl := common.CloudfuseListContainerURL + "/securitywarnings/" + common.CloudfuseVersion
 	found := checkVersionExists(warningsUrl)
 	suite.assert.False(found)
 }
@@ -145,7 +145,7 @@ func (suite *rootCmdSuite) TestGetRemoteVersionInvalidURL() {
 
 func (suite *rootCmdSuite) TestGetRemoteVersionInvalidContainer() {
 	defer suite.cleanupTest()
-	latestVersionUrl := common.LyvecloudfuseListContainerURL + "?restype=container&comp=list&prefix=latest1/"
+	latestVersionUrl := common.CloudfuseListContainerURL + "?restype=container&comp=list&prefix=latest1/"
 	out, err := getRemoteVersion(latestVersionUrl)
 	suite.assert.Empty(out)
 	suite.assert.NotNil(err)
@@ -158,7 +158,7 @@ func getDummyVersion() string {
 
 func (suite *rootCmdSuite) TestGetRemoteVersionValidContainer() {
 	defer suite.cleanupTest()
-	latestVersionUrl := common.LyvecloudfuseListContainerURL + "?restype=container&comp=list&prefix=latest/"
+	latestVersionUrl := common.CloudfuseListContainerURL + "?restype=container&comp=list&prefix=latest/"
 	out, err := getRemoteVersion(latestVersionUrl)
 	suite.assert.NotEmpty(out)
 	suite.assert.Nil(err)
@@ -166,10 +166,10 @@ func (suite *rootCmdSuite) TestGetRemoteVersionValidContainer() {
 
 func (suite *rootCmdSuite) TestGetRemoteVersionCurrentOlder() {
 	defer suite.cleanupTest()
-	common.LyvecloudfuseVersion = getDummyVersion()
+	common.CloudfuseVersion = getDummyVersion()
 	msg := <-beginDetectNewVersion()
 	suite.assert.NotEmpty(msg)
-	suite.assert.Contains(msg, "A new version of Lyvecloudfuse is available")
+	suite.assert.Contains(msg, "A new version of Cloudfuse is available")
 }
 
 // Test failing until we update
@@ -177,7 +177,7 @@ func (suite *rootCmdSuite) TestGetRemoteVersionCurrentOlder() {
 // linked to microsoft
 // func (suite *rootCmdSuite) TestGetRemoteVersionCurrentSame() {
 // 	defer suite.cleanupTest()
-// 	common.LyvecloudfuseVersion = common.LyvecloudfuseVersion_()
+// 	common.CloudfuseVersion = common.CloudfuseVersion_()
 // 	msg := <-beginDetectNewVersion()
 // 	suite.assert.Nil(msg)
 // }
@@ -191,7 +191,7 @@ func (suite *rootCmdSuite) testExecute() {
 
 	err := Execute()
 	suite.assert.Nil(err)
-	suite.assert.Contains(buf.String(), "lyvecloudfuse version")
+	suite.assert.Contains(buf.String(), "cloudfuse version")
 }
 
 func (suite *rootCmdSuite) TestParseArgs() {
@@ -219,7 +219,7 @@ func (suite *rootCmdSuite) TestParseArgs() {
 		{input: "mount /home/mntdir -o --config-file=config.yaml,rw", output: "mount /home/mntdir -o rw --config-file=config.yaml"},
 	}
 	for _, i := range inputs {
-		o := parseArgs(strings.Split("lyvecloudfuse "+i.input, " "))
+		o := parseArgs(strings.Split("cloudfuse "+i.input, " "))
 		suite.assert.Equal(i.output, strings.Join(o, " "))
 	}
 }

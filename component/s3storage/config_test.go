@@ -35,8 +35,8 @@
 package s3storage
 
 import (
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

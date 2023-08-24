@@ -38,7 +38,7 @@ import (
 	"log"
 	"time"
 
-	"lyvecloudfuse/common"
+	"cloudfuse/common"
 )
 
 // Logger : Interface to define a generic Logger. Implement this to create your new logging lib

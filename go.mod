@@ -1,4 +1,4 @@
-module lyvecloudfuse
+module cloudfuse
 
 go 1.20
 

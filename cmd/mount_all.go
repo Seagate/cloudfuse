@@ -43,12 +43,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
 
-	"lyvecloudfuse/component/azstorage"
-	"lyvecloudfuse/component/s3storage"
+	"cloudfuse/component/azstorage"
+	"cloudfuse/component/s3storage"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -57,9 +57,9 @@ import (
 )
 
 type containerListingOptions struct {
-	AllowList            []string `config:"container-allowlist"`
-	DenyList             []string `config:"container-denylist"`
-	lyvecloudfuseBinPath string
+	AllowList        []string `config:"container-allowlist"`
+	DenyList         []string `config:"container-denylist"`
+	cloudfuseBinPath string
 }
 
 var mountAllOpts containerListingOptions
@@ -72,7 +72,7 @@ var mountAllCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		mountAllOpts.lyvecloudfuseBinPath = os.Args[0]
+		mountAllOpts.cloudfuseBinPath = os.Args[0]
 		options.MountPath = args[0]
 		return processCommand()
 	},
@@ -87,7 +87,7 @@ func processCommand() error {
 
 	if options.ConfigFile == "" {
 		// Config file is not set in cli parameters
-		// Lyvecloudfuse defaults to config.yaml in current directory
+		// Cloudfuse defaults to config.yaml in current directory
 		// If the file does not exists then user might have configured required things in env variables
 		// Fall back to defaults and let components fail if all required env variables are not set.
 		_, err := os.Stat(common.DefaultConfigFilePath)
@@ -154,7 +154,7 @@ func processCommand() error {
 	// in 'mount all' command mode. This is used by azstorage component for certain config checks
 	config.SetBool("mount-all-containers", true)
 
-	log.Crit("Starting Lyvecloudfuse Mount All: %s", common.LyvecloudfuseVersion)
+	log.Crit("Starting Cloudfuse Mount All: %s", common.CloudfuseVersion)
 	log.Crit("Logging level set to : %s", logLevel.String())
 
 	// Get allowlist/denylist containers from the config
@@ -369,7 +369,7 @@ func mountAllContainers(containerList []string, configFile string, mountPath str
 
 		// Now that we have mount path and config file for this container fire a mount command for this one
 		fmt.Println("Mounting container :", container, "to path ", contMountPath)
-		cmd := exec.Command(mountAllOpts.lyvecloudfuseBinPath, cliParams...)
+		cmd := exec.Command(mountAllOpts.cloudfuseBinPath, cliParams...)
 
 		var errb bytes.Buffer
 		cmd.Stderr = &errb
