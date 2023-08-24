@@ -120,8 +120,8 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 }
 
 // Wrapper for awsS3Client.PutObject.
-// Takes an io.Reader to work with both files and byte arrays.
-// name is the path to the file.
+// Pass in the name of the file, an io.Reader with the object data, the size of the upload,
+// and whether the object is a symbolic link or not.
 func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSymLink bool) error {
 	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::putObject : putting object %s", key)
