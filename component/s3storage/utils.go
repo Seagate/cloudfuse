@@ -53,7 +53,10 @@ import (
 // TODO: add AWS SDK logging function code here (like getLogOptions)
 
 const (
-	DefaultPartSize = 8 * common.MbToBytes
+	DefaultPartSize     = 8 * common.MbToBytes
+	DefaultUploadCutoff = 100 * common.MbToBytes
+	DefaultConcurrency  = 5
+	MaxPartSizeMb       = 5 * 1024
 )
 
 // ----------- Cloud Storage error code handling ---------------

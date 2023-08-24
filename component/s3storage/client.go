@@ -407,6 +407,17 @@ func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
 // count = 0 reads to the end of the object.
 func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File) error {
 	log.Trace("Client::ReadToFile : name %s, offset : %d, count %d -> file %s", name, offset, count, fi.Name())
+
+	// If we are reading the entire object, then we can use a multipart download
+	if !cl.Config.disableConcurrentDownload && offset == 0 && count == 0 {
+		err := cl.getObjectMultipartDownload(name, fi)
+		if err != nil {
+			log.Err("Client::ReadToFile : getObjectMultipartDownload(%s) failed. Here's why: %v", name, err)
+			return err
+		}
+		return nil
+	}
+
 	// get object data
 	objectDataReader, err := cl.getObject(name, offset, count, false)
 	if err != nil {
@@ -499,7 +510,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 	}
 
 	// upload file data
-	err = cl.putObject(name, fi, isSymlink)
+	err = cl.putObject(name, fi, stat.Size(), isSymlink)
 	if err != nil {
 		log.Err("Client::WriteFromFile : putObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -531,7 +542,7 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data 
 	dataReader := bytes.NewReader(data)
 	// upload data to object
 	// TODO: handle metadata with S3
-	err := cl.putObject(name, dataReader, isSymlink)
+	err := cl.putObject(name, dataReader, int64(len(data)), isSymlink)
 	if err != nil {
 		log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
 	}
@@ -615,7 +626,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	}
 	// overwrite the object with the truncated data
 	truncatedDataReader := bytes.NewReader(objectData)
-	err = cl.putObject(name, truncatedDataReader, false)
+	err = cl.putObject(name, truncatedDataReader, int64(len(objectData)), false)
 	if err != nil {
 		log.Err("Client::TruncateFile : Failed to write truncated data to object %s", name)
 	}
