@@ -60,6 +60,7 @@ type monitorOptions struct {
 
 var pid string
 var cacheMonitorOptions file_cache.FileCacheOptions
+var configFile string
 
 func resetMonitorOptions() {
 	options.MonitorOpt = monitorOptions{}

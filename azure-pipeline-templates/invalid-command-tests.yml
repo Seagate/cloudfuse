@@ -37,17 +37,6 @@ steps:
     env:
       working_dir: ${{ parameters.working_dir }}
       mount_dir: ${{ parameters.mount_dir }}
-      
-  - script: |
-      ${working_dir}/blobfuse2 mountv1 ${mount_dir} --invalid-param &
-      if [ $? = 2 ]; then
-        exit 0
-      fi
-    displayName: 'Invalid Flag Mountv1 Command'
-    continueOnError: false
-    env:
-      working_dir: ${{ parameters.working_dir }}
-      mount_dir: ${{ parameters.mount_dir }}
 
   - script: |
       ${working_dir}/blobfuse2 secure ${mount_dir} --invalid-param &

@@ -36,12 +36,17 @@ package cmd
 
 import (
 	"bytes"
+	"crypto/rand"
+	"fmt"
 	"strings"
 	"testing"
 
 	"lyvecloudfuse/common"
 	"lyvecloudfuse/common/log"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -54,6 +59,32 @@ type rootCmdSuite struct {
 type osArgs struct {
 	input  string
 	output string
+}
+
+func resetCLIFlags(cmd cobra.Command) {
+	// reset all CLI flags before next test
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		f.Changed = false
+	})
+	viper.Reset()
+}
+
+func randomString(length int) string {
+	b := make([]byte, length)
+	rand.Read(b)
+	return fmt.Sprintf("%x", b)[:length]
+}
+
+// Taken from cobra library's testing https://github.com/spf13/cobra/blob/master/command_test.go#L34
+func executeCommandC(root *cobra.Command, args ...string) (output string, err error) {
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs(args)
+
+	err = root.Execute()
+
+	return buf.String(), err
 }
 
 func (suite *rootCmdSuite) SetupTest() {

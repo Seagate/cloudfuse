@@ -78,8 +78,6 @@ To learn about a specific command, just include the name of the command (For exa
 ## Usage
 - Mount with blobfuse2
     * blobfuse2 mount <mount path> --config-file=<config file>
-- Mount blobfuse2 using legacy blobfuse config and cli parameters
-    * blobfuse2 mountv1 <blobfuse mount cli with options>
 - Mount all containers in your storage account
     * blobfuse2 mount all <mount path> --config-file=<config file>
 - List all mount instances of blobfuse2
