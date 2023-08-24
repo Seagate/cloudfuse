@@ -65,7 +65,7 @@
             <enum>Qt::NoFocus</enum>
            </property>
            <property name="maximum">
-            <number>3000</number>
+            <number>2147483647</number>
            </property>
            <property name="singleStep">
             <number>20</number>
@@ -208,7 +208,7 @@
             <item>
              <widget class="QSpinBox" name="spinBox_fileCache_evictionTimeout">
               <property name="maximum">
-               <number>1000000</number>
+               <number>2147483647</number>
               </property>
               <property name="value">
                <number>120</number>
@@ -218,7 +218,7 @@
             <item>
              <widget class="QSpinBox" name="spinBox_fileCache_maxEviction">
               <property name="maximum">
-               <number>1000000</number>
+               <number>2147483647</number>
               </property>
               <property name="value">
                <number>5000</number>
@@ -228,14 +228,14 @@
             <item>
              <widget class="QSpinBox" name="spinBox_fileCache_maxCacheSize">
               <property name="maximum">
-               <number>1000000</number>
+               <number>2147483647</number>
               </property>
              </widget>
             </item>
             <item>
              <widget class="QSpinBox" name="spinBox_fileCache_evictMaxThresh">
               <property name="maximum">
-               <number>3000</number>
+               <number>2147483647</number>
               </property>
               <property name="value">
                <number>80</number>
@@ -245,7 +245,7 @@
             <item>
              <widget class="QSpinBox" name="spinBox_fileCache_evictMinThresh">
               <property name="maximum">
-               <number>3000</number>
+               <number>2147483647</number>
               </property>
               <property name="value">
                <number>60</number>
@@ -255,7 +255,7 @@
             <item>
              <widget class="QSpinBox" name="spinBox_fileCache_refreshSec">
               <property name="maximum">
-               <number>4000</number>
+               <number>2147483647</number>
               </property>
               <property name="singleStep">
                <number>20</number>
@@ -518,7 +518,7 @@
           <item>
            <widget class="QSpinBox" name="spinBox_azure_blockSize">
             <property name="maximum">
-             <number>3000</number>
+             <number>2147483647</number>
             </property>
             <property name="value">
              <number>16</number>
@@ -528,7 +528,7 @@
           <item>
            <widget class="QSpinBox" name="spinBox_azure_maxConcurrency">
             <property name="maximum">
-             <number>3000</number>
+             <number>2147483647</number>
             </property>
             <property name="value">
              <number>32</number>
@@ -562,14 +562,14 @@
           <item>
            <widget class="QSpinBox" name="spinBox_azure_blockOnMount">
             <property name="maximum">
-             <number>3000</number>
+             <number>2147483647</number>
             </property>
            </widget>
           </item>
           <item>
            <widget class="QSpinBox" name="spinBox_azure_maxRetries">
             <property name="maximum">
-             <number>3000</number>
+             <number>2147483647</number>
             </property>
             <property name="value">
              <number>5</number>
@@ -579,7 +579,7 @@
           <item>
            <widget class="QSpinBox" name="spinBox_azure_maxRetryTimeout">
             <property name="maximum">
-             <number>3000</number>
+             <number>2147483647</number>
             </property>
             <property name="value">
              <number>900</number>
@@ -589,7 +589,7 @@
           <item>
            <widget class="QSpinBox" name="spinBox_azure_retryBackoff">
             <property name="maximum">
-             <number>3000</number>
+             <number>2147483647</number>
             </property>
             <property name="value">
              <number>4</number>
@@ -599,7 +599,7 @@
           <item>
            <widget class="QSpinBox" name="spinBox_azure_maxRetryDelay">
             <property name="maximum">
-             <number>3000</number>
+             <number>2147483647</number>
             </property>
             <property name="value">
              <number>60</number>
