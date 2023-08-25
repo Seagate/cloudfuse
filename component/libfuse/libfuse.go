@@ -40,11 +40,11 @@ import (
 	"context"
 	"fmt"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/stats_manager"
+	"cloudfuse/common"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/stats_manager"
 
 	"github.com/winfsp/cgofuse/fuse"
 )
@@ -108,7 +108,7 @@ type LibfuseOptions struct {
 	nonEmptyMount           bool   `config:"nonempty" yaml:"nonempty,omitempty"`
 	NetworkShare            bool   `config:"network-share" yaml:"network-share,omitempty"`
 	Uid                     uint32 `config:"uid" yaml:"uid,omitempty"`
-	Gid                     uint32 `config:"gid" yaml:"uid,omitempty"`
+	Gid                     uint32 `config:"gid" yaml:"gid,omitempty"`
 	MaxFuseThreads          uint32 `config:"max-fuse-threads" yaml:"max-fuse-threads,omitempty"`
 	DirectIO                bool   `config:"direct-io" yaml:"direct-io,omitempty"`
 }
@@ -148,6 +148,10 @@ func (lf *Libfuse) SetName(name string) {
 // SetNextComponent sets the next component in the pipeline.
 func (lf *Libfuse) SetNextComponent(nc internal.Component) {
 	lf.BaseComponent.SetNextComponent(nc)
+}
+
+func (lf *Libfuse) Priority() internal.ComponentPriority {
+	return internal.EComponentPriority.Producer()
 }
 
 // Start : Pipeline calls this method to start the component functionality
@@ -313,10 +317,6 @@ func (lf *Libfuse) Configure(_ bool) error {
 	return nil
 }
 
-// OnConfigChange : If component has registered, on config file change this method is called
-func (lf *Libfuse) OnConfigChange() {
-}
-
 // ------------------------- Factory -------------------------------------------
 
 // Pipeline will call this method to create your object, initialize your variables here
@@ -350,7 +350,7 @@ func init() {
 	config.BindPFlag(compName+".fuse-trace", debug)
 	debug.Hidden = true
 
-	ignoreOpenFlags := config.AddBoolFlag("ignore-open-flags", true, "Ignore unsupported open flags (APPEND, WRONLY) by blobfuse when writeback caching is enabled.")
+	ignoreOpenFlags := config.AddBoolFlag("ignore-open-flags", true, "Ignore unsupported open flags (APPEND, WRONLY) by cloudfuse when writeback caching is enabled.")
 	config.BindPFlag(compName+".ignore-open-flags", ignoreOpenFlags)
 
 	networkShareFlags := config.AddBoolFlag("network-share", false, "Run as a network share. Only supported on Windows.")

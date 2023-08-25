@@ -51,10 +51,10 @@ func TestMain(t *testing.T) {
 		}
 	}
 	os.Args = args
-	if strings.Contains(os.Args[0], "lyvecloudfuse.test") {
+	if strings.Contains(os.Args[0], "cloudfuse.test") {
 		t.Log("Starting coverage test")
 		main()
 	} else {
-		t.Error("Failed to start lyvecloudfuse binary")
+		t.Error("Failed to start cloudfuse binary")
 	}
 }

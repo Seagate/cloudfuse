@@ -44,11 +44,11 @@ import (
 	"syscall"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
-	"lyvecloudfuse/internal/stats_manager"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
+	"cloudfuse/internal/stats_manager"
 
 	"github.com/winfsp/cgofuse/fuse"
 )
@@ -59,8 +59,8 @@ In below code lot of places we are doing this sort of conversions:
 or we are doing:
 	- handle.ID = (handlemap.HandleID)(fh)
 
-In lyve cloud fuse we maintain handles as an object stored in a handlemap. Cgofuse gives us handles as integer
-values so we need to do type conversions to conver those values to our Handle ID values that lyve cloud fuse
+In cloudfuse we maintain handles as an object stored in a handlemap. Cgofuse gives us handles as integer
+values so we need to do type conversions to conver those values to our Handle ID values that cloudfuse
 uses so we convert the integer into a handle object.
 */
 

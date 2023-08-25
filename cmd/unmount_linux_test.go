@@ -43,8 +43,8 @@ import (
 	"testing"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -55,7 +55,7 @@ var configUnMountLoopback string = `
 logging:
   type: syslog
   level: log_debug
-  #file-path: lyvecloudfuse.log
+  #file-path: cloudfuse.log
 default-working-dir: ./
 components:
   - libfuse
@@ -99,7 +99,7 @@ func (suite *unmountTestSuite) TestUnmountCmd() {
 	os.MkdirAll(mountDirectory1, 0777)
 	defer os.RemoveAll(mountDirectory1)
 
-	cmd := exec.Command("../lyvecloudfuse", "mount", mountDirectory1, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command("../cloudfuse", "mount", mountDirectory1, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
 	_, err := cmd.Output()
 	suite.assert.Nil(err)
 
@@ -116,7 +116,7 @@ func (suite *unmountTestSuite) TestUnmountCmdFail() {
 	os.MkdirAll(mountDirectory2, 0777)
 	defer os.RemoveAll(mountDirectory2)
 
-	cmd := exec.Command("../lyvecloudfuse", "mount", mountDirectory2, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command("../cloudfuse", "mount", mountDirectory2, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
 	_, err := cmd.Output()
 	suite.assert.Nil(err)
 
@@ -140,7 +140,7 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
 	os.MkdirAll(mountDirectory3, 0777)
 	defer os.RemoveAll(mountDirectory3)
 
-	cmd := exec.Command("../lyvecloudfuse", "mount", mountDirectory3, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command("../cloudfuse", "mount", mountDirectory3, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
 	_, err := cmd.Output()
 	suite.assert.Nil(err)
 
@@ -156,7 +156,7 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
 	os.MkdirAll(mountDirectory4, 0777)
 	defer os.RemoveAll(mountDirectory4)
 
-	cmd := exec.Command("../lyvecloudfuse", "mount", mountDirectory4, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command("../cloudfuse", "mount", mountDirectory4, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
 	_, err := cmd.Output()
 	suite.assert.Nil(err)
 
@@ -184,7 +184,7 @@ func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
 	os.MkdirAll(mountDirectory5, 0777)
 	defer os.RemoveAll(mountDirectory5)
 
-	cmd := exec.Command("../lyvecloudfuse", "mount", mountDirectory5, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command("../cloudfuse", "mount", mountDirectory5, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
 	_, err := cmd.Output()
 	suite.assert.Nil(err)
 
@@ -194,9 +194,6 @@ func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
 
 	_, err = executeCommandC(rootCmd, "unmount", mountDirectory5+"*")
 	suite.assert.Nil(err)
-
-	lst, _ = unmountCmd.ValidArgsFunction(nil, nil, "")
-	suite.assert.Empty(lst)
 
 	lst, _ = unmountCmd.ValidArgsFunction(nil, nil, "abcd")
 	suite.assert.Empty(lst)

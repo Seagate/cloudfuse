@@ -40,8 +40,8 @@ import (
 	"os"
 	"testing"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -70,7 +70,7 @@ func (suite *cachePolicyTestSuite) TestGetUsage() {
 	f, _ := os.Create(cache_path + "/test")
 	data := make([]byte, 1024*1024)
 	f.Write(data)
-	result := getUsage(cache_path)
+	result, _ := getUsage(cache_path)
 	suite.assert.Equal(float64(1), math.Floor(result))
 }
 
@@ -80,7 +80,8 @@ func (suite *cachePolicyTestSuite) TestGetUsageSizeOnDisk() {
 	f, _ := os.Create(cache_path + "/test")
 	data := make([]byte, 4097)
 	f.Write(data)
-	result := getUsage(cache_path)
+	result, err := getUsage(cache_path)
+	suite.assert.Nil(err)
 
 	// Linux du overestimates the number of sectors used by 1 sometimes
 	// So check that we aren't more or less than 1 sector size off.

@@ -11,7 +11,7 @@ testname=$5
 outputPath=results_fio_$testname.txt
 rm $outputPath
 
-echo "| Case | latest lcf write IOPS | latest lcf read IOPS | blob2 write IOPS | blob2 read IOPS |" >> $outputPath
+echo "| Case | latest cf write IOPS | latest cf read IOPS | blob2 write IOPS | blob2 read IOPS |" >> $outputPath
 echo "| -- | -- | -- | -- | -- |" >> $outputPath
 
 for i in {1..5}; 
@@ -42,21 +42,21 @@ echo -n "Test command: "
 echo $fiocmd
 echo 
 
-# Mount Lyvecloudfuse
-./lyvecloudfuse mount $mntPath --config-file=$v2configPath
+# Mount Cloudfuse
+./cloudfuse mount $mntPath --config-file=$v2configPath
 if [ $? -ne 0 ]; then
     exit 1
 fi
 sleep 12
-ps -aux | grep lyvecloudfuse
+ps -aux | grep cloudfuse
 
 sed_line=3
-lyvecloudfuse_write_average=0
-lyvecloudfuse_read_average=0
+cloudfuse_write_average=0
+cloudfuse_read_average=0
 
 for i in {1..5}; 
 do 
-	echo "Lyvecloudfuse Run $i"
+	echo "Cloudfuse Run $i"
 
     fio_result=`$fiocmd$i`
     echo $fio_result
@@ -74,26 +74,26 @@ do
 	rm $mntPath/testfile4G$i
 
 	(( sed_line++ ))
-    lyvecloudfuse_write_average=$(( $lyvecloudfuse_write_average + $write_iops ))
-    lyvecloudfuse_read_average=$(( $lyvecloudfuse_read_average + $read_iops ))
+    cloudfuse_write_average=$(( $cloudfuse_write_average + $write_iops ))
+    cloudfuse_read_average=$(( $cloudfuse_read_average + $read_iops ))
     echo "========================================================="
 done
 sudo fusermount3 -u $mntPath
 
-# Mount Blobfuse2
-blobfuse2 mount $mntPath --config-file=$v2configPath
+# Mount Cloudfuse
+cloudfuse mount $mntPath --config-file=$v2configPath
 if [ $? -ne 0 ]; then
     exit 1
 fi
 sleep 12
-ps -aux | grep blobfuse2
+ps -aux | grep cloudfuse
 
 sed_line=3
 blobfuse_write_average=0
 blobfuse_read_average=0
 for i in {1..5}; 
 do 
-	echo "Blobfuse2 Run $i"
+	echo "Cloudfuse Run $i"
 
     fio_result=`$fiocmd$i`
     echo $fio_result
@@ -117,18 +117,18 @@ do
 done
 sudo fusermount3 -u $mntPath
 
-lyvecloudfuse_write_average=$(( $lyvecloudfuse_write_average / 5 ))
-lyvecloudfuse_read_average=$(( $lyvecloudfuse_read_average / 5 ))
+cloudfuse_write_average=$(( $cloudfuse_write_average / 5 ))
+cloudfuse_read_average=$(( $cloudfuse_read_average / 5 ))
 blobfuse_write_average=$(( $blobfuse_write_average / 5 ))
 blobfuse_read_average=$(( $blobfuse_read_average / 5 ))
 
-sed -i "8s/$/ ${lyvecloudfuse_write_average} | ${lyvecloudfuse_read_average} | ${blobfuse_write_average} | ${blobfuse_read_average} |/" $outputPath
+sed -i "8s/$/ ${cloudfuse_write_average} | ${cloudfuse_read_average} | ${blobfuse_write_average} | ${blobfuse_read_average} |/" $outputPath
 
 # Calculate the % difference
-diff_write=$(( $lyvecloudfuse_write_average - $blobfuse_write_average ))
+diff_write=$(( $cloudfuse_write_average - $blobfuse_write_average ))
 percent_write=`echo "scale=2; $diff_write * 100 / $blobfuse_write_average" | bc`
 
-diff_read=$(( $lyvecloudfuse_read_average - $blobfuse_read_average ))
+diff_read=$(( $cloudfuse_read_average - $blobfuse_read_average ))
 percent_read=`echo "scale=2; $diff_read * 100 / $blobfuse_read_average" | bc`
 
 sed -i "9s/$/ ${percent_write} | ${percent_read} |/" $outputPath

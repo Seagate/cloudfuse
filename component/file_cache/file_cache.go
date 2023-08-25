@@ -46,12 +46,12 @@ import (
 	"sync"
 	"syscall"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
-	"lyvecloudfuse/internal/stats_manager"
+	"cloudfuse/common"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
+	"cloudfuse/internal/stats_manager"
 
 	"github.com/spf13/cobra"
 )
@@ -301,13 +301,13 @@ func (c *FileCache) Configure(_ bool) error {
 	}
 
 	if config.IsSet(compName + ".background-download") {
-		log.Warn("unsupported v1 CLI parameter: background-download is not supported in lyvecloudfuse. Consider using the streaming component.")
+		log.Warn("unsupported v1 CLI parameter: background-download is not supported in cloudfuse. Consider using the streaming component.")
 	}
 	if config.IsSet(compName + ".cache-poll-timeout-msec") {
-		log.Warn("unsupported v1 CLI parameter: cache-poll-timeout-msec is not supported in lyvecloudfuse. Polling occurs every timeout interval.")
+		log.Warn("unsupported v1 CLI parameter: cache-poll-timeout-msec is not supported in cloudfuse. Polling occurs every timeout interval.")
 	}
 	if config.IsSet(compName + ".upload-modified-only") {
-		log.Warn("unsupported v1 CLI parameter: upload-modified-only is always true in lyvecloudfuse.")
+		log.Warn("unsupported v1 CLI parameter: upload-modified-only is always true in cloudfuse.")
 	}
 	if config.IsSet(compName + ".sync-to-flush") {
 		log.Warn("Sync will upload current contents of file.")
@@ -321,6 +321,8 @@ func (c *FileCache) Configure(_ bool) error {
 
 // OnConfigChange : If component has registered, on config file change this method is called
 func (c *FileCache) OnConfigChange() {
+	log.Trace("FileCache::OnConfigChange : %s", c.Name())
+
 	conf := FileCacheOptions{}
 	err := config.UnmarshalKey(compName, &conf)
 	if err != nil {
@@ -352,7 +354,7 @@ func (c *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 		maxEviction:   conf.MaxEviction,
 		highThreshold: float64(conf.HighThreshold),
 		lowThreshold:  float64(conf.LowThreshold),
-		cacheTimeout:  uint32(conf.Timeout),
+		cacheTimeout:  uint32(c.cacheTimeout),
 		maxSizeMB:     conf.MaxSizeMB,
 		fileLocks:     c.fileLocks,
 		policyTrace:   conf.EnablePolicyTrace,
@@ -756,11 +758,12 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 
 		if fileSize > 0 {
 			// Download/Copy the file from storage to the local file.
+			// We pass a count of 0 to get the entire object
 			err = fc.NextComponent().CopyToFile(
 				internal.CopyToFileOptions{
 					Name:   options.Name,
 					Offset: 0,
-					Count:  fileSize,
+					Count:  0,
 					File:   f,
 				})
 			if err != nil {
@@ -1363,6 +1366,10 @@ func init() {
 	uploadModifiedOnly := config.AddBoolFlag("upload-modified-only", false, "Flag to turn off unnecessary uploads to storage.")
 	config.BindPFlag(compName+".upload-modified-only", uploadModifiedOnly)
 	uploadModifiedOnly.Hidden = true
+
+	cachePolicy := config.AddStringFlag("file-cache-policy", "lru", "Cache eviction policy.")
+	config.BindPFlag(compName+".policy", cachePolicy)
+	cachePolicy.Hidden = true
 
 	syncToFlush := config.AddBoolFlag("sync-to-flush", false, "Sync call on file will force a upload of the file.")
 	config.BindPFlag(compName+".sync-to-flush", syncToFlush)

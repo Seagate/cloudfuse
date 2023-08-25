@@ -50,9 +50,9 @@ import (
 	"strings"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
 
 	"github.com/Azure/azure-storage-azcopy/v10/azbfs"
 	"github.com/Azure/azure-storage-azcopy/v10/ste"
@@ -64,7 +64,7 @@ import (
 //    ----------- Helper to create pipeline options ---------------
 
 var UserAgent = func() string {
-	return "Azure-Storage-Fuse/" + common.LyvecloudfuseVersion
+	return "Azure-Storage-Fuse/" + common.CloudfuseVersion
 }
 
 const (
@@ -90,8 +90,16 @@ func getAzBlobPipelineOptions(conf AzStorageConfig) (azblob.PipelineOptions, ste
 		RetryDelay:    time.Second * time.Duration(conf.backoffTime),   // Backoff amount for each retry (exponential or linear)
 		MaxRetryDelay: time.Second * time.Duration(conf.maxRetryDelay), // Max delay between retries
 	}
+
+	telemetryValue := conf.telemetry
+	if telemetryValue != "" {
+		telemetryValue += " "
+	}
+
+	telemetryValue += UserAgent() + " (" + common.GetCurrentDistro() + ")"
+
 	telemetryOptions := azblob.TelemetryOptions{
-		Value: UserAgent() + " (" + common.GetCurrentDistro() + ")",
+		Value: telemetryValue,
 	}
 
 	sysLogDisabled := log.GetType() == "silent" // If logging is enabled, allow the SDK to log retries to syslog.
@@ -101,12 +109,12 @@ func getAzBlobPipelineOptions(conf AzStorageConfig) (azblob.PipelineOptions, ste
 	}
 	logOptions := getLogOptions(conf.sdkTrace)
 	// Create custom HTTPClient to pass to the factory in order to set our proxy
-	var pipelineHTTPClient = newLyvecloudfuseHttpClient(conf)
+	var pipelineHTTPClient = newCloudfuseHttpClient(conf)
 	return azblob.PipelineOptions{
 			Log:        logOptions,
 			RequestLog: requestLogOptions,
 			Telemetry:  telemetryOptions,
-			HTTPSender: newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient),
+			HTTPSender: newCloudfuseHTTPClientFactory(pipelineHTTPClient),
 		},
 		// Set RetryOptions to control how HTTP request are retried when retryable failures occur
 		retryOptions
@@ -121,9 +129,17 @@ func getAzBfsPipelineOptions(conf AzStorageConfig) (azbfs.PipelineOptions, ste.X
 		RetryDelay:    time.Second * time.Duration(conf.backoffTime),   // Backoff amount for each retry (exponential or linear)
 		MaxRetryDelay: time.Second * time.Duration(conf.maxRetryDelay), // Max delay between retries
 	}
-	telemetryOptions := azbfs.TelemetryOptions{
-		Value: UserAgent() + " (" + common.GetCurrentDistro() + ")",
+
+	telemetryValue := conf.telemetry
+	if telemetryValue != "" {
+		telemetryValue += " "
 	}
+
+	telemetryValue += UserAgent() + " (" + common.GetCurrentDistro() + ")"
+	telemetryOptions := azbfs.TelemetryOptions{
+		Value: telemetryValue,
+	}
+
 	sysLogDisabled := log.GetType() == "silent" // If logging is enabled, allow the SDK to log retries to syslog.
 	requestLogOptions := azbfs.RequestLogOptions{
 		// TODO: We can potentially consider making LogWarningIfTryOverThreshold a user settable option. For now lets use the default
@@ -131,12 +147,12 @@ func getAzBfsPipelineOptions(conf AzStorageConfig) (azbfs.PipelineOptions, ste.X
 	}
 	logOptions := getLogOptions(conf.sdkTrace)
 	// Create custom HTTPClient to pass to the factory in order to set our proxy
-	var pipelineHTTPClient = newLyvecloudfuseHttpClient(conf)
+	var pipelineHTTPClient = newCloudfuseHttpClient(conf)
 	return azbfs.PipelineOptions{
 			Log:        logOptions,
 			RequestLog: requestLogOptions,
 			Telemetry:  telemetryOptions,
-			HTTPSender: newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient),
+			HTTPSender: newCloudfuseHTTPClientFactory(pipelineHTTPClient),
 		},
 		// Set RetryOptions to control how HTTP request are retried when retryable failures occur
 		retryOptions
@@ -144,7 +160,7 @@ func getAzBfsPipelineOptions(conf AzStorageConfig) (azbfs.PipelineOptions, ste.X
 
 // Create an HTTP Client with configured proxy
 // TODO: More configurations for other http client parameters?
-func newLyvecloudfuseHttpClient(conf AzStorageConfig) *http.Client {
+func newCloudfuseHttpClient(conf AzStorageConfig) *http.Client {
 	var ProxyURL func(req *http.Request) (*url.URL, error) = func(req *http.Request) (*url.URL, error) {
 		// If a proxy address is passed return
 		var proxyURL url.URL = url.URL{
@@ -182,13 +198,13 @@ func newLyvecloudfuseHttpClient(conf AzStorageConfig) *http.Client {
 	}
 }
 
-// newLyvecloudfuseHTTPClientFactory creates a custom HTTPClientPolicyFactory object that sends HTTP requests to the http client.
-func newLyvecloudfuseHTTPClientFactory(pipelineHTTPClient *http.Client) pipeline.Factory {
+// newCloudfuseHTTPClientFactory creates a custom HTTPClientPolicyFactory object that sends HTTP requests to the http client.
+func newCloudfuseHTTPClientFactory(pipelineHTTPClient *http.Client) pipeline.Factory {
 	return pipeline.FactoryFunc(func(next pipeline.Policy, po *pipeline.PolicyOptions) pipeline.PolicyFunc {
 		return func(ctx context.Context, request pipeline.Request) (pipeline.Response, error) {
 			r, err := pipelineHTTPClient.Do(request.WithContext(ctx))
 			if err != nil {
-				log.Err("BlockBlob::newLyvecloudfuseHTTPClientFactory : HTTP request failed [%s]", err.Error())
+				log.Err("BlockBlob::newCloudfuseHTTPClientFactory : HTTP request failed [%s]", err.Error())
 				err = pipeline.NewError(err, "HTTP request failed")
 			}
 			return pipeline.NewHTTPResponse(r), err
@@ -508,6 +524,57 @@ func writePermission(sb *strings.Builder, permitted bool, permission rune) {
 	} else {
 		sb.WriteRune('-')
 	}
+}
+
+// Called by x method
+// How to interpret the mask and name user acl : https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-access-control
+func getFileModeFromACL(objid string, acl string, owner string) (os.FileMode, error) {
+	var mode os.FileMode = 0
+	if acl == "" {
+		return mode, fmt.Errorf("empty permissions from the service")
+	}
+
+	extractPermission := func(acl string, key string) string {
+		idx := strings.Index(acl, key) + len(key)
+		return acl[idx : idx+3]
+	}
+
+	extractNamedUserACL := func(acl string, objid string) string {
+		key := fmt.Sprintf("user:%s:", objid)
+		idx := strings.Index(acl, key) + len(key)
+		if idx == -1 {
+			return "---"
+		}
+
+		userACL := acl[idx : idx+3]
+		mask := extractPermission(acl, "mask::")
+
+		permissions := ""
+		for i, c := range userACL {
+			if userACL[i] == mask[i] {
+				permissions += string(c)
+			} else {
+				permissions += "-"
+			}
+		}
+
+		return permissions
+	}
+
+	// Sample string : user::rwx,user:objid1:r--,user:objid2:r--,group::r--,mask::r-x,other::rwx:
+	permissions := ""
+	if owner == objid {
+		// Owner of this blob is the authenticated object id so extract the user permissions from the ACL directly
+		permissions = extractPermission(acl, "user::")
+	} else {
+		// Owner of this blob is not the authenticated object id, search object id exists in the ACL
+		permissions = extractNamedUserACL(acl, objid)
+	}
+
+	permissions += extractPermission(acl, "group::")
+	permissions += extractPermission(acl, "other::")
+
+	return getFileMode(permissions)
 }
 
 // Called by x method

@@ -27,8 +27,8 @@ sudo service docker start
 # List docker container images
 docker images ls
 
-# Delete old lyvecloudfuse image
-docker images rm azure-lyvecloudfuse -f
+# Delete old cloudfuse image
+docker images rm azure-cloudfuse -f
 
 # List docker instances running
 docker container ls

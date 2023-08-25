@@ -43,16 +43,16 @@ import (
 	"regexp"
 	"strings"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 )
 
 var unmountCmd = &cobra.Command{
 	Use:               "unmount <mount path>",
-	Short:             "Unmount Lyvecloudfuse",
-	Long:              "Unmount Lyvecloudfuse. Only available on Linux",
+	Short:             "Unmount Cloudfuse",
+	Long:              "Unmount Cloudfuse. Only available on Linux",
 	SuggestFor:        []string{"unmount", "unmnt"},
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
@@ -64,16 +64,16 @@ var unmountCmd = &cobra.Command{
 			for _, mntPath := range lstMnt {
 				match, _ := regexp.MatchString(mntPathPrefix, mntPath)
 				if match {
-					err := unmountLyvecloudfuse(mntPath)
+					err := unmountCloudfuse(mntPath)
 					if err != nil {
 						return fmt.Errorf("failed to unmount %s [%s]", mntPath, err.Error())
 					}
 				}
 			}
 		} else {
-			err := unmountLyvecloudfuse(args[0])
+			err := unmountCloudfuse(args[0])
 			if err != nil {
-				return fmt.Errorf("failed to unmount %s [%s]", args[0], err.Error())
+				return err
 			}
 		}
 
@@ -89,18 +89,28 @@ var unmountCmd = &cobra.Command{
 }
 
 // Attempts to unmount the directory and returns true if the operation succeeded
-func unmountLyvecloudfuse(mntPath string) error {
-	cliOut := exec.Command("fusermount", "-u", mntPath)
+func unmountCloudfuse(mntPath string) error {
+	unmountCmd := []string{"fusermount3", "fusermount"}
+
 	var errb bytes.Buffer
-	cliOut.Stderr = &errb
-	_, err := cliOut.Output()
-	if err != nil {
-		log.Err("unmountLyvecloudfuse : failed to unmount (%s : %s)", err.Error(), errb.String())
-		return fmt.Errorf("%s", errb.String())
-	} else {
-		fmt.Println("Successfully unmounted", mntPath)
-		return nil
+	var err error
+	for _, umntCmd := range unmountCmd {
+		cliOut := exec.Command(umntCmd, "-u", mntPath)
+		cliOut.Stderr = &errb
+		_, err = cliOut.Output()
+
+		if err == nil {
+			fmt.Println("Successfully unmounted", mntPath)
+			return nil
+		}
+
+		if !strings.Contains(err.Error(), "executable file not found") {
+			log.Err("unmountCloudfuse : failed to unmount (%s : %s)", err.Error(), errb.String())
+			break
+		}
 	}
+
+	return fmt.Errorf("%s", errb.String()+" "+err.Error())
 }
 
 func init() {

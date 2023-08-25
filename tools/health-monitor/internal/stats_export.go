@@ -42,10 +42,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal/stats_manager"
-	hmcommon "lyvecloudfuse/tools/health-monitor/common"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal/stats_manager"
+	hmcommon "cloudfuse/tools/health-monitor/common"
 )
 
 type ExportedStat struct {
@@ -63,7 +63,7 @@ type StatsExporter struct {
 
 type Output struct {
 	Timestamp string                  `json:"Timestamp,omitempty"`
-	Bfs       []stats_manager.PipeMsg `json:"BlobfuseStats,omitempty"`
+	Cfs       []stats_manager.PipeMsg `json:"BlobfuseStats,omitempty"`
 	FcEvent   []*hmcommon.CacheEvent  `json:"FileCache,omitempty"`
 	Cpu       string                  `json:"CPUUsage,omitempty"`
 	Mem       string                  `json:"MemoryUsage,omitempty"`
@@ -175,8 +175,8 @@ func (se *StatsExporter) StatsExporter() {
 }
 
 func (se *StatsExporter) addToList(st *ExportedStat, idx int) {
-	if st.MonitorName == hmcommon.BlobfuseStats {
-		se.outputList[idx].Bfs = append(se.outputList[idx].Bfs, st.Stat.(stats_manager.PipeMsg))
+	if st.MonitorName == hmcommon.CloudfuseStats {
+		se.outputList[idx].Cfs = append(se.outputList[idx].Cfs, st.Stat.(stats_manager.PipeMsg))
 	} else if st.MonitorName == hmcommon.FileCacheMon {
 		se.outputList[idx].FcEvent = append(se.outputList[idx].FcEvent, st.Stat.(*hmcommon.CacheEvent))
 	} else if st.MonitorName == hmcommon.CpuProfiler {

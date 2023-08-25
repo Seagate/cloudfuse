@@ -35,7 +35,7 @@
 package winservice
 
 import (
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common/log"
 	"os"
 
 	"golang.org/x/sys/windows/registry"
@@ -43,8 +43,8 @@ import (
 
 // Windows Registry Paths
 const (
-	lcfRegistry      = `SOFTWARE\Seagate\LyveCloudFuse\`
-	instanceRegistry = lcfRegistry + `Instances\`
+	cfRegistry       = `SOFTWARE\Seagate\Cloudfuse\`
+	instanceRegistry = cfRegistry + `Instances\`
 	winFspRegistry   = `SOFTWARE\WOW6432Node\WinFsp\Services\`
 )
 
@@ -62,7 +62,7 @@ type KeyData struct {
 	ConfigFile string
 }
 
-// Specific mount command used in lyvecloudfuse. This is the command that is executed when WinFsp launches our service.
+// Specific mount command used in cloudfuse. This is the command that is executed when WinFsp launches our service.
 // %1 and %2 are strings that are added when mounting where %1 represents the mount directory and %2 the location of the
 // config file.
 const mountCmd = `mount %1 --config-file=%2`
@@ -89,7 +89,7 @@ func ReadRegistryInstanceEntry(name string) (KeyData, error) {
 	return d, nil
 }
 
-// readRegistryEntry reads the lyvecloudfuse registry and returns all the instances to be mounted.
+// readRegistryEntry reads the cloudfuse registry and returns all the instances to be mounted.
 func readRegistryEntry() ([]KeyData, error) {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, instanceRegistry, registry.ALL_ACCESS)
 	if err != nil {
@@ -188,9 +188,9 @@ func RemoveRegistryMount(name string) error {
 	return nil
 }
 
-// RemoveRegistryMount removes the entire lyvecloudfuse registry
+// RemoveRegistryMount removes the entire cloudfuse registry
 func RemoveAllRegistryMount() error {
-	err := registry.DeleteKey(registry.LOCAL_MACHINE, lcfRegistry)
+	err := registry.DeleteKey(registry.LOCAL_MACHINE, cfRegistry)
 	if err != nil {
 		return err
 	}

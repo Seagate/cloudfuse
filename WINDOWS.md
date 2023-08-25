@@ -1,13 +1,13 @@
 # Windows Support
 
-LyveCloudFUSE supports running on Windows either as an executable or through Windows Services.
+Cloudfuse supports running on Windows either as an executable or through Windows Services.
 
 ## Filename Limitations
 
-As LyveCloudFUSE supports both Windows and Linux as well as Azure and S3 storage, there are naming restrictions that
+As Cloudfuse supports both Windows and Linux as well as Azure and S3 storage, there are naming restrictions that
 must be followed in order for data to be available on all systems.
 
-LyveCloudFUSE does not support filenames longer than 255 characters. It does not support filenames that contain the `\`
+Cloudfuse does not support filenames longer than 255 characters. It does not support filenames that contain the `\`
 character or any control characters (ASCII 0 -31). On Windows it can support paths with a length longer than 255 if you
 enable the LongPathsEnabled registry option. See
 <https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=powershell>.

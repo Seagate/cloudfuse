@@ -1,19 +1,20 @@
-module lyvecloudfuse
+module cloudfuse
 
 go 1.20
 
 require (
 	github.com/Azure/azure-pipeline-go v0.2.4-0.20220425205405-09e6f201e1e4
-	github.com/Azure/azure-storage-azcopy/v10 v10.19.0
+	github.com/Azure/azure-storage-azcopy/v10 v10.19.1-0.20230717101935-ab8ff0a85e48
 	github.com/Azure/azure-storage-blob-go v0.15.0
 	github.com/Azure/go-autorest/autorest v0.11.29
 	github.com/Azure/go-autorest/autorest/adal v0.9.23
 	github.com/JeffreyRichter/enum v0.0.0-20180725232043-2567042f9cda
-	github.com/aws/aws-sdk-go-v2 v1.17.4
-	github.com/aws/aws-sdk-go-v2/config v1.18.12
-	github.com/aws/aws-sdk-go-v2/credentials v1.13.12
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.30.2
-	github.com/aws/smithy-go v1.13.5
+	github.com/aws/aws-sdk-go-v2 v1.20.1
+	github.com/aws/aws-sdk-go-v2/config v1.18.33
+	github.com/aws/aws-sdk-go-v2/credentials v1.13.32
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.77
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.38.2
+	github.com/aws/smithy-go v1.14.1
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/golang/mock v1.6.0
 	github.com/mitchellh/mapstructure v1.5.0
@@ -28,7 +29,8 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/winfsp/cgofuse v1.5.0
 	go.uber.org/atomic v1.11.0
-	golang.org/x/sys v0.9.0
+	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63
+	golang.org/x/sys v0.11.0
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -45,19 +47,19 @@ require (
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
-	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.4.10 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.22 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.28 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.22 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/ini v1.3.29 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.0.19 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.9.11 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.1.23 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.22 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.13.22 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.12.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.14.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.18.3 // indirect
+	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.4.12 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.13.8 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.38 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.32 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.3.39 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.1.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.9.13 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.1.33 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.32 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.15.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.13.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.15.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.21.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/danieljoos/wincred v1.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -74,6 +76,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hillu/go-ntdll v0.0.0-20230408164318-f8894bfa00af // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect

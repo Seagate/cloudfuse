@@ -55,11 +55,11 @@ import (
 	"testing"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
+	"cloudfuse/common"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-storage-blob-go/azblob"
@@ -3076,7 +3076,7 @@ func (s *blockBlobTestSuite) TestInvalidateMD5PostUpload() {
 			s.assert.Nil(err)
 
 			blobURL := s.containerUrl.NewBlobURL(name)
-			_, _ = blobURL.SetHTTPHeaders(context.Background(), azblob.BlobHTTPHeaders{ContentMD5: []byte("blobfuse")}, azblob.BlobAccessConditions{})
+			_, _ = blobURL.SetHTTPHeaders(context.Background(), azblob.BlobHTTPHeaders{ContentMD5: []byte("cloudfuse")}, azblob.BlobAccessConditions{})
 
 			prop, err := s.az.storage.GetAttr(name)
 			s.assert.Nil(err)
@@ -3246,7 +3246,7 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnRead() {
 			_ = os.Remove(name)
 
 			blobURL := s.containerUrl.NewBlobURL(name)
-			_, _ = blobURL.SetHTTPHeaders(context.Background(), azblob.BlobHTTPHeaders{ContentMD5: []byte("blobfuse")}, azblob.BlobAccessConditions{})
+			_, _ = blobURL.SetHTTPHeaders(context.Background(), azblob.BlobHTTPHeaders{ContentMD5: []byte("cloudfuse")}, azblob.BlobAccessConditions{})
 
 			prop, err := s.az.storage.GetAttr(name)
 			s.assert.Nil(err)
@@ -3306,7 +3306,7 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnReadNoVaildate() {
 			_ = os.Remove(name)
 
 			blobURL := s.containerUrl.NewBlobURL(name)
-			_, _ = blobURL.SetHTTPHeaders(context.Background(), azblob.BlobHTTPHeaders{ContentMD5: []byte("blobfuse")}, azblob.BlobAccessConditions{})
+			_, _ = blobURL.SetHTTPHeaders(context.Background(), azblob.BlobHTTPHeaders{ContentMD5: []byte("cloudfuse")}, azblob.BlobAccessConditions{})
 
 			prop, err := s.az.storage.GetAttr(name)
 			s.assert.Nil(err)

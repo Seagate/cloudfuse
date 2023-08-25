@@ -40,15 +40,15 @@ import (
 	"errors"
 	"fmt"
 
-	"lyvecloudfuse/common"
+	"cloudfuse/common"
 
 	"github.com/spf13/cobra"
 )
 
 var umntAllCmd = &cobra.Command{
 	Use:               "all",
-	Short:             "Unmount all instances of Lyvecloudfuse",
-	Long:              "Unmount all instances of Lyvecloudfuse. Only available on Linux",
+	Short:             "Unmount all instances of Cloudfuse",
+	Long:              "Unmount all instances of Cloudfuse. Only available on Linux",
 	SuggestFor:        []string{"al", "all"},
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, _ []string) error {
@@ -63,7 +63,7 @@ var umntAllCmd = &cobra.Command{
 
 		for _, mntPath := range lstMnt {
 			mountfound += 1
-			err := unmountLyvecloudfuse(mntPath)
+			err := unmountCloudfuse(mntPath)
 			if err == nil {
 				unmounted += 1
 			} else {

@@ -45,9 +45,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
 )
 
 // Creates a new object attribute
@@ -162,7 +162,8 @@ func (c *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	if maxCacheSize == 0 {
 		return nil, false, nil
 	}
-	usage := getUsage(c.tmpPath) * MB
+	usage, _ := getUsage(c.tmpPath)
+	usage *= MB
 
 	available := maxCacheSize - usage
 	statfs := &unix.Statfs_t{}

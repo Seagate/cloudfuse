@@ -39,6 +39,8 @@ import (
 	"os/exec"
 	"runtime"
 
+	hmcommon "cloudfuse/tools/health-monitor/common"
+
 	"github.com/spf13/cobra"
 )
 
@@ -60,7 +62,7 @@ var healthMonStopAll = &cobra.Command{
 // Attempts to kill all health monitors
 func stopAll() error {
 	if runtime.GOOS == "windows" {
-		cliOut := exec.Command("taskkill", "/IM", "bfusemon.exe", "/F")
+		cliOut := exec.Command("taskkill", "/IM", "cfusemon.exe", "/F")
 		_, err := cliOut.Output()
 		if err != nil {
 			return err
@@ -68,7 +70,7 @@ func stopAll() error {
 		fmt.Println("Successfully stopped all health monitor binaries.")
 		return nil
 	}
-	cliOut := exec.Command("killall", "bfusemon")
+	cliOut := exec.Command("killall", hmcommon.CfuseMon)
 	_, err := cliOut.Output()
 	if err != nil {
 		return err

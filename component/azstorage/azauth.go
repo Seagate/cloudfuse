@@ -35,7 +35,7 @@
 package azstorage
 
 import (
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common/log"
 )
 
 // AzAuthConfig : Config to authenticate to storage
@@ -61,6 +61,7 @@ type azAuthConfig struct {
 	TenantID                string
 	ClientID                string
 	ClientSecret            string
+	OAuthTokenFilePath      string
 	ActiveDirectoryEndpoint string
 
 	Endpoint     string

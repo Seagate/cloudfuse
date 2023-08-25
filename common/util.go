@@ -114,7 +114,7 @@ func DirectoryExists(path string) bool {
 	return true
 }
 
-// GetCurrentUser is a utility function that returns the UID and GID of the user that invokes the lyvecloudfuse command.
+// GetCurrentUser is a utility function that returns the UID and GID of the user that invokes the cloudfuse command.
 func GetCurrentUser() (uint32, uint32, error) {
 	var (
 		currentUser      *user.User
@@ -156,7 +156,7 @@ func NormalizeObjectName(name string) string {
 	return strings.ReplaceAll(name, "\\", "/")
 }
 
-// List all mount points which were mounted using lyvecloudfuse
+// List all mount points which were mounted using cloudfuse
 func ListMountPoints() ([]string, error) {
 	// TODO: Add support to list current mounts
 	// We cannot list mount points like we do on Linux
@@ -177,8 +177,8 @@ func ListMountPoints() ([]string, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// If there is any directory mounted using lyvecloudfuse its of our interest
-		if strings.HasPrefix(line, "lyvecloudfuse") {
+		// If there is any directory mounted using cloudfuse its of our interest
+		if strings.HasPrefix(line, "cloudfuse") {
 			// Extract the mount path from this line
 			mntPath := strings.Split(line, " ")[1]
 			mntList = append(mntList, mntPath)
@@ -264,8 +264,8 @@ func (m *KeyedMutex) GetLock(key string) *sync.Mutex {
 }
 
 // check if health monitor is enabled and blofuse stats monitor is not disabled
-func MonitorBfs() bool {
-	return EnableMonitoring && !BfsDisabled
+func MonitorCfs() bool {
+	return EnableMonitoring && !CfsDisabled
 }
 
 // convert ~ to $HOME in path

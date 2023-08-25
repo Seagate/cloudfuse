@@ -41,16 +41,16 @@ import (
 	"strings"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	hmcommon "lyvecloudfuse/tools/health-monitor/common"
-	hminternal "lyvecloudfuse/tools/health-monitor/internal"
-	_ "lyvecloudfuse/tools/health-monitor/monitor"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	hmcommon "cloudfuse/tools/health-monitor/common"
+	hminternal "cloudfuse/tools/health-monitor/internal"
+	_ "cloudfuse/tools/health-monitor/monitor"
 )
 
 func getMonitors() []hminternal.Monitor {
 	compMap := map[string]bool{
-		hmcommon.BlobfuseStats:     hmcommon.NoBfsMon,
+		hmcommon.CloudfuseStats:    hmcommon.NoCfsMon,
 		hmcommon.CpuMemoryProfiler: (hmcommon.NoCpuProf && hmcommon.NoMemProf),
 		hmcommon.NetworkProfiler:   hmcommon.NoNetProf,
 		hmcommon.FileCacheMon:      hmcommon.NoFileCacheMon,
@@ -76,7 +76,7 @@ func main() {
 	flag.Parse()
 
 	if hmcommon.CheckVersion {
-		fmt.Printf("health-monitor version %s\n", hmcommon.BfuseMonitorVersion)
+		fmt.Printf("health-monitor version %s\n", hmcommon.CfuseMonitorVersion)
 		return
 	}
 
@@ -86,7 +86,7 @@ func main() {
 		MaxFileSize: common.DefaultMaxLogFileSize,
 		FileCount:   common.DefaultLogFileCount,
 		TimeTracker: false,
-		Tag:         hmcommon.BfuseMon,
+		Tag:         hmcommon.CfuseMon,
 	})
 
 	if err != nil {
@@ -95,8 +95,8 @@ func main() {
 	}
 
 	if len(strings.TrimSpace(hmcommon.Pid)) == 0 {
-		fmt.Printf("pid of lyvecloudfuse process not provided\n")
-		log.Err("main::main : pid of lyvecloudfuse process not provided")
+		fmt.Printf("pid of cloudfuse process not provided\n")
+		log.Err("main::main : pid of cloudfuse process not provided")
 		time.Sleep(1 * time.Second) // adding 1 second wait for adding to log(base type) before exiting
 		os.Exit(1)
 	}
@@ -114,15 +114,15 @@ func main() {
 	common.TransferPipe += "_" + hmcommon.Pid
 	common.PollingPipe += "_" + hmcommon.Pid
 
-	log.Debug("Lyvecloudfuse Pid: %v \n"+
+	log.Debug("Cloudfuse Pid: %v \n"+
 		"Transfer Pipe: %v \n"+
 		"Polling Pipe: %v \n"+
-		"Lyvecloudfuse Stats poll interval: %v \n"+
+		"Cloudfuse Stats poll interval: %v \n"+
 		"Health Stats poll interval: %v \n"+
 		"Cache Path: %v \n"+
 		"Max cache size in MB: %v \n",
 		"Output path: %v",
-		hmcommon.Pid, common.TransferPipe, common.PollingPipe, hmcommon.BfsPollInterval,
+		hmcommon.Pid, common.TransferPipe, common.PollingPipe, hmcommon.CfsPollInterval,
 		hmcommon.ProcMonInterval, hmcommon.TempCachePath, hmcommon.MaxCacheSize, hmcommon.OutputPath)
 
 	comps := getMonitors()
@@ -131,7 +131,7 @@ func main() {
 		go obj.Monitor() // nolint
 	}
 
-	// check if the pid of lyvecloudfuse is active
+	// check if the pid of cloudfuse is active
 	if len(comps) > 0 {
 		hmcommon.MonitorPid()
 	}
@@ -145,15 +145,15 @@ func main() {
 }
 
 func init() {
-	flag.StringVar(&hmcommon.Pid, "pid", "", "Pid of lyvecloudfuse process")
-	flag.IntVar(&hmcommon.BfsPollInterval, "stats-poll-interval-sec", 10, "Lyvecloudfuse stats polling interval in seconds")
+	flag.StringVar(&hmcommon.Pid, "pid", "", "Pid of cloudfuse process")
+	flag.IntVar(&hmcommon.CfsPollInterval, "stats-poll-interval-sec", 10, "Cloudfuse stats polling interval in seconds")
 	flag.IntVar(&hmcommon.ProcMonInterval, "process-monitor-interval-sec", 30, "CPU, memory and network usage polling interval in seconds")
 	flag.StringVar(&hmcommon.OutputPath, "output-path", "", "Path where output files will be created")
 
-	flag.BoolVar(&hmcommon.NoBfsMon, "no-lyvecloudfuse-stats", false, "Disable lyvecloudfuse stats polling")
-	flag.BoolVar(&hmcommon.NoCpuProf, "no-cpu-profiler", false, "Disable CPU monitoring on lyvecloudfuse process")
-	flag.BoolVar(&hmcommon.NoMemProf, "no-memory-profiler", false, "Disable memory monitoring on lyvecloudfuse process")
-	flag.BoolVar(&hmcommon.NoNetProf, "no-network-profiler", false, "Disable network monitoring on lyvecloudfuse process")
+	flag.BoolVar(&hmcommon.NoCfsMon, "no-cloudfuse-stats", false, "Disable cloudfuse stats polling")
+	flag.BoolVar(&hmcommon.NoCpuProf, "no-cpu-profiler", false, "Disable CPU monitoring on cloudfuse process")
+	flag.BoolVar(&hmcommon.NoMemProf, "no-memory-profiler", false, "Disable memory monitoring on cloudfuse process")
+	flag.BoolVar(&hmcommon.NoNetProf, "no-network-profiler", false, "Disable network monitoring on cloudfuse process")
 	flag.BoolVar(&hmcommon.NoFileCacheMon, "no-file-cache-monitor", false, "Disable file cache directory monitor")
 
 	flag.StringVar(&hmcommon.TempCachePath, "cache-path", "", "path to local disk cache")

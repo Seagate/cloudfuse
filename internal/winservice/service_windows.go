@@ -36,9 +36,9 @@ package winservice
 
 import (
 	"bytes"
+	"cloudfuse/common/log"
 	"encoding/binary"
 	"errors"
-	"lyvecloudfuse/common/log"
 	"time"
 
 	"golang.org/x/sys/windows"
@@ -47,7 +47,7 @@ import (
 )
 
 const (
-	SvcName    = "lyvecloudfuse"
+	SvcName    = "cloudfuse"
 	winfspPipe = `\\.\pipe\WinFsp.{14E7137D-22B4-437A-B0C1-D21D1BDF3767}`
 	startCmd   = 'S'
 	stopCmd    = 'T'
@@ -56,9 +56,9 @@ const (
 	failCmd    = '!'
 )
 
-type LyveCloudFuse struct{}
+type Cloudfuse struct{}
 
-func (m *LyveCloudFuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
+func (m *Cloudfuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
 	// Notify the Service Control Manager that the service is starting
 	changes <- svc.Status{State: svc.StartPending}
 	log.Trace("Starting %s service", SvcName)
@@ -133,7 +133,7 @@ func IsMounted(mountPath string) (bool, error) {
 		return false, err
 	}
 
-	// Everything in the list is a name of a service using WinFsp, like lyvecloudfuse and then
+	// Everything in the list is a name of a service using WinFsp, like cloudfuse and then
 	// the name of the mount which is the mount path
 	if len(list)%2 != 0 {
 		return false, errors.New("unable to get list from Winfsp because received odd number of elements")
@@ -148,7 +148,7 @@ func IsMounted(mountPath string) (bool, error) {
 	return false, nil
 }
 
-// startService starts lyvecloudfuse by instructing WinFsp to launch it.
+// startService starts cloudfuse by instructing WinFsp to launch it.
 func startServices() error {
 	// Read registry to get names of the instances we need to start
 	instances, err := readRegistryEntry()
@@ -169,7 +169,7 @@ func startServices() error {
 	return nil
 }
 
-// stopServicess stops lyvecloudfuse by instructing WinFsp to stop it.
+// stopServicess stops cloudfuse by instructing WinFsp to stop it.
 func stopServices() error {
 	// Read registry to get names of the instances we need to stop
 	instances, err := readRegistryEntry()

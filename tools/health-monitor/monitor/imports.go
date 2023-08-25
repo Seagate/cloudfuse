@@ -35,8 +35,8 @@
 package monitor
 
 import (
-	_ "lyvecloudfuse/tools/health-monitor/monitor/blobfuse_stats"
-	_ "lyvecloudfuse/tools/health-monitor/monitor/cpu_mem_profiler"
-	_ "lyvecloudfuse/tools/health-monitor/monitor/file_cache"
-	_ "lyvecloudfuse/tools/health-monitor/monitor/network_profiler"
+	_ "cloudfuse/tools/health-monitor/monitor/cloudfuse_stats"
+	_ "cloudfuse/tools/health-monitor/monitor/cpu_mem_profiler"
+	_ "cloudfuse/tools/health-monitor/monitor/file_cache"
+	_ "cloudfuse/tools/health-monitor/monitor/network_profiler"
 )

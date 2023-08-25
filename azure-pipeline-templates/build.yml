@@ -65,7 +65,7 @@ steps:
   - task: Go@0
     inputs:
       command: 'build'
-      arguments: "-tags ${{ parameters.tags }} -o lyvecloudfuse"
+      arguments: "-tags ${{ parameters.tags }} -o cloudfuse"
       workingDirectory: ${{ parameters.working_directory }}
     displayName: "Go Build"
 
@@ -73,14 +73,14 @@ steps:
   - task: Go@0
     inputs:
       command: 'build'
-      arguments: "-tags ${{ parameters.tags }} -o bfusemon ./tools/health-monitor/"
+      arguments: "-tags ${{ parameters.tags }} -o cfusemon ./tools/health-monitor/"
       workingDirectory: ${{ parameters.working_directory }}
-    displayName: "Go Build bfusemon"
+    displayName: "Go Build cfusemon"
     
   #Verification of built binary
   - script: |
-      sudo chmod +x ${working_directory}/lyvecloudfuse
-      ${working_directory}/lyvecloudfuse --version
+      sudo chmod +x ${working_directory}/cloudfuse
+      ${working_directory}/cloudfuse --version
     displayName: 'Test binary'
     env:
       working_directory: ${{ parameters.working_directory }}
@@ -137,6 +137,22 @@ steps:
       echo "}" >> $cnfFile
       cat $cnfFile
     displayName: "Create AzureTest Config"
+    continueOnError: false
+    workingDirectory: ${{ parameters.working_directory }}
+
+  - script: |
+        cnfFile=$HOME/s3test.json
+        echo $cnfFile
+        touch $cnfFile
+        echo "{" > $cnfFile
+        echo "\"bucket-name\"": "\"$(S3TEST_BUCKET_NAME)\"", >> $cnfFile
+        echo "\"access-key\"": "\"$(S3TEST_ACCESS_KEY)\"", >> $cnfFile
+        echo "\"secret-key\"": "\"$(S3TEST_SECRET_KEY)\"", >> $cnfFile
+        echo "\"endpoint\"": "\"$(S3TEST_ENDPOINT)\"", >> $cnfFile
+        echo "\"region\"": "\"$(S3TEST_REGION)\"" >> $cnfFile
+        echo "}" >> $cnfFile
+        cat $cnfFile
+    displayName: "Create S3Test Config"
     continueOnError: false
     workingDirectory: ${{ parameters.working_directory }}
 

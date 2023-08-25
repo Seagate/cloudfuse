@@ -38,7 +38,7 @@ parameters:
 steps:    
   - script: |
       cd $(WORK_DIR)
-      $(WORK_DIR)/blobfuse2 gen-test-config --config-file=${{ parameters.conf_template }} --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.config_file }}
+      $(WORK_DIR)/cloudfuse gen-test-config --config-file=${{ parameters.conf_template }} --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.config_file }}
     displayName: 'Create Config File : ${{ parameters.idstring }}'
     env:
       NIGHTLY_STO_ACC_NAME: ${{ parameters.account_name }}
@@ -67,7 +67,7 @@ steps:
       stream_direct_test: ${{ parameters.stream_direct_test }}
       mountStep:
         script: |
-          $(WORK_DIR)/blobfuse2 mount ${{ parameters.mount_dir }} --config-file=${{ parameters.config_file }} --default-working-dir=$(System.DefaultWorkingDirectory)
+          $(WORK_DIR)/cloudfuse mount ${{ parameters.mount_dir }} --config-file=${{ parameters.config_file }} --default-working-dir=$(System.DefaultWorkingDirectory)
         displayName: 'E2E TEST : ${{ parameters.idstring }}'
         timeoutInMinutes: 3
         continueOnError: false

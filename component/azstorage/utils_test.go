@@ -39,8 +39,8 @@ import (
 	"strconv"
 	"testing"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/stretchr/testify/assert"
@@ -238,6 +238,43 @@ func (s *utilsTestSuite) TestGetFileMode() {
 				assert.Contains(err.Error(), i.str)
 			}
 
+		})
+	}
+}
+
+func (s *utilsTestSuite) TestGetFileModeFromACL() {
+	assert := assert.New(s.T())
+
+	type blobACLs struct {
+		acl    string
+		owner  string
+		mode   os.FileMode
+		errstr string
+	}
+
+	objid := "tmp-obj-id"
+	var inputs = []blobACLs{
+		// acl, owner, mode, error string
+		{"", "", 0, "empty permissions from the service"},
+		{"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:r-x,group::r--,mask::r-x,other::rwx", "", 0547, ""},
+		{"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:rwx,group::r--,mask::r--,other::rwx", "", 0447, ""},
+		{"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:rwx,group::rw-,mask::r--,other::rwx", "tmp-obj-id", 0767, ""},
+		{"user::rwx,user:tmp-obj-1:r--,group::rw-,mask::r--,other::rwx", "tmp-obj-id", 0767, ""},
+		{"user::rwx,user:tmp-obj-1:r--,group::rw-,mask::r--,other::rwx", "0", 0067, ""},
+	}
+
+	_ = log.SetDefaultLogger("silent", common.LogConfig{})
+
+	for _, i := range inputs {
+		s.Run(i.acl, func() {
+			m, err := getFileModeFromACL(objid, i.acl, i.owner)
+			if i.errstr == "" {
+				assert.Nil(err)
+				assert.EqualValues(i.mode, m)
+			} else {
+				assert.NotNil(err)
+				assert.Contains(err.Error(), i.errstr)
+			}
 		})
 	}
 }

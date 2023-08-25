@@ -43,10 +43,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
 
 	"github.com/pbnjay/memory"
 )

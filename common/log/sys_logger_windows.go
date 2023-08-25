@@ -37,10 +37,10 @@
 package log
 
 import (
+	"cloudfuse/common"
 	"errors"
 	"fmt"
 	"log"
-	"lyvecloudfuse/common"
 
 	"golang.org/x/sys/windows/svc/eventlog"
 )
@@ -98,7 +98,7 @@ func (sl *SysLogger) init() error {
 
 func (sl *SysLogger) logEvent(lvl common.LogLevel, msg string) error {
 
-	wlog, err := eventlog.Open("LyveCloudFuse")
+	wlog, err := eventlog.Open("Cloudfuse")
 	if err != nil {
 		return err
 	}

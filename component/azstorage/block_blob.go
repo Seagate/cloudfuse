@@ -49,11 +49,11 @@ import (
 	"syscall"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/convertname"
-	"lyvecloudfuse/internal/stats_manager"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/convertname"
+	"cloudfuse/internal/stats_manager"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-storage-azcopy/v10/ste"
@@ -685,7 +685,7 @@ func (bb *BlockBlob) ReadToFile(name string, offset int64, count int64, fi *os.F
 	var downloadPtr *int64 = new(int64)
 	*downloadPtr = 1
 
-	if common.MonitorBfs() {
+	if common.MonitorCfs() {
 		bb.downloadOptions.Progress = func(bytesTransferred int64) {
 			trackDownload(name, bytesTransferred, count, downloadPtr)
 		}
@@ -892,7 +892,7 @@ func (bb *BlockBlob) WriteFromFile(name string, metadata map[string]string, fi *
 			ContentMD5:  md5sum,
 		},
 	}
-	if common.MonitorBfs() && stat.Size() > 0 {
+	if common.MonitorCfs() && stat.Size() > 0 {
 		uploadOptions.Progress = func(bytesTransferred int64) {
 			trackUpload(name, bytesTransferred, stat.Size(), uploadPtr)
 		}

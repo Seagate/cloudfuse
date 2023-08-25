@@ -38,9 +38,9 @@ import (
 	"fmt"
 	"os"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal/stats_manager"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal/stats_manager"
 )
 
 const DefaultEvictTime = 10
@@ -81,7 +81,7 @@ func getUsagePercentage(path string, maxSize float64) float64 {
 		return 0
 	}
 
-	currSize := getUsage(path)
+	currSize, _ := getUsage(path)
 	usagePercent := (currSize / float64(maxSize)) * 100
 	log.Debug("cachePolicy::getUsagePercentage : current cache usage : %f%%", usagePercent)
 

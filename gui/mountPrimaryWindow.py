@@ -6,12 +6,12 @@ import yaml
 
 # Import QT libraries
 from PySide6.QtCore import Qt
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtGui
 from PySide6.QtWidgets import QMainWindow
 
 # Import the custom class created with QtDesigner 
 from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
-from lyve_config_common import lyveSettingsWidget
+from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
 
 bucketOptions = ['s3storage', 'azstorage']
@@ -20,15 +20,30 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-
-        self.setWindowTitle("LyveCloud FUSE")
-
-
+        self.setWindowTitle("Cloud FUSE")
+        
+        if platform == 'win32':
+            # Windows directory and filename conventions:
+            #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
+            # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
+            self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
+        else:
+            # Allow anything BUT Nul
+            # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
+            self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
+       
         # Set up the signals for all the interactable intities
         self.button_browse.clicked.connect(self.getFileDirInput)
         self.button_config.clicked.connect(self.showSettingsWidget)
         self.button_mount.clicked.connect(self.mountBucket)
         self.button_unmount.clicked.connect(self.unmountBucket)
+        
+        if platform == "win32":
+            self.lineEdit_mountPoint.setToolTip("Designate a new location to mount the bucket, do not create the directory")
+            self.button_browse.setToolTip("Browse to a new location but don't create a new directory")
+        else:
+            self.lineEdit_mountPoint.setToolTip("Designate a location to mount the bucket - the directory must already exist")
+            self.button_browse.setToolTip("Browse to a pre-existing directory")
 
     # Define the slots that will be triggered when the signals in Qt are activated
 
@@ -38,7 +53,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
         targetIndex = self.dropDown_bucketSelect.currentIndex()
         if bucketOptions[targetIndex] == 's3storage':
-            self.settings = lyveSettingsWidget()
+            self.settings = s3SettingsWidget()
         else:
             self.settings = azureSettingsWidget()
         self.settings.setWindowModality(Qt.ApplicationModal)
@@ -53,12 +68,12 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         msg = QtWidgets.QMessageBox()
 
         # use the completedProcess object in mount var to determine next steps 
-        # if service already installed, run lyvecloudfuse.exe service start
-        # if start successful, run lyvecloudfuse.exe service mount
+        # if service already installed, run cloudfuse.exe service start
+        # if start successful, run cloudfuse.exe service mount
         
-        mount = subprocess.run([".\lyvecloudfuse.exe", "service", "install"], capture_output=True, check=False)    
-        if mount.returncode == 0 or mount.stderr.decode().find("lyvecloudfuse service already exists") != -1: #we found this message
-            mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "start"], capture_output=True))
+        mount = subprocess.run([".\cloudfuse.exe", "service", "install"], capture_output=True, check=False)    
+        if mount.returncode == 0 or mount.stderr.decode().find("cloudfuse service already exists") != -1: #we found this message
+            mount = (subprocess.run([".\cloudfuse.exe", "service", "start"], capture_output=True))
             if mount.stderr.decode().find("An instance of the service is already running.") != -1:
                 return True
             elif mount.returncode == 1: 
@@ -93,13 +108,13 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             
             if platform == "win32":
                 # Windows mount has a quirk where the folder shouldn't exist yet,
-                # add lyveCloudFuse at the end of the directory 
-                directory = directory+'/lyveCloudFuse'
+                # add CloudFuse at the end of the directory 
+                directory = directory+'/cloudFuse'
                 
                 isRunning = self.windowsServiceInstall()  #install and start the service
             
                 if isRunning:
-                    mount = (subprocess.run([".\lyvecloudfuse.exe", "service", "mount", directory, "--config-file=.\config.yaml"], capture_output=True))
+                    mount = (subprocess.run([".\cloudfuse.exe", "service", "mount", directory, "--config-file=.\config.yaml"], capture_output=True))
                     if mount.returncode == 0:
                         self.textEdit_output.setText("Successfully mounted container\n")
                     elif mount.stderr.decode().find("mount path exists") != -1:
@@ -120,7 +135,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 # TODO: For future use to get output on Popen
                 # for line in mount.stdout.readlines():    
             else:
-                mount = subprocess.run(["./lyvecloudfuse", "mount", directory, "--config-file=./config.yaml"], capture_output=True)
+                mount = subprocess.run(["./cloudfuse", "mount", directory, "--config-file=./config.yaml"], capture_output=True)
                 # Print to the text edit window the results of the mount
                 if mount.returncode == 0:
                     self.textEdit_output.setText("Successfully mounted container\n")
@@ -138,8 +153,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         msg = QtWidgets.QMessageBox()
         directory = str(self.lineEdit_mountPoint.text())
         try:#TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
-            directory = directory+'/lyveCloudFuse'
-            unmount = (subprocess.run([".\lyvecloudfuse.exe", "service", "unmount", directory], capture_output=True))      
+            directory = directory+'/cloudFuse'
+            unmount = (subprocess.run([".\cloudfuse", "service", "unmount", directory], capture_output=True))      
             # Print to the text edit window the results of the unmount
             if unmount.returncode == 0:
                 self.textEdit_output.setText("Successfully unmounted container\n" + unmount.stdout.decode())

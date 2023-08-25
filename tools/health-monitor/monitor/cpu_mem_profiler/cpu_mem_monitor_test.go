@@ -39,9 +39,9 @@ import (
 	"os"
 	"testing"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	hmcommon "lyvecloudfuse/tools/health-monitor/common"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	hmcommon "cloudfuse/tools/health-monitor/common"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"

@@ -40,7 +40,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"lyvecloudfuse/common"
+	"cloudfuse/common"
 
 	"github.com/spf13/cobra"
 )
@@ -54,7 +54,7 @@ type secureOptions struct {
 	Value      string
 }
 
-const SecureConfigEnvName string = "LYVECLOUDFUSE_SECURE_CONFIG_PASSPHRASE"
+const SecureConfigEnvName string = "CLOUDFUSE_SECURE_CONFIG_PASSPHRASE"
 const SecureConfigExtension string = ".azsec"
 
 var secOpts secureOptions
@@ -65,7 +65,7 @@ var secureCmd = &cobra.Command{
 	Short:             "Encrypt / Decrypt your config file",
 	Long:              "Encrypt / Decrypt your config file",
 	SuggestFor:        []string{"sec", "secre"},
-	Example:           "lyvecloudfuse secure encrypt --config-file=config.yaml --passphrase=PASSPHRASE",
+	Example:           "cloudfuse secure encrypt --config-file=config.yaml --passphrase=PASSPHRASE",
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -82,7 +82,7 @@ var encryptCmd = &cobra.Command{
 	Short:             "Encrypt your config file",
 	Long:              "Encrypt your config file",
 	SuggestFor:        []string{"en", "enc"},
-	Example:           "lyvecloudfuse secure encrypt --config-file=config.yaml --passphrase=PASSPHRASE",
+	Example:           "cloudfuse secure encrypt --config-file=config.yaml --passphrase=PASSPHRASE",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := validateOptions()
@@ -104,7 +104,7 @@ var decryptCmd = &cobra.Command{
 	Short:             "Decrypt your config file",
 	Long:              "Decrypt your config file",
 	SuggestFor:        []string{"de", "dec"},
-	Example:           "lyvecloudfuse secure decrypt --config-file=config.yaml --passphrase=PASSPHRASE",
+	Example:           "cloudfuse secure decrypt --config-file=config.yaml --passphrase=PASSPHRASE",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := validateOptions()
@@ -137,7 +137,7 @@ func validateOptions() error {
 	}
 
 	if secOpts.PassPhrase == "" {
-		return errors.New("provide the passphrase as a cli parameter or configure the LYVECLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+		return errors.New("provide the passphrase as a cli parameter or configure the CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
 	}
 
 	return nil
@@ -236,7 +236,7 @@ func init() {
 		"Configuration file to be encrypted / decrypted")
 
 	secureCmd.PersistentFlags().StringVar(&secOpts.PassPhrase, "passphrase", "",
-		"Key to be used for encryption / decryption. Can also be specified by env-variable LYVECLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\nKey length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+		"Key to be used for encryption / decryption. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\nKey length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 
 	secureCmd.PersistentFlags().StringVar(&secOpts.OutputFile, "output-file", "",
 		"Path and name for the output file")

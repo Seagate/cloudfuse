@@ -35,11 +35,11 @@
 package cmd
 
 import (
-	_ "lyvecloudfuse/component/attr_cache"
-	_ "lyvecloudfuse/component/azstorage"
-	_ "lyvecloudfuse/component/file_cache"
-	_ "lyvecloudfuse/component/libfuse"
-	_ "lyvecloudfuse/component/loopback"
-	_ "lyvecloudfuse/component/s3storage"
-	_ "lyvecloudfuse/component/stream"
+	_ "cloudfuse/component/attr_cache"
+	_ "cloudfuse/component/azstorage"
+	_ "cloudfuse/component/file_cache"
+	_ "cloudfuse/component/libfuse"
+	_ "cloudfuse/component/loopback"
+	_ "cloudfuse/component/s3storage"
+	_ "cloudfuse/component/stream"
 )

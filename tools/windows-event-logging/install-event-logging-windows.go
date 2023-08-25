@@ -45,7 +45,7 @@ import (
 func setupEvents() error {
 
 	//TODO: set up / separate the InstallAsEventCreate() to only run from the installer.
-	err := eventlog.InstallAsEventCreate("LyveCloudFuse", eventlog.Info|eventlog.Warning|eventlog.Error)
+	err := eventlog.InstallAsEventCreate("Cloudfuse", eventlog.Info|eventlog.Warning|eventlog.Error)
 
 	return err
 }

@@ -1,4 +1,19 @@
-## 2.0.4 (WIP)
+## 2.0.5 (WIP)
+**Features**
+- In case of MSI based authentication, user shall provide object-id of the identity and honour-acl flag for file-system to work with ACLs assigned to the given identity instead of permissions.
+- Added support to read OAuth token from a user given file.
+
+**Bug Fixes**
+- Fixed priority level check of components to reject invalid pipeline entries.
+- [#1196](https://github.com/Azure/azure-storage-fuse/issues/1196) 100% CPU usage in 2.0.4 fixed.
+- [#1207](https://github.com/Azure/azure-storage-fuse/issues/1207) Fix log-rotate script.
+- Unmount command was looking for `fusermount` while on fuse3 systems it should be looking for `fusermount3`.
+- If `du` command is not found skip checking for disk usage in LRU cache-eviction policy.
+- V1 flag of `file-cache-timeout-in-seconds` not interpreted correctly by V2 and causing eviction policy to assume its 0. 
+- If `du` is not found on standard path try paths where it can potentially be found.
+- Fix uid/gid marshalling for `mountv1` command, which was resulting in panic.
+
+## 2.0.4 (2023-07-03)
 **Features**
 - Added new config parameter "max-fuse-threads" under "libfuse" config to control max threads allowed at libfuse layer.
 - Added new config parameter 'refresh-sec' in 'file-cache'. When file-cache-timeout is set to a large value, this field can control when to refresh the file if file in container has changed.

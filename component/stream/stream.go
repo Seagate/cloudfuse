@@ -39,10 +39,10 @@ import (
 	"errors"
 	"fmt"
 
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
 
 	"github.com/pbnjay/memory"
 )
@@ -210,7 +210,7 @@ func init() {
 	config.BindPFlag(compName+".max-blocks-per-file", maxBlocksMb)
 	maxBlocksMb.Hidden = true
 
-	streamCacheSize := config.AddUint64Flag("stream-cache-mb", 0, "Limit total amount of data being cached in memory to conserve memory footprint of blobfuse.")
+	streamCacheSize := config.AddUint64Flag("stream-cache-mb", 0, "Limit total amount of data being cached in memory to conserve memory footprint of cloudfuse.")
 	config.BindPFlag(compName+".stream-cache-mb", streamCacheSize)
 	streamCacheSize.Hidden = true
 }

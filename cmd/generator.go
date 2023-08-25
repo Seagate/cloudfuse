@@ -45,8 +45,8 @@ import (
 var generateCmd = &cobra.Command{
 	Use:               "generate [component name]",
 	Hidden:            true,
-	Short:             "Generate a new component for Lyvecloudfuse",
-	Long:              "Generate a new component for Lyvecloudfuse",
+	Short:             "Generate a new component for Cloudfuse",
+	Long:              "Generate a new component for Cloudfuse",
 	SuggestFor:        []string{"gen", "gener"},
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,

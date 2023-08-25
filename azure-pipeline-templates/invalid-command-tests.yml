@@ -6,7 +6,7 @@ parameters:
 
 steps:
   - script: |
-      ${working_dir}/blobfuse2 --invalid-param &
+      ${working_dir}/cloudfuse --invalid-param &
       if [ $? = 2 ]; then
         exit 0
       fi
@@ -17,7 +17,7 @@ steps:
       mount_dir: ${{ parameters.mount_dir }}
 
   - script: |
-      ${working_dir}/blobfuse2 mount ${mount_dir} --invalid-param &
+      ${working_dir}/cloudfuse mount ${mount_dir} --invalid-param &
       if [ $? = 2 ]; then
         exit 0
       fi
@@ -28,7 +28,7 @@ steps:
       mount_dir: ${{ parameters.mount_dir }}
 
   - script: |
-      ${working_dir}/blobfuse2 unmount ${mount_dir} --invalid-param &
+      ${working_dir}/cloudfuse unmount ${mount_dir} --invalid-param &
       if [ $? = 2 ]; then
         exit 0
       fi
@@ -37,20 +37,9 @@ steps:
     env:
       working_dir: ${{ parameters.working_dir }}
       mount_dir: ${{ parameters.mount_dir }}
-      
-  - script: |
-      ${working_dir}/blobfuse2 mountv1 ${mount_dir} --invalid-param &
-      if [ $? = 2 ]; then
-        exit 0
-      fi
-    displayName: 'Invalid Flag Mountv1 Command'
-    continueOnError: false
-    env:
-      working_dir: ${{ parameters.working_dir }}
-      mount_dir: ${{ parameters.mount_dir }}
 
   - script: |
-      ${working_dir}/blobfuse2 secure ${mount_dir} --invalid-param &
+      ${working_dir}/cloudfuse secure ${mount_dir} --invalid-param &
       if [ $? = 2 ]; then
         exit 0
       fi
@@ -61,7 +50,7 @@ steps:
       mount_dir: ${{ parameters.mount_dir }}
 
   - script: |
-      ${working_dir}/blobfuse2 version ${mount_dir} --invalid-param &
+      ${working_dir}/cloudfuse version ${mount_dir} --invalid-param &
       if [ $? = 2 ]; then
         exit 0
       fi

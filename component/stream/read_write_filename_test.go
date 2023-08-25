@@ -39,9 +39,9 @@ import (
 	"syscall"
 	"testing"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
+	"cloudfuse/common"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
 
 	"github.com/stretchr/testify/suite"
 )

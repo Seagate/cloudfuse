@@ -52,11 +52,11 @@ steps:
       mount_dir: ${{ parameters.mount_dir }}
 
   - script: |
-      cat blobfuse2-logs.txt
+      cat cloudfuse-logs.txt
     displayName: 'View Logs'
 
   - script: |
-      > blobfuse2-logs.txt
+      > cloudfuse-logs.txt
     displayName: 'Clear Logs'
 
   # Cleanup 

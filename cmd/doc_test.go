@@ -40,8 +40,8 @@ import (
 	"runtime"
 	"testing"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"

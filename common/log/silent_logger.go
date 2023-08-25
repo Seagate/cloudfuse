@@ -37,7 +37,7 @@ package log
 import (
 	"log"
 
-	"lyvecloudfuse/common"
+	"cloudfuse/common"
 )
 
 type SilentLogger struct {

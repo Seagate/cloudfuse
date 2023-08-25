@@ -36,42 +36,117 @@ package s3storage
 
 import (
 	"errors"
+	"fmt"
 
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+)
+
+var (
+	errConfigFieldEmpty = errors.New("config field empty")
 )
 
 type Options struct {
-	BucketName         string `config:"bucket-name" yaml:"bucket-name,omitempty"`
-	KeyID              string `config:"key-id" yaml:"key-id,omitempty"`
-	SecretKey          string `config:"secret-key" yaml:"secret-key,omitempty"`
-	Region             string `config:"region" yaml:"region,omitempty"`
-	Endpoint           string `config:"endpoint" yaml:"endpoint,omitempty"`
-	PrefixPath         string `config:"subdirectory" yaml:"subdirectory,omitempty"`
-	RestrictedCharsWin bool   `config:"restricted-characters-windows" yaml:"-"`
+	BucketName                string `config:"bucket-name" yaml:"bucket-name,omitempty"`
+	KeyID                     string `config:"key-id" yaml:"key-id,omitempty"`
+	SecretKey                 string `config:"secret-key" yaml:"secret-key,omitempty"`
+	Region                    string `config:"region" yaml:"region,omitempty"`
+	Endpoint                  string `config:"endpoint" yaml:"endpoint,omitempty"`
+	PrefixPath                string `config:"subdirectory" yaml:"subdirectory,omitempty"`
+	RestrictedCharsWin        bool   `config:"restricted-characters-windows" yaml:"-"`
+	PartSizeMb                int64  `config:"part-size-mb" yaml:"part-size-mb,omitempty"`
+	UploadCutoffMb            int64  `config:"upload-cutoff-mb" yaml:"upload-cutoff-mb,omitempty"`
+	Concurrency               int    `config:"concurrency" yaml:"concurrency,omitempty"`
+	DisableConcurrentDownload bool   `config:"disable-concurrent-download" yaml:"disable-concurrent-download,omitempty"`
 }
 
 // ParseAndValidateConfig : Parse and validate config
 func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	log.Trace("ParseAndValidateConfig : Parsing config")
 
-	// Validate account name is present or not
+	// Validate bucket name
 	if opt.BucketName == "" {
-		return errors.New("bucket name not provided")
+		return fmt.Errorf("%w: bucket name not provided", errConfigFieldEmpty)
 	}
+
+	// Validate key id
+	if opt.KeyID == "" {
+		return fmt.Errorf("%w: key id not provided", errConfigFieldEmpty)
+	}
+
+	// Validate secret key
+	if opt.SecretKey == "" {
+		return fmt.Errorf("%w: bucket name not provided", errConfigFieldEmpty)
+	}
+
+	// Set authentication config
 	s3.stConfig.authConfig.BucketName = opt.BucketName
 	s3.stConfig.authConfig.KeyID = opt.KeyID
 	s3.stConfig.authConfig.SecretKey = opt.SecretKey
 	s3.stConfig.authConfig.Region = opt.Region
 	s3.stConfig.authConfig.Endpoint = opt.Endpoint
 
+	// Set restricted characters
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
+	s3.stConfig.disableConcurrentDownload = opt.DisableConcurrentDownload
+
+	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
+	if opt.PartSizeMb < 5 || opt.PartSizeMb > MaxPartSizeMb {
+		log.Warn("ParseAndValidateConfig : Part size must be between 5MB and 5GB. Default to default size")
+		s3.stConfig.partSize = DefaultPartSize
+	} else {
+		s3.stConfig.partSize = opt.PartSizeMb * common.MbToBytes
+	}
+
+	// Cutoff size must not be less than 5 MB. Otherwise, set to default.
+	if opt.UploadCutoffMb < 5 {
+		s3.stConfig.uploadCutoff = DefaultUploadCutoff
+	} else {
+		s3.stConfig.uploadCutoff = opt.UploadCutoffMb * common.MbToBytes
+	}
+
+	if opt.Concurrency > 0 {
+		s3.stConfig.concurrency = opt.Concurrency
+	} else {
+		s3.stConfig.concurrency = DefaultConcurrency
+	}
+
+	// Part size must be at least 5 MB. Otherwise, set to default of 8 MB.
+	if opt.PartSizeMb < 5 {
+		s3.stConfig.partSize = DefaultPartSize
+	} else {
+		s3.stConfig.partSize = opt.PartSizeMb * common.MbToBytes
+	}
 
 	// If subdirectory is mounted, take the prefix path
 	s3.stConfig.prefixPath = removeLeadingSlashes(opt.PrefixPath)
+
 	// TODO: add more config options to customize AWS SDK behavior and import them here
 
 	return nil
 }
 
-// TODO: allow dynamic config changes to affect SDK behavior?
+// ParseAndReadDynamicConfig : On config change read only the required config
+func ParseAndReadDynamicConfig(s3 *S3Storage, opt Options, reload bool) error {
+	log.Trace("ParseAndReadDynamicConfig : Reparsing config")
+
+	// Part size must be at least 5 MB. Otherwise, set to default of 8 MB.
+	if opt.PartSizeMb < 5 {
+		s3.stConfig.partSize = DefaultPartSize
+	} else {
+		s3.stConfig.partSize = opt.PartSizeMb * common.MbToBytes
+	}
+
+	// Cutoff size must not be less than 5 MB. Otherwise, set to default of 200 MB.
+	if opt.UploadCutoffMb < 5 {
+		s3.stConfig.uploadCutoff = DefaultUploadCutoff
+	} else {
+		s3.stConfig.uploadCutoff = opt.UploadCutoffMb * common.MbToBytes
+	}
+	s3.stConfig.concurrency = opt.Concurrency
+
+	return nil
+}
+
 // TODO: write config_test.go with unit tests
+// TODO: allow dynamic config changes to affect SDK behavior?

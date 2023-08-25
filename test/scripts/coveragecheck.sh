@@ -1,7 +1,7 @@
 #!/bin/bash
 
 overall_check() {
-    cvg=`tail -1 ./lyvecloudfuse_func_cover.rpt | cut -d ")" -f2 | sed -e 's/^[[:space:]]*//' | cut -d "%" -f1`
+    cvg=`tail -1 ./cloudfuse_func_cover.rpt | cut -d ")" -f2 | sed -e 's/^[[:space:]]*//' | cut -d "%" -f1`
     cvgVal=`expr $cvg`
     echo $cvgVal
     if [ 1 -eq "$(echo "${cvgVal} < 80" | bc)" ]
@@ -17,7 +17,7 @@ overall_check() {
 file_check() {
     flag=0
 
-    for i in `grep "value=\"file" ./lyvecloudfuse_coverage.html | cut -d ">" -f2 | cut -d "<" -f1 | sed -e "s/ //g"`
+    for i in `grep "value=\"file" ./cloudfuse_coverage.html | cut -d ">" -f2 | cut -d "<" -f1 | sed -e "s/ //g"`
     do 
         fileName=`echo $i | cut -d "(" -f1`
         percent=`echo $i | cut -d "(" -f2 | cut -d "%" -f1`

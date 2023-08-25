@@ -40,13 +40,28 @@ steps:
       mountStep: ${{ parameters.mountStep }}
 
   # Run End to End test
-  # Check blobfuse2 is mounted or not    
+  # Check cloudfuse is mounted or not    
   - script: |
       df
       echo "-------------------------------------------------------------------"
-      df | grep blobfuse2
+      df | grep cloudfuse
       exit $?
     displayName: 'Verify Mount'
+
+  - script: |
+      out=`pidstat -p \`pidof blobfuse2\` -u 2 5  | tail -n 1`
+      outData=($out)
+      cpu=${outData[7]}
+      echo "CPU is :" $cpu
+      
+      if [[ $cpu > 5 ]]
+      then
+        echo "CPU usage is high"
+        exit 1
+      else
+        echo "CPU usage is low"
+      fi
+    displayName: 'CPU Usage test'
 
   - task: Go@0
     inputs:
@@ -63,16 +78,16 @@ steps:
   # Publish build artifacts to Azure Pipelines or a Windows file share
   - task: PublishBuildArtifacts@1
     inputs:
-      pathToPublish: blobfuse2-logs.txt
+      pathToPublish: cloudfuse-logs.txt
       artifactName: ${{ parameters.artifact_name }}
     condition: ${{ parameters.verbose_log }}
     
   - script: |
-      tail -n 200 blobfuse2-logs.txt
+      tail -n 200 cloudfuse-logs.txt
     displayName: 'View Logs'
     condition: failed()
 
   - script: |
-      > blobfuse2-logs.txt
+      > cloudfuse-logs.txt
     displayName: 'Clear Logs'
     condition: always()

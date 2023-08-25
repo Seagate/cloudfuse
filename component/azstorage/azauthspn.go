@@ -35,9 +35,11 @@
 package azstorage
 
 import (
+	"fmt"
+	"os"
 	"time"
 
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common/log"
 
 	"github.com/Azure/azure-storage-azcopy/v10/azbfs"
 	"github.com/Azure/azure-storage-blob-go/azblob"
@@ -69,16 +71,36 @@ func (azspn *azAuthSPN) fetchToken() (*adal.ServicePrincipalToken, error) {
 		return nil, err
 	}
 
-	//  Generate the SPN token
+	//  Create the resource URL
 	resourceURL := azspn.config.AuthResource
 	if resourceURL == "" {
 		resourceURL = azspn.getEndpoint()
 	}
 
-	spt, err := adal.NewServicePrincipalToken(*config, azspn.config.ClientID, azspn.config.ClientSecret, resourceURL)
-	if err != nil {
-		log.Err("AzAuthSPN::fetchToken : Failed to generate token for SPN [%s]", err.Error())
-		return nil, err
+	//  Generate the SPN token
+	var spt *adal.ServicePrincipalToken
+	if azspn.config.OAuthTokenFilePath != "" {
+		log.Trace("AzAuthSPN::fetchToken : Going for fedrated token flow.")
+
+		tokenReader := func() (string, error) {
+			token, err := os.ReadFile(azspn.config.OAuthTokenFilePath)
+			if err != nil {
+				return "", fmt.Errorf("failed to read OAuth token file %s [%v]", azspn.config.OAuthTokenFilePath, err.Error())
+			}
+			return string(token), nil
+		}
+
+		spt, err = adal.NewServicePrincipalTokenFromFederatedTokenCallback(*config, azspn.config.ClientID, tokenReader, resourceURL)
+		if err != nil {
+			log.Err("AzAuthSPN::fetchToken : Failed to generate token for SPN [%s]", err.Error())
+			return nil, err
+		}
+	} else {
+		spt, err = adal.NewServicePrincipalToken(*config, azspn.config.ClientID, azspn.config.ClientSecret, resourceURL)
+		if err != nil {
+			log.Err("AzAuthSPN::fetchToken : Failed to generate token for SPN [%s]", err.Error())
+			return nil, err
+		}
 	}
 
 	return spt, nil

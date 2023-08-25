@@ -1,23 +1,23 @@
 
-# Build lyvecloudfuse binary
+# Build cloudfuse binary
 cd ..
 if [ "$1" == "fuse2" ]
 then
-	echo "Building lyvecloudfuse with libfuse"
+	echo "Building cloudfuse with libfuse"
 	./build.sh fuse2
 else
-	echo "Building lyvecloudfuse with libfuse3"
+	echo "Building cloudfuse with libfuse3"
 	./build.sh
 fi
 
 # As docker build can not go out of scope of this directory copy the binary here
 cd -
-cp ../lyvecloudfuse ./
-cp ../setup/11-lyvecloudfuse.conf ./
-cp ../setup/lyvecloudfuse-logrotate ./
+cp ../cloudfuse ./
+cp ../setup/11-cloudfuse.conf ./
+cp ../setup/cloudfuse-logrotate ./
 
-ver=`./lyvecloudfuse --version | cut -d " " -f 3`
-tag="azure-lyvecloudfuse.$ver"
+ver=`./cloudfuse --version | cut -d " " -f 3`
+tag="azure-cloudfuse.$ver"
 
 # Cleanup older container image from docker
 docker image rm $tag -f
@@ -33,8 +33,8 @@ else
 fi
  
 # Image build is executed so we can clean up temp executable from here
-rm -rf ./lyvecloudfuse
-rm -rf 11-lyvecloudfuse.conf lyvecloudfuse-logrotate
+rm -rf ./cloudfuse
+rm -rf 11-cloudfuse.conf cloudfuse-logrotate
 
 # If build was successful then launch a container instance
 status=`docker images | grep $tag`
