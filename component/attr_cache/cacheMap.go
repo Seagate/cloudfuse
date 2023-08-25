@@ -101,13 +101,36 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 
 	if len(paths) < 2 {
 		// this is a leaf
-		value.children[paths[0]] = newAttrCacheItem(attr, exists, cachedAt)
+		_, isElem := value.children[paths[0]]
+		if !isElem {
+			value.children[paths[0]] = newAttrCacheItem(attr, exists, cachedAt) // we end up with string key being a single folder name instead of a full path. This also will take care of using the folder attribute data.
+		}
+
 	} else {
-		//paths[0]
-		//TODO: we don't know if the child exists, so it may need to be created..
-		// lets find out wher we are in the path with paths[0] and recursivly insert folders.
-		// "find path[0] in the children and insert into that."
+
+		//TODO: we don't know if the child exists, so it may need to be created.
+		_, exists := value.children[paths[0]] // here the full path as the key is used as the key of the map[string]*attrCacheItem
+		if !exists {
+
+			// for a folder. I need to get the attr for this folder path and create it.
+			// lets think about how we can use the newAttrCacheItem() and consider the inputs to be defaults that are distinctive from real data.
+			// lets consider running the map["value"] a second time once the respective attr data has been found
+
+			uniqTime := time.Date(1909, 10, 13, 11, 45, 15, 1, time.Now().Location()) // Art tatum birthday
+			tmpAttrCacheItm := &attrCacheItem{attr: internal.CreateObjAttrDir(paths[0]), cachedAt: uniqTime}
+
+			value.children[paths[0]] = newAttrCacheItem(tmpAttrCacheItm.attr, exists, cachedAt) // you may be recreating the flat map here. Make sure we are going into the next child map.. I am. the value.children["value"].insertHelper() runs make(map[string]**attracheItem)
+			//                    ^^^^^^^^ this is how we know we are going into the nested map. insertHelper() creates another map in this next level of *attrCacheItem.
+
+			// currently the values of the keys are base folders for any given path string provided. (first / highest folder in the hirarchy)
+			// lets try it this way first (single folder / file names at each level).
+
+		} else {
+			// once we have the read folder data,
+			value.children[paths[0]] = newAttrCacheItem(attr, exists, cachedAt)
+		}
 		value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1])
+
 	}
 }
 
