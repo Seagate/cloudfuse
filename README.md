@@ -34,11 +34,6 @@ Cloudfuse currently only supports libfuse2. On Linux, you need to install the li
 On Windows, you also need to install the third party utility [WinFsp](https://winfsp.dev/). To download WinFsp, please see
 run the WinFsp installer found [here](https://winfsp.dev/rel/).
 
-
-<!-- ## Find Help
-For complete guidance, visit any of these articles
-* Blobfuse2 Wiki -->
-
 ## Supported Operations
 The general format of the Cloudfuse commands is `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
 * `help` - Help about any command
