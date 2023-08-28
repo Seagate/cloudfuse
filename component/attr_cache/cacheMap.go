@@ -125,6 +125,13 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 
 }
 
+// input: full path to item or file as string
+// output: the attrCacheItem value for the key found in path
+// description: a lookup of any attrCacheItem based on any given full path.
+func (value *attrCacheItem) get(path string) {
+
+}
+
 func (value *attrCacheItem) valid() bool {
 	return value.attrFlag.IsSet(AttrFlagValid)
 }
