@@ -130,6 +130,8 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 // description: a lookup of any attrCacheItem based on any given full path.
 func (value *attrCacheItem) get(path string) {
 
+	// go down the tree using the full path for reference
+	// once we find the last item in the path provided, provide the attrCacheItem value for that key.
 }
 
 func (value *attrCacheItem) valid() bool {
