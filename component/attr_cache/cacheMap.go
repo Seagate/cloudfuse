@@ -90,7 +90,6 @@ func (value *attrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt
 
 }
 
-// get paths
 func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string) {
 
 	paths := strings.SplitN(path, "/", 2) // paths[0] is home paths[1] is user/folder/file
@@ -100,25 +99,19 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 	}
 
 	if len(paths) < 2 {
+
 		// this is a leaf
-		_, isElem := value.children[paths[0]]
-		if !isElem {
-			value.children[paths[0]] = newAttrCacheItem(attr, exists, cachedAt) // we end up with string key being a single folder name instead of a full path. This also will take care of using the folder attribute data.
-		}
+		// we end up with string key being a single folder name instead of a full path. This also will take care of using the folder attribute data.
+		value.children[paths[0]] = newAttrCacheItem(attr, exists, cachedAt)
 
 	} else {
 
-		//TODO: we don't know if the child exists, so it may need to be created.
-		_, exists := value.children[paths[0]] // here the root of the path string is used as the key of the map[string]*attrCacheItem
-		if !exists {
-
-			// setting up distictive stubbed attr folder data
-			uniqTime := time.Date(1909, 10, 13, 11, 45, 15, 1, time.Now().Location()) // Art tatum birthday
-			tmpAttrCacheItm := &attrCacheItem{attr: internal.CreateObjAttrDir(paths[0]), cachedAt: uniqTime}
+		// here the root of the path string is used as the key of the map[string]*attrCacheItem
+		_, ok := value.children[paths[0]]
+		if !ok {
 
 			//insert stubbed folder attr data into tree
-			value.children[paths[0]] = newAttrCacheItem(tmpAttrCacheItm.attr, exists, cachedAt)
-
+			value.children[paths[0]] = newAttrCacheItem(internal.CreateObjAttrDir(paths[0]), exists, cachedAt)
 		}
 		value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1])
 	}
@@ -128,10 +121,21 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 // input: full path to item or file as string
 // output: the attrCacheItem value for the key found in path
 // description: a lookup of any attrCacheItem based on any given full path.
-func (value *attrCacheItem) get(path string) {
+func (value *attrCacheItem) get(path string) *attrCacheItem {
+
+	//how do I reference an already existing map[string]*attrCacheItem?
+
+	var cachedItem *attrCacheItem
+	paths := strings.Split(path, "/")
+
+	for i, value := range paths {
+
+		cachedItem, ok = value.children[value]
+	}
 
 	// go down the tree using the full path for reference
 	// once we find the last item in the path provided, provide the attrCacheItem value for that key.
+
 }
 
 func (value *attrCacheItem) valid() bool {
