@@ -126,8 +126,6 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 // TODO: write tests
 func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
 
-	//how do I reference an already existing map[string]*attrCacheItem?
-
 	var cachedItem *attrCacheItem
 	paths := strings.Split(path, "/")
 
@@ -143,16 +141,11 @@ func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
 		} else {
 			value = value.children[pathElement]
 		}
-
-		//we need to go into the sub maps withint he child map element.
-		//side note: cacheLocks. channel, sync, semiphore.
-
-		return cachedItem, nil
+		//TODO: side note: cacheLocks. channel, sync, semiphore.
 
 	}
 
-	// go down the tree using the full path for reference
-	// once we find the last item in the path provided, provide the attrCacheItem value for that key.
+	return cachedItem, nil
 
 }
 
@@ -175,11 +168,13 @@ func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
 	value.attrFlag.Set(AttrFlagValid)
 	value.cachedAt = deletedTime
 	value.attr = &internal.ObjAttr{}
+	value.children = make(map[string]*attrCacheItem)
 }
 
 func (value *attrCacheItem) invalidate() {
 	value.attrFlag.Clear(AttrFlagValid)
 	value.attr = &internal.ObjAttr{}
+	value.children = make(map[string]*attrCacheItem)
 }
 
 func (value *attrCacheItem) markInCloud(inCloud bool) {
