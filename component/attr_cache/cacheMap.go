@@ -35,6 +35,7 @@
 package attr_cache
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -90,6 +91,7 @@ func (value *attrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt
 
 }
 
+// TODO: write unit tests for this
 func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string) {
 
 	paths := strings.SplitN(path, "/", 2) // paths[0] is home paths[1] is user/folder/file
@@ -121,16 +123,32 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 // input: full path to item or file as string
 // output: the attrCacheItem value for the key found in path
 // description: a lookup of any attrCacheItem based on any given full path.
-func (value *attrCacheItem) get(path string) *attrCacheItem {
+// TODO: write tests
+func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
 
 	//how do I reference an already existing map[string]*attrCacheItem?
 
 	var cachedItem *attrCacheItem
 	paths := strings.Split(path, "/")
 
-	for i, value := range paths {
+	for i, pathElement := range paths {
 
-		cachedItem, ok = value.children[value]
+		currentItem, ok := value.children[pathElement]
+		if !ok {
+			return nil, fmt.Errorf("The path element : %s does not exist", pathElement)
+		}
+
+		if i == len(paths) {
+			cachedItem = currentItem
+		} else {
+			value = value.children[pathElement]
+		}
+
+		//we need to go into the sub maps withint he child map element.
+		//side note: cacheLocks. channel, sync, semiphore.
+
+		return cachedItem, nil
+
 	}
 
 	// go down the tree using the full path for reference
