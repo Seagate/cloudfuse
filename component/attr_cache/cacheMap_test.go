@@ -57,7 +57,7 @@ func (suite *cacheMapTestSite) cleanupTest() {
 	suite.mockCtrl.Finish()
 }
 
-func (suite *cacheMapTestSite) TestinsertCacheMap() {
+func (suite *cacheMapTestSite) TestInsertCacheMap() {
 	defer suite.cleanupTest()
 
 	// .generate a path
