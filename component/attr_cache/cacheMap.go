@@ -81,18 +81,20 @@ func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *
 	return item
 }
 
-func (value *attrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) {
+func (value *attrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {
 
 	path := value.attr.Path // home/user/folder/file
 	path = internal.TruncateDirName(path)
 
 	//start recursion
-	value.insertHelper(attr, exists, cachedAt, path)
+	value = value.insertHelper(attr, exists, cachedAt, path)
+
+	return value
 
 }
 
 // TODO: write unit tests for this
-func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string) {
+func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string) *attrCacheItem {
 
 	paths := strings.SplitN(path, "/", 2) // paths[0] is home paths[1] is user/folder/file
 
@@ -117,7 +119,7 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 		}
 		value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1])
 	}
-
+	return value
 }
 
 // input: full path to item or file as string
