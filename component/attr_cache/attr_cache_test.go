@@ -113,30 +113,36 @@ func addPathToCache(assert *assert.Assertions, attrCache *AttrCache, path string
 	if isDir {
 		pathAttr = getDirPathAttr(path)
 	}
-	attrCache.cacheMap[path] = newAttrCacheItem(pathAttr, true, time.Now())
+	attrCache.cacheMap.children[path] = newAttrCacheItem(pathAttr, true, time.Now())
 	assert.Contains(attrCache.cacheMap, path)
 }
 
 func assertDeleted(suite *attrCacheTestSuite, path string) {
 	suite.assert.Contains(suite.attrCache.cacheMap, path)
-	suite.assert.EqualValues(&internal.ObjAttr{}, suite.attrCache.cacheMap[path].attr)
-	suite.assert.True(suite.attrCache.cacheMap[path].valid())
-	suite.assert.False(suite.attrCache.cacheMap[path].exists())
+	cacheItem, err := suite.attrCache.cacheMap.get(path)
+	suite.assert.NotNil(err)
+	suite.assert.EqualValues(&internal.ObjAttr{}, cacheItem.attr)
+	suite.assert.True(cacheItem.valid())
+	suite.assert.False(cacheItem.exists())
 }
 
 func assertInvalid(suite *attrCacheTestSuite, path string) {
+	cacheItem, err := suite.attrCache.cacheMap.get(path)
+	suite.assert.NotNil(err)
 	suite.assert.Contains(suite.attrCache.cacheMap, path)
-	suite.assert.EqualValues(&internal.ObjAttr{}, suite.attrCache.cacheMap[path].attr)
-	suite.assert.False(suite.attrCache.cacheMap[path].valid())
+	suite.assert.EqualValues(&internal.ObjAttr{}, cacheItem.attr)
+	suite.assert.False(cacheItem.valid())
 }
 
 func assertUntouched(suite *attrCacheTestSuite, path string) {
+	cacheItem, err := suite.attrCache.cacheMap.get(path)
+	suite.assert.NotNil(err)
 	suite.assert.Contains(suite.attrCache.cacheMap, path)
-	suite.assert.NotEqualValues(suite.attrCache.cacheMap[path].attr, &internal.ObjAttr{})
-	suite.assert.EqualValues(defaultSize, suite.attrCache.cacheMap[path].attr.Size)
-	suite.assert.EqualValues(defaultMode, suite.attrCache.cacheMap[path].attr.Mode)
-	suite.assert.True(suite.attrCache.cacheMap[path].valid())
-	suite.assert.True(suite.attrCache.cacheMap[path].exists())
+	suite.assert.NotEqualValues(cacheItem.attr, &internal.ObjAttr{})
+	suite.assert.EqualValues(defaultSize, cacheItem.attr.Size)
+	suite.assert.EqualValues(defaultMode, cacheItem.attr.Mode)
+	suite.assert.True(cacheItem.valid())
+	suite.assert.True(cacheItem.exists())
 }
 
 func assertExists(suite *attrCacheTestSuite, path string) {

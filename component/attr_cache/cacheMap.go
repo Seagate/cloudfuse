@@ -73,10 +73,7 @@ func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *
 		item.attrFlag.Set(AttrFlagExists)
 	}
 
-	if item.attr.IsDir() {
-		item.children = make(map[string]*attrCacheItem)
-
-	}
+	item.insert(attr, exists, cachedAt)
 
 	return item
 }
