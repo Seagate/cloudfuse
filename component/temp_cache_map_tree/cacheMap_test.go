@@ -35,7 +35,7 @@
 package temp_cache_map_tree
 
 import (
-	"fmt"
+	_ "cloudfuse/component/attr_cache"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,14 +56,25 @@ func (suite *cacheMapTestSite) SetupTest() {
 
 func (suite *cacheMapTestSite) TestInsertCacheMap() {
 
+	// .generate a path directory
 	alist, blist, clist := generateNestedDirectory("david")
 
-	for p := alist.Front(); p != nil; p = p.Next() {
-		value := p.Value
-		fmt.Printf("value is %v \n", value)
+	// .populate the tree
+	for a := alist.Front(); a != nil; a = a.Next() {
+		value := a.Value
+		cacheMap.insert(value)
 	}
 
-	// .generate a path
+	for b := blist.Front(); b != nil; b = b.Next() {
+		value := b.Value
+		cacheMap.insert(value)
+	}
+
+	for c := clist.Front(); c != nil; c = c.Next() {
+		value := c.Value
+		cacheMap.insert(value)
+	}
+
 	//atters := generateNestedPathAttr("david", int64(1024), os.FileMode(0))
 
 	// .populate the tree
