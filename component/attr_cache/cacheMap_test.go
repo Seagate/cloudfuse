@@ -45,8 +45,8 @@ import (
 
 type cacheMapTestSite struct {
 	suite.Suite
-	assert    *assert.Assertions
-	attrCache *AttrCache
+	assert *assert.Assertions
+	//attrCache *AttrCache
 }
 
 func (suite *cacheMapTestSite) SetupTest() {
@@ -55,6 +55,11 @@ func (suite *cacheMapTestSite) SetupTest() {
 
 func (suite *cacheMapTestSite) TestInsertCacheMap() {
 
+	alist, blist, clist := generateNestedDirectory("david")
+
+	println(alist)
+	println(blist)
+	println(clist)
 	// .generate a path
 	//atters := generateNestedPathAttr("david", int64(1024), os.FileMode(0))
 
