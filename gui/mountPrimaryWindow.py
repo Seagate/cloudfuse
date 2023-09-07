@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QMainWindow
 from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
 from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
+#from aboutPage import aboutPage
 
 bucketOptions = ['s3storage', 'azstorage']
 mountTargetComponent = 3
@@ -37,7 +38,9 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.button_config.clicked.connect(self.showSettingsWidget)
         self.button_mount.clicked.connect(self.mountBucket)
         self.button_unmount.clicked.connect(self.unmountBucket)
-        
+        self.actionAbout_Qt.triggered.connect(self.showAboutQtPage)
+        self.actionAbout_LyveFuse.triggered.connect(self.showAboutLyveFusePage)
+
         if platform == "win32":
             self.lineEdit_mountPoint.setToolTip("Designate a new location to mount the bucket, do not create the directory")
             self.button_browse.setToolTip("Browse to a new location but don't create a new directory")
@@ -62,6 +65,20 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
         self.lineEdit_mountPoint.setText('{}'.format(directory))
+
+    def showAboutQtPage(self):
+        # self.about = aboutPage()
+        # self.about.show()
+
+        QtWidgets.QMessageBox.aboutQt(self, "About QT")
+        # msg.setStandardButtons(QtWidgets.QMessageBox.Discard | QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Save)
+        # dialog.setIcon(QtWidgets.QMessageBox.information)
+        #dialog.aboutQt('About QT')
+
+
+    def showAboutLyveFusePage(self):
+        dialog = QtWidgets.QMessageBox.about(self, "About Lyve", "Hello")
+        dialog.exec()
 
     #wrapper/helper for the service install and start.
     def windowsServiceInstall(self):

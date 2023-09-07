@@ -178,7 +178,8 @@
     <property name="title">
      <string>Help</string>
     </property>
-    <addaction name="actionAbout"/>
+    <addaction name="actionAbout_Qt"/>
+    <addaction name="actionAbout_CloudFuse"/>
    </widget>
    <addaction name="menu_Debug"/>
    <addaction name="menu_Help"/>
@@ -214,9 +215,14 @@
     <string>Setup</string>
    </property>
   </action>
-  <action name="actionAbout">
+  <action name="actionAbout_Qt">
    <property name="text">
-    <string>About</string>
+    <string>About QT</string>
+   </property>
+  </action>
+  <action name="actionAbout_CloudFuse">
+   <property name="text">
+    <string>About LyveFuse</string>
    </property>
   </action>
  </widget>
