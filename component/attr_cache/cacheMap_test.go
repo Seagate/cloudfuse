@@ -35,43 +35,42 @@
 package attr_cache
 
 import (
-	"cloudfuse/internal"
-	"os"
-	"time"
+	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
+
+// look at s3wrappers tests for reference. look at common folder tests as well for reference. half way between s3wrappers and utils test
 
 type cacheMapTestSite struct {
 	suite.Suite
 	assert    *assert.Assertions
 	attrCache *AttrCache
-	mockCtrl  *gomock.Controller
-	mock      *internal.MockComponent
 }
 
-func (suite *cacheMapTestSite) cleanupTest() {
-	_ = suite.attrCache.Stop()
-	suite.mockCtrl.Finish()
+func (suite *cacheMapTestSite) SetupTest() {
+	suite.assert = assert.New(suite.T())
 }
 
 func (suite *cacheMapTestSite) TestInsertCacheMap() {
-	defer suite.cleanupTest()
 
 	// .generate a path
-	atters := generateNestedPathAttr("david", int64(1024), os.FileMode(0))
+	//atters := generateNestedPathAttr("david", int64(1024), os.FileMode(0))
 
 	// .populate the tree
-	var cacheItem *attrCacheItem
-	for _, attr := range atters {
-		cacheItem = suite.attrCache.cacheMap.insert(attr, true, time.Now())
-	}
+	// var cacheItem *attrCacheItem
+	// for _, attr := range atters {
+	// 	cacheItem = suite.attrCache.cacheMap.insert(attr, true, time.Now())
+	// }
 
-	for item := range cacheItem.children {
-		println(item)
-	}
+	// for item := range cacheItem.children {
+	// 	println(item)
+	// }
 	// validate tree is properly populated
 
+}
+
+func TestCacheMapTestSuite(t *testing.T) {
+	suite.Run(t, new(cacheMapTestSite))
 }
