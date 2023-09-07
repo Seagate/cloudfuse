@@ -32,9 +32,10 @@
    SOFTWARE
 */
 
-package attr_cache
+package temp_cache_map_tree
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,9 +58,11 @@ func (suite *cacheMapTestSite) TestInsertCacheMap() {
 
 	alist, blist, clist := generateNestedDirectory("david")
 
-	println(alist)
-	println(blist)
-	println(clist)
+	for p := alist.Front(); p != nil; p = p.Next() {
+		value := p.Value
+		fmt.Printf("value is %v \n", value)
+	}
+
 	// .generate a path
 	//atters := generateNestedPathAttr("david", int64(1024), os.FileMode(0))
 

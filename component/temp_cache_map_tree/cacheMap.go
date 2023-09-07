@@ -32,9 +32,10 @@
    SOFTWARE
 */
 
-package attr_cache
+package temp_cache_map_tree
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
@@ -146,6 +147,38 @@ func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
 
 	return cachedItem, nil
 
+}
+
+// Directory structure
+// a/
+//
+//	 a/c1/
+//	  a/c1/gc1
+//		a/c2
+//
+// ab/
+//
+//	ab/c1
+//
+// ac
+func generateNestedDirectory(path string) (*list.List, *list.List, *list.List) {
+	path = internal.TruncateDirName(path)
+
+	aPaths := list.New()
+	aPaths.PushBack(path + "/")
+
+	aPaths.PushBack(path + "/c1" + "/")
+	aPaths.PushBack(path + "/c2")
+	aPaths.PushBack(path + "/c1" + "/gc1")
+
+	abPaths := list.New()
+	abPaths.PushBack(path + "b" + "/")
+	abPaths.PushBack(path + "b" + "/c1")
+
+	acPaths := list.New()
+	acPaths.PushBack(path + "c")
+
+	return aPaths, abPaths, acPaths
 }
 
 func (value *attrCacheItem) valid() bool {
