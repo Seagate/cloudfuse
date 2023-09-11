@@ -26,7 +26,7 @@ Cloudfuse also supports a health monitor. It allows customers gain more insight 
 behaving with the rest of their machine. Visit [here](tools/health-monitor/README.md) to set it up.
 
 ## Features compared to blobfuse2
-- Supports any S3 compatable storage
+- Supports any S3 compatible storage
 - Adds a GUI to configure and start mounts
 - Runs on Windows using WinFSP in foreground or as a Windows service
 
@@ -40,10 +40,10 @@ Cloudfuse currently only supports libfuse2. On Linux, you need to install the li
     sudo apt install libfuse2
 
 #### Running on Linux
-To start your mount of an S3 Bucket or Azure Container use the `mount` command and specifiy the location of your config
+To start your mount of an S3 Bucket or Azure Container use the `mount` command and specify the location of your config
 file. See [config file](#Config-file) for information about the config file. By default, cloudfuse will run in the
 background which allows you to close the terminal when you start a mount. If you would like it to run in the foreground
-you can specificy `foreground: true` in your config file or pass `--foreground=true` as an argument when mounting.
+you can specify `foreground: true` in your config file or pass `--foreground=true` as an argument when mounting.
 
         cloudfuse mount <mount path> --config-file=<config file>
 

@@ -60,7 +60,7 @@ or we are doing:
 	- handle.ID = (handlemap.HandleID)(fh)
 
 In cloudfuse we maintain handles as an object stored in a handlemap. Cgofuse gives us handles as integer
-values so we need to do type conversions to conver those values to our Handle ID values that cloudfuse
+values so we need to do type conversions to convert those values to our Handle ID values that cloudfuse
 uses so we convert the integer into a handle object.
 */
 

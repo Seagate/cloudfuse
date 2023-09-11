@@ -169,12 +169,3 @@ jobs:
         arguments: '-v -timeout=2h ./... --tags=unittest,$(tags) -coverprofile utcover.cov'
       displayName: 'Unit tests'
       condition: always()
-
-    # Comment out as this is specific to an interal microsoft test tool
-    # - task: ComponentGovernanceComponentDetection@0
-    #   inputs:
-    #     scanType: 'Register'
-    #     verbosity: 'Verbose'
-    #     alertWarningLevel: 'High'
-    #   displayName: "Component governance"
-    #   condition: always()
