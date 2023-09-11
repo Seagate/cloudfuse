@@ -495,7 +495,7 @@ func (cl *Client) getKey(name string, isSymLink bool) string {
 func (cl *Client) getFile(name string) (string, bool) {
 	isSymLink := false
 
-	//todo: wrtie a test the catches the out of bounds issue.
+	//todo: write a test the catches the out of bounds issue.
 	if strings.HasSuffix(name, symlinkStr) {
 		isSymLink = true
 		name = name[:len(name)-len(symlinkStr)]

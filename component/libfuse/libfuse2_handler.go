@@ -816,7 +816,7 @@ func (cf *CgofuseFS) Readlink(path string) (int, string) {
 	return 0, targetPath
 }
 
-// Fsync syncronizes the file.
+// Fsync synchronizes the file.
 func (cf *CgofuseFS) Fsync(path string, datasync bool, fh uint64) int {
 	if fh == 0 {
 		return -fuse.EIO
@@ -846,7 +846,7 @@ func (cf *CgofuseFS) Fsync(path string, datasync bool, fh uint64) int {
 	return 0
 }
 
-// Fsyncdir syncronizes a directory.
+// Fsyncdir synchronizes a directory.
 func (cf *CgofuseFS) Fsyncdir(path string, datasync bool, fh uint64) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
