@@ -35,8 +35,10 @@
 package temp_cache_map_tree
 
 import (
-	_ "cloudfuse/component/attr_cache"
+	"cloudfuse/internal"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -57,23 +59,32 @@ func (suite *cacheMapTestSite) SetupTest() {
 func (suite *cacheMapTestSite) TestInsertCacheMap() {
 
 	// .generate a path directory
-	alist, blist, clist := generateNestedDirectory("david")
+	alist, _, _ := GenerateNestedDirectory("David")
 
 	// .populate the tree
 	for a := alist.Front(); a != nil; a = a.Next() {
 		value := a.Value
-		cacheMap.insert(value)
+
+		cachedAttrItem := attrItem.Insert(attr, true, time.Now())
+
+		println(cachedAttrItem)
+
 	}
 
-	for b := blist.Front(); b != nil; b = b.Next() {
-		value := b.Value
-		cacheMap.insert(value)
-	}
+	// for b := blist.Front(); b != nil; b = b.Next() {
+	// 	value := b.Value
 
-	for c := clist.Front(); c != nil; c = c.Next() {
-		value := c.Value
-		cacheMap.insert(value)
-	}
+	// 	attr := attr_cache.GetPathAttr(value.(string), 1024, os.FileMode(0), false)
+	// 	cacheItem := attrItem.Insert(attr, true, time.Now())
+	// 	for
+	// }
+
+	// for c := clist.Front(); c != nil; c = c.Next() {
+	// 	value := c.Value
+
+	// 	attr := attr_cache.GetPathAttr(value.(string), 1024, os.FileMode(0), false)
+	// 	attrItem.Insert(attr, true, time.Now())
+	// }
 
 	//atters := generateNestedPathAttr("david", int64(1024), os.FileMode(0))
 
@@ -92,4 +103,55 @@ func (suite *cacheMapTestSite) TestInsertCacheMap() {
 
 func TestCacheMapTestSuite(t *testing.T) {
 	suite.Run(t, new(cacheMapTestSite))
+}
+
+// Directory structure
+// a/
+//
+//	 a/c1/
+//	  a/c1/gc1
+//		a/c2
+//
+// ab/
+//
+//	ab/c1
+//
+// ac
+func GenerateNestedDirectory(path string) (*list.List, *list.List, *list.List) {
+	path = internal.TruncateDirName(path)
+
+	aPaths := list.New()
+	aPaths.PushBack(path + "/")
+
+	aPaths.PushBack(path + "/c1" + "/")
+	aPaths.PushBack(path + "/c2")
+	aPaths.PushBack(path + "/c1" + "/gc1")
+
+	abPaths := list.New()
+	abPaths.PushBack(path + "b" + "/")
+	abPaths.PushBack(path + "b" + "/c1")
+
+	acPaths := list.New()
+	acPaths.PushBack(path + "c")
+
+	return aPaths, abPaths, acPaths
+}
+
+func GetPathAttr(path string, size int64, mode os.FileMode, metadata bool) *internal.ObjAttr {
+	flags := internal.NewFileBitMap()
+	if metadata {
+		flags.Set(internal.PropFlagMetadataRetrieved)
+	}
+	return &internal.ObjAttr{
+		Path:     path,
+		Name:     filepath.Base(path),
+		Size:     size,
+		Mode:     mode,
+		Mtime:    time.Now(),
+		Atime:    time.Now(),
+		Ctime:    time.Now(),
+		Crtime:   time.Now(),
+		Flags:    flags,
+		Metadata: nil,
+	}
 }

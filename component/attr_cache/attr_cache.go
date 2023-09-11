@@ -62,7 +62,7 @@ type AttrCache struct {
 	noSymlinks   bool
 	cacheDirs    bool
 	maxFiles     int
-	cacheMap     attrCacheItem
+	cacheMap     AttrCacheItem
 	cacheLock    sync.RWMutex
 }
 
@@ -112,7 +112,7 @@ func (ac *AttrCache) Start(ctx context.Context) error {
 	log.Trace("AttrCache::Start : Starting component %s", ac.Name())
 
 	// AttrCache : start code goes here
-	ac.cacheMap = make(map[string]*attrCacheItem)
+	ac.cacheMap = make(map[string]*AttrCacheItem)
 
 	return nil
 }
@@ -229,7 +229,7 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	foundCachedContents := false
 	for key, value := range ac.cacheMap {
 		if value.attr.IsDir() {
-			value.children = make(map[string]*attrCacheItem)
+			value.children = make(map[string]*AttrCacheItem)
 			value.children[key] = value
 		}
 		if strings.HasPrefix(key, prefix) {
@@ -338,7 +338,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 			if value.attr.IsDir() && value.valid() && value.exists() {
 				// add the destination directory to our cache
 				dstDirAttr := internal.CreateObjAttrDir(dstKey)
-				dstDirCacheItem := newAttrCacheItem(dstDirAttr, true, time)
+				dstDirCacheItem := NewAttrCacheItem(dstDirAttr, true, time)
 				dstDirCacheItem.markInCloud(value.isInCloud())
 				ac.cacheMap[dstKey] = dstDirCacheItem
 			} else {
@@ -365,7 +365,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 		// add the destination directory to our cache
 		dstDir = internal.TruncateDirName(dstDir)
 		dstDirAttr := internal.CreateObjAttrDir(dstDir)
-		dstDirAttrCacheItem := newAttrCacheItem(dstDirAttr, true, time)
+		dstDirAttrCacheItem := NewAttrCacheItem(dstDirAttr, true, time)
 		dstDirAttrCacheItem.markInCloud(false)
 		ac.cacheMap[dstDir] = dstDirAttrCacheItem
 	}
@@ -387,7 +387,7 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 		dirCacheItem, found := ac.cacheMap[dirPath]
 		if !(found && dirCacheItem.valid() && dirCacheItem.exists()) {
 			dirObjAttr := internal.CreateObjAttrDir(dirPath)
-			dirCacheItem = newAttrCacheItem(dirObjAttr, true, time)
+			dirCacheItem = NewAttrCacheItem(dirObjAttr, true, time)
 			ac.cacheMap[dirPath] = dirCacheItem
 		}
 		dirCacheItem.markInCloud(true)
@@ -412,7 +412,7 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 				return os.ErrExist
 			}
 			newDirAttr := internal.CreateObjAttrDir(newDirPath)
-			newDirAttrCacheItem := newAttrCacheItem(newDirAttr, true, time.Now())
+			newDirAttrCacheItem := NewAttrCacheItem(newDirAttr, true, time.Now())
 			newDirAttrCacheItem.markInCloud(false)
 			ac.cacheMap[newDirPath] = newDirAttrCacheItem
 		} else {
@@ -550,7 +550,7 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 				break
 			}
 
-			ac.cacheMap[internal.TruncateDirName(attr.Path)] = newAttrCacheItem(attr, true, currTime)
+			ac.cacheMap[internal.TruncateDirName(attr.Path)] = NewAttrCacheItem(attr, true, currTime)
 		}
 
 	}
@@ -672,13 +672,13 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 // to record which of them contain objects in their subtrees
 func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 	// first gather a list of ancestors
-	var ancestorCacheItems []*attrCacheItem
+	var ancestorCacheItems []*AttrCacheItem
 	ancestorPath := internal.TruncateDirName(dirPath)
 	for ancestorPath != "" {
 		ancestorCacheItem, found := ac.cacheMap[ancestorPath]
 		if !(found && ancestorCacheItem.valid() && ancestorCacheItem.exists()) {
 			ancestorObjAttr := internal.CreateObjAttrDir(ancestorPath)
-			ancestorCacheItem = newAttrCacheItem(ancestorObjAttr, true, time)
+			ancestorCacheItem = NewAttrCacheItem(ancestorObjAttr, true, time)
 			ac.cacheMap[ancestorPath] = ancestorCacheItem
 		}
 		ancestorCacheItems = append(ancestorCacheItems, ancestorCacheItem)
@@ -889,7 +889,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// TODO: bug: when cacheDirs is true, the cache limit will cause some directories to be double-listed
 		// TODO: shouldn't this be an LRU? This sure looks like the opposite...
 		if len(ac.cacheMap) < ac.maxFiles {
-			ac.cacheMap[truncatedPath] = newAttrCacheItem(pathAttr, true, time.Now())
+			ac.cacheMap[truncatedPath] = NewAttrCacheItem(pathAttr, true, time.Now())
 		} else {
 			log.Debug("AttrCache::GetAttr : %s skipping adding to attribute cache because it is full", options.Name)
 		}
@@ -898,7 +898,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		}
 	} else if err == syscall.ENOENT {
 		// Path does not exist so cache a no-entry item
-		ac.cacheMap[truncatedPath] = newAttrCacheItem(&internal.ObjAttr{}, false, time.Now())
+		ac.cacheMap[truncatedPath] = NewAttrCacheItem(&internal.ObjAttr{}, false, time.Now())
 	}
 
 	return pathAttr, err
