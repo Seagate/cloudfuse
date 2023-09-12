@@ -50,12 +50,13 @@ import (
 
 type cacheMapTestSite struct {
 	suite.Suite
-	assert *assert.Assertions
-	//attrCache *AttrCache
+	assert    *assert.Assertions
+	nestedDir *list.List
 }
 
 func (suite *cacheMapTestSite) SetupTest() {
 	suite.assert = assert.New(suite.T())
+	suite.nestedDir, _, _ = GenerateNestedDirectory("david")
 }
 
 func (suite *cacheMapTestSite) TestInsertCacheMap() {
@@ -126,21 +127,18 @@ func TestCacheMapTestSuite(t *testing.T) {
 func GenerateNestedDirectory(path string) (*list.List, *list.List, *list.List) {
 	path = internal.TruncateDirName(path)
 
-	aPaths := list.New()
-	aPaths.PushBack(path + "/")
+	dirPaths := list.New()
+	dirPaths.PushBack(path + "/")
+	dirPaths.PushBack(path + "/c1" + "/")
+	dirPaths.PushBack(path + "b" + "/")
 
-	aPaths.PushBack(path + "/c1" + "/")
-	aPaths.PushBack(path + "/c2")
-	aPaths.PushBack(path + "/c1" + "/gc1")
+	filePaths := list.New()
+	filePaths.PushBack(path + "/c2")
+	filePaths.PushBack(path + "/c1" + "/gc1")
+	filePaths.PushBack(path + "b" + "/c1")
+	filePaths.PushBack(path + "c")
 
-	abPaths := list.New()
-	abPaths.PushBack(path + "b" + "/")
-	abPaths.PushBack(path + "b" + "/c1")
-
-	acPaths := list.New()
-	acPaths.PushBack(path + "c")
-
-	return aPaths, abPaths, acPaths
+	return dirPaths, filePaths
 }
 
 func GetPathAttr(path string, size int64, mode os.FileMode, metadata bool) *internal.ObjAttr {
