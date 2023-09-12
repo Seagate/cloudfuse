@@ -61,7 +61,7 @@ type AttrCacheItem struct {
 	children map[string]*AttrCacheItem
 }
 
-func NewAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *AttrCacheItem {
+func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *AttrCacheItem {
 	item := &AttrCacheItem{
 		attr:     attr,
 		attrFlag: 0,
@@ -73,25 +73,25 @@ func NewAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *
 		item.attrFlag.Set(AttrFlagExists)
 	}
 
-	item.Insert(attr, exists, cachedAt)
+	//item.Insert(attr, exists, cachedAt)
 
 	return item
 }
 
-func (value *AttrCacheItem) Insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *AttrCacheItem {
+func (value *AttrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *AttrCacheItem {
 
 	path := value.attr.Path // home/user/folder/file
 	path = internal.TruncateDirName(path)
 
 	//start recursion
-	value = value.InsertHelper(attr, exists, cachedAt, path)
+	value = value.insertHelper(attr, exists, cachedAt, path)
 
 	return value
 
 }
 
 // TODO: write unit tests for this
-func (value *AttrCacheItem) InsertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string) *AttrCacheItem {
+func (value *AttrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string) *AttrCacheItem {
 
 	paths := strings.SplitN(path, "/", 2) // paths[0] is home paths[1] is user/folder/file
 
@@ -103,7 +103,7 @@ func (value *AttrCacheItem) InsertHelper(attr *internal.ObjAttr, exists bool, ca
 
 		// this is a leaf
 		// we end up with string key being a single folder name instead of a full path. This also will take care of using the folder attribute data.
-		value.children[paths[0]] = NewAttrCacheItem(attr, exists, cachedAt)
+		value.children[paths[0]] = newAttrCacheItem(attr, exists, cachedAt)
 
 	} else {
 
@@ -112,9 +112,9 @@ func (value *AttrCacheItem) InsertHelper(attr *internal.ObjAttr, exists bool, ca
 		if !ok {
 
 			//insert stubbed folder attr data into tree
-			value.children[paths[0]] = NewAttrCacheItem(internal.CreateObjAttrDir(paths[0]), exists, cachedAt)
+			value.children[paths[0]] = newAttrCacheItem(internal.CreateObjAttrDir(paths[0]), exists, cachedAt)
 		}
-		value.children[paths[0]].InsertHelper(attr, exists, cachedAt, paths[1])
+		value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1])
 	}
 	return value
 }
@@ -123,7 +123,7 @@ func (value *AttrCacheItem) InsertHelper(attr *internal.ObjAttr, exists bool, ca
 // output: the attrCacheItem value for the key found in path
 // description: a lookup of any attrCacheItem based on any given full path.
 // TODO: write tests
-func (value *AttrCacheItem) Get(path string) (*AttrCacheItem, error) {
+func (value *AttrCacheItem) get(path string) (*AttrCacheItem, error) {
 
 	var cachedItem *AttrCacheItem
 	paths := strings.Split(path, "/")

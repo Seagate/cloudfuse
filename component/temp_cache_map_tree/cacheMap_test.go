@@ -36,7 +36,9 @@ package temp_cache_map_tree
 
 import (
 	"cloudfuse/internal"
+	"container/list"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -58,46 +60,50 @@ func (suite *cacheMapTestSite) SetupTest() {
 
 func (suite *cacheMapTestSite) TestInsertCacheMap() {
 
+	attrCacheItemInstance := AttrCacheItem{}
 	// .generate a path directory
-	alist, _, _ := GenerateNestedDirectory("David")
+	alist, blist, clist := GenerateNestedDirectory("David")
 
 	// .populate the tree
 	for a := alist.Front(); a != nil; a = a.Next() {
-		value := a.Value
-
-		cachedAttrItem := attrItem.Insert(attr, true, time.Now())
-
-		println(cachedAttrItem)
-
+		valueStr := a.Value.(string)
+		if valueStr[len(valueStr)-1:] == "/" {
+			attrCacheItemInstance.attr = internal.CreateObjAttrDir(valueStr)
+			attrCacheItemInstance.insert(attrCacheItemInstance.attr, true, time.Now())
+		} else {
+			attrCacheItemInstance.attr = internal.CreateObjAttr(valueStr, 1024, time.Now())
+			attrCacheItemInstance.insert(attrCacheItemInstance.attr, attrCacheItemInstance.exists(), attrCacheItemInstance.cachedAt)
+		}
 	}
 
-	// for b := blist.Front(); b != nil; b = b.Next() {
-	// 	value := b.Value
+	for b := blist.Front(); b != nil; b = b.Next() {
+		valueStr := b.Value.(string)
+		if valueStr[len(valueStr)-1:] == "/" {
+			attrCacheItemInstance.attr = internal.CreateObjAttrDir(valueStr)
+			attrCacheItemInstance.insert(attrCacheItemInstance.attr, true, time.Now())
+		} else {
+			attrCacheItemInstance.attr = internal.CreateObjAttr(valueStr, 1024, time.Now())
+			attrCacheItemInstance.insert(attrCacheItemInstance.attr, attrCacheItemInstance.exists(), attrCacheItemInstance.cachedAt)
+		}
+	}
 
-	// 	attr := attr_cache.GetPathAttr(value.(string), 1024, os.FileMode(0), false)
-	// 	cacheItem := attrItem.Insert(attr, true, time.Now())
-	// 	for
-	// }
+	for c := clist.Front(); c != nil; c = c.Next() {
+		valueStr := c.Value.(string)
+		if valueStr[len(valueStr)-1:] == "/" {
+			attrCacheItemInstance.attr = internal.CreateObjAttrDir(valueStr)
+			attrCacheItemInstance.insert(attrCacheItemInstance.attr, true, time.Now())
+		} else {
+			attrCacheItemInstance.attr = internal.CreateObjAttr(valueStr, 1024, time.Now())
+			attrCacheItemInstance.insert(attrCacheItemInstance.attr, attrCacheItemInstance.exists(), attrCacheItemInstance.cachedAt)
+		}
+	}
 
-	// for c := clist.Front(); c != nil; c = c.Next() {
-	// 	value := c.Value
-
-	// 	attr := attr_cache.GetPathAttr(value.(string), 1024, os.FileMode(0), false)
-	// 	attrItem.Insert(attr, true, time.Now())
-	// }
-
-	//atters := generateNestedPathAttr("david", int64(1024), os.FileMode(0))
-
-	// .populate the tree
-	// var cacheItem *attrCacheItem
-	// for _, attr := range atters {
-	// 	cacheItem = suite.attrCache.cacheMap.insert(attr, true, time.Now())
-	// }
-
-	// for item := range cacheItem.children {
-	// 	println(item)
-	// }
 	// validate tree is properly populated
+	for a := alist.Front(); a != nil; a = a.Next() {
+		cachedItem, err := attrCacheItemInstance.get(a.Value.(string))
+		suite.assert.NotNil(err)
+		suite.assert.EqualValues(cachedItem)
+	}
 
 }
 
