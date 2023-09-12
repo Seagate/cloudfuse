@@ -93,6 +93,8 @@ func newTestClient(configuration string) (*Client, error) {
 		},
 		prefixPath:                conf.PrefixPath,
 		disableConcurrentDownload: conf.DisableConcurrentDownload,
+		partSize:                  conf.PartSizeMb * common.MbToBytes,
+		uploadCutoff:              conf.UploadCutoffMb * common.MbToBytes,
 	}
 	// create a Client
 	client := NewConnection(configForS3Client)
@@ -133,10 +135,17 @@ func (s *clientTestSuite) SetupTest() {
 }
 
 func (s *clientTestSuite) setupTestHelper(configuration string, create bool) {
+	if storageTestConfigurationParameters.PartSizeMb == 0 {
+		storageTestConfigurationParameters.PartSizeMb = 5
+	}
+	if storageTestConfigurationParameters.UploadCutoffMb == 0 {
+		storageTestConfigurationParameters.UploadCutoffMb = 5
+	}
 	if configuration == "" {
-		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s\n  part-size-mb: %d\n  upload-cutoff-mb: %d\n",
 			storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
-			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region,
+			storageTestConfigurationParameters.PartSizeMb, storageTestConfigurationParameters.UploadCutoffMb)
 	}
 	s.config = configuration
 

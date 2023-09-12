@@ -41,6 +41,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
 	"syscall"
@@ -559,14 +560,17 @@ func (cl *Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, err
 		return &blockList, err
 	}
 
-	partSize := cl.Config.partSize
+	cutoff := cl.Config.uploadCutoff
 	var objectSize int64
 
-	// if file is smaller than block size then it is a small file
-	if result.Size < partSize {
+	// if file is smaller than the uploadCutoff it is small, otherwise it is a multipart
+	// upload
+	if result.Size < cutoff {
 		blockList.Flags.Set(common.SmallFile)
 		return &blockList, nil
 	}
+
+	partSize := cl.Config.partSize
 
 	// Create a list of blocks that are the partSize except for the last block
 	for objectSize <= result.Size {
@@ -646,40 +650,123 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 	// tracks the case where our offset is great than our current file size (appending only - not modifying pre-existing data)
 	var dataBuffer *[]byte
 
-	// get the existing object data
-	isSymlink := options.Metadata[symlinkKey] == "true"
-	oldData, _ := cl.ReadBuffer(name, 0, 0, isSymlink)
-	// update the data with the new data
-	// if we're only overwriting existing data
-	if int64(len(oldData)) >= offset+length {
-		copy(oldData[offset:], data)
-		dataBuffer = &oldData
-		// else appending and/or overwriting
-	} else {
-		// if the file is not empty then we need to combine the data
-		if len(oldData) > 0 {
-			// new data buffer with the size of old and new data
-			newDataBuffer := make([]byte, offset+length)
-			// copy the old data into it
-			// TODO: better way to do this?
-			if offset != 0 {
-				copy(newDataBuffer, oldData)
-				oldData = nil
-			}
-			// overwrite with the new data we want to add
-			copy(newDataBuffer[offset:], data)
-			dataBuffer = &newDataBuffer
-		} else {
-			dataBuffer = &data
-		}
-	}
-	// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple blocks
-	err := cl.WriteFromBuffer(name, options.Metadata, *dataBuffer)
+	fileOffsets, err := cl.GetFileBlockOffsets(name)
 	if err != nil {
-		log.Err("Client::Write : Failed to upload to object. Here's why: %v ", name, err)
 		return err
 	}
+
+	if fileOffsets.SmallFile() {
+		// case 1: file consists of no parts (small file)
+
+		// get the existing object data
+		isSymlink := options.Metadata[symlinkKey] == "true"
+		oldData, _ := cl.ReadBuffer(name, 0, 0, isSymlink)
+		// update the data with the new data
+		// if we're only overwriting existing data
+		if int64(len(oldData)) >= offset+length {
+			copy(oldData[offset:], data)
+			dataBuffer = &oldData
+			// else appending and/or overwriting
+		} else {
+			// if the file is not empty then we need to combine the data
+			if len(oldData) > 0 {
+				// new data buffer with the size of old and new data
+				newDataBuffer := make([]byte, offset+length)
+				// copy the old data into it
+				// TODO: better way to do this?
+				if offset != 0 {
+					copy(newDataBuffer, oldData)
+					oldData = nil
+				}
+				// overwrite with the new data we want to add
+				copy(newDataBuffer[offset:], data)
+				dataBuffer = &newDataBuffer
+			} else {
+				dataBuffer = &data
+			}
+		}
+
+		// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple parts
+		err := cl.WriteFromBuffer(name, options.Metadata, *dataBuffer)
+		if err != nil {
+			log.Err("Client::Write : Failed to upload to object. Here's why: %v ", name, err)
+			return err
+		}
+	} else {
+		// case 2: given offset is within the size of the object - and the object consists of multiple parts
+		// case 3: new parts need to be added
+
+		index, oldDataSize, exceedsFileBlocks, appendOnly := fileOffsets.FindBlocksToModify(offset, length)
+		// keeps track of how much new data will be appended to the end of the file (applicable only to case 3)
+		newBufferSize := int64(0)
+		// case 3?
+		if exceedsFileBlocks {
+			newBufferSize = cl.createNewBlocks(fileOffsets, offset, length)
+		}
+		// buffer that holds that pre-existing data in those blocks we're interested in
+		oldDataBuffer := make([]byte, oldDataSize+newBufferSize)
+		if !appendOnly {
+			// fetch the parts that will be impacted by the new changes so we can overwrite them
+			err = cl.ReadInBuffer(name, fileOffsets.BlockList[index].StartIndex, oldDataSize, oldDataBuffer)
+			if err != nil {
+				log.Err("BlockBlob::Write : Failed to read data in buffer %s [%s]", name, err.Error())
+			}
+		}
+		// this gives us where the offset with respect to the buffer that holds our old data - so we can start writing the new data
+		blockOffset := offset - fileOffsets.BlockList[index].StartIndex
+		copy(oldDataBuffer[blockOffset:], data)
+		err := cl.stageAndCommitModifiedBlocks(name, oldDataBuffer, fileOffsets)
+		return err
+	}
+
 	return nil
+}
+
+func (cl *Client) createBlock(blockIdLength, startIndex, size int64) *common.Block {
+	newBlockId := base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(blockIdLength))
+	newBlock := &common.Block{
+		Id:         newBlockId,
+		StartIndex: startIndex,
+		EndIndex:   startIndex + size,
+	}
+	// mark truncated since it is a new empty block
+	newBlock.Flags.Set(common.TruncatedBlock)
+	newBlock.Flags.Set(common.DirtyBlock)
+	return newBlock
+}
+
+func (cl *Client) createNewBlocks(blockList *common.BlockOffsetList, offset, length int64) int64 {
+	partSize := cl.Config.partSize
+	prevIndex := blockList.BlockList[len(blockList.BlockList)-1].EndIndex
+	if partSize == 0 {
+		partSize = DefaultPartSize
+	}
+	// BufferSize is the size of the buffer that will go beyond our current object
+	var bufferSize int64
+	for i := prevIndex; i < offset+length; i += partSize {
+		blkSize := int64(math.Min(float64(partSize), float64((offset+length)-i)))
+		newBlock := cl.createBlock(blockList.BlockIdLength, i, blkSize)
+		blockList.BlockList = append(blockList.BlockList, newBlock)
+		// reset the counter to determine if there are leftovers at the end
+		bufferSize += blkSize
+	}
+	return bufferSize
+}
+
+func (cl *Client) stageAndCommitModifiedBlocks(name string, data []byte, offsetList *common.BlockOffsetList) error {
+	blockOffset := int64(0)
+	for _, blk := range offsetList.BlockList {
+		if blk.Dirty() {
+			blk.Data = data[blockOffset : (blk.EndIndex-blk.StartIndex)+blockOffset]
+			blockOffset = (blk.EndIndex - blk.StartIndex) + blockOffset
+			// Clear the truncated flag if we are writing data to this block
+			if blk.Truncated() {
+				blk.Flags.Clear(common.TruncatedBlock)
+			}
+		}
+	}
+
+	return cl.StageAndCommit(name, offsetList)
 }
 
 func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error {
