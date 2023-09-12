@@ -50,20 +50,35 @@ import (
 
 type cacheMapTestSite struct {
 	suite.Suite
-	assert    *assert.Assertions
-	nestedDir *list.List
+	assert      *assert.Assertions
+	nestedDir   *list.List
+	nestedFiles *list.List
 }
 
 func (suite *cacheMapTestSite) SetupTest() {
 	suite.assert = assert.New(suite.T())
-	suite.nestedDir, _, _ = GenerateNestedDirectory("david")
+
+	//set up nested Dir tree
+	suite.nestedDir, suite.nestedFiles = GenerateNestedDirectory("david")
+	attrCacheItemInstance := AttrCacheItem{}
+
+	//set up the cacheMap Tree
+	for dir := suite.nestedDir.Front(); dir != nil; dir = dir.Next() {
+		attrCacheItemInstance.attr = internal.CreateObjAttrDir(dir.Value.(string))
+		attrCacheItemInstance.insert(attrCacheItemInstance.attr, attrCacheItemInstance.exists(), attrCacheItemInstance.cachedAt)
+	}
+
+	for file := suite.nestedFiles.Front(); file != nil; file = file.Next() {
+		attrCacheItemInstance.attr = internal.CreateObjAttr(file.Value.(string), 1024, time.Now())
+		attrCacheItemInstance.insert(attrCacheItemInstance.attr, attrCacheItemInstance.exists(), attrCacheItemInstance.cachedAt)
+	}
+
 }
 
 func (suite *cacheMapTestSite) TestInsertCacheMap() {
 
 	attrCacheItemInstance := AttrCacheItem{}
 	// .generate a path directory
-	alist, blist, clist := GenerateNestedDirectory("David")
 
 	// .populate the tree
 	for a := alist.Front(); a != nil; a = a.Next() {
@@ -124,7 +139,7 @@ func TestCacheMapTestSuite(t *testing.T) {
 //	ab/c1
 //
 // ac
-func GenerateNestedDirectory(path string) (*list.List, *list.List, *list.List) {
+func GenerateNestedDirectory(path string) (*list.List, *list.List) {
 	path = internal.TruncateDirName(path)
 
 	dirPaths := list.New()
