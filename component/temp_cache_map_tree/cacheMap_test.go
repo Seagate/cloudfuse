@@ -48,36 +48,35 @@ import (
 
 // look at s3wrappers tests for reference. look at common folder tests as well for reference. half way between s3wrappers and utils test
 
-type cacheMapTestSite struct {
+type cacheMapTestSuite struct {
 	suite.Suite
-	assert      *assert.Assertions
-	nestedDir   *list.List
-	nestedFiles *list.List
+	assert            *assert.Assertions
+	rootAttrCacheItem attrCacheItem
 }
 
-func (suite *cacheMapTestSite) SetupTest() {
+// what is every test going to need to test with?
+func (suite *cacheMapTestSuite) SetupTest() {
 	suite.assert = assert.New(suite.T())
 
 	//set up nested Dir tree
-	suite.nestedDir, suite.nestedFiles = GenerateNestedDirectory("david")
-	attrCacheItemInstance := AttrCacheItem{}
+	nestedDir, nestedFiles := GenerateNestedDirectory("david")
+	suite.rootAttrCacheItem = attrCacheItem{}
 
 	//set up the cacheMap Tree
-	for dir := suite.nestedDir.Front(); dir != nil; dir = dir.Next() {
-		attrCacheItemInstance.attr = internal.CreateObjAttrDir(dir.Value.(string))
-		attrCacheItemInstance.insert(attrCacheItemInstance.attr, attrCacheItemInstance.exists(), attrCacheItemInstance.cachedAt)
+	for dir := nestedDir.Front(); dir != nil; dir = dir.Next() {
+		suite.rootAttrCacheItem.attr = internal.CreateObjAttrDir(dir.Value.(string))
+		suite.rootAttrCacheItem.insert(suite.rootAttrCacheItem.attr, suite.rootAttrCacheItem.exists(), suite.rootAttrCacheItem.cachedAt)
 	}
 
-	for file := suite.nestedFiles.Front(); file != nil; file = file.Next() {
-		attrCacheItemInstance.attr = internal.CreateObjAttr(file.Value.(string), 1024, time.Now())
-		attrCacheItemInstance.insert(attrCacheItemInstance.attr, attrCacheItemInstance.exists(), attrCacheItemInstance.cachedAt)
+	for file := nestedFiles.Front(); file != nil; file = file.Next() {
+		suite.rootAttrCacheItem.attr = internal.CreateObjAttr(file.Value.(string), 1024, time.Now())
+		suite.rootAttrCacheItem.insert(suite.rootAttrCacheItem.attr, suite.rootAttrCacheItem.exists(), suite.rootAttrCacheItem.cachedAt)
 	}
-
 }
 
-func (suite *cacheMapTestSite) TestInsertCacheMap() {
+func (suite *cacheMapTestSuite) TestInsertCacheMap() {
 
-	attrCacheItemInstance := AttrCacheItem{}
+	attrCacheItemInstance := attrCacheItem{}
 	// .generate a path directory
 
 	// .populate the tree
@@ -124,7 +123,7 @@ func (suite *cacheMapTestSite) TestInsertCacheMap() {
 }
 
 func TestCacheMapTestSuite(t *testing.T) {
-	suite.Run(t, new(cacheMapTestSite))
+	suite.Run(t, new(cacheMapTestSuite))
 }
 
 // Directory structure
