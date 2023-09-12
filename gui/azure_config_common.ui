@@ -128,7 +128,7 @@
        <item>
         <widget class="QSpinBox" name="spinBox_libfuse_attExp">
          <property name="maximum">
-          <number>3000</number>
+          <number>2147483647</number>
          </property>
          <property name="value">
           <number>120</number>
@@ -138,7 +138,7 @@
        <item>
         <widget class="QSpinBox" name="spinBox_libfuse_entExp">
          <property name="maximum">
-          <number>3000</number>
+          <number>2147483647</number>
          </property>
          <property name="value">
           <number>120</number>
@@ -148,7 +148,7 @@
        <item>
         <widget class="QSpinBox" name="spinBox_libfuse_negEntryExp">
          <property name="maximum">
-          <number>3000</number>
+          <number>2147483647</number>
          </property>
          <property name="value">
           <number>120</number>
@@ -357,21 +357,21 @@
           <item>
            <widget class="QSpinBox" name="spinBox_streaming_blockSize">
             <property name="maximum">
-             <number>3000</number>
+             <number>2147483647</number>
             </property>
            </widget>
           </item>
           <item>
            <widget class="QSpinBox" name="spinBox_streaming_maxBuff">
             <property name="maximum">
-             <number>3000</number>
+             <number>2147483647</number>
             </property>
            </widget>
           </item>
           <item>
            <widget class="QSpinBox" name="spinBox_streaming_buffSize">
             <property name="maximum">
-             <number>3000</number>
+             <number>2147483647</number>
             </property>
            </widget>
           </item>

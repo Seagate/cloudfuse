@@ -48,7 +48,7 @@ var getKeyCmd = &cobra.Command{
 	Short:             "Get value of requested config parameter from your encrypted config file",
 	Long:              "Get value of requested config parameter from your encrypted config file",
 	SuggestFor:        []string{"g", "get"},
-	Example:           "lyvecloudfuse secure get --config-file=config.yaml --passphrase=PASSPHRASE --key=logging.log_level",
+	Example:           "cloudfuse secure get --config-file=config.yaml --passphrase=PASSPHRASE --key=logging.log_level",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := validateOptions()

@@ -1,7 +1,7 @@
 
 
-ver=`../lyvecloudfuse --version | cut -d " " -f 3`
-image="azure-lyvecloudfuse.$ver"
+ver=`../cloudfuse --version | cut -d " " -f 3`
+image="azure-cloudfuse.$ver"
 
 docker login blobfuse2containers.azurecr.io --username $1 --password $2
 docker tag $image:latest blobfuse2containers.azurecr.io/$image

@@ -35,8 +35,8 @@
 package cmd
 
 import (
+	"cloudfuse/internal"
 	"context"
-	"lyvecloudfuse/internal"
 	"os"
 )
 

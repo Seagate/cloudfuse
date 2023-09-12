@@ -37,9 +37,9 @@
 package main
 
 import (
-	"lyvecloudfuse/cmd"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal/winservice"
+	"cloudfuse/cmd"
+	"cloudfuse/common/log"
+	"cloudfuse/internal/winservice"
 
 	"golang.org/x/sys/windows/svc"
 )
@@ -54,7 +54,7 @@ func main() {
 	}
 
 	if isService {
-		handler := &winservice.LyveCloudFuse{}
+		handler := &winservice.Cloudfuse{}
 		run := svc.Run
 		err = run(cmd.SvcName, handler)
 		if err != nil {

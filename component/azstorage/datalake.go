@@ -46,10 +46,10 @@ import (
 	"syscall"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/convertname"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/convertname"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 
@@ -69,10 +69,10 @@ type Datalake struct {
 var _ AzConnection = &Datalake{}
 
 // transformAccountEndpoint
-// Users must set an endpoint to allow blobfuse to
+// Users must set an endpoint to allow cloudfuse to
 // 1. support Azure clouds (ex: Public, Zonal DNS, China, Germany, Gov, etc)
 // 2. direct REST APIs to a truly custom endpoint (ex: www dot custom-domain dot com)
-// We can handle case 1 by simply replacing the .dfs. to .blob. and blobfuse will work fine.
+// We can handle case 1 by simply replacing the .dfs. to .blob. and cloudfuse will work fine.
 // However, case 2 will not work since the endpoint likely only redirects to the dfs endpoint and not the blob endpoint, so we don't know what endpoint to use when we call blob endpoints.
 // This is also a known problem with the SDKs.
 func transformAccountEndpoint(potentialDfsEndpoint string) string {

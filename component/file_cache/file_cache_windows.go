@@ -43,9 +43,9 @@ import (
 	"syscall"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
 
 	"golang.org/x/sys/windows"
 )
@@ -162,7 +162,7 @@ func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	if maxCacheSize == 0 {
 		return nil, false, nil
 	}
-	usage, _ := getUsage(fc.tmpPath)
+	usage, _ := common.GetUsage(fc.tmpPath)
 	available := maxCacheSize - usage
 
 	var free, total, avail uint64

@@ -42,12 +42,12 @@ import (
 	"strings"
 	"time"
 
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common/log"
 
 	"github.com/shirou/gopsutil/v3/process"
 )
 
-// check whether lyvecloudfuse process is running for the given pid
+// check whether cloudfuse process is running for the given pid
 func CheckProcessStatus(pid string) error {
 	if runtime.GOOS == "windows" {
 		pid, err := strconv.ParseInt(pid, 10, 32)
@@ -60,7 +60,7 @@ func CheckProcessStatus(pid string) error {
 		// then the process is running
 		_, err = process.NewProcess(int32(pid))
 		if err != nil {
-			return fmt.Errorf("lyvecloudfuse is not running on pid %v", pid)
+			return fmt.Errorf("cloudfuse is not running on pid %v", pid)
 		}
 		return nil
 	}
@@ -80,10 +80,10 @@ func CheckProcessStatus(pid string) error {
 		}
 	}
 
-	return fmt.Errorf("lyvecloudfuse is not running on pid %v", pid)
+	return fmt.Errorf("cloudfuse is not running on pid %v", pid)
 }
 
-// check lyvecloudfuse pid status at every second
+// check cloudfuse pid status at every second
 func MonitorPid() {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()

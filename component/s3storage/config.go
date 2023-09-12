@@ -38,8 +38,8 @@ import (
 	"errors"
 	"fmt"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 )
 
 var (
@@ -47,14 +47,17 @@ var (
 )
 
 type Options struct {
-	BucketName         string `config:"bucket-name" yaml:"bucket-name,omitempty"`
-	KeyID              string `config:"key-id" yaml:"key-id,omitempty"`
-	SecretKey          string `config:"secret-key" yaml:"secret-key,omitempty"`
-	Region             string `config:"region" yaml:"region,omitempty"`
-	Endpoint           string `config:"endpoint" yaml:"endpoint,omitempty"`
-	PrefixPath         string `config:"subdirectory" yaml:"subdirectory,omitempty"`
-	RestrictedCharsWin bool   `config:"restricted-characters-windows" yaml:"-"`
-	PartSizeMb         int64  `config:"part-size-mb" yaml:"part-size-mb,omitempty"`
+	BucketName                string `config:"bucket-name" yaml:"bucket-name,omitempty"`
+	KeyID                     string `config:"key-id" yaml:"key-id,omitempty"`
+	SecretKey                 string `config:"secret-key" yaml:"secret-key,omitempty"`
+	Region                    string `config:"region" yaml:"region,omitempty"`
+	Endpoint                  string `config:"endpoint" yaml:"endpoint,omitempty"`
+	PrefixPath                string `config:"subdirectory" yaml:"subdirectory,omitempty"`
+	RestrictedCharsWin        bool   `config:"restricted-characters-windows" yaml:"-"`
+	PartSizeMb                int64  `config:"part-size-mb" yaml:"part-size-mb,omitempty"`
+	UploadCutoffMb            int64  `config:"upload-cutoff-mb" yaml:"upload-cutoff-mb,omitempty"`
+	Concurrency               int    `config:"concurrency" yaml:"concurrency,omitempty"`
+	DisableConcurrentDownload bool   `config:"disable-concurrent-download" yaml:"disable-concurrent-download,omitempty"`
 }
 
 // ParseAndValidateConfig : Parse and validate config
@@ -85,6 +88,28 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 
 	// Set restricted characters
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
+	s3.stConfig.disableConcurrentDownload = opt.DisableConcurrentDownload
+
+	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
+	if opt.PartSizeMb < 5 || opt.PartSizeMb > MaxPartSizeMb {
+		log.Warn("ParseAndValidateConfig : Part size must be between 5MB and 5GB. Default to default size")
+		s3.stConfig.partSize = DefaultPartSize
+	} else {
+		s3.stConfig.partSize = opt.PartSizeMb * common.MbToBytes
+	}
+
+	// Cutoff size must not be less than 5 MB. Otherwise, set to default.
+	if opt.UploadCutoffMb < 5 {
+		s3.stConfig.uploadCutoff = DefaultUploadCutoff
+	} else {
+		s3.stConfig.uploadCutoff = opt.UploadCutoffMb * common.MbToBytes
+	}
+
+	if opt.Concurrency > 0 {
+		s3.stConfig.concurrency = opt.Concurrency
+	} else {
+		s3.stConfig.concurrency = DefaultConcurrency
+	}
 
 	// Part size must be at least 5 MB. Otherwise, set to default of 8 MB.
 	if opt.PartSizeMb < 5 {
@@ -111,6 +136,14 @@ func ParseAndReadDynamicConfig(s3 *S3Storage, opt Options, reload bool) error {
 	} else {
 		s3.stConfig.partSize = opt.PartSizeMb * common.MbToBytes
 	}
+
+	// Cutoff size must not be less than 5 MB. Otherwise, set to default of 200 MB.
+	if opt.UploadCutoffMb < 5 {
+		s3.stConfig.uploadCutoff = DefaultUploadCutoff
+	} else {
+		s3.stConfig.uploadCutoff = opt.UploadCutoffMb * common.MbToBytes
+	}
+	s3.stConfig.concurrency = opt.Concurrency
 
 	return nil
 }

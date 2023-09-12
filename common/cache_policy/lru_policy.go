@@ -38,8 +38,8 @@ import (
 	"container/list"
 	"sync"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 )
 
 // KeyPair: the list node containing both block key and cache block values

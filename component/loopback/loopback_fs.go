@@ -43,11 +43,11 @@ import (
 	"strings"
 	"syscall"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
+	"cloudfuse/common"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
 )
 
 //LoopbackFS component Config specifications:
@@ -312,6 +312,17 @@ func (lfs *LoopbackFS) ReadLink(options internal.ReadLinkOptions) (string, error
 func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
 	log.Trace("LoopbackFS::ReadInBuffer : name=%s", options.Handle.Path)
 	f := options.Handle.GetFileObject()
+
+	if f == nil {
+		f1, err := os.OpenFile(common.JoinUnixFilepath(lfs.path, options.Handle.Path), os.O_RDONLY, 0777)
+		if err != nil {
+			return 0, nil
+		}
+
+		n, err := f1.ReadAt(options.Data, options.Offset)
+		f1.Close()
+		return n, err
+	}
 
 	options.Handle.RLock()
 	defer options.Handle.RUnlock()

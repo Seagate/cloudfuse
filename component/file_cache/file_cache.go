@@ -46,12 +46,12 @@ import (
 	"sync"
 	"syscall"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
-	"lyvecloudfuse/internal/stats_manager"
+	"cloudfuse/common"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
+	"cloudfuse/internal/stats_manager"
 
 	"github.com/spf13/cobra"
 )
@@ -301,20 +301,20 @@ func (c *FileCache) Configure(_ bool) error {
 	}
 
 	if config.IsSet(compName + ".background-download") {
-		log.Warn("unsupported v1 CLI parameter: background-download is not supported in lyvecloudfuse. Consider using the streaming component.")
+		log.Warn("unsupported v1 CLI parameter: background-download is not supported in cloudfuse. Consider using the streaming component.")
 	}
 	if config.IsSet(compName + ".cache-poll-timeout-msec") {
-		log.Warn("unsupported v1 CLI parameter: cache-poll-timeout-msec is not supported in lyvecloudfuse. Polling occurs every timeout interval.")
+		log.Warn("unsupported v1 CLI parameter: cache-poll-timeout-msec is not supported in cloudfuse. Polling occurs every timeout interval.")
 	}
 	if config.IsSet(compName + ".upload-modified-only") {
-		log.Warn("unsupported v1 CLI parameter: upload-modified-only is always true in lyvecloudfuse.")
+		log.Warn("unsupported v1 CLI parameter: upload-modified-only is always true in cloudfuse.")
 	}
 	if config.IsSet(compName + ".sync-to-flush") {
 		log.Warn("Sync will upload current contents of file.")
 	}
 
-	log.Info("FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v",
-		c.createEmptyFile, int(c.cacheTimeout), c.tmpPath, int(cacheConfig.maxSizeMB), int(cacheConfig.highThreshold), int(cacheConfig.lowThreshold), c.refreshSec)
+	log.Info("FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v",
+		c.createEmptyFile, int(c.cacheTimeout), c.tmpPath, int(cacheConfig.maxSizeMB), int(cacheConfig.highThreshold), int(cacheConfig.lowThreshold), c.refreshSec, cacheConfig.maxEviction)
 
 	return nil
 }
@@ -758,11 +758,12 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 
 		if fileSize > 0 {
 			// Download/Copy the file from storage to the local file.
+			// We pass a count of 0 to get the entire object
 			err = fc.NextComponent().CopyToFile(
 				internal.CopyToFileOptions{
 					Name:   options.Name,
 					Offset: 0,
-					Count:  fileSize,
+					Count:  0,
 					File:   f,
 				})
 			if err != nil {
@@ -1203,6 +1204,15 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	}
 
 	fc.policy.CachePurge(localSrcPath)
+
+	if fc.cacheTimeout == 0 {
+		// Destination file needs to be deleted immediately
+		fc.policy.CachePurge(localDstPath)
+	} else {
+		// Add destination file to cache, it will be removed on timeout
+		fc.policy.CacheValid(localDstPath)
+	}
+
 	return nil
 }
 
@@ -1210,33 +1220,45 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("FileCache::TruncateFile : name=%s, size=%d", options.Name, options.Size)
 
-	flock := fc.fileLocks.Get(options.Name)
-	flock.Lock()
-	defer flock.Unlock()
+	// If you call truncate CLI command from shell it always sends an open call first followed by truncate
+	// But if you call the truncate method from a C/C++ code then open is not hit and only truncate comes
 
-	err := fc.NextComponent().TruncateFile(options)
-	err = fc.validateStorageError(options.Name, err, "TruncateFile", true)
-	if err != nil {
-		log.Err("FileCache::TruncateFile : %s failed to truncate [%s]", options.Name, err.Error())
-		return err
+	var h *handlemap.Handle = nil
+	var err error = nil
+
+	if options.Size == 0 {
+		// If size is 0 then no need to download any file we can just create an empty file
+		h, err = fc.CreateFile(internal.CreateFileOptions{Name: options.Name, Mode: fc.defaultPermission})
+		if err != nil {
+			log.Err("FileCache::TruncateFile : Error creating file %s [%s]", options.Name, err.Error())
+			return err
+		}
+	} else {
+		// If size is not 0 then we need to open the file and then truncate it
+		// Open will force download if file was not present in local system
+		h, err = fc.OpenFile(internal.OpenFileOptions{Name: options.Name, Flags: os.O_RDWR, Mode: fc.defaultPermission})
+		if err != nil {
+			log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
+			return err
+		}
 	}
 
 	// Update the size of the file in the local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
-	info, err := os.Stat(localPath)
-	if err == nil || os.IsExist(err) {
-		fc.policy.CacheValid(localPath)
+	fc.policy.CacheValid(localPath)
 
-		if info.Size() != options.Size {
-			err = os.Truncate(localPath, options.Size)
-			if err != nil {
-				log.Err("FileCache::TruncateFile : error truncating cached file %s [%s]", localPath, err.Error())
-				return err
-			}
-		}
+	// Truncate the file created in local system
+	err = os.Truncate(localPath, options.Size)
+	if err != nil {
+		log.Err("FileCache::TruncateFile : error truncating cached file %s [%s]", localPath, err.Error())
+		_ = fc.CloseFile(internal.CloseFileOptions{Handle: h})
+		return err
 	}
 
-	return nil
+	// Mark the handle as dirty so that close of this file will force an upload
+	h.Flags.Set(handlemap.HandleFlagDirty)
+
+	return fc.CloseFile(internal.CloseFileOptions{Handle: h})
 }
 
 // Chmod : Update the file with its new permissions

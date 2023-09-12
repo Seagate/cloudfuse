@@ -42,9 +42,9 @@ import (
 	"strings"
 	"syscall"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
 
 	"github.com/aws/smithy-go"
 )
@@ -53,7 +53,10 @@ import (
 // TODO: add AWS SDK logging function code here (like getLogOptions)
 
 const (
-	DefaultPartSize = 8 * common.MbToBytes
+	DefaultPartSize     = 8 * common.MbToBytes
+	DefaultUploadCutoff = 100 * common.MbToBytes
+	DefaultConcurrency  = 5
+	MaxPartSizeMb       = 5 * 1024
 )
 
 // ----------- Cloud Storage error code handling ---------------
@@ -79,7 +82,7 @@ func parseS3Err(err error, attemptedAction string) error {
 	pc, _, _, ok := runtime.Caller(1)
 	if ok {
 		longFuncName := runtime.FuncForPC(pc).Name()
-		// the function name returned is long, e.g. "lyvecloudfuse/component/s3storage.(*Client).getObject"
+		// the function name returned is long, e.g. "cloudfuse/component/s3storage.(*Client).getObject"
 		// split the long function name using the component name
 		funcNameParts := strings.Split(longFuncName, compName)
 		if len(funcNameParts) > 1 {

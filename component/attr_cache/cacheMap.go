@@ -38,8 +38,8 @@ import (
 	"os"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/internal"
+	"cloudfuse/common"
+	"cloudfuse/internal"
 )
 
 // Flags represented in BitMap for various flags in the attr cache item

@@ -37,8 +37,8 @@
 package libfuse
 
 import (
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 
 	"github.com/winfsp/cgofuse/fuse"
 	"golang.org/x/sys/windows"

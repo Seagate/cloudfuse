@@ -10,6 +10,9 @@ parameters:
   - name: prefix
     type: string
     default: 'Test'
+  - name: ro_mount
+    type: boolean
+    default: false    
 
 steps:
 
@@ -30,9 +33,9 @@ steps:
     env:
       mount_dir: ${{ parameters.mount_dir }}
 
-  # Check blobfuse2 is mounted or not    
+  # Check cloudfuse is mounted or not    
   - script: |
-      sudo ps -aux | grep blobfuse2
+      sudo ps -aux | grep cloudfuse
     displayName: 'Print Process info'
     env:
       mount_dir: ${{ parameters.mount_dir }}
@@ -42,5 +45,6 @@ steps:
     timeoutInMinutes: 30
     displayName: '${{ parameters.prefix }}: PreStart Cleanup'
     continueOnError: true
+    condition: eq( ${{ parameters.ro_mount }}, false )
     env:
       mount_dir: ${{ parameters.mount_dir }}

@@ -1,5 +1,5 @@
-//go:build !authtest && !unittest
-// +build !authtest,!unittest
+//go:build !authtest
+// +build !authtest
 
 /*
     _____           _____   _____   ____          ______  _____  ------
@@ -51,11 +51,11 @@ import (
 	"testing"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
+	"cloudfuse/common"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -91,7 +91,10 @@ func newTestClient(configuration string) (*Client, error) {
 			Region:     conf.Region,
 			Endpoint:   conf.Endpoint,
 		},
-		prefixPath: conf.PrefixPath,
+		prefixPath:                conf.PrefixPath,
+		disableConcurrentDownload: conf.DisableConcurrentDownload,
+		partSize:                  conf.PartSizeMb * common.MbToBytes,
+		uploadCutoff:              conf.UploadCutoffMb * common.MbToBytes,
 	}
 	// create a Client
 	client := NewConnection(configForS3Client)
@@ -132,10 +135,17 @@ func (s *clientTestSuite) SetupTest() {
 }
 
 func (s *clientTestSuite) setupTestHelper(configuration string, create bool) {
+	if storageTestConfigurationParameters.PartSizeMb == 0 {
+		storageTestConfigurationParameters.PartSizeMb = 5
+	}
+	if storageTestConfigurationParameters.UploadCutoffMb == 0 {
+		storageTestConfigurationParameters.UploadCutoffMb = 5
+	}
 	if configuration == "" {
-		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s\n  part-size-mb: %d\n  upload-cutoff-mb: %d\n",
 			storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
-			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region,
+			storageTestConfigurationParameters.PartSizeMb, storageTestConfigurationParameters.UploadCutoffMb)
 	}
 	s.config = configuration
 
@@ -157,8 +167,6 @@ func (s *clientTestSuite) cleanupTest() {
 func (s *clientTestSuite) TestListBuckets() {
 	defer s.cleanupTest()
 	// TODO: generalize this test by creating, listing, then destroying a bucket
-	// 	We need to get permissions to create buckets in Lyve Cloud, or implement this against AWS S3.
-	// 	For now, the bucket parameter has been removed from the test suite for tidiness sake
 	buckets, err := s.client.ListBuckets()
 	s.assert.Nil(err)
 	s.assert.Equal(buckets, []string{"stxe1-srg-lens-lab1"})
@@ -599,6 +607,39 @@ func (s *clientTestSuite) TestReadToFile() {
 	s.assert.Nil(err)
 	defer os.Remove(f.Name())
 
+	err = s.client.ReadToFile(name, 0, 0, f)
+	s.assert.Nil(err)
+
+	// file content should match generated body
+	output := make([]byte, bodyLen)
+	f, err = os.Open(f.Name())
+	s.assert.Nil(err)
+	outputLen, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(bodyLen, outputLen)
+	s.assert.EqualValues(body, output)
+	f.Close()
+}
+
+func (s *clientTestSuite) TestReadToFileRanged() {
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	body := []byte(randomString(bodyLen))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	f, err := os.CreateTemp("", name+".tmp")
+	s.assert.Nil(err)
+	defer os.Remove(f.Name())
+
 	err = s.client.ReadToFile(name, 0, int64(bodyLen), f)
 	s.assert.Nil(err)
 
@@ -612,6 +653,43 @@ func (s *clientTestSuite) TestReadToFile() {
 	s.assert.EqualValues(body, output)
 	f.Close()
 }
+
+func (s *clientTestSuite) TestReadToFileNoMultipart() {
+	storageTestConfigurationParameters.DisableConcurrentDownload = true
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(vdConfig, true)
+	defer s.cleanupTest()
+	// setup
+	name := generateFileName()
+	maxBodyLen := 50
+	minBodyLen := 10
+	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	body := []byte(randomString(bodyLen))
+	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(name),
+		Body:   bytes.NewReader(body),
+	})
+	s.assert.Nil(err)
+
+	f, err := os.CreateTemp("", name+".tmp")
+	s.assert.Nil(err)
+	defer os.Remove(f.Name())
+
+	err = s.client.ReadToFile(name, 0, 0, f)
+	s.assert.Nil(err)
+
+	// file content should match generated body
+	output := make([]byte, bodyLen)
+	f, err = os.Open(f.Name())
+	s.assert.Nil(err)
+	outputLen, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(bodyLen, outputLen)
+	s.assert.EqualValues(body, output)
+	f.Close()
+}
+
 func (s *clientTestSuite) TestReadBuffer() {
 	defer s.cleanupTest()
 	// setup

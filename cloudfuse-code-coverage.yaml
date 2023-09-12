@@ -1,0 +1,918 @@
+# cloudfuse Nightly Build-Sanity Pipeline
+
+# In case of failure on a Self-Hosted Agent perform the following steps to get the vm back online:
+# 1. Check which vm is offline by going to agent-pools in Azure pipelines portal
+# 2. Log into the VM that is offline
+# 3. Clear the _work or work directory which must be in myagent or $(HOME) directory
+# 4. Verify whether system is online from the Azure pipelines portal
+
+parameters:
+  - name: coverage_test
+    displayName: 'Code Coverage'
+    type: boolean
+    default: true
+
+  - name: cleanup_test
+    displayName: 'Account Cleanup'
+    type: boolean
+    default: true
+
+
+stages:
+  - ${{ if eq(parameters.coverage_test, true) }}:    
+    - stage: BuildAndTest
+      jobs:
+        - job: Coverage
+          timeoutInMinutes: 300
+          strategy:
+            matrix:
+              # Ubuntu-18:
+              #   AgentName: 'cloudfuse-ubuntu18'
+              #   imageName: 'ubuntu-18.04'
+              #   containerName: 'test-cnt-ubn-18'
+              #   fuselib: 'libfuse-dev'
+              #   fuselib2: 'fuse'
+              #   tags: 'fuse2'
+              Ubuntu-20:
+                AgentName: 'cloudfuse-ubuntu20'
+                imageName: 'ubuntu-20.04'
+                containerName: 'test-cnt-ubn-20'
+                fuselib: 'libfuse-dev'
+                fuselib2: 'fuse'        
+
+          pool:
+            vmImage: $(imageName)
+            # name: "cloudfuse-ubuntu-pool"
+            # demands:
+            #   - ImageOverride -equals $(AgentName)
+
+          variables:
+            - group: NightlyCloudFuse
+            - name: MOUNT_DIR
+              value: '$(Pipeline.Workspace)/blob_mnt'
+            - name: TEMP_DIR
+              value: '$(Pipeline.Workspace)/cloudfuse_tmp'
+            - name: cloudfuse_CFG
+              value: '$(Pipeline.Workspace)/cloudfuse.yaml'
+            - name: cloudfuse_STREAM_CFG
+              value: '$(Pipeline.Workspace)/cloudfuse_stream.yaml'
+            - name: cloudfuse_ADLS_CFG
+              value: '$(Pipeline.Workspace)/cloudfuse.adls.yaml'
+            - name: GOPATH
+              value: '$(Pipeline.Workspace)/go'
+            - name: ROOT_DIR
+              value: '$(Pipeline.Workspace)' 
+            - name: WORK_DIR
+              value: '.'
+
+          steps:
+            - checkout: self
+
+            # Clone the repo
+            # - script: |
+            #     git clone https://github.com/Azure/azure-storage-fuse
+            #   displayName: 'Checkout Code'
+            #   workingDirectory: $(ROOT_DIR)
+
+            # Checkout the branch
+            # - script: |
+            #     git checkout `echo $(Build.SourceBranch) | cut -d "/" -f 1,2 --complement`
+            #   displayName: 'Checkout Branch'
+            #   workingDirectory: $(WORK_DIR)
+          
+            - script: |
+                sudo apt-get update --fix-missing -o Dpkg::Options::="--force-confnew"
+                sudo apt-get install make cmake gcc g++ parallel $(fuselib) $(fuselib2) -y -o Dpkg::Options::="--force-confnew"
+              displayName: 'Install libfuse'
+
+
+            # Create directory structure
+            - script: |
+                sudo mkdir -p $(ROOT_DIR)
+                sudo chown -R `whoami` $(ROOT_DIR)
+                chmod 777 $(ROOT_DIR)
+              displayName: 'Create Directory Structure'
+
+            # -------------------------------------------------------
+            # Pull and build the code
+            - template: 'azure-pipeline-templates/build.yml'
+              parameters:
+                working_directory: $(WORK_DIR)
+                root_dir: $(Pipeline.Workspace)
+                mount_dir: $(MOUNT_DIR)
+                temp_dir: $(TEMP_DIR)
+                gopath: $(GOPATH)
+                container: $(containerName)
+                tags: $(tags)
+                fuselib: $(fuselib)
+                skip_msi: "false"
+                skip_ut: true
+
+            # -------------------------------------------------------
+            # UT based code coverage test
+            - script: |
+                go test -v -timeout=1h ./... --tags=unittest,storagetest,$(tags) -covermode count -coverprofile ./cloudfuse_ut.cov
+              workingDirectory: $(WORK_DIR)
+              displayName: "UT Code Coverage"
+        
+            # -------------------------------------------------------
+            # Build code coverage binary
+            - script: |
+                go test -coverpkg="./..." -covermode=count -c --tags=$(tags) -o cloudfuse.test
+              workingDirectory: $(WORK_DIR)
+              displayName: "Build coverage binary"
+              condition: always()
+
+            # -------------------------------------------------------
+            # Config Generation (Block Blob)
+            - script: |
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(cloudfuse_CFG)
+              env:
+                NIGHTLY_STO_ACC_NAME: $(NIGHTLY_STO_BLOB_ACC_NAME)
+                NIGHTLY_STO_ACC_KEY: $(NIGHTLY_STO_BLOB_ACC_KEY)
+                ACCOUNT_TYPE: 'block'
+                ACCOUNT_ENDPOINT: 'https://$(NIGHTLY_STO_BLOB_ACC_NAME).blob.core.windows.net'
+                VERBOSE_LOG: false
+                USE_HTTP: false
+              displayName: 'Create Config File - Block Blob'
+              workingDirectory: $(WORK_DIR)
+              #continueOnError: false
+              condition: always()
+            
+            # Code Coverage with e2e-tests for block blob
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_block.cov mount $(MOUNT_DIR) --config-file=$(cloudfuse_CFG) --foreground=true &
+                sleep 10
+                ps -aux | grep cloudfuse
+                rm -rf $(MOUNT_DIR)/*
+                cd test/e2e_tests
+                go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
+                cd -
+                sudo fusermount -u $(MOUNT_DIR)
+                sleep 5
+              workingDirectory: $(WORK_DIR)
+              displayName: "Block Blob Coverage"
+              condition: always()
+
+            # Code Coverage with health monitor, dynamic, CPU and mem profilers enabled for block blob
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                cp $(cloudfuse_CFG) /tmp/configBlockProfilerTemp.yaml
+                echo "dynamic-profile: true" >> /tmp/configBlockProfilerTemp.yaml
+                echo "cpu-profile: /tmp/cpuBlockProfTmp" >> /tmp/configBlockProfilerTemp.yaml
+                echo "mem-profile: /tmp/memBlockProfTmp" >> /tmp/configBlockProfilerTemp.yaml
+                echo "health_monitor:" >> /tmp/configBlockProfilerTemp.yaml
+                echo "  enable-monitoring: true" >> /tmp/configBlockProfilerTemp.yaml
+                echo "  monitor-disable-list:" >> /tmp/configBlockProfilerTemp.yaml
+                echo "    - cloudfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
+                cat /tmp/configBlockProfilerTemp.yaml
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_block_profiler.cov mount $(MOUNT_DIR) --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
+                sleep 10
+                ps -aux | grep cloudfuse
+                rm -rf $(MOUNT_DIR)/*
+                cd test/e2e_tests
+                go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
+                cd -
+                sudo fusermount -u $(MOUNT_DIR)
+                sleep 5
+              workingDirectory: $(WORK_DIR)
+              displayName: "Block Blob Coverage with profilers"
+              condition: always()
+
+            # Config Generation (ADLS)
+            - script: |
+                ./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(cloudfuse_ADLS_CFG)
+              env:
+                NIGHTLY_STO_ACC_NAME: $(AZTEST_ADLS_ACC_NAME)
+                NIGHTLY_STO_ACC_KEY:  $(AZTEST_ADLS_KEY)
+                ACCOUNT_TYPE: 'adls'
+                ACCOUNT_ENDPOINT: 'https://$(AZTEST_ADLS_ACC_NAME).dfs.core.windows.net'
+                VERBOSE_LOG: false
+                USE_HTTP: false
+              displayName: 'Create Config File - ADLS'
+              workingDirectory: $(WORK_DIR)
+              #continueOnError: false
+              condition: always()
+
+            # Code Coverage with e2e-tests for ADLS
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_adls.cov mount $(MOUNT_DIR) --config-file=$(cloudfuse_ADLS_CFG) --foreground=true &
+                sleep 10
+                ps -aux | grep cloudfuse
+                rm -rf $(MOUNT_DIR)/*
+                cd test/e2e_tests
+                go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -adls=true -tmp-path=$(TEMP_DIR)
+                cd -
+                ./cloudfuse.test unmount all
+                sleep 5
+              workingDirectory: $(WORK_DIR)
+              displayName: "ADLS Coverage"
+              condition: always()
+
+            # Code Coverage with health monitor, dynamic, CPU and mem profilers enabled for adls
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                cp $(cloudfuse_ADLS_CFG) /tmp/configAdlsProfilerTemp.yaml
+                echo "dynamic-profile: true" >> /tmp/configAdlsProfilerTemp.yaml
+                echo "cpu-profile: /tmp/cpuAdlsProfTmp" >> /tmp/configAdlsProfilerTemp.yaml
+                echo "mem-profile: /tmp/memAdlsProfTmp" >> /tmp/configAdlsProfilerTemp.yaml
+                echo "health_monitor:" >> /tmp/configAdlsProfilerTemp.yaml
+                echo "  enable-monitoring: true" >> /tmp/configAdlsProfilerTemp.yaml
+                echo "  monitor-disable-list:" >> /tmp/configAdlsProfilerTemp.yaml
+                echo "    - cloudfuse_stats" >> /tmp/configAdlsProfilerTemp.yaml
+                cat /tmp/configAdlsProfilerTemp.yaml
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_adls_profiler.cov mount $(MOUNT_DIR) --config-file=/tmp/configAdlsProfilerTemp.yaml --foreground=true &
+                sleep 10
+                ps -aux | grep cloudfuse
+                rm -rf $(MOUNT_DIR)/*
+                cd test/e2e_tests
+                go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
+                cd -
+                sudo fusermount -u $(MOUNT_DIR)
+                sleep 5
+              workingDirectory: $(WORK_DIR)
+              displayName: "ADLS Coverage with profilers"
+              condition: always()
+
+            # -------------------------------------------------------
+            # Config Generation (S3)
+            - script: |
+                ./cloudfuse.test gen-test-config --config-file=s3_key.yaml --temp-path=$(TEMP_DIR) --output-file=$(cloudfuse_CFG)
+              env:
+                S3_BUCKET_NAME: $(S3TEST_BUCKET_NAME)
+                S3_ENDPOINT: $(S3TEST_ENDPOINT)
+                S3_KEY_ID: $(S3TEST_ACCESS_KEY)
+                S3_REGION: $(S3TEST_REGION)
+                S3_SECRET_KEY: $(S3TEST_SECRET_KEY)
+              displayName: 'Create Config File - S3'
+              workingDirectory: $(WORK_DIR)
+              #continueOnError: false
+              condition: always()
+            
+            # Code Coverage with e2e-tests for S3
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_s3.cov mount $(MOUNT_DIR) --config-file=$(cloudfuse_CFG) --foreground=true &
+                sleep 10
+                ps -aux | grep cloudfuse
+                cd test/e2e_tests
+                go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
+                cd -
+                ./cloudfuse.test unmount all
+                sleep 5
+              workingDirectory: $(WORK_DIR)
+              displayName: "S3 Coverage"
+              condition: always()
+
+            # Code Coverage with health monitor, dynamic, CPU and mem profilers enabled for S3
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                cp $(cloudfuse_CFG) /tmp/configBlockProfilerTemp.yaml
+                echo "dynamic-profile: true" >> /tmp/configBlockProfilerTemp.yaml
+                echo "cpu-profile: /tmp/cpuBlockProfTmp" >> /tmp/configBlockProfilerTemp.yaml
+                echo "mem-profile: /tmp/memBlockProfTmp" >> /tmp/configBlockProfilerTemp.yaml
+                echo "health_monitor:" >> /tmp/configBlockProfilerTemp.yaml
+                echo "  enable-monitoring: true" >> /tmp/configBlockProfilerTemp.yaml
+                echo "  monitor-disable-list:" >> /tmp/configBlockProfilerTemp.yaml
+                echo "    - cloudfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
+                cat /tmp/configBlockProfilerTemp.yaml
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_s3_profiler.cov mount $(MOUNT_DIR) --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
+                sleep 10
+                ps -aux | grep cloudfuse
+                cd test/e2e_tests
+                go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
+                cd -
+                sudo fusermount -u $(MOUNT_DIR)
+                sleep 5
+              workingDirectory: $(WORK_DIR)
+              displayName: "S3 Coverage with profilers"
+              condition: always()
+
+            # -------------------------------------------------------
+            # Config Generation (Block Blob - LFU policy)
+            - script: |
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_gentest2.cov gen-test-config --config-file=azure_key_lfu.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(cloudfuse_CFG)
+              env:
+                NIGHTLY_STO_ACC_NAME: $(NIGHTLY_STO_BLOB_ACC_NAME)
+                NIGHTLY_STO_ACC_KEY: $(NIGHTLY_STO_BLOB_ACC_KEY)
+                ACCOUNT_TYPE: 'block'
+                ACCOUNT_ENDPOINT: 'https://$(NIGHTLY_STO_BLOB_ACC_NAME).blob.core.windows.net'
+                VERBOSE_LOG: false
+              displayName: 'Create Config File - LFU'
+              #continueOnError: false
+              workingDirectory: $(WORK_DIR)
+              condition: always()
+            
+            # Code Coverage with e2e-tests for block blob with lfu policy
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_block_lfu.cov mount $(MOUNT_DIR) --config-file=$(cloudfuse_CFG) --foreground=true &
+                sleep 10
+                ps -aux | grep cloudfuse
+                rm -rf $(MOUNT_DIR)/*
+                cd test/e2e_tests
+                go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
+                cd -
+                ./cloudfuse.test unmount $(MOUNT_DIR)
+                sleep 5
+              workingDirectory: $(WORK_DIR)
+              displayName: "Block Blob LFU Coverage"
+              condition: always()
+
+            # -------------------------------------------------------
+            # Config Generation (S3 - LFU policy)
+            - script: |
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_gentest2_s3.cov gen-test-config --config-file=s3_key_lfu.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(cloudfuse_CFG)
+              env:
+                S3_BUCKET_NAME: $(S3TEST_BUCKET_NAME)
+                S3_ENDPOINT: $(S3TEST_ENDPOINT)
+                S3_KEY_ID: $(S3TEST_ACCESS_KEY)
+                S3_REGION: $(S3TEST_REGION)
+                S3_SECRET_KEY: $(S3TEST_SECRET_KEY)
+              displayName: 'Create Config File - S3 LFU'
+              #continueOnError: false
+              workingDirectory: $(WORK_DIR)
+              condition: always()
+            
+            # Code Coverage with e2e-tests for S3 with lfu policy
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_s3_lfu.cov mount $(MOUNT_DIR) --config-file=$(cloudfuse_CFG) --foreground=true &
+                sleep 10
+                ps -aux | grep cloudfuse
+                cd test/e2e_tests
+                go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
+                cd -
+                ./cloudfuse.test unmount $(MOUNT_DIR)
+                sleep 5
+              workingDirectory: $(WORK_DIR)
+              displayName: "S3 LFU Coverage"
+              condition: always()
+
+            # -------------------------------------------------------
+            # Config Generation (Block Blob - Stream)
+            - script: |
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_gentest3.cov gen-test-config --config-file=azure_stream.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(cloudfuse_STREAM_CFG)
+              displayName: 'Create Config File - Stream'
+              env:
+                NIGHTLY_STO_ACC_NAME: $(NIGHTLY_STO_BLOB_ACC_NAME)
+                NIGHTLY_STO_ACC_KEY: $(NIGHTLY_STO_BLOB_ACC_KEY)
+                ACCOUNT_TYPE: 'block'
+                ACCOUNT_ENDPOINT: 'https://$(NIGHTLY_STO_BLOB_ACC_NAME).blob.core.windows.net'
+                VERBOSE_LOG: false
+              continueOnError: false
+              workingDirectory: $(WORK_DIR)
+              condition: always()
+            
+            # Streaming test preparation
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_stream_prep.cov mount $(MOUNT_DIR) --config-file=$(cloudfuse_STREAM_CFG) --foreground=true &
+                sleep 10
+                ps -aux | grep cloudfuse
+                for i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'head -c {}M < /dev/urandom > $(WORK_DIR)/myfile_{}'
+                for i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'cp $(WORK_DIR)/myfile_{} $(MOUNT_DIR)/'
+                ./cloudfuse.test unmount "$(MOUNT_DIR)*"
+                sudo fusermount -u $(MOUNT_DIR) 
+                sleep 5
+              workingDirectory: $(WORK_DIR)
+              displayName: "Block Blob Stream Preparation"
+              condition: always()
+
+            # Code Coverage with e2e-tests for block blob with streaming on
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_stream.cov mount $(MOUNT_DIR) --config-file=$(cloudfuse_STREAM_CFG) --foreground=true &
+                sleep 10
+                ps -aux | grep cloudfuse
+                rm -rf $(MOUNT_DIR)/*
+                cd test/e2e_tests
+                go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
+                cd -
+                sudo fusermount -u $(MOUNT_DIR) 
+                sleep 5
+              workingDirectory: $(WORK_DIR)
+              displayName: "Block Blob Stream Coverage"
+              condition: always()
+
+
+            # -------------------------------------------------------
+            # Config Generation (Block Blob) for cli options
+            - script: |
+                ./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(cloudfuse_CFG)
+              displayName: 'Create Config File - Block Blob'
+              env:
+                NIGHTLY_STO_ACC_NAME: $(NIGHTLY_STO_BLOB_ACC_NAME)
+                NIGHTLY_STO_ACC_KEY: $(NIGHTLY_STO_BLOB_ACC_KEY)
+                ACCOUNT_TYPE: 'block'
+                ACCOUNT_ENDPOINT: 'https://$(NIGHTLY_STO_BLOB_ACC_NAME).blob.core.windows.net'
+                VERBOSE_LOG: false
+                USE_HTTP: false
+              condition: always()
+              workingDirectory: $(WORK_DIR)
+
+            # Component generation code coverage
+            - script: |
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/generate_cmd.cov generate test_component
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : Component Generation"
+              condition: always()
+
+            # Mount / Unmount / List code coverage
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/list_empty_cmd.cov mount list
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : Mount List"
+              condition: always()
+
+            - script: |
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_cmd.cov mount all $(MOUNT_DIR) --config-file=$(cloudfuse_CFG) --log-level=log_debug 
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+
+                sleep 20     
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/list_cmd_all.cov mount list
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+                ./cloudfuse.test unmount all
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : Mount all and List"
+              condition: always()
+
+            - script: |
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_cmd_all.cov mount all $(MOUNT_DIR) --config-file=$(cloudfuse_CFG) --log-level=log_debug 
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+
+                sleep 20
+                cd $(MOUNT_DIR)/$(containerName)
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_cmd_cont_fail.cov unmount $(MOUNT_DIR)/$(containerName)
+                cd -
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_cmd_cont.cov unmount $(MOUNT_DIR)/$(containerName)
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_wild_cmd.cov unmount "testmut*"
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_wild_cmd.cov unmount "abcdef*"
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_negative_cmd.cov unmount abcdef
+                if [ $? -ne 1 ]; then
+                  exit 1
+                fi
+
+                for i in {1..5}; do ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/umnt_all_cmd$i.cov unmount all; done
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : Unmount options"
+              condition: always()
+
+
+            # Mount / Unmount Negative tests
+            - script: |
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_neg.cov mount all /abc --config-file=$(cloudfuse_CFG) --log-level=log_debug
+                if [ $? -eq 0 ]; then
+                  exit 1
+                fi
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : Invalid mount path"
+              timeoutInMinutes: 2
+              condition: always()
+
+            - script: |
+                ./cloudfuse.test unmount all
+                cp $(cloudfuse_CFG) /tmp/configMountall.yaml
+                echo "mountall:" >> /tmp/configMountall.yaml
+                echo "  container-allowlist:" >> /tmp/configMountall.yaml
+                echo "    - abcd" >> /tmp/configMountall.yaml
+                cat /tmp/configMountall.yaml
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/secure_encrypt_all.cov secure encrypt --config-file=/tmp/configMountall.yaml --output-file=$(Pipeline.Workspace)/cloudfuse.azsec --passphrase=123123123123123123123123 
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_all_cmd_secure.cov mount all $(MOUNT_DIR) --config-file=$(Pipeline.Workspace)/cloudfuse.azsec --passphrase=123123123123123123123123 --log-level=log_debug --foreground=true &
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+
+                sleep 5
+                ./cloudfuse.test unmount all
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : Mount all with secure config"
+              timeoutInMinutes: 2
+              condition: always()
+
+            - script: |
+                ./cloudfuse.test unmount all
+                cp $(cloudfuse_CFG) /tmp/configMountall.yaml
+                echo "mountall:" >> /tmp/configMountall.yaml
+                echo "  container-denylist:" >> /tmp/configMountall.yaml
+                echo "    - abcd" >> /tmp/configMountall.yaml
+                cat /tmp/configMountall.yaml
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/secure_encrypt_all2.cov secure encrypt --config-file=/tmp/configMountall.yaml --output-file=$(Pipeline.Workspace)/cloudfuse.azsec --passphrase=123123123123123123123123 
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_all_cmd_secure2.cov mount all $(MOUNT_DIR) --config-file=$(Pipeline.Workspace)/cloudfuse.azsec --passphrase=123123123123123123123123 --log-level=log_debug --foreground=true &
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+
+                sleep 5
+                ./cloudfuse.test unmount all
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : Mount all with secure config 2"
+              timeoutInMinutes: 2
+              condition: always()
+
+            - script: |
+                ./cloudfuse.test unmount all
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_foreg.cov mount $(MOUNT_DIR) --config-file=$(cloudfuse_CFG) --log-level=log_debug --foreground=true &
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+
+                sleep 5
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_remount.cov mount $(MOUNT_DIR) --config-file=$(cloudfuse_CFG) --log-level=log_debug
+                if [ $? -eq 0 ]; then
+                  exit 1
+                fi
+
+                sleep 5
+                ./cloudfuse.test unmount all
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : Remount test"
+              timeoutInMinutes: 2
+              condition: always()
+
+            # Doc generation tests
+            - script: |
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/doc1.cov doc
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/doc2.cov doc --output-location /notexists
+                touch ~/a.txt
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/doc2.cov doc --output-location ~/a.txt
+                rm -rf ~/a.txt
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : doc generation"
+              timeoutInMinutes: 2
+              condition: always()
+
+            # Version check
+            - script: |
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/version1.cov --version
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/version2.cov version
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/version2.cov version --check
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : version"
+              timeoutInMinutes: 2
+              condition: always()
+
+            # Simulate config change
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                ./cloudfuse.test unmount all
+                
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_foreg_2.cov mount all $(MOUNT_DIR) --config-file=$(cloudfuse_CFG) --log-level=log_debug --foreground=true &
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+
+                sleep 5
+                echo -e "\n\nlogging:\n  level:log_debug\n  type:base" >> $(cloudfuse_CFG)
+                sed -i 's/timeout:.*/timeout: 300/' $(cloudfuse_CFG)
+                sleep 5
+
+                ./cloudfuse.test unmount all
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : Config change simulator"
+              condition: always()
+
+            # Secure Config, fine to use insecure passphrase as this is just for testing
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                ./cloudfuse.test unmount all
+                ./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(cloudfuse_CFG)
+                
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/secure_encrypt.cov secure encrypt --config-file=$(cloudfuse_CFG) --output-file=$(Pipeline.Workspace)/cloudfuse.azsec --passphrase=123123123123123123123123 
+                if [ $? -ne 0 ]; then
+                  exit 1
+                fi
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/mount_secure.cov mount $(MOUNT_DIR) --config-file=$(Pipeline.Workspace)/cloudfuse.azsec --passphrase=123123123123123123123123 &
+                sleep 10
+                ps -aux | grep cloudfuse
+                rm -rf $(MOUNT_DIR)/*
+                cd test/e2e_tests
+                go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -adls=false -tmp-path=$(TEMP_DIR)
+                cd -
+
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/secure_set.cov secure set --config-file=$(Pipeline.Workspace)/cloudfuse.azsec --passphrase=123123123123123123123123 --key=logging.level --value=log_debug
+                ./cloudfuse.test unmount all
+                sleep 5
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : Secure Config"
+              env:
+                NIGHTLY_STO_ACC_NAME: $(NIGHTLY_STO_BLOB_ACC_NAME)
+                NIGHTLY_STO_ACC_KEY: $(NIGHTLY_STO_BLOB_ACC_KEY)
+                ACCOUNT_TYPE: 'block'
+                ACCOUNT_ENDPOINT: 'https://$(NIGHTLY_STO_BLOB_ACC_NAME).blob.core.windows.net'
+                VERBOSE_LOG: false
+                USE_HTTP: false
+              condition: always()
+
+            # stop health monitor binary associated with a given cloudfuse pid
+            - script: |
+                ./cloudfuse.test unmount all
+                sudo kill -9 `pidof cloudfuse.test`
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                mkdir -p $(MOUNT_DIR)/hmon_test
+
+                sudo ln -s `pwd`/cfusemon /usr/local/bin/cfusemon
+                ls -l /usr/local/bin/cfusemon*
+
+                cat /tmp/configAdlsProfilerTemp.yaml
+                ./cloudfuse.test mount $(MOUNT_DIR)/hmon_test --config-file=/tmp/configAdlsProfilerTemp.yaml
+                sleep 10
+                ps -aux | grep cloudfuse
+                ps -aux | grep cfusemon
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cfusemon_stop_pid.cov health-monitor stop --pid=`pidof cloudfuse`
+                ./cloudfuse.test unmount all
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : Health monitor stop pid"
+              condition: always()
+
+            # stop all health monitor binaries
+            - script: |
+                ./cloudfuse.test unmount all
+                sudo kill -9 `pidof cloudfuse.test`
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                mkdir -p $(MOUNT_DIR)/hmon_test
+
+                cat /tmp/configAdlsProfilerTemp.yaml
+                ./cloudfuse.test mount $(MOUNT_DIR)/hmon_test --config-file=/tmp/configAdlsProfilerTemp.yaml
+                sleep 10
+                ps -aux | grep cloudfuse
+                ps -aux | grep cfusemon
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cfusemon_stop_all.cov health-monitor stop all
+                ./cloudfuse.test unmount all
+              workingDirectory: $(WORK_DIR)
+              displayName: "CLI : Health monitor stop all"
+              condition: always()
+
+            # Start Proxy
+            - script: |
+                sudo apt-get update --fix-missing -y
+                sudo apt remove mitmproxy -y
+                sudo apt-get install python3-setuptools -y
+                sudo apt install python3-pip -y
+                sudo pip3 install mitmproxy
+                mitmdump -w proxy_logs.txt &
+              displayName: 'Install & Start Proxy'
+
+            # Configure Proxy cert & env
+            - script: |
+                sudo mkdir /usr/local/share/ca-certificates/extra
+                sudo cp ~/.mitmproxy/mitmproxy-ca-cert.cer /usr/local/share/ca-certificates/extra/mitmproxy-ca-cert.crt
+                sudo update-ca-certificates
+                export https_proxy="127.0.0.1:8080"
+                export http_proxy="127.0.0.1:8080"
+              displayName: 'Configure Proxy'
+              condition: always()
+
+            # Config Generation (Block Blob Proxy)
+            - script: |
+                ./cloudfuse.test gen-test-config --config-file=azure_key_proxy.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(cloudfuse_CFG)
+              env:
+                NIGHTLY_STO_ACC_NAME: $(NIGHTLY_STO_BLOB_ACC_NAME)
+                NIGHTLY_STO_ACC_KEY: $(NIGHTLY_STO_BLOB_ACC_KEY)
+                ACCOUNT_TYPE: 'block'
+                ACCOUNT_ENDPOINT: 'https://$(NIGHTLY_STO_BLOB_ACC_NAME).blob.core.windows.net'
+                VERBOSE_LOG: false
+                USE_HTTP: false
+              displayName: 'Create Config File - Block Blob Proxy'
+              workingDirectory: $(WORK_DIR)
+              #continueOnError: false
+              condition: always()
+            
+            # Code Coverage with e2e-tests for block blob Proxy
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_block_proxy.cov mount $(MOUNT_DIR) --config-file=$(cloudfuse_CFG) --disable-compression=true --foreground=true &
+                sleep 10
+                ps -aux | grep cloudfuse
+                rm -rf $(MOUNT_DIR)/*
+                cd test/e2e_tests
+                go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -tmp-path=$(TEMP_DIR)
+                cd -
+                sudo fusermount -u $(MOUNT_DIR) 
+                sleep 5
+              workingDirectory: $(WORK_DIR)
+              displayName: "Block Blob Coverage Proxy"
+              condition: always()
+
+            # Config Generation (ADLS Proxy)
+            - script: |
+                ./cloudfuse.test gen-test-config --config-file=azure_key_proxy.yaml --container-name=$(containerName) --temp-path=$(TEMP_DIR) --output-file=$(cloudfuse_ADLS_CFG)
+              env:
+                NIGHTLY_STO_ACC_NAME: $(AZTEST_ADLS_ACC_NAME)
+                NIGHTLY_STO_ACC_KEY:  $(AZTEST_ADLS_KEY)
+                ACCOUNT_TYPE: 'adls'
+                ACCOUNT_ENDPOINT: 'https://$(AZTEST_ADLS_ACC_NAME).dfs.core.windows.net'
+                VERBOSE_LOG: false
+                USE_HTTP: false
+              displayName: 'Create Config File - ADLS Proxy'
+              workingDirectory: $(WORK_DIR)
+              #continueOnError: false
+              condition: always()
+
+            # Code Coverage with e2e-tests for ADLS Proxy
+            - script: |
+                rm -rf $(MOUNT_DIR)/*
+                rm -rf $(TEMP_DIR)/*
+                ./cloudfuse.test -test.v -test.coverprofile=$(WORK_DIR)/cloudfuse_adls_proxy.cov mount $(MOUNT_DIR) --config-file=$(cloudfuse_ADLS_CFG) --foreground=true &
+                sleep 10
+                ps -aux | grep cloudfuse
+                rm -rf $(MOUNT_DIR)/*
+                cd test/e2e_tests
+                go test -v -timeout=7200s ./... -args -mnt-path=$(MOUNT_DIR) -adls=true -tmp-path=$(TEMP_DIR)
+                cd -
+                ./cloudfuse.test unmount all
+                sleep 5
+              workingDirectory: $(WORK_DIR)
+              displayName: "ADLS Coverage Proxy"
+              condition: always()
+
+            # -------------------------------------------------------
+            # Coverage report consolidation
+            - script: |
+                echo 'mode: count' > ./cloudfuse_coverage_raw.rpt
+                tail -q -n +2 ./*.cov >> ./cloudfuse_coverage_raw.rpt
+                cat ./cloudfuse_coverage_raw.rpt | grep -v mock_component | grep -v base_component | grep -v loopback | grep -v tools | grep -v "common/log" | grep -v "common/exectime" | grep -v "internal/stats_manager" | grep -v "main.go" | grep -v "component/azstorage/azauthmsi.go" > ./cloudfuse_coverage.rpt 
+                go tool cover -func cloudfuse_coverage.rpt  > ./cloudfuse_func_cover.rpt
+                go tool cover -html=./cloudfuse_coverage.rpt -o ./cloudfuse_coverage.html
+                go tool cover -html=./cloudfuse_ut.cov -o ./cloudfuse_ut.html
+                cp ./*.rpt  $(Build.ArtifactStagingDirectory)/
+                cp ./*.cov  $(Build.ArtifactStagingDirectory)/
+                cp ./*.html $(Build.ArtifactStagingDirectory)/
+              workingDirectory: $(WORK_DIR)
+              displayName: "Save coverage report"
+              condition: always()
+
+            # Publish the Artifacts
+            - task: PublishBuildArtifacts@1
+              inputs:
+                artifactName: 'cloudfuse Coverage $(tags)'
+              displayName: 'Publish Artifacts for cloudfuse code coverage'
+              condition: succeeded()
+
+            # Overall code coverage check
+            - script: |
+                chmod 777 ./test/scripts/coveragecheck.sh
+                ./test/scripts/coveragecheck.sh
+              workingDirectory: $(WORK_DIR)
+              displayName: "Overall coverage check"
+              condition: always()
+
+            # File level code coverage check
+            - script: |
+                ./test/scripts/coveragecheck.sh file
+              workingDirectory: $(WORK_DIR)
+              displayName: "File level coverage check"
+              condition: always()
+        
+    
+  
+  - ${{ if eq(parameters.cleanup_test, true) }}:   
+    - stage: AccountCleanup
+      condition: always()
+      jobs:
+        - job: Cleanup
+          timeoutInMinutes: 300
+          strategy:
+            matrix:
+              Ubuntu-20:
+                AgentName: 'cloudfuse-ubuntu20'
+                imageName: 'ubuntu-20.04'
+                containerName: 'test-cnt-ubn-20'
+                fuselib: 'libfuse3-dev'
+                fuselib2: 'fuse3'
+                tags: 'fuse3'          
+
+          pool:
+            vmImage: $(imageName)
+            # name: "cloudfuse-ubuntu-pool"
+            # demands:
+            #   - ImageOverride -equals $(AgentName)
+
+          variables:
+            - group: NightlyCloudfuse
+            - name: MOUNT_DIR
+              value: '$(Pipeline.Workspace)/blob_mnt'
+            - name: TEMP_DIR
+              value: '$(Pipeline.Workspace)/cloudfuse_tmp'
+            - name: cloudfuse_CFG
+              value: '$(Pipeline.Workspace)/cloudfuse.yaml'
+            - name: cloudfuse_STREAM_CFG
+              value: '$(Pipeline.Workspace)/cloudfuse_stream.yaml'
+            - name: cloudfuse_ADLS_CFG
+              value: '$(Pipeline.Workspace)/cloudfuse.adls.yaml'
+            - name: GOPATH
+              value: '$(Pipeline.Workspace)/go'
+            - name: ROOT_DIR
+              value: '$(System.DefaultWorkingDirectory)' 
+            - name: WORK_DIR
+              value: '$(System.DefaultWorkingDirectory)/azure-storage-fuse'
+
+          steps:
+            - checkout: self
+
+            # GoTool task used only for Microsoft Hosted Agents to install Go-lang
+            - task: GoTool@0
+              inputs:
+                version: '1.20.5'
+              displayName: "GoTool Setup"
+
+            - script: |
+                sudo apt-get update --fix-missing -o Dpkg::Options::="--force-confnew"
+                sudo apt-get install make cmake gcc g++ parallel $(fuselib) $(fuselib2) git -y -o Dpkg::Options::="--force-confnew"
+              displayName: 'Install dependency'
+
+            # Clone the repo
+            # - script: |
+            #     git clone https://github.com/Azure/azure-storage-fuse
+            #   displayName: 'Checkout Code'
+            #   workingDirectory: $(ROOT_DIR)
+
+            # Checkout the branch
+            # - script: |
+            #     git checkout `echo $(Build.SourceBranch) | cut -d "/" -f 1,2 --complement`
+            #   displayName: 'Checkout Branch'
+            #   workingDirectory: $(WORK_DIR)
+          
+            # Run the block blob cleanup
+            - task: Go@0
+              inputs:
+                command: 'test'
+                arguments: '-timeout 120m -v test/accoutcleanup/accountcleanup_test.go'
+              displayName: 'Block Blob cleanup'
+              timeoutInMinutes: 120
+              continueOnError: true
+              env:
+                STORAGE_ACCOUNT_NAME: $(NIGHTLY_STO_BLOB_ACC_NAME)
+                STORAGE_ACCOUNT_Key: $(NIGHTLY_STO_BLOB_ACC_KEY)
+
+            # Run the gen2 cleanup
+            - task: Go@0
+              inputs:
+                command: 'test'
+                arguments: '-timeout 120m -v test/accoutcleanup/accountcleanup_test.go'
+              displayName: 'Gen2 cleanup'
+              timeoutInMinutes: 120
+              continueOnError: true
+              env:
+                STORAGE_ACCOUNT_NAME: $(AZTEST_ADLS_ACC_NAME)
+                STORAGE_ACCOUNT_Key: $(AZTEST_ADLS_KEY)
+

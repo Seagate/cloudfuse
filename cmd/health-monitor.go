@@ -41,11 +41,11 @@ import (
 	"runtime"
 	"strings"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/component/file_cache"
-	hmcommon "lyvecloudfuse/tools/health-monitor/common"
+	"cloudfuse/common"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
+	"cloudfuse/component/file_cache"
+	hmcommon "cloudfuse/tools/health-monitor/common"
 
 	"github.com/spf13/cobra"
 )
@@ -53,13 +53,14 @@ import (
 type monitorOptions struct {
 	EnableMon       bool     `config:"enable-monitoring"`
 	DisableList     []string `config:"monitor-disable-list"`
-	BfsPollInterval int      `config:"stats-poll-interval-sec"`
+	CfsPollInterval int      `config:"stats-poll-interval-sec"`
 	ProcMonInterval int      `config:"process-monitor-interval-sec"`
 	OutputPath      string   `config:"output-path"`
 }
 
 var pid string
 var cacheMonitorOptions file_cache.FileCacheOptions
+var configFile string
 
 func resetMonitorOptions() {
 	options.MonitorOpt = monitorOptions{}
@@ -68,9 +69,9 @@ func resetMonitorOptions() {
 
 var healthMonCmd = &cobra.Command{
 	Use:               "health-monitor",
-	Short:             "Monitor lyvecloudfuse mount",
-	Long:              "Monitor lyvecloudfuse mount",
-	SuggestFor:        []string{"bfusemon", "monitor health"},
+	Short:             "Monitor cloudfuse mount",
+	Long:              "Monitor cloudfuse mount",
+	SuggestFor:        []string{"cfusemon", "monitor health"},
 	Args:              cobra.ExactArgs(0),
 	Hidden:            true,
 	FlagErrorHandling: cobra.ExitOnError,
@@ -104,17 +105,17 @@ var healthMonCmd = &cobra.Command{
 
 		cliParams := buildCliParamForMonitor()
 		log.Debug("health-monitor : Options = %v", cliParams)
-		log.Debug("health-monitor : Starting health-monitor for lyvecloudfuse pid = %s", pid)
+		log.Debug("health-monitor : Starting health-monitor for cloudfuse pid = %s", pid)
 
 		var hmcmd *exec.Cmd
 		if runtime.GOOS == "windows" {
-			path, err := filepath.Abs(hmcommon.BfuseMon + ".exe")
+			path, err := filepath.Abs(hmcommon.CfuseMon + ".exe")
 			if err != nil {
 				return fmt.Errorf("failed to start health monitor [%s]", err.Error())
 			}
 			hmcmd = exec.Command(path, cliParams...)
 		} else {
-			hmcmd = exec.Command(hmcommon.BfuseMon, cliParams...)
+			hmcmd = exec.Command(hmcommon.CfuseMon, cliParams...)
 		}
 		cliOut, err := hmcmd.Output()
 		if len(cliOut) > 0 {
@@ -137,7 +138,7 @@ func validateHMonOptions() error {
 	errMsg := ""
 
 	if len(pid) == 0 {
-		errMsg = "pid of lyvecloudfuse process not given. "
+		errMsg = "pid of cloudfuse process not given. "
 	}
 
 	if len(configFile) == 0 {
@@ -155,8 +156,8 @@ func buildCliParamForMonitor() []string {
 	var cliParams []string
 
 	cliParams = append(cliParams, "--pid="+pid)
-	if options.MonitorOpt.BfsPollInterval != 0 {
-		cliParams = append(cliParams, fmt.Sprintf("--stats-poll-interval-sec=%v", options.MonitorOpt.BfsPollInterval))
+	if options.MonitorOpt.CfsPollInterval != 0 {
+		cliParams = append(cliParams, fmt.Sprintf("--stats-poll-interval-sec=%v", options.MonitorOpt.CfsPollInterval))
 	}
 	if options.MonitorOpt.ProcMonInterval != 0 {
 		cliParams = append(cliParams, fmt.Sprintf("--process-monitor-interval-sec=%v", options.MonitorOpt.ProcMonInterval))
@@ -171,8 +172,8 @@ func buildCliParamForMonitor() []string {
 
 	for _, v := range options.MonitorOpt.DisableList {
 		switch v {
-		case hmcommon.BlobfuseStats:
-			cliParams = append(cliParams, "--no-lyvecloudfuse-stats")
+		case hmcommon.CloudfuseStats:
+			cliParams = append(cliParams, "--no-cloudfuse-stats")
 		case hmcommon.CpuProfiler:
 			cliParams = append(cliParams, "--no-cpu-profiler")
 		case hmcommon.MemoryProfiler:
@@ -192,7 +193,7 @@ func buildCliParamForMonitor() []string {
 func init() {
 	rootCmd.AddCommand(healthMonCmd)
 
-	healthMonCmd.Flags().StringVar(&pid, "pid", "", "Pid of lyvecloudfuse process")
+	healthMonCmd.Flags().StringVar(&pid, "pid", "", "Pid of cloudfuse process")
 	_ = healthMonCmd.MarkFlagRequired("pid")
 
 	healthMonCmd.Flags().StringVar(&configFile, "config-file", "config.yaml",

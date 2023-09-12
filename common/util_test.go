@@ -127,8 +127,8 @@ func (suite *typesTestSuite) TestEncryptDecrypt() {
 	suite.assert.EqualValues(data, d)
 }
 
-func (suite *utilTestSuite) TestMonitorBfs() {
-	monitor := MonitorBfs()
+func (suite *utilTestSuite) TestMonitorCfs() {
+	monitor := MonitorCfs()
 	suite.assert.False(monitor)
 }
 
@@ -223,4 +223,47 @@ func (suite *utilTestSuite) TestIsDriveLetter() {
 	path = "C:\\Users"
 	match = IsDriveLetter(path)
 	suite.assert.Equal(false, match)
+}
+
+func (suite *utilTestSuite) TestGetUSage() {
+	pwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	dirName := filepath.Join(pwd, "util_test")
+	err = os.Mkdir(dirName, 0777)
+	suite.assert.Nil(err)
+
+	data := make([]byte, 1024*1024)
+	err = os.WriteFile(dirName+"/1.txt", data, 0777)
+	suite.assert.Nil(err)
+
+	err = os.WriteFile(dirName+"/2.txt", data, 0777)
+	suite.assert.Nil(err)
+
+	usage, err := GetUsage(dirName)
+	suite.assert.Nil(err)
+	suite.assert.GreaterOrEqual(int(usage), 2)
+	suite.assert.LessOrEqual(int(usage), 4)
+
+	_ = os.RemoveAll(dirName)
+}
+
+func (suite *utilTestSuite) TestGetDiskUsage() {
+	pwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	dirName := filepath.Join(pwd, "util_test", "a", "b", "c")
+	err = os.MkdirAll(dirName, 0777)
+	suite.assert.Nil(err)
+
+	usage, usagePercent, err := GetDiskUsageFromStatfs(dirName)
+	suite.assert.Nil(err)
+	suite.assert.NotEqual(usage, 0)
+	suite.assert.NotEqual(usagePercent, 0)
+	suite.assert.NotEqual(usagePercent, 100)
+	_ = os.RemoveAll(filepath.Join(pwd, "util_test"))
 }

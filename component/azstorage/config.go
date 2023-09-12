@@ -40,8 +40,8 @@ import (
 	"reflect"
 	"strings"
 
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/JeffreyRichter/enum/enum"
@@ -477,13 +477,13 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	}
 
 	if config.IsSet(compName + ".set-content-type") {
-		log.Warn("unsupported v1 CLI parameter: set-content-type is always true in lyvecloudfuse.")
+		log.Warn("unsupported v1 CLI parameter: set-content-type is always true in cloudfuse.")
 	}
 	if config.IsSet(compName + ".ca-cert-file") {
-		log.Warn("unsupported v1 CLI parameter: ca-cert-file is not supported in lyvecloudfuse. Use the default ca cert path for your environment.")
+		log.Warn("unsupported v1 CLI parameter: ca-cert-file is not supported in cloudfuse. Use the default ca cert path for your environment.")
 	}
 	if config.IsSet(compName + ".debug-libcurl") {
-		log.Warn("unsupported v1 CLI parameter: debug-libcurl is not applicable in lyvecloudfuse.")
+		log.Warn("unsupported v1 CLI parameter: debug-libcurl is not applicable in cloudfuse.")
 	}
 
 	log.Info("ParseAndValidateConfig : Account: %s, Container: %s, AccountType: %s, Auth: %s, Prefix: %s, Endpoint: %s, ListBlock: %d, MD5 : %v %v, "+

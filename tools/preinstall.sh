@@ -1,2 +1,2 @@
-sudo rm -rf /usr/share/lyvecloudfuse/
-sudo mkdir /usr/share/lyvecloudfuse
+sudo rm -rf /usr/share/cloudfuse/
+sudo mkdir /usr/share/cloudfuse

@@ -44,7 +44,7 @@ import (
 	"sync"
 	"time"
 
-	"lyvecloudfuse/common"
+	"cloudfuse/common"
 )
 
 // LogConfig : Configuration to be provided to logging infra

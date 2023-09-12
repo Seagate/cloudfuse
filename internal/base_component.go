@@ -37,8 +37,8 @@ package internal
 import (
 	"context"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/internal/handlemap"
+	"cloudfuse/common"
+	"cloudfuse/internal/handlemap"
 )
 
 // BaseComponent : Base implementation of the component interface

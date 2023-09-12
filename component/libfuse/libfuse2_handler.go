@@ -44,11 +44,11 @@ import (
 	"syscall"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
-	"lyvecloudfuse/internal/stats_manager"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
+	"cloudfuse/internal/stats_manager"
 
 	"github.com/winfsp/cgofuse/fuse"
 )
@@ -59,8 +59,8 @@ In below code lot of places we are doing this sort of conversions:
 or we are doing:
 	- handle.ID = (handlemap.HandleID)(fh)
 
-In lyve cloud fuse we maintain handles as an object stored in a handlemap. Cgofuse gives us handles as integer
-values so we need to do type conversions to conver those values to our Handle ID values that lyve cloud fuse
+In cloudfuse we maintain handles as an object stored in a handlemap. Cgofuse gives us handles as integer
+values so we need to do type conversions to conver those values to our Handle ID values that cloudfuse
 uses so we convert the integer into a handle object.
 */
 
@@ -140,8 +140,10 @@ func (lf *Libfuse) initFuse() error {
 
 	// direct_io option is used to bypass the kernel cache. It disables the use of
 	// page cache (file content cache) in the kernel for the filesystem.
-	if lf.directIO {
+	if fuseFS.directIO {
 		options += ",direct_io"
+	} else {
+		options += ",kernel_cache"
 	}
 
 	// Setup options as a slice
@@ -364,7 +366,10 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 		return -fuse.EBADF
 	}
 
+	handle.RLock()
 	val, found := handle.GetValue("cache")
+	handle.RUnlock()
+
 	if !found {
 		return -fuse.EIO
 	}

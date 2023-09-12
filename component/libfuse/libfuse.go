@@ -40,11 +40,11 @@ import (
 	"context"
 	"fmt"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/config"
-	"lyvecloudfuse/common/log"
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/stats_manager"
+	"cloudfuse/common"
+	"cloudfuse/common/config"
+	"cloudfuse/common/log"
+	"cloudfuse/internal"
+	"cloudfuse/internal/stats_manager"
 
 	"github.com/winfsp/cgofuse/fuse"
 )
@@ -272,6 +272,12 @@ func (lf *Libfuse) Configure(_ bool) error {
 		log.Err("Libfuse::Configure : config error [invalid config attributes]")
 		return fmt.Errorf("config error in %s [invalid config attributes]", lf.Name())
 	}
+
+	err = config.UnmarshalKey("lfuse", &conf)
+	if err != nil {
+		log.Err("Libfuse::Configure : config error [invalid config attributes: %s]", err.Error())
+		return fmt.Errorf("config error in lfuse [invalid config attributes]")
+	}
 	// Extract values from 'conf' and store them as you wish here
 
 	err = config.UnmarshalKey("mount-path", &conf.mountPath)
@@ -310,9 +316,9 @@ func (lf *Libfuse) Configure(_ bool) error {
 	}
 
 	log.Info("Libfuse::Configure : read-only %t, allow-other %t, allow-root %t, default-perm %d, entry-timeout %d, attr-time %d, negative-timeout %d, "+
-		"ignore-open-flags: %t, nonempty %t, network-share %t",
+		"ignore-open-flags: %t, nonempty %t, network-share %t, direct_io %t",
 		lf.readOnly, lf.allowOther, lf.allowRoot, lf.filePermission, lf.entryExpiration, lf.attributeExpiration, lf.negativeTimeout,
-		lf.ignoreOpenFlags, lf.nonEmptyMount, lf.networkShare)
+		lf.ignoreOpenFlags, lf.nonEmptyMount, lf.networkShare, lf.directIO)
 
 	return nil
 }
@@ -350,7 +356,7 @@ func init() {
 	config.BindPFlag(compName+".fuse-trace", debug)
 	debug.Hidden = true
 
-	ignoreOpenFlags := config.AddBoolFlag("ignore-open-flags", true, "Ignore unsupported open flags (APPEND, WRONLY) by blobfuse when writeback caching is enabled.")
+	ignoreOpenFlags := config.AddBoolFlag("ignore-open-flags", true, "Ignore unsupported open flags (APPEND, WRONLY) by cloudfuse when writeback caching is enabled.")
 	config.BindPFlag(compName+".ignore-open-flags", ignoreOpenFlags)
 
 	networkShareFlags := config.AddBoolFlag("network-share", false, "Run as a network share. Only supported on Windows.")

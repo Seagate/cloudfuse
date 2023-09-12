@@ -35,11 +35,11 @@
 package cmd
 
 import (
+	"cloudfuse/common"
+	"cloudfuse/internal/winservice"
 	"errors"
 	"fmt"
 	"io/fs"
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/internal/winservice"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,20 +55,20 @@ type serviceOptions struct {
 	MountPath  string
 }
 
-const SvcName = "lyvecloudfuse"
+const SvcName = "cloudfuse"
 
 var servOpts serviceOptions
 
 // Section defining all the command that we have in secure feature
 var serviceCmd = &cobra.Command{
 	Use:               "service",
-	Short:             "Manage lyvecloudfuse as a Windows service. This requires Administrator rights to run.",
-	Long:              "Manage lyvecloudfuse as a Windows service. This requires Administrator rights to run.",
+	Short:             "Manage cloudfuse as a Windows service. This requires Administrator rights to run.",
+	Long:              "Manage cloudfuse as a Windows service. This requires Administrator rights to run.",
 	SuggestFor:        []string{"ser", "serv"},
-	Example:           "lyvecloudfuse service install",
+	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("missing command options\n\nDid you mean this?\n\tlyvecloudfuse service mount\n\nRun 'lyvecloudfuse service --help' for usage")
+		return errors.New("missing command options\n\nDid you mean this?\n\tcloudfuse service mount\n\nRun 'cloudfuse service --help' for usage")
 	},
 }
 
@@ -77,7 +77,7 @@ var installCmd = &cobra.Command{
 	Short:             "Install as a Windows service",
 	Long:              "Install as a Windows service",
 	SuggestFor:        []string{"ins", "inst"},
-	Example:           "lyvecloudfuse service install",
+	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := installService()
@@ -97,7 +97,7 @@ var uninstallCmd = &cobra.Command{
 	Short:             "Remove as a Windows service",
 	Long:              "Remove as a Windows service",
 	SuggestFor:        []string{"uninst", "uninstal"},
-	Example:           "lyvecloudfuse service uninstall",
+	Example:           "cloudfuse service uninstall",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := removeService()
@@ -117,7 +117,7 @@ var startCmd = &cobra.Command{
 	Short:             "start the Windows service",
 	Long:              "start the Windows service",
 	SuggestFor:        []string{"sta", "star"},
-	Example:           "lyvecloudfuse service start",
+	Example:           "cloudfuse service start",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := startService()
@@ -137,7 +137,7 @@ var stopCmd = &cobra.Command{
 	Short:             "stop the Windows service",
 	Long:              "stop the Windows service",
 	SuggestFor:        []string{"sto"},
-	Example:           "lyvecloudfuse service stop",
+	Example:           "cloudfuse service stop",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := stopService()
@@ -158,7 +158,7 @@ var mountServiceCmd = &cobra.Command{
 	Long:              "mount an instance that will persist in Windows when restarted",
 	SuggestFor:        []string{"mnt", "mout"},
 	Args:              cobra.ExactArgs(1),
-	Example:           "lyvecloudfuse service mount Z: --config-file=C:\\config.yaml",
+	Example:           "cloudfuse service mount Z: --config-file=C:\\config.yaml",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		servOpts.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
@@ -204,7 +204,7 @@ var unmountServiceCmd = &cobra.Command{
 	Long:              "unmount an instance and remove entry from Windows service",
 	SuggestFor:        []string{"umount", "unmoun"},
 	Args:              cobra.ExactArgs(1),
-	Example:           "lyvecloudfuse service unmount --name=Mount1",
+	Example:           "cloudfuse service unmount --name=Mount1",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		servOpts.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
@@ -242,7 +242,7 @@ var unmountServiceCmd = &cobra.Command{
 
 //--------------- command section ends
 
-// installService adds lyvecloudfuse as a windows service.
+// installService adds cloudfuse as a windows service.
 func installService() error {
 	exepath, err := os.Executable()
 	if err != nil {
@@ -262,7 +262,7 @@ func installService() error {
 		return fmt.Errorf("%s service already exists", SvcName)
 	}
 
-	service, err = scm.CreateService(SvcName, exepath, mgr.Config{DisplayName: "LyveCloudFUSE", StartType: mgr.StartAutomatic})
+	service, err = scm.CreateService(SvcName, exepath, mgr.Config{DisplayName: "Cloudfuse", StartType: mgr.StartAutomatic})
 	if err != nil {
 		return err
 	}
@@ -277,7 +277,7 @@ func installService() error {
 	return nil
 }
 
-// removeService uninstall the lyvecloudfuse windows service.
+// removeService uninstall the cloudfuse windows service.
 func removeService() error {
 	scm, err := mgr.Connect()
 	if err != nil {
@@ -295,7 +295,7 @@ func removeService() error {
 	// Ignore error if unable to find
 	_ = winservice.RemoveWinFspRegistry()
 
-	// Remove all registry entries for lyvecloudfuse
+	// Remove all registry entries for cloudfuse
 	// Ignore error if registry path does not exist
 	_ = winservice.RemoveAllRegistryMount()
 
@@ -359,12 +359,12 @@ func unmountInstance() error {
 	return winservice.StopMount(servOpts.MountPath)
 }
 
-// isMounted returns if the current mountPath is mounted using lyvecloudfuse.
+// isMounted returns if the current mountPath is mounted using cloudfuse.
 func isMounted() (bool, error) {
 	return winservice.IsMounted(servOpts.MountPath)
 }
 
-// isServiceRunning returns whether the lyvecloudfuse service is currently running.
+// isServiceRunning returns whether the cloudfuse service is currently running.
 func isServiceRunning() (bool, error) {
 	scm, err := mgr.Connect()
 	if err != nil {

@@ -281,7 +281,7 @@
           <item>
            <widget class="QSpinBox" name="spinBox_fileCache_evictionTimeout">
             <property name="maximum">
-             <number>1000000</number>
+             <number>2147483647</number>
             </property>
             <property name="singleStep">
              <number>10</number>
@@ -291,7 +291,7 @@
           <item>
            <widget class="QSpinBox" name="spinBox_fileCache_maxEviction">
             <property name="maximum">
-             <number>1000000</number>
+             <number>2147483647</number>
             </property>
             <property name="singleStep">
              <number>20</number>
@@ -304,7 +304,7 @@
           <item>
            <widget class="QSpinBox" name="spinBox_fileCache_maxCacheSize">
             <property name="maximum">
-             <number>1000000</number>
+             <number>2147483647</number>
             </property>
             <property name="singleStep">
              <number>100</number>
@@ -314,7 +314,7 @@
           <item>
            <widget class="QSpinBox" name="spinBox_fileCache_evictMaxThresh">
             <property name="maximum">
-             <number>3000</number>
+             <number>2147483647</number>
             </property>
             <property name="singleStep">
              <number>5</number>
@@ -327,7 +327,7 @@
           <item>
            <widget class="QSpinBox" name="spinBox_fileCache_evictMinThresh">
             <property name="maximum">
-             <number>3000</number>
+             <number>2147483647</number>
             </property>
             <property name="singleStep">
              <number>5</number>
@@ -340,7 +340,7 @@
           <item>
            <widget class="QSpinBox" name="spinBox_fileCache_refreshSec">
             <property name="maximum">
-             <number>4000</number>
+             <number>2147483647</number>
             </property>
             <property name="singleStep">
              <number>20</number>
@@ -393,7 +393,7 @@
          <item>
           <widget class="QSpinBox" name="spinBox_libfuse_maxFuseThreads">
            <property name="maximum">
-            <number>3000</number>
+            <number>2147483647</number>
            </property>
            <property name="singleStep">
             <number>20</number>

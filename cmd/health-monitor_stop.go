@@ -44,22 +44,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var lyvecloudfusePid string
+var cloudfusePid string
 
 var healthMonStop = &cobra.Command{
 	Use:               "stop",
-	Short:             "Stops the health monitor binary associated with a given Lyvecloudfuse pid",
-	Long:              "Stops the health monitor binary associated with a given Lyvecloudfuse pid",
+	Short:             "Stops the health monitor binary associated with a given Cloudfuse pid",
+	Long:              "Stops the health monitor binary associated with a given Cloudfuse pid",
 	SuggestFor:        []string{"stp", "st"},
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		lyvecloudfusePid = strings.TrimSpace(lyvecloudfusePid)
+		cloudfusePid = strings.TrimSpace(cloudfusePid)
 
-		if len(lyvecloudfusePid) == 0 {
-			return fmt.Errorf("pid of lyvecloudfuse process not given")
+		if len(cloudfusePid) == 0 {
+			return fmt.Errorf("pid of cloudfuse process not given")
 		}
 
-		pid, err := getPid(lyvecloudfusePid)
+		pid, err := getPid(cloudfusePid)
 		if err != nil {
 			return fmt.Errorf("failed to get health monitor pid")
 		}
@@ -74,9 +74,9 @@ var healthMonStop = &cobra.Command{
 }
 
 // Attempts to get pid of the health monitor
-func getPid(lyvecloudfusePid string) (string, error) {
+func getPid(cloudfusePid string) (string, error) {
 	if runtime.GOOS == "windows" {
-		cliOut := exec.Command("wmic", "process", "where", fmt.Sprintf("ParentProcessId=%s", lyvecloudfusePid), "get", "ProcessId")
+		cliOut := exec.Command("wmic", "process", "where", fmt.Sprintf("ParentProcessId=%s", cloudfusePid), "get", "ProcessId")
 		output, err := cliOut.Output()
 		if err != nil {
 			return "", err
@@ -84,12 +84,12 @@ func getPid(lyvecloudfusePid string) (string, error) {
 		strOutput := string(output)
 
 		if strings.Contains(strOutput, "No Instance") {
-			return "", fmt.Errorf("failed to process PID from %s", lyvecloudfusePid)
+			return "", fmt.Errorf("failed to process PID from %s", cloudfusePid)
 		}
 		lines := strings.Split(strings.TrimSpace(strOutput), "\n")[1:]
 
 		if len(lines) == 0 {
-			return "", fmt.Errorf("failed to process PID from %s", lyvecloudfusePid)
+			return "", fmt.Errorf("failed to process PID from %s", cloudfusePid)
 		}
 		pid := strings.TrimSpace(lines[0])
 		return pid, nil
@@ -102,7 +102,7 @@ func getPid(lyvecloudfusePid string) (string, error) {
 	}
 	processes := strings.Split(string(out), "\n")
 	for _, process := range processes {
-		if strings.Contains(process, "bfusemon") && strings.Contains(process, fmt.Sprintf("--pid=%s", lyvecloudfusePid)) {
+		if strings.Contains(process, "cfusemon") && strings.Contains(process, fmt.Sprintf("--pid=%s", cloudfusePid)) {
 			re := regexp.MustCompile(`[-]?\d[\d,]*[\.]?[\d{2}]*`)
 			pids := re.FindAllString(process, 1)
 			if pids == nil {
@@ -142,6 +142,6 @@ func init() {
 	healthMonCmd.AddCommand(healthMonStop)
 	healthMonStop.AddCommand(healthMonStopAll)
 
-	healthMonStop.Flags().StringVar(&lyvecloudfusePid, "pid", "", "Lyvecloudfuse PID associated with the health monitor that should be stopped")
+	healthMonStop.Flags().StringVar(&cloudfusePid, "pid", "", "Cloudfuse PID associated with the health monitor that should be stopped")
 	_ = healthMonStop.MarkFlagRequired("pid")
 }

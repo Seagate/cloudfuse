@@ -37,7 +37,7 @@ package internal
 import (
 	"os"
 
-	"lyvecloudfuse/internal/handlemap"
+	"cloudfuse/internal/handlemap"
 )
 
 type CreateDirOptions struct {

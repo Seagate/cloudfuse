@@ -38,7 +38,7 @@ import (
 	"io/fs"
 	"testing"
 
-	"lyvecloudfuse/common"
+	"cloudfuse/common"
 
 	"github.com/stretchr/testify/suite"
 )

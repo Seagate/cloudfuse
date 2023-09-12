@@ -43,9 +43,9 @@ import (
 	"strings"
 	"time"
 
-	"lyvecloudfuse/common/log"
-	hmcommon "lyvecloudfuse/tools/health-monitor/common"
-	hminternal "lyvecloudfuse/tools/health-monitor/internal"
+	"cloudfuse/common/log"
+	hmcommon "cloudfuse/tools/health-monitor/common"
+	hminternal "cloudfuse/tools/health-monitor/internal"
 
 	"github.com/shirou/gopsutil/v3/process"
 )
@@ -110,7 +110,7 @@ func (cm *CpuMemProfiler) ExportStats(timestamp string, st interface{}) {
 
 func (cm *CpuMemProfiler) Validate() error {
 	if len(cm.pid) == 0 {
-		return fmt.Errorf("pid of lyvecloudfuse is not given")
+		return fmt.Errorf("pid of cloudfuse is not given")
 	}
 
 	if cm.pollInterval == 0 {
@@ -162,22 +162,22 @@ func (cm *CpuMemProfiler) getCpuMemoryUsage() (*hmcommon.CpuMemStat, error) {
 
 	cliOut, err := exec.Command("bash", "-c", topCmd).Output()
 	if err != nil {
-		log.Err("cpu_mem_monitor::getCpuMemoryUsage : Lyvecloudfuse is not running on pid %v [%v]", cm.pid, err)
+		log.Err("cpu_mem_monitor::getCpuMemoryUsage : Cloudfuse is not running on pid %v [%v]", cm.pid, err)
 		return nil, err
 	}
 
 	processes := strings.Split(strings.Trim(string(cliOut), "\n"), "\n")
 	if len(processes) < 2 {
-		log.Err("cpu_mem_monitor::getCpuMemoryUsage : Lyvecloudfuse is not running on pid %v", cm.pid)
-		return nil, fmt.Errorf("lyvecloudfuse is not running on pid %v", cm.pid)
+		log.Err("cpu_mem_monitor::getCpuMemoryUsage : Cloudfuse is not running on pid %v", cm.pid)
+		return nil, fmt.Errorf("cloudfuse is not running on pid %v", cm.pid)
 	}
 
 	cpuIndex, memIndex := getCpuMemIndex(processes[0])
 	stats := strings.Fields(processes[1])
 	if cpuIndex == -1 || memIndex == -1 || len(stats) <= int(math.Max(float64(cpuIndex), float64(memIndex))) || len(stats[cpuIndex]) == 0 || len(stats[memIndex]) == 0 {
 		log.Debug("cpu_mem_monitor::getCpuMemoryUsage : %v", processes)
-		log.Err("cpu_mem_monitor::getCpuMemoryUsage : Lyvecloudfuse is not running on pid %v", cm.pid)
-		return nil, fmt.Errorf("lyvecloudfuse is not running on pid %v", cm.pid)
+		log.Err("cpu_mem_monitor::getCpuMemoryUsage : Cloudfuse is not running on pid %v", cm.pid)
+		return nil, fmt.Errorf("cloudfuse is not running on pid %v", cm.pid)
 	}
 
 	cpuMemStat := &hmcommon.CpuMemStat{

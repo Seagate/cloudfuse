@@ -76,7 +76,7 @@ parameters:
 steps:
   - script: |
       cd ${{ parameters.working_dir }}
-      ${{ parameters.working_dir }}/blobfuse2 gen-test-config --config-file=azure_key.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.config }}
+      ${{ parameters.working_dir }}/cloudfuse gen-test-config --config-file=azure_key.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.config }}
     displayName: Create Key Config File
     env:
       ACCOUNT_TYPE: ${{ parameters.account_type }}
@@ -90,11 +90,12 @@ steps:
       
   - script: cat ${{ parameters.config }}
     displayName: Print config file
+    condition: ${{ parameters.test_key_credential }}
 
 # Stream e2e
   - script: |
       cd ${{ parameters.working_dir }}
-      ${{ parameters.working_dir }}/blobfuse2 gen-test-config --config-file=azure_stream.yaml --container-name=${{ parameters.container }} --output-file=${{ parameters.stream_config }}
+      ${{ parameters.working_dir }}/cloudfuse gen-test-config --config-file=azure_stream.yaml --container-name=${{ parameters.container }} --output-file=${{ parameters.stream_config }}
     displayName: Create Stream Config File
     env:
       ACCOUNT_TYPE: ${{ parameters.account_type }}
@@ -107,11 +108,12 @@ steps:
       
   - script: cat ${{ parameters.stream_config }}
     displayName: Print Stream config file with Handle Level Caching
+    condition: ${{ parameters.test_stream }}
 
 # Stream e2e filename level caching
   - script: |
       cd ${{ parameters.working_dir }}
-      ${{ parameters.working_dir }}/blobfuse2 gen-test-config --config-file=azure_stream_filename.yaml --container-name=${{ parameters.container }} --output-file=${{ parameters.stream_filename_config }}
+      ${{ parameters.working_dir }}/cloudfuse gen-test-config --config-file=azure_stream_filename.yaml --container-name=${{ parameters.container }} --output-file=${{ parameters.stream_filename_config }}
     displayName: Create Stream Config File
     env:
       ACCOUNT_TYPE: ${{ parameters.account_type }}
@@ -124,11 +126,12 @@ steps:
       
   - script: cat ${{ parameters.stream_filename_config }}
     displayName: Print Stream config file with Filename Caching
+    condition: ${{ parameters.test_stream }}
 
 # Create sas credential config file if we need to test it
   - script: |
       cd ${{ parameters.working_dir }}
-      ${{ parameters.working_dir }}/blobfuse2 gen-test-config --config-file=azure_sas.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.sas_credential_config }}
+      ${{ parameters.working_dir }}/cloudfuse gen-test-config --config-file=azure_sas.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.sas_credential_config }}
     displayName: Create SAS Config File
     env:
       NIGHTLY_STO_BLOB_ACC_NAME: ${{ parameters.account_name }}
@@ -141,11 +144,12 @@ steps:
       
   - script: cat ${{ parameters.sas_credential_config }}
     displayName: Print SAS config file
+    condition: ${{ parameters.test_sas_credential }}
 
 # Create spn credential config file if we need to test it
   - script: |
       cd ${{ parameters.working_dir }}
-      ${{ parameters.working_dir }}/blobfuse2 gen-test-config --config-file=azure_spn.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.spn_credential_config }}
+      ${{ parameters.working_dir }}/cloudfuse gen-test-config --config-file=azure_spn.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.spn_credential_config }}
     displayName: Create SPN Config File
     env:
       NIGHTLY_SPN_ACC_NAME: ${{ parameters.spn_account_name }}
@@ -160,11 +164,12 @@ steps:
       
   - script: cat ${{ parameters.spn_credential_config }}
     displayName: Print SPN config file
+    condition: ${{ parameters.test_spn_credential }}
 
   # Create azurite config file if we need to test it
   - script: |
       cd ${{ parameters.working_dir }}
-      ${{ parameters.working_dir }}/blobfuse2 gen-test-config --config-file=azure_key.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.azurite_config }}
+      ${{ parameters.working_dir }}/cloudfuse gen-test-config --config-file=azure_key.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.azurite_config }}
     displayName: Create Key Config File
     # Note: It is fine to hardcode these credentials since they are publicly documented fake credentials for Azurite
     env:
@@ -197,7 +202,7 @@ steps:
         verbose_log: ${{ parameters.verbose_log }}
         mountStep:
           script: >
-            ${{ parameters.working_dir }}/blobfuse2 mount ${{ parameters.mount_dir }} --config-file=${{ parameters.config }}
+            ${{ parameters.working_dir }}/cloudfuse mount ${{ parameters.mount_dir }} --config-file=${{ parameters.config }}
             --default-working-dir=${{ parameters.working_dir }}
           displayName: 'E2E Test: Mount with Key Credential Configuration'
           timeoutInMinutes: 3
@@ -217,7 +222,7 @@ steps:
         verbose_log: ${{ parameters.verbose_log }}
         mountStep:
           script: >
-            ${{ parameters.working_dir }}/blobfuse2 mount ${{ parameters.mount_dir }} --config-file=${{ parameters.stream_config }}
+            ${{ parameters.working_dir }}/cloudfuse mount ${{ parameters.mount_dir }} --config-file=${{ parameters.stream_config }}
             --default-working-dir=${{ parameters.working_dir }}
           displayName: 'E2E Test: Mount with Stream Configuration'
           timeoutInMinutes: 3
@@ -237,7 +242,7 @@ steps:
         verbose_log: ${{ parameters.verbose_log }}
         mountStep:
           script: >
-            ${{ parameters.working_dir }}/blobfuse2 mount ${{ parameters.mount_dir }} --config-file=${{ parameters.stream_filename_config }}
+            ${{ parameters.working_dir }}/cloudfuse mount ${{ parameters.mount_dir }} --config-file=${{ parameters.stream_filename_config }}
             --default-working-dir=${{ parameters.working_dir }}
           displayName: 'E2E Test: Mount with Filename Stream Configuration'
           timeoutInMinutes: 3
@@ -256,7 +261,7 @@ steps:
         verbose_log: ${{ parameters.verbose_log }}
         mountStep:
           script: >
-            ${{ parameters.working_dir }}/blobfuse2 mount ${{ parameters.mount_dir }} --config-file=${{ parameters.sas_credential_config }}
+            ${{ parameters.working_dir }}/cloudfuse mount ${{ parameters.mount_dir }} --config-file=${{ parameters.sas_credential_config }}
             --default-working-dir=${{ parameters.working_dir }}
           displayName: 'E2E Test: Mount with SAS Credential Configuration'
           timeoutInMinutes: 3
@@ -275,7 +280,7 @@ steps:
         verbose_log: ${{ parameters.verbose_log }}
         mountStep:
           script: >
-            ${{ parameters.working_dir }}/blobfuse2 mount ${{ parameters.mount_dir }} --config-file=${{ parameters.spn_credential_config }}
+            ${{ parameters.working_dir }}/cloudfuse mount ${{ parameters.mount_dir }} --config-file=${{ parameters.spn_credential_config }}
             --default-working-dir=${{ parameters.working_dir }}
           displayName: 'E2E Test: Mount with SPN Credential Configuration'
           timeoutInMinutes: 3
@@ -303,7 +308,7 @@ steps:
         verbose_log: ${{ parameters.verbose_log }}
         mountStep:
           script: >
-            ${{ parameters.working_dir }}/blobfuse2 mount ${{ parameters.mount_dir }} --config-file=${{ parameters.azurite_config }}
+            ${{ parameters.working_dir }}/cloudfuse mount ${{ parameters.mount_dir }} --config-file=${{ parameters.azurite_config }}
             --default-working-dir=${{ parameters.working_dir }}
           displayName: 'E2E Test: Mount with Azurite Configuration'
           timeoutInMinutes: 3
@@ -382,7 +387,7 @@ steps:
 #--------------------------------------- Setup: End to end tests with different File Cache configurations ------------------------------------------
   - script: |
       cd ${{ parameters.working_dir }}
-      ${{ parameters.working_dir }}/blobfuse2 gen-test-config --config-file=azure_key_huge.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.config }}
+      ${{ parameters.working_dir }}/cloudfuse gen-test-config --config-file=azure_key_huge.yaml --container-name=${{ parameters.container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.config }}
     displayName: Create Config File
     env:
       NIGHTLY_STO_ACC_NAME: ${{ parameters.account_name }}
@@ -415,15 +420,14 @@ steps:
       distro_name: ${{ parameters.distro_name }}
       mountStep:
         script: >
-          ${{ parameters.working_dir }}/blobfuse2 mount ${{ parameters.mount_dir }} --config-file=${{ parameters.config }}
-          --default-working-dir=${{ parameters.working_dir }}
+          ${{ parameters.working_dir }}/cloudfuse mount ${{ parameters.mount_dir }} --config-file=${{ parameters.config }} --default-working-dir=${{ parameters.working_dir }}
         displayName: 'StressTest: Mount'
         timeoutInMinutes: 3
         continueOnError: false
 
   - script: |
       cd ${{ parameters.working_dir }}
-      ${{ parameters.working_dir }}/blobfuse2 gen-test-config --config-file=azure_key_huge.yaml --container-name=${{ parameters.huge_container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.config }}
+      ${{ parameters.working_dir }}/cloudfuse gen-test-config --config-file=azure_key_huge.yaml --container-name=${{ parameters.huge_container }} --temp-path=${{ parameters.temp_dir }} --output-file=${{ parameters.config }}
     displayName: Create Config File
     env:
       NIGHTLY_STO_ACC_NAME: ${{ parameters.account_name }}
@@ -445,7 +449,7 @@ steps:
       distro_name: ${{ parameters.distro_name }}
       mountStep:
         script: >
-          ${{ parameters.working_dir }}/blobfuse2 mount ${{ parameters.mount_dir }} --config-file=${{ parameters.config }}
+          ${{ parameters.working_dir }}/cloudfuse mount ${{ parameters.mount_dir }} --config-file=${{ parameters.config }}
           --default-working-dir=${{ parameters.working_dir }}
         displayName: 'HugeList: Mount'
         continueOnError: false

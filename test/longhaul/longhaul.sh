@@ -1,5 +1,11 @@
 
-SERVICE="lyvecloudfuse"
+# To create ramdisk
+# sudo mkdir -p /mnt/ramdisk
+# sudo chmod 777 /mnt/ramdisk
+# sudo mount -t tmpfs -o rw,size=4G tmpfs /mnt/ramdisk
+
+
+SERVICE="cloudfuse"
 SCRIPT="longhaul.sh"
 
 # To create ramdisk
@@ -18,10 +24,10 @@ then
 			echo "`date` :: Trimmed " > ./longhaul2.log
 		fi
 
-		echo "`whoami` : `date` :: `./lyvecloudfuse --version` Starting stress test " >> ./longhaul2.log
+		echo "`whoami` : `date` :: `./cloudfuse --version` Starting stress test " >> ./longhaul2.log
 
-		mem=$(top -b -n 1 -p `pgrep -x lyvecloudfuse` | tail -1)
-		elap=$( ps -p `pgrep -x lyvecloudfuse` -o etime | tail -1)
+		mem=$(top -b -n 1 -p `pgrep -x cloudfuse` | tail -1)
+		elap=$( ps -p `pgrep -x cloudfuse` -o etime | tail -1)
 		echo $mem " :: " $elap >> ./longhaul2.log
 	
 		rm -rf /home/vibhansa/blob_mnt2/stress	
@@ -40,24 +46,24 @@ then
 		sudo rm -rf /var/log/blob*.gz
 	fi
 else
-	echo "`date` :: Re-Starting lyvecloudfuse *******************" >> ./longhaul2.log
+	echo "`date` :: Re-Starting cloudfuse *******************" >> ./longhaul2.log
 	rm -rf /home/vibhansa/blob_mnt2/*
 	rm -rf /mnt/ramdisk/*
 	sudo fusermount -u ~/blob_mnt2
 	rm -rf /mnt/ramdisk2/*
-	./lyvecloudfuse mount ~/blob_mnt2 --config-file=./config.yaml
+	./cloudfuse mount ~/blob_mnt2 --config-file=./config.yaml
 	sleep 2
 
 	if [ `stat -c %s ./restart2.log` -gt 10485760 ]
 	then 
 		echo "`date` Trimmed " > ./restart2.log
 	fi
-	echo "`date`: Restart : `./lyvecloudfuse --version`" >> ./restart2.log
+	echo "`date`: Restart : `./cloudfuse --version`" >> ./restart2.log
 
-	# Send email that lyvecloudfuse has crashed
-	echo "Lyvecloudfuse Failure" | mail -s "Lyvecloudfuse Restart" -A ./restart2.log -a "From: longhaul@blobfuse.com" <mail id here>
+	# Send email that cloudfuse has crashed
+	echo "Cloudfuse Failure" | mail -s "Cloudfuse Restart" -A ./restart2.log -a "From: longhaul@blobfuse.com" <mail id here>
 	
-	cp /var/log/lyvecloudfuse.log /home/vibhansa/blob_mnt2/
+	cp /var/log/cloudfuse.log /home/vibhansa/blob_mnt2/
 	cp ./longhaul2.log  /home/vibhansa/blob_mnt2/
 	cp ./restart2.log /home/vibhansa/blob_mnt2/
 fi	

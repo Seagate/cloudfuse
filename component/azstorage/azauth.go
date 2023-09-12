@@ -35,7 +35,7 @@
 package azstorage
 
 import (
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common/log"
 )
 
 // AzAuthConfig : Config to authenticate to storage

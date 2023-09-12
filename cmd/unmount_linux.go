@@ -43,16 +43,16 @@ import (
 	"regexp"
 	"strings"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 )
 
 var unmountCmd = &cobra.Command{
 	Use:               "unmount <mount path>",
-	Short:             "Unmount Lyvecloudfuse",
-	Long:              "Unmount Lyvecloudfuse. Only available on Linux",
+	Short:             "Unmount Cloudfuse",
+	Long:              "Unmount Cloudfuse. Only available on Linux",
 	SuggestFor:        []string{"unmount", "unmnt"},
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
@@ -64,14 +64,14 @@ var unmountCmd = &cobra.Command{
 			for _, mntPath := range lstMnt {
 				match, _ := regexp.MatchString(mntPathPrefix, mntPath)
 				if match {
-					err := unmountLyvecloudfuse(mntPath)
+					err := unmountCloudfuse(mntPath)
 					if err != nil {
 						return fmt.Errorf("failed to unmount %s [%s]", mntPath, err.Error())
 					}
 				}
 			}
 		} else {
-			err := unmountLyvecloudfuse(args[0])
+			err := unmountCloudfuse(args[0])
 			if err != nil {
 				return err
 			}
@@ -89,7 +89,7 @@ var unmountCmd = &cobra.Command{
 }
 
 // Attempts to unmount the directory and returns true if the operation succeeded
-func unmountLyvecloudfuse(mntPath string) error {
+func unmountCloudfuse(mntPath string) error {
 	unmountCmd := []string{"fusermount3", "fusermount"}
 
 	var errb bytes.Buffer
@@ -105,7 +105,7 @@ func unmountLyvecloudfuse(mntPath string) error {
 		}
 
 		if !strings.Contains(err.Error(), "executable file not found") {
-			log.Err("unmountLyvecloudfuse : failed to unmount (%s : %s)", err.Error(), errb.String())
+			log.Err("unmountCloudfuse : failed to unmount (%s : %s)", err.Error(), errb.String())
 			break
 		}
 	}

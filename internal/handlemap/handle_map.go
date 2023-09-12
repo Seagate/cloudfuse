@@ -35,12 +35,13 @@
 package handlemap
 
 import (
+	"container/list"
 	"os"
 	"sync"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/cache_policy"
+	"cloudfuse/common"
+	"cloudfuse/common/cache_policy"
 
 	"go.uber.org/atomic"
 )
@@ -54,7 +55,7 @@ const (
 	HandleFlagUnknown uint16 = iota
 	HandleFlagDirty          // File has been modified with write operation or is a new file
 	HandleFlagFSynced        // User has called fsync on the file explicitly
-	HandleFlagCached         // File is cached in the local system by lyvecloudfuse
+	HandleFlagCached         // File is cached in the local system by cloudfuse
 )
 
 // Structure to hold in memory cache for streaming layer
@@ -66,10 +67,16 @@ type Cache struct {
 	HandleCount int64
 }
 
+type Buffers struct {
+	Cooked  *list.List
+	Cooking *list.List
+}
+
 type Handle struct {
 	sync.RWMutex
 	FObj     *os.File // File object being represented by this handle
 	CacheObj *Cache   // Streaming layer cache for this handle
+	Buffers  *Buffers
 	ID       HandleID // Blobfuse assigned unique ID to this handle
 	Size     int64    // Size of the file being handled here
 	Mtime    time.Time
@@ -90,6 +97,7 @@ func NewHandle(path string) *Handle {
 		values:   make(map[string]interface{}),
 		CacheObj: nil,
 		FObj:     nil,
+		Buffers:  nil,
 	}
 }
 
@@ -125,33 +133,27 @@ func (handle *Handle) FD() int {
 
 // SetValue : Store user defined parameter inside handle
 func (handle *Handle) SetValue(key string, value interface{}) {
-	handle.Lock()
 	handle.values[key] = value
-	handle.Unlock()
 }
 
 // GetValue : Retrieve user defined parameter from handle
 func (handle *Handle) GetValue(key string) (interface{}, bool) {
-	handle.RLock()
 	val, ok := handle.values[key]
-	handle.RUnlock()
 	return val, ok
 }
 
-// RemoveValue : Delete user defined parameter from handle
-func (handle *Handle) RemoveValue(key string) {
-	handle.Lock()
+// GetValue : Retrieve user defined parameter from handle
+func (handle *Handle) RemoveValue(key string) (interface{}, bool) {
+	val, ok := handle.values[key]
 	delete(handle.values, key)
-	handle.Unlock()
+	return val, ok
 }
 
 // Cleanup : Delete all user defined parameter from handle
 func (handle *Handle) Cleanup() {
-	handle.Lock()
 	for key := range handle.values {
 		delete(handle.values, key)
 	}
-	handle.Unlock()
 }
 
 // defaultHandleMap holds a synchronized map[ HandleID ]*Handle

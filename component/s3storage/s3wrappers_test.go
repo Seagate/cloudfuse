@@ -1,5 +1,5 @@
-//go:build !authtest && !unittest
-// +build !authtest,!unittest
+//go:build !authtest
+// +build !authtest
 
 /*
     _____           _____   _____   ____          ______  _____  ------
@@ -36,11 +36,11 @@
 package s3storage
 
 import (
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 	"encoding/json"
 	"fmt"
 	"io"
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
 	"os"
 	"runtime"
 	"testing"

@@ -38,8 +38,8 @@ import (
 	"net/url"
 	"os"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/internal"
+	"cloudfuse/common"
+	"cloudfuse/internal"
 )
 
 type Connection struct {
@@ -48,10 +48,13 @@ type Connection struct {
 }
 
 type Config struct {
-	authConfig         s3AuthConfig
-	prefixPath         string
-	restrictedCharsWin bool
-	partSize           int64
+	authConfig                s3AuthConfig
+	prefixPath                string
+	restrictedCharsWin        bool
+	partSize                  int64
+	uploadCutoff              int64
+	concurrency               int
+	disableConcurrentDownload bool
 }
 
 // TODO: move s3AuthConfig to s3auth.go

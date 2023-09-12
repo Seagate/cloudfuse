@@ -37,7 +37,7 @@ package cmd
 import (
 	"fmt"
 
-	"lyvecloudfuse/common"
+	"cloudfuse/common"
 
 	"github.com/spf13/cobra"
 )
@@ -49,7 +49,7 @@ var versionCmd = &cobra.Command{
 	Short:             "Command to print the current version along with optional check for latest version",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("lyvecloudfuse version: %s\n", common.LyvecloudfuseVersion)
+		fmt.Printf("cloudfuse version: %s\n", common.CloudfuseVersion)
 		if check {
 			return VersionCheck()
 		}

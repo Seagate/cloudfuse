@@ -35,8 +35,8 @@
 package stream
 
 import (
-	"lyvecloudfuse/internal"
-	"lyvecloudfuse/internal/handlemap"
+	"cloudfuse/internal"
+	"cloudfuse/internal/handlemap"
 )
 
 type StreamConnection interface {

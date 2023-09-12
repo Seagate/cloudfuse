@@ -44,8 +44,8 @@ import (
 	"strings"
 	"time"
 
-	"lyvecloudfuse/common"
-	"lyvecloudfuse/common/log"
+	"cloudfuse/common"
+	"cloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 )
@@ -63,10 +63,10 @@ type Blob struct {
 var disableVersionCheck bool
 
 var rootCmd = &cobra.Command{
-	Use:               "lyvecloudfuse",
-	Short:             "Lyvecloudfuse is an open source project developed to provide a virtual filesystem backed by the Azure Storage.",
-	Long:              "Lyvecloudfuse is an open source project developed to provide a virtual filesystem backed by the Azure Storage. It uses the fuse protocol to communicate with the Linux FUSE kernel module, and implements the filesystem operations using the Azure Storage REST APIs.",
-	Version:           common.LyvecloudfuseVersion,
+	Use:               "cloudfuse",
+	Short:             "Cloudfuse is an open source project developed to provide a virtual filesystem backed by the Azure Storage.",
+	Long:              "Cloudfuse is an open source project developed to provide a virtual filesystem backed by the Azure Storage. It uses the fuse protocol to communicate with the Linux FUSE kernel module, and implements the filesystem operations using the Azure Storage REST APIs.",
+	Version:           common.CloudfuseVersion,
 	FlagErrorHandling: cobra.ExitOnError,
 	SilenceUsage:      true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -76,7 +76,7 @@ var rootCmd = &cobra.Command{
 				return err
 			}
 		}
-		return errors.New("missing command options\n\nDid you mean this?\n\tlyvecloudfuse mount\n\nRun 'lyvecloudfuse --help' for usage")
+		return errors.New("missing command options\n\nDid you mean this?\n\tcloudfuse mount\n\nRun 'cloudfuse --help' for usage")
 	},
 }
 
@@ -127,7 +127,7 @@ func beginDetectNewVersion() chan interface{} {
 	go func() {
 		defer close(completed)
 
-		latestVersionUrl := common.LyvecloudfuseListContainerURL + "?restype=container&comp=list&prefix=latest/"
+		latestVersionUrl := common.CloudfuseListContainerURL + "?restype=container&comp=list&prefix=latest/"
 		remoteVersion, err := getRemoteVersion(latestVersionUrl)
 		if err != nil {
 			log.Err("beginDetectNewVersion: error getting latest version [%s]", err.Error())
@@ -138,9 +138,9 @@ func beginDetectNewVersion() chan interface{} {
 			return
 		}
 
-		local, err := common.ParseVersion(common.LyvecloudfuseVersion)
+		local, err := common.ParseVersion(common.CloudfuseVersion)
 		if err != nil {
-			log.Err("beginDetectNewVersion: error parsing LyvecloudfuseVersion [%s]", err.Error())
+			log.Err("beginDetectNewVersion: error parsing CloudfuseVersion [%s]", err.Error())
 			completed <- err.Error()
 			return
 		}
@@ -155,19 +155,19 @@ func beginDetectNewVersion() chan interface{} {
 		if local.OlderThan(*remote) {
 			executablePathSegments := strings.Split(strings.Replace(os.Args[0], "\\", "/", -1), "/")
 			executableName := executablePathSegments[len(executablePathSegments)-1]
-			log.Info("beginDetectNewVersion: A new version of Lyvecloudfuse is available. Current Version=%s, Latest Version=%s", common.LyvecloudfuseVersion, remoteVersion)
+			log.Info("beginDetectNewVersion: A new version of Cloudfuse is available. Current Version=%s, Latest Version=%s", common.CloudfuseVersion, remoteVersion)
 			fmt.Fprintf(stderr, "*** "+executableName+": A new version [%s] is available. Consider upgrading to latest version for bug-fixes & new features. ***\n", remoteVersion)
 			log.Info("*** "+executableName+": A new version [%s] is available. Consider upgrading to latest version for bug-fixes & new features. ***\n", remoteVersion)
 
-			warningsUrl := common.LyvecloudfuseListContainerURL + "/securitywarnings/" + common.LyvecloudfuseVersion
+			warningsUrl := common.CloudfuseListContainerURL + "/securitywarnings/" + common.CloudfuseVersion
 			hasWarnings := checkVersionExists(warningsUrl)
 
 			if hasWarnings {
-				warningsPage := common.LyvecloudfuseWarningsURL + "#" + strings.ReplaceAll(common.LyvecloudfuseVersion, ".", "")
-				fmt.Fprintf(stderr, "Visit %s to see the list of vulnerabilities associated with your current version [%s]\n", warningsPage, common.LyvecloudfuseVersion)
-				log.Warn("Visit %s to see the list of vulnerabilities associated with your current version [%s]\n", warningsPage, common.LyvecloudfuseVersion)
+				warningsPage := common.CloudfuseWarningsURL + "#" + strings.ReplaceAll(common.CloudfuseVersion, ".", "")
+				fmt.Fprintf(stderr, "Visit %s to see the list of vulnerabilities associated with your current version [%s]\n", warningsPage, common.CloudfuseVersion)
+				log.Warn("Visit %s to see the list of vulnerabilities associated with your current version [%s]\n", warningsPage, common.CloudfuseVersion)
 			}
-			completed <- "A new version of Lyvecloudfuse is available"
+			completed <- "A new version of Cloudfuse is available"
 		}
 	}()
 	return completed
@@ -198,17 +198,17 @@ func ignoreCommand(cmdArgs []string) bool {
 }
 
 // parseArgs : Depending upon inputs are coming from /etc/fstab or CLI, parameter style may vary.
-// -- /etc/fstab example : lyvecloudfuse mount <dir> -o suid,nodev,--config-file=config.yaml,--use-adls=true,allow_other
-// -- cli command        : lyvecloudfuse mount <dir> -o suid,nodev --config-file=config.yaml --use-adls=true -o allow_other
+// -- /etc/fstab example : cloudfuse mount <dir> -o suid,nodev,--config-file=config.yaml,--use-adls=true,allow_other
+// -- cli command        : cloudfuse mount <dir> -o suid,nodev --config-file=config.yaml --use-adls=true -o allow_other
 // -- As we need to support both the ways, here we convert the /etc/fstab style (comma separated list) to standard cli ways
 func parseArgs(cmdArgs []string) []string {
-	// Ignore binary name, rest all are arguments to lyvecloudfuse
+	// Ignore binary name, rest all are arguments to cloudfuse
 	cmdArgs = cmdArgs[1:]
 
 	cmd, _, err := rootCmd.Find(cmdArgs)
 	if err != nil && cmd == rootCmd && !ignoreCommand(cmdArgs) {
 		/* /etc/fstab has a standard format and it goes like "<binary> <mount point> <type> <options>"
-		 * as here we can not give any subcommand like "lyvecloudfuse mount" (giving this will assume mount is mount point)
+		 * as here we can not give any subcommand like "cloudfuse mount" (giving this will assume mount is mount point)
 		 * we need to assume 'mount' being default sub command.
 		 * To do so, we just ignore the implicit commands handled by cobra and then try to check if input matches any of
 		 * our subcommands or not. If not, we assume user has executed mount command without specifying mount subcommand
