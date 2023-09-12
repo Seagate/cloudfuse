@@ -95,8 +95,9 @@ type storageTestConfiguration struct {
 	BucketName                string `json:"bucket-name"`
 	KeyID                     string `json:"access-key"`
 	SecretKey                 string `json:"secret-key"`
-	Endpoint                  string `json:"endpoint"`
 	Region                    string `json:"region"`
+	Profile                   string `json:"profile"`
+	Endpoint                  string `json:"endpoint"`
 	Prefix                    string `json:"prefix"`
 	RestrictedCharsWin        bool   `json:"restricted-characters-windows"`
 	PartSizeMb                int64  `json:"part-size-mb"`
@@ -332,10 +333,10 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, bucket string
 
 func generateConfigYaml(testParams storageTestConfiguration) string {
 	return fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n"+
-		"  endpoint: %s\n  region: %s\n  subdirectory: %s\n  restricted-characters-windows: %t\n  part-size-mb: %d\n"+
-		"  upload-cutoff-mb: %d\n  disable-concurrent-download: %t",
+		"  region: %s\n  profile: %s\n  endpoint: %s\n  subdirectory: %s\n  restricted-characters-windows: %t\n"+
+		"  part-size-mb: %d\n  upload-cutoff-mb: %d\n  disable-concurrent-download: %t",
 		testParams.BucketName, testParams.KeyID, testParams.SecretKey,
-		testParams.Endpoint, testParams.Region, testParams.Prefix, testParams.RestrictedCharsWin, testParams.PartSizeMb,
+		testParams.Region, testParams.Profile, testParams.Endpoint, testParams.Prefix, testParams.RestrictedCharsWin, testParams.PartSizeMb,
 		testParams.UploadCutoffMb, testParams.DisableConcurrentDownload)
 }
 
@@ -362,9 +363,8 @@ func (s *s3StorageTestSuite) cleanupTest() {
 
 func (s *s3StorageTestSuite) TestDefault() {
 	defer s.cleanupTest()
+	// only test required parameters
 	s.assert.Equal(storageTestConfigurationParameters.BucketName, s.s3Storage.stConfig.authConfig.BucketName)
-	s.assert.Equal(storageTestConfigurationParameters.KeyID, s.s3Storage.stConfig.authConfig.KeyID)
-	s.assert.Equal(storageTestConfigurationParameters.SecretKey, s.s3Storage.stConfig.authConfig.SecretKey)
 	// TODO: Uncomment the following line when we have our own bucket and can remove the default test prefix path
 	// s.assert.Empty(s.s3Storage.stConfig.prefixPath)
 	s.assert.False(s.s3Storage.stConfig.restrictedCharsWin)
