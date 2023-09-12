@@ -222,7 +222,7 @@
   </action>
   <action name="actionAbout_CloudFuse">
    <property name="text">
-    <string>About LyveFuse</string>
+    <string>About Cloudfuse</string>
    </property>
   </action>
  </widget>

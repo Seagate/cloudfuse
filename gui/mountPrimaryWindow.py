@@ -13,7 +13,7 @@ from PySide6.QtWidgets import QMainWindow
 from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
 from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
-#from aboutPage import aboutPage
+from aboutPage import aboutPage
 
 bucketOptions = ['s3storage', 'azstorage']
 mountTargetComponent = 3
@@ -39,8 +39,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.button_mount.clicked.connect(self.mountBucket)
         self.button_unmount.clicked.connect(self.unmountBucket)
         self.actionAbout_Qt.triggered.connect(self.showAboutQtPage)
-        self.actionAbout_LyveFuse.triggered.connect(self.showAboutLyveFusePage)
-
+        self.actionAbout_CloudFuse.triggered.connect(self.showAboutCloudFusePage)
+        
         if platform == "win32":
             self.lineEdit_mountPoint.setToolTip("Designate a new location to mount the bucket, do not create the directory")
             self.button_browse.setToolTip("Browse to a new location but don't create a new directory")
@@ -51,7 +51,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     # Define the slots that will be triggered when the signals in Qt are activated
 
     # There are unique settings per bucket selected for the pipeline, 
-    # so we must use different widgets to show the different settings
+    #   so we must use different widgets to show the different settings
     def showSettingsWidget(self):
 
         targetIndex = self.dropDown_bucketSelect.currentIndex()
@@ -66,27 +66,23 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
         self.lineEdit_mountPoint.setText('{}'.format(directory))
 
+
+    # Display the pre-baked about QT messagebox
     def showAboutQtPage(self):
-        # self.about = aboutPage()
-        # self.about.show()
-
         QtWidgets.QMessageBox.aboutQt(self, "About QT")
-        # msg.setStandardButtons(QtWidgets.QMessageBox.Discard | QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Save)
-        # dialog.setIcon(QtWidgets.QMessageBox.information)
-        #dialog.aboutQt('About QT')
 
+    # Display the custom dialog box for the cloudfuse 'about' page.
+    def showAboutCloudFusePage(self):
+        self.page = aboutPage()
+        self.page.show()
 
-    def showAboutLyveFusePage(self):
-        dialog = QtWidgets.QMessageBox.about(self, "About Lyve", "Hello")
-        dialog.exec()
-
-    #wrapper/helper for the service install and start.
+    # Wrapper/helper for the service install and start.
     def windowsServiceInstall(self):
         msg = QtWidgets.QMessageBox()
 
-        # use the completedProcess object in mount var to determine next steps 
-        # if service already installed, run cloudfuse.exe service start
-        # if start successful, run cloudfuse.exe service mount
+        # Use the completedProcess object in mount var to determine next steps 
+        #   if service already installed, run cloudfuse.exe service start
+        #   if start successful, run cloudfuse.exe service mount
         
         mount = subprocess.run([".\cloudfuse.exe", "service", "install"], capture_output=True, check=False)    
         if mount.returncode == 0 or mount.stderr.decode().find("cloudfuse service already exists") != -1: #we found this message
@@ -102,7 +98,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 msg.exec()
                 return False
             else:
-                return True #started just fine
+                # Started just fine
+                return True 
         else:
             self.textEdit_output.setText("!!Error installing service to mount container!!\n")# + mount.stdout.decode())
             # Get the users attention by popping open a new window on an error
@@ -125,10 +122,11 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             
             if platform == "win32":
                 # Windows mount has a quirk where the folder shouldn't exist yet,
-                # add CloudFuse at the end of the directory 
+                #   add CloudFuse at the end of the directory 
                 directory = directory+'/cloudFuse'
                 
-                isRunning = self.windowsServiceInstall()  #install and start the service
+                # Install and start the service
+                isRunning = self.windowsServiceInstall()  
             
                 if isRunning:
                     mount = (subprocess.run([".\cloudfuse.exe", "service", "mount", directory, "--config-file=.\config.yaml"], capture_output=True))
@@ -169,7 +167,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def unmountBucket(self):
         msg = QtWidgets.QMessageBox()
         directory = str(self.lineEdit_mountPoint.text())
-        try:#TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
+        # TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
+        try:
             directory = directory+'/cloudFuse'
             unmount = (subprocess.run([".\cloudfuse", "service", "unmount", directory], capture_output=True))      
             # Print to the text edit window the results of the unmount
