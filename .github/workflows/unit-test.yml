@@ -156,7 +156,15 @@ jobs:
     strategy:
       matrix:
         go: ['1.20']
-        os: [ubuntu-latest, windows-latest]
+        job_name: ['linux', 'windows']
+
+        include:
+          - job_name: linux
+            os: ubuntu-latest
+
+          - job_name: windows
+            os: windows-latest
+            cgo: '0'
 
     name: Lint
     runs-on:  ${{ matrix.os }}
@@ -170,6 +178,17 @@ jobs:
           go-version: ${{ matrix.go }}
           check-latest: true
       - run: go version
+
+      - name: Set CGO
+        shell: bash
+        run: |
+          if [[ "${{ matrix.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ matrix.cgo }}' >> $GITHUB_ENV ; fi
+
+      - name: Install libfuse on Linux
+        shell: bash
+        run: |
+          sudo apt-get install fuse3 libfuse-dev rpm pkg-config
+        if: matrix.os == 'ubuntu-latest'
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
@@ -195,3 +214,4 @@ jobs:
           else
             echo "Notices are up to date."
           fi
+        if: matrix.os == 'ubuntu-latest'
