@@ -12,6 +12,15 @@ writes, however, it does not guarantee continuous sync of data written to storag
 Cloudfuse. For data integrity it is recommended that multiple sources do not modify the same blob/object/file. Please
 submit an issue [here]() for any issues/feature requests/questions.
 
+## NOTICE
+
+- We have seen some customer issues around files getting corrupted when `streaming` is used in write mode. Kindly avoid using this feature for write while we investigate and resolve it.
+
+<!---TODO Add our own wiki page when we get a Github
+## Supported Platforms
+Visit [this](https://github.com/Azure/azure-storage-fuse/wiki/Blobfuse2-Supported-Platforms) page to see list of supported linux distros.
+--->
+
 ## Features
 - Mount an S3 bucket or Azure storage container or datalake file system on Linux and Windows.
 - Basic file system operations such as mkdir, opendir, readdir, rmdir, open, read, create, write, close, unlink,
@@ -141,6 +150,13 @@ include the name of the command (For example: `cloudfuse mount -h`).
       otherwise it just evicts file from local cache.
 - Stream options
     * `--block-size-mb=<SIZE IN MB>`: Size of a block to be downloaded during streaming.
+- Block-Cache options
+    * `--block-cache-block-size=<SIZE IN MB>`: Size of a block to be downloaded as a unit.
+    * `--block-cache-pool-size=<SIZE IN MB>`: Size of pool to be used for caching. This limits total memory used by block-cache.
+    * `--block-cache-path=<PATH>`: Path where downloaded blocks will be persisted. Not providing this parameter will disable the disk caching.
+    * `--block-cache-disk-size=<SIZE IN MB>`: Disk space to be used for caching.
+    * `--block-cache-prefetch=<Number of blocks>`: Number of blocks to prefetch at max when sequential reads are in progress.
+    * `--block-cache-prefetch-on-open=true`: Start prefetching on open system call instead of waiting for first read. Enhances perf if file is read sequentially from offset 0.
 - Fuse options
     * `--attr-timeout=<TIMEOUT IN SECONDS>`: Time the kernel can cache inode attributes.
     * `--entry-timeout=<TIMEOUT IN SECONDS>`: Time the kernel can cache directory listing.
@@ -218,6 +234,7 @@ cost and performance implications.
 - chown  : Change of ownership is not supported by Azure Storage hence Cloudfuse does not support this.
 - Creation of device files or pipes is not supported by Cloudfuse.
 - Cloudfuse does not support extended-attributes (x-attrs) operations
+- Cloudfuse does not support lseek() operation on directory handles. No error is thrown but it will not work as expected.
 
 ## Un-Supported Scenarios
 - Cloudfuse does not support overlapping mount paths. While running multiple instances of Cloudfuse make sure each

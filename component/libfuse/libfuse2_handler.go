@@ -140,8 +140,10 @@ func (lf *Libfuse) initFuse() error {
 
 	// direct_io option is used to bypass the kernel cache. It disables the use of
 	// page cache (file content cache) in the kernel for the filesystem.
-	if lf.directIO {
+	if fuseFS.directIO {
 		options += ",direct_io"
+	} else {
+		options += ",kernel_cache"
 	}
 
 	// Setup options as a slice
@@ -364,7 +366,10 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 		return -fuse.EBADF
 	}
 
+	handle.RLock()
 	val, found := handle.GetValue("cache")
+	handle.RUnlock()
+
 	if !found {
 		return -fuse.EIO
 	}

@@ -1,4 +1,10 @@
 
+# To create ramdisk
+# sudo mkdir -p /mnt/ramdisk
+# sudo chmod 777 /mnt/ramdisk
+# sudo mount -t tmpfs -o rw,size=4G tmpfs /mnt/ramdisk
+
+
 SERVICE="cloudfuse"
 SCRIPT="longhaul.sh"
 
