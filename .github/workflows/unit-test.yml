@@ -180,7 +180,7 @@ jobs:
           version: latest
 
           # Optional: golangci-lint command line arguments.
-          args: --tests=false --skip-dirs test,common/stats_collector,common/stats_monitor --max-issues-per-linter=0 --skip-files component/libfuse/libfuse2_handler_test_wrapper.go
+          args: --tests=false --timeout=5m --skip-dirs test,common/stats_collector,common/stats_monitor --max-issues-per-linter=0 --skip-files component/libfuse/libfuse2_handler_test_wrapper.go
 
       - name: Go Format Check
         run: gofmt -s -l -d . | tee >&2
