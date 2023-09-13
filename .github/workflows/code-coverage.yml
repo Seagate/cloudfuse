@@ -1,22 +1,15 @@
 name: Code_Coverage
 on:
   push:
-     branches:
+    branches:
       - code-coverage-github-action
   pull_request:
     types: [opened, synchronize]
-  workflow_dispatch:
-    inputs:
-      coverage_test:
-        description: Code Coverage
-        default: true
-        type: boolean
-        required: false
-      cleanup_test:
-        description: Account Cleanup
-        default: true
-        type: boolean
-        required: false
+
+concurrency:
+  # New commit on branch cancels a running workflow on the same branch
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   BuildAndTest-Coverage:
@@ -47,7 +40,6 @@ jobs:
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
     
-    if: inputs.coverage_test == true
     timeout-minutes: 300
     steps:
     - name: checkout
@@ -507,7 +499,6 @@ jobs:
       cloudfuse_CFG: "${{ github.workspace }}/cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "${{ github.workspace }}/cloudfuse_stream.yaml"
     
-    if: inputs.cleanup_test == true
     timeout-minutes: 30
     steps:
     - name: checkout
