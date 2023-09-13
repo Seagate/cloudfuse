@@ -3,10 +3,15 @@ on:
   push:
     branches:
       - main
-      - unit-test-github-action
   pull_request:
-    branches:
-    - main
+  workflow_dispatch:
+    inputs:
+      manual:
+        description: 'Manual Run'
+        type: boolean
+        required: true
+        default: true
+
 jobs:
   test:
     strategy:
