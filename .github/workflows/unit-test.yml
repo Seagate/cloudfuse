@@ -28,11 +28,11 @@ jobs:
     runs-on:  ${{ matrix.os }}
 
     env:
-      S3TEST_ENDPOINT: http://localhost:4566
-      S3TEST_REGION: us-east-1
-      S3TEST_ACCESS_KEY: test
-      S3TEST_SECRET_KEY: test
-      S3TEST_BUCKET_NAME: test
+      AWS_ENDPOINT: http://localhost:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_BUCKET_NAME: test
 
     steps:
       - name: Checkout code
@@ -132,11 +132,11 @@ jobs:
           echo $cnfFile
           touch $cnfFile
           echo "{" > $cnfFile
-          echo "\"bucket-name\"": "\"${{ env.S3TEST_BUCKET_NAME }}\"", >> $cnfFile
-          echo "\"access-key\"": "\"${{ env.S3TEST_ACCESS_KEY }}\"", >> $cnfFile
-          echo "\"secret-key\"": "\"${{ env.S3TEST_SECRET_KEY }}\"", >> $cnfFile
-          echo "\"endpoint\"": "\"${{ env.S3TEST_ENDPOINT }}\"", >> $cnfFile
-          echo "\"region\"": "\"${{ env.S3TEST_REGION }}\"" >> $cnfFile
+          echo "\"bucket-name\"": "\"${{ env.AWS_BUCKET_NAME }}\"", >> $cnfFile
+          echo "\"access-key\"": "\"${{ env.AWS_ACCESS_KEY_ID }}\"", >> $cnfFile
+          echo "\"secret-key\"": "\"${{ env.AWS_SECRET_ACCESS_KEY }}\"", >> $cnfFile
+          echo "\"endpoint\"": "\"${{ env.AWS_ENDPOINT }}\"", >> $cnfFile
+          echo "\"region\"": "\"${{ env.AWS_REGION }}\"" >> $cnfFile
           echo "}" >> $cnfFile
         if: matrix.os == 'ubuntu-latest'
 
@@ -146,11 +146,11 @@ jobs:
           Write-Host $cnfFile
           $content = @"
           {
-            "bucket-name": "${{ env.S3TEST_BUCKET_NAME }}",
-            "access-key": "${{ env.S3TEST_ACCESS_KEY }}",
-            "secret-key": "${{ env.S3TEST_SECRET_KEY }}",
-            "endpoint": "${{ env.S3TEST_ENDPOINT }}",
-            "region": "${{ env.S3TEST_REGION }}"
+            "bucket-name": "${{ env.AWS_BUCKET_NAME }}",
+            "access-key": "${{ env.AWS_ACCESS_KEY_ID }}",
+            "secret-key": "${{ env.AWS_SECRET_ACCESS_KEY }}",
+            "endpoint": "${{ env.AWS_ENDPOINT }}",
+            "region": "${{ env.AWS_REGION }}"
           }
           "@
           $content | Out-File -FilePath $cnfFile -Encoding Ascii
