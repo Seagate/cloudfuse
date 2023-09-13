@@ -76,49 +76,21 @@ func (suite *cacheMapTestSuite) SetupTest() {
 
 func (suite *cacheMapTestSuite) TestInsertCacheMap() {
 
-	attrCacheItemInstance := attrCacheItem{}
-	// .generate a path directory
+	//create path string in form of david/dir/file
 
-	// .populate the tree
-	for a := alist.Front(); a != nil; a = a.Next() {
-		valueStr := a.Value.(string)
-		if valueStr[len(valueStr)-1:] == "/" {
-			attrCacheItemInstance.attr = internal.CreateObjAttrDir(valueStr)
-			attrCacheItemInstance.insert(attrCacheItemInstance.attr, true, time.Now())
-		} else {
-			attrCacheItemInstance.attr = internal.CreateObjAttr(valueStr, 1024, time.Now())
-			attrCacheItemInstance.insert(attrCacheItemInstance.attr, attrCacheItemInstance.exists(), attrCacheItemInstance.cachedAt)
-		}
-	}
+	//insert path into suite.rootAttrCacheItem
 
-	for b := blist.Front(); b != nil; b = b.Next() {
-		valueStr := b.Value.(string)
-		if valueStr[len(valueStr)-1:] == "/" {
-			attrCacheItemInstance.attr = internal.CreateObjAttrDir(valueStr)
-			attrCacheItemInstance.insert(attrCacheItemInstance.attr, true, time.Now())
-		} else {
-			attrCacheItemInstance.attr = internal.CreateObjAttr(valueStr, 1024, time.Now())
-			attrCacheItemInstance.insert(attrCacheItemInstance.attr, attrCacheItemInstance.exists(), attrCacheItemInstance.cachedAt)
-		}
-	}
+	//verify correct values are in cacheMapTree
 
-	for c := clist.Front(); c != nil; c = c.Next() {
-		valueStr := c.Value.(string)
-		if valueStr[len(valueStr)-1:] == "/" {
-			attrCacheItemInstance.attr = internal.CreateObjAttrDir(valueStr)
-			attrCacheItemInstance.insert(attrCacheItemInstance.attr, true, time.Now())
-		} else {
-			attrCacheItemInstance.attr = internal.CreateObjAttr(valueStr, 1024, time.Now())
-			attrCacheItemInstance.insert(attrCacheItemInstance.attr, attrCacheItemInstance.exists(), attrCacheItemInstance.cachedAt)
-		}
-	}
+}
 
-	// validate tree is properly populated
-	for a := alist.Front(); a != nil; a = a.Next() {
-		cachedItem, err := attrCacheItemInstance.get(a.Value.(string))
-		suite.assert.NotNil(err)
-		suite.assert.EqualValues(cachedItem)
-	}
+func (suite *cacheMapTestSuite) TestDeleteCacheMap() {
+
+	//create path string in form of david/dir/file
+
+	//insert path into suite.rootAttrCacheItem
+
+	//verify correct values are in cacheMapTree
 
 }
 
