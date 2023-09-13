@@ -90,9 +90,11 @@ func (s *s3wrapperTestSuite) SetupTest() {
 
 func (s *s3wrapperTestSuite) setupTestHelper(configuration string) {
 	if configuration == "" {
-		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		configuration = fmt.Sprintf(
+			"s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  region: %s\n  profile: %s\n  endpoint: %s",
 			storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
-			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Region,
+			storageTestConfigurationParameters.Profile, storageTestConfigurationParameters.Endpoint)
 	}
 	s.config = configuration
 

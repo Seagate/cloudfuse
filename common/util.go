@@ -53,6 +53,9 @@ import (
 	"gopkg.in/ini.v1"
 )
 
+// Sector size of disk
+const SectorSize = 4096
+
 var RootMount bool
 var ForegroundMount bool
 

@@ -1,4 +1,4 @@
-//go:build windows
+//go:build linux
 
 /*
     _____           _____   _____   ____          ______  _____  ------
@@ -12,6 +12,8 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -32,48 +34,15 @@
    SOFTWARE
 */
 
-package file_cache
+package cmd
 
 import (
-	"os"
-	"path/filepath"
+	_ "cloudfuse/component/attr_cache"
+	_ "cloudfuse/component/azstorage"
+	_ "cloudfuse/component/block_cache"
+	_ "cloudfuse/component/file_cache"
+	_ "cloudfuse/component/libfuse"
+	_ "cloudfuse/component/loopback"
+	_ "cloudfuse/component/s3storage"
+	_ "cloudfuse/component/stream"
 )
-
-// totalSectors walks through all files in the path and gives an estimate of the total number of sectors
-// that are being used. Based on https://stackoverflow.com/questions/32482673/how-to-get-directory-total-size
-func totalSectors(path string) int64 {
-	//bytes per sector is hard coded to 4096 bytes since syscall to windows and BytesPerSector for the drive in question is an estimate.
-	// https://devblogs.microsoft.com/oldnewthing/20160427-00/?p=93365
-
-	var totalSectors int64
-	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			totalSectors += (info.Size() / sectorSize)
-			if info.Size()%sectorSize != 0 {
-				totalSectors++
-			}
-		}
-		return err
-	})
-
-	// TODO: Handle this error properly
-	if err != nil {
-		return totalSectors
-	}
-
-	return totalSectors
-
-}
-
-// getUsage provides an estimate of the size on disk in MB for provided directory path string
-func getUsage(path string) (float64, error) {
-	totalSectors := totalSectors(path)
-
-	totalBytes := float64(totalSectors * sectorSize)
-	totalBytes = totalBytes / MB
-
-	return totalBytes, nil
-}
