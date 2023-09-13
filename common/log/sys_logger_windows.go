@@ -73,7 +73,7 @@ func (sl *SysLogger) GetLoggerObj() *log.Logger {
 
 func (sl *SysLogger) SetLogLevel(level common.LogLevel) {
 	sl.level = level
-	sl.logEvent(common.ELogLevel.LOG_CRIT(), "Log level reset to :"+level.String())
+	_ = sl.logEvent(common.ELogLevel.LOG_CRIT(), "Log level reset to :"+level.String())
 }
 
 func (sl *SysLogger) GetType() string {
@@ -125,42 +125,42 @@ func (sl *SysLogger) logEvent(lvl common.LogLevel, msg string) error {
 func (sl *SysLogger) Debug(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_DEBUG() {
 		msg := fmt.Sprintf(format, args...)
-		sl.logEvent(common.ELogLevel.LOG_DEBUG(), msg)
+		_ = sl.logEvent(common.ELogLevel.LOG_DEBUG(), msg)
 	}
 }
 
 func (sl *SysLogger) Trace(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_TRACE() {
 		msg := fmt.Sprintf(format, args...)
-		sl.logEvent(common.ELogLevel.LOG_TRACE(), msg)
+		_ = sl.logEvent(common.ELogLevel.LOG_TRACE(), msg)
 	}
 }
 
 func (sl *SysLogger) Info(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_INFO() {
 		msg := fmt.Sprintf(format, args...)
-		sl.logEvent(common.ELogLevel.LOG_INFO(), msg)
+		_ = sl.logEvent(common.ELogLevel.LOG_INFO(), msg)
 	}
 }
 
 func (sl *SysLogger) Warn(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_WARNING() {
 		msg := fmt.Sprintf(format, args...)
-		sl.logEvent(common.ELogLevel.LOG_WARNING(), msg)
+		_ = sl.logEvent(common.ELogLevel.LOG_WARNING(), msg)
 	}
 }
 
 func (sl *SysLogger) Err(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_ERR() {
 		msg := fmt.Sprintf(format, args...)
-		sl.logEvent(common.ELogLevel.LOG_ERR(), msg)
+		_ = sl.logEvent(common.ELogLevel.LOG_ERR(), msg)
 	}
 }
 
 func (sl *SysLogger) Crit(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_CRIT() {
 		msg := fmt.Sprintf(format, args...)
-		sl.logEvent(common.ELogLevel.LOG_CRIT(), msg)
+		_ = sl.logEvent(common.ELogLevel.LOG_CRIT(), msg)
 	}
 }
 

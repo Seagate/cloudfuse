@@ -187,7 +187,7 @@ jobs:
       - name: Install libfuse on Linux
         shell: bash
         run: |
-          sudo apt-get install fuse3 libfuse-dev rpm pkg-config
+          sudo apt-get install fuse3 libfuse-dev
         if: matrix.os == 'ubuntu-latest'
 
       - name: golangci-lint
@@ -199,10 +199,7 @@ jobs:
           version: latest
 
           # Optional: golangci-lint command line arguments.
-          args: --tests=false --timeout=5m --skip-dirs test,common/stats_collector,common/stats_monitor --max-issues-per-linter=0 --skip-files component/libfuse/libfuse2_handler_test_wrapper.go
-
-      - name: Go Format Check
-        run: gofmt -s -l -d . | tee >&2
+          args: --tests=false --timeout=5m --skip-dirs test,common/stats_collector,common/stats_monitor --skip-files component/libfuse/libfuse2_handler_test_wrapper.go --out-format=github-actions
 
       - name: Notice file check
         run: |

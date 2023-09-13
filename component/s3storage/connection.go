@@ -102,8 +102,8 @@ type S3Connection interface {
 	List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error)
 
 	ReadToFile(name string, offset int64, count int64, fi *os.File) error
-	ReadBuffer(name string, offset int64, len int64, isSymlink bool) ([]byte, error)
-	ReadInBuffer(name string, offset int64, len int64, data []byte) error
+	ReadBuffer(name string, offset int64, length int64, isSymlink bool) ([]byte, error)
+	ReadInBuffer(name string, offset int64, length int64, data []byte) error
 
 	WriteFromFile(name string, metadata map[string]string, fi *os.File) error
 	WriteFromBuffer(name string, metadata map[string]string, data []byte) error

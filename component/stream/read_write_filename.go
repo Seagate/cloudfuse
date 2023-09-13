@@ -288,19 +288,19 @@ func (rw *ReadWriteFilenameCache) GetAttr(options internal.GetAttrOptions) (*int
 	return attrs, nil
 }
 
-func (rw *ReadWriteFilenameCache) purge(fileName string, close bool) {
+func (rw *ReadWriteFilenameCache) purge(fileName string, closeOp bool) {
 	// check if this file is cached
 	rw.Lock()
 	defer rw.Unlock()
 	buffer, found := rw.fileCache[fileName]
 	if found {
 		// if it is a close operation then decrement the handle count on the buffer
-		if close {
+		if closeOp {
 			atomic.AddInt64(&buffer.HandleCount, -1)
 		}
 		// rw.RUnlock()
 		// if the handle count is 0 (no open handles) purge the buffer
-		if atomic.LoadInt64(&buffer.HandleCount) <= 0 || !close {
+		if atomic.LoadInt64(&buffer.HandleCount) <= 0 || !closeOp {
 			delete(rw.fileCache, fileName)
 			buffer.Lock()
 			defer buffer.Unlock()
