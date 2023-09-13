@@ -153,21 +153,10 @@ jobs:
         run: go test -v -timeout=2h ./... --tags=unittest
 
   lint:
-    strategy:
-      matrix:
-        go: ['1.20']
-        job_name: ['linux', 'windows']
-
-        include:
-          - job_name: linux
-            os: ubuntu-latest
-
-          - job_name: windows
-            os: windows-latest
-            cgo: '0'
-
     name: Lint
-    runs-on:  ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    env:
+      go: 'go1.20'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -175,20 +164,19 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go }}
+          go-version: ${{ env.go }}
           check-latest: true
       - run: go version
 
       - name: Set CGO
         shell: bash
         run: |
-          if [[ "${{ matrix.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ matrix.cgo }}' >> $GITHUB_ENV ; fi
+          if [[ "${{ env.go }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.go }}' >> $GITHUB_ENV ; fi
 
       - name: Install libfuse on Linux
         shell: bash
         run: |
-          sudo apt-get install fuse3 libfuse-dev
-        if: matrix.os == 'ubuntu-latest'
+          sudo apt-get install libfuse-dev
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
@@ -211,4 +199,3 @@ jobs:
           else
             echo "Notices are up to date."
           fi
-        if: matrix.os == 'ubuntu-latest'
