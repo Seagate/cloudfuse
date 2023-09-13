@@ -8,7 +8,7 @@ class aboutPage(QWidget, Ui_About):
         super().__init__()
         self.setupUi(self)
         
-        # By default, hyperlinks are set to look for local files in the current director, set the behavior to  open the
+        # By default, hyperlinks are set to look for local files in the current directory; set the behavior to  open the
         #   external link in the system's default browser
         self.textBrowser.setOpenExternalLinks(True)
 
