@@ -27,10 +27,8 @@ jobs:
 
     runs-on:  ${{ matrix.os }}
     env:
-      MOUNT_DIR: "${{ github.workspace }}/tmp/blob_mnt"
-      ROOT_DIR: "${{ github.workspace }}/tmp"
-      TEMP_DIR: "${{ github.workspace }}/tmp/cloudfuse_tmp"
-      WORK_DIR: "."
+      MOUNT_DIR: "./blob_mnt"
+      TEMP_DIR: "./cloudfuse_tmp"
       cloudfuse_ADLS_CFG: "./cloudfuse.adls.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
@@ -54,9 +52,8 @@ jobs:
     
     - name: Create Directory Structure
       run: |-
-        sudo mkdir -p ${{ env.ROOT_DIR }}
-        sudo chown -R `whoami` ${{ env.ROOT_DIR }}
-        chmod 777 ${{ env.ROOT_DIR }}
+        sudo mkdir -p ${{ env.MOUNT_DIR }}
+        sudo mkdir -p ${{ env.TEMP_DIR }}
 
     - name: Go module cache
       uses: actions/cache@v3
@@ -96,7 +93,6 @@ jobs:
         echo "\"skip-msi\"": "true", >> $cnfFile
         echo "\"proxy-address\"": "\"\"" >> $cnfFile
         echo "}" >> $cnfFile
-      if: matrix.os == 'ubuntu-latest'
     
     - name: Create S3 Configuration File
       run: |-
@@ -110,7 +106,6 @@ jobs:
         echo "\"endpoint\"": "\"${{ env.S3TEST_ENDPOINT }}\"", >> $cnfFile
         echo "\"region\"": "\"${{ env.S3TEST_REGION }}\"" >> $cnfFile
         echo "}" >> $cnfFile
-      if: matrix.os == 'ubuntu-latest'
     
     - name: UT Code Coverage
       run: go test -v -timeout=1h ./... --tags=unittest,storagetest -covermode count -coverprofile ./cloudfuse_ut.cov
