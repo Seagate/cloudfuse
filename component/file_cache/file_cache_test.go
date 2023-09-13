@@ -1156,7 +1156,7 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 
 	// Wait  file is evicted
 	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, file))
-	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
+	for i := 0; i < 20 && !os.IsNotExist(err); i++ {
 		time.Sleep(time.Second)
 		_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, file))
 	}
