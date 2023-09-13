@@ -100,11 +100,11 @@ jobs:
         echo $cnfFile
         touch $cnfFile
         echo "{" > $cnfFile
-        echo "\"bucket-name\"": "\"${{ env.S3TEST_BUCKET_NAME }}\"", >> $cnfFile
-        echo "\"access-key\"": "\"${{ env.S3TEST_ACCESS_KEY }}\"", >> $cnfFile
-        echo "\"secret-key\"": "\"${{ env.S3TEST_SECRET_KEY }}\"", >> $cnfFile
-        echo "\"endpoint\"": "\"${{ env.S3TEST_ENDPOINT }}\"", >> $cnfFile
-        echo "\"region\"": "\"${{ env.S3TEST_REGION }}\"" >> $cnfFile
+        echo "\"bucket-name\"": "\"${{ secrets.S3TEST_BUCKET_NAME }}\"", >> $cnfFile
+        echo "\"access-key\"": "\"${{ secrets.S3TEST_ACCESS_KEY }}\"", >> $cnfFile
+        echo "\"secret-key\"": "\"${{ secrets.S3TEST_SECRET_KEY }}\"", >> $cnfFile
+        echo "\"endpoint\"": "\"${{ secrets.S3TEST_ENDPOINT }}\"", >> $cnfFile
+        echo "\"region\"": "\"${{ secrets.S3TEST_REGION }}\"" >> $cnfFile
         echo "}" >> $cnfFile
     
     - name: UT Code Coverage
