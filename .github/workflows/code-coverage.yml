@@ -43,7 +43,7 @@ jobs:
     - name: Install libfuse
       run: |-
         sudo apt-get update --fix-missing -o Dpkg::Options::="--force-confnew"
-        sudo apt-get install make cmake gcc g++ parallel ${{ matrix.fuselib }} ${{ matrix.fuselib }}2) -y -o Dpkg::Options::="--force-confnew"
+        sudo apt-get install make cmake gcc g++ parallel ${{ matrix.fuselib }} ${{ matrix.fuselib2 }} -y -o Dpkg::Options::="--force-confnew"
     
     - name: Create Directory Structure
       run: |-
@@ -251,11 +251,9 @@ jobs:
       run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest3.cov gen-test-config --config-file=azure_stream.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_STREAM_CFG }}"
     
     - name: Block Blob Stream Preparation
-      if: always()
       run: "rm -rf ${{ env.MOUNT_DIR }}/*\nrm -rf ${{ env.TEMP_DIR }}/*\n./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream_prep.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nfor i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'head -c {}M < /dev/urandom > ${{ env.WORK_DIR }}/myfile_{}'\nfor i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'cp ${{ env.WORK_DIR }}/myfile_{} ${{ env.MOUNT_DIR }}/'\n./cloudfuse.test unmount \"${{ env.MOUNT_DIR }}*\"\nsudo fusermount -u ${{ env.MOUNT_DIR }} \nsleep 5"
     
     - name: Block Blob Stream Coverage
-      if: always()
       run: "rm -rf ${{ env.MOUNT_DIR }}/*\nrm -rf ${{ env.TEMP_DIR }}/*\n./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${{ env.MOUNT_DIR }}/*\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}\ncd -\nsudo fusermount -u ${{ env.MOUNT_DIR }} \nsleep 5"
     
     - name: Create Config File - Block Blob
