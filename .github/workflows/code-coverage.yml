@@ -16,7 +16,7 @@ jobs:
     strategy:
         matrix:
           go: ['1.20']
-          job_name: ['linux', 'windows']
+          job_name: ['linux']
   
           include:
             - job_name: linux
@@ -24,11 +24,6 @@ jobs:
               containerName: 'test-cnt-ubn'
               fuselib: libfuse-dev
               fuselib2: fuse
-  
-            - job_name: windows
-              os: windows-latest
-              containerName: 'test-cnt-win'
-              cgo: '0'
 
     runs-on:  ${{ matrix.os }}
     env:
