@@ -136,8 +136,9 @@ func (s3 *S3Storage) OnConfigChange() {
 }
 
 func (s3 *S3Storage) configureAndTest(isParent bool) error {
-	s3.storage = NewConnection(s3.stConfig)
-	return nil
+	var err error
+	s3.storage, err = NewConnection(s3.stConfig)
+	return err
 }
 
 // Start : Initialize the go-sdk pipeline here and test auth is working fine

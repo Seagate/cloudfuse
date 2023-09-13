@@ -51,6 +51,7 @@ type Options struct {
 	KeyID                     string `config:"key-id" yaml:"key-id,omitempty"`
 	SecretKey                 string `config:"secret-key" yaml:"secret-key,omitempty"`
 	Region                    string `config:"region" yaml:"region,omitempty"`
+	Profile                   string `config:"profile" yaml:"region,omitempty"`
 	Endpoint                  string `config:"endpoint" yaml:"endpoint,omitempty"`
 	PrefixPath                string `config:"subdirectory" yaml:"subdirectory,omitempty"`
 	RestrictedCharsWin        bool   `config:"restricted-characters-windows" yaml:"-"`
@@ -69,21 +70,12 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 		return fmt.Errorf("%w: bucket name not provided", errConfigFieldEmpty)
 	}
 
-	// Validate key id
-	if opt.KeyID == "" {
-		return fmt.Errorf("%w: key id not provided", errConfigFieldEmpty)
-	}
-
-	// Validate secret key
-	if opt.SecretKey == "" {
-		return fmt.Errorf("%w: bucket name not provided", errConfigFieldEmpty)
-	}
-
 	// Set authentication config
 	s3.stConfig.authConfig.BucketName = opt.BucketName
 	s3.stConfig.authConfig.KeyID = opt.KeyID
 	s3.stConfig.authConfig.SecretKey = opt.SecretKey
 	s3.stConfig.authConfig.Region = opt.Region
+	s3.stConfig.authConfig.Profile = opt.Profile
 	s3.stConfig.authConfig.Endpoint = opt.Endpoint
 
 	// Set restricted characters

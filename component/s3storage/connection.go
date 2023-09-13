@@ -66,15 +66,16 @@ type s3AuthConfig struct {
 	BucketName string
 	KeyID      string
 	SecretKey  string
-	Endpoint   string
 	Region     string
+	Profile    string
+	Endpoint   string
 }
 
 // NewConnection : Create S3Connection Object
-func NewConnection(cfg Config) S3Connection {
+func NewConnection(cfg Config) (S3Connection, error) {
 	stg := &Client{}
-	_ = stg.Configure(cfg)
-	return stg
+	err := stg.Configure(cfg)
+	return stg, err
 }
 
 type S3Connection interface {

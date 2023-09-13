@@ -66,6 +66,7 @@ func (s *configTestSuite) SetupTest() {
 		KeyID:              "testKeyId",
 		SecretKey:          "testSecretKey",
 		Region:             "testRegion",
+		Profile:            "testProfile",
 		Endpoint:           "testEndpoint",
 		RestrictedCharsWin: true,
 		PrefixPath:         "testPrefixPath",
@@ -84,23 +85,7 @@ func (s *configTestSuite) TestEmptyBucketName() {
 	s.assert.ErrorIs(err, errConfigFieldEmpty)
 }
 
-func (s *configTestSuite) TestEmptyKeyID() {
-	// When
-	s.opt.KeyID = ""
-
-	// Then
-	err := ParseAndValidateConfig(s.s3, s.opt)
-	s.assert.ErrorIs(err, errConfigFieldEmpty)
-}
-
-func (s *configTestSuite) TestEmptySecretKey() {
-	// When
-	s.opt.SecretKey = ""
-
-	// Then
-	err := ParseAndValidateConfig(s.s3, s.opt)
-	s.assert.ErrorIs(err, errConfigFieldEmpty)
-}
+// TODO: make errors from the default aws credentials provider visible to the user somehow
 
 func (s *configTestSuite) TestConfigParse() {
 	// When
@@ -112,6 +97,7 @@ func (s *configTestSuite) TestConfigParse() {
 	s.assert.Equal(s.opt.KeyID, s.s3.stConfig.authConfig.KeyID)
 	s.assert.Equal(s.opt.SecretKey, s.s3.stConfig.authConfig.SecretKey)
 	s.assert.Equal(s.opt.Region, s.s3.stConfig.authConfig.Region)
+	s.assert.Equal(s.opt.Profile, s.s3.stConfig.authConfig.Profile)
 	s.assert.Equal(s.opt.Endpoint, s.s3.stConfig.authConfig.Endpoint)
 	s.assert.Equal(s.opt.RestrictedCharsWin, s.s3.stConfig.restrictedCharsWin)
 	s.assert.Equal(s.opt.PrefixPath, s.s3.stConfig.prefixPath)

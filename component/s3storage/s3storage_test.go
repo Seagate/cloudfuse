@@ -95,8 +95,9 @@ type storageTestConfiguration struct {
 	BucketName                string `json:"bucket-name"`
 	KeyID                     string `json:"access-key"`
 	SecretKey                 string `json:"secret-key"`
-	Endpoint                  string `json:"endpoint"`
 	Region                    string `json:"region"`
+	Profile                   string `json:"profile"`
+	Endpoint                  string `json:"endpoint"`
 	Prefix                    string `json:"prefix"`
 	RestrictedCharsWin        bool   `json:"restricted-characters-windows"`
 	PartSizeMb                int64  `json:"part-size-mb"`
@@ -332,10 +333,10 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, bucket string
 
 func generateConfigYaml(testParams storageTestConfiguration) string {
 	return fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n"+
-		"  endpoint: %s\n  region: %s\n  subdirectory: %s\n  restricted-characters-windows: %t\n  part-size-mb: %d\n"+
-		"  upload-cutoff-mb: %d\n  disable-concurrent-download: %t",
+		"  region: %s\n  profile: %s\n  endpoint: %s\n  subdirectory: %s\n  restricted-characters-windows: %t\n"+
+		"  part-size-mb: %d\n  upload-cutoff-mb: %d\n  disable-concurrent-download: %t",
 		testParams.BucketName, testParams.KeyID, testParams.SecretKey,
-		testParams.Endpoint, testParams.Region, testParams.Prefix, testParams.RestrictedCharsWin, testParams.PartSizeMb,
+		testParams.Region, testParams.Profile, testParams.Endpoint, testParams.Prefix, testParams.RestrictedCharsWin, testParams.PartSizeMb,
 		testParams.UploadCutoffMb, testParams.DisableConcurrentDownload)
 }
 
@@ -362,9 +363,8 @@ func (s *s3StorageTestSuite) cleanupTest() {
 
 func (s *s3StorageTestSuite) TestDefault() {
 	defer s.cleanupTest()
+	// only test required parameters
 	s.assert.Equal(storageTestConfigurationParameters.BucketName, s.s3Storage.stConfig.authConfig.BucketName)
-	s.assert.Equal(storageTestConfigurationParameters.KeyID, s.s3Storage.stConfig.authConfig.KeyID)
-	s.assert.Equal(storageTestConfigurationParameters.SecretKey, s.s3Storage.stConfig.authConfig.SecretKey)
 	// TODO: Uncomment the following line when we have our own bucket and can remove the default test prefix path
 	// s.assert.Empty(s.s3Storage.stConfig.prefixPath)
 	s.assert.False(s.s3Storage.stConfig.restrictedCharsWin)
@@ -1824,6 +1824,7 @@ func (s *s3StorageTestSuite) TestOverwriteBlocks() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = 5
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -1865,6 +1866,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocks() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = 5
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
 	s.setupTestHelper(vdConfig, s.bucket, true)
 
@@ -1900,9 +1902,131 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocks() {
 	f.Close()
 }
 
+func (s *s3StorageTestSuite) TestAppendBlocks() {
+	defer s.cleanupTest()
+	blockSizeMB := 5
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = 5
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(vdConfig, s.bucket, true)
+
+	// Setup
+	name := generateFileName()
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.Nil(err)
+	data := make([]byte, 5*MB)
+	rand.Read(data)
+
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
+	s.assert.Nil(err)
+	f, _ := os.CreateTemp("", name+".tmp")
+	defer os.Remove(f.Name())
+	newTestData := []byte("43211234cake")
+	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5 * MB, Data: newTestData})
+	s.assert.Nil(err)
+
+	currentData := append(data, []byte("43211234cake")...)
+	dataLen := len(currentData)
+	output := make([]byte, dataLen)
+
+	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	s.assert.Nil(err)
+
+	f, err = os.Open(f.Name())
+	s.assert.Nil(err)
+	len, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(dataLen, len)
+	s.assert.EqualValues(currentData, output)
+	f.Close()
+}
+
+func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksLargeFile() {
+	defer s.cleanupTest()
+	blockSizeMB := 5
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = 5
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(vdConfig, s.bucket, true)
+
+	// Setup
+	name := generateFileName()
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.Nil(err)
+	data := make([]byte, 15*MB)
+	rand.Read(data)
+
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
+	s.assert.Nil(err)
+	f, _ := os.CreateTemp("", name+".tmp")
+	defer os.Remove(f.Name())
+	newTestData := []byte("43211234cake")
+	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 15*MB - 4, Data: newTestData})
+	s.assert.Nil(err)
+
+	currentData := append(data[:len(data)-4], []byte("43211234cake")...)
+	dataLen := len(currentData)
+	output := make([]byte, dataLen)
+
+	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	s.assert.Nil(err)
+
+	f, err = os.Open(f.Name())
+	s.assert.Nil(err)
+	len, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(dataLen, len)
+	s.assert.EqualValues(currentData, output)
+	f.Close()
+}
+
+func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksMiddleLargeFile() {
+	defer s.cleanupTest()
+	blockSizeMB := 5
+	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
+	storageTestConfigurationParameters.UploadCutoffMb = 5
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(vdConfig, s.bucket, true)
+
+	// Setup
+	name := generateFileName()
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.Nil(err)
+	data := make([]byte, 15*MB)
+	rand.Read(data)
+
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
+	s.assert.Nil(err)
+	f, _ := os.CreateTemp("", name+".tmp")
+	defer os.Remove(f.Name())
+	newTestData := []byte("43211234cake")
+	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5*MB - 4, Data: newTestData})
+	s.assert.Nil(err)
+
+	currentData := append(data[:5*MB-4], []byte("43211234cake")...)
+	currentData = append(currentData, data[5*MB+8:]...)
+	dataLen := len(currentData)
+	output := make([]byte, dataLen)
+
+	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
+	s.assert.Nil(err)
+
+	f, err = os.Open(f.Name())
+	s.assert.Nil(err)
+	len, err := f.Read(output)
+	s.assert.Nil(err)
+	s.assert.EqualValues(dataLen, len)
+	s.assert.EqualValues(currentData, output)
+	f.Close()
+}
+
 func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSize() {
 	defer s.cleanupTest()
 	// Setup
+	storageTestConfigurationParameters.UploadCutoffMb = 5
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
 	s.assert.Nil(err)

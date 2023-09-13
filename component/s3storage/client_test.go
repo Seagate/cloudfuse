@@ -89,13 +89,16 @@ func newTestClient(configuration string) (*Client, error) {
 			KeyID:      conf.KeyID,
 			SecretKey:  conf.SecretKey,
 			Region:     conf.Region,
+			Profile:    conf.Profile,
 			Endpoint:   conf.Endpoint,
 		},
 		prefixPath:                conf.PrefixPath,
 		disableConcurrentDownload: conf.DisableConcurrentDownload,
+		partSize:                  conf.PartSizeMb * common.MbToBytes,
+		uploadCutoff:              conf.UploadCutoffMb * common.MbToBytes,
 	}
 	// create a Client
-	client := NewConnection(configForS3Client)
+	client, err := NewConnection(configForS3Client)
 
 	return client.(*Client), err
 }
@@ -132,18 +135,28 @@ func (s *clientTestSuite) SetupTest() {
 	s.setupTestHelper("", true)
 }
 
-func (s *clientTestSuite) setupTestHelper(configuration string, create bool) {
+func (s *clientTestSuite) setupTestHelper(configuration string, create bool) error {
+	// TODO: actually create a test bucket for testing (flagged with the create parameter)
+	if storageTestConfigurationParameters.PartSizeMb == 0 {
+		storageTestConfigurationParameters.PartSizeMb = 5
+	}
+	if storageTestConfigurationParameters.UploadCutoffMb == 0 {
+		storageTestConfigurationParameters.UploadCutoffMb = 5
+	}
 	if configuration == "" {
-		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s\n  part-size-mb: %d\n  upload-cutoff-mb: %d\n",
 			storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
-			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region,
+			storageTestConfigurationParameters.PartSizeMb, storageTestConfigurationParameters.UploadCutoffMb)
 	}
 	s.config = configuration
 
 	s.assert = assert.New(s.T())
 
-	s.client, _ = newTestClient(configuration)
+	var err error
+	s.client, err = newTestClient(configuration)
 	s.awsS3Client = s.client.awsS3Client
+	return err
 }
 
 // TODO: do we need s3StatsCollector for this test suite?
@@ -155,6 +168,42 @@ func (s *clientTestSuite) cleanupTest() {
 	// s.tearDownTestHelper(true)
 	_ = log.Destroy()
 }
+
+func (s *clientTestSuite) TestCredentialsError() {
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
+		"WRONGSECRETKEY")
+	// S3 connection creation should fail
+	err := s.setupTestHelper(config, false)
+	s.assert.NotNil(err)
+}
+
+func (s *clientTestSuite) TestEnvVarCredentials() {
+	defer s.cleanupTest()
+	// setup
+	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
+	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s", "stxe1-srg-lens-lab1")
+	// S3 connection should find credentials from environment variables
+	err := s.setupTestHelper(config, false)
+	s.assert.Nil(err)
+}
+
+func (s *clientTestSuite) TestCredentialPrecedence() {
+	defer s.cleanupTest()
+	// setup
+	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
+	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
+		"WRONGSECRETKEY")
+	// Wrong credentials should take precedence, so S3 connection should fail
+	err := s.setupTestHelper(config, false)
+	s.assert.NotNil(err)
+}
+
 func (s *clientTestSuite) TestListBuckets() {
 	defer s.cleanupTest()
 	// TODO: generalize this test by creating, listing, then destroying a bucket
@@ -648,7 +697,7 @@ func (s *clientTestSuite) TestReadToFileRanged() {
 func (s *clientTestSuite) TestReadToFileNoMultipart() {
 	storageTestConfigurationParameters.DisableConcurrentDownload = true
 	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, true)
+	s.setupTestHelper(vdConfig, false)
 	defer s.cleanupTest()
 	// setup
 	name := generateFileName()
