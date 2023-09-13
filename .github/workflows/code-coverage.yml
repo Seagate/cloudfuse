@@ -18,11 +18,6 @@ on:
         type: boolean
         required: false
 
-concurrency:
-  # New commit on branch cancels a running workflow on the same branch
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   BuildAndTest-Coverage:
     strategy:
