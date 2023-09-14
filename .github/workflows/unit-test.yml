@@ -139,13 +139,10 @@ jobs:
           echo "Startup complete"
           
       - name: Install Azurite
-        uses: actions/setup-node@v3
-        with:
-          node-version: 20
-      - run: npm install -g azurite
+        run: npm install -g azurite
     
       - name: Start Azurite
-        run: azurite
+        run: azurite --silent &
       
       - name: Run some Tests against LocalStack
         run: |
