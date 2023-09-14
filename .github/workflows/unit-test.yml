@@ -136,7 +136,8 @@ jobs:
           echo "\"access-key\"": "\"${{ env.AWS_ACCESS_KEY_ID }}\"", >> $cnfFile
           echo "\"secret-key\"": "\"${{ env.AWS_SECRET_ACCESS_KEY }}\"", >> $cnfFile
           echo "\"endpoint\"": "\"${{ env.AWS_ENDPOINT }}\"", >> $cnfFile
-          echo "\"region\"": "\"${{ env.AWS_REGION }}\"" >> $cnfFile
+          echo "\"region\"": "\"${{ env.AWS_REGION }}\"", >> $cnfFile
+          echo "\""use-path-style\"": "\"true\"" >> $cnfFile
           echo "}" >> $cnfFile
         if: matrix.os == 'ubuntu-latest'
 
@@ -150,7 +151,8 @@ jobs:
             "access-key": "${{ env.AWS_ACCESS_KEY_ID }}",
             "secret-key": "${{ env.AWS_SECRET_ACCESS_KEY }}",
             "endpoint": "${{ env.AWS_ENDPOINT }}",
-            "region": "${{ env.AWS_REGION }}"
+            "region": "${{ env.AWS_REGION }}",
+            "use-path-style": true
           }
           "@
           $content | Out-File -FilePath $cnfFile -Encoding Ascii
