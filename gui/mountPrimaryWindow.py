@@ -135,12 +135,12 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 # TODO: For future use to get output on Popen
                 # for line in mount.stdout.readlines():    
             else:
-                mount = subprocess.run(["./cloudfuse", "mount", directory, "--config-file=./config.yaml"], capture_output=True)
+                mount = subprocess.run(["./cloudfuse", "mount", directory, "--config-file=./config.yaml"], shell=True, capture_output=True)
                 # Print to the text edit window the results of the mount
                 if mount.returncode == 0:
                     self.textEdit_output.setText("Successfully mounted container\n")
                 else:
-                    self.textEdit_output.setText("!!Error mounting container!!\n")# + mount.stdout.decode())
+                    self.textEdit_output.setText("!!Error mounting container!!\n" + mount.stderr.decode())
                     # Get the users attention by popping open a new window on an error
                     msg.setWindowTitle("Error")
                     msg.setText("Error mounting container - check the settings and try again")
@@ -154,14 +154,14 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         directory = str(self.lineEdit_mountPoint.text())
         try:#TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
             directory = directory+'/cloudFuse'
-            unmount = (subprocess.run([".\cloudfuse", "service", "unmount", directory], capture_output=True))      
+            unmount = subprocess.run([".\cloudfuse", "service", "unmount", directory], shell=True, capture_output=True)
             # Print to the text edit window the results of the unmount
             if unmount.returncode == 0:
-                self.textEdit_output.setText("Successfully unmounted container\n" + unmount.stdout.decode())
+                self.textEdit_output.setText("Successfully unmounted container\n" + unmount.stderr.decode())
             else:
-                self.textEdit_output.setText("!!Error unmounting container!!\n" + unmount.stdout.decode())
+                self.textEdit_output.setText("!!Error unmounting container!!\n" + unmount.stderr.decode())
                 msg.setWindowTitle("Error")
-                msg.setText("Error unmounting container - check the logs")
+                msg.setText("Error unmounting container - check the logs\n" + unmount.stderr.decode())
                 # Show the message box
                 msg.exec()
         except ValueError:
