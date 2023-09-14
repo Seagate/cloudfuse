@@ -55,6 +55,7 @@ type Config struct {
 	uploadCutoff              int64
 	concurrency               int
 	disableConcurrentDownload bool
+	usePathStyle              bool
 }
 
 // TODO: move s3AuthConfig to s3auth.go

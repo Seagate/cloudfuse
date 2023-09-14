@@ -172,6 +172,9 @@ func (cl *Client) deleteObject(name string, isSymLink bool) error {
 // Wrapper for awsS3Client.DeleteObjects.
 // names is a list of paths to the objects.
 func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
+	if objects == nil {
+		return nil
+	}
 	log.Trace("Client::deleteObjects : deleting %d objects", len(objects))
 	// build list to send to DeleteObjects
 	keyList := make([]types.ObjectIdentifier, len(objects))
