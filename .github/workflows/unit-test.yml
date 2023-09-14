@@ -33,6 +33,10 @@ jobs:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       AWS_BUCKET_NAME: test
+      # Using default test credentials for Azurite
+      BLOB_ENDPOINT: http://127.0.0.1:10000/devstoreaccount1
+      BLOB_ACCOUNT: devstoreaccount1
+      BLOB_KEY: Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
 
     steps:
       - name: Checkout code
@@ -56,15 +60,6 @@ jobs:
           sudo apt-get install fuse3 libfuse-dev rpm pkg-config
         if: matrix.os == 'ubuntu-latest'
 
-      - name: Go module cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
       - name: Build
         run: |
           ./build.sh
@@ -75,22 +70,9 @@ jobs:
           echo $cnfFile
           touch $cnfFile
           echo "{" > $cnfFile
-          echo "\"block-acct\"": "\"${{ secrets.AZTEST_BLOCK_ACC_NAME }}\"", >> $cnfFile
-          echo "\"adls-acct\"": "\"${{ secrets.AZTEST_ADLS_ACC_NAME }}\"", >> $cnfFile
-          echo "\"block-cont\"": "\"${{ matrix.containerName }}\"", >> $cnfFile
-          echo "\"adls-cont\"": "\"${{ matrix.containerName }}\"", >> $cnfFile
-          echo "\"block-key\"": "\"${{ secrets.AZTEST_BLOCK_KEY }}\"", >> $cnfFile
-          echo "\"adls-key\"": "\"${{ secrets.AZTEST_ADLS_KEY }}\"", >> $cnfFile
-          echo "\"block-sas\"": "\"${{ secrets.AZTEST_BLOCK_SAS }}\"", >> $cnfFile
-          echo "\"block-cont-sas-ubn-18\"": "\"${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_18 }}\"", >> $cnfFile
-          echo "\"block-cont-sas-ubn-20\"": "\"${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_20 }}\"", >> $cnfFile
-          echo "\"adls-sas\"": "\"${{ secrets.AZTEST_ADLS_SAS }}\"", >> $cnfFile
-          echo "\"msi-appid\"": "\"${{ secrets.AZTEST_APP_ID }}\"", >> $cnfFile
-          echo "\"msi-resid\"": "\"${{ secrets.AZTEST_RES_ID }}\"", >> $cnfFile
-          echo "\"msi-objid\"": "\"${{ secrets.AZTEST_OBJ_ID }}\"", >> $cnfFile
-          echo "\"spn-client\"": "\"${{ secrets.AZTEST_CLIENT }}\"", >> $cnfFile
-          echo "\"spn-tenant\"": "\"${{ secrets.AZTEST_TENANT }}\"", >> $cnfFile
-          echo "\"spn-secret\"": "\"${{ secrets.AZTEST_SECRET }}\"", >> $cnfFile
+          echo "\"block-acct\"": "\"${{ env.BLOB_ACCOUNT }}\"", >> $cnfFile
+          echo "\"block-key\"": "\"${{ env.BLOB_KEY }}\"", >> $cnfFile
+          echo "\"endpoint\"": "\"${{ env.BLOB_ENDPOINT }}\"", >> $cnfFile
           echo "\"skip-msi\"": "true", >> $cnfFile
           echo "\"proxy-address\"": "\"\"" >> $cnfFile
           echo "}" >> $cnfFile
@@ -102,22 +84,9 @@ jobs:
           Write-Host $cnfFile
           $content = @"
           {
-            "block-acct": "${{ secrets.AZTEST_BLOCK_ACC_NAME }}",
-            "adls-acct": "${{ secrets.AZTEST_ADLS_ACC_NAME }}",
-            "block-cont": "${{ matrix.containerName }}",
-            "adls-cont": "${{ matrix.containerName }}",
-            "block-key": "${{ secrets.AZTEST_BLOCK_KEY }}",
-            "adls-key": "${{ secrets.AZTEST_ADLS_KEY }}",
-            "block-sas": "${{ secrets.AZTEST_BLOCK_SAS }}",
-            "block-cont-sas-ubn-18": "${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_18 }}",
-            "block-cont-sas-ubn-20": "${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_20 }}",
-            "adls-sas": "${{ secrets.AZTEST_ADLS_SAS }}",
-            "msi-appid": "${{ secrets.AZTEST_APP_ID }}",
-            "msi-resid": "${{ secrets.AZTEST_RES_ID }}",
-            "msi-objid": "${{ secrets.AZTEST_OBJ_ID }}",
-            "spn-client": "${{ secrets.AZTEST_CLIENT }}",
-            "spn-tenant": "${{ secrets.AZTEST_TENANT }}",
-            "spn-secret": "${{ secrets.AZTEST_SECRET }}",
+            "block-acct": "${{ env.BLOB_ACCOUNT }}",
+            "block-key": "${{ env.BLOB_KEY }}",
+            "endpoint": "${{ env.BLOB_ENDPOINT }}",
             "skip-msi": true,
             "proxy-address": ""
           }
@@ -159,15 +128,31 @@ jobs:
         shell: powershell
         if: matrix.os == 'windows-latest'
 
+      - name: Install LocalStack from pip
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install localstack awscli-local[ver1] # install LocalStack cli and awslocal
+
       - name: Start LocalStack
         run: |
-          pip install localstack awscli-local[ver1] # install LocalStack cli and awslocal
           docker pull localstack/localstack         # Make sure to pull the latest version of the image
           localstack start -d                       # Start LocalStack in the background
           
-          echo "Waiting for LocalStack startup..."  # Wait 30 seconds for the LocalStack container
-          localstack wait -t 30                     # to become ready before timing out 
-          echo "Startup complete"          
+          echo "Waiting for LocalStack startup..."  # Wait 20 seconds for the LocalStack container
+          localstack wait -t 20                     # to become ready before timing out 
+          echo "Startup complete"
+          
+      - name: Install Azurite
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm install -g azurite
+    
+      - name: Start Azurite
+        run: azurite
       
       - name: Run some Tests against LocalStack
         run: |
@@ -175,7 +160,7 @@ jobs:
           awslocal s3 ls
           
       - name: Run unit tests
-        run: go test -v -timeout=2h ./... --tags=unittest
+        run: go test -v -timeout=2h ./... --tags=unittest,azurite
 
   lint:
     name: Lint

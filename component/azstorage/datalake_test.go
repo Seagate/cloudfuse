@@ -1,5 +1,5 @@
-//go:build !authtest
-// +build !authtest
+//go:build !authtest && !azurite
+// +build !authtest,!azurite
 
 /*
     _____           _____   _____   ____          ______  _____  ------
