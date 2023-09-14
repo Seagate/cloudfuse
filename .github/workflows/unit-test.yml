@@ -128,15 +128,9 @@ jobs:
         shell: powershell
         if: matrix.os == 'windows-latest'
 
-      - name: Install LocalStack from pip
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-      - run: pip install localstack awscli-local[ver1] # install LocalStack cli and awslocal
-
       - name: Start LocalStack
         run: |
+          pip install localstack awscli-local[ver1] # install LocalStack cli and awslocal
           docker pull localstack/localstack         # Make sure to pull the latest version of the image
           localstack start -d                       # Start LocalStack in the background
           
