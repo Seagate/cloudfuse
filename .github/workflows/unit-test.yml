@@ -137,7 +137,7 @@ jobs:
           echo "\"secret-key\"": "\"${{ env.AWS_SECRET_ACCESS_KEY }}\"", >> $cnfFile
           echo "\"endpoint\"": "\"${{ env.AWS_ENDPOINT }}\"", >> $cnfFile
           echo "\"region\"": "\"${{ env.AWS_REGION }}\"", >> $cnfFile
-          echo "\"use-path-style\"": "\"true\"" >> $cnfFile
+          echo "\"use-path-style\"": true\ >> $cnfFile
           echo "}" >> $cnfFile
         if: matrix.os == 'ubuntu-latest'
 
