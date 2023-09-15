@@ -29,6 +29,7 @@ jobs:
     env:
       MOUNT_DIR: "./blob_mnt"
       TEMP_DIR: "./cloudfuse_tmp"
+      WORK_DIR: "."
       cloudfuse_ADLS_CFG: "./cloudfuse.adls.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
