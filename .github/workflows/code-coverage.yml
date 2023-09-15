@@ -349,6 +349,7 @@ jobs:
     - name: 'CLI : Unmount options'
       shell: bash {0}
       run: |-
+        set +x
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_cmd_all.cov mount all ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --log-level=log_debug 
         if [ $? -ne 0 ]; then
           exit 1
