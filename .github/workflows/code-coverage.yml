@@ -27,8 +27,8 @@ jobs:
 
     runs-on:  ${{ matrix.os }}
     env:
-      MOUNT_DIR: "./blob_mnt"
-      TEMP_DIR: "./cloudfuse_tmp"
+      MOUNT_DIR: "$HOME/blob_mnt"
+      TEMP_DIR: "$HOME/cloudfuse_tmp"
       WORK_DIR: "."
       cloudfuse_ADLS_CFG: "./cloudfuse.adls.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
