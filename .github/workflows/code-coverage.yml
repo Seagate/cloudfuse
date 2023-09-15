@@ -414,7 +414,9 @@ jobs:
     
     - name: 'CLI : doc generation'
       timeout-minutes: 2
+      shell: bash {0}
       run: |-
+        set +x
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/doc1.cov doc
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/doc2.cov doc --output-location /notexists
         touch ~/a.txt
