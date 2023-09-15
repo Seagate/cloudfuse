@@ -378,7 +378,9 @@ jobs:
     
     - name: 'CLI : Invalid mount path'
       timeout-minutes: 2
+      shell: bash {0}
       run: |-
+        set +x
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_neg.cov mount all /abc --config-file=${{ env.cloudfuse_CFG }} --log-level=log_debug
         if [ $? -eq 0 ]; then
           exit 1
@@ -394,7 +396,9 @@ jobs:
     
     - name: 'CLI : Remount test'
       timeout-minutes: 2
+      shell: bash {0}
       run: |-
+        set +x
         ./cloudfuse.test unmount all
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_foreg.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --log-level=log_debug --foreground=true &
         if [ $? -ne 0 ]; then
