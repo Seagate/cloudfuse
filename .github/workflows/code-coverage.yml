@@ -186,7 +186,7 @@ jobs:
         cd test/e2e_tests
         go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -adls=true -tmp-path=${{ env.TEMP_DIR }}
         cd -
-        ./cloudfuse.test unmount all
+        sudo fusermount -u ${{ env.MOUNT_DIR }}
         sleep 5
     
     - name: ADLS Coverage with profilers
@@ -231,7 +231,7 @@ jobs:
         cd test/e2e_tests
         go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
         cd -
-        ./cloudfuse.test unmount all
+        sudo fusermount -u ${{ env.MOUNT_DIR }}
         sleep 5
     
     - name: S3 Coverage with profilers
