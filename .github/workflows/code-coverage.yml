@@ -60,15 +60,6 @@ jobs:
         sudo chown -R `whoami` ${{ env.TEMP_DIR }}
         chmod 777 ${{ env.TEMP_DIR }}
 
-    - name: Go module cache
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-
     - name: Build
       run: |
         ./build.sh
@@ -586,15 +577,6 @@ jobs:
             fuselib2: fuse
 
     runs-on:  ${{ matrix.os }}
-    env:
-      MOUNT_DIR: "${{ github.workspace }}/blob_mnt"
-      ROOT_DIR: "${{ github.workspace }}"
-      TEMP_DIR: "${{ github.workspace }}/cloudfuse_tmp"
-      WORK_DIR: "${{ github.workspace }}/azure-storage-fuse"
-      cloudfuse_ADLS_CFG: "${{ github.workspace }}/cloudfuse.adls.yaml"
-      cloudfuse_CFG: "${{ github.workspace }}/cloudfuse.yaml"
-      cloudfuse_STREAM_CFG: "${{ github.workspace }}/cloudfuse_stream.yaml"
-    
     timeout-minutes: 30
     steps:
     - name: checkout
@@ -610,8 +592,7 @@ jobs:
     - name: Install dependency
       run: |-
         sudo apt-get update --fix-missing -o Dpkg::Options::="--force-confnew"
-        sudo apt-get install make cmake gcc g++ parallel ${{ matrix.fuselib }} ${{ matrix.fuselib }}2) git -y -o Dpkg::Options::="--force-confnew"
-
+        sudo apt-get install make cmake gcc g++ parallel ${{ matrix.fuselib }} ${{ matrix.fuselib2 }} -y -o Dpkg::Options::="--force-confnew"
       
     - name: Cleanup Blob Storage
       run: go test -timeout 120m -v test/accoutcleanup/accountcleanup_test.go
