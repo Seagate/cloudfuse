@@ -425,7 +425,9 @@ jobs:
     
     - name: 'CLI : version'
       timeout-minutes: 2
+      shell: bash {0}
       run: |-
+        set +x
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/version1.cov --version
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/version2.cov version
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/version2.cov version --check
