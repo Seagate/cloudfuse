@@ -347,13 +347,12 @@ jobs:
       run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_cmd.cov mount all ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --log-level=log_debug \nif [ $? -ne 0 ]; then\n  exit 1\nfi\n\nsleep 20     \n\n./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/list_cmd_all.cov mount list\nif [ $? -ne 0 ]; then\n  exit 1\nfi\n./cloudfuse.test unmount all"
     
     - name: 'CLI : Unmount options'
-      run: 
+      run: |-
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_cmd_all.cov mount all ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --log-level=log_debug 
         if [ $? -ne 0 ]; then
           exit 1
         fi
         sleep 20
-        cd ${{ env.MOUNT_DIR }}/${{ matrix.containerName }}
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/umnt_cmd_cont.cov unmount ${{ env.MOUNT_DIR }}/${{ matrix.containerName }}
         if [ $? -ne 0 ]; then
           exit 1
