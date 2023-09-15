@@ -2,9 +2,8 @@ name: Code_Coverage
 on:
   push:
     branches:
-      - code-coverage-github-action
+      - main
   pull_request:
-    types: [opened, synchronize]
 
 concurrency:
   # New commit on branch cancels a running workflow on the same branch
