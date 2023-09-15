@@ -374,7 +374,7 @@ jobs:
         if [ $? -ne 1 ]; then
           exit 1
         fi
-        for i in {1..5}; do ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/umnt_all_cmd$i.cov unmount all; done"
+        for i in {1..5}; do ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/umnt_all_cmd$i.cov unmount all; done
     
     - name: 'CLI : Invalid mount path'
       timeout-minutes: 2
