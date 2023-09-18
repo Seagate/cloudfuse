@@ -72,11 +72,12 @@ func (suite *cacheMapTestSuite) SetupTest() {
 
 }
 
-func (suite *cacheMapTestSuite) TestInsertCacheMap() {
+func (suite *cacheMapTestSuite) TestInsertFileCacheMap() {
 
 	//create path string in form of david/dir/file
 	path := "david/c1/davidTestFile.txt"
-	suite.rootAttrCacheItem.attr = internal.CreateObjAttr(path, 1024, time.Now())
+	startTime := time.Now()
+	suite.rootAttrCacheItem.attr = internal.CreateObjAttr(path, 1024, startTime)
 
 	//insert path into suite.rootAttrCacheItem
 
@@ -86,6 +87,33 @@ func (suite *cacheMapTestSuite) TestInsertCacheMap() {
 	cachedItem, err := suite.rootAttrCacheItem.get(path)
 	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(path, cachedItem.attr.Path)
+	suite.assert.EqualValues(1024, cachedItem.attr.Size)
+	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
+	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
+
+}
+
+func (suite *cacheMapTestSuite) TestInsertFolderCacheMap() {
+
+	//create path string in form of david/dir/file
+	path := "david/c1/TestFolder"
+	startTime := time.Now()
+	suite.rootAttrCacheItem.attr = internal.CreateObjAttrDir(path)
+
+	//insert path into suite.rootAttrCacheItem
+
+	suite.rootAttrCacheItem.insert(suite.rootAttrCacheItem.attr, suite.rootAttrCacheItem.exists(), suite.rootAttrCacheItem.cachedAt)
+
+	//verify correct values are in cacheMapTree
+	cachedItem, err := suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(path, cachedItem.attr.Path)
+	suite.assert.EqualValues(4096, cachedItem.attr.Size)
+	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
+	suite.assert.EqualValues(true, cachedItem.attr.IsDir())
+
 }
 
 func (suite *cacheMapTestSuite) TestDeleteCacheMap() {
@@ -101,7 +129,6 @@ func (suite *cacheMapTestSuite) TestGetCacheMapItem() {
 	suite.assert.NotNil(item)
 	attrStr := item.attr.Path
 	suite.assert.EqualValues(path, attrStr)
-	println(attrStr)
 }
 
 func TestCacheMapTestSuite(t *testing.T) {
