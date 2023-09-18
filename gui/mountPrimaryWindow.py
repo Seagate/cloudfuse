@@ -157,13 +157,13 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         msg = QtWidgets.QMessageBox()
         directory = str(self.lineEdit_mountPoint.text())
         try:#TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
-            # Create the mount command to send to subprocess. If shell=True is set and the command is not in one string
-            #   the subprocess will interpret the additional arguments as separate commands.
             if platform == "win32":
                 # for windows, 'cloudfuse' was added to the directory so add it back in for umount
                 directory = directory+'/cloudFuse'
                 unmount = (subprocess.run([".\cloudfuse.exe", "service", "unmount", directory], capture_output=True))
             else:
+                # Create the mount command to send to subprocess. If shell=True is set and the command is not in one string
+                #   the subprocess will interpret the additional arguments as separate commands.
                 cmd = "./cloudfuse unmount " + directory
                 unmount = subprocess.run([cmd], shell=True, capture_output=True)
 
