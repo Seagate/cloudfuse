@@ -162,10 +162,10 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             if platform == "win32":
                 # for windows, 'cloudfuse' was added to the directory so add it back in for umount
                 directory = directory+'/cloudFuse'
-                cmd  = ".\cloudfuse.exe service unmount " + directory
+                unmount = (subprocess.run([".\cloudfuse.exe", "service", "unmount", directory], capture_output=True))
             else:
                 cmd = "./cloudfuse unmount " + directory
-            unmount = subprocess.run([cmd], shell=True, capture_output=True)
+                unmount = subprocess.run([cmd], shell=True, capture_output=True)
 
             # Print to the text edit window the results of the unmount
             if unmount.returncode == 0:
