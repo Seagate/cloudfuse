@@ -135,7 +135,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 # TODO: For future use to get output on Popen
                 # for line in mount.stdout.readlines():    
             else:
-                mount = subprocess.run(["./cloudfuse", "mount", directory, "--config-file=./config.yaml"], shell=True, capture_output=True)
+                #mount = subprocess.run(["./cloudfuse", "mount", directory, "--config-file=./config.yaml"], shell=True, capture_output=True)
+                mount = subprocess.run(["./cloudfuse", "mount", directory, "--config-file=./config.yaml"], capture_output=True)
                 # Print to the text edit window the results of the mount
                 if mount.returncode == 0:
                     self.textEdit_output.setText("Successfully mounted container\n")
@@ -154,7 +155,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         directory = str(self.lineEdit_mountPoint.text())
         try:#TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
             directory = directory+'/cloudFuse'
-            unmount = subprocess.run([".\cloudfuse", "service", "unmount", directory], shell=True, capture_output=True)
+            #unmount = subprocess.run(["./cloudfuse", "service", "unmount", directory], shell=True, capture_output=True)
+            unmount = subprocess.run(["./cloudfuse", "unmount", directory], capture_output=True)
             # Print to the text edit window the results of the unmount
             if unmount.returncode == 0:
                 self.textEdit_output.setText("Successfully unmounted container\n" + unmount.stderr.decode())
