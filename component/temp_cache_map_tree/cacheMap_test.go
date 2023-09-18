@@ -37,8 +37,6 @@ package temp_cache_map_tree
 import (
 	"cloudfuse/internal"
 	"container/list"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -57,12 +55,11 @@ type cacheMapTestSuite struct {
 // what is every test going to need to test with?
 func (suite *cacheMapTestSuite) SetupTest() {
 	suite.assert = assert.New(suite.T())
+	suite.rootAttrCacheItem = attrCacheItem{}
 
 	//set up nested Dir tree
 	nestedDir, nestedFiles := GenerateNestedDirectory("david")
-	suite.rootAttrCacheItem = attrCacheItem{}
 
-	//set up the cacheMap Tree
 	for dir := nestedDir.Front(); dir != nil; dir = dir.Next() {
 		suite.rootAttrCacheItem.attr = internal.CreateObjAttrDir(dir.Value.(string))
 		suite.rootAttrCacheItem.insert(suite.rootAttrCacheItem.attr, suite.rootAttrCacheItem.exists(), suite.rootAttrCacheItem.cachedAt)
@@ -72,6 +69,7 @@ func (suite *cacheMapTestSuite) SetupTest() {
 		suite.rootAttrCacheItem.attr = internal.CreateObjAttr(file.Value.(string), 1024, time.Now())
 		suite.rootAttrCacheItem.insert(suite.rootAttrCacheItem.attr, suite.rootAttrCacheItem.exists(), suite.rootAttrCacheItem.cachedAt)
 	}
+
 }
 
 func (suite *cacheMapTestSuite) TestInsertCacheMap() {
@@ -87,11 +85,31 @@ func (suite *cacheMapTestSuite) TestInsertCacheMap() {
 func (suite *cacheMapTestSuite) TestDeleteCacheMap() {
 
 	//create path string in form of david/dir/file
+	path := "david/c1/davidTestFile.txt"
+	suite.rootAttrCacheItem.attr = internal.CreateObjAttr(path, 1024, time.Now())
 
 	//insert path into suite.rootAttrCacheItem
 
-	//verify correct values are in cacheMapTree
+	suite.rootAttrCacheItem.insert(suite.rootAttrCacheItem.attr, suite.rootAttrCacheItem.exists(), suite.rootAttrCacheItem.cachedAt)
 
+	//verify correct values are in cacheMapTree
+	cachedItem, err := suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.equal
+
+}
+
+func (suite *cacheMapTestSuite) TestGetCacheMapItem() {
+
+	suite.SetupTest()
+	path := "david/c1/gc1"
+	item, err := suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(item)
+	attrStr := item.attr.Path
+	suite.assert.EqualValues(path, attrStr)
+	println(attrStr)
 }
 
 func TestCacheMapTestSuite(t *testing.T) {
@@ -125,23 +143,4 @@ func GenerateNestedDirectory(path string) (*list.List, *list.List) {
 	filePaths.PushBack(path + "c")
 
 	return dirPaths, filePaths
-}
-
-func GetPathAttr(path string, size int64, mode os.FileMode, metadata bool) *internal.ObjAttr {
-	flags := internal.NewFileBitMap()
-	if metadata {
-		flags.Set(internal.PropFlagMetadataRetrieved)
-	}
-	return &internal.ObjAttr{
-		Path:     path,
-		Name:     filepath.Base(path),
-		Size:     size,
-		Mode:     mode,
-		Mtime:    time.Now(),
-		Atime:    time.Now(),
-		Ctime:    time.Now(),
-		Crtime:   time.Now(),
-		Flags:    flags,
-		Metadata: nil,
-	}
 }

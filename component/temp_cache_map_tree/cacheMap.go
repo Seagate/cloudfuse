@@ -135,7 +135,7 @@ func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
 			return nil, fmt.Errorf("The path element : %s does not exist", pathElement)
 		}
 
-		if i == len(paths) {
+		if i == len(paths)-1 {
 			cachedItem = currentItem
 		} else {
 			value = value.children[pathElement]
