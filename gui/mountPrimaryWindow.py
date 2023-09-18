@@ -135,8 +135,11 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 # TODO: For future use to get output on Popen
                 # for line in mount.stdout.readlines():    
             else:
-                #mount = subprocess.run(["./cloudfuse", "mount", directory, "--config-file=./config.yaml"], shell=True, capture_output=True)
-                mount = subprocess.run(["./cloudfuse", "mount", directory, "--config-file=./config.yaml"], capture_output=True)
+                # Create the mount command to send to subprocess. If shell=True is set and the command is not in one string
+                #   the subprocess will interpret the additional arguments as separate commands. 
+                cmd = "./cloudfuse mount " + directory + " --config-file=./config.yaml"
+                mount = subprocess.run([cmd], shell=True, capture_output=True)
+
                 # Print to the text edit window the results of the mount
                 if mount.returncode == 0:
                     self.textEdit_output.setText("Successfully mounted container\n")
@@ -144,7 +147,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     self.textEdit_output.setText("!!Error mounting container!!\n" + mount.stderr.decode())
                     # Get the users attention by popping open a new window on an error
                     msg.setWindowTitle("Error")
-                    msg.setText("Error mounting container - check the settings and try again")
+                    msg.setText("Error mounting container - check the settings and try again\n" + mount.stderr.decode())
                     # Show the message box
                     msg.exec()
         except ValueError:
@@ -154,9 +157,16 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         msg = QtWidgets.QMessageBox()
         directory = str(self.lineEdit_mountPoint.text())
         try:#TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
-            directory = directory+'/cloudFuse'
-            #unmount = subprocess.run(["./cloudfuse", "service", "unmount", directory], shell=True, capture_output=True)
-            unmount = subprocess.run(["./cloudfuse", "unmount", directory], capture_output=True)
+            # Create the mount command to send to subprocess. If shell=True is set and the command is not in one string
+            #   the subprocess will interpret the additional arguments as separate commands.
+            if platform == "win32":
+                # for windows, 'cloudfuse' was added to the directory so add it back in for umount
+                directory = directory+'/cloudFuse'
+                cmd  = ".\cloudfuse.exe service unmount " + directory
+            else:
+                cmd = "./cloudfuse unmount " + directory
+            unmount = subprocess.run([cmd], shell=True, capture_output=True)
+
             # Print to the text edit window the results of the unmount
             if unmount.returncode == 0:
                 self.textEdit_output.setText("Successfully unmounted container\n" + unmount.stderr.decode())
