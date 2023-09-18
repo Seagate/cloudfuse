@@ -75,16 +75,6 @@ func (suite *cacheMapTestSuite) SetupTest() {
 func (suite *cacheMapTestSuite) TestInsertCacheMap() {
 
 	//create path string in form of david/dir/file
-
-	//insert path into suite.rootAttrCacheItem
-
-	//verify correct values are in cacheMapTree
-
-}
-
-func (suite *cacheMapTestSuite) TestDeleteCacheMap() {
-
-	//create path string in form of david/dir/file
 	path := "david/c1/davidTestFile.txt"
 	suite.rootAttrCacheItem.attr = internal.CreateObjAttr(path, 1024, time.Now())
 
@@ -96,7 +86,9 @@ func (suite *cacheMapTestSuite) TestDeleteCacheMap() {
 	cachedItem, err := suite.rootAttrCacheItem.get(path)
 	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
-	suite.assert.equal
+}
+
+func (suite *cacheMapTestSuite) TestDeleteCacheMap() {
 
 }
 
