@@ -223,7 +223,7 @@ func (s *clientTestSuite) TestSetPrefixPath() {
 	s.assert.Nil(err)
 
 	// object should be at prefix
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(path.Join(prefix, fileName)),
 	})
@@ -238,7 +238,7 @@ func (s *clientTestSuite) TestCreateFile() {
 	s.assert.Nil(err)
 
 	// file should be in bucket
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
@@ -257,7 +257,7 @@ func (s *clientTestSuite) TestCreateLink() {
 	// setup
 	target := generateFileName()
 
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(target),
 	})
@@ -270,7 +270,7 @@ func (s *clientTestSuite) TestCreateLink() {
 
 	source = s.client.getKey(source, true)
 
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(source),
 	})
@@ -295,7 +295,7 @@ func (s *clientTestSuite) TestReadLink() {
 
 	source = s.client.getKey(source, true)
 
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(source),
 	})
@@ -322,13 +322,13 @@ func (s *clientTestSuite) TestDeleteLink() {
 
 	source = s.client.getKey(source, true)
 
-	_, err = s.awsS3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+	_, err = s.awsS3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(source),
 	})
 	s.assert.Nil(err)
 
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(source),
 	})
@@ -359,7 +359,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 		sources[i] = s.client.getKey(sources[i], true)
 
 		// make sure the links are there
-		result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 			Bucket: aws.String(s.client.Config.authConfig.BucketName),
 			Key:    aws.String(folder + sources[i]),
 		})
@@ -382,7 +382,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 		}
 	}
 	// send keyList for deletion
-	_, err := s.awsS3Client.DeleteObjects(context.TODO(), &s3.DeleteObjectsInput{
+	_, err := s.awsS3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Delete: &types.Delete{
 			Objects: keyList,
@@ -393,7 +393,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 
 	// make sure the links aren't there
 	for i := range sources {
-		_, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		_, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 			Bucket: aws.String(s.client.Config.authConfig.BucketName),
 			Key:    aws.String(folder + sources[i]),
 		})
@@ -406,7 +406,7 @@ func (s *clientTestSuite) TestDeleteFile() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
@@ -418,7 +418,7 @@ func (s *clientTestSuite) TestDeleteFile() {
 	// This is similar to the s3 bucket command, use getobject for now
 	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
 	// File should not be in the account
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
@@ -430,7 +430,7 @@ func (s *clientTestSuite) TestDeleteDirectory() {
 	// setup
 	dirName := generateDirectoryName()
 	fileName := generateFileName() // can't have empty directory
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(path.Join(dirName, fileName)),
 	})
@@ -440,7 +440,7 @@ func (s *clientTestSuite) TestDeleteDirectory() {
 	s.assert.Nil(err)
 
 	// file in directory should no longer be there
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(path.Join(dirName, fileName)),
 	})
@@ -451,7 +451,7 @@ func (s *clientTestSuite) TestRenameFile() {
 	// Setup
 
 	src := generateFileName()
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(src),
 	})
@@ -462,24 +462,47 @@ func (s *clientTestSuite) TestRenameFile() {
 	s.assert.Nil(err)
 
 	// Src should not be in the account
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(src),
 	})
 	s.assert.NotNil(err)
 	// Dst should be in the account
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(dst),
 	})
 	s.assert.Nil(err)
+}
+func (s *clientTestSuite) TestRenameFileError() {
+	defer s.cleanupTest()
+	// Setup
+
+	src := generateFileName()
+	dst := generateFileName()
+
+	err := s.client.RenameFile(src, dst, false)
+	s.assert.EqualError(err, syscall.ENOENT.Error())
+
+	// Src should not be in the account
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(src),
+	})
+	s.assert.NotNil(err)
+	// Dst should not be in the account
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(dst),
+	})
+	s.assert.NotNil(err)
 }
 func (s *clientTestSuite) TestRenameDirectory() {
 	defer s.cleanupTest()
 	// setup
 	srcDir := generateDirectoryName()
 	fileName := generateFileName() // can't have empty directory
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(path.Join(srcDir, fileName)),
 	})
@@ -490,13 +513,13 @@ func (s *clientTestSuite) TestRenameDirectory() {
 	s.assert.Nil(err)
 
 	// file in srcDir should no longer be there
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(path.Join(srcDir, fileName)),
 	})
 	s.assert.NotNil(err)
 	// file in dstDir should be there
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(path.Join(dstDir, fileName)),
 	})
@@ -508,7 +531,7 @@ func (s *clientTestSuite) TestGetAttrDir() {
 	dirName := generateDirectoryName()
 	filename := dirName + "/" + generateFileName()
 
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(filename),
 	})
@@ -527,7 +550,7 @@ func (s *clientTestSuite) TestGetAttrFile() {
 	minBodyLen := 10
 	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
@@ -550,7 +573,7 @@ func (s *clientTestSuite) TestGetAttrFile() {
 
 	time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
 
-	_, err = s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
@@ -580,28 +603,28 @@ func (s *clientTestSuite) TestList() {
 	// setup directory hierarchy like setupHierarchy in s3storage_test where 'a' is generated base
 	// a/c1/gc1
 	gc1 := base + "/c1" + "/gc1"
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(gc1),
 	})
 	s.assert.Nil(err)
 	// a/c2
 	c2 := base + "/c2"
-	_, err = s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(c2),
 	})
 	s.assert.Nil(err)
 	// ab/c1
 	abc1 := base + "b/c1"
-	_, err = s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(abc1),
 	})
 	s.assert.Nil(err)
 	// ac
 	ac := base + "c"
-	_, err = s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(ac),
 	})
@@ -636,7 +659,7 @@ func (s *clientTestSuite) TestReadToFile() {
 	minBodyLen := 10
 	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
@@ -669,7 +692,7 @@ func (s *clientTestSuite) TestReadToFileRanged() {
 	minBodyLen := 10
 	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
@@ -705,7 +728,7 @@ func (s *clientTestSuite) TestReadToFileNoMultipart() {
 	minBodyLen := 10
 	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
@@ -738,7 +761,7 @@ func (s *clientTestSuite) TestReadBuffer() {
 	minBodyLen := 10
 	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
@@ -759,7 +782,7 @@ func (s *clientTestSuite) TestReadInBuffer() {
 	minBodyLen := 10
 	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
@@ -797,7 +820,7 @@ func (s *clientTestSuite) TestWriteFromFile() {
 	//todo: create another test like this one that does getObject here with and without the .rclonelink suffix
 	// this checks the integration between attr cache and s3storage for metadata.make sure the flag passed down is
 	// respected.
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
@@ -823,7 +846,7 @@ func (s *clientTestSuite) TestWriteFromBuffer() {
 	err := s.client.WriteFromBuffer(name, options.Metadata, body)
 	s.assert.Nil(err)
 
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
@@ -843,7 +866,7 @@ func (s *clientTestSuite) TestTruncateFile() {
 	minBodyLen := 10
 	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
@@ -854,7 +877,7 @@ func (s *clientTestSuite) TestTruncateFile() {
 	err = s.client.TruncateFile(name, int64(size))
 	s.assert.Nil(err)
 
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
@@ -874,7 +897,7 @@ func (s *clientTestSuite) TestWrite() {
 	minBodyLen := 10
 	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	oldBody := []byte(randomString(bodyLen))
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(oldBody),
@@ -887,7 +910,7 @@ func (s *clientTestSuite) TestWrite() {
 	err = s.client.Write(internal.WriteFileOptions{Handle: h, Offset: int64(offset), Data: newData})
 	s.assert.Nil(err)
 
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
