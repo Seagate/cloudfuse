@@ -58,7 +58,7 @@ func (suite *cacheMapTestSuite) SetupTest() {
 	suite.rootAttrCacheItem = attrCacheItem{}
 
 	//set up nested Dir tree
-	nestedDir, nestedFiles := GenerateNestedDirectory("david")
+	nestedDir, nestedFiles := GenerateNestedDirectory("test")
 
 	for dir := nestedDir.Front(); dir != nil; dir = dir.Next() {
 		suite.rootAttrCacheItem.attr = internal.CreateObjAttrDir(dir.Value.(string))
@@ -75,13 +75,12 @@ func (suite *cacheMapTestSuite) SetupTest() {
 func (suite *cacheMapTestSuite) TestInsertFileCacheMap() {
 
 	//create path string in form of david/dir/file
-	path := "david/c1/davidTestFile.txt"
+	path := "/test/c1/TestFile.txt"
 	startTime := time.Now()
-	suite.rootAttrCacheItem.attr = internal.CreateObjAttr(path, 1024, startTime)
+	attr := internal.CreateObjAttr(path, 1024, startTime)
 
 	//insert path into suite.rootAttrCacheItem
-
-	suite.rootAttrCacheItem.insert(suite.rootAttrCacheItem.attr, suite.rootAttrCacheItem.exists(), suite.rootAttrCacheItem.cachedAt)
+	suite.rootAttrCacheItem.insert(attr, true, startTime)
 
 	//verify correct values are in cacheMapTree
 	cachedItem, err := suite.rootAttrCacheItem.get(path)
@@ -97,13 +96,13 @@ func (suite *cacheMapTestSuite) TestInsertFileCacheMap() {
 func (suite *cacheMapTestSuite) TestInsertFolderCacheMap() {
 
 	//create path string in form of david/dir/file
-	path := "david/c1/TestFolder"
+	path := "test/c1/TestFolder"
 	startTime := time.Now()
-	suite.rootAttrCacheItem.attr = internal.CreateObjAttrDir(path)
+	attr := internal.CreateObjAttrDir(path)
 
 	//insert path into suite.rootAttrCacheItem
 
-	suite.rootAttrCacheItem.insert(suite.rootAttrCacheItem.attr, suite.rootAttrCacheItem.exists(), suite.rootAttrCacheItem.cachedAt)
+	suite.rootAttrCacheItem.insert(attr, true, startTime)
 
 	//verify correct values are in cacheMapTree
 	cachedItem, err := suite.rootAttrCacheItem.get(path)
@@ -122,8 +121,7 @@ func (suite *cacheMapTestSuite) TestDeleteCacheMap() {
 
 func (suite *cacheMapTestSuite) TestGetCacheMapItem() {
 
-	suite.SetupTest()
-	path := "david/c1/gc1"
+	path := "test/c1/gc1"
 	item, err := suite.rootAttrCacheItem.get(path)
 	suite.assert.Nil(err)
 	suite.assert.NotNil(item)
