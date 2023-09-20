@@ -40,6 +40,8 @@ import (
 
 	"cloudfuse/common"
 	"cloudfuse/internal"
+
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type Connection struct {
@@ -55,6 +57,8 @@ type Config struct {
 	uploadCutoff              int64
 	concurrency               int
 	disableConcurrentDownload bool
+	enableChecksum            bool
+	checksumAlgorithm         types.ChecksumAlgorithm
 }
 
 // TODO: move s3AuthConfig to s3auth.go

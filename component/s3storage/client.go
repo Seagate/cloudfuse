@@ -828,11 +828,17 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 	//send command to start copy and get the upload id as it is needed later
 	var uploadID string
-	createOutput, err := cl.awsS3Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
+	createMultipartUploadInput := &s3.CreateMultipartUploadInput{
 		Bucket:      aws.String(cl.Config.authConfig.BucketName),
 		Key:         aws.String(key),
 		ContentType: aws.String(getContentType(key)),
-	})
+	}
+
+	if cl.Config.enableChecksum {
+		createMultipartUploadInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+	}
+
+	createOutput, err := cl.awsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
 	if err != nil {
 		log.Err("Client::StageAndCommit : Failed to create multipart upload. Here's why: %v ", name, err)
 		return err
@@ -861,18 +867,37 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 		var err error
 		var eTag *string
+		var checksumCRC32 *string
+		var checksumCRC32C *string
+		var checksumSHA256 *string
+		var checksumSHA1 *string
 		if blk.Dirty() || len(data) > 0 {
 			// This block has data that is not yet in the bucket
-			var partResp *s3.UploadPartOutput
-			partResp, err = cl.awsS3Client.UploadPart(context.TODO(), &s3.UploadPartInput{
+			uploadPartInput := &s3.UploadPartInput{
 				Bucket:     aws.String(cl.Config.authConfig.BucketName),
 				Key:        aws.String(key),
 				PartNumber: partNumber,
 				UploadId:   &uploadID,
 				Body:       bytes.NewReader(data),
-			})
+			}
+
+			if cl.Config.enableChecksum {
+				uploadPartInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+			}
+
+			var partResp *s3.UploadPartOutput
+			partResp, err = cl.awsS3Client.UploadPart(context.TODO(), uploadPartInput)
 			eTag = partResp.ETag
 			blk.Flags.Clear(common.DirtyBlock)
+
+			// Collect the checksums
+			// It is easier to just collect all checksums and then upload them together
+			// as ones that are not used will just be nil and an object can only ever
+			// have one valid checksum
+			checksumCRC32 = partResp.ChecksumCRC32
+			checksumCRC32C = partResp.ChecksumCRC32C
+			checksumSHA1 = partResp.ChecksumSHA1
+			checksumSHA256 = partResp.ChecksumSHA256
 		} else {
 			// This block is already in the bucket, so we need to copy this part
 			var partResp *s3.UploadPartCopyOutput
@@ -885,6 +910,15 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 				UploadId:        &uploadID,
 			})
 			eTag = partResp.CopyPartResult.ETag
+
+			// Collect the checksums
+			// It is easier to just collect all checksums and then upload them together
+			// as ones that are not used will just be nil and an object can only ever
+			// have one valid checksum
+			checksumCRC32 = partResp.CopyPartResult.ChecksumCRC32
+			checksumCRC32C = partResp.CopyPartResult.ChecksumCRC32C
+			checksumSHA1 = partResp.CopyPartResult.ChecksumSHA1
+			checksumSHA256 = partResp.CopyPartResult.ChecksumSHA256
 		}
 
 		if err != nil {
@@ -900,6 +934,12 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 			cPart := types.CompletedPart{
 				ETag:       &etag,
 				PartNumber: partNum,
+			}
+			if cl.Config.enableChecksum {
+				cPart.ChecksumCRC32 = checksumCRC32
+				cPart.ChecksumCRC32C = checksumCRC32C
+				cPart.ChecksumSHA1 = checksumSHA1
+				cPart.ChecksumSHA256 = checksumSHA256
 			}
 			parts = append(parts, cPart)
 		}
