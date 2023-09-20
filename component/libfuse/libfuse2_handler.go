@@ -60,7 +60,7 @@ or we are doing:
 	- handle.ID = (handlemap.HandleID)(fh)
 
 In cloudfuse we maintain handles as an object stored in a handlemap. Cgofuse gives us handles as integer
-values so we need to do type conversions to conver those values to our Handle ID values that cloudfuse
+values so we need to do type conversions to convert those values to our Handle ID values that cloudfuse
 uses so we convert the integer into a handle object.
 */
 
@@ -821,7 +821,7 @@ func (cf *CgofuseFS) Readlink(path string) (int, string) {
 	return 0, targetPath
 }
 
-// Fsync syncronizes the file.
+// Fsync synchronizes the file.
 func (cf *CgofuseFS) Fsync(path string, datasync bool, fh uint64) int {
 	if fh == 0 {
 		return -fuse.EIO
@@ -851,7 +851,7 @@ func (cf *CgofuseFS) Fsync(path string, datasync bool, fh uint64) int {
 	return 0
 }
 
-// Fsyncdir syncronizes a directory.
+// Fsyncdir synchronizes a directory.
 func (cf *CgofuseFS) Fsyncdir(path string, datasync bool, fh uint64) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)

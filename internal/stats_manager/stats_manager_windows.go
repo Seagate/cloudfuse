@@ -249,7 +249,7 @@ func statsPolling() {
 		}
 
 		message := messageBuf.String()
-		log.Debug("stats_manager::statsPolling : Recieved message to polling pipe %v", message)
+		log.Debug("stats_manager::statsPolling : Received message to polling pipe %v", message)
 
 		// validating poll message
 		if !strings.Contains(string(message), "Poll at") {

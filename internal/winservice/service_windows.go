@@ -211,7 +211,7 @@ func writeCommandToUtf16(cmd uint16, args ...string) []byte {
 	return buf.Bytes()
 }
 
-// winFspCommand sends an instruciton to WinFsp.
+// winFspCommand sends an instruction to WinFsp.
 func winFspCommand(command []byte) ([]string, error) {
 	var retStrings []string
 	winPipe, err := windows.UTF16PtrFromString(winfspPipe)
