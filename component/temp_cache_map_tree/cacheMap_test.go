@@ -61,13 +61,13 @@ func (suite *cacheMapTestSuite) SetupTest() {
 	nestedDir, nestedFiles := GenerateNestedDirectory("test")
 
 	for dir := nestedDir.Front(); dir != nil; dir = dir.Next() {
-		suite.rootAttrCacheItem.attr = internal.CreateObjAttrDir(dir.Value.(string))
-		suite.rootAttrCacheItem.insert(suite.rootAttrCacheItem.attr, suite.rootAttrCacheItem.exists(), suite.rootAttrCacheItem.cachedAt)
+		attr := internal.CreateObjAttrDir(dir.Value.(string))
+		suite.rootAttrCacheItem.insert(attr, true, time.Now())
 	}
 
 	for file := nestedFiles.Front(); file != nil; file = file.Next() {
-		suite.rootAttrCacheItem.attr = internal.CreateObjAttr(file.Value.(string), 1024, time.Now())
-		suite.rootAttrCacheItem.insert(suite.rootAttrCacheItem.attr, suite.rootAttrCacheItem.exists(), suite.rootAttrCacheItem.cachedAt)
+		attr := internal.CreateObjAttr(file.Value.(string), 1024, time.Now())
+		suite.rootAttrCacheItem.insert(attr, true, time.Now())
 	}
 
 }
