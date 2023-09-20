@@ -116,7 +116,11 @@ func (suite *cacheMapTestSuite) TestInsertFolderCacheMap() {
 }
 
 func (suite *cacheMapTestSuite) TestDeleteCacheMap() {
+	deleteTime := time.Now()
 
+	//delete a child that has children instead of root.
+	suite.rootAttrCacheItem.markDeleted(deleteTime)
+	suite.rootAttrCacheItem.invalidate()
 }
 
 func (suite *cacheMapTestSuite) TestGetCacheMapItem() {
