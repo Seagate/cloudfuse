@@ -74,7 +74,7 @@ func (suite *cacheMapTestSuite) SetupTest() {
 
 func (suite *cacheMapTestSuite) TestInsertFileCacheMap() {
 
-	//create path string in form of david/dir/file
+	//create path string in form of test/dir/file
 	path := "/test/c1/TestFile.txt"
 	startTime := time.Now()
 	attr := internal.CreateObjAttr(path, 1024, startTime)
@@ -95,7 +95,7 @@ func (suite *cacheMapTestSuite) TestInsertFileCacheMap() {
 
 func (suite *cacheMapTestSuite) TestInsertFolderCacheMap() {
 
-	//create path string in form of david/dir/file
+	//create path string in form of test/dir/file
 	path := "test/c1/TestFolder"
 	startTime := time.Now()
 	attr := internal.CreateObjAttrDir(path)
@@ -119,7 +119,6 @@ func (suite *cacheMapTestSuite) TestDeleteAttrItem() {
 	deleteTime := time.Now()
 
 	//insert an item
-	//create path string in form of david/dir/file
 	path := "/test/c1/TempFile.txt"
 	startTime := time.Now()
 	attr := internal.CreateObjAttr(path, 1024, startTime)
