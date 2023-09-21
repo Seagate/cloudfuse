@@ -116,6 +116,7 @@ func (suite *cacheMapTestSuite) TestInsertFolderCacheMap() {
 }
 
 func (suite *cacheMapTestSuite) TestDeleteAttrItem() {
+
 	deleteTime := time.Now()
 
 	//insert an item
@@ -175,6 +176,7 @@ func TestCacheMapTestSuite(t *testing.T) {
 //
 // ac
 func GenerateNestedDirectory(path string) (*list.List, *list.List) {
+
 	path = internal.TruncateDirName(path)
 
 	dirPaths := list.New()
