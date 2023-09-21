@@ -73,7 +73,6 @@ func (suite *cacheMapTestSuite) SetupTest() {
 }
 
 func (suite *cacheMapTestSuite) TestInsertFileCacheMap() {
-
 	//create path string in form of test/dir/file
 	path := "/a/c1/TestFile.txt"
 	startTime := time.Now()
@@ -90,11 +89,9 @@ func (suite *cacheMapTestSuite) TestInsertFileCacheMap() {
 	suite.assert.EqualValues(1024, cachedItem.attr.Size)
 	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
 	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
-
 }
 
 func (suite *cacheMapTestSuite) TestInsertFolderCacheMap() {
-
 	//create path string in form of test/dir/file
 	path := "a/c1/TestFolder"
 	startTime := time.Now()
@@ -112,11 +109,9 @@ func (suite *cacheMapTestSuite) TestInsertFolderCacheMap() {
 	suite.assert.EqualValues(4096, cachedItem.attr.Size)
 	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
 	suite.assert.EqualValues(true, cachedItem.attr.IsDir())
-
 }
 
 func (suite *cacheMapTestSuite) TestDeleteAttrItem() {
-
 	deleteTime := time.Now()
 
 	//insert an item
@@ -146,11 +141,9 @@ func (suite *cacheMapTestSuite) TestDeleteAttrItem() {
 	suite.assert.NotNil(cachedItem)
 	suite.assert.EqualValues(true, cachedItem.isDeleted())
 	suite.assert.EqualValues(false, cachedItem.exists())
-
 }
 
 func (suite *cacheMapTestSuite) TestGetCacheMapItem() {
-
 	path := "a/c1/gc1"
 	item, err := suite.rootAttrCacheItem.get(path)
 	suite.assert.Nil(err)
@@ -176,7 +169,6 @@ func TestCacheMapTestSuite(t *testing.T) {
 //
 // ac
 func GenerateNestedDirectory(path string) (*list.List, *list.List) {
-
 	path = internal.TruncateDirName(path)
 
 	dirPaths := list.New()
