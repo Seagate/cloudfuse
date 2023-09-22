@@ -109,6 +109,23 @@ func (suite *cacheMapTestSuite) TestInsertFolderCacheMap() {
 	suite.assert.EqualValues(true, cachedItem.attr.IsDir())
 }
 
+func (suite *cacheMapTestSuite) TestInsertDirsAndFilesCacheMap() {
+	path := "a/c1/c12/c3p0/newfile.txt"
+	startTime := time.Now()
+	attr := internal.CreateObjAttr(path, 1024, startTime)
+
+	suite.rootAttrCacheItem.insert(attr, true, startTime)
+
+	cachedItem, err := suite.rootAttrCacheItem.get(path)
+
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(path, cachedItem.attr.Path)
+	suite.assert.EqualValues(1024, cachedItem.attr.Size)
+	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
+
+}
+
 func (suite *cacheMapTestSuite) TestDeleteAttrItem() {
 	deleteTime := time.Now()
 
