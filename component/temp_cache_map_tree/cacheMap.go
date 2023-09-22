@@ -81,16 +81,17 @@ func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *
 func (value *attrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {
 	path := attr.Path // home/user/folder/file
 	path = internal.TruncateDirName(path)
+	var itemPath string
 
 	//start recursion
-	value = value.insertHelper(attr, exists, cachedAt, path)
+	value = value.insertHelper(attr, exists, cachedAt, path, itemPath)
 
 	return value
 
 }
 
 // TODO: write unit tests for this
-func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string) *attrCacheItem {
+func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string, itemPath string) *attrCacheItem {
 	paths := strings.SplitN(path, "/", 2) // paths[0] is home paths[1] is user/folder/file
 
 	if value.children == nil {
@@ -105,14 +106,13 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 
 	} else {
 
-		// here the root of the path string is used as the key of the map[string]*attrCacheItem
+		itemPath += paths[0] + "/"
 		_, ok := value.children[paths[0]]
 		if !ok {
-
-			//insert stubbed folder attr data into tree
-			value.children[paths[0]] = newAttrCacheItem(internal.CreateObjAttrDir(paths[0]), exists, cachedAt)
+			//You need to pass the full path to the directory to internal.CreateObjAttrDir(), but paths[0] is just the directory's name and not its full path.
+			value.children[paths[0]] = newAttrCacheItem(internal.CreateObjAttrDir(itemPath), exists, cachedAt)
 		}
-		value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1])
+		value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1], itemPath)
 	}
 	return value
 }
