@@ -11,15 +11,10 @@ then
         if [ $? -ne 1 ]
         then
             echo "Replacing in $i"
-            result=$(grep "[+:]build" $i)
-            #TODO: handle multiple compiler directives correctly
-            #TODO: cound LICENSE lines instead of hardcoding
-            if [ $? -ne 1 ]
-            then
-                sed -i -e '5,32{R LICENSE' -e 'd}' $i
-            else
-                sed -i -e '2,31{R LICENSE' -e 'd}' $i
-            fi
+            # find the start and end line of the existing license
+            firstLine=$(($(grep -n -m 1 "\/\*" $i | cut -f1 -d:)+1))
+            lastLine=$(($(grep -n -m 1 "\*\/" $i | cut -f1 -d:)-1))
+            sed -i -e "$firstLine,$lastLine{R LICENSE" -e "d}" $i
         fi
     done
 else
