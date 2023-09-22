@@ -131,7 +131,7 @@ func (cl *Client) Configure(cfg Config) error {
 		)
 	}
 	defaultConfig, err := config.LoadDefaultConfig(
-		context.TODO(),
+		context.Background(),
 		config.WithSharedConfigProfile(cl.Config.authConfig.Profile),
 		config.WithCredentialsProvider(credentialsProvider),
 		config.WithEndpointResolverWithOptions(endpointResolver),
@@ -821,9 +821,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	}
 
 	//struct for starting a multipart upload
-	ctx, cancelFn := context.WithTimeout(context.TODO(), 10*time.Minute)
-	defer cancelFn()
-
+	ctx := context.Background()
 	key := cl.getKey(name, false)
 
 	//send command to start copy and get the upload id as it is needed later
@@ -886,7 +884,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 			}
 
 			var partResp *s3.UploadPartOutput
-			partResp, err = cl.awsS3Client.UploadPart(context.TODO(), uploadPartInput)
+			partResp, err = cl.awsS3Client.UploadPart(ctx, uploadPartInput)
 			eTag = partResp.ETag
 			blk.Flags.Clear(common.DirtyBlock)
 
@@ -901,7 +899,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 		} else {
 			// This block is already in the bucket, so we need to copy this part
 			var partResp *s3.UploadPartCopyOutput
-			partResp, err = cl.awsS3Client.UploadPartCopy(context.TODO(), &s3.UploadPartCopyInput{
+			partResp, err = cl.awsS3Client.UploadPartCopy(ctx, &s3.UploadPartCopyInput{
 				Bucket:          aws.String(cl.Config.authConfig.BucketName),
 				Key:             aws.String(key),
 				CopySource:      aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, key)),
@@ -948,7 +946,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	}
 
 	// complete the upload
-	_, err = cl.awsS3Client.CompleteMultipartUpload(context.TODO(), &s3.CompleteMultipartUploadInput{
+	_, err = cl.awsS3Client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
 		Bucket:   aws.String(cl.Config.authConfig.BucketName),
 		Key:      aws.String(key),
 		UploadId: &uploadID,
