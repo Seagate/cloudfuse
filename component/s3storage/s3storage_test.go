@@ -135,7 +135,7 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(ctx context.Context, reader 
 	if readerSize <= partSizeBytes {
 		// If the size can fit in 1 Upload call, do it this way
 		var body io.ReadSeeker = io.NewSectionReader(reader, 0, readerSize)
-		_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 			Bucket:      aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 			Key:         aws.String(key),
 			Body:        body,
@@ -172,7 +172,7 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(ctx context.Context, reader 
 		if partNumber == numBlocks {
 			endSize = readerSize - int64(partNumber-1)*partSizeBytes
 		}
-		partResp, err := s.awsS3Client.UploadPart(context.TODO(), &s3.UploadPartInput{
+		partResp, err := s.awsS3Client.UploadPart(context.Background(), &s3.UploadPartInput{
 			Bucket:     aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 			Key:        aws.String(key),
 			PartNumber: partNumber,
@@ -181,14 +181,14 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(ctx context.Context, reader 
 		})
 
 		if err != nil {
-			s.awsS3Client.AbortMultipartUpload(context.TODO(), &s3.AbortMultipartUploadInput{
+			s.awsS3Client.AbortMultipartUpload(context.Background(), &s3.AbortMultipartUploadInput{
 				Bucket:   aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 				Key:      aws.String(key),
 				UploadId: &uploadID,
 			})
 
 			// AWS states you need to call listparts to verify that multipart upload was properly aborted
-			resp, _ := s.awsS3Client.ListParts(context.TODO(), &s3.ListPartsInput{
+			resp, _ := s.awsS3Client.ListParts(context.Background(), &s3.ListPartsInput{
 				Bucket:   aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 				Key:      aws.String(key),
 				UploadId: &uploadID,
@@ -213,7 +213,7 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(ctx context.Context, reader 
 	}
 
 	// complete the upload
-	_, err = s.awsS3Client.CompleteMultipartUpload(context.TODO(), &s3.CompleteMultipartUploadInput{
+	_, err = s.awsS3Client.CompleteMultipartUpload(context.Background(), &s3.CompleteMultipartUploadInput{
 		Bucket:   aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:      aws.String(key),
 		UploadId: &uploadID,
@@ -222,14 +222,14 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(ctx context.Context, reader 
 		},
 	})
 	if err != nil {
-		s.awsS3Client.AbortMultipartUpload(context.TODO(), &s3.AbortMultipartUploadInput{
+		s.awsS3Client.AbortMultipartUpload(context.Background(), &s3.AbortMultipartUploadInput{
 			Bucket:   aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 			Key:      aws.String(key),
 			UploadId: &uploadID,
 		})
 
 		// AWS states you need to call listparts to verify that multipart upload was properly aborted
-		resp, _ := s.awsS3Client.ListParts(context.TODO(), &s3.ListPartsInput{
+		resp, _ := s.awsS3Client.ListParts(context.Background(), &s3.ListPartsInput{
 			Bucket:   aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 			Key:      aws.String(key),
 			UploadId: &uploadID,
@@ -375,7 +375,7 @@ func (s *s3StorageTestSuite) TestListBuckets() {
 	defer s.cleanupTest()
 
 	// TODO: Fix this so we can create buckets
-	// _, err := s.client.CreateBucket(context.TODO(), &s3.CreateBucketInput{
+	// _, err := s.client.CreateBucket(context.Background(), &s3.CreateBucketInput{
 	// 	Bucket: aws.String("lens-lab-test-create"),
 	// 	CreateBucketConfiguration: &types.CreateBucketConfiguration{
 	// 		LocationConstraint: types.BucketLocationConstraint("us-east-1"),
@@ -931,7 +931,7 @@ func (s *s3StorageTestSuite) TestCreateFile() {
 	s.assert.EqualValues(0, h.Size)
 	// File should be in the account
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -962,7 +962,7 @@ func (s *s3StorageTestSuite) TestCreateFileWindowsNameConvert() {
 	s.assert.EqualValues(0, h.Size)
 	// File should be in the account with the correct object key
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, objectName)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -1051,7 +1051,7 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
 	// File should not be in the account
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -1078,7 +1078,7 @@ func (s *s3StorageTestSuite) TestDeleteFileWindowsNameConvert() {
 
 	// File should not be in the account
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, objectName)
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -1097,7 +1097,7 @@ func (s *s3StorageTestSuite) TestDeleteFileError() {
 
 	// File should not be in the account
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -1126,7 +1126,7 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 
 	// Object will be updated with new data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -1168,7 +1168,7 @@ func (s *s3StorageTestSuite) TestCopyFromFileWindowsNameConvert() {
 
 	// Object will be updated with new data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, objectName)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -1320,7 +1320,7 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -1352,7 +1352,7 @@ func (s *s3StorageTestSuite) TestWriteFileMultipartUpload() {
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -1364,7 +1364,7 @@ func (s *s3StorageTestSuite) TestWriteFileMultipartUpload() {
 
 	// The etag in AWS indicates if it was uploaded as a multipart upload
 	// After the etag there is a dash with the number of parts in the object
-	res, err := s.awsS3Client.HeadObject(context.TODO(), &s3.HeadObjectInput{
+	res, err := s.awsS3Client.HeadObject(context.Background(), &s3.HeadObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -1400,7 +1400,7 @@ func (s *s3StorageTestSuite) TestWriteFileWindowsNameConvert() {
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, objectName)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -1428,7 +1428,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmaller() {
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
@@ -1466,7 +1466,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, objectName)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
@@ -1495,7 +1495,7 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileSmaller() {
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
@@ -1524,7 +1524,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileEqual() {
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
@@ -1553,7 +1553,7 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileEqual() {
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
@@ -1582,7 +1582,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileBigger() {
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
@@ -1607,7 +1607,7 @@ func (s *s3StorageTestSuite) TestTruncateEmptyFileBigger() {
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -1636,7 +1636,7 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileBigger() {
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
-	result, err := s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
@@ -2145,14 +2145,14 @@ func (s *s3StorageTestSuite) TestRenameFile() {
 
 	// Src should not be in the account
 	srcKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, src)
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(srcKey),
 	})
 	s.assert.NotNil(err)
 	// Dst should be in the account
 	dstKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, dst)
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(dstKey),
 	})
@@ -2184,14 +2184,14 @@ func (s *s3StorageTestSuite) TestRenameFileWindowsNameConvert() {
 
 	// Src should not be in the account
 	srcKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, srcObjectName)
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(srcKey),
 	})
 	s.assert.NotNil(err)
 	// Dst should be in the account
 	dstKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, dstObjectName)
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(dstKey),
 	})
@@ -2210,13 +2210,13 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 
 	// Src and destination should not be in the account
 	srcKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, src)
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(srcKey),
 	})
 	s.assert.NotNil(err)
 	dstKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, dst)
-	_, err = s.awsS3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(dstKey),
 	})
@@ -2689,7 +2689,7 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsChunkedFile() {
 	data := make([]byte, 10*MB)
 	rand.Read(data)
 
-	_, err := s.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)),
 		Body:   bytes.NewReader(data),
