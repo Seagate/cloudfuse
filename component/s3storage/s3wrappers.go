@@ -457,7 +457,7 @@ func createObjAttr(path string, size int64, lastModified time.Time, isSymLink bo
 }
 
 // create an object attributes struct for a directory
-func createObjAttrDir(path string) (attr *internal.ObjAttr) {
+func createObjAttrDir(path string) (attr *internal.ObjAttr) { //nolint
 	// strip any trailing slash
 	path = internal.TruncateDirName(path)
 	// For these dirs we get only the name and no other properties so hardcoding time to current time

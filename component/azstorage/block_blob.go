@@ -738,22 +738,22 @@ func (bb *BlockBlob) ReadToFile(name string, offset int64, count int64, fi *os.F
 }
 
 // ReadBuffer : Download a specific range from a blob to a buffer
-func (bb *BlockBlob) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
+func (bb *BlockBlob) ReadBuffer(name string, offset int64, length int64) ([]byte, error) {
 	log.Trace("BlockBlob::ReadBuffer : name %s", name)
 	var buff []byte
-	if len == 0 {
-		len = azblob.CountToEnd
+	if length == 0 {
+		length = azblob.CountToEnd
 		attr, err := bb.GetAttr(name)
 		if err != nil {
 			return buff, err
 		}
 		buff = make([]byte, attr.Size)
 	} else {
-		buff = make([]byte, len)
+		buff = make([]byte, length)
 	}
 
 	blobURL := bb.getBlobURL(name)
-	err := azblob.DownloadBlobToBuffer(context.Background(), blobURL, offset, len, buff, bb.downloadOptions)
+	err := azblob.DownloadBlobToBuffer(context.Background(), blobURL, offset, length, buff, bb.downloadOptions)
 
 	if err != nil {
 		e := storeBlobErrToErr(err)
@@ -771,12 +771,12 @@ func (bb *BlockBlob) ReadBuffer(name string, offset int64, len int64) ([]byte, e
 }
 
 // ReadInBuffer : Download specific range from a file to a user provided buffer
-func (bb *BlockBlob) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
+func (bb *BlockBlob) ReadInBuffer(name string, offset int64, length int64, data []byte) error {
 	// log.Trace("BlockBlob::ReadInBuffer : name %s", name)
 	blobURL := bb.getBlobURL(name)
 	opt := bb.downloadOptions
-	opt.BlockSize = len
-	err := azblob.DownloadBlobToBuffer(context.Background(), blobURL, offset, len, data, opt)
+	opt.BlockSize = length
+	err := azblob.DownloadBlobToBuffer(context.Background(), blobURL, offset, length, data, opt)
 
 	if err != nil {
 		e := storeBlobErrToErr(err)

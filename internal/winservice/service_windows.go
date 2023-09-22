@@ -77,7 +77,7 @@ func (m *Cloudfuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 	log.Trace("Successfully started %s service", SvcName)
 
-	for {
+	for { //nolint
 		select {
 		case c := <-r:
 			switch c.Cmd {
@@ -232,7 +232,7 @@ func winFspCommand(command []byte) ([]string, error) {
 	if err != nil {
 		return retStrings, err
 	}
-	defer windows.CloseHandle(handle)
+	defer windows.CloseHandle(handle) //nolint
 
 	// Send the command to WinFSP
 	var overlapped windows.Overlapped

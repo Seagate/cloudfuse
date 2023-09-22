@@ -253,7 +253,7 @@ func installService() error {
 	if err != nil {
 		return err
 	}
-	defer scm.Disconnect()
+	defer scm.Disconnect() //nolint
 
 	// Don't install the service if it already exists
 	service, err := scm.OpenService(SvcName)
@@ -283,7 +283,7 @@ func removeService() error {
 	if err != nil {
 		return err
 	}
-	defer scm.Disconnect()
+	defer scm.Disconnect() //nolint
 
 	service, err := scm.OpenService(SvcName)
 	if err != nil {
@@ -312,7 +312,7 @@ func startService() error {
 	if err != nil {
 		return err
 	}
-	defer scm.Disconnect()
+	defer scm.Disconnect() //nolint
 
 	service, err := scm.OpenService(SvcName)
 	if err != nil {
@@ -333,7 +333,7 @@ func stopService() error {
 	if err != nil {
 		return err
 	}
-	defer scm.Disconnect()
+	defer scm.Disconnect() //nolint
 
 	service, err := scm.OpenService(SvcName)
 	if err != nil {
@@ -370,7 +370,7 @@ func isServiceRunning() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer scm.Disconnect()
+	defer scm.Disconnect() //nolint
 
 	service, err := scm.OpenService(SvcName)
 	if err != nil {

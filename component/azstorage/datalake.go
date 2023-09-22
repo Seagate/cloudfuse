@@ -559,13 +559,13 @@ func (dl *Datalake) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 }
 
 // ReadBuffer : Download a specific range from a file to a buffer
-func (dl *Datalake) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
-	return dl.BlockBlob.ReadBuffer(name, offset, len)
+func (dl *Datalake) ReadBuffer(name string, offset int64, length int64) ([]byte, error) {
+	return dl.BlockBlob.ReadBuffer(name, offset, length)
 }
 
 // ReadInBuffer : Download specific range from a file to a user provided buffer
-func (dl *Datalake) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
-	return dl.BlockBlob.ReadInBuffer(name, offset, len, data)
+func (dl *Datalake) ReadInBuffer(name string, offset int64, length int64, data []byte) error {
+	return dl.BlockBlob.ReadInBuffer(name, offset, length, data)
 }
 
 // WriteFromFile : Upload local file to file

@@ -83,7 +83,7 @@ func (cfs *CloudfuseStats) statsReader() error {
 		}
 		log.Info("StatsReader::statsReader : Connected transfer pipe %s", cfs.transferPipe)
 
-		go cfs.handleStatsReader(handle)
+		go cfs.handleStatsReader(handle) //nolint
 	}
 }
 

@@ -453,10 +453,10 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 // Reads starting at a byte offset from the start of the object, with length in bytes = len.
 // len = 0 reads to the end of the object.
 // name is the file path
-func (cl *Client) ReadBuffer(name string, offset int64, len int64, isSymlink bool) ([]byte, error) {
-	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, len)
+func (cl *Client) ReadBuffer(name string, offset int64, length int64, isSymlink bool) ([]byte, error) {
+	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, length)
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, len, isSymlink)
+	objectDataReader, err := cl.getObject(name, offset, length, isSymlink)
 	if err != nil {
 		log.Err("Client::ReadBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return nil, err
@@ -476,10 +476,10 @@ func (cl *Client) ReadBuffer(name string, offset int64, len int64, isSymlink boo
 // Reads starting at a byte offset from the start of the object, with length in bytes = len.
 // len = 0 reads to the end of the object.
 // name is the file path.
-func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
-	log.Trace("Client::ReadInBuffer : name %s offset %d len %d", name, offset, len)
+func (cl *Client) ReadInBuffer(name string, offset int64, length int64, data []byte) error {
+	log.Trace("Client::ReadInBuffer : name %s offset %d len %d", name, offset, length)
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, len, false)
+	objectDataReader, err := cl.getObject(name, offset, length, false)
 	if err != nil {
 		log.Err("Client::ReadInBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return err
