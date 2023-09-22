@@ -149,7 +149,7 @@ func GetCurrentUser() (uint32, uint32, error) {
 }
 
 // JoinUnixFilepath uses filepath.join to join a path and ensures that
-// path only uses unix path delimeters.
+// path only uses unix path delimiters.
 func JoinUnixFilepath(elem ...string) string {
 	return NormalizeObjectName(filepath.Join(elem...))
 }

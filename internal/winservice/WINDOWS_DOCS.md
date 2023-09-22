@@ -32,7 +32,7 @@ Commands are sent to WinFsp using named pipes. The WinFsp pipe is located at
 \\.\pipe\WinFsp.{14E7137D-22B4-437A-B0C1-D21D1BDF3767}. Each command is sent as a UTF16 formatted string in bytes. Each
 command requires a class name to be sent which refers to the name of the registry key in the WinFsp registry that WinFsp
 should use when executing the command. In this case it is cloudfuse. Most commands require an instance name to
-uniquely identify the running mount. The instance name is simplify the mount path in our architecure.
+uniquely identify the running mount. The instance name is simplify the mount path in our architecture.
 
 Each command will write output to the named pipe to indicate success or failure. '$' indicates a successful command and
 '!' indicates failure.

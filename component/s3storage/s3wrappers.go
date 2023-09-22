@@ -127,27 +127,28 @@ func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSym
 	log.Trace("Client::putObject : putting object %s", key)
 	var err error
 
+	putObjectInput := &s3.PutObjectInput{
+		Bucket:      aws.String(cl.Config.authConfig.BucketName),
+		Key:         aws.String(key),
+		Body:        objectData,
+		ContentType: aws.String(getContentType(key)),
+	}
+
+	if cl.Config.enableChecksum {
+		putObjectInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+	}
+
 	// If the object is small, just do a normal put object.
 	// If not, then use a multipart upload
 	if size < cl.Config.uploadCutoff {
-		_, err = cl.awsS3Client.PutObject(context.TODO(), &s3.PutObjectInput{
-			Bucket:      aws.String(cl.Config.authConfig.BucketName),
-			Key:         aws.String(key),
-			Body:        objectData,
-			ContentType: aws.String(getContentType(key)),
-		})
+		_, err = cl.awsS3Client.PutObject(context.TODO(), putObjectInput)
 	} else {
 		uploader := manager.NewUploader(cl.awsS3Client, func(u *manager.Uploader) {
 			u.PartSize = cl.Config.partSize
 			u.Concurrency = cl.Config.concurrency
 		})
 
-		_, err = uploader.Upload(context.TODO(), &s3.PutObjectInput{
-			Bucket:      aws.String(cl.Config.authConfig.BucketName),
-			Key:         aws.String(key),
-			Body:        objectData,
-			ContentType: aws.String(getContentType(key)),
-		})
+		_, err = uploader.Upload(context.TODO(), putObjectInput)
 	}
 
 	attemptedAction := fmt.Sprintf("upload object %s", key)
@@ -498,7 +499,7 @@ func (cl *Client) getKey(name string, isSymLink bool) string {
 func (cl *Client) getFile(name string) (string, bool) {
 	isSymLink := false
 
-	//todo: wrtie a test the catches the out of bounds issue.
+	//todo: write a test the catches the out of bounds issue.
 	if strings.HasSuffix(name, symlinkStr) {
 		isSymLink = true
 		name = name[:len(name)-len(symlinkStr)]

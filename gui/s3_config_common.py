@@ -108,7 +108,7 @@ class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
         self.setCheckboxFromSetting(self.checkBox_streaming_fileCachingLevel,stream['file-caching'])
         self.setCheckboxFromSetting(self.checkBox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
 
-        # Spinbox automatically sanitizes intputs for decimal values only, so no need to check for the appropriate data type. 
+        # Spinbox automatically sanitizes inputs for decimal values only, so no need to check for the appropriate data type. 
         self.spinBox_libfuse_attExp.setValue(libfuse['attribute-expiration-sec'])
         self.spinBox_libfuse_entExp.setValue(libfuse['entry-expiration-sec'])
         self.spinBox_libfuse_negEntryExp.setValue(libfuse['negative-entry-expiration-sec'])

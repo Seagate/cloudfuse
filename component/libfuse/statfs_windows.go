@@ -44,7 +44,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Statfs sets file system statics. It returns 0 if successful.
+// Statfs sets file system statistics. It returns 0 if successful.
 func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)

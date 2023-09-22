@@ -5,6 +5,13 @@ on:
       - main
       - local-storage-github-action
   pull_request:
+  workflow_dispatch:
+    inputs:
+      manual:
+        description: 'Manual Run'
+        type: boolean
+        required: true
+        default: true
 
 jobs:
   test:
