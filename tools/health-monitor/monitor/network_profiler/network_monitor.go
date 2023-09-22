@@ -37,9 +37,9 @@ package network_monitor
 import (
 	"fmt"
 
-	"cloudfuse/common/log"
-	hmcommon "cloudfuse/tools/health-monitor/common"
-	hminternal "cloudfuse/tools/health-monitor/internal"
+	"github.com/Seagate/cloudfuse/common/log"
+	hmcommon "github.com/Seagate/cloudfuse/tools/health-monitor/common"
+	hminternal "github.com/Seagate/cloudfuse/tools/health-monitor/internal"
 )
 
 type NetworkProfiler struct {

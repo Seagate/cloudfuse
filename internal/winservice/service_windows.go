@@ -36,10 +36,11 @@ package winservice
 
 import (
 	"bytes"
-	"cloudfuse/common/log"
 	"encoding/binary"
 	"errors"
 	"time"
+
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"

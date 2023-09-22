@@ -42,8 +42,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	common "cloudfuse/common"
-	handlemap "cloudfuse/internal/handlemap"
+	common "github.com/Seagate/cloudfuse/common"
+	handlemap "github.com/Seagate/cloudfuse/internal/handlemap"
 
 	gomock "github.com/golang/mock/gomock"
 )

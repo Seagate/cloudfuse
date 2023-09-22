@@ -40,8 +40,8 @@ import (
 	"os"
 	"testing"
 
-	"cloudfuse/common"
-	"cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/internal"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"

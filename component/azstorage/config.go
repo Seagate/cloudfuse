@@ -40,8 +40,8 @@ import (
 	"reflect"
 	"strings"
 
-	"cloudfuse/common/config"
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common/config"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/JeffreyRichter/enum/enum"

@@ -38,7 +38,7 @@ import (
 	"context"
 	"fmt"
 
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common/log"
 )
 
 // Pipeline: Base pipeline structure holding list of components deployed along with the head of pipeline

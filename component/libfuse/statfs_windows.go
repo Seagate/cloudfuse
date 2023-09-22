@@ -37,8 +37,8 @@
 package libfuse
 
 import (
-	"cloudfuse/common"
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/winfsp/cgofuse/fuse"
 	"golang.org/x/sys/windows"

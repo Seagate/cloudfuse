@@ -38,8 +38,8 @@ import (
 	"os"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/internal"
 )
 
 // Flags represented in BitMap for various flags in the attr cache item

@@ -37,7 +37,7 @@ package azstorage
 import (
 	"fmt"
 
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/Azure/azure-storage-azcopy/v10/azbfs"
 	"github.com/Azure/azure-storage-blob-go/azblob"

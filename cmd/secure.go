@@ -40,7 +40,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common"
 
 	"github.com/spf13/cobra"
 )

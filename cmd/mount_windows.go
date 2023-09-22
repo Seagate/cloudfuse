@@ -35,9 +35,10 @@
 package cmd
 
 import (
-	"cloudfuse/internal"
 	"context"
 	"os"
+
+	"github.com/Seagate/cloudfuse/internal"
 )
 
 // Create dummy function so that mount.go code can compile

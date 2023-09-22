@@ -36,14 +36,15 @@
 package s3storage
 
 import (
-	"cloudfuse/common"
-	"cloudfuse/common/log"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"runtime"
 	"testing"
+
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"

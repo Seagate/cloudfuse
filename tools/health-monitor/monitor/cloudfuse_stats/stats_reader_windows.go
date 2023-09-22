@@ -43,8 +43,8 @@ import (
 	"os"
 	"time"
 
-	"cloudfuse/common/log"
-	"cloudfuse/internal/stats_manager"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"golang.org/x/sys/windows"
 )

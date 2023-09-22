@@ -39,9 +39,9 @@ import (
 	"os"
 	"testing"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	hmcommon "cloudfuse/tools/health-monitor/common"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	hmcommon "github.com/Seagate/cloudfuse/tools/health-monitor/common"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"

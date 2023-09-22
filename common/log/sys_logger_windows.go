@@ -37,10 +37,11 @@
 package log
 
 import (
-	"cloudfuse/common"
 	"errors"
 	"fmt"
 	"log"
+
+	"github.com/Seagate/cloudfuse/common"
 
 	"golang.org/x/sys/windows/svc/eventlog"
 )

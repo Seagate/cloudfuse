@@ -45,7 +45,7 @@ import (
 	"strings"
 	"time"
 
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/Azure/azure-storage-azcopy/v10/azbfs"
 	"github.com/Azure/azure-storage-azcopy/v10/common"

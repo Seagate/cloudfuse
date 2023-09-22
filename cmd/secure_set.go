@@ -40,7 +40,7 @@ import (
 	"reflect"
 	"strings"
 
-	"cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

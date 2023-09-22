@@ -35,7 +35,7 @@
 package azstorage
 
 import (
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common/log"
 )
 
 // AzAuthConfig : Config to authenticate to storage
