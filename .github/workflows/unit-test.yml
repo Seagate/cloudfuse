@@ -18,18 +18,17 @@ jobs:
     strategy:
       matrix:
         go: ['1.20']
-        job_name: ['linux']
-        # job_name: ['linux', 'windows']
+        job_name: ['linux', 'windows']
 
         include:
           - job_name: linux
             os: ubuntu-latest
             containerName: 'test-cnt-ubn'
 
-          # - job_name: windows
-          #   os: windows-latest
-          #   containerName: 'test-cnt-win'
-          #   cgo: '0'
+          - job_name: windows
+            os: windows-latest
+            containerName: 'test-cnt-win'
+            cgo: '0'
 
     name: Build and Test on
     runs-on:  ${{ matrix.os }}
