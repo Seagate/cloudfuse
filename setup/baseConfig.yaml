@@ -183,7 +183,9 @@ s3storage:
   part-size-mb: <size of each part for multipart uploads (in MB). Valid range is 5MB to 5120MB. Default - 8 MB>
   upload-cutoff-mb: <files exceeding this size will use be uploaded in parts (in MB). Default - 100 MB>
   concurrency: <number of parallel upload/download threads. Default - 5>
-  disable-concurrent-download: <disables concurrent downloads. Can improve performance with small files at the cost of slow downloads for large objects>
+  disable-concurrent-download: true|false <disables concurrent downloads. Can improve performance with small files at the cost of slow downloads for large objects>
+  enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
+  checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - SHA1> 
 
 # Mount all configuration
 mountall:

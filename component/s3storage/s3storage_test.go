@@ -323,7 +323,7 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, bucket string
 	// TODO: once we have a separate test bucket, or (preferably) the ability to create one in testing
 	// 	remove this prefix so we can test operations at the root of the bucket
 	if s.s3Storage.stConfig.prefixPath == "" {
-		s.s3Storage.stConfig.prefixPath = "test"
+		s.s3Storage.stConfig.prefixPath = "test" + randomString(8)
 		err = s.s3Storage.storage.SetPrefixPath(s.s3Storage.stConfig.prefixPath)
 		if err != nil {
 			fmt.Printf("s3StorageTestSuite::setupTestHelper : SetPrefixPath failed. Here's why: %v\n", err)

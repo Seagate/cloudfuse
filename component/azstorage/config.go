@@ -487,7 +487,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	}
 
 	log.Info("ParseAndValidateConfig : Account: %s, Container: %s, AccountType: %s, Auth: %s, Prefix: %s, Endpoint: %s, ListBlock: %d, MD5 : %v %v, "+
-		"Virtual Directory: %v, Max Results For List %v, Disable Compression: %v, Restircted Windows Characters: %v",
+		"Virtual Directory: %v, Max Results For List %v, Disable Compression: %v, Restricted Windows Characters: %v",
 		az.stConfig.authConfig.AccountName, az.stConfig.container, az.stConfig.authConfig.AccountType, az.stConfig.authConfig.AuthMode,
 		az.stConfig.prefixPath, az.stConfig.authConfig.Endpoint, az.stConfig.cancelListForSeconds, az.stConfig.validateMD5, az.stConfig.updateMD5,
 		az.stConfig.virtualDirectory, az.stConfig.maxResultsForList, az.stConfig.disableCompression, az.stConfig.restrictedCharsWin)

@@ -1,0 +1,206 @@
+name: Unit-Tests
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      manual:
+        description: 'Manual Run'
+        type: boolean
+        required: true
+        default: true
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        go: ['1.20']
+        job_name: ['linux', 'windows']
+
+        include:
+          - job_name: linux
+            os: ubuntu-latest
+            containerName: 'test-cnt-ubn'
+
+          - job_name: windows
+            os: windows-latest
+            containerName: 'test-cnt-win'
+            cgo: '0'
+
+    name: Build and Test on
+    runs-on:  ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go }}
+          check-latest: true
+      - run: go version
+
+      - name: Set CGO
+        shell: bash
+        run: |
+          if [[ "${{ matrix.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ matrix.cgo }}' >> $GITHUB_ENV ; fi
+
+      - name: Install libfuse on Linux
+        shell: bash
+        run: |
+          sudo apt-get install fuse3 libfuse-dev rpm pkg-config
+        if: matrix.os == 'ubuntu-latest'
+
+      - name: Go module cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build
+        run: |
+          ./build.sh
+
+      - name: Create Azure Configuration File on Linux
+        run: |-
+          cnfFile=$HOME/azuretest.json
+          echo $cnfFile
+          touch $cnfFile
+          echo "{" > $cnfFile
+          echo "\"block-acct\"": "\"${{ secrets.AZTEST_BLOCK_ACC_NAME }}\"", >> $cnfFile
+          echo "\"adls-acct\"": "\"${{ secrets.AZTEST_ADLS_ACC_NAME }}\"", >> $cnfFile
+          echo "\"block-cont\"": "\"${{ matrix.containerName }}\"", >> $cnfFile
+          echo "\"adls-cont\"": "\"${{ matrix.containerName }}\"", >> $cnfFile
+          echo "\"block-key\"": "\"${{ secrets.AZTEST_BLOCK_KEY }}\"", >> $cnfFile
+          echo "\"adls-key\"": "\"${{ secrets.AZTEST_ADLS_KEY }}\"", >> $cnfFile
+          echo "\"block-sas\"": "\"${{ secrets.AZTEST_BLOCK_SAS }}\"", >> $cnfFile
+          echo "\"block-cont-sas-ubn-18\"": "\"${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_18 }}\"", >> $cnfFile
+          echo "\"block-cont-sas-ubn-20\"": "\"${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_20 }}\"", >> $cnfFile
+          echo "\"adls-sas\"": "\"${{ secrets.AZTEST_ADLS_SAS }}\"", >> $cnfFile
+          echo "\"msi-appid\"": "\"${{ secrets.AZTEST_APP_ID }}\"", >> $cnfFile
+          echo "\"msi-resid\"": "\"${{ secrets.AZTEST_RES_ID }}\"", >> $cnfFile
+          echo "\"msi-objid\"": "\"${{ secrets.AZTEST_OBJ_ID }}\"", >> $cnfFile
+          echo "\"spn-client\"": "\"${{ secrets.AZTEST_CLIENT }}\"", >> $cnfFile
+          echo "\"spn-tenant\"": "\"${{ secrets.AZTEST_TENANT }}\"", >> $cnfFile
+          echo "\"spn-secret\"": "\"${{ secrets.AZTEST_SECRET }}\"", >> $cnfFile
+          echo "\"skip-msi\"": "true", >> $cnfFile
+          echo "\"proxy-address\"": "\"\"" >> $cnfFile
+          echo "}" >> $cnfFile
+        if: matrix.os == 'ubuntu-latest'
+
+      - name: Create Azure Configuration File on Windows
+        run: |-
+          $cnfFile="~\azuretest.json"
+          Write-Host $cnfFile
+          $content = @"
+          {
+            "block-acct": "${{ secrets.AZTEST_BLOCK_ACC_NAME }}",
+            "adls-acct": "${{ secrets.AZTEST_ADLS_ACC_NAME }}",
+            "block-cont": "${{ matrix.containerName }}",
+            "adls-cont": "${{ matrix.containerName }}",
+            "block-key": "${{ secrets.AZTEST_BLOCK_KEY }}",
+            "adls-key": "${{ secrets.AZTEST_ADLS_KEY }}",
+            "block-sas": "${{ secrets.AZTEST_BLOCK_SAS }}",
+            "block-cont-sas-ubn-18": "${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_18 }}",
+            "block-cont-sas-ubn-20": "${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_20 }}",
+            "adls-sas": "${{ secrets.AZTEST_ADLS_SAS }}",
+            "msi-appid": "${{ secrets.AZTEST_APP_ID }}",
+            "msi-resid": "${{ secrets.AZTEST_RES_ID }}",
+            "msi-objid": "${{ secrets.AZTEST_OBJ_ID }}",
+            "spn-client": "${{ secrets.AZTEST_CLIENT }}",
+            "spn-tenant": "${{ secrets.AZTEST_TENANT }}",
+            "spn-secret": "${{ secrets.AZTEST_SECRET }}",
+            "skip-msi": true,
+            "proxy-address": ""
+          }
+          "@
+          $content | Out-File -FilePath $cnfFile -Encoding Ascii
+        shell: powershell
+        if: matrix.os == 'windows-latest'
+      
+      - name: Create S3 Configuration File on Linux
+        run: |-
+          cnfFile=$HOME/s3test.json
+          echo $cnfFile
+          touch $cnfFile
+          echo "{" > $cnfFile
+          echo "\"bucket-name\"": "\"${{ secrets.S3TEST_BUCKET_NAME }}\"", >> $cnfFile
+          echo "\"access-key\"": "\"${{ secrets.S3TEST_ACCESS_KEY }}\"", >> $cnfFile
+          echo "\"secret-key\"": "\"${{ secrets.S3TEST_SECRET_KEY }}\"", >> $cnfFile
+          echo "\"endpoint\"": "\"${{ secrets.S3TEST_ENDPOINT }}\"", >> $cnfFile
+          echo "\"region\"": "\"${{ secrets.S3TEST_REGION }}\"" >> $cnfFile
+          echo "}" >> $cnfFile
+        if: matrix.os == 'ubuntu-latest'
+
+      - name: Create S3 Configuration File on Windows
+        run: |-
+          $cnfFile="~\s3test.json"
+          Write-Host $cnfFile
+          $content = @"
+          {
+            "bucket-name": "${{ secrets.S3TEST_BUCKET_NAME }}",
+            "access-key": "${{ secrets.S3TEST_ACCESS_KEY }}",
+            "secret-key": "${{ secrets.S3TEST_SECRET_KEY }}",
+            "endpoint": "${{ secrets.S3TEST_ENDPOINT }}",
+            "region": "${{ secrets.S3TEST_REGION }}"
+          }
+          "@
+          $content | Out-File -FilePath $cnfFile -Encoding Ascii
+        shell: powershell
+        if: matrix.os == 'windows-latest'
+
+      - name: Run unit tests
+        run: go test -v -timeout=2h ./... --tags=unittest
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    env:
+      go: '1.20'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.go }}
+          check-latest: true
+      - run: go version
+
+      - name: Set CGO
+        shell: bash
+        run: |
+          if [[ "${{ env.go }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.go }}' >> $GITHUB_ENV ; fi
+
+      - name: Install libfuse on Linux
+        shell: bash
+        run: |
+          sudo apt-get install libfuse-dev
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          # Require: The version of golangci-lint to use.
+          # When `install-mode` is `binary` (default) the value can be v1.2 or v1.2.3 or `latest` to use the latest version.
+          # When `install-mode` is `goinstall` the value can be v1.2.3, `latest`, or the hash of a commit.
+          version: latest
+
+          # Optional: golangci-lint command line arguments.
+          args: --tests=false --timeout=5m --skip-dirs test,common/stats_collector,common/stats_monitor --skip-files component/libfuse/libfuse2_handler_test_wrapper.go --out-format=github-actions
+
+      - name: Notice file check
+        run: |
+          ./notices_fix.sh
+          result=$(git diff NOTICE | wc -l)
+          if [ $result -ne 0 ]; then
+            echo "Notices needs a fix. Run ./notices_fix.sh and commit NOTICE file."
+            exit 1
+          else
+            echo "Notices are up to date."
+          fi

@@ -100,7 +100,7 @@
        <item>
         <widget class="QLabel" name="label_4">
          <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The amount of time (seconds) the kernal can cache inode attributes&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The amount of time (seconds) the kernel can cache inode attributes&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="text">
           <string>Attribute expiration (s)</string>
