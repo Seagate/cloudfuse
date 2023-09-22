@@ -122,26 +122,20 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 // description: a lookup of any attrCacheItem based on any given full path.
 // TODO: write tests
 func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
-	var cachedItem *attrCacheItem
+
 	paths := strings.Split(path, "/")
-
-	for i, pathElement := range paths {
-
-		currentItem, ok := value.children[pathElement]
+	var currentItem *attrCacheItem
+	var ok bool
+	currentItem = value
+	for _, pathElement := range paths {
+		currentItem, ok = currentItem.children[pathElement]
 		if !ok {
 			return nil, fmt.Errorf("The path element : %s does not exist", pathElement)
 		}
-
-		if i == len(paths)-1 {
-			cachedItem = currentItem
-		} else {
-			value = value.children[pathElement]
-		}
 		//TODO: side note: cacheLocks. channel, sync, semiphore.
-
 	}
 
-	return cachedItem, nil
+	return currentItem, nil
 
 }
 
