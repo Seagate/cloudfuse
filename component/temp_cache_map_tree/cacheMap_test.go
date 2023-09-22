@@ -126,6 +126,39 @@ func (suite *cacheMapTestSuite) TestInsertDirsAndFilesCacheMap() {
 
 }
 
+func (suite *cacheMapTestSuite) TestMarkDeleted() {
+	deleteTime := time.Now()
+
+	//insert an item
+	path := "a/c1/TempFile.txt"
+	startTime := time.Now()
+	attr := internal.CreateObjAttr(path, 1024, startTime)
+
+	//insert path into suite.rootAttrCacheItem
+	suite.rootAttrCacheItem.insert(attr, true, startTime)
+
+	//validate it is there
+	cachedItem, err := suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(path, cachedItem.attr.Path)
+	suite.assert.EqualValues(1024, cachedItem.attr.Size)
+	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
+	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
+
+	// mark it deleted
+	cachedItem.markDeleted(deleteTime)
+
+	//verify it is gone
+	cachedItem, err = suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(0, len(cachedItem.children))
+	suite.assert.EqualValues("", cachedItem.attr.Path)
+	suite.assert.EqualValues(true, cachedItem.isDeleted())
+	suite.assert.EqualValues(false, cachedItem.exists())
+}
+
 func (suite *cacheMapTestSuite) TestDeleteAttrItem() {
 	deleteTime := time.Now()
 
