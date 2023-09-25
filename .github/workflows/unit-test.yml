@@ -13,26 +13,14 @@ on:
         default: true
 
 jobs:
-  test:
-    strategy:
-      matrix:
-        go: ['1.20']
-        job_name: ['linux', 'windows']
-
-        include:
-          - job_name: linux
-            os: ubuntu-latest
-            containerName: 'test-cnt-ubn'
-
-          - job_name: windows
-            os: windows-latest
-            containerName: 'test-cnt-win'
-            cgo: '0'
-
+  linux-unit-test:
     name: Build and Test on
-    runs-on:  ${{ matrix.os }}
-
+    runs-on: ubuntu-latest
     env:
+      go: '1.20'
+      cgo: ''
+      containerName: 'test-cnt-ubn'
+
       AWS_ENDPOINT: http://localhost:4566
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: test
@@ -50,7 +38,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go }}
+          go-version: ${{ env.go }}
           check-latest: true
       - run: go version
 
@@ -62,13 +50,12 @@ jobs:
       - name: Set CGO
         shell: bash
         run: |
-          if [[ "${{ matrix.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ matrix.cgo }}' >> $GITHUB_ENV ; fi
+          if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
 
       - name: Install libfuse on Linux
         shell: bash
         run: |
           sudo apt-get install fuse3 libfuse-dev rpm pkg-config
-        if: matrix.os == 'ubuntu-latest'
 
       - name: Build
         run: |
@@ -86,24 +73,6 @@ jobs:
           echo "\"skip-msi\"": "true", >> $cnfFile
           echo "\"proxy-address\"": "\"\"" >> $cnfFile
           echo "}" >> $cnfFile
-        if: matrix.os == 'ubuntu-latest'
-
-      - name: Create Azure Configuration File on Windows
-        run: |-
-          $cnfFile="~\azuretest.json"
-          Write-Host $cnfFile
-          $content = @"
-          {
-            "block-acct": "${{ env.BLOB_ACCOUNT }}",
-            "block-key": "${{ env.BLOB_KEY }}",
-            "endpoint": "${{ env.BLOB_ENDPOINT }}",
-            "skip-msi": true,
-            "proxy-address": ""
-          }
-          "@
-          $content | Out-File -FilePath $cnfFile -Encoding Ascii
-        shell: powershell
-        if: matrix.os == 'windows-latest'
       
       - name: Create S3 Configuration File on Linux
         run: |-
@@ -118,25 +87,6 @@ jobs:
           echo "\"region\"": "\"${{ env.AWS_REGION }}\"", >> $cnfFile
           echo "\"use-path-style\"": true\ >> $cnfFile
           echo "}" >> $cnfFile
-        if: matrix.os == 'ubuntu-latest'
-
-      - name: Create S3 Configuration File on Windows
-        run: |-
-          $cnfFile="~\s3test.json"
-          Write-Host $cnfFile
-          $content = @"
-          {
-            "bucket-name": "${{ env.AWS_BUCKET_NAME }}",
-            "access-key": "${{ env.AWS_ACCESS_KEY_ID }}",
-            "secret-key": "${{ env.AWS_SECRET_ACCESS_KEY }}",
-            "endpoint": "${{ env.AWS_ENDPOINT }}",
-            "region": "${{ env.AWS_REGION }}",
-            "use-path-style": true
-          }
-          "@
-          $content | Out-File -FilePath $cnfFile -Encoding Ascii
-        shell: powershell
-        if: matrix.os == 'windows-latest'
 
       - name: Start LocalStack
         run: |
@@ -160,8 +110,83 @@ jobs:
           awslocal s3 ls
           
       - name: Run unit tests
-        run: go test -v -timeout=2h ./... --tags=unittest,azurite
+        run: go test -v -timeout=1h ./... --tags=unittest,azurite
 
+  test:
+    runs-on: windows-latest
+    env:
+      go: '1.20'
+      cgo: '0'
+      containerName: 'test-cnt-win'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.go }}
+          check-latest: true
+      - run: go version
+
+      - name: Set CGO
+        shell: bash
+        run: |
+          if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
+
+      - name: Build
+        run: |
+          ./build.sh
+
+      - name: Create Azure Configuration File on Windows
+        run: |-
+          $cnfFile="~\azuretest.json"
+          Write-Host $cnfFile
+          $content = @"
+          {
+            "block-acct": "${{ secrets.AZTEST_BLOCK_ACC_NAME }}",
+            "adls-acct": "${{ secrets.AZTEST_ADLS_ACC_NAME }}",
+            "block-cont": "${{ matrix.containerName }}",
+            "adls-cont": "${{ matrix.containerName }}",
+            "block-key": "${{ secrets.AZTEST_BLOCK_KEY }}",
+            "adls-key": "${{ secrets.AZTEST_ADLS_KEY }}",
+            "block-sas": "${{ secrets.AZTEST_BLOCK_SAS }}",
+            "block-cont-sas-ubn-18": "${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_18 }}",
+            "block-cont-sas-ubn-20": "${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_20 }}",
+            "adls-sas": "${{ secrets.AZTEST_ADLS_SAS }}",
+            "msi-appid": "${{ secrets.AZTEST_APP_ID }}",
+            "msi-resid": "${{ secrets.AZTEST_RES_ID }}",
+            "msi-objid": "${{ secrets.AZTEST_OBJ_ID }}",
+            "spn-client": "${{ secrets.AZTEST_CLIENT }}",
+            "spn-tenant": "${{ secrets.AZTEST_TENANT }}",
+            "spn-secret": "${{ secrets.AZTEST_SECRET }}",
+            "skip-msi": true,
+            "proxy-address": ""
+          }
+          "@
+          $content | Out-File -FilePath $cnfFile -Encoding Ascii
+        shell: powershell
+
+      - name: Create S3 Configuration File on Windows
+        run: |-
+          $cnfFile="~\s3test.json"
+          Write-Host $cnfFile
+          $content = @"
+          {
+            "bucket-name": "${{ secrets.S3TEST_BUCKET_NAME }}",
+            "access-key": "${{ secrets.S3TEST_ACCESS_KEY }}",
+            "secret-key": "${{ secrets.S3TEST_SECRET_KEY }}",
+            "endpoint": "${{ secrets.S3TEST_ENDPOINT }}",
+            "region": "${{ secrets.S3TEST_REGION }}"
+          }
+          "@
+          $content | Out-File -FilePath $cnfFile -Encoding Ascii
+        shell: powershell
+
+      - name: Run unit tests
+        run: go test -v -timeout=1h ./... --tags=unittest   
+    
   lint:
     name: Lint
     runs-on: ubuntu-latest
