@@ -39,7 +39,7 @@ import (
 	"strings"
 	"testing"
 
-	"cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"

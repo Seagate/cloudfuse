@@ -41,8 +41,8 @@ import (
 	"strconv"
 	"testing"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/stretchr/testify/assert"

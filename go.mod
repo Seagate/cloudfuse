@@ -1,4 +1,4 @@
-module cloudfuse
+module github.com/Seagate/cloudfuse
 
 go 1.20
 

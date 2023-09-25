@@ -41,8 +41,8 @@ import (
 	"strings"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"golang.org/x/sys/windows"
 )

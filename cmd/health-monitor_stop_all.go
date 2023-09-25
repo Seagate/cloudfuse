@@ -39,7 +39,7 @@ import (
 	"os/exec"
 	"runtime"
 
-	hmcommon "cloudfuse/tools/health-monitor/common"
+	hmcommon "github.com/Seagate/cloudfuse/tools/health-monitor/common"
 
 	"github.com/spf13/cobra"
 )

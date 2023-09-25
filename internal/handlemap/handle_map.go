@@ -40,8 +40,8 @@ import (
 	"sync"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/common/cache_policy"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/cache_policy"
 
 	"go.uber.org/atomic"
 )

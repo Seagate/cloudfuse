@@ -39,8 +39,8 @@ import (
 	"os"
 	"testing"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"

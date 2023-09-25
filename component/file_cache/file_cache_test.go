@@ -45,12 +45,12 @@ import (
 	"testing"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/common/config"
-	"cloudfuse/common/log"
-	"cloudfuse/component/loopback"
-	"cloudfuse/internal"
-	"cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/component/loopback"
+	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/handlemap"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"

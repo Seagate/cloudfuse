@@ -41,11 +41,11 @@ import (
 	"strings"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	hmcommon "cloudfuse/tools/health-monitor/common"
-	hminternal "cloudfuse/tools/health-monitor/internal"
-	_ "cloudfuse/tools/health-monitor/monitor"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	hmcommon "github.com/Seagate/cloudfuse/tools/health-monitor/common"
+	hminternal "github.com/Seagate/cloudfuse/tools/health-monitor/internal"
+	_ "github.com/Seagate/cloudfuse/tools/health-monitor/monitor"
 )
 
 func getMonitors() []hminternal.Monitor {

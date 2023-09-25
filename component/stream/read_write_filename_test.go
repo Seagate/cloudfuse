@@ -39,9 +39,9 @@ import (
 	"syscall"
 	"testing"
 
-	"cloudfuse/common"
-	"cloudfuse/internal"
-	"cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/handlemap"
 
 	"github.com/stretchr/testify/suite"
 )

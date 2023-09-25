@@ -41,8 +41,8 @@ import (
 	"strings"
 	"testing"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"

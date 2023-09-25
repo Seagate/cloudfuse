@@ -35,7 +35,7 @@
 
 package block_cache
 
-import "cloudfuse/common/log"
+import "github.com/Seagate/cloudfuse/common/log"
 
 const _1MB uint64 = (1024 * 1024)
 

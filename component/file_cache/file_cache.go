@@ -46,12 +46,12 @@ import (
 	"sync"
 	"syscall"
 
-	"cloudfuse/common"
-	"cloudfuse/common/config"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
-	"cloudfuse/internal/handlemap"
-	"cloudfuse/internal/stats_manager"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/spf13/cobra"
 )

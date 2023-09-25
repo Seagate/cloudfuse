@@ -35,8 +35,8 @@
 package stream
 
 import (
-	"cloudfuse/internal"
-	"cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/handlemap"
 )
 
 type StreamConnection interface {

@@ -50,9 +50,9 @@ import (
 	"strings"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
 
 	"github.com/Azure/azure-storage-azcopy/v10/azbfs"
 	"github.com/Azure/azure-storage-azcopy/v10/ste"

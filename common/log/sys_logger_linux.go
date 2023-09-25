@@ -44,7 +44,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common"
 )
 
 type SysLogger struct {

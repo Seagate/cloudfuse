@@ -44,7 +44,7 @@ import (
 	"sync"
 	"time"
 
-	"cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common"
 )
 
 // LogConfig : Configuration to be provided to logging infra
