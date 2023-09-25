@@ -159,6 +159,8 @@ func (suite *cacheMapTestSuite) TestMarkDeletedAttrCacheItem() {
 	suite.assert.EqualValues(true, cachedItem.isDeleted())
 	suite.assert.EqualValues(false, cachedItem.exists())
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
+	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagExists))
 
 }
 
@@ -181,6 +183,7 @@ func (suite *cacheMapTestSuite) TestInvalidateAttrCacheItem() {
 	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
 	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
 	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagExists))
 
 	//delete it
 	cachedItem.invalidate()
@@ -191,6 +194,7 @@ func (suite *cacheMapTestSuite) TestInvalidateAttrCacheItem() {
 	suite.assert.NotNil(cachedItem)
 	suite.assert.EqualValues(false, cachedItem.isDeleted())
 	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagValid))
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagExists))
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
 
 }
