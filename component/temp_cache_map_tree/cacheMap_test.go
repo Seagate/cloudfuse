@@ -157,6 +157,7 @@ func (suite *cacheMapTestSuite) TestMarkDeleted() {
 	suite.assert.EqualValues("", cachedItem.attr.Path)
 	suite.assert.EqualValues(true, cachedItem.isDeleted())
 	suite.assert.EqualValues(false, cachedItem.exists())
+	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
 }
 
 func (suite *cacheMapTestSuite) TestInvalidateAttrCacheItem() {
