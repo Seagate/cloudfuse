@@ -387,7 +387,7 @@ func (s *s3StorageTestSuite) TestListBuckets() {
 
 	buckets, err := s.s3Storage.ListBuckets()
 	s.assert.Nil(err)
-	s.assert.Equal(buckets, []string{"stxe1-srg-lens-lab1"})
+	s.assert.Equal(buckets, []string{storageTestConfigurationParameters.BucketName})
 }
 
 func (s *s3StorageTestSuite) TestCreateDir() {

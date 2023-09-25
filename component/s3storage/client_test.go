@@ -185,7 +185,8 @@ func (s *clientTestSuite) TestEnvVarCredentials() {
 	// setup
 	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
-	config := fmt.Sprintf("s3storage:\n  bucket-name: %s", "stxe1-srg-lens-lab1")
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s",
+		storageTestConfigurationParameters.BucketName)
 	// S3 connection should find credentials from environment variables
 	err := s.setupTestHelper(config, false)
 	s.assert.Nil(err)
@@ -209,7 +210,7 @@ func (s *clientTestSuite) TestListBuckets() {
 	// TODO: generalize this test by creating, listing, then destroying a bucket
 	buckets, err := s.client.ListBuckets()
 	s.assert.Nil(err)
-	s.assert.Equal(buckets, []string{"stxe1-srg-lens-lab1"})
+	s.assert.Equal(buckets, []string{storageTestConfigurationParameters.BucketName})
 }
 func (s *clientTestSuite) TestSetPrefixPath() {
 	defer s.cleanupTest()
