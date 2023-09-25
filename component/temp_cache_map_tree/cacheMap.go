@@ -121,7 +121,7 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 // description: a lookup of any attrCacheItem based on any given full path.
 // TODO: write tests
 func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
-
+	path = internal.TruncateDirName(path)
 	paths := strings.Split(path, "/")
 	var currentItem *attrCacheItem
 	var ok bool

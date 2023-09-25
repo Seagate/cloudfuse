@@ -126,7 +126,7 @@ func (suite *cacheMapTestSuite) TestInsertDirsAndFilesCacheMap() {
 
 }
 
-func (suite *cacheMapTestSuite) TestMarkDeleted() {
+func (suite *cacheMapTestSuite) TestMarkDeletedAttrCacheItem() {
 	deleteTime := time.Now()
 
 	//insert an item
@@ -145,6 +145,8 @@ func (suite *cacheMapTestSuite) TestMarkDeleted() {
 	suite.assert.EqualValues(1024, cachedItem.attr.Size)
 	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
 	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
+	suite.assert.EqualValues("TempFile.txt", cachedItem.attr.Name)
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
 
 	// mark it deleted
 	cachedItem.markDeleted(deleteTime)
@@ -153,11 +155,11 @@ func (suite *cacheMapTestSuite) TestMarkDeleted() {
 	cachedItem, err = suite.rootAttrCacheItem.get(path)
 	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
-	suite.assert.EqualValues(0, len(cachedItem.children))
 	suite.assert.EqualValues("", cachedItem.attr.Path)
 	suite.assert.EqualValues(true, cachedItem.isDeleted())
 	suite.assert.EqualValues(false, cachedItem.exists())
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
+
 }
 
 func (suite *cacheMapTestSuite) TestInvalidateAttrCacheItem() {
@@ -193,18 +195,19 @@ func (suite *cacheMapTestSuite) TestInvalidateAttrCacheItem() {
 
 }
 
-func (suite *cacheMapTestSuite) TestDeleteAttrItem() {
+func (suite *cacheMapTestSuite) TestDeleteBranchAttrItem() {
 	deleteTime := time.Now()
 
 	//insert an item
-	path := "a/c1/TempFile.txt"
+	path := "a/g/f/TempFile.txt"
+	parentPath := "a/g"
 	startTime := time.Now()
 	attr := internal.CreateObjAttr(path, 1024, startTime)
 
 	//insert path into suite.rootAttrCacheItem
 	suite.rootAttrCacheItem.insert(attr, true, startTime)
 
-	//validate it is there
+	//validate file is there
 	cachedItem, err := suite.rootAttrCacheItem.get(path)
 	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
@@ -213,19 +216,39 @@ func (suite *cacheMapTestSuite) TestDeleteAttrItem() {
 	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
 	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
 	suite.assert.EqualValues("TempFile.txt", cachedItem.attr.Name)
+	suite.assert.EqualValues(path, cachedItem.attr.Path)
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
 
-	//delete it
+	//validate folder "g"
+	cachedItem, err = suite.rootAttrCacheItem.get(parentPath)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(parentPath, cachedItem.attr.Path)
+	suite.assert.EqualValues(4096, cachedItem.attr.Size)
+	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
+	suite.assert.EqualValues(true, cachedItem.attr.IsDir())
+	suite.assert.EqualValues("g", cachedItem.attr.Name)
+	suite.assert.EqualValues(parentPath, cachedItem.attr.Path)
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
+	suite.assert.EqualValues(1, len(cachedItem.children))
+
+	//mark "g" folder deleted
 	cachedItem.markDeleted(deleteTime)
 
-	//verify it is gone
-	cachedItem, err = suite.rootAttrCacheItem.get(path)
+	//verify "g" folder is gone
+	cachedItem, err = suite.rootAttrCacheItem.get(parentPath)
 	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
 	suite.assert.EqualValues(true, cachedItem.isDeleted())
 	suite.assert.EqualValues(false, cachedItem.exists())
-	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
+	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
+	suite.assert.EqualValues(0, len(cachedItem.children))
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
 
+	//verify file is gone
+	cachedItem, err = suite.rootAttrCacheItem.get(path)
+	suite.assert.NotNil(err)
+	suite.assert.Nil(cachedItem)
 }
 
 func (suite *cacheMapTestSuite) TestGetCacheMapItem() {
