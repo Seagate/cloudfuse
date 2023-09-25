@@ -37,9 +37,9 @@
 package main
 
 import (
-	"cloudfuse/cmd"
-	"cloudfuse/common/log"
-	"cloudfuse/internal/winservice"
+	"github.com/Seagate/cloudfuse/cmd"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal/winservice"
 
 	"golang.org/x/sys/windows/svc"
 )

@@ -35,8 +35,9 @@
 package winservice
 
 import (
-	"cloudfuse/common/log"
 	"os"
+
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"golang.org/x/sys/windows/registry"
 )

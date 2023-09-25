@@ -39,7 +39,7 @@ import (
 	"path"
 	"time"
 
-	"cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common"
 )
 
 // create an object attributes struct

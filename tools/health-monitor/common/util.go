@@ -42,7 +42,7 @@ import (
 	"strings"
 	"time"
 
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/shirou/gopsutil/v3/process"
 )

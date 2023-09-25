@@ -35,14 +35,15 @@
 package cmd
 
 import (
-	"cloudfuse/common"
-	"cloudfuse/internal/winservice"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/internal/winservice"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows"

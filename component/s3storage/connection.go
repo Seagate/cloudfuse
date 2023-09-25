@@ -38,8 +38,8 @@ import (
 	"net/url"
 	"os"
 
-	"cloudfuse/common"
-	"cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/internal"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )

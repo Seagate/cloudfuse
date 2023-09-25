@@ -45,9 +45,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
 )
 
 // Creates a new object attribute

@@ -37,12 +37,12 @@
 package cmd
 
 import (
-	_ "cloudfuse/component/attr_cache"
-	_ "cloudfuse/component/azstorage"
-	_ "cloudfuse/component/block_cache"
-	_ "cloudfuse/component/file_cache"
-	_ "cloudfuse/component/libfuse"
-	_ "cloudfuse/component/loopback"
-	_ "cloudfuse/component/s3storage"
-	_ "cloudfuse/component/stream"
+	_ "github.com/Seagate/cloudfuse/component/attr_cache"
+	_ "github.com/Seagate/cloudfuse/component/azstorage"
+	_ "github.com/Seagate/cloudfuse/component/block_cache"
+	_ "github.com/Seagate/cloudfuse/component/file_cache"
+	_ "github.com/Seagate/cloudfuse/component/libfuse"
+	_ "github.com/Seagate/cloudfuse/component/loopback"
+	_ "github.com/Seagate/cloudfuse/component/s3storage"
+	_ "github.com/Seagate/cloudfuse/component/stream"
 )

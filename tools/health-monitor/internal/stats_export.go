@@ -42,10 +42,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	"cloudfuse/internal/stats_manager"
-	hmcommon "cloudfuse/tools/health-monitor/common"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal/stats_manager"
+	hmcommon "github.com/Seagate/cloudfuse/tools/health-monitor/common"
 )
 
 type ExportedStat struct {

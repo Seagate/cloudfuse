@@ -37,9 +37,10 @@
 package log
 
 import (
-	"cloudfuse/common"
 	"errors"
 	"strings"
+
+	"github.com/Seagate/cloudfuse/common"
 )
 
 // newLogger : Method to create Logger object

@@ -37,8 +37,8 @@
 package main
 
 import (
-	"cloudfuse/cmd"
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/cmd"
+	"github.com/Seagate/cloudfuse/common/log"
 )
 
 //go:generate ./cmd/componentGenerator.sh $NAME

@@ -38,7 +38,7 @@ import (
 	"io/fs"
 	"testing"
 
-	"cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common"
 
 	"github.com/stretchr/testify/suite"
 )

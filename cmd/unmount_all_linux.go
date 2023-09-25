@@ -40,7 +40,7 @@ import (
 	"errors"
 	"fmt"
 
-	"cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common"
 
 	"github.com/spf13/cobra"
 )

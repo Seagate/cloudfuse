@@ -38,8 +38,8 @@ import (
 	"container/list"
 	"sync"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 )
 
 // KeyPair: the list node containing both block key and cache block values

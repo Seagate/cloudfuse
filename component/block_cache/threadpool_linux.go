@@ -38,7 +38,7 @@ package block_cache
 import (
 	"sync"
 
-	"cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/internal/handlemap"
 )
 
 // ThreadPool is a group of workers that can be used to execute a task

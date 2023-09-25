@@ -37,8 +37,8 @@ package internal
 import (
 	"context"
 
-	"cloudfuse/common"
-	"cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/internal/handlemap"
 )
 
 // BaseComponent : Base implementation of the component interface

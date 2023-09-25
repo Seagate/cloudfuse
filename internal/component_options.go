@@ -37,7 +37,7 @@ package internal
 import (
 	"os"
 
-	"cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/internal/handlemap"
 )
 
 type CreateDirOptions struct {

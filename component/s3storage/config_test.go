@@ -35,9 +35,10 @@
 package s3storage
 
 import (
-	"cloudfuse/common"
-	"cloudfuse/common/log"
 	"testing"
+
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"

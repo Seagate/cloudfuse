@@ -49,11 +49,11 @@ import (
 	"syscall"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
-	"cloudfuse/internal/convertname"
-	"cloudfuse/internal/stats_manager"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/convertname"
+	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-storage-azcopy/v10/ste"

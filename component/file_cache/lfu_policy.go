@@ -40,7 +40,7 @@ import (
 	"sync"
 	"time"
 
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common/log"
 )
 
 type lfuPolicy struct {

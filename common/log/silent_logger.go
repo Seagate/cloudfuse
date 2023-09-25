@@ -37,7 +37,7 @@ package log
 import (
 	"log"
 
-	"cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common"
 )
 
 type SilentLogger struct {
