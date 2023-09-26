@@ -35,12 +35,13 @@ jobs:
       - name: Download Cloudfuse dependencies
         run: | 
           go get
+          ls -l
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
-          scan-ref: './cloudfuse'
+          scan-ref: '.'
           ignore-unfixed: true
           format: 'sarif'
           output: 'trivy-results-binary.sarif'
