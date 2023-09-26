@@ -14,7 +14,7 @@ on:
 
 jobs:
   linux-unit-test:
-    name: Build and Test on
+    name: Build and Test on Linux
     runs-on: ubuntu-latest
     env:
       go: '1.20'
@@ -113,6 +113,7 @@ jobs:
         run: go test -v -timeout=1h ./... --tags=unittest,azurite
 
   test:
+    name: Build and Test on Windows
     runs-on: windows-latest
     env:
       go: '1.20'
@@ -147,8 +148,8 @@ jobs:
           {
             "block-acct": "${{ secrets.AZTEST_BLOCK_ACC_NAME }}",
             "adls-acct": "${{ secrets.AZTEST_ADLS_ACC_NAME }}",
-            "block-cont": "${{ matrix.containerName }}",
-            "adls-cont": "${{ matrix.containerName }}",
+            "block-cont": "${{ env.containerName }}",
+            "adls-cont": "${{ env.containerName }}",
             "block-key": "${{ secrets.AZTEST_BLOCK_KEY }}",
             "adls-key": "${{ secrets.AZTEST_ADLS_KEY }}",
             "block-sas": "${{ secrets.AZTEST_BLOCK_SAS }}",
