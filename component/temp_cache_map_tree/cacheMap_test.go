@@ -185,7 +185,7 @@ func (suite *cacheMapTestSuite) TestInvalidateAttrCacheItem() {
 	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
 	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagExists))
 
-	//delete it
+	//invalidate
 	cachedItem.invalidate()
 
 	//verify it is invalade
