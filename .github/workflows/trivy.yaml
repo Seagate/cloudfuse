@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - main
+      - trivy-github-action
   pull_request:
   schedule:
     # every Monday at 7:31pm
@@ -29,7 +30,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Build Cloudfuse
         run: | 
