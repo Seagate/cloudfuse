@@ -35,7 +35,6 @@ jobs:
       - name: Download Cloudfuse dependencies
         run: | 
           go get
-          ls -l
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -47,11 +46,13 @@ jobs:
           output: 'trivy-results-binary.sarif'
           severity: 'CRITICAL,HIGH,MEDIUM'
 
+      #TODO: use exit-code, or similar above, but still print the report on failure (how?)
       - name: List Issues
         run: |
           cat trivy-results-binary.sarif
 
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: 'trivy-results-binary.sarif'
+      #TODO: uncomment when codeql is available
+      # - name: Upload Trivy scan results to GitHub Security tab
+      #   uses: github/codeql-action/upload-sarif@v2
+      #   with:
+      #     sarif_file: 'trivy-results-binary.sarif'
