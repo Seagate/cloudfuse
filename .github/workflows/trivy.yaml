@@ -32,11 +32,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Cloudfuse
+      - name: Download Cloudfuse dependencies
         run: | 
-          sudo apt-get install fuse3 libfuse3-dev -y
-          go build -o cloudfuse
-          ls -l
+          go get
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
