@@ -55,7 +55,9 @@ type cacheMapTestSuite struct {
 // what is every test going to need to test with?
 func (suite *cacheMapTestSuite) SetupTest() {
 	suite.assert = assert.New(suite.T())
-	suite.rootAttrCacheItem = attrCacheItem{}
+
+	rootAttr := internal.CreateObjAttrDir("")
+	suite.rootAttrCacheItem = *newAttrCacheItem(rootAttr, true, time.Now())
 
 	//set up nested Dir tree
 	nestedDir, nestedFiles := GenerateNestedDirectory("a")
@@ -253,6 +255,15 @@ func (suite *cacheMapTestSuite) TestDeleteBranchAttrItem() {
 	cachedItem, err = suite.rootAttrCacheItem.get(path)
 	suite.assert.NotNil(err)
 	suite.assert.Nil(cachedItem)
+}
+
+func (suite *cacheMapTestSuite) TestGetRootCacheMapItem() {
+	path := ""
+	item, err := suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(item)
+	attrStr := item.attr.Path
+	suite.assert.EqualValues(path, attrStr)
 }
 
 func (suite *cacheMapTestSuite) TestGetCacheMapItem() {

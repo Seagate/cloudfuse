@@ -127,6 +127,9 @@ func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
 	var ok bool
 	currentItem = value
 	for _, pathElement := range paths {
+		if path == "" {
+			continue
+		}
 		currentItem, ok = currentItem.children[pathElement]
 		if !ok {
 			return nil, fmt.Errorf("The path element : %s does not exist", pathElement)
