@@ -125,7 +125,6 @@ func (suite *cacheMapTestSuite) TestInsertDirsAndFilesCacheMap() {
 	suite.assert.EqualValues(path, cachedItem.attr.Path)
 	suite.assert.EqualValues(1024, cachedItem.attr.Size)
 	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
-
 }
 
 func (suite *cacheMapTestSuite) TestMarkDeletedAttrCacheItem() {
@@ -163,7 +162,6 @@ func (suite *cacheMapTestSuite) TestMarkDeletedAttrCacheItem() {
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
 	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
 	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagExists))
-
 }
 
 func (suite *cacheMapTestSuite) TestInvalidateAttrCacheItem() {
@@ -198,7 +196,6 @@ func (suite *cacheMapTestSuite) TestInvalidateAttrCacheItem() {
 	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagValid))
 	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagExists))
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
-
 }
 
 func (suite *cacheMapTestSuite) TestDeleteBranchAttrItem() {
