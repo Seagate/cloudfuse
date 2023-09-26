@@ -188,7 +188,7 @@ func (suite *cacheMapTestSuite) TestInvalidateAttrCacheItem() {
 	//invalidate
 	cachedItem.invalidate()
 
-	//verify it is invalade
+	//verify it is invalid
 	cachedItem, err = suite.rootAttrCacheItem.get(path)
 	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
@@ -246,6 +246,59 @@ func (suite *cacheMapTestSuite) TestDeleteBranchAttrItem() {
 	suite.assert.EqualValues(false, cachedItem.exists())
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
 	suite.assert.EqualValues(0, len(cachedItem.children))
+	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
+
+	//verify file is gone
+	cachedItem, err = suite.rootAttrCacheItem.get(path)
+	suite.assert.NotNil(err)
+	suite.assert.Nil(cachedItem)
+}
+
+func (suite *cacheMapTestSuite) TestInvalidateBranchAttrItem() {
+	//insert an item
+	path := "a/g/f/TempFile.txt"
+	parentPath := "a/g"
+	startTime := time.Now()
+	attr := internal.CreateObjAttr(path, 1024, startTime)
+
+	//insert path into suite.rootAttrCacheItem
+	suite.rootAttrCacheItem.insert(attr, true, startTime)
+
+	//validate file is there
+	cachedItem, err := suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(path, cachedItem.attr.Path)
+	suite.assert.EqualValues(1024, cachedItem.attr.Size)
+	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
+	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
+	suite.assert.EqualValues("TempFile.txt", cachedItem.attr.Name)
+	suite.assert.EqualValues(path, cachedItem.attr.Path)
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
+
+	//validate folder "g"
+	cachedItem, err = suite.rootAttrCacheItem.get(parentPath)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(parentPath, cachedItem.attr.Path)
+	suite.assert.EqualValues(4096, cachedItem.attr.Size)
+	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
+	suite.assert.EqualValues(true, cachedItem.attr.IsDir())
+	suite.assert.EqualValues("g", cachedItem.attr.Name)
+	suite.assert.EqualValues(parentPath, cachedItem.attr.Path)
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
+	suite.assert.EqualValues(1, len(cachedItem.children))
+
+	//mark "g" folder as invalid
+	cachedItem.invalidate()
+
+	//verify "g" folder is invalid
+	cachedItem, err = suite.rootAttrCacheItem.get(parentPath)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(false, cachedItem.isDeleted())
+	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagValid))
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagExists))
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
 
 	//verify file is gone
