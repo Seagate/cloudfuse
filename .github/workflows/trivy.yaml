@@ -42,17 +42,9 @@ jobs:
           scan-type: fs
           scan-ref: '.'
           ignore-unfixed: true
-          format: 'sarif'
-          output: 'trivy-results-binary.sarif'
+          format: 'table'
           severity: 'CRITICAL,HIGH,MEDIUM'
           exit-code: '1'
-
-      #TODO: use exit-code, or similar above, but still print the report on failure (how?)
-      - name: List Issues
-        # if: ${{ failure() }}
-        run: |
-          cat trivy-results-binary.sarif
-          exit 1
 
       #TODO: uncomment when codeql is available
       # - name: Upload Trivy scan results to GitHub Security tab
