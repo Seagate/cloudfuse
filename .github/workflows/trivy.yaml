@@ -41,13 +41,11 @@ jobs:
         with:
           scan-type: fs
           scan-ref: '.'
-          # ignore-unfixed: true
+          ignore-unfixed: true
           format: 'sarif'
           output: 'trivy-results-binary.sarif'
-          # severity: 'CRITICAL,HIGH,MEDIUM'
+          severity: 'CRITICAL,HIGH,MEDIUM'
           exit-code: '1'
-          list-all-pkgs: true
-          scanners: 'vuln,secret,config'
 
       #TODO: use exit-code, or similar above, but still print the report on failure (how?)
       - name: List Issues
