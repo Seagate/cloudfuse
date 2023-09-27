@@ -42,7 +42,6 @@ jobs:
           output: 'trivy-results-binary.sarif'
           severity: 'CRITICAL,HIGH,MEDIUM'
           exit-code: '1'
-        continue-on-error: true
 
       #TODO: use exit-code, or similar above, but still print the report on failure (how?)
       - name: List Issues
