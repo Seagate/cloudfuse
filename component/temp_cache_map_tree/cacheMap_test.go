@@ -152,7 +152,7 @@ func (suite *cacheMapTestSuite) TestMarkDeletedAttrCacheItem() {
 	// mark it deleted
 	cachedItem.markDeleted(deleteTime)
 
-	//verify it is gone
+	//verify it is marked deleted
 	cachedItem, err = suite.rootAttrCacheItem.get(path)
 	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
@@ -162,6 +162,31 @@ func (suite *cacheMapTestSuite) TestMarkDeletedAttrCacheItem() {
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
 	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
 	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagExists))
+
+	// verify subtree is marked deleted
+
+	for cachedItem.children != nil {
+		for _, val := range cachedItem.children {
+			suite.assert.NotNil(val)
+			suite.assert.EqualValues("", val.attr.Path)
+			suite.assert.EqualValues(true, val.isDeleted())
+			suite.assert.EqualValues(false, val.exists())
+			suite.assert.EqualValues(val.attr, &internal.ObjAttr{})
+			suite.assert.EqualValues(true, val.attrFlag.IsSet(AttrFlagValid))
+			suite.assert.EqualValues(false, val.attrFlag.IsSet(AttrFlagExists))
+		}
+	}
+
+	cachedItem, err = suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues("", cachedItem.attr.Path)
+	suite.assert.EqualValues(true, cachedItem.isDeleted())
+	suite.assert.EqualValues(false, cachedItem.exists())
+	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
+	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagExists))
+
 }
 
 func (suite *cacheMapTestSuite) TestInvalidateAttrCacheItem() {

@@ -157,11 +157,13 @@ func (value *attrCacheItem) isInCloud() bool {
 
 func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
 
+	value.attrFlag.Clear(AttrFlagExists)
+	value.attrFlag.Set(AttrFlagValid)
+	value.cachedAt = deletedTime
+	value.attr = &internal.ObjAttr{}
+
 	for value.children != nil {
 		for _, val := range value.children {
-			value.attrFlag.Clear(AttrFlagExists)
-			value.attrFlag.Set(AttrFlagValid)
-			value.cachedAt = deletedTime
 			val.markDeleted(deletedTime)
 		}
 
