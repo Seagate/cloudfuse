@@ -70,13 +70,14 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         # use the completedProcess object in mount var to determine next steps 
         # if service already installed, run cloudfuse.exe service start
         # if start successful, run cloudfuse.exe service mount
-        
-        mount = subprocess.run([".\cloudfuse.exe", "service", "install"], capture_output=True, check=False)    
-        if mount.returncode == 0 or mount.stderr.decode().find("cloudfuse service already exists") != -1: #we found this message
-            mount = (subprocess.run([".\cloudfuse.exe", "service", "start"], capture_output=True))
-            if mount.stderr.decode().find("An instance of the service is already running.") != -1:
+        installCmd = ".\cloudfuse.exe service install"
+        windowsServiceCmd = subprocess.run([installCmd], shell=True, capture_output=True, check=False)    
+        if windowsServiceCmd.returncode == 0 or windowsServiceCmd.stderr.decode().find("cloudfuse service already exists") != -1: #we found this message
+            startCmd = ".\cloudfuse.exe service start"
+            windowsServiceCmd = (subprocess.run([startCmd], shell=True, capture_output=True))
+            if windowsServiceCmd.stderr.decode().find("An instance of the service is already running.") != -1:
                 return True
-            elif mount.returncode == 1: 
+            elif windowsServiceCmd.returncode == 1: 
                 self.textEdit_output.setText("!!Error starting service before mounting container!!\n")# + mount.stdout.decode())
                 # Get the users attention by popping open a new window on an error
                 msg.setWindowTitle("Error")
@@ -114,7 +115,9 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 isRunning = self.windowsServiceInstall()  #install and start the service
             
                 if isRunning:
-                    mount = (subprocess.run([".\cloudfuse.exe", "service", "mount", directory, "--config-file=.\config.yaml"], capture_output=True))
+                    # ".\cloudfuse.exe", "service", "mount", directory, "--config-file=.\config.yaml"
+                    cmd = ".\cloudfuse.exe service mount " + directory + " --config-file=.\config.yaml"
+                    mount = (subprocess.run([cmd],shell=True, capture_output=True))
                     if mount.returncode == 0:
                         self.textEdit_output.setText("Successfully mounted container\n")
                     elif mount.stderr.decode().find("mount path exists") != -1:
@@ -160,7 +163,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             if platform == "win32":
                 # for windows, 'cloudfuse' was added to the directory so add it back in for umount
                 directory = directory+'/cloudFuse'
-                unmount = (subprocess.run([".\cloudfuse.exe", "service", "unmount", directory], capture_output=True))
+                cmd = ".\cloudfuse.exe service unmount " + directory
+                unmount = subprocess.run([cmd], shell=True, capture_output=True)
             else:
                 # Create the mount command to send to subprocess. If shell=True is set and the command is not in one string
                 #   the subprocess will interpret the additional arguments as separate commands.
