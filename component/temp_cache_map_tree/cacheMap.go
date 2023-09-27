@@ -162,7 +162,7 @@ func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
 	value.cachedAt = deletedTime
 	value.attr = &internal.ObjAttr{}
 
-	for value.children != nil {
+	if value.children != nil {
 		for _, val := range value.children {
 			val.markDeleted(deletedTime)
 		}

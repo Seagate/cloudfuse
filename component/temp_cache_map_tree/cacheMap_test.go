@@ -163,30 +163,6 @@ func (suite *cacheMapTestSuite) TestMarkDeletedAttrCacheItem() {
 	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
 	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagExists))
 
-	// verify subtree is marked deleted
-
-	for cachedItem.children != nil {
-		for _, val := range cachedItem.children {
-			suite.assert.NotNil(val)
-			suite.assert.EqualValues("", val.attr.Path)
-			suite.assert.EqualValues(true, val.isDeleted())
-			suite.assert.EqualValues(false, val.exists())
-			suite.assert.EqualValues(val.attr, &internal.ObjAttr{})
-			suite.assert.EqualValues(true, val.attrFlag.IsSet(AttrFlagValid))
-			suite.assert.EqualValues(false, val.attrFlag.IsSet(AttrFlagExists))
-		}
-	}
-
-	cachedItem, err = suite.rootAttrCacheItem.get(path)
-	suite.assert.Nil(err)
-	suite.assert.NotNil(cachedItem)
-	suite.assert.EqualValues("", cachedItem.attr.Path)
-	suite.assert.EqualValues(true, cachedItem.isDeleted())
-	suite.assert.EqualValues(false, cachedItem.exists())
-	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
-	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
-	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagExists))
-
 }
 
 func (suite *cacheMapTestSuite) TestInvalidateAttrCacheItem() {
@@ -223,7 +199,7 @@ func (suite *cacheMapTestSuite) TestInvalidateAttrCacheItem() {
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
 }
 
-func (suite *cacheMapTestSuite) TestDeleteBranchAttrItem() {
+func (suite *cacheMapTestSuite) TestDeleteFolder() {
 	deleteTime := time.Now()
 
 	//insert an item
@@ -253,7 +229,6 @@ func (suite *cacheMapTestSuite) TestDeleteBranchAttrItem() {
 	suite.assert.NotNil(cachedItem)
 	suite.assert.EqualValues(parentPath, cachedItem.attr.Path)
 	suite.assert.EqualValues(4096, cachedItem.attr.Size)
-	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
 	suite.assert.EqualValues(true, cachedItem.attr.IsDir())
 	suite.assert.EqualValues("g", cachedItem.attr.Name)
 	suite.assert.EqualValues(parentPath, cachedItem.attr.Path)
@@ -270,13 +245,20 @@ func (suite *cacheMapTestSuite) TestDeleteBranchAttrItem() {
 	suite.assert.EqualValues(true, cachedItem.isDeleted())
 	suite.assert.EqualValues(false, cachedItem.exists())
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
-	suite.assert.EqualValues(0, len(cachedItem.children))
-	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
 
-	//verify file is gone
-	cachedItem, err = suite.rootAttrCacheItem.get(path)
-	suite.assert.NotNil(err)
-	suite.assert.Nil(cachedItem)
+	// verify subtree is marked deleted
+
+	suite.assert.NotNil(cachedItem.children)
+	for _, val := range cachedItem.children {
+		suite.assert.NotNil(val)
+		suite.assert.EqualValues("", val.attr.Path)
+		suite.assert.EqualValues(true, val.isDeleted())
+		suite.assert.EqualValues(false, val.exists())
+		suite.assert.EqualValues(val.attr, &internal.ObjAttr{})
+		suite.assert.EqualValues(true, val.attrFlag.IsSet(AttrFlagValid))
+		suite.assert.EqualValues(false, val.attrFlag.IsSet(AttrFlagExists))
+	}
+
 }
 
 func (suite *cacheMapTestSuite) TestInvalidateBranchAttrItem() {
