@@ -31,6 +31,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Check directory
+        run : |
+          ls -l
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
