@@ -256,6 +256,7 @@ func (suite *cacheMapTestSuite) TestDeleteFolder() {
 		suite.assert.EqualValues(val.attr, &internal.ObjAttr{})
 		suite.assert.EqualValues(true, val.attrFlag.IsSet(AttrFlagValid))
 		suite.assert.EqualValues(false, val.attrFlag.IsSet(AttrFlagExists))
+
 	}
 
 }
@@ -308,14 +309,27 @@ func (suite *cacheMapTestSuite) TestInvalidateFolder() {
 
 	// verify subtree is invalid
 	suite.assert.NotNil(cachedItem.children)
-	for _, val := range cachedItem.children {
-		suite.assert.Nil(err)
-		suite.assert.NotNil(val)
-		suite.assert.EqualValues(false, val.isDeleted())
-		suite.assert.EqualValues(false, val.attrFlag.IsSet(AttrFlagValid))
-		suite.assert.EqualValues(true, val.attrFlag.IsSet(AttrFlagExists))
-		suite.assert.EqualValues(val.attr, &internal.ObjAttr{})
+	item := cachedItem
+	for item != nil {
+		for _, val := range item.children {
+			suite.assert.NotNil(val)
+			suite.assert.EqualValues(false, val.isDeleted())
+			suite.assert.EqualValues(false, val.attrFlag.IsSet(AttrFlagValid))
+			suite.assert.EqualValues(true, val.attrFlag.IsSet(AttrFlagExists))
+			suite.assert.EqualValues(val.attr, &internal.ObjAttr{})
+			item = child(item)
+
+		}
 	}
+}
+
+func child(item *attrCacheItem) *attrCacheItem {
+	if item.children != nil {
+		for _, val := range item.children {
+			item = val
+		}
+	}
+	return item
 }
 
 func (suite *cacheMapTestSuite) TestGetRoot() {
