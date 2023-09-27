@@ -51,7 +51,7 @@ jobs:
 
       #TODO: use exit-code, or similar above, but still print the report on failure (how?)
       - name: List Issues
-        if: ${{ failure() }}
+        # if: ${{ failure() }}
         run: |
           cat trivy-results-binary.sarif
           exit 1
