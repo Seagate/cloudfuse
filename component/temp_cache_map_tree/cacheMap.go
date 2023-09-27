@@ -171,10 +171,13 @@ func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
 }
 
 func (value *attrCacheItem) invalidate() {
-
 	value.attrFlag.Clear(AttrFlagValid)
 	value.attr = &internal.ObjAttr{}
-	value.children = make(map[string]*attrCacheItem)
+	if value.children != nil {
+		for _, val := range value.children {
+			val.invalidate()
+		}
+	}
 }
 
 func (value *attrCacheItem) markInCloud(inCloud bool) {

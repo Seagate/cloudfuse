@@ -111,7 +111,7 @@ func (suite *cacheMapTestSuite) TestInsertFolderCacheMap() {
 	suite.assert.EqualValues(true, cachedItem.attr.IsDir())
 }
 
-func (suite *cacheMapTestSuite) TestInsertDirsAndFilesCacheMap() {
+func (suite *cacheMapTestSuite) TestInsertDirsAndFiles() {
 	path := "a/c1/c12/c3p0/newfile.txt"
 	startTime := time.Now()
 	attr := internal.CreateObjAttr(path, 1024, startTime)
@@ -127,7 +127,7 @@ func (suite *cacheMapTestSuite) TestInsertDirsAndFilesCacheMap() {
 	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
 }
 
-func (suite *cacheMapTestSuite) TestMarkDeletedAttrCacheItem() {
+func (suite *cacheMapTestSuite) TestMarkDeleted() {
 	deleteTime := time.Now()
 
 	//insert an item
@@ -165,7 +165,7 @@ func (suite *cacheMapTestSuite) TestMarkDeletedAttrCacheItem() {
 
 }
 
-func (suite *cacheMapTestSuite) TestInvalidateAttrCacheItem() {
+func (suite *cacheMapTestSuite) TestInvalidate() {
 	//insert an item
 	path := "a/c1/TempFile.txt"
 	startTime := time.Now()
@@ -261,7 +261,7 @@ func (suite *cacheMapTestSuite) TestDeleteFolder() {
 
 }
 
-func (suite *cacheMapTestSuite) TestInvalidateBranchAttrItem() {
+func (suite *cacheMapTestSuite) TestInvalidateFolder() {
 	//insert an item
 	path := "a/g/f/TempFile.txt"
 	parentPath := "a/g"
@@ -314,7 +314,7 @@ func (suite *cacheMapTestSuite) TestInvalidateBranchAttrItem() {
 	suite.assert.Nil(cachedItem)
 }
 
-func (suite *cacheMapTestSuite) TestGetRootCacheMapItem() {
+func (suite *cacheMapTestSuite) TestGetRoot() {
 	path := ""
 	item, err := suite.rootAttrCacheItem.get(path)
 	suite.assert.Nil(err)
@@ -323,7 +323,7 @@ func (suite *cacheMapTestSuite) TestGetRootCacheMapItem() {
 	suite.assert.EqualValues(path, attrStr)
 }
 
-func (suite *cacheMapTestSuite) TestGetCacheMapItem() {
+func (suite *cacheMapTestSuite) TestGet() {
 	path := "a/c1/gc1"
 	item, err := suite.rootAttrCacheItem.get(path)
 	suite.assert.Nil(err)
