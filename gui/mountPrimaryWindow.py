@@ -70,7 +70,12 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         # use the completedProcess object in mount var to determine next steps 
         # if service already installed, run cloudfuse.exe service start
         # if start successful, run cloudfuse.exe service mount
-        windowsServiceCmd = subprocess.run([".\cloudfuse.exe", "service", "install"], capture_output=True, check=False)    
+
+        try:
+            windowsServiceCmd = subprocess.run([".\cloudfuse.exe", "service", "install"], capture_output=True, check=True)
+        except:
+            return False
+
         if windowsServiceCmd.returncode == 0 or windowsServiceCmd.stderr.decode().find("cloudfuse service already exists") != -1: #we found this message
             windowsServiceCmd = (subprocess.run([".\cloudfuse.exe", "service", "start"], capture_output=True))
             if windowsServiceCmd.stderr.decode().find("An instance of the service is already running.") != -1:
