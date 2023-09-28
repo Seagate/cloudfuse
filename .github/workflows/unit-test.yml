@@ -13,24 +13,24 @@ on:
         default: true
 
 jobs:
-  test:
-    strategy:
-      matrix:
-        go: ['1.20']
-        job_name: ['linux', 'windows']
+  linux-unit-test:
+    name: Build and Test on Linux
+    runs-on: ubuntu-latest
+    env:
+      go: '1.20'
+      cgo: ''
+      containerName: 'test-cnt-ubn'
 
-        include:
-          - job_name: linux
-            os: ubuntu-latest
-            containerName: 'test-cnt-ubn'
+      AWS_ENDPOINT: http://localhost:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_BUCKET_NAME: test
+      # Using default test credentials for Azurite
+      BLOB_ENDPOINT: http://127.0.0.1:10000/devstoreaccount1
+      BLOB_ACCOUNT: devstoreaccount1
+      BLOB_KEY: Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
 
-          - job_name: windows
-            os: windows-latest
-            containerName: 'test-cnt-win'
-            cgo: '0'
-
-    name: Build and Test on
-    runs-on:  ${{ matrix.os }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -38,29 +38,24 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go }}
+          go-version: ${{ env.go }}
           check-latest: true
       - run: go version
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10' 
 
       - name: Set CGO
         shell: bash
         run: |
-          if [[ "${{ matrix.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ matrix.cgo }}' >> $GITHUB_ENV ; fi
+          if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
 
       - name: Install libfuse on Linux
         shell: bash
         run: |
           sudo apt-get install fuse3 libfuse-dev rpm pkg-config
-        if: matrix.os == 'ubuntu-latest'
-
-      - name: Go module cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
 
       - name: Build
         run: |
@@ -72,26 +67,78 @@ jobs:
           echo $cnfFile
           touch $cnfFile
           echo "{" > $cnfFile
-          echo "\"block-acct\"": "\"${{ secrets.AZTEST_BLOCK_ACC_NAME }}\"", >> $cnfFile
-          echo "\"adls-acct\"": "\"${{ secrets.AZTEST_ADLS_ACC_NAME }}\"", >> $cnfFile
-          echo "\"block-cont\"": "\"${{ matrix.containerName }}\"", >> $cnfFile
-          echo "\"adls-cont\"": "\"${{ matrix.containerName }}\"", >> $cnfFile
-          echo "\"block-key\"": "\"${{ secrets.AZTEST_BLOCK_KEY }}\"", >> $cnfFile
-          echo "\"adls-key\"": "\"${{ secrets.AZTEST_ADLS_KEY }}\"", >> $cnfFile
-          echo "\"block-sas\"": "\"${{ secrets.AZTEST_BLOCK_SAS }}\"", >> $cnfFile
-          echo "\"block-cont-sas-ubn-18\"": "\"${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_18 }}\"", >> $cnfFile
-          echo "\"block-cont-sas-ubn-20\"": "\"${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_20 }}\"", >> $cnfFile
-          echo "\"adls-sas\"": "\"${{ secrets.AZTEST_ADLS_SAS }}\"", >> $cnfFile
-          echo "\"msi-appid\"": "\"${{ secrets.AZTEST_APP_ID }}\"", >> $cnfFile
-          echo "\"msi-resid\"": "\"${{ secrets.AZTEST_RES_ID }}\"", >> $cnfFile
-          echo "\"msi-objid\"": "\"${{ secrets.AZTEST_OBJ_ID }}\"", >> $cnfFile
-          echo "\"spn-client\"": "\"${{ secrets.AZTEST_CLIENT }}\"", >> $cnfFile
-          echo "\"spn-tenant\"": "\"${{ secrets.AZTEST_TENANT }}\"", >> $cnfFile
-          echo "\"spn-secret\"": "\"${{ secrets.AZTEST_SECRET }}\"", >> $cnfFile
+          echo "\"block-acct\"": "\"${{ env.BLOB_ACCOUNT }}\"", >> $cnfFile
+          echo "\"block-key\"": "\"${{ env.BLOB_KEY }}\"", >> $cnfFile
+          echo "\"endpoint\"": "\"${{ env.BLOB_ENDPOINT }}\"", >> $cnfFile
           echo "\"skip-msi\"": "true", >> $cnfFile
           echo "\"proxy-address\"": "\"\"" >> $cnfFile
           echo "}" >> $cnfFile
-        if: matrix.os == 'ubuntu-latest'
+      
+      - name: Create S3 Configuration File on Linux
+        run: |-
+          cnfFile=$HOME/s3test.json
+          echo $cnfFile
+          touch $cnfFile
+          echo "{" > $cnfFile
+          echo "\"bucket-name\"": "\"${{ env.AWS_BUCKET_NAME }}\"", >> $cnfFile
+          echo "\"access-key\"": "\"${{ env.AWS_ACCESS_KEY_ID }}\"", >> $cnfFile
+          echo "\"secret-key\"": "\"${{ env.AWS_SECRET_ACCESS_KEY }}\"", >> $cnfFile
+          echo "\"endpoint\"": "\"${{ env.AWS_ENDPOINT }}\"", >> $cnfFile
+          echo "\"region\"": "\"${{ env.AWS_REGION }}\"", >> $cnfFile
+          echo "\"use-path-style\"": true\ >> $cnfFile
+          echo "}" >> $cnfFile
+
+      - name: Start LocalStack
+        run: |
+          pip install localstack awscli-local[ver1] # install LocalStack cli and awslocal
+          docker pull localstack/localstack         # Make sure to pull the latest version of the image
+          localstack start -d                       # Start LocalStack in the background
+          
+          echo "Waiting for LocalStack startup..."  # Wait 20 seconds for the LocalStack container
+          localstack wait -t 20                     # to become ready before timing out 
+          echo "Startup complete"
+          
+      - name: Install Azurite
+        run: npm install -g azurite
+    
+      - name: Start Azurite
+        run: azurite --silent &
+      
+      - name: Run some Tests against LocalStack
+        run: |
+          awslocal s3 mb s3://test
+          awslocal s3 ls
+          
+      - name: Run unit tests
+        run: go test -v -timeout=1h ./... --tags=unittest,azurite
+
+  test:
+    name: Build and Test on Windows
+    runs-on: windows-latest
+    env:
+      go: '1.20'
+      cgo: '0'
+      containerName: 'test-cnt-win'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.go }}
+          check-latest: true
+      - run: go version
+
+      - name: Set CGO
+        shell: bash
+        run: |
+          if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
+
+      - name: Build
+        run: |
+          ./build.sh
 
       - name: Create Azure Configuration File on Windows
         run: |-
@@ -101,8 +148,8 @@ jobs:
           {
             "block-acct": "${{ secrets.AZTEST_BLOCK_ACC_NAME }}",
             "adls-acct": "${{ secrets.AZTEST_ADLS_ACC_NAME }}",
-            "block-cont": "${{ matrix.containerName }}",
-            "adls-cont": "${{ matrix.containerName }}",
+            "block-cont": "${{ env.containerName }}",
+            "adls-cont": "${{ env.containerName }}",
             "block-key": "${{ secrets.AZTEST_BLOCK_KEY }}",
             "adls-key": "${{ secrets.AZTEST_ADLS_KEY }}",
             "block-sas": "${{ secrets.AZTEST_BLOCK_SAS }}",
@@ -121,21 +168,6 @@ jobs:
           "@
           $content | Out-File -FilePath $cnfFile -Encoding Ascii
         shell: powershell
-        if: matrix.os == 'windows-latest'
-      
-      - name: Create S3 Configuration File on Linux
-        run: |-
-          cnfFile=$HOME/s3test.json
-          echo $cnfFile
-          touch $cnfFile
-          echo "{" > $cnfFile
-          echo "\"bucket-name\"": "\"${{ secrets.S3TEST_BUCKET_NAME }}\"", >> $cnfFile
-          echo "\"access-key\"": "\"${{ secrets.S3TEST_ACCESS_KEY }}\"", >> $cnfFile
-          echo "\"secret-key\"": "\"${{ secrets.S3TEST_SECRET_KEY }}\"", >> $cnfFile
-          echo "\"endpoint\"": "\"${{ secrets.S3TEST_ENDPOINT }}\"", >> $cnfFile
-          echo "\"region\"": "\"${{ secrets.S3TEST_REGION }}\"" >> $cnfFile
-          echo "}" >> $cnfFile
-        if: matrix.os == 'ubuntu-latest'
 
       - name: Create S3 Configuration File on Windows
         run: |-
@@ -152,11 +184,10 @@ jobs:
           "@
           $content | Out-File -FilePath $cnfFile -Encoding Ascii
         shell: powershell
-        if: matrix.os == 'windows-latest'
 
       - name: Run unit tests
-        run: go test -v -timeout=2h ./... --tags=unittest
-
+        run: go test -v -timeout=1h ./... --tags=unittest   
+    
   lint:
     name: Lint
     runs-on: ubuntu-latest
