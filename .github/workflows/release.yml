@@ -26,10 +26,6 @@ jobs:
           sudo apt-get update --fix-missing
           sudo apt-get install libfuse3-dev
       -
-        name: Quick build check
-        run: |
-            go build .
-      -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
