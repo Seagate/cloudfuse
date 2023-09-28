@@ -246,7 +246,7 @@ func (suite *cacheMapTestSuite) TestDeleteFolder() {
 
 	// verify subtree is marked deleted
 	suite.assert.NotNil(cachedItem.children)
-	suite.confirmMarkDeletedFolder(cachedItem)
+	suite.confirmMarkDeleted(cachedItem)
 
 }
 
@@ -296,7 +296,7 @@ func (suite *cacheMapTestSuite) TestInvalidateFolder() {
 
 	// verify subtree is invalid
 	suite.assert.NotNil(cachedItem.children)
-	suite.confirmInvalidatedFolder(cachedItem)
+	suite.confirmInvalidated(cachedItem)
 }
 
 func (suite *cacheMapTestSuite) TestGetRoot() {
@@ -350,7 +350,7 @@ func GenerateNestedDirectory(path string) (*list.List, *list.List) {
 	return dirPaths, filePaths
 }
 
-func (suite *cacheMapTestSuite) confirmMarkDeletedFolder(item *attrCacheItem) {
+func (suite *cacheMapTestSuite) confirmMarkDeleted(item *attrCacheItem) {
 
 	suite.assert.NotNil(item)
 	suite.assert.EqualValues(true, item.isDeleted())
@@ -359,12 +359,12 @@ func (suite *cacheMapTestSuite) confirmMarkDeletedFolder(item *attrCacheItem) {
 
 	if item.children != nil {
 		for _, val := range item.children {
-			suite.confirmMarkDeletedFolder(val)
+			suite.confirmMarkDeleted(val)
 		}
 	}
 }
 
-func (suite *cacheMapTestSuite) confirmInvalidatedFolder(item *attrCacheItem) {
+func (suite *cacheMapTestSuite) confirmInvalidated(item *attrCacheItem) {
 
 	suite.assert.NotNil(item)
 	suite.assert.EqualValues(false, item.isDeleted())
@@ -373,7 +373,7 @@ func (suite *cacheMapTestSuite) confirmInvalidatedFolder(item *attrCacheItem) {
 
 	if item.children != nil {
 		for _, val := range item.children {
-			suite.confirmInvalidatedFolder(val)
+			suite.confirmInvalidated(val)
 		}
 	}
 }
