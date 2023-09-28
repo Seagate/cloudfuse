@@ -79,20 +79,19 @@ func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *
 }
 
 func (value *attrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {
-
 	path := attr.Path // home/user/folder/file
 	path = internal.TruncateDirName(path)
+	var itemPath string
 
 	//start recursion
-	value = value.insertHelper(attr, exists, cachedAt, path)
+	value = value.insertHelper(attr, exists, cachedAt, path, itemPath)
 
 	return value
 
 }
 
 // TODO: write unit tests for this
-func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string) *attrCacheItem {
-
+func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string, itemPath string) *attrCacheItem {
 	paths := strings.SplitN(path, "/", 2) // paths[0] is home paths[1] is user/folder/file
 
 	if value.children == nil {
@@ -107,14 +106,12 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 
 	} else {
 
-		// here the root of the path string is used as the key of the map[string]*attrCacheItem
+		itemPath += paths[0] + "/"
 		_, ok := value.children[paths[0]]
 		if !ok {
-
-			//insert stubbed folder attr data into tree
-			value.children[paths[0]] = newAttrCacheItem(internal.CreateObjAttrDir(paths[0]), exists, cachedAt)
+			value.children[paths[0]] = newAttrCacheItem(internal.CreateObjAttrDir(itemPath), exists, cachedAt)
 		}
-		value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1])
+		value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1], itemPath)
 	}
 	return value
 }
@@ -124,27 +121,23 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 // description: a lookup of any attrCacheItem based on any given full path.
 // TODO: write tests
 func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
-
-	var cachedItem *attrCacheItem
+	path = internal.TruncateDirName(path)
 	paths := strings.Split(path, "/")
-
-	for i, pathElement := range paths {
-
-		currentItem, ok := value.children[pathElement]
+	var currentItem *attrCacheItem
+	var ok bool
+	currentItem = value
+	for _, pathElement := range paths {
+		if path == "" {
+			continue
+		}
+		currentItem, ok = currentItem.children[pathElement]
 		if !ok {
 			return nil, fmt.Errorf("The path element : %s does not exist", pathElement)
 		}
-
-		if i == len(paths)-1 {
-			cachedItem = currentItem
-		} else {
-			value = value.children[pathElement]
-		}
 		//TODO: side note: cacheLocks. channel, sync, semiphore.
-
 	}
 
-	return cachedItem, nil
+	return currentItem, nil
 
 }
 
@@ -163,17 +156,28 @@ func (value *attrCacheItem) isInCloud() bool {
 }
 
 func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
+
 	value.attrFlag.Clear(AttrFlagExists)
 	value.attrFlag.Set(AttrFlagValid)
 	value.cachedAt = deletedTime
 	value.attr = &internal.ObjAttr{}
-	value.children = make(map[string]*attrCacheItem)
+
+	if value.children != nil {
+		for _, val := range value.children {
+			val.markDeleted(deletedTime)
+		}
+
+	}
 }
 
 func (value *attrCacheItem) invalidate() {
 	value.attrFlag.Clear(AttrFlagValid)
 	value.attr = &internal.ObjAttr{}
-	value.children = make(map[string]*attrCacheItem)
+	if value.children != nil {
+		for _, val := range value.children {
+			val.invalidate()
+		}
+	}
 }
 
 func (value *attrCacheItem) markInCloud(inCloud bool) {

@@ -55,10 +55,12 @@ type cacheMapTestSuite struct {
 // what is every test going to need to test with?
 func (suite *cacheMapTestSuite) SetupTest() {
 	suite.assert = assert.New(suite.T())
-	suite.rootAttrCacheItem = attrCacheItem{}
+
+	rootAttr := internal.CreateObjAttrDir("")
+	suite.rootAttrCacheItem = *newAttrCacheItem(rootAttr, true, time.Now())
 
 	//set up nested Dir tree
-	nestedDir, nestedFiles := GenerateNestedDirectory("test")
+	nestedDir, nestedFiles := GenerateNestedDirectory("a")
 
 	for dir := nestedDir.Front(); dir != nil; dir = dir.Next() {
 		attr := internal.CreateObjAttrDir(dir.Value.(string))
@@ -73,9 +75,8 @@ func (suite *cacheMapTestSuite) SetupTest() {
 }
 
 func (suite *cacheMapTestSuite) TestInsertFileCacheMap() {
-
 	//create path string in form of test/dir/file
-	path := "/test/c1/TestFile.txt"
+	path := "a/c1/TestFile.txt"
 	startTime := time.Now()
 	attr := internal.CreateObjAttr(path, 1024, startTime)
 
@@ -88,15 +89,12 @@ func (suite *cacheMapTestSuite) TestInsertFileCacheMap() {
 	suite.assert.NotNil(cachedItem)
 	suite.assert.EqualValues(path, cachedItem.attr.Path)
 	suite.assert.EqualValues(1024, cachedItem.attr.Size)
-	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
 	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
-
 }
 
 func (suite *cacheMapTestSuite) TestInsertFolderCacheMap() {
-
 	//create path string in form of test/dir/file
-	path := "test/c1/TestFolder"
+	path := "a/c1/TestFolder"
 	startTime := time.Now()
 	attr := internal.CreateObjAttrDir(path)
 
@@ -110,16 +108,30 @@ func (suite *cacheMapTestSuite) TestInsertFolderCacheMap() {
 	suite.assert.NotNil(cachedItem)
 	suite.assert.EqualValues(path, cachedItem.attr.Path)
 	suite.assert.EqualValues(4096, cachedItem.attr.Size)
-	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
 	suite.assert.EqualValues(true, cachedItem.attr.IsDir())
-
 }
 
-func (suite *cacheMapTestSuite) TestDeleteAttrItem() {
+func (suite *cacheMapTestSuite) TestInsertDirsAndFiles() {
+	path := "a/c1/c12/c3p0/newfile.txt"
+	startTime := time.Now()
+	attr := internal.CreateObjAttr(path, 1024, startTime)
+
+	suite.rootAttrCacheItem.insert(attr, true, startTime)
+
+	cachedItem, err := suite.rootAttrCacheItem.get(path)
+
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(path, cachedItem.attr.Path)
+	suite.assert.EqualValues(1024, cachedItem.attr.Size)
+	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
+}
+
+func (suite *cacheMapTestSuite) TestMarkDeleted() {
 	deleteTime := time.Now()
 
 	//insert an item
-	path := "/test/c1/TempFile.txt"
+	path := "a/c1/TempFile.txt"
 	startTime := time.Now()
 	attr := internal.CreateObjAttr(path, 1024, startTime)
 
@@ -134,23 +146,170 @@ func (suite *cacheMapTestSuite) TestDeleteAttrItem() {
 	suite.assert.EqualValues(1024, cachedItem.attr.Size)
 	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
 	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
+	suite.assert.EqualValues("TempFile.txt", cachedItem.attr.Name)
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
 
-	//delete it
+	// mark it deleted
 	cachedItem.markDeleted(deleteTime)
+
+	//verify it is marked deleted
+	cachedItem, err = suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues("", cachedItem.attr.Path)
+	suite.assert.EqualValues(true, cachedItem.isDeleted())
+	suite.assert.EqualValues(false, cachedItem.exists())
+	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
+	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagExists))
+
+}
+
+func (suite *cacheMapTestSuite) TestInvalidate() {
+	//insert an item
+	path := "a/c1/TempFile.txt"
+	startTime := time.Now()
+	attr := internal.CreateObjAttr(path, 1024, startTime)
+
+	//insert path into suite.rootAttrCacheItem
+	suite.rootAttrCacheItem.insert(attr, true, startTime)
+
+	//validate it is there
+	cachedItem, err := suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(path, cachedItem.attr.Path)
+	suite.assert.EqualValues(1024, cachedItem.attr.Size)
+	suite.assert.EqualValues("TempFile.txt", cachedItem.attr.Name)
+	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
+	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagExists))
+
+	//invalidate
 	cachedItem.invalidate()
 
-	//verify it is gone
+	//verify it is invalid
 	cachedItem, err = suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(false, cachedItem.isDeleted())
+	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagValid))
+	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
+}
+
+func (suite *cacheMapTestSuite) TestDeleteFolder() {
+	deleteTime := time.Now()
+
+	//insert an item
+	path := "a/c1/f/TempFile.txt"
+	parentPath := "a/c1"
+	startTime := time.Now()
+	attr := internal.CreateObjAttr(path, 1024, startTime)
+
+	//insert path into suite.rootAttrCacheItem
+	suite.rootAttrCacheItem.insert(attr, true, startTime)
+
+	//validate file is there
+	cachedItem, err := suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(path, cachedItem.attr.Path)
+	suite.assert.EqualValues(1024, cachedItem.attr.Size)
+	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
+	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
+	suite.assert.EqualValues("TempFile.txt", cachedItem.attr.Name)
+	suite.assert.EqualValues(path, cachedItem.attr.Path)
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
+
+	//validate folder "c1"
+	cachedItem, err = suite.rootAttrCacheItem.get(parentPath)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(parentPath, cachedItem.attr.Path)
+	suite.assert.EqualValues(4096, cachedItem.attr.Size)
+	suite.assert.EqualValues(true, cachedItem.attr.IsDir())
+	suite.assert.EqualValues("c1", cachedItem.attr.Name)
+	suite.assert.EqualValues(parentPath, cachedItem.attr.Path)
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
+
+	//mark "c1" folder deleted
+	cachedItem.markDeleted(deleteTime)
+
+	//verify "c1" folder is marked deleted
+	cachedItem, err = suite.rootAttrCacheItem.get(parentPath)
 	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
 	suite.assert.EqualValues(true, cachedItem.isDeleted())
 	suite.assert.EqualValues(false, cachedItem.exists())
+	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
+
+	// verify subtree is marked deleted
+	suite.assert.NotNil(cachedItem.children)
+	suite.confirmMarkDeleted(cachedItem)
 
 }
 
-func (suite *cacheMapTestSuite) TestGetCacheMapItem() {
+func (suite *cacheMapTestSuite) TestInvalidateFolder() {
+	//insert an item
+	path := "a/c1/f/TempFile.txt"
+	parentPath := "a/c1"
+	startTime := time.Now()
+	attr := internal.CreateObjAttr(path, 1024, startTime)
 
-	path := "test/c1/gc1"
+	//insert path into suite.rootAttrCacheItem
+	suite.rootAttrCacheItem.insert(attr, true, startTime)
+
+	//validate file is there
+	cachedItem, err := suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(path, cachedItem.attr.Path)
+	suite.assert.EqualValues(1024, cachedItem.attr.Size)
+	suite.assert.EqualValues(startTime, cachedItem.attr.Mtime)
+	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
+	suite.assert.EqualValues("TempFile.txt", cachedItem.attr.Name)
+	suite.assert.EqualValues(path, cachedItem.attr.Path)
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
+
+	//validate folder "g"
+	cachedItem, err = suite.rootAttrCacheItem.get(parentPath)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(parentPath, cachedItem.attr.Path)
+	suite.assert.EqualValues(4096, cachedItem.attr.Size)
+	suite.assert.EqualValues(true, cachedItem.attr.IsDir())
+	suite.assert.EqualValues("c1", cachedItem.attr.Name)
+	suite.assert.EqualValues(parentPath, cachedItem.attr.Path)
+	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
+
+	//mark "c1" folder as invalid
+	cachedItem.invalidate()
+
+	//verify "c1" folder is invalid
+	cachedItem, err = suite.rootAttrCacheItem.get(parentPath)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(cachedItem)
+	suite.assert.EqualValues(false, cachedItem.isDeleted())
+	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagValid))
+	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
+
+	// verify subtree is invalid
+	suite.assert.NotNil(cachedItem.children)
+	suite.confirmInvalidated(cachedItem)
+}
+
+func (suite *cacheMapTestSuite) TestGetRoot() {
+	path := ""
+	item, err := suite.rootAttrCacheItem.get(path)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(item)
+	attrStr := item.attr.Path
+	suite.assert.EqualValues(path, attrStr)
+}
+
+func (suite *cacheMapTestSuite) TestGet() {
+	path := "a/c1/gc1"
 	item, err := suite.rootAttrCacheItem.get(path)
 	suite.assert.Nil(err)
 	suite.assert.NotNil(item)
@@ -189,4 +348,32 @@ func GenerateNestedDirectory(path string) (*list.List, *list.List) {
 	filePaths.PushBack(path + "c")
 
 	return dirPaths, filePaths
+}
+
+func (suite *cacheMapTestSuite) confirmMarkDeleted(item *attrCacheItem) {
+
+	suite.assert.NotNil(item)
+	suite.assert.EqualValues(true, item.isDeleted())
+	suite.assert.EqualValues(false, item.exists())
+	suite.assert.EqualValues(item.attr, &internal.ObjAttr{})
+
+	if item.children != nil {
+		for _, val := range item.children {
+			suite.confirmMarkDeleted(val)
+		}
+	}
+}
+
+func (suite *cacheMapTestSuite) confirmInvalidated(item *attrCacheItem) {
+
+	suite.assert.NotNil(item)
+	suite.assert.EqualValues(false, item.isDeleted())
+	suite.assert.EqualValues(false, item.attrFlag.IsSet(AttrFlagValid))
+	suite.assert.EqualValues(item.attr, &internal.ObjAttr{})
+
+	if item.children != nil {
+		for _, val := range item.children {
+			suite.confirmInvalidated(val)
+		}
+	}
 }
