@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -47,10 +38,10 @@ import (
 	"syscall"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
-	"cloudfuse/internal/stats_manager"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -131,7 +122,7 @@ func (cl *Client) Configure(cfg Config) error {
 		)
 	}
 	defaultConfig, err := config.LoadDefaultConfig(
-		context.TODO(),
+		context.Background(),
 		config.WithSharedConfigProfile(cl.Config.authConfig.Profile),
 		config.WithCredentialsProvider(credentialsProvider),
 		config.WithEndpointResolverWithOptions(endpointResolver),
@@ -453,10 +444,10 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 // Reads starting at a byte offset from the start of the object, with length in bytes = len.
 // len = 0 reads to the end of the object.
 // name is the file path
-func (cl *Client) ReadBuffer(name string, offset int64, len int64, isSymlink bool) ([]byte, error) {
-	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, len)
+func (cl *Client) ReadBuffer(name string, offset int64, length int64, isSymlink bool) ([]byte, error) {
+	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, length)
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, len, isSymlink)
+	objectDataReader, err := cl.getObject(name, offset, length, isSymlink)
 	if err != nil {
 		log.Err("Client::ReadBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return nil, err
@@ -476,10 +467,10 @@ func (cl *Client) ReadBuffer(name string, offset int64, len int64, isSymlink boo
 // Reads starting at a byte offset from the start of the object, with length in bytes = len.
 // len = 0 reads to the end of the object.
 // name is the file path.
-func (cl *Client) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
-	log.Trace("Client::ReadInBuffer : name %s offset %d len %d", name, offset, len)
+func (cl *Client) ReadInBuffer(name string, offset int64, length int64, data []byte) error {
+	log.Trace("Client::ReadInBuffer : name %s offset %d len %d", name, offset, length)
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, len, false)
+	objectDataReader, err := cl.getObject(name, offset, length, false)
 	if err != nil {
 		log.Err("Client::ReadInBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -821,18 +812,22 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	}
 
 	//struct for starting a multipart upload
-	ctx, cancelFn := context.WithTimeout(context.TODO(), 10*time.Minute)
-	defer cancelFn()
-
+	ctx := context.Background()
 	key := cl.getKey(name, false)
 
 	//send command to start copy and get the upload id as it is needed later
 	var uploadID string
-	createOutput, err := cl.awsS3Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
+	createMultipartUploadInput := &s3.CreateMultipartUploadInput{
 		Bucket:      aws.String(cl.Config.authConfig.BucketName),
 		Key:         aws.String(key),
 		ContentType: aws.String(getContentType(key)),
-	})
+	}
+
+	if cl.Config.enableChecksum {
+		createMultipartUploadInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+	}
+
+	createOutput, err := cl.awsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
 	if err != nil {
 		log.Err("Client::StageAndCommit : Failed to create multipart upload. Here's why: %v ", name, err)
 		return err
@@ -861,22 +856,41 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 		var err error
 		var eTag *string
+		var checksumCRC32 *string
+		var checksumCRC32C *string
+		var checksumSHA256 *string
+		var checksumSHA1 *string
 		if blk.Dirty() || len(data) > 0 {
 			// This block has data that is not yet in the bucket
-			var partResp *s3.UploadPartOutput
-			partResp, err = cl.awsS3Client.UploadPart(context.TODO(), &s3.UploadPartInput{
+			uploadPartInput := &s3.UploadPartInput{
 				Bucket:     aws.String(cl.Config.authConfig.BucketName),
 				Key:        aws.String(key),
 				PartNumber: partNumber,
 				UploadId:   &uploadID,
 				Body:       bytes.NewReader(data),
-			})
+			}
+
+			if cl.Config.enableChecksum {
+				uploadPartInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+			}
+
+			var partResp *s3.UploadPartOutput
+			partResp, err = cl.awsS3Client.UploadPart(ctx, uploadPartInput)
 			eTag = partResp.ETag
 			blk.Flags.Clear(common.DirtyBlock)
+
+			// Collect the checksums
+			// It is easier to just collect all checksums and then upload them together
+			// as ones that are not used will just be nil and an object can only ever
+			// have one valid checksum
+			checksumCRC32 = partResp.ChecksumCRC32
+			checksumCRC32C = partResp.ChecksumCRC32C
+			checksumSHA1 = partResp.ChecksumSHA1
+			checksumSHA256 = partResp.ChecksumSHA256
 		} else {
 			// This block is already in the bucket, so we need to copy this part
 			var partResp *s3.UploadPartCopyOutput
-			partResp, err = cl.awsS3Client.UploadPartCopy(context.TODO(), &s3.UploadPartCopyInput{
+			partResp, err = cl.awsS3Client.UploadPartCopy(ctx, &s3.UploadPartCopyInput{
 				Bucket:          aws.String(cl.Config.authConfig.BucketName),
 				Key:             aws.String(key),
 				CopySource:      aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, key)),
@@ -885,6 +899,15 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 				UploadId:        &uploadID,
 			})
 			eTag = partResp.CopyPartResult.ETag
+
+			// Collect the checksums
+			// It is easier to just collect all checksums and then upload them together
+			// as ones that are not used will just be nil and an object can only ever
+			// have one valid checksum
+			checksumCRC32 = partResp.CopyPartResult.ChecksumCRC32
+			checksumCRC32C = partResp.CopyPartResult.ChecksumCRC32C
+			checksumSHA1 = partResp.CopyPartResult.ChecksumSHA1
+			checksumSHA256 = partResp.CopyPartResult.ChecksumSHA256
 		}
 
 		if err != nil {
@@ -901,6 +924,12 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 				ETag:       &etag,
 				PartNumber: partNum,
 			}
+			if cl.Config.enableChecksum {
+				cPart.ChecksumCRC32 = checksumCRC32
+				cPart.ChecksumCRC32C = checksumCRC32C
+				cPart.ChecksumSHA1 = checksumSHA1
+				cPart.ChecksumSHA256 = checksumSHA256
+			}
 			parts = append(parts, cPart)
 		}
 
@@ -908,7 +937,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 	}
 
 	// complete the upload
-	_, err = cl.awsS3Client.CompleteMultipartUpload(context.TODO(), &s3.CompleteMultipartUploadInput{
+	_, err = cl.awsS3Client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
 		Bucket:   aws.String(cl.Config.authConfig.BucketName),
 		Key:      aws.String(key),
 		UploadId: &uploadID,

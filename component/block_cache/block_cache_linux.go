@@ -44,11 +44,11 @@ import (
 	"path/filepath"
 	"sync"
 
-	"cloudfuse/common"
-	"cloudfuse/common/config"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
-	"cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/handlemap"
 
 	"github.com/vibhansa-msft/tlru"
 )
@@ -391,7 +391,7 @@ func (bc *BlockCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, e
 	return dataRead, nil
 }
 
-// getBlock: From offset generate the Block index and get the Block corrosponding to it
+// getBlock: From offset generate the Block index and get the Block corresponding to it
 /* Base logic of getBlock:
 Check if the given block is already available or not
 if not
@@ -446,7 +446,7 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 		node, found = handle.GetValue(fmt.Sprintf("%v", index))
 		if !found {
 			log.Err("BlockCache::getBlock : Failed to get the required block %v=>%s (offset %v, index %v)", handle.ID, handle.Path, readoffset, index)
-			return nil, fmt.Errorf("not able to find block immediately after scheudling")
+			return nil, fmt.Errorf("not able to find block immediately after scheduling")
 		}
 	}
 

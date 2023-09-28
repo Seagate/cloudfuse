@@ -1,19 +1,10 @@
 //go:build windows
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -37,11 +28,11 @@
 package cmd
 
 import (
-	_ "cloudfuse/component/attr_cache"
-	_ "cloudfuse/component/azstorage"
-	_ "cloudfuse/component/file_cache"
-	_ "cloudfuse/component/libfuse"
-	_ "cloudfuse/component/loopback"
-	_ "cloudfuse/component/s3storage"
-	_ "cloudfuse/component/stream"
+	_ "github.com/Seagate/cloudfuse/component/attr_cache"
+	_ "github.com/Seagate/cloudfuse/component/azstorage"
+	_ "github.com/Seagate/cloudfuse/component/file_cache"
+	_ "github.com/Seagate/cloudfuse/component/libfuse"
+	_ "github.com/Seagate/cloudfuse/component/loopback"
+	_ "github.com/Seagate/cloudfuse/component/s3storage"
+	_ "github.com/Seagate/cloudfuse/component/stream"
 )

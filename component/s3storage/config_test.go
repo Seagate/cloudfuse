@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -35,10 +26,12 @@
 package s3storage
 
 import (
-	"cloudfuse/common"
-	"cloudfuse/common/log"
 	"testing"
 
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -108,8 +101,66 @@ func (s *configTestSuite) TestPrefixPath() {
 	s.opt.PrefixPath = "/testPrefixPath"
 
 	// Then
-	ParseAndValidateConfig(s.s3, s.opt)
+	err := ParseAndValidateConfig(s.s3, s.opt)
+	s.assert.Nil(err)
 	s.assert.Equal("testPrefixPath", s.s3.stConfig.prefixPath)
+}
+
+func (s *configTestSuite) TestValidChecksum() {
+	// When
+	s.opt.EnableChecksum = true
+
+	// Then
+	// Default should be SHA1 if user does not provide checksum algorithm
+	err := ParseAndValidateConfig(s.s3, s.opt)
+	s.assert.Nil(err)
+	s.assert.True(s.s3.stConfig.enableChecksum)
+	s.assert.Equal(types.ChecksumAlgorithm("SHA1"), s.s3.stConfig.checksumAlgorithm)
+
+	// When
+	s.opt.EnableChecksum = true
+	s.opt.ChecksumAlgorithm = "SHA1"
+
+	// Then
+	err = ParseAndValidateConfig(s.s3, s.opt)
+	s.assert.Nil(err)
+	s.assert.True(s.s3.stConfig.enableChecksum)
+	s.assert.Equal(types.ChecksumAlgorithm("SHA1"), s.s3.stConfig.checksumAlgorithm)
+
+	// When
+	s.opt.ChecksumAlgorithm = "SHA256"
+
+	// Then
+	err = ParseAndValidateConfig(s.s3, s.opt)
+	s.assert.Nil(err)
+	s.assert.Equal(types.ChecksumAlgorithm("SHA256"), s.s3.stConfig.checksumAlgorithm)
+
+	// When
+	s.opt.ChecksumAlgorithm = "CRC32"
+
+	// Then
+	err = ParseAndValidateConfig(s.s3, s.opt)
+	s.assert.Nil(err)
+	s.assert.Equal(types.ChecksumAlgorithm("CRC32"), s.s3.stConfig.checksumAlgorithm)
+
+	// When
+	s.opt.ChecksumAlgorithm = "CRC32C"
+
+	// Then
+	err = ParseAndValidateConfig(s.s3, s.opt)
+	s.assert.Nil(err)
+	s.assert.Equal(types.ChecksumAlgorithm("CRC32C"), s.s3.stConfig.checksumAlgorithm)
+}
+
+func (s *configTestSuite) TestInvalidChecksum() {
+	// When
+	s.opt.EnableChecksum = true
+	s.opt.ChecksumAlgorithm = "invalid"
+
+	// Then
+	err := ParseAndValidateConfig(s.s3, s.opt)
+	s.assert.NotNil(err)
+	s.assert.ErrorIs(err, errInvalidConfigField)
 }
 
 func TestConfigTestSuite(t *testing.T) {

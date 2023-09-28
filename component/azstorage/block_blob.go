@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -49,11 +40,11 @@ import (
 	"syscall"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
-	"cloudfuse/internal/convertname"
-	"cloudfuse/internal/stats_manager"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/convertname"
+	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-storage-azcopy/v10/ste"
@@ -738,22 +729,22 @@ func (bb *BlockBlob) ReadToFile(name string, offset int64, count int64, fi *os.F
 }
 
 // ReadBuffer : Download a specific range from a blob to a buffer
-func (bb *BlockBlob) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
+func (bb *BlockBlob) ReadBuffer(name string, offset int64, length int64) ([]byte, error) {
 	log.Trace("BlockBlob::ReadBuffer : name %s", name)
 	var buff []byte
-	if len == 0 {
-		len = azblob.CountToEnd
+	if length == 0 {
+		length = azblob.CountToEnd
 		attr, err := bb.GetAttr(name)
 		if err != nil {
 			return buff, err
 		}
 		buff = make([]byte, attr.Size)
 	} else {
-		buff = make([]byte, len)
+		buff = make([]byte, length)
 	}
 
 	blobURL := bb.getBlobURL(name)
-	err := azblob.DownloadBlobToBuffer(context.Background(), blobURL, offset, len, buff, bb.downloadOptions)
+	err := azblob.DownloadBlobToBuffer(context.Background(), blobURL, offset, length, buff, bb.downloadOptions)
 
 	if err != nil {
 		e := storeBlobErrToErr(err)
@@ -771,12 +762,12 @@ func (bb *BlockBlob) ReadBuffer(name string, offset int64, len int64) ([]byte, e
 }
 
 // ReadInBuffer : Download specific range from a file to a user provided buffer
-func (bb *BlockBlob) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
+func (bb *BlockBlob) ReadInBuffer(name string, offset int64, length int64, data []byte) error {
 	// log.Trace("BlockBlob::ReadInBuffer : name %s", name)
 	blobURL := bb.getBlobURL(name)
 	opt := bb.downloadOptions
-	opt.BlockSize = len
-	err := azblob.DownloadBlobToBuffer(context.Background(), blobURL, offset, len, data, opt)
+	opt.BlockSize = length
+	err := azblob.DownloadBlobToBuffer(context.Background(), blobURL, offset, length, data, opt)
 
 	if err != nil {
 		e := storeBlobErrToErr(err)

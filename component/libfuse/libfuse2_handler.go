@@ -1,19 +1,10 @@
 package libfuse
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -44,11 +35,11 @@ import (
 	"syscall"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
-	"cloudfuse/internal/handlemap"
-	"cloudfuse/internal/stats_manager"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/winfsp/cgofuse/fuse"
 )
@@ -60,7 +51,7 @@ or we are doing:
 	- handle.ID = (handlemap.HandleID)(fh)
 
 In cloudfuse we maintain handles as an object stored in a handlemap. Cgofuse gives us handles as integer
-values so we need to do type conversions to conver those values to our Handle ID values that cloudfuse
+values so we need to do type conversions to convert those values to our Handle ID values that cloudfuse
 uses so we convert the integer into a handle object.
 */
 
@@ -821,7 +812,7 @@ func (cf *CgofuseFS) Readlink(path string) (int, string) {
 	return 0, targetPath
 }
 
-// Fsync syncronizes the file.
+// Fsync synchronizes the file.
 func (cf *CgofuseFS) Fsync(path string, datasync bool, fh uint64) int {
 	if fh == 0 {
 		return -fuse.EIO
@@ -851,7 +842,7 @@ func (cf *CgofuseFS) Fsync(path string, datasync bool, fh uint64) int {
 	return 0
 }
 
-// Fsyncdir syncronizes a directory.
+// Fsyncdir synchronizes a directory.
 func (cf *CgofuseFS) Fsyncdir(path string, datasync bool, fh uint64) int {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)

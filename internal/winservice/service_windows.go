@@ -1,14 +1,6 @@
 //go:build windows
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
@@ -36,10 +28,11 @@ package winservice
 
 import (
 	"bytes"
-	"cloudfuse/common/log"
 	"encoding/binary"
 	"errors"
 	"time"
+
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
@@ -77,7 +70,7 @@ func (m *Cloudfuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 	log.Trace("Successfully started %s service", SvcName)
 
-	for {
+	for { //nolint
 		select {
 		case c := <-r:
 			switch c.Cmd {
@@ -211,7 +204,7 @@ func writeCommandToUtf16(cmd uint16, args ...string) []byte {
 	return buf.Bytes()
 }
 
-// winFspCommand sends an instruciton to WinFsp.
+// winFspCommand sends an instruction to WinFsp.
 func winFspCommand(command []byte) ([]string, error) {
 	var retStrings []string
 	winPipe, err := windows.UTF16PtrFromString(winfspPipe)
@@ -232,7 +225,7 @@ func winFspCommand(command []byte) ([]string, error) {
 	if err != nil {
 		return retStrings, err
 	}
-	defer windows.CloseHandle(handle)
+	defer windows.CloseHandle(handle) //nolint
 
 	// Send the command to WinFSP
 	var overlapped windows.Overlapped

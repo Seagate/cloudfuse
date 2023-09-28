@@ -11,7 +11,7 @@ automatically run in foreground.
         cloudfuse.exe mount <mount path> --config-file=<config file>
 
 ## Running as a Windows service (recommended)
-To run as a Windows service you need to run the following commands in a terminal with administrator privaleges.
+To run as a Windows service you need to run the following commands in a terminal with administrator privileges.
 
 1. Install Cloudfuse as a Windows service.
 

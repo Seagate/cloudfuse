@@ -1,14 +1,6 @@
 //go:build windows
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
@@ -29,20 +21,20 @@
    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-   SOFTWARE
 */
 
 package cmd
 
 import (
-	"cloudfuse/common"
-	"cloudfuse/internal/winservice"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/internal/winservice"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows"
@@ -253,7 +245,7 @@ func installService() error {
 	if err != nil {
 		return err
 	}
-	defer scm.Disconnect()
+	defer scm.Disconnect() //nolint
 
 	// Don't install the service if it already exists
 	service, err := scm.OpenService(SvcName)
@@ -283,7 +275,7 @@ func removeService() error {
 	if err != nil {
 		return err
 	}
-	defer scm.Disconnect()
+	defer scm.Disconnect() //nolint
 
 	service, err := scm.OpenService(SvcName)
 	if err != nil {
@@ -312,7 +304,7 @@ func startService() error {
 	if err != nil {
 		return err
 	}
-	defer scm.Disconnect()
+	defer scm.Disconnect() //nolint
 
 	service, err := scm.OpenService(SvcName)
 	if err != nil {
@@ -333,7 +325,7 @@ func stopService() error {
 	if err != nil {
 		return err
 	}
-	defer scm.Disconnect()
+	defer scm.Disconnect() //nolint
 
 	service, err := scm.OpenService(SvcName)
 	if err != nil {
@@ -370,7 +362,7 @@ func isServiceRunning() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer scm.Disconnect()
+	defer scm.Disconnect() //nolint
 
 	service, err := scm.OpenService(SvcName)
 	if err != nil {
