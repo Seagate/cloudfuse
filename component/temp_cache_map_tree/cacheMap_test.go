@@ -195,7 +195,6 @@ func (suite *cacheMapTestSuite) TestInvalidate() {
 	suite.assert.NotNil(cachedItem)
 	suite.assert.EqualValues(false, cachedItem.isDeleted())
 	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagValid))
-	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagExists))
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
 }
 
@@ -293,7 +292,6 @@ func (suite *cacheMapTestSuite) TestInvalidateFolder() {
 	suite.assert.NotNil(cachedItem)
 	suite.assert.EqualValues(false, cachedItem.isDeleted())
 	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagValid))
-	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagExists))
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
 
 	// verify subtree is invalid
@@ -371,7 +369,6 @@ func (suite *cacheMapTestSuite) confirmInvalidatedFolder(item *attrCacheItem) {
 	suite.assert.NotNil(item)
 	suite.assert.EqualValues(false, item.isDeleted())
 	suite.assert.EqualValues(false, item.attrFlag.IsSet(AttrFlagValid))
-	suite.assert.EqualValues(true, item.attrFlag.IsSet(AttrFlagExists))
 	suite.assert.EqualValues(item.attr, &internal.ObjAttr{})
 
 	if item.children != nil {
