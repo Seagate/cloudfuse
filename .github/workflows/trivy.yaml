@@ -31,15 +31,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: fs
-          scan-ref: '.'
-          ignore-unfixed: true
-          format: 'table'
-          severity: 'CRITICAL,HIGH,MEDIUM'
-          exit-code: '1'
+      - name: Install Trivy
+        run: |
+          sudo apt-get install wget apt-transport-https gnupg lsb-release -y
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install trivy -y
+
+      - name: Run vulnerability scanner
+        run: |
+          trivy fs ./ --scanners license --exit-code 1 --severity HIGH,CRITICAL
+          trivy fs ./ --exit-code 1 --severity MEDIUM,HIGH,CRITICAL --dependency-tree
 
       #TODO: maybe use this when codeql is available (after publishing)
       # - name: Upload Trivy scan results to GitHub Security tab
