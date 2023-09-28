@@ -112,7 +112,8 @@ func (ac *AttrCache) Start(ctx context.Context) error {
 	log.Trace("AttrCache::Start : Starting component %s", ac.Name())
 
 	// AttrCache : start code goes here
-	ac.cacheMap = *newAttrCacheItem()
+	rootAttr := internal.CreateObjAttrDir("")
+	ac.cacheMap = *newAttrCacheItem(rootAttr, true, time.Now())
 
 	return nil
 }
