@@ -32,7 +32,7 @@
    SOFTWARE
 */
 
-package temp_cache_map_tree
+package attr_cache
 
 import (
 	"fmt"
