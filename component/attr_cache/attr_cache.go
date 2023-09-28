@@ -185,14 +185,14 @@ func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 	// Add a trailing / so that we only delete child paths under the directory and not paths that have the same prefix
 	prefix := dirToPrefix(path)
 
-	for key, value := range ac.cacheMap {
-		if strings.HasPrefix(key, prefix) {
-			value.markDeleted(time)
-		}
+	//get attrCacheItem
+	toBeDeleted, err := ac.cacheMap.get(prefix)
+
+	// delete the path itself and children.
+	if err != nil {
+		toBeDeleted.markDeleted(time)
 	}
 
-	// We need to delete the path itself since we only handle children above.
-	ac.deletePath(path, time)
 }
 
 func dirToPrefix(dir string) string {
