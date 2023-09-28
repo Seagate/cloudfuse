@@ -100,6 +100,7 @@ require (
 	github.com/wastore/keychain v0.0.0-20180920053336-f2c902a3d807 // indirect
 	github.com/wastore/keyctl v0.3.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
+	github.com/miekg/dns v1.0.3
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/crypto v0.12.0 // indirect
 	golang.org/x/net v0.14.0 // indirect
