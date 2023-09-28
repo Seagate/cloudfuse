@@ -85,7 +85,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         #   if start successful, run cloudfuse.exe service mount
 
         try:
-            windowsServiceCmd = subprocess.run([".\cloudfuse.exe", "service", "install"], capture_output=True, check=True)
+            windowsServiceCmd = subprocess.run([".\cloudfuse.exe", "service", "install"], capture_output=True, check=False)
         except:
             return False
 
