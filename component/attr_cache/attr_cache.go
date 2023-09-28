@@ -62,7 +62,7 @@ type AttrCache struct {
 	noSymlinks   bool
 	cacheDirs    bool
 	maxFiles     int
-	cacheMap     AttrCacheItem
+	cacheMap     attrCacheItem
 	cacheLock    sync.RWMutex
 }
 
@@ -112,7 +112,7 @@ func (ac *AttrCache) Start(ctx context.Context) error {
 	log.Trace("AttrCache::Start : Starting component %s", ac.Name())
 
 	// AttrCache : start code goes here
-	ac.cacheMap = make(map[string]*AttrCacheItem)
+	ac.cacheMap = *newAttrCacheItem()
 
 	return nil
 }
@@ -229,7 +229,7 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	foundCachedContents := false
 	for key, value := range ac.cacheMap {
 		if value.attr.IsDir() {
-			value.children = make(map[string]*AttrCacheItem)
+			value.children = make(map[string]*attrCacheItem)
 			value.children[key] = value
 		}
 		if strings.HasPrefix(key, prefix) {

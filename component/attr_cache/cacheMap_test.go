@@ -60,7 +60,7 @@ func (suite *cacheMapTestSuite) SetupTest() {
 	suite.rootAttrCacheItem = *newAttrCacheItem(rootAttr, true, time.Now())
 
 	//set up nested Dir tree
-	nestedDir, nestedFiles := GenerateNestedDirectory("a")
+	nestedDir, nestedFiles := generateNestedDirectory("a")
 
 	for dir := nestedDir.Front(); dir != nil; dir = dir.Next() {
 		attr := internal.CreateObjAttrDir(dir.Value.(string))
@@ -333,7 +333,7 @@ func TestCacheMapTestSuite(t *testing.T) {
 //	ab/c1
 //
 // ac
-func GenerateNestedDirectory(path string) (*list.List, *list.List) {
+func generateNestedDirectory(path string) (*list.List, *list.List) {
 	path = internal.TruncateDirName(path)
 
 	dirPaths := list.New()
