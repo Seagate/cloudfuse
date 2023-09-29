@@ -58,10 +58,8 @@ jobs:
         Copy-Item -Path $path -Destination (Join-Path (Split-Path -Path $path) 'make.exe')
     
     - name: Create Directory Structure
+      shell: bash
       run: |-
-        mkdir -p ${{ env.MOUNT_DIR }}
-        chown -R `whoami` ${{ env.MOUNT_DIR }}
-        chmod 777 ${{ env.MOUNT_DIR }}
         mkdir -p ${{ env.TEMP_DIR }}
         chown -R `whoami` ${{ env.TEMP_DIR }}
         chmod 777 ${{ env.TEMP_DIR }}
@@ -140,12 +138,11 @@ jobs:
     - name: Block Blob Coverage
       shell: bash
       run: |-
-        rm ${{ env.MOUNT_DIR }}/*
-        rm ${{ env.TEMP_DIR }}/*
+        rm -rf ${{ env.TEMP_DIR }}/*
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block.cov service mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
         sleep 10
         ps -W | grep cloudfuse
-        rm ${{ env.MOUNT_DIR }}/*
+        rm -rf ${{ env.MOUNT_DIR }}/*
         cd test/e2e_tests
         go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
         cd -
