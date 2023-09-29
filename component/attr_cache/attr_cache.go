@@ -191,6 +191,8 @@ func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 	// delete the path itself and children.
 	if err != nil {
 		toBeDeleted.markDeleted(time)
+	} else {
+		log.Err("could not find the cache map item due to the following error: ", err)
 	}
 
 }
@@ -201,15 +203,6 @@ func dirToPrefix(dir string) string {
 		prefix = ""
 	}
 	return prefix
-}
-
-// deletePath: deletes a path
-func (ac *AttrCache) deletePath(path string, time time.Time) {
-	// Keys in the cache map do not contain trailing /, truncate the path before referencing a key in the map.
-	value, found := ac.cacheMap[internal.TruncateDirName(path)]
-	if found {
-		value.markDeleted(time)
-	}
 }
 
 // deleteCachedDirectory: marks a directory and all its contents deleted
@@ -228,15 +221,19 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	prefix := dirToPrefix(path)
 	// remember whether we actually found any contents
 	foundCachedContents := false
-	for key, value := range ac.cacheMap {
-		if value.attr.IsDir() {
-			value.children = make(map[string]*attrCacheItem)
-			value.children[key] = value
-		}
-		if strings.HasPrefix(key, prefix) {
-			foundCachedContents = true
-			value.markDeleted(time)
-		}
+
+	//get attrCacheItem
+	toBeDeleted, err := ac.cacheMap.get(prefix)
+
+	// delete the path itself and children.
+	if err != nil {
+		toBeDeleted.markDeleted(time)
+	} else {
+		log.Err("could not find the cache map item due to the following error: ", err)
+	}
+
+	if toBeDeleted.children != nil {
+		foundCachedContents = true
 	}
 
 	// check if the directory to be deleted exists
@@ -244,9 +241,6 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 		log.Err("AttrCache::deleteCachedDirectory : directory %s does not exist in attr cache.", path)
 		return syscall.ENOENT
 	}
-
-	// We need to delete the path itself since we only handle children above.
-	ac.deletePath(path, time)
 
 	// If this leaves the parent or any ancestor directory empty, record that.
 	// Although this involves an unnecessary second traversal through the cache,
@@ -673,14 +667,14 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 // to record which of them contain objects in their subtrees
 func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 	// first gather a list of ancestors
-	var ancestorCacheItems []*AttrCacheItem
+	var ancestorCacheItems []*attrCacheItem
 	ancestorPath := internal.TruncateDirName(dirPath)
 	for ancestorPath != "" {
-		ancestorCacheItem, found := ac.cacheMap[ancestorPath]
-		if !(found && ancestorCacheItem.valid() && ancestorCacheItem.exists()) {
+		ancestorCacheItem, err := ac.cacheMap.get(ancestorPath)
+		if !(err != nil && ancestorCacheItem.valid() && ancestorCacheItem.exists()) {
 			ancestorObjAttr := internal.CreateObjAttrDir(ancestorPath)
-			ancestorCacheItem = NewAttrCacheItem(ancestorObjAttr, true, time)
-			ac.cacheMap[ancestorPath] = ancestorCacheItem
+			ancestorCacheItem = newAttrCacheItem(ancestorObjAttr, true, time)
+			ac.cacheMap.children[ancestorPath] = ancestorCacheItem
 		}
 		ancestorCacheItems = append(ancestorCacheItems, ancestorCacheItem)
 		// speculatively set all ancestors as not in cloud storage
@@ -694,37 +688,26 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		return
 	}
 	// search the cache to check whether each ancestor is in cloud storage
-cacheSearch:
-	for key, value := range ac.cacheMap {
-		// ignore items that are deleted, invalid, or directories that are not in cloud storage
-		if !value.exists() || !value.valid() || !value.isInCloud() {
-			continue
+
+	prefixMatchFound := false
+matchAncestors:
+	for _, ancestor := range ancestorCacheItems {
+		// don't visit ancestors that have already been updated
+		if ancestor.isInCloud() {
+			// if all ancestors have been updated, the entire search is done
+			break matchAncestors
 		}
-		// iterate over ancestors, from the deepest up
-		prefixMatchFound := false
-	matchAncestors:
-		for ancestorIndex, ancestor := range ancestorCacheItems {
-			// don't visit ancestors that have already been updated
-			if ancestor.isInCloud() {
-				// if all ancestors have been updated, the entire search is done
-				if ancestorIndex == 0 {
-					break cacheSearch
-				}
-				break matchAncestors
-			}
-			// we already found that one ancestor is in the cloud
-			// so its ancestors are too
-			if prefixMatchFound {
-				ancestor.markInCloud(true)
-				continue matchAncestors
-			}
-			// check for a prefix match
-			prefix := dirToPrefix(ancestor.attr.Path)
-			if strings.HasPrefix(key, prefix) {
-				prefixMatchFound = true
-				// update this ancestor
-				ancestor.markInCloud(true)
-			}
+		// we already found that one ancestor is in the cloud
+		// so its ancestors are too
+		if prefixMatchFound {
+			ancestor.markInCloud(true)
+			continue matchAncestors
+		}
+		// check for a prefix match
+		if ancestor.children != nil {
+			prefixMatchFound = true
+			// update this ancestor
+			ancestor.markInCloud(true)
 		}
 	}
 }
