@@ -126,6 +126,7 @@ jobs:
       run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service start"
     
     - name: Create Config File - Block Blob
+      shell: bash
       env:
         NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
         NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
@@ -146,7 +147,7 @@ jobs:
         cd test/e2e_tests
         go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
         cd -
-          ./cloudfuse.test service unmount ${{ env.MOUNT_DIR }}
+        ./cloudfuse.test service unmount ${{ env.MOUNT_DIR }}
         sleep 5
     
     - name: Block Blob Coverage with profilers
