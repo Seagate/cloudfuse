@@ -761,10 +761,21 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		// TODO: Can we just copy over the attributes from the source to the destination so we don't have to invalidate?
-		ac.deletePath(options.Src, renameTime)
-		ac.invalidatePath(options.Dst)
-	}
 
+		toBeDeleted, err := ac.cacheMap.get(options.Src)
+		if err != nil {
+			log.Err("could not find attr cache item due to following error: ", err)
+		} else {
+			toBeDeleted.markDeleted(renameTime)
+		}
+
+		toBeInvalid, err := ac.cacheMap.get(options.Dst)
+		if err != nil {
+			log.Err("could not find attr cache item due to following error: ", err)
+		} else {
+			toBeInvalid.invalidate()
+		}
+	}
 	return err
 }
 
