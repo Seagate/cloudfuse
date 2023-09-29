@@ -678,9 +678,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		ancestorCacheItem, err := ac.cacheMap.get(ancestorPath)
 		if err != nil { //TODO: do more specific error check for attrCacheItem not existing
 			ancestorObjAttr := internal.CreateObjAttrDir(ancestorPath)
-			ancestorCacheItem = newAttrCacheItem(ancestorObjAttr, true, time)
-			ac.cacheMap.children[ancestorPath] = ancestorCacheItem
-			log.Err("could not find the cache map item due to the following error: ", err)
+			ac.cacheMap.insert(ancestorObjAttr, true, time)
 		}
 		ancestorCacheItems = append(ancestorCacheItems, ancestorCacheItem)
 		// speculatively set all ancestors as not in cloud storage
