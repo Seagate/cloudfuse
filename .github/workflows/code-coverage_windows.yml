@@ -59,11 +59,11 @@ jobs:
     
     - name: Create Directory Structure
       run: |-
-        sudo mkdir -p ${{ env.MOUNT_DIR }}
-        sudo chown -R `whoami` ${{ env.MOUNT_DIR }}
+        mkdir -p ${{ env.MOUNT_DIR }}
+        chown -R `whoami` ${{ env.MOUNT_DIR }}
         chmod 777 ${{ env.MOUNT_DIR }}
-        sudo mkdir -p ${{ env.TEMP_DIR }}
-        sudo chown -R `whoami` ${{ env.TEMP_DIR }}
+        mkdir -p ${{ env.TEMP_DIR }}
+        chown -R `whoami` ${{ env.TEMP_DIR }}
         chmod 777 ${{ env.TEMP_DIR }}
 
     - name: Build
