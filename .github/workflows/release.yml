@@ -24,8 +24,9 @@ jobs:
         name: Install library dependencies
         run: |
           sudo dpkg --add-architecture arm64
-          sudo apt-get update --fix-missing
+          sudo apt-get update --fix-missing || true
           sudo apt-get install libfuse3-dev gcc-aarch64-linux-gnu libfuse3-dev:arm64
+        continue-on-error: true
       -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
