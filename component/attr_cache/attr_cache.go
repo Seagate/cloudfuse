@@ -679,7 +679,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		if err != nil {
 			log.Err("could not find the cache map item due to the following error: ", err)
 		} else {
-			//TODO: include element not found error in below if statment
+			//TODO: this code block is incorrect on handling none existing attrCacheItem element in tree
 			if !(ancestorCacheItem.valid() && ancestorCacheItem.exists()) {
 				ancestorObjAttr := internal.CreateObjAttrDir(ancestorPath)
 				ancestorCacheItem = newAttrCacheItem(ancestorObjAttr, true, time)
