@@ -495,27 +495,22 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 	}
 	numAdded := 0
 	ac.cacheLock.RLock()
-	for key, value := range ac.cacheMap {
-		// ignore invalid and deleted items
-		if !value.valid() || !value.exists() {
-			continue
-		}
-		// the only entries missing are the directories with no objects
-		if !value.attr.IsDir() || value.isInCloud() {
-			continue
-		}
-		// look for matches
-		if strings.HasPrefix(key, prefix) {
+
+	nonCloudItem, err := ac.cacheMap.get(prefix)
+	if err != nil {
+		log.Err("could not find the attr cached item: ", err)
+	} else {
+		if nonCloudItem.children != nil {
 			// exclude entries in subdirectories
-			pathInsideDirectory := strings.TrimPrefix(key, prefix)
-			if strings.Contains(pathInsideDirectory, "/") {
-				continue
+			pathInsideDirectory := strings.TrimPrefix(nonCloudItem.attr.Path, prefix)
+			if !strings.Contains(pathInsideDirectory, "/") {
+				pathList = append(pathList, nonCloudItem.attr)
+				numAdded++
 			}
 
-			pathList = append(pathList, value.attr)
-			numAdded++
 		}
 	}
+
 	ac.cacheLock.RUnlock()
 	// values should be returned in ascending order by key
 	// sort the list before returning it
