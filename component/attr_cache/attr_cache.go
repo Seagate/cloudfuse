@@ -603,11 +603,16 @@ func (ac *AttrCache) anyContentsInCache(prefix string) bool {
 	prefix = dirToPrefix(prefix)
 	ac.cacheLock.RLock()
 	defer ac.cacheLock.RUnlock()
-	for key, value := range ac.cacheMap {
-		if strings.HasPrefix(key, prefix) && value.valid() && value.exists() {
+
+	cachedContentItem, err := ac.cacheMap.get(prefix)
+	if err != nil {
+		log.Err("can't find cache map item due to following error: ", err)
+	} else { //TODO: this isn't looking at each child or not going through the sub tree. is that an issue?
+		if cachedContentItem.children != nil && cachedContentItem.valid() && cachedContentItem.exists() {
 			return true
 		}
 	}
+
 	return false
 }
 
