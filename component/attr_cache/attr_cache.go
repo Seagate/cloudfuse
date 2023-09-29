@@ -278,29 +278,15 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 	// Add a trailing / so that we only invalidate child paths under the directory and not paths that have the same prefix
 	prefix := dirToPrefix(path)
 
-	for key, value := range ac.cacheMap {
-		if strings.HasPrefix(key, prefix) {
-			// don't invalidate directories when cacheDirs is true
-			if ac.cacheDirs && value.attr.IsDir() {
-				continue
-			}
-			value.invalidate()
+	toBeInvalid, err := ac.cacheMap.get(prefix)
+	if err == nil {
+		if toBeInvalid.children != nil {
+			toBeInvalid.invalidate()
 		}
+	} else {
+		log.Err("could not find the attr cached item to invalidate due to the following error: ", err)
 	}
 
-	// We need to invalidate the path itself since we only handle children above.
-	if !ac.cacheDirs {
-		ac.invalidatePath(path)
-	}
-}
-
-// invalidatePath: invalidates a path
-func (ac *AttrCache) invalidatePath(path string) {
-	// Keys in the cache map do not contain trailing /, truncate the path before referencing a key in the map.
-	value, found := ac.cacheMap[internal.TruncateDirName(path)]
-	if found {
-		value.invalidate()
-	}
 }
 
 // renameCachedDirectory: Renames a cached directory and all its contents when ac.cacheDirs is true.
