@@ -139,16 +139,16 @@ jobs:
     
     - name: Block Blob Coverage
       run: |-
-        rm -rf ${{ env.MOUNT_DIR }}/*
-        rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
+        rm ${{ env.MOUNT_DIR }}/*
+        rm ${{ env.TEMP_DIR }}/*
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block.cov service mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
         sleep 10
         ps -W | grep cloudfuse
-        rm -rf ${{ env.MOUNT_DIR }}/*
+        rm ${{ env.MOUNT_DIR }}/*
         cd test/e2e_tests
         go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
         cd -
-        sudo fusermount -u ${{ env.MOUNT_DIR }}
+          ./cloudfuse.test service unmount ${{ env.MOUNT_DIR }}
         sleep 5
     
     - name: Block Blob Coverage with profilers
