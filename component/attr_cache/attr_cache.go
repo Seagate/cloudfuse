@@ -419,11 +419,22 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 				return os.ErrExist
 			}
 			newDirAttr := internal.CreateObjAttrDir(newDirPath)
-			newDirAttrCacheItem := NewAttrCacheItem(newDirAttr, true, time.Now())
-			newDirAttrCacheItem.markInCloud(false)
-			ac.cacheMap[newDirPath] = newDirAttrCacheItem
+			ac.cacheMap.insert(newDirAttr, true, time.Now())
+			newDirAttrCacheItem, err := ac.cacheMap.get(newDirPath)
+			if err != nil {
+				log.Err("could not find the attr cached item: ", err)
+			} else {
+				newDirAttrCacheItem.markInCloud(false)
+			}
+
 		} else {
-			ac.invalidatePath(options.Name)
+			dirAttrCacheItem, err := ac.cacheMap.get(internal.TruncateDirName(options.Name))
+			if err != nil {
+				log.Err("could not find the attr cached item: ", err)
+			} else {
+				dirAttrCacheItem.invalidate()
+			}
+
 		}
 	}
 	return err
