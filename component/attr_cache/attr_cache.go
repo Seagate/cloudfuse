@@ -384,15 +384,22 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 	dirPath = internal.TruncateDirName(dirPath)
 	if len(dirPath) != 0 {
-		dirCacheItem, found := ac.cacheMap[dirPath]
-		if !(found && dirCacheItem.valid() && dirCacheItem.exists()) {
+		dirCacheItem, err := ac.cacheMap.get(dirPath)
+		if err != nil { //TODO: do more specific error check for attrCacheItem not existing
 			dirObjAttr := internal.CreateObjAttrDir(dirPath)
-			dirCacheItem = NewAttrCacheItem(dirObjAttr, true, time)
-			ac.cacheMap[dirPath] = dirCacheItem
+			ac.cacheMap.insert(dirObjAttr, true, time)
 		}
-		dirCacheItem.markInCloud(true)
-		// recurse
-		ac.markAncestorsInCloud(getParentDir(dirPath), time)
+
+		dirCacheItem, err = ac.cacheMap.get(dirPath)
+		if err != nil { //make sure it exists this time.
+			log.Err("could not find the attr cached item: ", err)
+		} else {
+			dirCacheItem.markInCloud(true)
+
+			// recurse
+			ac.markAncestorsInCloud(getParentDir(dirPath), time)
+		}
+
 	}
 }
 
