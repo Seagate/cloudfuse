@@ -681,7 +681,12 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 		deletionTime := time.Now()
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		ac.deletePath(options.Name, deletionTime)
+		toBeDeleted, err := ac.cacheMap.get(options.Name)
+		if err != nil {
+			log.Err("cannot find the attr cache item due to the following error: ", err)
+		} else {
+			toBeDeleted.markDeleted(deletionTime)
+		}
 		if ac.cacheDirs {
 			ac.updateAncestorsInCloud(getParentDir(options.Name), deletionTime)
 		}
