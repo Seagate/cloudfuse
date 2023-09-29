@@ -229,7 +229,6 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	// delete the path itself and children.
 	if err != nil {
 		log.Err("could not find the cache map item due to the following error: ", err)
-
 	} else {
 		toBeDeleted.markDeleted(time)
 	}
@@ -284,9 +283,7 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 	if err != nil {
 		log.Err("could not find the attr cached item to invalidate due to the following error: ", err)
 	} else {
-		if toBeInvalid.children != nil {
-			toBeInvalid.invalidate()
-		}
+		toBeInvalid.invalidate()
 	}
 
 }
@@ -682,6 +679,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		if err != nil {
 			log.Err("could not find the cache map item due to the following error: ", err)
 		} else {
+			//TODO: include element not found error in below if statment
 			if !(ancestorCacheItem.valid() && ancestorCacheItem.exists()) {
 				ancestorObjAttr := internal.CreateObjAttrDir(ancestorPath)
 				ancestorCacheItem = newAttrCacheItem(ancestorObjAttr, true, time)
