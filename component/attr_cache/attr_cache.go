@@ -507,7 +507,6 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 				pathList = append(pathList, nonCloudItem.attr)
 				numAdded++
 			}
-
 		}
 	}
 
@@ -558,6 +557,7 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 			// TODO: call the insert in cacheMap.go to guild out a nested map tree.
 
 			// TODO: will this cause a bug when cacheDirs is enabled?
+			// TODO: this will require a tree traversal / scan to get cachedItems count
 			if len(ac.cacheMap) > ac.maxFiles {
 				log.Debug("AttrCache::cacheAttributes : %s skipping adding path to attribute cache because it is full", pathList)
 				break
