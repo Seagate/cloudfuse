@@ -317,33 +317,32 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	if err != nil {
 		log.Err("could not find the attr cached item to rename directory due to the following error: ", err)
 	} else {
-
-	}
-
-	for key, value := range ac.cacheMap {
-		if strings.HasPrefix(key, srcDir) {
+		if srcItem.children != nil {
 			foundCachedContents = true
-			dstKey := strings.Replace(key, srcDir, dstDir, 1)
+			dstKey := strings.Replace(srcItem.attr.Name, srcDir, dstDir, 1)
 
 			// track whether the destination is gaining objects
-			movedObjects = movedObjects || (value.isInCloud() && value.exists() && value.valid())
+			movedObjects = movedObjects || (srcItem.isInCloud() && srcItem.exists() && srcItem.valid())
+
 			// to keep the directory cache coherent,
 			// any renamed directories need a new cache entry
-			if value.attr.IsDir() && value.valid() && value.exists() {
+			if srcItem.attr.IsDir() && srcItem.valid() && srcItem.exists() {
 				// add the destination directory to our cache
 				dstDirAttr := internal.CreateObjAttrDir(dstKey)
-				dstDirCacheItem := NewAttrCacheItem(dstDirAttr, true, time)
-				dstDirCacheItem.markInCloud(value.isInCloud())
-				ac.cacheMap[dstKey] = dstDirCacheItem
-			} else {
-				// invalidate files so attributes get refreshed from the backend
-				ac.invalidatePath(dstKey)
+				ac.cacheMap.insert(dstDirAttr, true, time)
+				dstDirCacheItem, err := ac.cacheMap.get(dstDirAttr.Path)
+				if err != nil {
+					log.Err("could not find the destination attr cached item to rename directory due to the following error: ", err)
+				} else {
+					dstDirCacheItem.markInCloud(srcItem.isInCloud())
+
+					// invalidate files so attributes get refreshed from the backend
+					srcItem.invalidate()
+					// either way, mark the old cache entry deleted
+					srcItem.markDeleted(time)
+				}
 			}
-			// either way, mark the old cache entry deleted
-			value.markDeleted(time)
-
 		}
-
 	}
 
 	// if there were no cached entries to move, does this directory even exist?
@@ -358,20 +357,30 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	} else {
 		// add the destination directory to our cache
 		dstDir = internal.TruncateDirName(dstDir)
-		dstDirAttr := internal.CreateObjAttrDir(dstDir)
-		dstDirAttrCacheItem := NewAttrCacheItem(dstDirAttr, true, time)
-		dstDirAttrCacheItem.markInCloud(false)
-		ac.cacheMap[dstDir] = dstDirAttrCacheItem
+		dstItem, err := ac.cacheMap.get(dstDir)
+		if err != nil {
+			log.Err("could not find the attr cached item: ", err)
+		} else {
+			dstDirAttr := internal.CreateObjAttrDir(dstDir)
+			dstItem.insert(dstDirAttr, true, time)
+			dstDirAttrCacheItem, err := ac.cacheMap.get(dstDirAttr.Path)
+			if err != nil {
+				dstDirAttrCacheItem.markInCloud(false)
+			} else {
+				log.Err("could not find the attr cached item: ", err)
+			}
+
+		}
+
+		// delete the source directory from our cache
+		srcItem.markDeleted(time)
+
+		// If this leaves the parent or ancestor directories empty, record that.
+		// Although this involves an unnecessary second traversal through the cache,
+		// because of the code complexity, I think it's worth the readability gained.
+		ac.updateAncestorsInCloud(getParentDir(srcDir), time)
+
 	}
-
-	// delete the source directory from our cache
-	ac.deletePath(srcDir, time)
-
-	// If this leaves the parent or ancestor directories empty, record that.
-	// Although this involves an unnecessary second traversal through the cache,
-	// because of the code complexity, I think it's worth the readability gained.
-	ac.updateAncestorsInCloud(getParentDir(srcDir), time)
-
 	return nil
 }
 
