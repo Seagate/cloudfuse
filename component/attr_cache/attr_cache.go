@@ -189,10 +189,11 @@ func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 	toBeDeleted, err := ac.cacheMap.get(prefix)
 
 	// delete the path itself and children.
-	if err == nil {
-		toBeDeleted.markDeleted(time)
-	} else {
+	if err != nil {
 		log.Err("could not find the cache map item due to the following error: ", err)
+
+	} else {
+		toBeDeleted.markDeleted(time)
 	}
 
 }
@@ -226,10 +227,11 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	toBeDeleted, err := ac.cacheMap.get(prefix)
 
 	// delete the path itself and children.
-	if err == nil {
-		toBeDeleted.markDeleted(time)
-	} else {
+	if err != nil {
 		log.Err("could not find the cache map item due to the following error: ", err)
+
+	} else {
+		toBeDeleted.markDeleted(time)
 	}
 
 	if toBeDeleted.children != nil {
@@ -279,12 +281,12 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 	prefix := dirToPrefix(path)
 
 	toBeInvalid, err := ac.cacheMap.get(prefix)
-	if err == nil {
+	if err != nil {
+		log.Err("could not find the attr cached item to invalidate due to the following error: ", err)
+	} else {
 		if toBeInvalid.children != nil {
 			toBeInvalid.invalidate()
 		}
-	} else {
-		log.Err("could not find the attr cached item to invalidate due to the following error: ", err)
 	}
 
 }
@@ -310,6 +312,14 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	// remember whether we actually found any contents
 	foundCachedContents := false
 	movedObjects := false
+
+	srcItem, err := ac.cacheMap.get(srcDir)
+	if err != nil {
+		log.Err("could not find the attr cached item to rename directory due to the following error: ", err)
+	} else {
+
+	}
+
 	for key, value := range ac.cacheMap {
 		if strings.HasPrefix(key, srcDir) {
 			foundCachedContents = true
@@ -660,15 +670,14 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 	ancestorPath := internal.TruncateDirName(dirPath)
 	for ancestorPath != "" {
 		ancestorCacheItem, err := ac.cacheMap.get(ancestorPath)
-
-		if err == nil {
+		if err != nil {
+			log.Err("could not find the cache map item due to the following error: ", err)
+		} else {
 			if !(ancestorCacheItem.valid() && ancestorCacheItem.exists()) {
 				ancestorObjAttr := internal.CreateObjAttrDir(ancestorPath)
 				ancestorCacheItem = newAttrCacheItem(ancestorObjAttr, true, time)
 				ac.cacheMap.children[ancestorPath] = ancestorCacheItem
 			}
-		} else {
-			log.Err("could not find the cache map item due to the following error: ", err)
 		}
 
 		ancestorCacheItems = append(ancestorCacheItems, ancestorCacheItem)
