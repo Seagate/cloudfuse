@@ -312,7 +312,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 
 	srcItem, err := ac.cacheMap.get(srcDir)
 	if err != nil {
-		log.Err("could not find the attr cached item to rename directory due to the following error: ", err)
+		log.Err("could not get the attr cached item to rename directory due to the following error: ", err)
 	} else {
 		if srcItem.children != nil {
 			foundCachedContents = true
@@ -357,14 +357,14 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 		dstItem, err := ac.cacheMap.get(dstDir)
 		if err != nil {
 			log.Err("could not find the attr cached item: ", err)
-		} else {
+		} else { //TODO: peer review that this is correct
 			dstDirAttr := internal.CreateObjAttrDir(dstDir)
 			dstItem.insert(dstDirAttr, true, time)
 			dstDirAttrCacheItem, err := ac.cacheMap.get(dstDirAttr.Path)
 			if err != nil {
-				dstDirAttrCacheItem.markInCloud(false)
-			} else {
 				log.Err("could not find the attr cached item: ", err)
+			} else {
+				dstDirAttrCacheItem.markInCloud(false)
 			}
 
 		}
