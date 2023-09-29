@@ -189,7 +189,7 @@ func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 	toBeDeleted, err := ac.cacheMap.get(prefix)
 
 	// delete the path itself and children.
-	if err != nil {
+	if err == nil {
 		toBeDeleted.markDeleted(time)
 	} else {
 		log.Err("could not find the cache map item due to the following error: ", err)
@@ -226,7 +226,7 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	toBeDeleted, err := ac.cacheMap.get(prefix)
 
 	// delete the path itself and children.
-	if err != nil {
+	if err == nil {
 		toBeDeleted.markDeleted(time)
 	} else {
 		log.Err("could not find the cache map item due to the following error: ", err)
@@ -674,6 +674,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 	ancestorPath := internal.TruncateDirName(dirPath)
 	for ancestorPath != "" {
 		ancestorCacheItem, err := ac.cacheMap.get(ancestorPath)
+
 		if !(err != nil && ancestorCacheItem.valid() && ancestorCacheItem.exists()) {
 			ancestorObjAttr := internal.CreateObjAttrDir(ancestorPath)
 			ancestorCacheItem = newAttrCacheItem(ancestorObjAttr, true, time)
