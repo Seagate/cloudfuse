@@ -138,6 +138,7 @@ jobs:
       run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
     
     - name: Block Blob Coverage
+      shell: bash
       run: |-
         rm ${{ env.MOUNT_DIR }}/*
         rm ${{ env.TEMP_DIR }}/*
@@ -152,6 +153,7 @@ jobs:
         sleep 5
     
     - name: Block Blob Coverage with profilers
+      shell: bash
       run: |-
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
