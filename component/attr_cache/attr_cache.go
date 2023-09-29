@@ -252,8 +252,11 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 
 // pathExistsInCache: check if path is in cache, is valid, and not marked deleted
 func (ac *AttrCache) pathExistsInCache(path string) bool {
-	value, found := ac.cacheMap[internal.TruncateDirName(path)]
-	return (found && value.valid() && value.exists())
+	value, err := ac.cacheMap.get(internal.TruncateDirName(path))
+	if err != nil {
+		log.Err("could not find the attr cached item due to the following error: ", err)
+	}
+	return (value.valid() && value.exists())
 }
 
 func getParentDir(childPath string) string {
