@@ -839,9 +839,13 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 		defer ac.cacheLock.RUnlock()
 
 		// no need to truncate the name of the file
-		value, found := ac.cacheMap[options.Name]
-		if found && value.valid() && value.exists() {
-			value.setSize(options.Size)
+		value, err := ac.cacheMap.get(options.Name)
+		if err := nil {
+			log.Err("could not find attribute item in cache to truncate file due to the following error: ", err)
+		} else {
+			if found && value.valid() && value.exists() {
+				value.setSize(options.Size)
+			}
 		}
 	}
 	return err
