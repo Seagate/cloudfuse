@@ -1025,12 +1025,15 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 
-		value, found := ac.cacheMap[internal.TruncateDirName(options.Name)]
-		if found && value.valid() && value.exists() {
-			value.setMode(options.Mode)
+		value, err := ac.cacheMap.get(internal.TruncateDirName(options.Name))
+		if err != nil {
+			log.Err("The attribute item could not be retrieved from the cache due to the following error: ", err)
+		} else {
+			if value.valid() && value.exists() {
+				value.setMode(options.Mode)
+			}
 		}
 	}
-
 	return err
 }
 
