@@ -121,9 +121,11 @@ jobs:
 
     - name: Install Windows Service
       run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service install"
+      shell: powershell
 
     - name: Start Windows Service
       run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service start"
+      shell: powershell
     
     - name: Create Config File - Block Blob
       shell: bash
