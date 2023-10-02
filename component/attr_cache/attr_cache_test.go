@@ -1279,7 +1279,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsDeleted() {
 		suite.SetupTest()
 		suite.Run(path, func() {
 
-			addDirectoryToCache(suite.assert, suite.attrCache, "a", false)
+			AddDirectoryToCache(suite.assert, suite.attrCache, "a", false)
 			// delete directory a and file ac
 			suite.mock.EXPECT().DeleteDir(gomock.Any()).Return(nil)
 			suite.mock.EXPECT().DeleteFile(gomock.Any()).Return(nil)
@@ -1430,10 +1430,12 @@ func (suite *attrCacheTestSuite) TestGetAttrEnoentError() {
 			suite.assert.Equal(err, syscall.ENOENT)
 			suite.assert.EqualValues(&internal.ObjAttr{}, result)
 			suite.assert.Contains(suite.attrCache.cacheMap, truncatedPath)
-			suite.assert.EqualValues(&internal.ObjAttr{}, suite.attrCache.cacheMap[truncatedPath].attr)
-			suite.assert.True(suite.attrCache.cacheMap[truncatedPath].valid())
-			suite.assert.False(suite.attrCache.cacheMap[truncatedPath].exists())
-			suite.assert.NotNil(suite.attrCache.cacheMap[truncatedPath].cachedAt)
+			checkItem, err := suite.attrCache.cacheMap.get(truncatedPath)
+			suite.assert.NotNil(err)
+			suite.assert.EqualValues(&internal.ObjAttr{}, checkItem.attr)
+			suite.assert.True(checkItem.valid())
+			suite.assert.False(checkItem.exists())
+			suite.assert.NotNil(checkItem.cachedAt)
 		})
 	}
 }
