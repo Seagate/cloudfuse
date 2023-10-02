@@ -256,6 +256,7 @@ func (ac *AttrCache) pathExistsInCache(path string) bool {
 	value, err := ac.cacheMap.get(internal.TruncateDirName(path))
 	if err != nil {
 		log.Err("could not find the attr cached item due to the following error: ", err)
+		return false
 	}
 	return (value.valid() && value.exists())
 }
