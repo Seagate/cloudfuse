@@ -229,6 +229,7 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	// delete the path itself and children.
 	if err != nil {
 		log.Err("could not find the cache map item due to the following error: ", err)
+		return syscall.ENOENT
 	} else {
 		toBeDeleted.markDeleted(time)
 	}
