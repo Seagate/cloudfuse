@@ -896,7 +896,12 @@ func (ac *AttrCache) SyncFile(options internal.SyncFileOptions) error {
 	if err == nil {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		ac.invalidatePath(options.Handle.Path)
+		toBeInvalid, err := ac.cacheMap.get(options.Handle.Path)
+		if err != nil {
+			log.Err("The attribute item could not be invalidated in the cache due to the following error: ", err)
+		} else {
+			toBeInvalid.invalidate()
+		}
 	}
 	return err
 }
