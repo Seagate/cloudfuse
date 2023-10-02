@@ -1217,6 +1217,7 @@ func (suite *attrCacheTestSuite) TestTruncateFile() {
 	suite.assert.Contains(suite.attrCache.cacheMap, path)
 
 	checkItem, err := suite.attrCache.cacheMap.get(path)
+	suite.assert.NotNil(err)
 	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 	suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
 	suite.assert.EqualValues(defaultMode, checkItem.attr.Mode)
