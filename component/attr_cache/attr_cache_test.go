@@ -666,7 +666,7 @@ func (suite *attrCacheTestSuite) TestReadDirNoCacheOnListNoCacheDirs() {
 	path := "a"
 	size := int64(1024)
 	mode := os.FileMode(0)
-	aAttr := generateNestedPathAttr(path, size, mode)
+	aAttr := GenerateNestedPathAttr(path, size, mode)
 
 	options := internal.ReadDirOptions{Name: path}
 	suite.mock.EXPECT().ReadDir(options).Return(aAttr, nil)
@@ -735,7 +735,7 @@ func (suite *attrCacheTestSuite) TestIsDirEmptyFalseInCache() {
 	options := internal.IsDirEmptyOptions{
 		Name: path,
 	}
-	addDirectoryToCache(suite.assert, suite.attrCache, path, false)
+	AddDirectoryToCache(suite.assert, suite.attrCache, path, false)
 	// make sure the attribute cache handles the request itself
 	suite.mock.EXPECT().IsDirEmpty(options).MaxTimes(0)
 
@@ -784,7 +784,7 @@ func (suite *attrCacheTestSuite) TestRenameDir() {
 
 			// Error
 			// Destination Entry (ab) Already Exists
-			a, ab, ac := addDirectoryToCache(suite.assert, suite.attrCache, input.src, false)
+			a, ab, ac := AddDirectoryToCache(suite.assert, suite.attrCache, input.src, false)
 
 			suite.mock.EXPECT().RenameDir(options).Return(nil)
 
@@ -868,7 +868,7 @@ func (suite *attrCacheTestSuite) TestRenameDirNoCacheDirs() {
 			suite.assert.NotContains(suite.attrCache.cacheMap, truncatedDst)
 
 			// Entry Already Exists
-			a, ab, ac := addDirectoryToCache(suite.assert, suite.attrCache, input.src, false)
+			a, ab, ac := AddDirectoryToCache(suite.assert, suite.attrCache, input.src, false)
 
 			suite.mock.EXPECT().RenameDir(options).Return(nil)
 
@@ -1017,7 +1017,7 @@ func (suite *attrCacheTestSuite) TestSyncDir() {
 			suite.assert.NotContains(suite.attrCache.cacheMap, truncatedPath)
 
 			// Entry Already Exists
-			a, ab, ac := addDirectoryToCache(suite.assert, suite.attrCache, path, false)
+			a, ab, ac := AddDirectoryToCache(suite.assert, suite.attrCache, path, false)
 
 			suite.mock.EXPECT().SyncDir(options).Return(nil)
 
@@ -1075,7 +1075,7 @@ func (suite *attrCacheTestSuite) TestSyncDirNoCacheDirs() {
 			suite.assert.NotContains(suite.attrCache.cacheMap, truncatedPath)
 
 			// Entry Already Exists
-			a, ab, ac := addDirectoryToCache(suite.assert, suite.attrCache, path, false)
+			a, ab, ac := AddDirectoryToCache(suite.assert, suite.attrCache, path, false)
 
 			suite.mock.EXPECT().SyncDir(options).Return(nil)
 
@@ -1215,11 +1215,13 @@ func (suite *attrCacheTestSuite) TestTruncateFile() {
 	err = suite.attrCache.TruncateFile(options)
 	suite.assert.Nil(err)
 	suite.assert.Contains(suite.attrCache.cacheMap, path)
-	suite.assert.NotEqualValues(suite.attrCache.cacheMap[path].attr, &internal.ObjAttr{})
-	suite.assert.EqualValues(size, suite.attrCache.cacheMap[path].attr.Size) // new size should be set
-	suite.assert.EqualValues(defaultMode, suite.attrCache.cacheMap[path].attr.Mode)
-	suite.assert.True(suite.attrCache.cacheMap[path].valid())
-	suite.assert.True(suite.attrCache.cacheMap[path].exists())
+
+	checkItem, err := suite.attrCache.cacheMap.get(path)
+	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
+	suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
+	suite.assert.EqualValues(defaultMode, checkItem.attr.Mode)
+	suite.assert.True(checkItem.valid())
+	suite.assert.True(checkItem.exists())
 }
 
 // Tests CopyFromFile
