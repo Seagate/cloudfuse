@@ -124,10 +124,10 @@ jobs:
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service install
         sleep 5
 
-    - name: Start Windows Service
-      run: |-
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service start
-        sleep 5
+    # - name: Start Windows Service
+    #   run: |-
+    #     ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service start
+    #     sleep 5
     
     - name: Create Config File - Block Blob
       shell: bash
@@ -143,6 +143,8 @@ jobs:
     - name: Block Blob Coverage
       shell: bash
       run: |-
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service start
+        sleep 10
         rm -rf ${{ env.TEMP_DIR }}/*
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block.cov service mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
         sleep 10
