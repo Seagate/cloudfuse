@@ -424,14 +424,16 @@ func (suite *attrCacheTestSuite) TestDeleteDir() {
 
 			err := suite.attrCache.DeleteDir(options)
 			suite.assert.NotNil(err)
-			suite.assert.NotContains(suite.attrCache.cacheMap, truncatedPath)
+			_, err = suite.attrCache.cacheMap.get(truncatedPath)
+			suite.assert.NotNil(err)
 
 			// Entry Does Not Exist
 			suite.mock.EXPECT().DeleteDir(options).Return(nil)
 
 			err = suite.attrCache.DeleteDir(options)
 			suite.assert.True(os.IsNotExist(err))
-			suite.assert.NotContains(suite.attrCache.cacheMap, truncatedPath)
+			_, err = suite.attrCache.cacheMap.get(truncatedPath)
+			suite.assert.NotNil(err)
 
 			// Entry Exists
 			a, ab, ac := AddDirectoryToCache(suite.assert, suite.attrCache, path, false)
