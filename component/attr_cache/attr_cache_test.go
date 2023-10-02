@@ -114,7 +114,9 @@ func addPathToCache(assert *assert.Assertions, attrCache *AttrCache, path string
 		pathAttr = getDirPathAttr(path)
 	}
 	attrCache.cacheMap.insert(pathAttr, true, time.Now())
-	assert.Contains(attrCache.cacheMap, path)
+	_, err := attrCache.cacheMap.get(path)
+	assert.Nil(err)
+
 }
 
 func assertDeleted(suite *attrCacheTestSuite, path string) {
@@ -340,14 +342,18 @@ func (suite *attrCacheTestSuite) TestCreateDir() {
 
 			err = suite.attrCache.CreateDir(options)
 			suite.assert.Nil(err)
-			suite.assert.Contains(suite.attrCache.cacheMap, truncatedPath)
+
+			_, err = suite.attrCache.cacheMap.get(truncatedPath)
+			suite.assert.Nil(err)
 
 			// Entry Already Exists
 			suite.mock.EXPECT().CreateDir(options).Return(nil)
 
 			err = suite.attrCache.CreateDir(options)
 			suite.assert.Equal(os.ErrExist, err)
-			suite.assert.Contains(suite.attrCache.cacheMap, truncatedPath)
+
+			_, err = suite.attrCache.cacheMap.get(truncatedPath)
+			suite.assert.Nil(err)
 		})
 	}
 }
