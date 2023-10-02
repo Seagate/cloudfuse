@@ -539,14 +539,14 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 // intput: *attrCacheItem being the local root for the subtree.
 // output: int representing number of cached items in the sub tree
 // description: helper function to tally up all children from given attr cache item
-func (ac *AttrCache) countChildren(item *attrCacheItem) int {
+func (ac *AttrCache) CountChildren(item *attrCacheItem) int {
 
 	childCount := 0
 
 	if item.children != nil {
 		for _, val := range item.children {
 			childCount += 1
-			ac.countChildren(val)
+			ac.CountChildren(val)
 		}
 	}
 	return childCount

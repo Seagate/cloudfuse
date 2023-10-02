@@ -167,10 +167,12 @@ func assertInCloud(suite *attrCacheTestSuite, path string) {
 
 func assertNotInCloud(suite *attrCacheTestSuite, path string) {
 	suite.assert.Contains(suite.attrCache.cacheMap, path)
-	suite.assert.NotEqualValues(suite.attrCache.cacheMap[path].attr, &internal.ObjAttr{})
-	suite.assert.True(suite.attrCache.cacheMap[path].valid())
-	suite.assert.True(suite.attrCache.cacheMap[path].exists())
-	suite.assert.False(suite.attrCache.cacheMap[path].isInCloud())
+	checkItem, err := suite.attrCache.cacheMap.get(path)
+	suite.assert.NotNil(err)
+	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
+	suite.assert.True(checkItem.valid())
+	suite.assert.True(checkItem.exists())
+	suite.assert.False(checkItem.isInCloud())
 }
 
 // Directory structure
@@ -422,7 +424,7 @@ func (suite *attrCacheTestSuite) TestDeleteDir() {
 			suite.assert.NotContains(suite.attrCache.cacheMap, truncatedPath)
 
 			// Entry Exists
-			a, ab, ac := addDirectoryToCache(suite.assert, suite.attrCache, path, false)
+			a, ab, ac := AddDirectoryToCache(suite.assert, suite.attrCache, path, false)
 
 			suite.mock.EXPECT().DeleteDir(options).Return(nil)
 
@@ -475,7 +477,7 @@ func (suite *attrCacheTestSuite) TestDeleteDirNoCacheDirs() {
 			suite.assert.NotContains(suite.attrCache.cacheMap, truncatedPath)
 
 			// Entry Already Exists
-			a, ab, ac := addDirectoryToCache(suite.assert, suite.attrCache, path, false)
+			a, ab, ac := AddDirectoryToCache(suite.assert, suite.attrCache, path, false)
 
 			suite.mock.EXPECT().DeleteDir(options).Return(nil)
 
@@ -507,7 +509,7 @@ func (suite *attrCacheTestSuite) TestReadDirDoesNotExist() {
 		suite.cleanupTest()
 		suite.SetupTest()
 		suite.Run(path, func() {
-			aAttr := generateNestedPathAttr(path, size, mode)
+			aAttr := GenerateNestedPathAttr(path, size, mode)
 
 			options := internal.ReadDirOptions{Name: path}
 
@@ -519,18 +521,21 @@ func (suite *attrCacheTestSuite) TestReadDirDoesNotExist() {
 			returnedAttr, err := suite.attrCache.ReadDir(options)
 			suite.assert.Nil(err)
 			suite.assert.Equal(aAttr, returnedAttr)
-			suite.assert.Equal(len(suite.attrCache.cacheMap), len(aAttr))
+			suite.assert.Equal(suite.attrCache.CountChildren(suite.attrCache.cacheMap), len(aAttr))
 
 			// Entries should now be in the cache
 			for _, p := range aAttr {
 				suite.assert.Contains(suite.attrCache.cacheMap, p.Path)
-				suite.assert.NotEqualValues(suite.attrCache.cacheMap[p.Path].attr, &internal.ObjAttr{})
+
+				checkItem, err := suite.attrCache.cacheMap.get(p.Path)
+				suite.assert.NotNil(err)
+				suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 				if !p.IsDir() {
-					suite.assert.EqualValues(size, suite.attrCache.cacheMap[p.Path].attr.Size) // new size should be set
-					suite.assert.EqualValues(mode, suite.attrCache.cacheMap[p.Path].attr.Mode) // new mode should be set
+					suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
+					suite.assert.EqualValues(mode, checkItem.attr.Mode) // new mode should be set
 				}
-				suite.assert.True(suite.attrCache.cacheMap[p.Path].valid())
-				suite.assert.True(suite.attrCache.cacheMap[p.Path].exists())
+				suite.assert.True(checkItem.valid())
+				suite.assert.True(checkItem.exists())
 			}
 		})
 	}
