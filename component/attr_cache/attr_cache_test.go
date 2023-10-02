@@ -113,7 +113,7 @@ func addPathToCache(assert *assert.Assertions, attrCache *AttrCache, path string
 	if isDir {
 		pathAttr = getDirPathAttr(path)
 	}
-	attrCache.cacheMap.children[path] = NewAttrCacheItem(pathAttr, true, time.Now())
+	attrCache.cacheMap.children[path] = newAttrCacheItem(pathAttr, true, time.Now())
 	assert.Contains(attrCache.cacheMap, path)
 }
 
@@ -147,9 +147,11 @@ func assertUntouched(suite *attrCacheTestSuite, path string) {
 
 func assertExists(suite *attrCacheTestSuite, path string) {
 	suite.assert.Contains(suite.attrCache.cacheMap, path)
-	suite.assert.NotEqualValues(suite.attrCache.cacheMap[path].attr, &internal.ObjAttr{})
-	suite.assert.True(suite.attrCache.cacheMap[path].valid())
-	suite.assert.True(suite.attrCache.cacheMap[path].exists())
+	checkItem, err := suite.attrCache.cacheMap.get(path)
+	suite.assert.NotNil(err)
+	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
+	suite.assert.True(checkItem.valid())
+	suite.assert.True(checkItem.exists())
 }
 
 func assertInCloud(suite *attrCacheTestSuite, path string) {
