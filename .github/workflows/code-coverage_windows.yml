@@ -144,7 +144,7 @@ jobs:
       shell: bash
       run: |-
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service start
-        sleep 10
+        sleep 30
         rm -rf ${{ env.TEMP_DIR }}/*
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block.cov service mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
         sleep 10
