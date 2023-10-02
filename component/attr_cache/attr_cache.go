@@ -62,7 +62,7 @@ type AttrCache struct {
 	noSymlinks   bool
 	cacheDirs    bool
 	maxFiles     int
-	cacheMap     attrCacheItem
+	cacheMap     *attrCacheItem
 	cacheLock    sync.RWMutex
 }
 
@@ -113,7 +113,7 @@ func (ac *AttrCache) Start(ctx context.Context) error {
 
 	// AttrCache : start code goes here
 	rootAttr := internal.CreateObjAttrDir("")
-	ac.cacheMap = *newAttrCacheItem(rootAttr, true, time.Now())
+	ac.cacheMap = newAttrCacheItem(rootAttr, true, time.Now())
 
 	return nil
 }
@@ -281,7 +281,7 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 
 	toBeInvalid, err := ac.cacheMap.get(prefix)
 	if err != nil {
-		log.Err("could not find the attr cached item to invalidate due to the following error: ", err)
+		log.Err("could not invalidate cached attr item due to the following error: ", err)
 	} else {
 		toBeInvalid.invalidate()
 	}
@@ -312,7 +312,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 
 	srcItem, err := ac.cacheMap.get(srcDir)
 	if err != nil {
-		log.Err("could not get the attr cached item to rename directory due to the following error: ", err)
+		log.Err("could not get the source cached item for renaming directory due to the following error: ", err)
 	} else {
 		if srcItem.children != nil {
 			foundCachedContents = true
@@ -323,6 +323,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 
 			// to keep the directory cache coherent,
 			// any renamed directories need a new cache entry
+			// TODO: revisit above comments. scanning sub tree?
 			if srcItem.attr.IsDir() && srcItem.valid() && srcItem.exists() {
 				// add the destination directory to our cache
 				dstDirAttr := internal.CreateObjAttrDir(dstKey)
@@ -353,6 +354,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 		ac.markAncestorsInCloud(dstDir, time)
 	} else {
 		// add the destination directory to our cache
+		// am I adding a child to the already existing dstItem? is it a duplicate item as a child?
 		dstDir = internal.TruncateDirName(dstDir)
 		dstItem, err := ac.cacheMap.get(dstDir)
 		if err != nil {
@@ -541,6 +543,22 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	return pathList, token, err
 }
 
+// intput: *attrCacheItem being the local root for the subtree.
+// output: int representing number of cached items in the sub tree
+// description: helper function to tally up all children from given attr cache item
+func (ac *AttrCache) countChildren(item *attrCacheItem) int {
+
+	childCount := 0
+
+	if item.children != nil {
+		for _, val := range item.children {
+			childCount += 1
+			ac.countChildren(val)
+		}
+	}
+	return childCount
+}
+
 // cacheAttributes : On dir listing cache the attributes for all files
 // this will lock and release the mutex for writing
 func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
@@ -558,12 +576,13 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 
 			// TODO: will this cause a bug when cacheDirs is enabled?
 			// TODO: this will require a tree traversal / scan to get cachedItems count
-			if len(ac.cacheMap) > ac.maxFiles {
+
+			if ac.countChildren(ac.cacheMap) > ac.maxFiles {
 				log.Debug("AttrCache::cacheAttributes : %s skipping adding path to attribute cache because it is full", pathList)
 				break
 			}
 
-			ac.cacheMap[internal.TruncateDirName(attr.Path)] = NewAttrCacheItem(attr, true, currTime)
+			ac.cacheMap.insert(attr, true, currTime)
 		}
 
 	}
