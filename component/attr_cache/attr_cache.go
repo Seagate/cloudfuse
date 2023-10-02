@@ -903,24 +903,28 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	truncatedPath := internal.TruncateDirName(options.Name)
 
 	ac.cacheLock.RLock()
-	value, found := ac.cacheMap[truncatedPath]
+	value, err := ac.cacheMap.get(truncatedPath)
 	ac.cacheLock.RUnlock()
 
-	// Try to serve the request from the attribute cache
-	if found && value.valid() && time.Since(value.cachedAt).Seconds() < float64(ac.cacheTimeout) {
-		// Is the entry marked deleted?
-		if value.isDeleted() {
-			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
-			return &internal.ObjAttr{}, syscall.ENOENT
-		}
+	if err != nil {
+		log.Err("could not find the following attr item in cache to get attributes due to the following error: ", err)
+	} else {
+		// Try to serve the request from the attribute cache
+		if value.valid() && time.Since(value.cachedAt).Seconds() < float64(ac.cacheTimeout) {
+			// Is the entry marked deleted?
+			if value.isDeleted() {
+				log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
+				return &internal.ObjAttr{}, syscall.ENOENT
+			}
 
-		// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
-		// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
-		// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
-		if value.getAttr().IsMetadataRetrieved() || (ac.noSymlinks && !options.RetrieveMetadata) {
-			// path exists and we have all the metadata required or we do not care about metadata
-			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
-			return value.getAttr(), nil
+			// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
+			// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
+			// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
+			if value.getAttr().IsMetadataRetrieved() || (ac.noSymlinks && !options.RetrieveMetadata) {
+				// path exists and we have all the metadata required or we do not care about metadata
+				log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
+				return value.getAttr(), nil
+			}
 		}
 	}
 
@@ -934,8 +938,8 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// Retrieved attributes so cache them
 		// TODO: bug: when cacheDirs is true, the cache limit will cause some directories to be double-listed
 		// TODO: shouldn't this be an LRU? This sure looks like the opposite...
-		if len(ac.cacheMap) < ac.maxFiles {
-			ac.cacheMap[truncatedPath] = NewAttrCacheItem(pathAttr, true, time.Now())
+		if ac.countChildren(ac.cacheMap) < ac.maxFiles {
+			ac.cacheMap.insert(pathAttr, true, time.Now())
 		} else {
 			log.Debug("AttrCache::GetAttr : %s skipping adding to attribute cache because it is full", options.Name)
 		}
@@ -944,7 +948,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		}
 	} else if err == syscall.ENOENT {
 		// Path does not exist so cache a no-entry item
-		ac.cacheMap[truncatedPath] = NewAttrCacheItem(&internal.ObjAttr{}, false, time.Now())
+		ac.cacheMap.insert(&internal.ObjAttr{}, false, time.Now())
 	}
 
 	return pathAttr, err
