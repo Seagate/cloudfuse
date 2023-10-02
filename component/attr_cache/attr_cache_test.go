@@ -118,9 +118,9 @@ func addPathToCache(assert *assert.Assertions, attrCache *AttrCache, path string
 }
 
 func assertDeleted(suite *attrCacheTestSuite, path string) {
-	suite.assert.Contains(suite.attrCache.cacheMap, path)
+
 	cacheItem, err := suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
+	suite.assert.Nil(err)
 	suite.assert.EqualValues(&internal.ObjAttr{}, cacheItem.attr)
 	suite.assert.True(cacheItem.valid())
 	suite.assert.False(cacheItem.exists())
@@ -128,16 +128,16 @@ func assertDeleted(suite *attrCacheTestSuite, path string) {
 
 func assertInvalid(suite *attrCacheTestSuite, path string) {
 	cacheItem, err := suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
-	suite.assert.Contains(suite.attrCache.cacheMap, path)
+	suite.assert.Nil(err)
+
 	suite.assert.EqualValues(&internal.ObjAttr{}, cacheItem.attr)
 	suite.assert.False(cacheItem.valid())
 }
 
 func assertUntouched(suite *attrCacheTestSuite, path string) {
 	cacheItem, err := suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
-	suite.assert.Contains(suite.attrCache.cacheMap, path)
+	suite.assert.Nil(err)
+
 	suite.assert.NotEqualValues(cacheItem.attr, &internal.ObjAttr{})
 	suite.assert.EqualValues(defaultSize, cacheItem.attr.Size)
 	suite.assert.EqualValues(defaultMode, cacheItem.attr.Mode)
@@ -146,19 +146,18 @@ func assertUntouched(suite *attrCacheTestSuite, path string) {
 }
 
 func assertExists(suite *attrCacheTestSuite, path string) {
-	suite.assert.Contains(suite.attrCache.cacheMap, path)
+
 	checkItem, err := suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
+	suite.assert.Nil(err)
 	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 	suite.assert.True(checkItem.valid())
 	suite.assert.True(checkItem.exists())
 }
 
 func assertInCloud(suite *attrCacheTestSuite, path string) {
-	suite.assert.Contains(suite.attrCache.cacheMap, path)
 
 	checkItem, err := suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
+	suite.assert.Nil(err)
 	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 	suite.assert.True(checkItem.valid())
 	suite.assert.True(checkItem.exists())
@@ -166,7 +165,7 @@ func assertInCloud(suite *attrCacheTestSuite, path string) {
 }
 
 func assertNotInCloud(suite *attrCacheTestSuite, path string) {
-	suite.assert.Contains(suite.attrCache.cacheMap, path)
+
 	checkItem, err := suite.attrCache.cacheMap.get(path)
 	suite.assert.NotNil(err)
 	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
@@ -331,7 +330,9 @@ func (suite *attrCacheTestSuite) TestCreateDir() {
 
 			err := suite.attrCache.CreateDir(options)
 			suite.assert.NotNil(err)
-			suite.assert.NotContains(suite.attrCache.cacheMap, truncatedPath)
+
+			suite.attrCache.cacheMap.get(truncatedPath)
+			suite.assert.NotNil(err)
 
 			// Success
 			// Entry Does Not Already Exist
@@ -1147,7 +1148,9 @@ func (suite *attrCacheTestSuite) TestWriteFileError() {
 
 	_, err := suite.attrCache.WriteFile(options)
 	suite.assert.NotNil(err)
-	suite.assert.Contains(suite.attrCache.cacheMap, path) // GetAttr call will add this to the cache
+	suite.attrCache.cacheMap.get(path)
+	suite.assert.Nil(err)
+	// GetAttr call will add this to the cache
 }
 
 func (suite *attrCacheTestSuite) TestWriteFileDoesNotExist() {
@@ -1165,7 +1168,10 @@ func (suite *attrCacheTestSuite) TestWriteFileDoesNotExist() {
 
 	_, err := suite.attrCache.WriteFile(options)
 	suite.assert.Nil(err)
-	suite.assert.Contains(suite.attrCache.cacheMap, path) // GetAttr call will add this to the cache
+	suite.attrCache.cacheMap.get(path)
+	suite.assert.Nil(err)
+	// GetAttr call will add this to the cache
+
 }
 
 func (suite *attrCacheTestSuite) TestWriteFileExists() {
@@ -1214,10 +1220,9 @@ func (suite *attrCacheTestSuite) TestTruncateFile() {
 
 	err = suite.attrCache.TruncateFile(options)
 	suite.assert.Nil(err)
-	suite.assert.Contains(suite.attrCache.cacheMap, path)
 
 	checkItem, err := suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
+	suite.assert.Nil(err)
 	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 	suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
 	suite.assert.EqualValues(defaultMode, checkItem.attr.Mode)
@@ -1237,7 +1242,9 @@ func (suite *attrCacheTestSuite) TestCopyFromFileError() {
 
 	err := suite.attrCache.CopyFromFile(options)
 	suite.assert.NotNil(err)
-	suite.assert.Contains(suite.attrCache.cacheMap, path) // GetAttr call will add this to the cache
+	suite.attrCache.cacheMap.get(path)
+	suite.assert.Nil(err)
+	// GetAttr call will add this to the cache
 }
 
 func (suite *attrCacheTestSuite) TestCopyFromFileDoesNotExist() {
@@ -1252,7 +1259,9 @@ func (suite *attrCacheTestSuite) TestCopyFromFileDoesNotExist() {
 
 	err := suite.attrCache.CopyFromFile(options)
 	suite.assert.Nil(err)
-	suite.assert.Contains(suite.attrCache.cacheMap, path) // GetAttr call will add this to the cache
+	suite.attrCache.cacheMap.get(path)
+	suite.assert.Nil(err)
+	// GetAttr call will add this to the cache
 }
 
 func (suite *attrCacheTestSuite) TestCopyFromFileExists() {
