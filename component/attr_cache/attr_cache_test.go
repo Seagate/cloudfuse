@@ -552,13 +552,13 @@ func (suite *attrCacheTestSuite) TestReadDirExists() {
 		suite.cleanupTest()
 		suite.SetupTest()
 		suite.Run(path, func() {
-			aAttr := generateNestedPathAttr(path, size, mode)
+			aAttr := GenerateNestedPathAttr(path, size, mode)
 
 			options := internal.ReadDirOptions{Name: path}
 
 			// Success
 			// Entries Already Exist
-			a, ab, ac := addDirectoryToCache(suite.assert, suite.attrCache, path, false)
+			a, ab, ac := AddDirectoryToCache(suite.assert, suite.attrCache, path, false)
 
 			suite.assert.NotEmpty(suite.attrCache.cacheMap) // cacheMap should NOT be empty before read dir call and values should be untouched
 			for _, p := range aAttr {
@@ -574,13 +574,17 @@ func (suite *attrCacheTestSuite) TestReadDirExists() {
 				pString := p.Value.(string)
 				cachePath := internal.TruncateDirName(pString)
 				suite.assert.Contains(suite.attrCache.cacheMap, cachePath)
-				suite.assert.NotEqualValues(suite.attrCache.cacheMap[cachePath].attr, &internal.ObjAttr{})
-				if !suite.attrCache.cacheMap[cachePath].attr.IsDir() {
-					suite.assert.EqualValues(size, suite.attrCache.cacheMap[cachePath].attr.Size) // new size should be set
-					suite.assert.EqualValues(mode, suite.attrCache.cacheMap[cachePath].attr.Mode) // new mode should be set
+
+				checkItem, err := suite.attrCache.cacheMap.get(cachePath)
+				suite.assert.NotNil(err)
+
+				suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
+				if !checkItem.attr.IsDir() {
+					suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
+					suite.assert.EqualValues(mode, checkItem.attr.Mode) // new mode should be set
 				}
-				suite.assert.True(suite.attrCache.cacheMap[cachePath].valid())
-				suite.assert.True(suite.attrCache.cacheMap[cachePath].exists())
+				suite.assert.True(checkItem.valid())
+				suite.assert.True(checkItem.exists())
 			}
 
 			// ab and ac paths should be untouched
