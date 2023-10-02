@@ -113,7 +113,7 @@ func addPathToCache(assert *assert.Assertions, attrCache *AttrCache, path string
 	if isDir {
 		pathAttr = getDirPathAttr(path)
 	}
-	attrCache.cacheMap.children[path] = newAttrCacheItem(pathAttr, true, time.Now())
+	attrCache.cacheMap.insert(pathAttr, true, time.Now())
 	assert.Contains(attrCache.cacheMap, path)
 }
 
