@@ -1306,7 +1306,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithMetadata() {
 		suite.SetupTest()
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
-			addDirectoryToCache(suite.assert, suite.attrCache, "a", true) // add the paths to the cache with IsMetadataRetrieved=true
+			AddDirectoryToCache(suite.assert, suite.attrCache, "a", true) // add the paths to the cache with IsMetadataRetrieved=true
 
 			options := internal.GetAttrOptions{Name: path}
 			// no call to mock component since attributes are accessible
@@ -1332,7 +1332,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadataNoSymlinks() {
 		suite.assert.EqualValues(noSymlinks, suite.attrCache.cacheOnList)
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
-			addDirectoryToCache(suite.assert, suite.attrCache, "a", true) // add the paths to the cache with IsMetadataRetrieved=true
+			AddDirectoryToCache(suite.assert, suite.attrCache, "a", true) // add the paths to the cache with IsMetadataRetrieved=true
 
 			options := internal.GetAttrOptions{Name: path}
 			// no call to mock component since metadata is not needed in noSymlinks mode
@@ -1354,7 +1354,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadata() {
 		suite.SetupTest()
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
-			addDirectoryToCache(suite.assert, suite.attrCache, "a", false) // add the paths to the cache with IsMetadataRetrieved=false
+			AddDirectoryToCache(suite.assert, suite.attrCache, "a", false) // add the paths to the cache with IsMetadataRetrieved=false
 
 			options := internal.GetAttrOptions{Name: path}
 			// attributes should not be accessible so call the mock
@@ -1544,11 +1544,15 @@ func (suite *attrCacheTestSuite) TestChmod() {
 			err = suite.attrCache.Chmod(options)
 			suite.assert.Nil(err)
 			suite.assert.Contains(suite.attrCache.cacheMap, truncatedPath)
-			suite.assert.NotEqualValues(suite.attrCache.cacheMap[truncatedPath].attr, &internal.ObjAttr{})
-			suite.assert.EqualValues(defaultSize, suite.attrCache.cacheMap[truncatedPath].attr.Size)
-			suite.assert.EqualValues(mode, suite.attrCache.cacheMap[truncatedPath].attr.Mode) // new mode should be set
-			suite.assert.True(suite.attrCache.cacheMap[truncatedPath].valid())
-			suite.assert.True(suite.attrCache.cacheMap[truncatedPath].exists())
+
+			checkItem, err := suite.attrCache.cacheMap.get(truncatedPath)
+			suite.assert.NotNil(err)
+
+			suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
+			suite.assert.EqualValues(defaultSize, checkItem.attr.Size)
+			suite.assert.EqualValues(mode, checkItem.attr.Mode) // new mode should be set
+			suite.assert.True(checkItem.valid())
+			suite.assert.True(checkItem.exists())
 		})
 	}
 }
