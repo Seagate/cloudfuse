@@ -984,9 +984,14 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 	if err == nil {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		ac.invalidatePath(options.Name)
-		if ac.cacheDirs {
-			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
+		toBeInvalid, err := ac.cacheMap.get(options.Name)
+		if err != nil {
+			log.Err("The attribute item could not be invalidated in the cache due to the following error: ", err)
+		} else {
+			toBeInvalid.invalidate()
+			if ac.cacheDirs {
+				ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
+			}
 		}
 	}
 
