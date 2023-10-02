@@ -602,7 +602,7 @@ func (suite *attrCacheTestSuite) TestReadDirExists() {
 func (suite *attrCacheTestSuite) TestDirInCloud() {
 	defer suite.cleanupTest()
 	// build up the attribute cache
-	addDirectoryToCache(suite.assert, suite.attrCache, "a", true)
+	AddDirectoryToCache(suite.assert, suite.attrCache, "a", true)
 	deepPath := "a/b/c/d"
 	addPathToCache(suite.assert, suite.attrCache, deepPath, true)
 
@@ -639,7 +639,7 @@ func (suite *attrCacheTestSuite) TestReadDirNoCacheOnList() {
 	path := "a"
 	size := int64(1024)
 	mode := os.FileMode(0)
-	aAttr := generateNestedPathAttr(path, size, mode)
+	aAttr := GenerateNestedPathAttr(path, size, mode)
 
 	options := internal.ReadDirOptions{Name: path}
 	suite.mock.EXPECT().ReadDir(options).Return(aAttr, nil)
@@ -650,7 +650,7 @@ func (suite *attrCacheTestSuite) TestReadDirNoCacheOnList() {
 	suite.assert.Equal(aAttr, returnedAttr)
 
 	// cacheMap should only have the listed after the call
-	suite.assert.EqualValues(1, len(suite.attrCache.cacheMap))
+	suite.assert.EqualValues(1, suite.attrCache.CountChildren(suite.attrCache.cacheMap))
 	assertExists(suite, path)
 }
 
