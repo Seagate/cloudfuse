@@ -55,10 +55,12 @@ const (
 
 // attrCacheItem : Structure of each item in attr cache
 type attrCacheItem struct {
-	attr     *internal.ObjAttr
-	cachedAt time.Time
-	attrFlag common.BitMap16
-	children map[string]*attrCacheItem
+	attr        *internal.ObjAttr
+	cachedAt    time.Time
+	attrFlag    common.BitMap16
+	children    map[string]*attrCacheItem
+	globalCount int
+	folderCount int
 }
 
 func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {
@@ -103,6 +105,7 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 		// this is a leaf
 		// we end up with string key being a single folder name instead of a full path. This also will take care of using the folder attribute data.
 		value.children[paths[0]] = newAttrCacheItem(attr, exists, cachedAt)
+		value.globalCount++
 
 	} else {
 
@@ -110,6 +113,7 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 		_, ok := value.children[paths[0]]
 		if !ok {
 			value.children[paths[0]] = newAttrCacheItem(internal.CreateObjAttrDir(itemPath), exists, cachedAt)
+			value.folderCount++
 		}
 		value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1], itemPath)
 	}

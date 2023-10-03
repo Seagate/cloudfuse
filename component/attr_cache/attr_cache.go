@@ -491,23 +491,26 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 		prefix = ""
 	}
 	numAdded := 0
-	ac.cacheLock.RLock()
 
 	nonCloudItem, err := ac.cacheMap.get(prefix)
+
 	if err != nil {
 		log.Err("could not find the attr cached item: ", err)
 	} else {
-		if nonCloudItem.children != nil {
-			// exclude entries in subdirectories
-			pathInsideDirectory := strings.TrimPrefix(nonCloudItem.attr.Path, prefix)
-			if !strings.Contains(pathInsideDirectory, "/") {
-				pathList = append(pathList, nonCloudItem.attr)
-				numAdded++
+		if nonCloudItem.valid() && nonCloudItem.exists() && nonCloudItem.attr.IsDir() && !nonCloudItem.isInCloud() {
+			ac.cacheLock.RLock()
+			if nonCloudItem.children != nil {
+				for _, item := range nonCloudItem.children {
+					if !item.attr.IsDir() {
+						pathList = append(pathList, item.attr)
+						numAdded++
+					}
+				}
 			}
+			ac.cacheLock.RUnlock()
 		}
 	}
 
-	ac.cacheLock.RUnlock()
 	// values should be returned in ascending order by key
 	// sort the list before returning it
 	sort.Slice(pathList, func(i, j int) bool {
@@ -538,22 +541,6 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	return pathList, token, err
 }
 
-// intput: *attrCacheItem being the local root for the subtree.
-// output: int representing number of cached items in the sub tree
-// description: helper function to tally up all children from given attr cache item
-func (ac *AttrCache) CountChildren(item *attrCacheItem) int {
-
-	childCount := 0
-
-	if item.children != nil {
-		for _, val := range item.children {
-			childCount += 1
-			ac.CountChildren(val)
-		}
-	}
-	return childCount
-}
-
 // cacheAttributes : On dir listing cache the attributes for all files
 // this will lock and release the mutex for writing
 func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
@@ -572,7 +559,7 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 			// TODO: will this cause a bug when cacheDirs is enabled?
 			// TODO: this will require a tree traversal / scan to get cachedItems count
 
-			if ac.CountChildren(ac.cacheMap) > ac.maxFiles {
+			if ac.cacheMap.globalCount > ac.maxFiles {
 				log.Debug("AttrCache::cacheAttributes : %s skipping adding path to attribute cache because it is full", pathList)
 				break
 			}
@@ -954,7 +941,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// Retrieved attributes so cache them
 		// TODO: bug: when cacheDirs is true, the cache limit will cause some directories to be double-listed
 		// TODO: shouldn't this be an LRU? This sure looks like the opposite...
-		if ac.CountChildren(ac.cacheMap) < ac.maxFiles {
+		if ac.cacheMap.globalCount < ac.maxFiles {
 			ac.cacheMap.insert(pathAttr, true, time.Now())
 		} else {
 			log.Debug("AttrCache::GetAttr : %s skipping adding to attribute cache because it is full", options.Name)

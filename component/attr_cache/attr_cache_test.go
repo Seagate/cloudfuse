@@ -535,7 +535,7 @@ func (suite *attrCacheTestSuite) TestReadDirDoesNotExist() {
 			returnedAttr, err := suite.attrCache.ReadDir(options)
 			suite.assert.Nil(err)
 			suite.assert.Equal(aAttr, returnedAttr)
-			suite.assert.Equal(suite.attrCache.CountChildren(suite.attrCache.cacheMap), len(aAttr))
+			suite.assert.Equal(suite.attrCache.cacheMap.folderCount, len(aAttr))
 
 			// Entries should now be in the cache
 			for _, p := range aAttr {
@@ -660,7 +660,7 @@ func (suite *attrCacheTestSuite) TestReadDirNoCacheOnList() {
 	suite.assert.Equal(aAttr, returnedAttr)
 
 	// cacheMap should only have the listed after the call
-	suite.assert.EqualValues(1, suite.attrCache.CountChildren(suite.attrCache.cacheMap))
+	suite.assert.EqualValues(1, suite.attrCache.cacheMap.globalCount)
 	assertExists(suite, path)
 }
 
