@@ -148,7 +148,7 @@ jobs:
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service start
         sleep 30
         rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block.cov service mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
         sleep 10
         ps -W | grep cloudfuse
         rm -rf ${{ env.MOUNT_DIR }}/*
