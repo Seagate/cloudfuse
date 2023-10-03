@@ -585,7 +585,7 @@ func (suite *attrCacheTestSuite) TestReadDirExists() {
 				pString := p.Value.(string)
 				cachePath := internal.TruncateDirName(pString)
 				checkItem, err := suite.attrCache.cacheMap.get(cachePath)
-				suite.assert.NotNil(err)
+				suite.assert.Nil(err)
 
 				suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 				if !checkItem.attr.IsDir() {
