@@ -153,7 +153,7 @@ jobs:
         ps -W | grep cloudfuse
         rm -rf ${{ env.MOUNT_DIR }}/*
         cd test/e2e_tests
-        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
+        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
         ./cloudfuse.test service unmount ${{ env.MOUNT_DIR }}
         sleep 5

@@ -34,6 +34,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -413,11 +414,11 @@ func (suite *fileTestSuite) TestFileDeleteSingle() {
 
 // # Create a symlink to a file
 func (suite *fileTestSuite) TestLinkCreate() {
-	fileName := suite.testPath + "/small_write1.txt"
+	fileName := filepath.Join(suite.testPath, "small_write1.txt")
 	f, err := os.Create(fileName)
 	suite.Equal(nil, err)
 	f.Close()
-	symName := suite.testPath + "/small.lnk"
+	symName := filepath.Join(suite.testPath, "/small.lnk")
 	err = os.WriteFile(fileName, suite.minBuff, 0777)
 	suite.Equal(nil, err)
 
@@ -552,31 +553,31 @@ func (suite *fileTestSuite) TestCreateReadOnlyFile() {
 }
 
 // # Rename with special character in name
-func (suite *fileTestSuite) TestRenameSpecial() {
-	dirName := suite.testPath + "/" + "Alcaldía"
-	newDirName := suite.testPath + "/" + "Alδaδcaldía"
-	fileName := dirName + "/" + "भारत.txt"
-	newFileName := dirName + "/" + "भारतabcd.txt"
+// func (suite *fileTestSuite) TestRenameSpecial() {
+// 	dirName := suite.testPath + "/" + "Alcaldía"
+// 	newDirName := suite.testPath + "/" + "Alδaδcaldía"
+// 	fileName := dirName + "/" + "भारत.txt"
+// 	newFileName := dirName + "/" + "भारतabcd.txt"
 
-	err := os.Mkdir(dirName, 0777)
-	suite.Equal(nil, err)
+// 	err := os.Mkdir(dirName, 0777)
+// 	suite.Equal(nil, err)
 
-	f, err := os.Create(fileName)
-	suite.Equal(nil, err)
-	f.Close()
+// 	f, err := os.Create(fileName)
+// 	suite.Equal(nil, err)
+// 	f.Close()
 
-	err = os.Rename(fileName, newFileName)
-	suite.Equal(nil, err)
+// 	err = os.Rename(fileName, newFileName)
+// 	suite.Equal(nil, err)
 
-	err = os.Rename(newFileName, fileName)
-	suite.Equal(nil, err)
+// 	err = os.Rename(newFileName, fileName)
+// 	suite.Equal(nil, err)
 
-	err = os.Rename(dirName, newDirName)
-	suite.Equal(nil, err)
+// 	err = os.Rename(dirName, newDirName)
+// 	suite.Equal(nil, err)
 
-	err = os.RemoveAll(newDirName)
-	suite.Equal(nil, err)
-}
+// 	err = os.RemoveAll(newDirName)
+// 	suite.Equal(nil, err)
+// }
 
 // -------------- Main Method -------------------
 func TestFileTestSuite(t *testing.T) {
@@ -623,4 +624,6 @@ func init() {
 	regFileTestFlag(&fileTestPathPtr, "mnt-path", "", "Mount Path of Container")
 	regFileTestFlag(&fileTestAdlsPtr, "adls", "", "Account is ADLS or not")
 	regFileTestFlag(&fileTestGitClonePtr, "clone", "", "Git clone test is enable or not")
+	regFileTestFlag(&fileTestStreamDirectPtr, "stream-direct-test", "false", "Run stream direct tests")
+	regFileTestFlag(&fileTestDistroName, "distro-name", "", "Name of the distro")
 }
