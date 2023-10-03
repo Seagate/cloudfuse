@@ -531,16 +531,15 @@ func (suite *attrCacheTestSuite) TestReadDirDoesNotExist() {
 			// Entries Do Not Already Exist
 			suite.mock.EXPECT().ReadDir(options).Return(aAttr, nil)
 
-			suite.assert.Empty(suite.attrCache.cacheMap) // cacheMap should be empty before call
+			suite.assert.Empty(suite.attrCache.cacheMap.children) // cacheMap should be empty before call
 			returnedAttr, err := suite.attrCache.ReadDir(options)
 			suite.assert.Nil(err)
 			suite.assert.Equal(aAttr, returnedAttr)
-			suite.assert.Equal(suite.attrCache.cacheMap.folderCount, len(aAttr))
 
 			// Entries should now be in the cache
 			for _, p := range aAttr {
 				checkItem, err := suite.attrCache.cacheMap.get(p.Path)
-				suite.assert.NotNil(err)
+				suite.assert.Nil(err)
 				suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 				if !p.IsDir() {
 					suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
@@ -660,7 +659,6 @@ func (suite *attrCacheTestSuite) TestReadDirNoCacheOnList() {
 	suite.assert.Equal(aAttr, returnedAttr)
 
 	// cacheMap should only have the listed after the call
-	suite.assert.EqualValues(1, suite.attrCache.cacheMap.globalCount)
 	assertExists(suite, path)
 }
 

@@ -559,12 +559,8 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 			// TODO: will this cause a bug when cacheDirs is enabled?
 			// TODO: this will require a tree traversal / scan to get cachedItems count
 
-			if ac.cacheMap.globalCount > ac.maxFiles {
-				log.Debug("AttrCache::cacheAttributes : %s skipping adding path to attribute cache because it is full", pathList)
-				break
-			}
-
 			ac.cacheMap.insert(attr, true, currTime)
+
 		}
 
 	}
@@ -941,11 +937,9 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// Retrieved attributes so cache them
 		// TODO: bug: when cacheDirs is true, the cache limit will cause some directories to be double-listed
 		// TODO: shouldn't this be an LRU? This sure looks like the opposite...
-		if ac.cacheMap.globalCount < ac.maxFiles {
-			ac.cacheMap.insert(pathAttr, true, time.Now())
-		} else {
-			log.Debug("AttrCache::GetAttr : %s skipping adding to attribute cache because it is full", options.Name)
-		}
+
+		ac.cacheMap.insert(pathAttr, true, time.Now())
+
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
