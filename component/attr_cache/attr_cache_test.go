@@ -169,7 +169,7 @@ func assertInCloud(suite *attrCacheTestSuite, path string) {
 func assertNotInCloud(suite *attrCacheTestSuite, path string) {
 
 	checkItem, err := suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
+	suite.assert.Nil(err)
 	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 	suite.assert.True(checkItem.valid())
 	suite.assert.True(checkItem.exists())
