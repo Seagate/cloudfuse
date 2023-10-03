@@ -119,15 +119,15 @@ jobs:
     - name: Build coverage binary
       run: go test -coverpkg="./..." -covermode=count -c -o cloudfuse.test
 
-    # - name: Install Windows Service
-    #   run: |-
-    #     ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service install
-    #     sleep 5
+    - name: Install Windows Service
+      run: |-
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service install
+        sleep 5
 
-    # - name: Start Windows Service
-    #   run: |-
-    #     ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service start
-    #     sleep 5
+    - name: Start Windows Service
+      run: |-
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service start
+        sleep 5
     
     - name: Create Config File - Block Blob
       shell: bash
@@ -143,10 +143,6 @@ jobs:
     - name: Block Blob Coverage
       shell: bash
       run: |-
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service install
-        sleep 15
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service start
-        sleep 30
         rm -rf ${{ env.TEMP_DIR }}/*
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
         sleep 10
@@ -155,7 +151,6 @@ jobs:
         cd test/e2e_tests
         go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
-        ./cloudfuse.test service unmount ${{ env.MOUNT_DIR }}
         sleep 5
     
     - name: Block Blob Coverage with profilers
@@ -177,9 +172,8 @@ jobs:
         ps -W | grep cloudfuse
         rm -rf ${{ env.MOUNT_DIR }}/*
         cd test/e2e_tests
-        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
+        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
-        ./cloudfuse.test service unmount ${{ env.MOUNT_DIR }}
         sleep 5
     
     - name: Create Config File - ADLS
@@ -201,9 +195,8 @@ jobs:
         ps -aux | grep cloudfuse
         rm -rf ${{ env.MOUNT_DIR }}/*
         cd test/e2e_tests
-        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -adls=true -tmp-path=${{ env.TEMP_DIR }}
+        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
-        ./cloudfuse.test service unmount ${{ env.MOUNT_DIR }}
         sleep 5
     
     - name: ADLS Coverage with profilers
@@ -224,9 +217,8 @@ jobs:
         ps -aux | grep cloudfuse
         rm -rf ${{ env.MOUNT_DIR }}/*
         cd test/e2e_tests
-        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
+        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
-        sudo fusermount -u ${{ env.MOUNT_DIR }}
         sleep 5
     
     - name: Create Config File - S3
@@ -246,9 +238,8 @@ jobs:
         sleep 10
         ps -aux | grep cloudfuse
         cd test/e2e_tests
-        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
+        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
-        sudo fusermount -u ${{ env.MOUNT_DIR }}
         sleep 5
     
     - name: S3 Coverage with profilers
@@ -268,9 +259,8 @@ jobs:
         sleep 10
         ps -aux | grep cloudfuse
         cd test/e2e_tests
-        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
+        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
-        sudo fusermount -u ${{ env.MOUNT_DIR }}
         sleep 5
     
     - name: Create Config File - LFU
@@ -291,9 +281,8 @@ jobs:
         ps -aux | grep cloudfuse
         rm -rf ${{ env.MOUNT_DIR }}/*
         cd test/e2e_tests
-        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
+        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
-        sudo fusermount -u ${{ env.MOUNT_DIR }}
         sleep 5
       working-directory: "${{ env.WORK_DIR }}"
     
@@ -314,9 +303,8 @@ jobs:
         sleep 10
         ps -aux | grep cloudfuse
         cd test/e2e_tests
-        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
+        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
-        sudo fusermount -u ${{ env.MOUNT_DIR }}
         sleep 5
     
     - name: Create Config File - Stream
@@ -329,10 +317,18 @@ jobs:
       run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest3.cov gen-test-config --config-file=azure_stream.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_STREAM_CFG }}"
     
     - name: Block Blob Stream Preparation
-      run: "rm -rf ${{ env.MOUNT_DIR }}/*\nrm -rf ${{ env.TEMP_DIR }}/*\n./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream_prep.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nfor i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'head -c {}M < /dev/urandom > ${{ env.WORK_DIR }}/myfile_{}'\nfor i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'cp ${{ env.WORK_DIR }}/myfile_{} ${{ env.MOUNT_DIR }}/'\nsudo fusermount -u ${{ env.MOUNT_DIR }} \nsleep 5"
+      run: |-
+        rm -rf ${{ env.MOUNT_DIR }}/*
+        rm -rf ${{ env.TEMP_DIR }}/*
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream_prep.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} --foreground=true &
+        sleep 10
+        ps -aux | grep cloudfuse
+        for i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'head -c {}M < /dev/urandom > ${{ env.WORK_DIR }}/myfile_{}'
+        for i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'cp ${{ env.WORK_DIR }}/myfile_{} ${{ env.MOUNT_DIR }}/' 
+        sleep 5"
     
     - name: Block Blob Stream Coverage
-      run: "rm -rf ${{ env.MOUNT_DIR }}/*\nrm -rf ${{ env.TEMP_DIR }}/*\n./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${{ env.MOUNT_DIR }}/*\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}\ncd -\nsudo fusermount -u ${{ env.MOUNT_DIR }} \nsleep 5"
+      run: "rm -rf ${{ env.MOUNT_DIR }}/*\nrm -rf ${{ env.TEMP_DIR }}/*\n./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${{ env.MOUNT_DIR }}/*\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true\ncd -\n./cloudfuse.test service unmount ${{ env.MOUNT_DIR }} \nsleep 5"
     
     - name: Create Config File - Block Blob
       env:
@@ -541,7 +537,7 @@ jobs:
       run: "./cloudfuse.test gen-test-config --config-file=azure_key_proxy.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
     
     - name: Block Blob Coverage Proxy
-      run: "rm -rf ${{ env.MOUNT_DIR }}/*\nrm -rf ${{ env.TEMP_DIR }}/*\n./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_proxy.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --disable-compression=true --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${{ env.MOUNT_DIR }}/*\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}\ncd -\nsudo fusermount -u ${{ env.MOUNT_DIR }} \nsleep 5"
+      run: "rm -rf ${{ env.MOUNT_DIR }}/*\nrm -rf ${{ env.TEMP_DIR }}/*\n./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_proxy.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --disable-compression=true --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${{ env.MOUNT_DIR }}/*\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}\ncd -\n./cloudfuse.test service unmount ${{ env.MOUNT_DIR }} \nsleep 5"
     
     - name: Create Config File - ADLS Proxy
       env:
