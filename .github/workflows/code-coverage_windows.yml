@@ -477,18 +477,18 @@ jobs:
         rm -rf ${{ env.TEMP_DIR }}/*
         ./cloudfuse.test unmount all
         ./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/secure_encrypt.cov secure encrypt --config-file=${{ env.cloudfuse_CFG }} --output-file=${{ runner.workspace }}/cloudfuse.azsec --passphrase=123123123123123123123123 
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/secure_encrypt.cov secure encrypt --config-file=${{ env.cloudfuse_CFG }} --output-file=${{ env.WORK_DIR }}/cloudfuse.azsec --passphrase=123123123123123123123123 
         if [ $? -ne 0 ]; then
           exit 1
         fi
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_secure.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ runner.workspace }}/cloudfuse.azsec --passphrase=123123123123123123123123 &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_secure.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.WORK_DIR }}/cloudfuse.azsec --passphrase=123123123123123123123123 &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         rm -rf ${{ env.MOUNT_DIR }}/*
         cd test/e2e_tests
         go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -adls=false -tmp-path=${{ env.TEMP_DIR }}
         cd -
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/secure_set.cov secure set --config-file=${{ runner.workspace }}/cloudfuse.azsec --passphrase=123123123123123123123123 --key=logging.level --value=log_debug
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/secure_set.cov secure set --config-file=${{ env.WORK_DIR }}/cloudfuse.azsec --passphrase=123123123123123123123123 --key=logging.level --value=log_debug
         kill $pid
         sleep 5
     
