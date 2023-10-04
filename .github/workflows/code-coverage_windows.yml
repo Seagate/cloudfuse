@@ -335,18 +335,18 @@ jobs:
         VERBOSE_LOG: false
       run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest3.cov gen-test-config --config-file=azure_stream.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_STREAM_CFG }}"
     
-    - name: Block Blob Stream Preparation
-      shell: bash
-      run: |-
-        rm -rf ${{ env.MOUNT_DIR }}/*
-        rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream_prep.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} &
-        sleep 10
-        pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
-        for i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'head -c {}M < /dev/urandom > ${{ env.WORK_DIR }}/myfile_{}'
-        for i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'cp ${{ env.WORK_DIR }}/myfile_{} ${{ env.MOUNT_DIR }}/' 
-        kill $pid
-        sleep 5"
+    # - name: Block Blob Stream Preparation
+    #   shell: bash
+    #   run: |-
+    #     rm -rf ${{ env.MOUNT_DIR }}/*
+    #     rm -rf ${{ env.TEMP_DIR }}/*
+    #     ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream_prep.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} &
+    #     sleep 10
+    #     pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
+    #     for i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'head -c {}M < /dev/urandom > ${{ env.WORK_DIR }}/myfile_{}'
+    #     for i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'cp ${{ env.WORK_DIR }}/myfile_{} ${{ env.MOUNT_DIR }}/' 
+    #     kill $pid
+    #     sleep 5"
     
     - name: Block Blob Stream Coverage
       shell: bash
