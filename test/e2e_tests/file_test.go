@@ -365,6 +365,10 @@ func (suite *fileTestSuite) TestFileGetStat() {
 
 // # Change mod of file
 func (suite *fileTestSuite) TestFileChmod() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
 	if suite.adlsTest {
 		fileName := suite.testPath + "/test"
 		f, err := os.Create(fileName)
@@ -565,6 +569,10 @@ func (suite *fileTestSuite) TestReadOnlyFile() {
 } */
 
 func (suite *fileTestSuite) TestCreateReadOnlyFile() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
 	if suite.adlsTest == true {
 		fileName := suite.testPath + "/createReadOnlyFile.txt"
 		srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0444)
