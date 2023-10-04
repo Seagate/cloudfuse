@@ -167,7 +167,7 @@ jobs:
         echo "  monitor-disable-list:" >> /tmp/configBlockProfilerTemp.yaml
         echo "    - cloudfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
         cat /tmp/configBlockProfilerTemp.yaml
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_profiler.cov service mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configBlockProfilerTemp.yaml &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configBlockProfilerTemp.yaml &
         sleep 10
         ps -W | grep cloudfuse
         rm -rf ${{ env.MOUNT_DIR }}/*
@@ -192,7 +192,7 @@ jobs:
       run: |-
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls.cov service mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG }} --foreground=true &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG }} &
         sleep 10
         ps -aux | grep cloudfuse
         rm -rf ${{ env.MOUNT_DIR }}/*
@@ -215,7 +215,7 @@ jobs:
         echo "  monitor-disable-list:" >> /tmp/configAdlsProfilerTemp.yaml
         echo "    - cloudfuse_stats" >> /tmp/configAdlsProfilerTemp.yaml
         cat /tmp/configAdlsProfilerTemp.yaml
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configAdlsProfilerTemp.yaml --foreground=true &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configAdlsProfilerTemp.yaml &
         sleep 10
         ps -aux | grep cloudfuse
         rm -rf ${{ env.MOUNT_DIR }}/*
@@ -239,7 +239,7 @@ jobs:
       run: |-
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
         sleep 10
         ps -aux | grep cloudfuse
         cd test/e2e_tests
@@ -261,7 +261,7 @@ jobs:
         echo "  monitor-disable-list:" >> /tmp/configBlockProfilerTemp.yaml
         echo "    - cloudfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
         cat /tmp/configBlockProfilerTemp.yaml
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configBlockProfilerTemp.yaml &
         sleep 10
         ps -aux | grep cloudfuse
         cd test/e2e_tests
@@ -284,7 +284,7 @@ jobs:
       run: |-
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_lfu.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_lfu.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
         sleep 10
         ps -aux | grep cloudfuse
         rm -rf ${{ env.MOUNT_DIR }}/*
@@ -309,7 +309,7 @@ jobs:
       run: |-
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_lfu.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_lfu.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
         sleep 10
         ps -aux | grep cloudfuse
         cd test/e2e_tests
@@ -332,7 +332,7 @@ jobs:
       run: |-
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream_prep.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} --foreground=true &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream_prep.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} &
         sleep 10
         ps -aux | grep cloudfuse
         for i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'head -c {}M < /dev/urandom > ${{ env.WORK_DIR }}/myfile_{}'
@@ -341,7 +341,16 @@ jobs:
     
     - name: Block Blob Stream Coverage
       shell: bash
-      run: "rm -rf ${{ env.MOUNT_DIR }}/*\nrm -rf ${{ env.TEMP_DIR }}/*\n./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} --foreground=true &\nsleep 10\nps -aux | grep cloudfuse\nrm -rf ${{ env.MOUNT_DIR }}/*\ncd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true\ncd -\n./cloudfuse.test service unmount ${{ env.MOUNT_DIR }} \nsleep 5"
+      run: |-
+        rm -rf ${{ env.MOUNT_DIR }}/*
+        rm -rf ${{ env.TEMP_DIR }}/*
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} &
+        sleep 10
+        ps -aux | grep cloudfuse
+        rm -rf ${{ env.MOUNT_DIR }}/*
+        cd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
+        cd -
+        sleep 5
     
     - name: Create Config File - Block Blob
       shell: bash
