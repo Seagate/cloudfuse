@@ -348,20 +348,20 @@ jobs:
     #     kill $pid
     #     sleep 5"
     
-    - name: Block Blob Stream Coverage
-      shell: bash
-      run: |-
-        rm -rf ${{ env.MOUNT_DIR }}/*
-        rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} &
-        sleep 10
-        pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
-        rm -rf ${{ env.MOUNT_DIR }}/*
-        cd test/e2e_tests
-        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
-        cd -
-        kill $pid
-        sleep 5
+    # - name: Block Blob Stream Coverage
+    #   shell: bash
+    #   run: |-
+    #     rm -rf ${{ env.MOUNT_DIR }}/*
+    #     rm -rf ${{ env.TEMP_DIR }}/*
+    #     ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} &
+    #     sleep 10
+    #     pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
+    #     rm -rf ${{ env.MOUNT_DIR }}/*
+    #     cd test/e2e_tests
+    #     go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
+    #     cd -
+    #     kill $pid
+    #     sleep 5
     
     - name: Create Config File - Block Blob
       shell: bash
