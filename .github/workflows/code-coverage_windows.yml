@@ -146,11 +146,12 @@ jobs:
         rm -rf ${{ env.TEMP_DIR }}/*
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
         sleep 10
-        ps -W | grep cloudfuse
+        pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         rm -rf ${{ env.MOUNT_DIR }}/*
         cd test/e2e_tests
         go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
+        kill $pid
         sleep 5
     
     - name: Block Blob Coverage with profilers
@@ -169,11 +170,12 @@ jobs:
         cat /tmp/configBlockProfilerTemp.yaml
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configBlockProfilerTemp.yaml &
         sleep 10
-        ps -W | grep cloudfuse
+        pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         rm -rf ${{ env.MOUNT_DIR }}/*
         cd test/e2e_tests
         go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
+        kill $pid
         sleep 5
     
     - name: Create Config File - ADLS
@@ -194,11 +196,12 @@ jobs:
         rm -rf ${{ env.TEMP_DIR }}/*
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG }} &
         sleep 10
-        ps -aux | grep cloudfuse
+        pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         rm -rf ${{ env.MOUNT_DIR }}/*
         cd test/e2e_tests
         go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -adls=true -quick-test=true -stream-direct-test=true
         cd -
+        kill $pid
         sleep 5
     
     - name: ADLS Coverage with profilers
@@ -217,11 +220,12 @@ jobs:
         cat /tmp/configAdlsProfilerTemp.yaml
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configAdlsProfilerTemp.yaml &
         sleep 10
-        ps -aux | grep cloudfuse
+        pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         rm -rf ${{ env.MOUNT_DIR }}/*
         cd test/e2e_tests
         go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
+        kill $pid
         sleep 5
     
     - name: Create Config File - S3
@@ -241,10 +245,11 @@ jobs:
         rm -rf ${{ env.TEMP_DIR }}/*
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
         sleep 10
-        ps -aux | grep cloudfuse
+        pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         cd test/e2e_tests
         go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
+        kill $pid
         sleep 5
     
     - name: S3 Coverage with profilers
@@ -252,14 +257,14 @@ jobs:
       run: |-
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        cp ${{ env.cloudfuse_CFG }} /tmp/configBlockProfilerTemp.yaml
-        echo "dynamic-profile: true" >> /tmp/configBlockProfilerTemp.yaml
-        echo "cpu-profile: /tmp/cpuBlockProfTmp" >> /tmp/configBlockProfilerTemp.yaml
-        echo "mem-profile: /tmp/memBlockProfTmp" >> /tmp/configBlockProfilerTemp.yaml
-        echo "health_monitor:" >> /tmp/configBlockProfilerTemp.yaml
-        echo "  enable-monitoring: true" >> /tmp/configBlockProfilerTemp.yaml
-        echo "  monitor-disable-list:" >> /tmp/configBlockProfilerTemp.yaml
-        echo "    - cloudfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
+        cp ${{ env.cloudfuse_CFG }} configBlockProfilerTemp.yaml
+        echo "dynamic-profile: true" >> configBlockProfilerTemp.yaml
+        echo "cpu-profile: /tmp/cpuBlockProfTmp" >> configBlockProfilerTemp.yaml
+        echo "mem-profile: /tmp/memBlockProfTmp" >> configBlockProfilerTemp.yaml
+        echo "health_monitor:" >> configBlockProfilerTemp.yaml
+        echo "  enable-monitoring: true" >> configBlockProfilerTemp.yaml
+        echo "  monitor-disable-list:" >> configBlockProfilerTemp.yaml
+        echo "    - cloudfuse_stats" >> configBlockProfilerTemp.yaml
         cat /tmp/configBlockProfilerTemp.yaml
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configBlockProfilerTemp.yaml &
         sleep 10
