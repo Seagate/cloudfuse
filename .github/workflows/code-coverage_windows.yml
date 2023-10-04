@@ -357,7 +357,8 @@ jobs:
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         rm -rf ${{ env.MOUNT_DIR }}/*
-        cd test/e2e_tests\ngo test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
+        cd test/e2e_tests
+        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
         cd -
         kill $pid
         sleep 5
