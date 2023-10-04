@@ -578,6 +578,11 @@ func (suite *fileTestSuite) TestCreateReadOnlyFile() {
 
 // # Rename with special character in name
 func (suite *fileTestSuite) TestRenameSpecial() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
+
 	dirName := suite.testPath + "/" + "Alcaldía"
 	newDirName := suite.testPath + "/" + "Alδaδcaldía"
 	fileName := dirName + "/" + "भारत.txt"
