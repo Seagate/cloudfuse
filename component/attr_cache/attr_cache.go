@@ -393,7 +393,12 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 			dirObjAttr := internal.CreateObjAttrDir(dirPath)
 			ac.cacheMap.insert(dirObjAttr, true, time)
 		}
-		dirCacheItem.markInCloud(true)
+		dirCacheItem, err = ac.cacheMap.get(dirPath)
+		if err != nil { //TODO: do more specific error check for attrCacheItem not existing
+			log.Err("could not get the attribute item from cache due to the following error: ", err)
+		} else {
+			dirCacheItem.markInCloud(true)
+		}
 
 		// recurse
 		ac.markAncestorsInCloud(getParentDir(dirPath), time)
