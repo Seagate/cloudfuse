@@ -679,12 +679,12 @@ func (suite *attrCacheTestSuite) TestReadDirNoCacheOnListNoCacheDirs() {
 	options := internal.ReadDirOptions{Name: path}
 	suite.mock.EXPECT().ReadDir(options).Return(aAttr, nil)
 
-	suite.assert.Empty(suite.attrCache.cacheMap) // cacheMap should be empty before call
+	suite.assert.Empty(suite.attrCache.cacheMap.children) // cacheMap should be empty before call
 	returnedAttr, err := suite.attrCache.ReadDir(options)
 	suite.assert.Nil(err)
 	suite.assert.Equal(aAttr, returnedAttr)
 
-	suite.assert.Empty(suite.attrCache.cacheMap) // cacheMap should be empty after call
+	suite.assert.Empty(suite.attrCache.cacheMap.children) // cacheMap should be empty after call
 }
 
 func (suite *attrCacheTestSuite) TestReadDirError() {
