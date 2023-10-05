@@ -114,8 +114,8 @@ jobs:
         $content | Out-File -FilePath $cnfFile -Encoding Ascii
       shell: powershell
     
-    #- name: UT Code Coverage
-    #  run: go test -v -timeout=1h ./... --tags=unittest,storagetest -covermode count -coverprofile ./cloudfuse_ut.cov
+    - name: UT Code Coverage
+      run: go test -v -timeout=1h ./... --tags=unittest,storagetest -covermode count -coverprofile ./cloudfuse_ut.cov
     
     - name: Build coverage binary
       run: go test -coverpkg="./..." -covermode=count -c -o cloudfuse.test
