@@ -145,6 +145,7 @@ func (value *attrCacheItem) exists() bool {
 	return value.attrFlag.IsSet(AttrFlagExists)
 }
 
+// TODO: don't return true for deleted files.
 func (value *attrCacheItem) isInCloud() bool {
 	isObject := !value.attr.IsDir()
 	isDirInCloud := value.attr.IsDir() && !value.attrFlag.IsSet(AttrFlagNotInCloud)
@@ -155,6 +156,7 @@ func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
 
 	value.attrFlag.Clear(AttrFlagExists)
 	value.attrFlag.Set(AttrFlagValid)
+	value.attrFlag.Set(AttrFlagNotInCloud)
 	value.cachedAt = deletedTime
 	value.attr = &internal.ObjAttr{}
 
