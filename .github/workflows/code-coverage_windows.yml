@@ -178,31 +178,31 @@ jobs:
     #     kill $pid
     #     sleep 5
     
-    # - name: Create Config File - ADLS
-    #   shell: bash
-    #   env:
-    #     NIGHTLY_STO_ACC_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
-    #     NIGHTLY_STO_ACC_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
-    #     ACCOUNT_TYPE: adls
-    #     ACCOUNT_ENDPOINT: https://${{ secrets.AZTEST_ADLS_ACC_NAME }}.dfs.core.windows.net
-    #     VERBOSE_LOG: false
-    #     USE_HTTP: false
-    #   run: "./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_ADLS_CFG }}"
+    - name: Create Config File - ADLS
+      shell: bash
+      env:
+        NIGHTLY_STO_ACC_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
+        NIGHTLY_STO_ACC_KEY: "${{ secrets.AZTEST_ADLS_KEY }}"
+        ACCOUNT_TYPE: adls
+        ACCOUNT_ENDPOINT: https://${{ secrets.AZTEST_ADLS_ACC_NAME }}.dfs.core.windows.net
+        VERBOSE_LOG: false
+        USE_HTTP: false
+      run: "./cloudfuse.test gen-test-config --config-file=azure_key.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_ADLS_CFG }}"
     
-    # - name: ADLS Coverage
-    #   shell: bash
-    #   run: |-
-    #     rm -rf ${{ env.MOUNT_DIR }}/*
-    #     rm -rf ${{ env.TEMP_DIR }}/*
-    #     ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG }} &
-    #     sleep 10
-    #     pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
-    #     rm -rf ${{ env.MOUNT_DIR }}/*
-    #     cd test/e2e_tests
-    #     go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -adls=true -quick-test=true -stream-direct-test=true
-    #     cd -
-    #     kill $pid
-    #     sleep 5
+    - name: ADLS Coverage
+      shell: bash
+      run: |-
+        rm -rf ${{ env.MOUNT_DIR }}/*
+        rm -rf ${{ env.TEMP_DIR }}/*
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG }} &
+        sleep 10
+        pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
+        rm -rf ${{ env.MOUNT_DIR }}/*
+        cd test/e2e_tests
+        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -adls=true -quick-test=true -stream-direct-test=true
+        cd -
+        kill $pid
+        sleep 5
     
     - name: ADLS Coverage with profilers
       shell: bash
@@ -524,7 +524,7 @@ jobs:
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cfusemon_stop_all.cov health-monitor stop all
         kill $pid
         kill $pid_mon
-        sleep 5
+        sleep 5-
     
     - name: Save coverage report
       run: |
