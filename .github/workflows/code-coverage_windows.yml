@@ -527,6 +527,7 @@ jobs:
         sleep 5
     
     - name: Save coverage report
+      shell: bash
       run: |
         echo 'mode: count' > ./cloudfuse_coverage_raw.rpt
         tail -q -n +2 ./*.cov >> ./cloudfuse_coverage_raw.rpt
@@ -539,11 +540,13 @@ jobs:
         cp ./*.html ${{ runner.temp }}/
     
     - name: Overall coverage check
+      shell: bash
       run: |-
         chmod 777 ./test/scripts/coveragecheck.sh
         ./test/scripts/coveragecheck.sh
     
     - name: File level coverage check
+      shell: bash
       run: "./test/scripts/coveragecheck.sh file"
   
   AccountCleanup-Cleanup:
