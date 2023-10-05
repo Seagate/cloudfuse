@@ -717,28 +717,53 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		return
 	}
 	// search the cache to check whether each ancestor is in cloud storage
+cacheSearch:
+	for _, value := range ac.cacheMap.children {
+		// ignore items that are deleted, invalid, or directories that are not in cloud storage
+		if !value.exists() || !value.valid() || !value.isInCloud() {
+			continue
+		}
+		// iterate over ancestors, from the deepest up
+		prefixMatchFound := false
+	matchAncestors:
+		for ancestorIndex, ancestor := range ancestorCacheItems {
+			// don't visit ancestors that have already been updated
+			if ancestor.isInCloud() {
+				// if all ancestors have been updated, the entire search is done
+				if ancestorIndex == 0 {
+					break cacheSearch
+				}
+				break matchAncestors
+			}
+			// we already found that one ancestor is in the cloud
+			// so its ancestors are too
+			if prefixMatchFound {
+				ancestor.markInCloud(true)
+				continue matchAncestors
+			}
 
-	prefixMatchFound := false
-matchAncestors:
-	for _, ancestor := range ancestorCacheItems {
-		// don't visit ancestors that have already been updated
-		if ancestor.isInCloud() {
-			// if all ancestors have been updated, the entire search is done
-			break matchAncestors
-		}
-		// we already found that one ancestor is in the cloud
-		// so its ancestors are too
-		if prefixMatchFound {
-			ancestor.markInCloud(true)
-			continue matchAncestors
-		}
-		// check for a prefix match
-		if ancestor.children != nil {
-			prefixMatchFound = true
-			// update this ancestor
-			ancestor.markInCloud(true)
+			prefixMatchFound = ac.matchAncestorsHelper(value, ancestor)
+
 		}
 	}
+}
+
+func (ac *AttrCache) matchAncestorsHelper(child *attrCacheItem, ancestor *attrCacheItem) bool {
+	prefixMatchFound := false
+	// check for a prefix match
+	prefix := dirToPrefix(ancestor.attr.Path)
+	if strings.HasPrefix(child.attr.Path, prefix) {
+		prefixMatchFound = true
+		// update this ancestor
+		ancestor.markInCloud(true)
+	}
+
+	if child.children != nil {
+		for _, childItem := range child.children {
+			ac.matchAncestorsHelper(childItem, ancestor)
+		}
+	}
+	return prefixMatchFound
 }
 
 // RenameFile : Mark the source file deleted. Invalidate the destination file.
