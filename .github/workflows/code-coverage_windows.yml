@@ -503,8 +503,9 @@ jobs:
         ./cloudfuse.test mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG_HMON }} &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
+        win_pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f5`
         pid_mon=`ps -a | grep cfusemon | tr -s ' ' | cut -d ' ' -f2`
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cfusemon_stop_pid.cov health-monitor stop --pid=$pid
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cfusemon_stop_pid.cov health-monitor stop --pid=$win_pid
         kill $pid
         kill $pid_mon
         sleep 5
@@ -523,7 +524,7 @@ jobs:
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cfusemon_stop_all.cov health-monitor stop all
         kill $pid
         kill $pid_mon
-        sleep 5-
+        sleep 5
     
     - name: Save coverage report
       run: |
