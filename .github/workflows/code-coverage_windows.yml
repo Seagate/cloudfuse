@@ -498,8 +498,6 @@ jobs:
         set +x
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        sudo ln -s `pwd`/cfusemon /usr/local/bin/cfusemon
-        ls -l /usr/local/bin/cfusemon*
         cat /tmp/configAdlsProfilerTemp.yaml
         ./cloudfuse.test mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configAdlsProfilerTemp.yaml
         sleep 10
