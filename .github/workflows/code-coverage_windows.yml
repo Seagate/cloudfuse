@@ -29,6 +29,7 @@ jobs:
       TEMP_DIR: "$HOME/cloudfuse_tmp"
       WORK_DIR: "."
       cloudfuse_ADLS_CFG: "./cloudfuse.adls.yaml"
+      cloudfuse_ADLS_CFG_HMON: "./cloudfuse.adls.hmon.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
     
@@ -209,16 +210,16 @@ jobs:
       run: |-
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        cp ${{ env.cloudfuse_ADLS_CFG }} /tmp/configAdlsProfilerTemp.yaml
-        echo "dynamic-profile: true" >> /tmp/configAdlsProfilerTemp.yaml
-        echo "cpu-profile: /tmp/cpuAdlsProfTmp" >> /tmp/configAdlsProfilerTemp.yaml
-        echo "mem-profile: /tmp/memAdlsProfTmp" >> /tmp/configAdlsProfilerTemp.yaml
-        echo "health_monitor:" >> /tmp/configAdlsProfilerTemp.yaml
-        echo "  enable-monitoring: true" >> /tmp/configAdlsProfilerTemp.yaml
-        echo "  monitor-disable-list:" >> /tmp/configAdlsProfilerTemp.yaml
-        echo "    - cloudfuse_stats" >> /tmp/configAdlsProfilerTemp.yaml
-        cat /tmp/configAdlsProfilerTemp.yaml
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configAdlsProfilerTemp.yaml &
+        cp ${{ env.cloudfuse_ADLS_CFG }} ${{ env.cloudfuse_ADLS_CFG_HMON }}
+        echo "dynamic-profile: true" >> ${{ env.cloudfuse_ADLS_CFG_HMON }}
+        echo "cpu-profile: $HOME/hmontemp/cpuAdlsProfTmp" >> ${{ env.cloudfuse_ADLS_CFG_HMON }}
+        echo "mem-profile: $HOME/hmontemp/memAdlsProfTmp" >> ${{ env.cloudfuse_ADLS_CFG_HMON }}
+        echo "health_monitor:" >> ${{ env.cloudfuse_ADLS_CFG_HMON }}
+        echo "  enable-monitoring: true" >> ${{ env.cloudfuse_ADLS_CFG_HMON }}
+        echo "  monitor-disable-list:" >> ${{ env.cloudfuse_ADLS_CFG_HMON }}
+        echo "    - cloudfuse_stats" >> ${{ env.cloudfuse_ADLS_CFG_HMON }}
+        cat ${{ env.cloudfuse_ADLS_CFG_HMON }}
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG_HMON }} &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         rm -rf ${{ env.MOUNT_DIR }}/*
@@ -498,8 +499,8 @@ jobs:
         set +x
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        cat /tmp/configAdlsProfilerTemp.yaml
-        ./cloudfuse.test mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configAdlsProfilerTemp.yaml
+        cat ${{ env.cloudfuse_ADLS_CFG_HMON }}
+        ./cloudfuse.test mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG_HMON }} &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         pid_mon=`ps -a | grep cfusemon | tr -s ' ' | cut -d ' ' -f2`
@@ -514,8 +515,8 @@ jobs:
         set +x
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        cat /tmp/configAdlsProfilerTemp.yaml
-        ./cloudfuse.test mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configAdlsProfilerTemp.yaml &
+        cat ${{ env.cloudfuse_ADLS_CFG_HMON }}
+        ./cloudfuse.test mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG_HMON }} &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         pid_mon=`ps -a | grep cfusemon | tr -s ' ' | cut -d ' ' -f2`
