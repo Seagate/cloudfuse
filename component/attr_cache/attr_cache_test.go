@@ -1427,7 +1427,7 @@ func (suite *attrCacheTestSuite) TestGetAttrDoesNotExist() {
 			// attributes should not be accessible so call the mock
 			suite.mock.EXPECT().GetAttr(options).Return(GetPathAttr(path, defaultSize, fs.FileMode(defaultMode), false), nil)
 
-			suite.assert.Empty(suite.attrCache.cacheMap) // cacheMap should be empty before call
+			suite.assert.Empty(suite.attrCache.cacheMap.children) // cacheMap should be empty before call
 			_, err := suite.attrCache.GetAttr(options)
 			suite.assert.Nil(err)
 			assertUntouched(suite, truncatedPath) // item added to cache after
@@ -1499,7 +1499,7 @@ func (suite *attrCacheTestSuite) TestCacheTimeout() {
 	// attributes should not be accessible so call the mock
 	suite.mock.EXPECT().GetAttr(options).Return(GetPathAttr(path, defaultSize, fs.FileMode(defaultMode), true), nil)
 
-	suite.assert.Empty(suite.attrCache.cacheMap) // cacheMap should be empty before call
+	suite.assert.Empty(suite.attrCache.cacheMap.children) // cacheMap should be empty before call
 	_, err := suite.attrCache.GetAttr(options)
 	suite.assert.Nil(err)
 	assertUntouched(suite, path) // item added to cache after
@@ -1598,11 +1598,8 @@ func (suite *attrCacheTestSuite) TestChmod() {
 			err = suite.attrCache.Chmod(options)
 			suite.assert.Nil(err)
 
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.Nil(err)
-
 			checkItem, err := suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			suite.assert.Nil(err)
 
 			suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 			suite.assert.EqualValues(defaultSize, checkItem.attr.Size)
