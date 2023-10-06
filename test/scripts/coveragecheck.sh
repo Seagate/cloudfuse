@@ -1,9 +1,9 @@
 #!/bin/bash
 
 overall_check() {
-    cvg=$(tail -1 ./cloudfuse_func_cover.rpt | cut -d ")" -f2 | sed -e 's/^[[:space:]]*//' | cut -d "%" -f1)
+    cvg=$(tail -1 ./cloudfuse_func_cover.rpt | cut -d ")" -f2 | sed -e 's/^[[:space:]]*//' | cut -d "%" -f1 | awk '{printf("%d\n", $1)}')
     echo $cvg
-    if (( cvg < 80 ))
+    if [ $cvg -lt 80 ]
     then
         echo "Code coverage below 80%"
         # Exit code changed to prevent failing in CI/CD pipeline
@@ -20,8 +20,8 @@ file_check() {
     do 
         fileName=$(echo $i | cut -d "(" -f1)
         percent=$(echo $i | cut -d "(" -f2 | cut -d "%" -f1)
-        percentValue=$(expr $percent)
-        if [ 1 -eq "$(echo "${percentValue} < 70" | bc)" ]
+        percentValue=$(expr $percent | awk '{printf("%d\n", $1)}')
+        if [ $percentValue -lt 70 ]
         then
             flag=1
             echo $fileName" : "$percentValue
