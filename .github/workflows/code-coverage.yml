@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - main
-      - windows-code-coverage
   pull_request:
 
 concurrency:
@@ -671,12 +670,12 @@ jobs:
 
     - name: Install Windows Service
       run: |-
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service install
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_service_mount.cov service install
         sleep 5
 
     - name: Start Windows Service
       run: |-
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov service start
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_service_start.cov service start
         sleep 5
     
     - name: Create Config File - Block Blob
