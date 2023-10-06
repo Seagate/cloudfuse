@@ -77,8 +77,8 @@ jobs:
         {
           "block-acct": "${{ secrets.AZTEST_BLOCK_ACC_NAME }}",
           "adls-acct": "${{ secrets.AZTEST_ADLS_ACC_NAME }}",
-          "block-cont": "${{ env.containerName }}",
-          "adls-cont": "${{ env.containerName }}",
+          "block-cont": "${{ matrix.containerName }}",
+          "adls-cont": "${{ matrix.containerName }}",
           "block-key": "${{ secrets.AZTEST_BLOCK_KEY }}",
           "adls-key": "${{ secrets.AZTEST_ADLS_KEY }}",
           "block-sas": "${{ secrets.AZTEST_BLOCK_SAS }}",
