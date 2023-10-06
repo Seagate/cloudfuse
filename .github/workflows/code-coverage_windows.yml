@@ -535,9 +535,6 @@ jobs:
         go tool cover -func cloudfuse_coverage.rpt  > ./cloudfuse_func_cover.rpt
         go tool cover -html=./cloudfuse_coverage.rpt -o ./cloudfuse_coverage.html
         go tool cover -html=./cloudfuse_ut.cov -o ./cloudfuse_ut.html
-        cp ./*.rpt  ${{ runner.temp }}/
-        cp ./*.cov  ${{ runner.temp }}/
-        cp ./*.html ${{ runner.temp }}/
     
     - name: Overall coverage check
       shell: bash
