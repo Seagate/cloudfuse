@@ -1181,7 +1181,7 @@ func (suite *attrCacheTestSuite) TestWriteFileError() {
 
 	_, err := suite.attrCache.WriteFile(options)
 	suite.assert.NotNil(err)
-	suite.attrCache.cacheMap.get(path)
+	_, err = suite.attrCache.cacheMap.get(path)
 	suite.assert.Nil(err)
 	// GetAttr call will add this to the cache
 }

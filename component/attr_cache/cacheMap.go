@@ -79,8 +79,12 @@ func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *
 }
 
 func (value *attrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) {
-	path := attr.Path // home/user/folder/file
-	path = internal.TruncateDirName(path)
+	var path string
+	if (attr.Path != "" && attr.Name == "") || attr != nil {
+		path = attr.Path // home/user/folder/file
+		path = internal.TruncateDirName(path)
+	}
+
 	var itemPath string
 
 	//start recursion

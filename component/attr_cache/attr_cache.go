@@ -794,7 +794,14 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 		defer ac.cacheLock.RUnlock()
 		// TODO: Could we just update the size and mod time of the file here? Or can other attributes change here?
 
-		toBeInvalid, err := ac.cacheMap.get(attr.Path)
+		var toBeInvalid *attrCacheItem
+		var err error
+		if attr == nil {
+			toBeInvalid, err = ac.cacheMap.get(options.Handle.Path)
+		} else {
+			toBeInvalid, err = ac.cacheMap.get(attr.Path) //attr is nil here for TestWriteFileDoesNotExist()
+		}
+
 		if err != nil {
 			log.Err("could not find attribute item in cache to invalidate due to the following error: ", err)
 		} else {
@@ -902,26 +909,24 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	value, err := ac.cacheMap.get(truncatedPath)
 	ac.cacheLock.RUnlock()
 
-	if err != nil {
-		log.Err("could not find the following attr item in cache to get attributes due to the following error: ", err)
-	} else {
+	if err == nil && value.valid() && time.Since(value.cachedAt).Seconds() < float64(ac.cacheTimeout) {
 		// Try to serve the request from the attribute cache
-		if value.valid() && time.Since(value.cachedAt).Seconds() < float64(ac.cacheTimeout) {
-			// Is the entry marked deleted?
-			if value.isDeleted() {
-				log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
-				return &internal.ObjAttr{}, syscall.ENOENT
-			}
 
-			// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
-			// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
-			// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
-			if value.getAttr().IsMetadataRetrieved() || (ac.noSymlinks && !options.RetrieveMetadata) {
-				// path exists and we have all the metadata required or we do not care about metadata
-				log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
-				return value.getAttr(), nil
-			}
+		// Is the entry marked deleted?
+		if value.isDeleted() {
+			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
+			return &internal.ObjAttr{}, syscall.ENOENT
 		}
+
+		// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
+		// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
+		// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
+		if value.getAttr().IsMetadataRetrieved() || (ac.noSymlinks && !options.RetrieveMetadata) {
+			// path exists and we have all the metadata required or we do not care about metadata
+			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
+			return value.getAttr(), nil
+		}
+
 	}
 
 	// Get the attributes from next component and cache them
@@ -934,8 +939,11 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// Retrieved attributes so cache them
 		// TODO: bug: when cacheDirs is true, the cache limit will cause some directories to be double-listed
 		// TODO: shouldn't this be an LRU? This sure looks like the opposite...
-
-		ac.cacheMap.insert(pathAttr, true, time.Now())
+		if pathAttr == nil {
+			ac.cacheMap.insert(&internal.ObjAttr{Path: options.Name}, true, time.Now())
+		} else {
+			ac.cacheMap.insert(pathAttr, true, time.Now())
+		}
 
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
