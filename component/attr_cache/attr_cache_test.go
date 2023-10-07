@@ -1277,7 +1277,7 @@ func (suite *attrCacheTestSuite) TestCopyFromFileError() {
 
 	err := suite.attrCache.CopyFromFile(options)
 	suite.assert.NotNil(err)
-	suite.attrCache.cacheMap.get(path)
+	_, err = suite.attrCache.cacheMap.get(path)
 	suite.assert.Nil(err)
 	// GetAttr call will add this to the cache
 }
@@ -1294,7 +1294,7 @@ func (suite *attrCacheTestSuite) TestCopyFromFileDoesNotExist() {
 
 	err := suite.attrCache.CopyFromFile(options)
 	suite.assert.Nil(err)
-	suite.attrCache.cacheMap.get(path)
+	_, err = suite.attrCache.cacheMap.get(path)
 	suite.assert.Nil(err)
 	// GetAttr call will add this to the cache
 }

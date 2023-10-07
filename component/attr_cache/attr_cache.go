@@ -957,7 +957,7 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 		// TODO: Could we just update the size and mod time of the file here? Or can other attributes change here?
 		// TODO: we're RLocking the cache but we need to also lock this attr item because another thread could be reading this attr item
 
-		toBeInvalid, err := ac.cacheMap.get(attr.Path)
+		toBeInvalid, err := ac.cacheMap.get(options.Name) //empty for TestCopyFromFileDoesNotExist()
 		if err != nil {
 			log.Err("The attribute item could not be invalidated in the cache due to the following error: ", err)
 		} else {
@@ -1046,7 +1046,11 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		}
 	} else if err == syscall.ENOENT {
 		// Path does not exist so cache a no-entry item
-		ac.cacheMap.insert(&internal.ObjAttr{}, false, time.Now())
+		// this insert should involve the key of the cacheMap item being the truncatedPath. Do we have insert some how know the truncated path to use as the key? or do we do a key literal insert right here? the latter is mesyier for cacheMap access scope.
+
+		//ac.cacheMap.insert(&internal.ObjAttr{}, false, time.Now())
+		ac.cacheMap.children = make(map[string]*attrCacheItem)
+		ac.cacheMap.children[truncatedPath] = newAttrCacheItem(&internal.ObjAttr{}, false, time.Now())
 	}
 
 	return pathAttr, err
