@@ -87,6 +87,7 @@ func newTestClient(configuration string) (*Client, error) {
 		disableConcurrentDownload: conf.DisableConcurrentDownload,
 		partSize:                  conf.PartSizeMb * common.MbToBytes,
 		uploadCutoff:              conf.UploadCutoffMb * common.MbToBytes,
+		usePathStyle:              conf.UsePathStyle,
 	}
 	// create a Client
 	client, err := NewConnection(configForS3Client)
@@ -135,10 +136,12 @@ func (s *clientTestSuite) setupTestHelper(configuration string, create bool) err
 		storageTestConfigurationParameters.UploadCutoffMb = 5
 	}
 	if configuration == "" {
-		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s\n  part-size-mb: %d\n  upload-cutoff-mb: %d\n",
+		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s\n  part-size-mb: %d\n"+
+			"  upload-cutoff-mb: %d\n  use-path-style: %t\n",
 			storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
 			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region,
-			storageTestConfigurationParameters.PartSizeMb, storageTestConfigurationParameters.UploadCutoffMb)
+			storageTestConfigurationParameters.PartSizeMb, storageTestConfigurationParameters.UploadCutoffMb,
+			storageTestConfigurationParameters.UsePathStyle)
 	}
 	s.config = configuration
 
@@ -176,8 +179,8 @@ func (s *clientTestSuite) TestEnvVarCredentials() {
 	// setup
 	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
-	config := fmt.Sprintf("s3storage:\n  bucket-name: %s",
-		storageTestConfigurationParameters.BucketName)
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  endpoint: %s", storageTestConfigurationParameters.BucketName,
+		storageTestConfigurationParameters.Endpoint)
 	// S3 connection should find credentials from environment variables
 	err := s.setupTestHelper(config, false)
 	s.assert.Nil(err)
@@ -201,7 +204,7 @@ func (s *clientTestSuite) TestListBuckets() {
 	// TODO: generalize this test by creating, listing, then destroying a bucket
 	buckets, err := s.client.ListBuckets()
 	s.assert.Nil(err)
-	s.assert.Equal(buckets, []string{storageTestConfigurationParameters.BucketName})
+	s.assert.Contains(buckets, storageTestConfigurationParameters.BucketName)
 }
 func (s *clientTestSuite) TestSetPrefixPath() {
 	defer s.cleanupTest()

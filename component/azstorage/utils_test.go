@@ -1,3 +1,5 @@
+//go:build !azurite
+
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 

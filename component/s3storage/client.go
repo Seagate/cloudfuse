@@ -131,8 +131,16 @@ func (cl *Client) Configure(cfg Config) error {
 		log.Err("Client::Configure : config.LoadDefaultConfig() failed. Here's why: %v", err)
 		return err
 	}
+
 	// Create an Amazon S3 service client
-	cl.awsS3Client = s3.NewFromConfig(defaultConfig)
+	if cl.Config.usePathStyle {
+		cl.awsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
+			o.UsePathStyle = true
+		})
+	} else {
+		cl.awsS3Client = s3.NewFromConfig(defaultConfig)
+	}
+
 	// ListBuckets here to test connection
 	_, err = cl.ListBuckets()
 	if err != nil {

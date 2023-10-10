@@ -55,6 +55,7 @@ type Options struct {
 	DisableConcurrentDownload bool                    `config:"disable-concurrent-download" yaml:"disable-concurrent-download,omitempty"`
 	EnableChecksum            bool                    `config:"enable-checksum" yaml:"enable-checksum,omitempty"`
 	ChecksumAlgorithm         types.ChecksumAlgorithm `config:"checksum-algorithm" yaml:"checksum-algorithm,omitempty"`
+	UsePathStyle              bool                    `config:"use-path-style" yaml:"use-path-style,omitempty"`
 }
 
 // ParseAndValidateConfig : Parse and validate config
@@ -77,6 +78,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	// Set restricted characters
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
 	s3.stConfig.disableConcurrentDownload = opt.DisableConcurrentDownload
+	s3.stConfig.usePathStyle = opt.UsePathStyle
 
 	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
 	if opt.PartSizeMb < 5 || opt.PartSizeMb > MaxPartSizeMb {
