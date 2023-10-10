@@ -1,6 +1,4 @@
-# Refer ./setup/baseConfig.yaml for full set of config parameters
-
-allow-other: true
+# Refer to /usr/share/cloudfuse/baseConfig.yaml for full set of config parameters
 
 logging:
   type: syslog
