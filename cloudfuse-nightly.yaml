@@ -2024,8 +2024,8 @@ stages:
                   continueOnError: false
 
             - script: |
-                sudo ps -aux | grep bfusemon
-              displayName: 'Print bfusemon Process info'
+                sudo ps -aux | grep cfusemon
+              displayName: 'Print cfusemon Process info'
               env:
                 mount_dir: $(MOUNT_DIR)
 
