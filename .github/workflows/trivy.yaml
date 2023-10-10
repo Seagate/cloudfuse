@@ -3,15 +3,15 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: build
+name: trivy
 
 on:
   push:
-    branches: [ "main", master ]
+    branches:
+      - main
   pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [ "main" ]
   schedule:
+    # every Monday at 7:31pm
     - cron: '31 19 * * 1'
 
 permissions:
@@ -29,29 +29,23 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Build Cloudfuse
-        run: | 
-          sudo apt-get install fuse3 libfuse3-dev -y
-          go build -o cloudfuse
-          ls -l
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: fs
-          scan-ref: './cloudfuse'
-          ignore-unfixed: true
-          format: 'sarif'
-          output: 'trivy-results-binary.sarif'
-          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
-
-      - name: List Issues
+      - name: Install Trivy
         run: |
-          cat trivy-results-binary.sarif
+          sudo apt-get install wget apt-transport-https gnupg lsb-release -y
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install trivy -y
 
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: 'trivy-results-binary.sarif'
+      - name: Run vulnerability scanner
+        run: |
+          trivy fs ./ --scanners license --exit-code 1 --severity HIGH,CRITICAL
+          trivy fs ./ --exit-code 1 --severity MEDIUM,HIGH,CRITICAL --dependency-tree
+
+      #TODO: maybe use this when codeql is available (after publishing)
+      # - name: Upload Trivy scan results to GitHub Security tab
+      #   uses: github/codeql-action/upload-sarif@v2
+      #   with:
+      #     sarif_file: 'trivy-results-binary.sarif'

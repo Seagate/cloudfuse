@@ -50,6 +50,7 @@ type Config struct {
 	disableConcurrentDownload bool
 	enableChecksum            bool
 	checksumAlgorithm         types.ChecksumAlgorithm
+	usePathStyle              bool
 }
 
 // TODO: move s3AuthConfig to s3auth.go
