@@ -53,20 +53,17 @@ cp cloudfuse/setup/cloudfuse-logrotate pkgDir/etc/logrotate.d/cloudfuse
 
 # using fpm tool for packaging of our binary & performing post-install operations
 # for additional information about fpm refer https://fpm.readthedocs.io/en/v1.13.1/
-BuildArtifactStagingDirectory=~/cfBASD/
+BuildArtifactStagingDirectory=~/cfBASD
 mkdir -p $BuildArtifactStagingDirectory
-rm $BuildArtifactStagingDirectory/* || true
 versionNumber=$(./pkgDir/usr/bin/cloudfuse --version | cut -d " " -f 3)
 # make deb package
-rm ./cloudfuse*.deb
 fpm -s dir -t deb -n cloudfuse -C pkgDir/ -v $versionNumber -d fuse \
     --maintainer "Seagate Cloudfuse Team" --url "https://github.com/Seagate/cloudfuse" \
     --description "A user-space filesystem for interacting with cloud storage" 
-mv ./cloudfuse*.deb ./cloudfuse-$versionNumber.x86_64.deb
+mv ./cloudfuse*.deb ./cloudfuse-$versionNumber.arm64.deb
 cp ./cloudfuse*.deb $BuildArtifactStagingDirectory
 # make rpm package
-rm ./cloudfuse*.rpm
-fpm -s dir -t rpm -n cloudfuse -C pkgDir/ -v $versionNumber -d fuse \
+fpm -s dir -t rpm -n cloudfuse -C pkgDir/ -v $versionNumber -d $(depends) \
     --maintainer "Seagate Cloudfuse Team" --url "https://github.com/Seagate/cloudfuse" \
     --description "A user-space filesystem for interacting with cloud storage" 
 mv ./cloudfuse*.rpm ./cloudfuse-$versionNumber.x86_64.rpm
