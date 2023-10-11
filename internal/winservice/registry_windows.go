@@ -1,14 +1,6 @@
 //go:build windows
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
@@ -35,8 +27,9 @@
 package winservice
 
 import (
-	"cloudfuse/common/log"
 	"os"
+
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"golang.org/x/sys/windows/registry"
 )

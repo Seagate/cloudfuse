@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -42,9 +33,9 @@ import (
 	"strings"
 	"syscall"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
 
 	"github.com/aws/smithy-go"
 )
@@ -82,7 +73,7 @@ func parseS3Err(err error, attemptedAction string) error {
 	pc, _, _, ok := runtime.Caller(1)
 	if ok {
 		longFuncName := runtime.FuncForPC(pc).Name()
-		// the function name returned is long, e.g. "cloudfuse/component/s3storage.(*Client).getObject"
+		// the function name returned is long, e.g. "github.com/Seagate/cloudfuse/component/s3storage.(*Client).getObject"
 		// split the long function name using the component name
 		funcNameParts := strings.Split(longFuncName, compName)
 		if len(funcNameParts) > 1 {
@@ -212,7 +203,7 @@ func getContentType(key string) string {
 	return "application/octet-stream"
 }
 
-func populateContentType(newSet string) error {
+func populateContentType(newSet string) error { //nolint
 	var data map[string]string
 	if err := json.Unmarshal([]byte(newSet), &data); err != nil {
 		log.Err("Failed to parse config file : %s [%s]", newSet, err.Error())

@@ -2,14 +2,6 @@
 // +build !authtest
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
@@ -36,14 +28,15 @@
 package s3storage
 
 import (
-	"cloudfuse/common"
-	"cloudfuse/common/log"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"runtime"
 	"testing"
+
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -90,9 +83,11 @@ func (s *s3wrapperTestSuite) SetupTest() {
 
 func (s *s3wrapperTestSuite) setupTestHelper(configuration string) {
 	if configuration == "" {
-		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		configuration = fmt.Sprintf(
+			"s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  region: %s\n  profile: %s\n  endpoint: %s",
 			storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
-			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region)
+			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Region,
+			storageTestConfigurationParameters.Profile, storageTestConfigurationParameters.Endpoint)
 	}
 	s.config = configuration
 

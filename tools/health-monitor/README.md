@@ -2,13 +2,15 @@
 
 ## About
 
-Cloudfuse Health Monitor is a tool which will help in monitoring Cloudfuse mounts. It supports the following types of monitors:
+Cloudfuse Health Monitor is a tool which will help in monitoring Cloudfuse mounts. It supports the following types of
+monitors:
 
 1. **Cloudfuse Stats Monitor:** Monitor the different statistics of cloudfuse components like,
     - Total bytes uploaded and downloaded via cloudfuse
     - Events like create, delete, rename, synchronize, truncate, etc. on files or directories in the mounted directory
     - Progress of uploads or downloads of large files to/from Azure Storage
-    - Keep track of number of calls that were made to Azure Storage for operations like create, delete, rename, chmod, etc. in the mounted directory
+    - Keep track of number of calls that were made to Azure Storage for operations like create, delete, rename, chmod,
+      etc. in the mounted directory
     - Total number of open handles on files
     - Number of times an open file request was served from the file cache or downloaded from the Azure Storage  
 
@@ -18,11 +20,12 @@ Cloudfuse Health Monitor is a tool which will help in monitoring Cloudfuse mount
     - Monitor the different events like create, delete, rename, chmod, etc. of files and directories in the cache
     - Keep track of the cache consumption with respect to the cache size specified during mounting
 
-> **Note:** Health Monitor runs as a separate process where one health monitor process is associated with monitoring one cloudfuse mounted directory.
+> **Note:** Health Monitor runs as a separate process where one health monitor process is associated with monitoring one
+> cloudfuse mounted directory.
 
-## On Windows
+## Windows
 
-Cloudfuse Health Monitor can also run fully on Windows. All of the functionality of the Health Monitor is fully supported.
+The Cloudfuse Health Monitor is also fully supported on Windows.
 
 ## Enable Health Monitor
 
@@ -30,8 +33,10 @@ The different configuration options for the health monitor are,
 - `enable-monitoring: true|false`: Boolean parameter to enable health monitor. By default it is disabled
 - `stats-poll-interval-sec: <TIME IN SECONDS>`: Cloudfuse stats polling interval (in sec). Default is 10 seconds
 - `process-monitor-interval-sec: <TIME IN SECONDS>`: CPU and memory usage polling interval (in sec). Default is 30 sec
-- `output-path: <PATH>`: Path where health monitor will generate its output file. It takes the current directory as default, if not specified. Output file name will be `monitor_<pid>.json`
-- `monitor-disable-list: <LIST OF MONITORS>`: List of monitors to be disabled. To disable a monitor, add its corresponding name in the list
+- `output-path: <PATH>`: Path where health monitor will generate its output file. It takes the current directory as
+  default, if not specified. Output file name will be `monitor_<pid>.json`
+- `monitor-disable-list: <LIST OF MONITORS>`: List of monitors to be disabled. To disable a monitor, add its
+  corresponding name in the list
     - `cloudfuse_stats` - Disable cloudfuse stats polling
     - `cpu_profiler` - Disable CPU monitoring on cloudfuse process
     - `memory_profiler` - Disable memory monitoring on cloudfuse process
@@ -39,7 +44,8 @@ The different configuration options for the health monitor are,
 
 ### Sample Config
 
-Add the following section to your cloudfuse config file. Here file cache and memory monitors are disabled. If you want to enable all monitors simply remove the monitor-disable-list section.
+Add the following section to your cloudfuse config file. Here file cache and memory monitors are disabled. If you want
+to enable all monitors simply remove the monitor-disable-list section.
 ```yaml
 health_monitor:
   enable-monitoring: true
@@ -53,7 +59,10 @@ health_monitor:
 
 ## Output Reports
 
-Health monitor will store its output reports in the path specified in the `output-path` config option. If this option is not specified, it takes the current directory as default. It stores the last 100MB of monitor data in 10 different files named as `monitor_<pid>_<index>.json` where `monitor_<pid>.json`(Zeroth index) is latest and `monitor_<pid>_9.json` is the oldest output file.
+Health monitor will store its output reports in the path specified in the `output-path` config option. If this option is
+not specified, it takes the current directory as default. It stores the last 100MB of monitor data in 10 different files
+named as `monitor_<pid>_<index>.json` where `monitor_<pid>.json`(Zeroth index) is latest and `monitor_<pid>_9.json` is
+the oldest output file.
 
 ### Sample Output
 
@@ -62,7 +71,7 @@ Health monitor will store its output reports in the path specified in the `outpu
     "Timestamp": "t1",
     "CPUUsage": "value in %",
     "MemoryUsage": "value in bytes",
-    "BlobfuseStats": [
+    "CloudfuseStats": [
         {
             "componentName": "azstorage",
             "value": {

@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -40,8 +31,8 @@ import (
 	"reflect"
 	"strings"
 
-	"cloudfuse/common/config"
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common/config"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/JeffreyRichter/enum/enum"
@@ -487,7 +478,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	}
 
 	log.Info("ParseAndValidateConfig : Account: %s, Container: %s, AccountType: %s, Auth: %s, Prefix: %s, Endpoint: %s, ListBlock: %d, MD5 : %v %v, "+
-		"Virtual Directory: %v, Max Results For List %v, Disable Compression: %v, Restircted Windows Characters: %v",
+		"Virtual Directory: %v, Max Results For List %v, Disable Compression: %v, Restricted Windows Characters: %v",
 		az.stConfig.authConfig.AccountName, az.stConfig.container, az.stConfig.authConfig.AccountType, az.stConfig.authConfig.AuthMode,
 		az.stConfig.prefixPath, az.stConfig.authConfig.Endpoint, az.stConfig.cancelListForSeconds, az.stConfig.validateMD5, az.stConfig.updateMD5,
 		az.stConfig.virtualDirectory, az.stConfig.maxResultsForList, az.stConfig.disableCompression, az.stConfig.restrictedCharsWin)

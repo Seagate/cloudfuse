@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -43,11 +34,11 @@ import (
 	"strings"
 	"syscall"
 
-	"cloudfuse/common"
-	"cloudfuse/common/config"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
-	"cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/handlemap"
 )
 
 //LoopbackFS component Config specifications:
@@ -312,6 +303,17 @@ func (lfs *LoopbackFS) ReadLink(options internal.ReadLinkOptions) (string, error
 func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
 	log.Trace("LoopbackFS::ReadInBuffer : name=%s", options.Handle.Path)
 	f := options.Handle.GetFileObject()
+
+	if f == nil {
+		f1, err := os.OpenFile(common.JoinUnixFilepath(lfs.path, options.Handle.Path), os.O_RDONLY, 0777)
+		if err != nil {
+			return 0, nil
+		}
+
+		n, err := f1.ReadAt(options.Data, options.Offset)
+		f1.Close()
+		return n, err
+	}
 
 	options.Handle.RLock()
 	defer options.Handle.RUnlock()

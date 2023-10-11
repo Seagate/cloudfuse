@@ -1,19 +1,10 @@
 //go:build windows
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -37,10 +28,11 @@
 package log
 
 import (
-	"cloudfuse/common"
 	"errors"
 	"fmt"
 	"log"
+
+	"github.com/Seagate/cloudfuse/common"
 
 	"golang.org/x/sys/windows/svc/eventlog"
 )
@@ -73,7 +65,7 @@ func (sl *SysLogger) GetLoggerObj() *log.Logger {
 
 func (sl *SysLogger) SetLogLevel(level common.LogLevel) {
 	sl.level = level
-	sl.logEvent(common.ELogLevel.LOG_CRIT(), "Log level reset to :"+level.String())
+	_ = sl.logEvent(common.ELogLevel.LOG_CRIT(), "Log level reset to :"+level.String())
 }
 
 func (sl *SysLogger) GetType() string {
@@ -125,42 +117,42 @@ func (sl *SysLogger) logEvent(lvl common.LogLevel, msg string) error {
 func (sl *SysLogger) Debug(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_DEBUG() {
 		msg := fmt.Sprintf(format, args...)
-		sl.logEvent(common.ELogLevel.LOG_DEBUG(), msg)
+		_ = sl.logEvent(common.ELogLevel.LOG_DEBUG(), msg)
 	}
 }
 
 func (sl *SysLogger) Trace(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_TRACE() {
 		msg := fmt.Sprintf(format, args...)
-		sl.logEvent(common.ELogLevel.LOG_TRACE(), msg)
+		_ = sl.logEvent(common.ELogLevel.LOG_TRACE(), msg)
 	}
 }
 
 func (sl *SysLogger) Info(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_INFO() {
 		msg := fmt.Sprintf(format, args...)
-		sl.logEvent(common.ELogLevel.LOG_INFO(), msg)
+		_ = sl.logEvent(common.ELogLevel.LOG_INFO(), msg)
 	}
 }
 
 func (sl *SysLogger) Warn(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_WARNING() {
 		msg := fmt.Sprintf(format, args...)
-		sl.logEvent(common.ELogLevel.LOG_WARNING(), msg)
+		_ = sl.logEvent(common.ELogLevel.LOG_WARNING(), msg)
 	}
 }
 
 func (sl *SysLogger) Err(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_ERR() {
 		msg := fmt.Sprintf(format, args...)
-		sl.logEvent(common.ELogLevel.LOG_ERR(), msg)
+		_ = sl.logEvent(common.ELogLevel.LOG_ERR(), msg)
 	}
 }
 
 func (sl *SysLogger) Crit(format string, args ...interface{}) {
 	if sl.level >= common.ELogLevel.LOG_CRIT() {
 		msg := fmt.Sprintf(format, args...)
-		sl.logEvent(common.ELogLevel.LOG_CRIT(), msg)
+		_ = sl.logEvent(common.ELogLevel.LOG_CRIT(), msg)
 	}
 }
 

@@ -15,7 +15,7 @@ cd "$tmp_dir" || { exit 1; }
 git checkout "$tags" || { exit 1; }
 cd - || { exit 1; }
 
-# Get list of files that we have modifed
+# Get list of files that we have modified
 # This diff command prints output like as follows:
 #   Files ./cmd/mount.go and /tmp/tmp.yyhbYNR6UN/cmd/mount.go differ
 # Then get the lines that differ and get the path to the file that differs

@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -41,12 +32,12 @@ import (
 	"syscall"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/common/config"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
-	"cloudfuse/internal/handlemap"
-	"cloudfuse/internal/stats_manager"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	azcopyCommon "github.com/Azure/azure-storage-azcopy/v10/common"
 
@@ -180,8 +171,7 @@ func (az *AzStorage) Start(ctx context.Context) error {
 	log.Debug("Starting azstorage stats collector")
 
 	// This is a workaround right now to disable the input watcher thread which continuously monitors below config to change
-	// Running this thread continuously increases the CPU usage by 5% even when there is no activity on blobfuse2 mount path
-	// Lifecycle manager init is commented in the "blobfuse2-cpu-usage" branch. Blobfuse2 imports azcopy from this branch.
+	// Running this thread continuously increases the CPU usage by 5% even when there is no activity on cloudfuse mount path
 	azcopyCommon.GetLifecycleMgr().EnableInputWatcher()
 
 	return nil

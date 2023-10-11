@@ -1,14 +1,6 @@
 //go:build windows
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
@@ -35,9 +27,10 @@
 package cmd
 
 import (
-	"cloudfuse/internal"
 	"context"
 	"os"
+
+	"github.com/Seagate/cloudfuse/internal"
 )
 
 // Create dummy function so that mount.go code can compile

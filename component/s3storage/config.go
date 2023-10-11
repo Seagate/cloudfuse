@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -38,26 +29,33 @@ import (
 	"errors"
 	"fmt"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 var (
-	errConfigFieldEmpty = errors.New("config field empty")
+	errConfigFieldEmpty   = errors.New("config field empty")
+	errInvalidConfigField = errors.New("config field is invalid")
 )
 
 type Options struct {
-	BucketName                string `config:"bucket-name" yaml:"bucket-name,omitempty"`
-	KeyID                     string `config:"key-id" yaml:"key-id,omitempty"`
-	SecretKey                 string `config:"secret-key" yaml:"secret-key,omitempty"`
-	Region                    string `config:"region" yaml:"region,omitempty"`
-	Endpoint                  string `config:"endpoint" yaml:"endpoint,omitempty"`
-	PrefixPath                string `config:"subdirectory" yaml:"subdirectory,omitempty"`
-	RestrictedCharsWin        bool   `config:"restricted-characters-windows" yaml:"-"`
-	PartSizeMb                int64  `config:"part-size-mb" yaml:"part-size-mb,omitempty"`
-	UploadCutoffMb            int64  `config:"upload-cutoff-mb" yaml:"upload-cutoff-mb,omitempty"`
-	Concurrency               int    `config:"concurrency" yaml:"concurrency,omitempty"`
-	DisableConcurrentDownload bool   `config:"disable-concurrent-download" yaml:"disable-concurrent-download,omitempty"`
+	BucketName                string                  `config:"bucket-name" yaml:"bucket-name,omitempty"`
+	KeyID                     string                  `config:"key-id" yaml:"key-id,omitempty"`
+	SecretKey                 string                  `config:"secret-key" yaml:"secret-key,omitempty"`
+	Region                    string                  `config:"region" yaml:"region,omitempty"`
+	Profile                   string                  `config:"profile" yaml:"region,omitempty"`
+	Endpoint                  string                  `config:"endpoint" yaml:"endpoint,omitempty"`
+	PrefixPath                string                  `config:"subdirectory" yaml:"subdirectory,omitempty"`
+	RestrictedCharsWin        bool                    `config:"restricted-characters-windows" yaml:"-"`
+	PartSizeMb                int64                   `config:"part-size-mb" yaml:"part-size-mb,omitempty"`
+	UploadCutoffMb            int64                   `config:"upload-cutoff-mb" yaml:"upload-cutoff-mb,omitempty"`
+	Concurrency               int                     `config:"concurrency" yaml:"concurrency,omitempty"`
+	DisableConcurrentDownload bool                    `config:"disable-concurrent-download" yaml:"disable-concurrent-download,omitempty"`
+	EnableChecksum            bool                    `config:"enable-checksum" yaml:"enable-checksum,omitempty"`
+	ChecksumAlgorithm         types.ChecksumAlgorithm `config:"checksum-algorithm" yaml:"checksum-algorithm,omitempty"`
+	UsePathStyle              bool                    `config:"use-path-style" yaml:"use-path-style,omitempty"`
 }
 
 // ParseAndValidateConfig : Parse and validate config
@@ -69,26 +67,18 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 		return fmt.Errorf("%w: bucket name not provided", errConfigFieldEmpty)
 	}
 
-	// Validate key id
-	if opt.KeyID == "" {
-		return fmt.Errorf("%w: key id not provided", errConfigFieldEmpty)
-	}
-
-	// Validate secret key
-	if opt.SecretKey == "" {
-		return fmt.Errorf("%w: bucket name not provided", errConfigFieldEmpty)
-	}
-
 	// Set authentication config
 	s3.stConfig.authConfig.BucketName = opt.BucketName
 	s3.stConfig.authConfig.KeyID = opt.KeyID
 	s3.stConfig.authConfig.SecretKey = opt.SecretKey
 	s3.stConfig.authConfig.Region = opt.Region
+	s3.stConfig.authConfig.Profile = opt.Profile
 	s3.stConfig.authConfig.Endpoint = opt.Endpoint
 
 	// Set restricted characters
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
 	s3.stConfig.disableConcurrentDownload = opt.DisableConcurrentDownload
+	s3.stConfig.usePathStyle = opt.UsePathStyle
 
 	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
 	if opt.PartSizeMb < 5 || opt.PartSizeMb > MaxPartSizeMb {
@@ -120,6 +110,22 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 
 	// If subdirectory is mounted, take the prefix path
 	s3.stConfig.prefixPath = removeLeadingSlashes(opt.PrefixPath)
+
+	s3.stConfig.enableChecksum = opt.EnableChecksum
+	if opt.EnableChecksum {
+		// Use default SHA1 checksum if user does not provide algorithm
+		if opt.ChecksumAlgorithm == "" {
+			opt.ChecksumAlgorithm = types.ChecksumAlgorithmSha1
+		}
+
+		if opt.ChecksumAlgorithm != types.ChecksumAlgorithmCrc32 &&
+			opt.ChecksumAlgorithm != types.ChecksumAlgorithmCrc32c &&
+			opt.ChecksumAlgorithm != types.ChecksumAlgorithmSha1 &&
+			opt.ChecksumAlgorithm != types.ChecksumAlgorithmSha256 {
+			return fmt.Errorf("%w: checksum is not a valid checksum. valid values are CRC32, CRC32C, SHA1, SHA256", errInvalidConfigField)
+		}
+		s3.stConfig.checksumAlgorithm = opt.ChecksumAlgorithm
+	}
 
 	// TODO: add more config options to customize AWS SDK behavior and import them here
 

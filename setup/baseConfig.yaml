@@ -16,7 +16,7 @@
 #   6. By default 'writeback-cache' is enabled for libfuse3 and this may result in append/write operations to fail.
 #      Either you can disable 'writeback-cache', which might hurt the performance
 #      or you can configure cloudfuse to ignore open flags given by user and make it work with ''writeback-cache'.
-#      'libfuse' sectoin below has both the configurations.
+#      'libfuse' section below has both the configurations.
 #   7. If are you using 'allow-other: true' config then make sure user_allow_other is enabled in /etc/fuse.conf file as 
 #      well otherwise mount will fail. By default /etc/fuse.conf will have this option disabled we just need to 
 #      enable it and save the file.
@@ -53,6 +53,7 @@ logging:
 components:
   - libfuse
   - stream
+  - block_cache
   - file_cache
   - attr_cache
   - azstorage
@@ -79,6 +80,17 @@ stream:
   max-buffers: <total number of buffers to store blocks in. Default - 0 MB>
   buffer-size-mb: <size for each buffer. Default - 0>
   file-caching: <read/write mode file level caching or handle level caching. Default - false (handle level caching ON)>
+
+# Block cache related configuration. Block cache is only supported on Linux.
+block_cache:
+  block-size-mb: <size of each block to be cached in memory (in MB). Default - 16 MB>
+  mem-size-mb: <total amount of memory to be preallocated for block cache (in MB). Default - 4192 MB>
+  path: <path to local disk cache where downloaded blocked will be stored>
+  disk-size-mb: <maximum disk cache size allowed. Default - 4192 MB>
+  disk-timeout-sec: <default disk cache eviction timeout (in sec). Default - 120 sec>
+  prefetch: <number of blocks to be prefetched in serial read case. Min - 11>
+  parallelism: <number of parallel threads downloading the data and writing to disk cache. Default - 128> 
+  prefetch-on-open: true|false <prefetch blocks on open. This shall be used only when user application is going to read file from offset 0> 
 
 # Disk cache related configuration
 file_cache:
@@ -161,16 +173,20 @@ azstorage:
 s3storage:
   # Required
   bucket-name: <name of the bucket to be mounted>
-  key-id: <S3 access key ID (example - AKIAIOSFODNN7EXAMPLE)>
-  secret-key: <S3 secret access key (example - wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY)>
   # Optional
+  key-id: <S3 access key ID. Default - use credentials from environment variables or shared profile (see README)>
+  secret-key: <S3 secret access key. Default - use credentials from environment variables or shared profile (see README)>
   region: <S3 region. Default - us-east-1>
+  profile: <AWS shared configuration profile name. Credentials above take precedence over shared profile. Default - "default">
   endpoint: <S3 endpoint URL. Default - https://s3.[region].lyvecloud.seagate.com>
   subdirectory: <name of subdirectory to be mounted instead of whole bucket>
   part-size-mb: <size of each part for multipart uploads (in MB). Valid range is 5MB to 5120MB. Default - 8 MB>
   upload-cutoff-mb: <files exceeding this size will use be uploaded in parts (in MB). Default - 100 MB>
   concurrency: <number of parallel upload/download threads. Default - 5>
-  disable-concurrent-download: <disables concurrent downloads. Can improve performance with small files at the cost of slow downloads for large objects>
+  disable-concurrent-download: true|false <disables concurrent downloads. Can improve performance with small files at the cost of slow downloads for large objects>
+  enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
+  checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - SHA1>
+  usePathStyle: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
 
 # Mount all configuration
 mountall:

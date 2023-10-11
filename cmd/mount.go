@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -50,10 +41,10 @@ import (
 	"strings"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/common/config"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
 
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"
@@ -91,6 +82,7 @@ type mountOptions struct {
 	Streaming      bool     `config:"streaming"`
 	AttrCache      bool     `config:"use-attr-cache"`
 	LibfuseOptions []string `config:"libfuse-options"`
+	BlockCache     bool     `config:"block-cache"`
 }
 
 var options mountOptions
@@ -281,6 +273,8 @@ var mountCmd = &cobra.Command{
 
 			if config.IsSet("streaming") && options.Streaming {
 				pipeline = append(pipeline, "stream")
+			} else if config.IsSet("block-cache") && options.BlockCache {
+				pipeline = append(pipeline, "block_cache")
 			} else {
 				pipeline = append(pipeline, "file_cache")
 			}
@@ -310,16 +304,16 @@ var mountCmd = &cobra.Command{
 				} else if v == "allow_other" || v == "allow_other=true" {
 					config.Set("allow-other", "true")
 				} else if strings.HasPrefix(v, "attr_timeout=") {
-					config.Set("libfuse.attribute-expiration-sec", parameter[1])
+					config.Set("lfuse.attribute-expiration-sec", parameter[1])
 				} else if strings.HasPrefix(v, "entry_timeout=") {
-					config.Set("libfuse.entry-expiration-sec", parameter[1])
+					config.Set("lfuse.entry-expiration-sec", parameter[1])
 				} else if strings.HasPrefix(v, "negative_timeout=") {
-					config.Set("libfuse.negative-entry-expiration-sec", parameter[1])
+					config.Set("lfuse.negative-entry-expiration-sec", parameter[1])
 				} else if v == "ro" || v == "ro=true" {
 					config.Set("read-only", "true")
 				} else if v == "allow_root" || v == "allow_root=true" {
 					config.Set("allow-root", "true")
-					// config.Set("libfuse.default-permission", "700")
+					// config.Set("lfuse.default-permission", "700")
 				} else if v == "nonempty" {
 					skipNonEmpty = true
 					config.Set("nonempty", "true")
@@ -329,21 +323,21 @@ var mountCmd = &cobra.Command{
 						return fmt.Errorf("failed to parse umask [%s]", err.Error())
 					}
 					perm := ^uint32(permission) & 777
-					config.Set("libfuse.default-permission", fmt.Sprint(perm))
+					config.Set("lfuse.default-permission", fmt.Sprint(perm))
 				} else if strings.HasPrefix(v, "uid=") {
 					val, err := strconv.ParseUint(parameter[1], 10, 32)
 					if err != nil {
 						return fmt.Errorf("failed to parse uid [%s]", err.Error())
 					}
-					config.Set("libfuse.uid", fmt.Sprint(val))
+					config.Set("lfuse.uid", fmt.Sprint(val))
 				} else if strings.HasPrefix(v, "gid=") {
 					val, err := strconv.ParseUint(parameter[1], 10, 32)
 					if err != nil {
 						return fmt.Errorf("failed to parse gid [%s]", err.Error())
 					}
-					config.Set("libfuse.gid", fmt.Sprint(val))
+					config.Set("lfuse.gid", fmt.Sprint(val))
 				} else if v == "direct_io" || v == "direct_io=true" {
-					config.Set("libfuse.direct-io", "true")
+					config.Set("lfuse.direct-io", "true")
 				} else {
 					return errors.New(common.FuseAllowedFlags)
 				}
@@ -415,7 +409,7 @@ var mountCmd = &cobra.Command{
 		log.Crit("Starting Cloudfuse Mount : %s on [%s]", common.CloudfuseVersion, common.GetCurrentDistro())
 		log.Crit("Logging level set to : %s", logLevel.String())
 
-		// If on Linux start with the go deamon
+		// If on Linux start with the go daemon
 		// If on Windows, don't use the daemon since it is not supported
 		// TODO: Enable running as a service on Windows
 		if runtime.GOOS == "windows" {
@@ -630,6 +624,10 @@ func init() {
 	mountCmd.Flags().BoolVar(&options.Streaming, "streaming", false, "Enable Streaming.")
 	config.BindPFlag("streaming", mountCmd.Flags().Lookup("streaming"))
 	mountCmd.Flags().Lookup("streaming").Hidden = true
+
+	mountCmd.Flags().BoolVar(&options.BlockCache, "block-cache", false, "Enable Block-Cache.")
+	config.BindPFlag("block-cache", mountCmd.Flags().Lookup("block-cache"))
+	mountCmd.Flags().Lookup("block-cache").Hidden = true
 
 	mountCmd.Flags().BoolVar(&options.AttrCache, "use-attr-cache", true, "Use attribute caching.")
 	config.BindPFlag("use-attr-cache", mountCmd.Flags().Lookup("use-attr-cache"))

@@ -1,19 +1,10 @@
 //go:build linux
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -43,8 +34,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -329,6 +320,22 @@ func (suite *mountTestSuite) TestStreamAttrCacheOptionsV1() {
 		"--streaming", "--use-attr-cache", "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check")
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "failed to initialize new pipeline")
+}
+
+func (suite *mountTestSuite) TestBlockCacheMountWithoutRO() {
+	defer suite.cleanupTest()
+
+	mntDir, err := os.MkdirTemp("", "mntdir")
+	suite.assert.Nil(err)
+	defer os.RemoveAll(mntDir)
+
+	tempLogDir := "/tmp/templogs_" + randomString(6)
+	defer os.RemoveAll(tempLogDir)
+
+	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--log-file-path=%s", tempLogDir+"/blobfuse2.log"),
+		"--block-cache", "--use-attr-cache", "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check")
+	suite.assert.NotNil(err)
+	suite.assert.Contains(op, "filesystem is not mounted in read-only mode")
 }
 
 // mount failure test where a libfuse option is incorrect

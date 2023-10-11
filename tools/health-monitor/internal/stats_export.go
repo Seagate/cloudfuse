@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -42,10 +33,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	"cloudfuse/internal/stats_manager"
-	hmcommon "cloudfuse/tools/health-monitor/common"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal/stats_manager"
+	hmcommon "github.com/Seagate/cloudfuse/tools/health-monitor/common"
 )
 
 type ExportedStat struct {
@@ -63,7 +54,7 @@ type StatsExporter struct {
 
 type Output struct {
 	Timestamp string                  `json:"Timestamp,omitempty"`
-	Cfs       []stats_manager.PipeMsg `json:"BlobfuseStats,omitempty"`
+	Cfs       []stats_manager.PipeMsg `json:"CloudfuseStats,omitempty"`
 	FcEvent   []*hmcommon.CacheEvent  `json:"FileCache,omitempty"`
 	Cpu       string                  `json:"CPUUsage,omitempty"`
 	Mem       string                  `json:"MemoryUsage,omitempty"`

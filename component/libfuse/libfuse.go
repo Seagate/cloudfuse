@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -40,11 +31,11 @@ import (
 	"context"
 	"fmt"
 
-	"cloudfuse/common"
-	"cloudfuse/common/config"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
-	"cloudfuse/internal/stats_manager"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/winfsp/cgofuse/fuse"
 )
@@ -272,6 +263,12 @@ func (lf *Libfuse) Configure(_ bool) error {
 		log.Err("Libfuse::Configure : config error [invalid config attributes]")
 		return fmt.Errorf("config error in %s [invalid config attributes]", lf.Name())
 	}
+
+	err = config.UnmarshalKey("lfuse", &conf)
+	if err != nil {
+		log.Err("Libfuse::Configure : config error [invalid config attributes: %s]", err.Error())
+		return fmt.Errorf("config error in lfuse [invalid config attributes]")
+	}
 	// Extract values from 'conf' and store them as you wish here
 
 	err = config.UnmarshalKey("mount-path", &conf.mountPath)
@@ -310,9 +307,9 @@ func (lf *Libfuse) Configure(_ bool) error {
 	}
 
 	log.Info("Libfuse::Configure : read-only %t, allow-other %t, allow-root %t, default-perm %d, entry-timeout %d, attr-time %d, negative-timeout %d, "+
-		"ignore-open-flags: %t, nonempty %t, network-share %t",
+		"ignore-open-flags: %t, nonempty %t, network-share %t, direct_io %t",
 		lf.readOnly, lf.allowOther, lf.allowRoot, lf.filePermission, lf.entryExpiration, lf.attributeExpiration, lf.negativeTimeout,
-		lf.ignoreOpenFlags, lf.nonEmptyMount, lf.networkShare)
+		lf.ignoreOpenFlags, lf.nonEmptyMount, lf.networkShare, lf.directIO)
 
 	return nil
 }

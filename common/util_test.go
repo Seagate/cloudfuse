@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -223,4 +214,47 @@ func (suite *utilTestSuite) TestIsDriveLetter() {
 	path = "C:\\Users"
 	match = IsDriveLetter(path)
 	suite.assert.Equal(false, match)
+}
+
+func (suite *utilTestSuite) TestGetUSage() {
+	pwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	dirName := filepath.Join(pwd, "util_test")
+	err = os.Mkdir(dirName, 0777)
+	suite.assert.Nil(err)
+
+	data := make([]byte, 1024*1024)
+	err = os.WriteFile(dirName+"/1.txt", data, 0777)
+	suite.assert.Nil(err)
+
+	err = os.WriteFile(dirName+"/2.txt", data, 0777)
+	suite.assert.Nil(err)
+
+	usage, err := GetUsage(dirName)
+	suite.assert.Nil(err)
+	suite.assert.GreaterOrEqual(int(usage), 2)
+	suite.assert.LessOrEqual(int(usage), 4)
+
+	_ = os.RemoveAll(dirName)
+}
+
+func (suite *utilTestSuite) TestGetDiskUsage() {
+	pwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	dirName := filepath.Join(pwd, "util_test", "a", "b", "c")
+	err = os.MkdirAll(dirName, 0777)
+	suite.assert.Nil(err)
+
+	usage, usagePercent, err := GetDiskUsageFromStatfs(dirName)
+	suite.assert.Nil(err)
+	suite.assert.NotEqual(usage, 0)
+	suite.assert.NotEqual(usagePercent, 0)
+	suite.assert.NotEqual(usagePercent, 100)
+	_ = os.RemoveAll(filepath.Join(pwd, "util_test"))
 }

@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -40,8 +31,8 @@ import (
 	"os"
 	"testing"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -70,8 +61,9 @@ func (suite *cachePolicyTestSuite) TestGetUsage() {
 	f, _ := os.Create(cache_path + "/test")
 	data := make([]byte, 1024*1024)
 	f.Write(data)
-	result, _ := getUsage(cache_path)
+	result, _ := common.GetUsage(cache_path)
 	suite.assert.Equal(float64(1), math.Floor(result))
+	f.Close()
 }
 
 // We should return the sector size used. Here there should be two sectors used
@@ -80,24 +72,31 @@ func (suite *cachePolicyTestSuite) TestGetUsageSizeOnDisk() {
 	f, _ := os.Create(cache_path + "/test")
 	data := make([]byte, 4097)
 	f.Write(data)
-	result, err := getUsage(cache_path)
+	result, err := common.GetUsage(cache_path)
 	suite.assert.Nil(err)
 
 	// Linux du overestimates the number of sectors used by 1 sometimes
 	// So check that we aren't more or less than 1 sector size off.
-	suite.assert.GreaterOrEqual(result, 2.0*sectorSize/MB)
-	suite.assert.LessOrEqual(result, 3.0*sectorSize/MB)
+	suite.assert.GreaterOrEqual(result, 2.0*common.SectorSize/MB)
+	suite.assert.LessOrEqual(result, 3.0*common.SectorSize/MB)
 }
 
 func (suite *cachePolicyTestSuite) TestGetUsagePercentage() {
 	defer suite.cleanupTest()
-	f, _ := os.Create(cache_path + "/test")
 	data := make([]byte, 1024*1024)
+
+	f, _ := os.Create(cache_path + "/test")
 	f.Write(data)
 	result := getUsagePercentage(cache_path, 4)
 	// since the value might defer a little distro to distro
 	suite.assert.GreaterOrEqual(result, float64(25))
 	suite.assert.LessOrEqual(result, float64(30))
+	f.Close()
+
+	result = getUsagePercentage("/", 0)
+	// since the value might defer a little distro to distro
+	suite.assert.GreaterOrEqual(result, float64(0))
+	suite.assert.LessOrEqual(result, float64(90))
 }
 
 func (suite *cachePolicyTestSuite) TestDeleteFile() {
@@ -105,6 +104,7 @@ func (suite *cachePolicyTestSuite) TestDeleteFile() {
 	f, _ := os.Create(cache_path + "/test")
 	result := deleteFile(f.Name() + "not_exist")
 	suite.assert.Equal(nil, result)
+	f.Close()
 }
 
 func TestCachePolicyTestSuite(t *testing.T) {

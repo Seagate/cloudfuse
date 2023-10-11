@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -38,9 +29,9 @@ import (
 	"net/url"
 	"os"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-storage-blob-go/azblob"
@@ -119,8 +110,8 @@ type AzConnection interface {
 	List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error)
 
 	ReadToFile(name string, offset int64, count int64, fi *os.File) error
-	ReadBuffer(name string, offset int64, len int64) ([]byte, error)
-	ReadInBuffer(name string, offset int64, len int64, data []byte) error
+	ReadBuffer(name string, offset int64, length int64) ([]byte, error)
+	ReadInBuffer(name string, offset int64, length int64, data []byte) error
 
 	WriteFromFile(name string, metadata map[string]string, fi *os.File) error
 	WriteFromBuffer(name string, metadata map[string]string, data []byte) error

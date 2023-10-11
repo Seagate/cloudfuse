@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -46,10 +37,10 @@ import (
 	"syscall"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
-	"cloudfuse/internal/convertname"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/internal/convertname"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 
@@ -559,13 +550,13 @@ func (dl *Datalake) ReadToFile(name string, offset int64, count int64, fi *os.Fi
 }
 
 // ReadBuffer : Download a specific range from a file to a buffer
-func (dl *Datalake) ReadBuffer(name string, offset int64, len int64) ([]byte, error) {
-	return dl.BlockBlob.ReadBuffer(name, offset, len)
+func (dl *Datalake) ReadBuffer(name string, offset int64, length int64) ([]byte, error) {
+	return dl.BlockBlob.ReadBuffer(name, offset, length)
 }
 
 // ReadInBuffer : Download specific range from a file to a user provided buffer
-func (dl *Datalake) ReadInBuffer(name string, offset int64, len int64, data []byte) error {
-	return dl.BlockBlob.ReadInBuffer(name, offset, len, data)
+func (dl *Datalake) ReadInBuffer(name string, offset int64, length int64, data []byte) error {
+	return dl.BlockBlob.ReadInBuffer(name, offset, length, data)
 }
 
 // WriteFromFile : Upload local file to file

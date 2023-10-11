@@ -1,20 +1,11 @@
-//go:build !authtest
-// +build !authtest
+//go:build !authtest && !azurite
+// +build !authtest,!azurite
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -44,41 +35,12 @@ import (
 	"os"
 	"testing"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
-
-type storageTestConfiguration struct {
-	// Get the mount path from command line argument
-	BlockAccount   string `json:"block-acct"`
-	AdlsAccount    string `json:"adls-acct"`
-	BlockContainer string `json:"block-cont"`
-	AdlsContainer  string `json:"adls-cont"`
-	// AdlsDirectory      string `json:"adls-dir"`
-	BlockContainerHuge string `json:"block-cont-huge"`
-	AdlsContainerHuge  string `json:"adls-cont-huge"`
-	BlockKey           string `json:"block-key"`
-	AdlsKey            string `json:"adls-key"`
-	BlockSas           string `json:"block-sas"`
-	BlockContSasUbn18  string `json:"block-cont-sas-ubn-18"`
-	BlockContSasUbn20  string `json:"block-cont-sas-ubn-20"`
-	AdlsSas            string `json:"adls-sas"`
-	// AdlsDirSasUbn18    string `json:"adls-dir-sas-ubn-18"`
-	// AdlsDirSasUbn20    string `json:"adls-dir-sas-ubn-20"`
-	MsiAppId        string `json:"msi-appid"`
-	MsiResId        string `json:"msi-resid"`
-	MsiObjId        string `json:"msi-objid"`
-	SpnClientId     string `json:"spn-client"`
-	SpnTenantId     string `json:"spn-tenant"`
-	SpnClientSecret string `json:"spn-secret"`
-	SkipMsi         bool   `json:"skip-msi"`
-	ProxyAddress    string `json:"proxy-address"`
-}
-
-var storageTestConfigurationParameters storageTestConfiguration
 
 type authTestSuite struct {
 	suite.Suite
@@ -713,6 +675,33 @@ func (suite *authTestSuite) TestBlockInvalidSpn() {
 }
 
 func (suite *authTestSuite) TestBlockInvalidTokenPathSpn() {
+	defer suite.cleanupTest()
+
+	_ = os.WriteFile("newtoken.txt", []byte("abcdef"), 0777)
+	defer os.Remove("newtoken.txt")
+
+	stgConfig := AzStorageConfig{
+		container: storageTestConfigurationParameters.BlockContainer,
+		authConfig: azAuthConfig{
+			AuthMode:           EAuthType.SPN(),
+			AccountType:        EAccountType.BLOCK(),
+			AccountName:        storageTestConfigurationParameters.BlockAccount,
+			ClientID:           storageTestConfigurationParameters.SpnClientId,
+			TenantID:           storageTestConfigurationParameters.SpnTenantId,
+			ClientSecret:       "",
+			Endpoint:           generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
+			OAuthTokenFilePath: "newtoken.txt",
+		},
+	}
+	assert := assert.New(suite.T())
+	stg := NewAzStorageConnection(stgConfig)
+	if stg == nil {
+		assert.Fail("TestBlockInvalidSpn : Failed to create Storage object")
+	}
+	_ = stg.SetupPipeline()
+}
+
+func (suite *authTestSuite) TestBlockSpn() {
 	defer suite.cleanupTest()
 
 	_ = os.WriteFile("newtoken.txt", []byte("abcdef"), 0777)

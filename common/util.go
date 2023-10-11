@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -52,6 +43,9 @@ import (
 
 	"gopkg.in/ini.v1"
 )
+
+// Sector size of disk
+const SectorSize = 4096
 
 var RootMount bool
 var ForegroundMount bool
@@ -146,7 +140,7 @@ func GetCurrentUser() (uint32, uint32, error) {
 }
 
 // JoinUnixFilepath uses filepath.join to join a path and ensures that
-// path only uses unix path delimeters.
+// path only uses unix path delimiters.
 func JoinUnixFilepath(elem ...string) string {
 	return NormalizeObjectName(filepath.Join(elem...))
 }

@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -38,13 +29,12 @@ import (
 	"fmt"
 	"os"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	"cloudfuse/internal/stats_manager"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal/stats_manager"
 )
 
 const DefaultEvictTime = 10
-const sectorSize = 4096
 
 type cachePolicyConfig struct {
 	tmpPath      string
@@ -77,12 +67,25 @@ type cachePolicy interface {
 
 // getUsagePercentage:  The current cache usage as a percentage of the maxSize
 func getUsagePercentage(path string, maxSize float64) float64 {
+	var currSize float64
+	var usagePercent float64
+	var err error
+
 	if maxSize == 0 {
-		return 0
+		currSize, usagePercent, err = common.GetDiskUsageFromStatfs(path)
+		if err != nil {
+			log.Err("cachePolicy::getUsagePercentage : failed to get disk usage for %s [%v]", path, err.Error)
+		}
+	} else {
+		// We need to compuate % usage of temp directory against configured limit
+		currSize, err = common.GetUsage(path)
+		if err != nil {
+			log.Err("cachePolicy::getUsagePercentage : failed to get directory usage for %s [%v]", path, err.Error)
+		}
+
+		usagePercent = (currSize / float64(maxSize)) * 100
 	}
 
-	currSize, _ := getUsage(path)
-	usagePercent := (currSize / float64(maxSize)) * 100
 	log.Debug("cachePolicy::getUsagePercentage : current cache usage : %f%%", usagePercent)
 
 	fileCacheStatsCollector.UpdateStats(stats_manager.Replace, cacheUsage, fmt.Sprintf("%f MB", currSize))

@@ -1,19 +1,10 @@
 //go:build windows
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -43,9 +34,9 @@ import (
 	"syscall"
 	"time"
 
-	"cloudfuse/common"
-	"cloudfuse/common/log"
-	"cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
 
 	"golang.org/x/sys/windows"
 )
@@ -162,7 +153,7 @@ func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	if maxCacheSize == 0 {
 		return nil, false, nil
 	}
-	usage, _ := getUsage(fc.tmpPath)
+	usage, _ := common.GetUsage(fc.tmpPath)
 	available := maxCacheSize - usage
 
 	var free, total, avail uint64
