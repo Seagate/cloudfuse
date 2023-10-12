@@ -196,7 +196,7 @@ var unmountServiceCmd = &cobra.Command{
 	Long:              "unmount an instance and remove entry from Windows service",
 	SuggestFor:        []string{"umount", "unmoun"},
 	Args:              cobra.ExactArgs(1),
-	Example:           "cloudfuse service unmount --name=Mount1",
+	Example:           "cloudfuse service unmount Z:",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		servOpts.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
