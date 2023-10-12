@@ -170,6 +170,7 @@ func (suite *fileTestSuite) TestFileCreatEncodeChar() {
 }
 
 func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
+	// Some of these characters are not allowed on Windows.
 	if runtime.GOOS == "windows" {
 		fmt.Println("Skipping test for Windows")
 		return
@@ -219,6 +220,7 @@ func (suite *fileTestSuite) TestFileCreateLongName() {
 }
 
 func (suite *fileTestSuite) TestFileCreateSlashName() {
+	// Backslashes are not allowed in filenames on Windows.
 	if runtime.GOOS == "windows" {
 		fmt.Println("Skipping test for Windows")
 		return
@@ -365,6 +367,7 @@ func (suite *fileTestSuite) TestFileGetStat() {
 
 // # Change mod of file
 func (suite *fileTestSuite) TestFileChmod() {
+	// File permissions don't work on Windows.
 	if runtime.GOOS == "windows" {
 		fmt.Println("Skipping test for Windows")
 		return
@@ -417,6 +420,7 @@ func (suite *fileTestSuite) TestFileDeleteSingle() {
 
 // # Create a symlink to a file
 func (suite *fileTestSuite) TestLinkCreate() {
+	// Symbolic link creation requires admin rights on Windows.
 	if runtime.GOOS == "windows" {
 		fmt.Println("Skipping test for Windows")
 		return
@@ -439,6 +443,7 @@ func (suite *fileTestSuite) TestLinkCreate() {
 
 // # Read a small file using symlink
 func (suite *fileTestSuite) TestLinkRead() {
+	// Symbolic link creation requires admin rights on Windows.
 	if runtime.GOOS == "windows" {
 		fmt.Println("Skipping test for Windows")
 		return
@@ -465,6 +470,7 @@ func (suite *fileTestSuite) TestLinkRead() {
 
 // # Write a small file using symlink
 func (suite *fileTestSuite) TestLinkWrite() {
+	// Symbolic link creation requires admin rights on Windows.
 	if runtime.GOOS == "windows" {
 		fmt.Println("Skipping test for Windows")
 		return
@@ -489,6 +495,7 @@ func (suite *fileTestSuite) TestLinkWrite() {
 
 // # Rename the target file and validate read on symlink fails
 func (suite *fileTestSuite) TestLinkRenameTarget() {
+	// Symbolic link creation requires admin rights on Windows.
 	if runtime.GOOS == "windows" {
 		fmt.Println("Skipping test for Windows")
 		return
@@ -521,6 +528,7 @@ func (suite *fileTestSuite) TestLinkRenameTarget() {
 
 // # Delete the symklink and check target file is still intact
 func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
+	// Symbolic link creation requires admin rights on Windows.
 	if runtime.GOOS == "windows" {
 		fmt.Println("Skipping test for Windows")
 		return
@@ -569,6 +577,7 @@ func (suite *fileTestSuite) TestReadOnlyFile() {
 } */
 
 func (suite *fileTestSuite) TestCreateReadOnlyFile() {
+	// File permissions not working on Windows.
 	if runtime.GOOS == "windows" {
 		fmt.Println("Skipping test for Windows")
 		return
@@ -586,6 +595,7 @@ func (suite *fileTestSuite) TestCreateReadOnlyFile() {
 
 // # Rename with special character in name
 func (suite *fileTestSuite) TestRenameSpecial() {
+	// This test is flaky on GitHub actions, often, but not always failing.
 	if runtime.GOOS == "windows" {
 		fmt.Println("Skipping test for Windows")
 		return
