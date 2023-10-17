@@ -1,10 +1,8 @@
 # Refer ./setup/baseConfig.yaml for full set of config parameters
 
-allow-other: true
-
 logging:
   type: syslog
-  level: log_debug
+  level: log_warning
 
 components:
   - libfuse
@@ -28,8 +26,8 @@ attr_cache:
 azstorage:
   type: block
   account-name: mystorageaccount
-  account-key: mystoragekey
+  sas: ?sv=<SAS_TOKEN>
   endpoint: https://mystorageaccount.blob.core.windows.net
-  mode: key
+  mode: sas
   container: mycontainer
  

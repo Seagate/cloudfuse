@@ -1,16 +1,14 @@
 # Refer ./setup/baseConfig.yaml for full set of config parameters
 
-allow-other: true
-
 logging:
   type: syslog
-  level: log_debug
+  level: log_warning
 
 components:
   - libfuse
   - stream
   - attr_cache
-  - azstorage
+  - s3storage
 
 libfuse:
   attribute-expiration-sec: 120
@@ -25,11 +23,9 @@ stream:
 attr_cache:
   timeout-sec: 7200
 
-azstorage:
-  type: block
-  account-name: mystorageaccount
-  account-key: mystoragekey
-  endpoint: https://mystorageaccount.blob.core.windows.net
-  mode: key
-  container: mycontainer
- 
+s3storage:
+  bucket-name: mystorageaccount
+  key-id: mystoragekey
+  secret-key: mystoragesecretkey
+  endpoint: https://s3.us-east-1.lyvecloud.seagate.com
+  region: us-east-1
