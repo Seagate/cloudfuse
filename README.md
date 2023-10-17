@@ -1,77 +1,72 @@
 # Cloudfuse - An S3 and Azure Storage FUSE driver
 ## About
+Cloudfuse provides the ability to mount a cloud bucket as a folder on Linux and Windows with a GUI for easy configuration. 
 Cloudfuse is a fork of the open source project
-[blobfuse2](https://github.com/Azure/azure-storage-fuse) from Microsoft that
-adds support for S3 storage, a GUI for configuration and mounting, and Windows
+[blobfuse2](https://github.com/Azure/azure-storage-fuse) from Microsoft which then added support
+for S3 storage, a GUI for configuration and mounting, and Windows
 support. It provides a virtual filesystem backed by either S3 or Azure Storage.
-It uses the libfuse open source library (fuse) to communicate with the Linux
-FUSE kernel module and uses WinFSP to support running on Windows. It implements
-the filesystem operations using the S3 and Azure Storage REST APIs.
 
-Cloudfuse is stable, provided that it is used within its limits documented here.
-Cloudfuse supports both reads and writes, however, it does not guarantee
-continuous sync of data written to storage using other APIs or other mounts of
-Cloudfuse. For data integrity it is recommended that multiple sources do not
-modify the same blob/object/file. Please submit an issue
+## SUPPORT
+Please submit an issue
 [here](https://github.com/Seagate/cloudfuse/issues) for any issues/feature
 requests/questions.
 
-## NOTICE
 
-- We have seen some customer issues around files getting corrupted when `streaming` is used in write mode. Kindly avoid using this feature for write while we investigate and resolve it.
+## QUICK SETUP
 
-<!---TODO Add our own wiki page when we get a Github
-## Supported Platforms
-Visit [this](https://github.com/Azure/azure-storage-fuse/wiki/Blobfuse2-Supported-Platforms) page to see list of supported linux distros.
---->
+COMING SOON!
+Download the provided installation packages for your preferred operating system. 
 
-## Features
-- Mount an S3 bucket or Azure storage container or datalake file system on Linux
-  and Windows.
-- Basic file system operations such as mkdir, opendir, readdir, rmdir, open,
-   read, create, write, close, unlink, truncate, stat, rename
-- Local caching to improve subsequent access times
-- Streaming to support reading AND writing large files
-- Parallel downloads and uploads to improve access time for large files
-- Multiple mounts to the same container for read-only workloads
+
+Please refer to the [Installation from source](https://github.com/Seagate/cloudfuse/wiki/Installation-From-Source) to 
+manually install Cloudfuse.
+
+## QUICK CONFIG
+
+COMING SOON!
+Open the Cloudfuse GUI provided in the installation package
+
+For now, run the GUI from source, please refer to the [running the GUI from source](https://github.com/Seagate/cloudfuse/wiki/Running-the-GUI-from-source)
+to configure the Config file. 
+
+To configure you setup for a specific cloud bucket refer to [Azure Storage Configuration](https://github.com/Seagate/cloudfuse/wiki/Azure-Storage-Configuration) or [S3 Storage Configuration](https://github.com/Seagate/cloudfuse/wiki/S3-Storage-Configuration) wiki's.
+
+## Basic Use
+
 
 ## Health Monitor
 Cloudfuse also supports a health monitor. It allows customers gain more insight
 into how their Cloudfuse instance is behaving with the rest of their machine.
-Visit [here](tools/health-monitor/README.md) to set it up.
+Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it up.
 
-## Features compared to blobfuse2
-- Supports any S3 compatible storage
-- Adds a GUI to configure and start mounts
-- Runs on Windows using WinFSP in foreground or as a Windows service
+## Advanced Usage
+- Mount with cloudfuse
+    * cloudfuse mount \<mount path> --config-file=\<config file>
+- Mount all containers in your storage account
+    * cloudfuse mount all \<mount path> --config-file=\<config file>
+- List all mount instances of cloudfuse
+    * cloudfuse mount list
+- Unmount cloudfuse on Linux
+    * cloudfuse unmount \<mount path>
+- Unmount all cloudfuse instances on Linux
+    * cloudfuse unmount all
+- Install as a Windows service
+    * cloudfuse service install
+- Uninstall cloudfuse from a Windows service
+    * cloudfuse service uninstall
+- Start the Windows service
+    * cloudfuse service start
+- Stop the Windows service
+    * cloudfuse service stop
+- Mount an instance that will persist in Windows when restarted
+    * cloudfuse service mount \<mount path>  --config-file=\<config file>
+- Unmount mount of Cloudfuse running as a Windows service
+    * cloudfuse service unmount \<mount path>
 
-## Download Cloudfuse
-You can install Cloudfuse by cloning this repository. In the workspace execute
-the build script `./build.sh` to build the binary. This will build a binary both
-for Linux or for Windows depending on the OS you are using.
-
-### Linux
-Cloudfuse currently only supports libfuse2. On Linux, you need to install the
-libfuse2 package, for example on Ubuntu:
-
-    sudo apt install libfuse2
-
-#### Running on Linux
-To start your mount of an S3 Bucket or Azure Container use the `mount` command
-and specify the location of your config file. See [config file](#config-file)
-for information about the config file. By default, cloudfuse will run in the
-background which allows you to close the terminal when you start a mount. If you
-would like it to run in the foreground you can specify `foreground: true` in
-your config file or pass `--foreground=true` as an argument when mounting.
-
-        cloudfuse mount <mount path> --config-file=<config file>
-
-### Windows
-On Windows, you also need to install the third party utility
-[WinFsp](https://winfsp.dev/). To download WinFsp, please run the WinFsp
-installer found [here](https://winfsp.dev/rel/).
-
-See [here](WINDOWS.md) for how to setup Cloudfuse to run on Windows.
+## Find help from your command prompt
+To see a list of commands, type `cloudfuse -h` and then press the ENTER key. To
+learn about a specific command, just include the name of the command (For
+example: `cloudfuse mount -h`).
 
 ## Supported Operations
 The general format of the Cloudfuse commands is `cloudfuse [command] [arguments]
@@ -95,34 +90,9 @@ The general format of the Cloudfuse commands is `cloudfuse [command] [arguments]
 * `unmount` - Unmounts the Cloudfuse filesystem.
 * `unmount all` - Unmounts all Cloudfuse filesystems.
 
-## Find help from your command prompt
-To see a list of commands, type `cloudfuse -h` and then press the ENTER key. To
-learn about a specific command, just include the name of the command (For
-example: `cloudfuse mount -h`).
+## NOTICE
+- We have seen some customer issues around files getting corrupted when `streaming` is used in write mode. Kindly avoid using this feature for write while we investigate and resolve it.
 
-## Usage
-- Mount with cloudfuse
-    * cloudfuse mount \<mount path> --config-file=\<config file>
-- Mount all containers in your storage account
-    * cloudfuse mount all \<mount path> --config-file=\<config file>
-- List all mount instances of cloudfuse
-    * cloudfuse mount list
-- Unmount cloudfuse on Linux
-    * cloudfuse unmount \<mount path>
-- Unmount all cloudfuse instances on Linux
-    * cloudfuse unmount all
-- Install as a Windows service
-    * cloudfuse service install
-- Uninstall cloudfuse from a Windows service
-    * cloudfuse service uninstall
-- Start the Windows service
-    * cloudfuse service start
-- Stop the Windows service
-    * cloudfuse service stop
-- Mount an instance that will persist in Windows when restarted
-    * cloudfuse service mount \<mount path>  --config-file=\<config file>
-- Unmount mount of Cloudfuse running as a Windows service
-    * cloudfuse service unmount \<mount path>
 
 <!---TODO Add Usage for mount, unmount, etc--->
 ## CLI parameters
@@ -199,106 +169,9 @@ example: `cloudfuse mount -h`).
     * `--ignore-open-flags=true`: Ignore the append and write only flag since
       O_APPEND and O_WRONLY is not supported with writeback caching.
 
-## S3 configuration
-S3 connections will be configured by options in the following order of precedence:
-- The s3storage section of the [Config file](#config-file)
-- Environment variables
-    * `AWS_ACCESS_KEY_ID`: key ID, used as a pair with `AWS_SECRET_ACCESS_KEY`
-    * `AWS_SECRET_ACCESS_KEY`: secret key, used as a pair with
-      `AWS_ACCESS_KEY_ID`
-    * `AWS_SESSION_TOKEN`: validates a temporary key pair (key ID & secret key)
-    * `AWS_WEB_IDENTITY_TOKEN_FILE`: temporary credential from an external
-      identity provider
-    * `AWS_REGION`: the service region (e.g. us-east-1)
-    * `AWS_PROFILE`: the profile name to use from shared configuration
-      file(s)
-- Shared configuration files (~/.aws/credentials and ~/.aws/config)
-    * The formatting for these files is documented at the link below.
-For more information about environment variables and shared configuration files,
-please see the documentation
-[here](https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/#specifying-credentials).
-
-## Azure storage configuration with environment variables
-- General options
-    * `AZURE_STORAGE_ACCOUNT`: Specifies the storage account to be connected.
-    * `AZURE_STORAGE_ACCOUNT_TYPE`: Specifies the account type 'block' or 'adls'
-    * `AZURE_STORAGE_ACCOUNT_CONTAINER`: Specifies the name of the container to
-      be mounted
-    * `AZURE_STORAGE_BLOB_ENDPOINT`: Specifies the blob endpoint to use.
-      Defaults to *.blob.core.windows.net, but is useful for targeting storage
-      emulators.
-    * `AZURE_STORAGE_AUTH_TYPE`: Overrides the currently specified auth type.
-      Case insensitive. Options: Key, SAS, MSI, SPN
-- Account key auth:
-    * `AZURE_STORAGE_ACCESS_KEY`: Specifies the storage account key to use for
-      authentication.
-- SAS token auth:
-    * `AZURE_STORAGE_SAS_TOKEN`: Specifies the SAS token to use for
-      authentication.
-- Managed Identity auth:
-    * `AZURE_STORAGE_IDENTITY_CLIENT_ID`: Only one of these three parameters are
-      needed if multiple identities are present on the system.
-    * `AZURE_STORAGE_IDENTITY_OBJECT_ID`: Only one of these three parameters are
-      needed if multiple identities are present on the system.
-    * `AZURE_STORAGE_IDENTITY_RESOURCE_ID`: Only one of these three parameters
-      are needed if multiple identities are present on the system.
-    * `MSI_ENDPOINT`: Specifies a custom managed identity endpoint, as IMDS may
-      not be available under some scenarios. Uses the `MSI_SECRET` parameter as
-      the `Secret` header.
-    * `MSI_SECRET`: Specifies a custom secret for an alternate managed identity
-      endpoint.
-- Service Principal Name auth:
-    * `AZURE_STORAGE_SPN_CLIENT_ID`: Specifies the client ID for your
-      application registration
-    * `AZURE_STORAGE_SPN_TENANT_ID`: Specifies the tenant ID for your
-      application registration
-    * `AZURE_STORAGE_AAD_ENDPOINT`: Specifies a custom AAD endpoint to
-      authenticate against
-    * `AZURE_STORAGE_SPN_CLIENT_SECRET`: Specifies the client secret for your
-      application registration.
-    * `AZURE_STORAGE_AUTH_RESOURCE` : Scope to be used while requesting for
-      token.
-- Proxy Server:
-    * `http_proxy`: The proxy server address. Example: `10.1.22.4:8080`.    
-    * `https_proxy`: The proxy server address when https is turned off forcing
-      http. Example: `10.1.22.4:8080`.
-
-## Config file
-- See [this](./sampleFileCacheConfig.yaml) sample config file.
-- See [this](./setup/baseConfig.yaml) config file for a list and description of
-  all possible configurable options in cloudfuse.
-
-***Please note: do not use quotations `""` for any of the config parameters***
-
 ## Frequently Asked Questions
-- How do I generate a SAS for Azure with permissions for rename? az cli has a
-  command to generate a sas token. Open a command prompt and make sure you are
-  logged in to az cli. Run the following command and the sas token will be
-  displayed in the command prompt. az storage container generate-sas
-  --account-name \<account name ex:myadlsaccount> --account-key \<accountKey> -n
-  \<container name> --permissions dlrwac --start \<today's date ex: 2021-03-26>
-  --expiry \<date greater than the current time ex:2021-03-28>
-- Why do I get EINVAL on opening a file with WRONLY or APPEND flags? To improve
-  performance, Cloudfuse by default enables writeback caching, which can produce
-  unexpected behavior for files opened with WRONLY or APPEND flags, so Cloudfuse
-  returns EINVAL on open of a file with those flags. Either use
-  disable-writeback-caching to turn off writeback caching (can potentially
-  result in degraded performance) or ignore-open-flags (replace WRONLY with RDWR
-  and ignore APPEND) based on your workload.
-- How to mount Cloudfuse inside a container? Refer to 'docker' folder in this
-  repo. It contains a sample 'Dockerfile'. If you wish to create your own
-  container image, try 'buildandruncontainer.sh' script, it will create a
-  container image and launch the container using current environment variables
-  holding your storage account credentials.
-- Why am I not able to see the updated contents of file(s), which were updated
-  through means other than Cloudfuse mount? If your use-case involves
-  updating/uploading file(s) through other means and you wish to see the updated
-  contents on Cloudfuse mount then you need to disable kernel page-cache. `-o
-  direct_io` CLI parameter is the option you need to use while mounting. Along
-  with this, set `file-cache-timeout=0` and all other libfuse caching parameters
-  should also be set to 0. User shall be aware that disabling kernel cache can
-  result into more calls to S3 or Azure Storage which will have cost and
-  performance implications.
+
+A list of FAQs can be found [here](https://github.com/Seagate/cloudfuse/wiki/Frequently-Asked-Questions)
 
 ## Un-Supported File system operations
 - mkfifo : fifo creation is not supported by cloudfuse and this will result in
