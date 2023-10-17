@@ -136,7 +136,7 @@ func (value *attrCacheItem) valid() bool {
 }
 
 func (value *attrCacheItem) exists() bool {
-	return value.attrFlag.IsSet(AttrFlagExists)
+	return value.valid() && value.attrFlag.IsSet(AttrFlagExists)
 }
 
 // TODO: don't return true for deleted files.
