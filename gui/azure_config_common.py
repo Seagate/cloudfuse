@@ -135,7 +135,7 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         self.spinBox_streaming_buffSize.setValue(stream['buffer-size-mb'])
         self.spinBox_streaming_maxBuff.setValue(stream['max-buffers'])
         
-        # There is no sanitizing for lineEdit at the moment, the GUI depends on the user being correc.
+        # There is no sanitizing for lineEdit at the moment, the GUI depends on the user being correct.
 
         self.lineEdit_azure_accountKey.setText(azStorage['account-key'])
         self.lineEdit_azure_sasStorage.setText(azStorage['sas'])

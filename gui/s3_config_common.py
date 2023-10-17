@@ -116,7 +116,7 @@ class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
         self.spinBox_streaming_buffSize.setValue(stream['buffer-size-mb'])
         self.spinBox_streaming_maxBuff.setValue(stream['max-buffers'])
         # TODO:
-        # There is no sanitizing for lineEdit at the moment, the GUI depends on the user being correc.
+        # There is no sanitizing for lineEdit at the moment, the GUI depends on the user being correct.
         self.lineEdit_bucketName.setText(s3storage['bucket-name'])
         self.lineEdit_endpoint.setText(s3storage['endpoint'])
         self.lineEdit_secretKey.setText(s3storage['secret-key'])

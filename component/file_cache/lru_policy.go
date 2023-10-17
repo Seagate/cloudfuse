@@ -298,7 +298,7 @@ func (p *lruPolicy) clearCache() {
 
 					pUsage := getUsagePercentage(p.tmpPath, p.maxSizeMB)
 					if pUsage < p.lowThreshold || cleanupCount >= 3 {
-						log.Info("lruPolicy::ClearCache : Threshold stablized %f > %f", pUsage, p.lowThreshold)
+						log.Info("lruPolicy::ClearCache : Threshold stabilized %f > %f", pUsage, p.lowThreshold)
 						continueDeletion = false
 					}
 				}
