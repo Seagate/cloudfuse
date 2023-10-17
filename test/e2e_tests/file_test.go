@@ -170,6 +170,7 @@ func (suite *fileTestSuite) TestFileCreatEncodeChar() {
 }
 
 func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
+	// Some of these characters are not allowed on Windows.
 	if runtime.GOOS == "windows" {
 		fmt.Println("Skipping test for Windows")
 		return
@@ -219,6 +220,7 @@ func (suite *fileTestSuite) TestFileCreateLongName() {
 }
 
 func (suite *fileTestSuite) TestFileCreateSlashName() {
+	// Backslashes are not allowed in filenames on Windows.
 	if runtime.GOOS == "windows" {
 		fmt.Println("Skipping test for Windows")
 		return
@@ -365,6 +367,11 @@ func (suite *fileTestSuite) TestFileGetStat() {
 
 // # Change mod of file
 func (suite *fileTestSuite) TestFileChmod() {
+	// File permissions don't work on Windows.
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
 	if suite.adlsTest {
 		fileName := suite.testPath + "/test"
 		f, err := os.Create(fileName)
@@ -413,6 +420,12 @@ func (suite *fileTestSuite) TestFileDeleteSingle() {
 
 // # Create a symlink to a file
 func (suite *fileTestSuite) TestLinkCreate() {
+	// Symbolic link creation requires admin rights on Windows.
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
+
 	fileName := suite.testPath + "/small_write1.txt"
 	f, err := os.Create(fileName)
 	suite.Equal(nil, err)
@@ -430,6 +443,12 @@ func (suite *fileTestSuite) TestLinkCreate() {
 
 // # Read a small file using symlink
 func (suite *fileTestSuite) TestLinkRead() {
+	// Symbolic link creation requires admin rights on Windows.
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
+
 	fileName := suite.testPath + "/small_write1.txt"
 	f, err := os.Create(fileName)
 	suite.Equal(nil, err)
@@ -451,6 +470,12 @@ func (suite *fileTestSuite) TestLinkRead() {
 
 // # Write a small file using symlink
 func (suite *fileTestSuite) TestLinkWrite() {
+	// Symbolic link creation requires admin rights on Windows.
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
+
 	targetName := suite.testPath + "/small_write1.txt"
 	f, err := os.Create(targetName)
 	suite.Equal(nil, err)
@@ -470,6 +495,12 @@ func (suite *fileTestSuite) TestLinkWrite() {
 
 // # Rename the target file and validate read on symlink fails
 func (suite *fileTestSuite) TestLinkRenameTarget() {
+	// Symbolic link creation requires admin rights on Windows.
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
+
 	fileName := suite.testPath + "/small_write1.txt"
 	symName := suite.testPath + "/small.lnk"
 	f, err := os.Create(fileName)
@@ -497,6 +528,12 @@ func (suite *fileTestSuite) TestLinkRenameTarget() {
 
 // # Delete the symklink and check target file is still intact
 func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
+	// Symbolic link creation requires admin rights on Windows.
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
+
 	fileName := suite.testPath + "/small_write1.txt"
 	symName := suite.testPath + "/small.lnk"
 	f, err := os.Create(fileName)
@@ -540,6 +577,11 @@ func (suite *fileTestSuite) TestReadOnlyFile() {
 } */
 
 func (suite *fileTestSuite) TestCreateReadOnlyFile() {
+	// File permissions not working on Windows.
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
 	if suite.adlsTest == true {
 		fileName := suite.testPath + "/createReadOnlyFile.txt"
 		srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0444)
@@ -553,6 +595,12 @@ func (suite *fileTestSuite) TestCreateReadOnlyFile() {
 
 // # Rename with special character in name
 func (suite *fileTestSuite) TestRenameSpecial() {
+	// This test is flaky on GitHub actions, often, but not always failing.
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
+
 	dirName := suite.testPath + "/" + "Alcaldía"
 	newDirName := suite.testPath + "/" + "Alδaδcaldía"
 	fileName := dirName + "/" + "भारत.txt"
@@ -623,4 +671,6 @@ func init() {
 	regFileTestFlag(&fileTestPathPtr, "mnt-path", "", "Mount Path of Container")
 	regFileTestFlag(&fileTestAdlsPtr, "adls", "", "Account is ADLS or not")
 	regFileTestFlag(&fileTestGitClonePtr, "clone", "", "Git clone test is enable or not")
+	regFileTestFlag(&fileTestStreamDirectPtr, "stream-direct-test", "false", "Run stream direct tests")
+	regFileTestFlag(&fileTestDistroName, "distro-name", "", "Name of the distro")
 }

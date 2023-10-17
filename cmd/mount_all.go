@@ -57,8 +57,8 @@ var mountAllOpts containerListingOptions
 
 var mountAllCmd = &cobra.Command{
 	Use:               "all [path] <flags>",
-	Short:             "Mounts all azure blob container or s3 bucket for a given account as a filesystem",
-	Long:              "Mounts all azure blob container or s3 bucket for a given account as a filesystem",
+	Short:             "Mounts all containers for a given cloud account as a filesystem",
+	Long:              "Mounts all containers for a given cloud account as a filesystem",
 	SuggestFor:        []string{"mnta", "mout"},
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,

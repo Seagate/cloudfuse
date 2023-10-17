@@ -27,7 +27,7 @@ To run as a Windows service you need to run the following commands in a terminal
 
         cloudfuse.exe service mount <mount path> --config-file=<config file>
 
-To unmount a specific instance use the unmount command. This will also prevent this mount from persiting on restarts.
+To unmount a specific instance use the unmount command. This will also prevent this mount from persisting on restarts.
 
         cloudfuse.exe service unmount <mount path>
 
