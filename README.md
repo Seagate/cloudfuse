@@ -52,21 +52,21 @@ The general format of the Cloudfuse commands is `cloudfuse [command] [arguments]
   - Azure Datalake Gen2 Container
   - Example: cloudfuse mount \<mount path> --config-file=\<config file>
 * `mount all` - Mounts all the containers in an S3 Account or Azure account as a
- - Example: cloudfuse mount all \<mount path> --config-file=\<config file>
+  - Example: cloudfuse mount all \<mount path> --config-file=\<config file>
   filesystem. The supported storage services include
   - [S3 Storage](https://aws.amazon.com/s3/)
   - [Blob Storage](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction)
   - [Datalake Storage Gen2](https://docs.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction)
 * `mount list` - Lists all Cloudfuse filesystems.
- - cloudfuse mount list
+  - cloudfuse mount list
 * `secure decrypt` - Decrypts a config file.
 * `secure encrypt` - Encrypts a config file.
 * `secure get` - Gets value of a config parameter from an encrypted config file.
 * `secure set` - Updates value of a config parameter.
 * `unmount` - Unmounts the Cloudfuse filesystem.
- - Example: cloudfuse unmount \<mount path>
+  - Example: cloudfuse unmount \<mount path>
 * `unmount all` - Unmounts all Cloudfuse filesystems.
- - Example: cloudfuse unmount all
+  - Example: cloudfuse unmount all
 * `service` - Windows service only to start.
 * Windows Only Commands:
   * `cloudfuse service install` - Install as a Windows service
