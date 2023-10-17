@@ -97,6 +97,7 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 		value.children[paths[0]] = newAttrCacheItem(attr, exists, cachedAt)
 	} else {
 		itemPath += paths[0] + "/"
+		//see if the directory exists. if not, create it.
 		_, ok := value.children[paths[0]]
 		if !ok {
 			value.children[paths[0]] = newAttrCacheItem(internal.CreateObjAttrDir(itemPath), exists, cachedAt)
