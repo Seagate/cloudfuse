@@ -73,8 +73,6 @@ func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *
 		item.attrFlag.Set(AttrFlagExists)
 	}
 
-	//item.Insert(attr, exists, cachedAt)
-
 	return item
 }
 
