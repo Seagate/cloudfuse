@@ -46,23 +46,15 @@ The general format of the Cloudfuse commands is `cloudfuse [command] [arguments]
 * commands:
 * `help` - Help about any command
 * `mount` - Mounts a cloud storage container as a filesystem. The supported
-  containers include
-  - S3 Bucket
-  - Azure Blob Container
-  - Azure Datalake Gen2 Container
+  containers include:
+  - [S3 Bucket Storage](https://aws.amazon.com/s3/)
+  - [Azure Blob Storage](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction)
+  - [Azure Datalake Storage Gen2](https://docs.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction)
   - Example: cloudfuse mount \<mount path> --config-file=\<config file>
-* `mount all` - Mounts all the containers in an S3 Account or Azure account as a
+* `mount all` - Mounts all the containers in an S3 Account or Azure account supported by mount
   - Example: cloudfuse mount all \<mount path> --config-file=\<config file>
-  filesystem. The supported storage services include
-  - [S3 Storage](https://aws.amazon.com/s3/)
-  - [Blob Storage](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction)
-  - [Datalake Storage Gen2](https://docs.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction)
 * `mount list` - Lists all Cloudfuse filesystems.
   - cloudfuse mount list
-* `secure decrypt` - Decrypts a config file.
-* `secure encrypt` - Encrypts a config file.
-* `secure get` - Gets value of a config parameter from an encrypted config file.
-* `secure set` - Updates value of a config parameter.
 * `unmount` - Unmounts the Cloudfuse filesystem.
   - Example: cloudfuse unmount \<mount path>
 * `unmount all` - Unmounts all Cloudfuse filesystems.
@@ -75,6 +67,10 @@ The general format of the Cloudfuse commands is `cloudfuse [command] [arguments]
   * `cloudfuse service stop` - Stop the Windows service
   * `cloudfuse service mount \<mount path>  --config-file=\<config file>` - Mount an instance that will persist in Windows when restarted
   * `cloudfuse service unmount \<mount path>` - Unmount mount of Cloudfuse running as a Windows service
+* `secure decrypt` - Decrypts a config file.
+* `secure encrypt` - Encrypts a config file.
+* `secure get` - Gets value of a config parameter from an encrypted config file.
+* `secure set` - Updates value of a config parameter.
 
 ## Find help from your command prompt
 To see a list of commands, type `cloudfuse -h` and then press the ENTER key. To
