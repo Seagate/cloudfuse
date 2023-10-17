@@ -69,18 +69,12 @@ The general format of the Cloudfuse commands is `cloudfuse [command] [arguments]
  - Example: cloudfuse unmount all
 * `service` - Windows service only to start.
 * Windows Only Commands:
-  - Install as a Windows service
-      * `cloudfuse service install`
-  - Uninstall cloudfuse from a Windows service
-      * `cloudfuse service uninstall`
-- Start the Windows service
-    * `cloudfuse service start`
-- Stop the Windows service
-    * `cloudfuse service stop`
-- Mount an instance that will persist in Windows when restarted
-    * `cloudfuse service mount \<mount path>  --config-file=\<config file>`
-- Unmount mount of Cloudfuse running as a Windows service
-    * `cloudfuse service unmount \<mount path>`
+  * `cloudfuse service install` - Install as a Windows service
+  * `cloudfuse service uninstall` - Uninstall cloudfuse from a Windows service
+  * `cloudfuse service start` - Start the Windows service
+  * `cloudfuse service stop` - Stop the Windows service
+  * `cloudfuse service mount \<mount path>  --config-file=\<config file>` - Mount an instance that will persist in Windows when restarted
+  * `cloudfuse service unmount \<mount path>` - Unmount mount of Cloudfuse running as a Windows service
 
 ## Find help from your command prompt
 To see a list of commands, type `cloudfuse -h` and then press the ENTER key. To
