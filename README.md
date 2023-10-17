@@ -11,12 +11,10 @@ Please submit an issue
 [here](https://github.com/Seagate/cloudfuse/issues) for any issues/feature
 requests/questions.
 
-
 ## QUICK SETUP
 
 COMING SOON!
 Download the provided installation packages for your preferred operating system. 
-
 
 Please refer to the [Installation from source](https://github.com/Seagate/cloudfuse/wiki/Installation-From-Source) to 
 manually install Cloudfuse.
@@ -32,7 +30,7 @@ to configure the Config file.
 To configure you setup for a specific cloud bucket refer to [Azure Storage Configuration](https://github.com/Seagate/cloudfuse/wiki/Azure-Storage-Configuration) or [S3 Storage Configuration](https://github.com/Seagate/cloudfuse/wiki/S3-Storage-Configuration) wiki's.
 
 ## Basic Use
-
+COMING SOON!
 
 ## Health Monitor
 Cloudfuse also supports a health monitor. It allows customers gain more insight
