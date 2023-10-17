@@ -1,5 +1,5 @@
 name: Feature request
-description: Request a new feature or improvement specific to this CORTX component. Please first check to make sure this has not yet been requested.  
+description: Request a new feature or improvement to Cloudfuse. Please first check to make sure this has not yet been requested.  
 labels: [enhancement]
 body:
   - type: textarea

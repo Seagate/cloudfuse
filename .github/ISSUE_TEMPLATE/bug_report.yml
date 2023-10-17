@@ -1,5 +1,5 @@
 name: Bug report
-description: Report problems and issues specific to Cloudfuse. Please first check to make sure this has not yet been reported.
+description: Report problems and issues to Cloudfuse. Please first check to make sure this has not yet been reported.
 labels: [bug]
 
 body:
