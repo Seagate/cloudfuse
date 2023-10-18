@@ -780,7 +780,7 @@ func (suite *attrCacheTestSuite) TestRenameDir() {
 			suite.mock.EXPECT().RenameDir(options).Return(nil)
 
 			err = suite.attrCache.RenameDir(options)
-			suite.assert.Equal(err, syscall.ENOENT)
+			suite.assert.NotNil(err)
 
 			_, err = suite.attrCache.cacheMap.get(truncatedSrc)
 			suite.assert.NotNil(err)

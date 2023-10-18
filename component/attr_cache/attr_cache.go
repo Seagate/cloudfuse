@@ -197,9 +197,6 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	// When we delete directory a, we only want to delete a/, a/b, and a/c.
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
-	// remember whether we actually found any contents
-	foundCachedContents := false
-
 	//get attrCacheItem
 	toBeDeleted, err := ac.cacheMap.get(path)
 
@@ -211,12 +208,8 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 		toBeDeleted.markDeleted(time)
 	}
 
-	if toBeDeleted.children != nil {
-		foundCachedContents = true
-	}
-
 	// check if the directory to be deleted exists
-	if !foundCachedContents && !ac.pathExistsInCache(path) {
+	if toBeDeleted.children == nil && !ac.pathExistsInCache(path) {
 		log.Err("AttrCache::deleteCachedDirectory : directory %s does not exist in attr cache.", path)
 		return syscall.ENOENT
 	}
@@ -225,7 +218,6 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	// Although this involves an unnecessary second traversal through the cache,
 	// because of the code complexity, I think it's worth the readability gained.
 	ac.updateAncestorsInCloud(getParentDir(path), time)
-
 	return nil
 }
 
@@ -288,21 +280,18 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
 	// remember whether we actually found any contents
-	foundCachedContents := false
 	srcItem, err := ac.cacheMap.get(srcDir)
 	if err != nil {
 		log.Err("could not get the source cached item for renaming directory due to the following error: ", err)
+		return err
 	} else {
-		if srcItem.children != nil {
-			foundCachedContents = true
-		}
 		srcDir = internal.TruncateDirName(srcDir)
 		dstDir = internal.TruncateDirName(dstDir)
 		ac.renameCachedDirectoryHelper(srcItem, srcDir, dstDir, time)
 	}
 
 	// if there were no cached entries to move, does this directory even exist?
-	if !foundCachedContents && !ac.pathExistsInCache(srcDir) {
+	if srcItem.children == nil && !ac.pathExistsInCache(srcDir) {
 		log.Err("AttrCache::renameCachedDirectory : Source directory %s does not exist.", srcDir)
 		return syscall.ENOENT
 	}
