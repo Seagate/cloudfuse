@@ -31,7 +31,6 @@ import (
 	"os"
 	"path"
 	"sort"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -246,17 +245,17 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 	toBeInvalid, err := ac.cacheMap.get(path)
 	if err != nil {
 		log.Err("could not invalidate cached attr item due to the following error: ", err)
-	} else {
-		// don't invalidate directories when cacheDirs is true
-		if !ac.cacheDirs && toBeInvalid.attr.IsDir() {
-			toBeInvalid.invalidate()
-		} else if ac.cacheDirs && !toBeInvalid.attr.IsDir() {
-			toBeInvalid.invalidate()
-		} else if ac.cacheDirs && toBeInvalid.attr.IsDir() {
-			if toBeInvalid.children != nil {
-				for _, childItem := range toBeInvalid.children {
-					ac.invalidateDirectory(childItem.attr.Path)
-				}
+		return
+	}
+	// don't invalidate directories when cacheDirs is true
+	if !ac.cacheDirs && toBeInvalid.attr.IsDir() {
+		toBeInvalid.invalidate()
+	} else if ac.cacheDirs && !toBeInvalid.attr.IsDir() {
+		toBeInvalid.invalidate()
+	} else if ac.cacheDirs && toBeInvalid.attr.IsDir() {
+		if toBeInvalid.children != nil {
+			for _, childItem := range toBeInvalid.children {
+				ac.invalidateDirectory(childItem.attr.Path)
 			}
 		}
 	}
@@ -296,141 +295,15 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 }
 
 func (ac *AttrCache) renameCachedDirectoryHelper(itemSrc *attrCacheItem, srcDir string, dstDir string, time time.Time) {
-	movedObjects := false
-	var dstKey string
-	if itemSrc.children != nil {
-		for _, childSrc := range itemSrc.children {
-			dstKey = strings.Replace(childSrc.attr.Path, srcDir, dstDir, 2)
-
-			// track whether the destination is gaining objects
-			movedObjects = movedObjects || (childSrc.isInCloud() && childSrc.exists() && childSrc.valid())
-
-			// to keep the directory cache coherent,
-			// any renamed directories need a new cache entry
-			// TODO: revisit above comments. scanning sub tree?
-			var dstDirCacheItem *attrCacheItem
-			var err error
-			if childSrc.attr.IsDir() && childSrc.valid() && childSrc.exists() {
-				// add the destination directory to our cache
-				dstDirAttr := internal.CreateObjAttrDir(dstKey)
-				ac.cacheMap.insert(dstDirAttr, true, time)
-				dstDirCacheItem, err = ac.cacheMap.get(dstDirAttr.Path)
-				if err != nil {
-					log.Err("could not find the destination attr cached item to rename directory due to the following error: ", err)
-					return
-				}
-				dstDirCacheItem.markInCloud(childSrc.isInCloud())
-
-			} else {
-				// invalidate files so attributes get refreshed from the backend
-				if dstDirCacheItem != nil {
-					dstDirCacheItem.invalidate()
-				}
-			}
-
-			if childSrc.children != nil {
-				for _, srcGrdChild := range childSrc.children {
-					ac.renameCachedDirectoryHelper(srcGrdChild, srcDir, dstDir, time)
-				}
-			}
-
-			// TODO: maybe encapulate the following if else statement into a wrapper?
-			if movedObjects {
-				ac.markAncestorsInCloud(dstKey, time)
-			} else {
-				// add the destination directory to our cache
-				// am I adding a child to the already existing dstItem? is it a duplicate item as a child?
-				dstDir = internal.TruncateDirName(dstDir)
-				dstItem, err := ac.cacheMap.get(dstDir)
-				if err != nil {
-					log.Err("could not find the attr cached item: ", err)
-				} else { //TODO: peer review that this is correct
-					dstDirAttr := internal.CreateObjAttrDir(dstDir)
-					dstItem.insert(dstDirAttr, true, time)
-					dstDirAttrCacheItem, err := ac.cacheMap.get(dstDirAttr.Path)
-					if err != nil {
-						log.Err("could not find the attr cached item: ", err)
-					} else {
-						dstDirAttrCacheItem.markInCloud(false)
-					}
-
-				}
-
-				// delete the source directory from our cache
-				itemSrc.markDeleted(time)
-
-				// If this leaves the parent or ancestor directories empty, record that.
-				// Although this involves an unnecessary second traversal through the cache,
-				// because of the code complexity, I think it's worth the readability gained.
-				ac.updateAncestorsInCloud(getParentDir(srcDir), time)
-			}
-
-			// either way, mark the old cache entry deleted
-			childSrc.markDeleted(time)
-		}
-		itemSrc.markDeleted(time)
-	} else {
-		dstKey = strings.Replace(itemSrc.attr.Path, srcDir, dstDir, 2)
-
-		// track whether the destination is gaining objects
-		movedObjects = movedObjects || (itemSrc.isInCloud() && itemSrc.exists() && itemSrc.valid())
-
-		// to keep the directory cache coherent,
-		// any renamed directories need a new cache entry
-		// TODO: files or objects (non dirs) in the sub tree are not getting inserted into cacheMap tree. is this a bug?
-		var dstDirCacheItem *attrCacheItem
-		var err error
-		if itemSrc.attr.IsDir() && itemSrc.valid() && itemSrc.exists() {
-			// add the destination directory to our cache
-			dstDirAttr := internal.CreateObjAttrDir(dstKey)
-			ac.cacheMap.insert(dstDirAttr, true, time)
-			dstDirCacheItem, err = ac.cacheMap.get(dstDirAttr.Path)
-			if err != nil {
-				log.Err("could not find the destination attr cached item to rename directory due to the following error: ", err)
-			} else {
-				dstDirCacheItem.markInCloud(itemSrc.isInCloud())
-			}
-		} else {
-			// invalidate files so attributes get refreshed from the backend
-			if dstDirCacheItem != nil {
-				dstDirCacheItem.invalidate()
-			}
-		}
-
-		// either way, mark the old cache entry deleted
-		itemSrc.markDeleted(time)
-
-		if movedObjects {
-			ac.markAncestorsInCloud(dstKey, time)
-		} else {
-			// add the destination directory to our cache
-			// am I adding a child to the already existing dstItem? is it a duplicate item as a child?
-			dstDir = internal.TruncateDirName(dstDir)
-			dstItem, err := ac.cacheMap.get(dstDir)
-			if err != nil {
-				log.Err("could not find the attr cached item: ", err)
-			} else { //TODO: peer review that this is correct
-				dstDirAttr := internal.CreateObjAttrDir(dstDir)
-				dstItem.insert(dstDirAttr, true, time)
-				dstDirAttrCacheItem, err := ac.cacheMap.get(dstDirAttr.Path)
-				if err != nil {
-					log.Err("could not find the attr cached item: ", err)
-				} else {
-					dstDirAttrCacheItem.markInCloud(false)
-				}
-
-			}
-
-			// delete the source directory from our cache
-			itemSrc.markDeleted(time)
-
-			// If this leaves the parent or ancestor directories empty, record that.
-			// Although this involves an unnecessary second traversal through the cache,
-			// because of the code complexity, I think it's worth the readability gained.
-			ac.updateAncestorsInCloud(getParentDir(srcDir), time)
-		}
-
-	}
+	// we have the source item. look at everything in the source item as reference
+	// for each item in the subtree of itemSrc, create the destination item based on the source item information.
+	// 1.) check that source item isInCloud and is valid
+	// 2.) take the source name and change it to the destination name
+	// 3.) create an attribute using the destination name
+	// 4.) insert the attribute from previous step into the cacheMap
+	// 5.) mark that inserted item in the cloud
+	// 6.) repeat steps 1 - 5 for any children in the current source Item
+	// 7.) if step 1 is true, markAncestorsIncloud(destination name)
 
 }
 
