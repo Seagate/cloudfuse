@@ -20,7 +20,7 @@ manually install Cloudfuse.
 
 ## Config
 COMING SOON!
-Open the Cloudfuse GUI provided in the installation package
+Open the Cloudfuse GUI provided in the installation package.
 
 For now, run the GUI from source, please refer to the [running the GUI from source](https://github.com/Seagate/cloudfuse/wiki/Running-the-GUI-from-source)
 to configure the Config file. 
@@ -36,21 +36,26 @@ Launch the provided GUI and check the configs are set from the above instruction
   - You should now see your data in the folder you selected.
 * `To unmount`
   - Through the main window in the GUI, browse to the folder your mounted cloud resides and select it.
-  - Click the unmount mutton
-  - The folder the cloud was in should now be empty
+  - Select the type of cloud you have, S3 or Azure.
+  - Click the unmount mutton.
+  - The folder the cloud was in should now be empty.
 
 ### Windows
 Note: Make sure WinSFP is installed in the setup section dedicated to Windows.
 * `To Mount`
   - Launch the provided GUI escalated with admin rights (this is for the windows service option).
-  - To attach your cloud to a folder, browse to the location you want your cloud to mount and make sure that directory is empty, then select mount.
-  - You will see an error if you did not launch the GUI with admin rights, if this happens just relaunch the GUI by right-clicking and selecting 'Run as Administrator'
+  - To attach your cloud to a folder, browse to the location you want your cloud to mount and make sure that directory is empty.
+  - Select the type of cloud you want, either S3 or Azure.
+  - Click mount.
+  - You will see an error if you did not launch the GUI with admin rights, if this happens just relaunch the GUI by right-clicking and selecting 'Run as Administrator'.
 
 * `To Unmount`
-  - Launch the provided GUI with admin rights
-  - Through the main window of the GUI, browse to the cloud you want unmounted and select that folder, then click unmount
+  - Launch the provided GUI with admin rights.
+  - Through the main window of the GUI, browse to the cloud you want unmounted and select that folder
+  - Select the type of cloud you have mounted, either S3 or Azure.
+  - Click unmount.
 
-If you do not desure to use the GUI to mount/unmount your cloud, please reger to Command Line Interface Operations further down
+If you do not desire to use the GUI to mount/unmount your cloud, please refer to Command Line Interface Operations below.
 
 ## Health Monitor
 Cloudfuse also supports a health monitor. It allows customers gain more insight
