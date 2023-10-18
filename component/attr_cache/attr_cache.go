@@ -214,9 +214,6 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 		return syscall.ENOENT
 	}
 
-	// If this leaves the parent or any ancestor directory empty, record that.
-	// Although this involves an unnecessary second traversal through the cache,
-	// because of the code complexity, I think it's worth the readability gained.
 	ac.updateAncestorsInCloud(getParentDir(path), time)
 	return nil
 }
