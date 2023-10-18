@@ -178,7 +178,7 @@ func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 
 	// delete the path itself and children.
 	if err != nil {
-		log.Err("could not find the cache map item due to the following error: ", err)
+		log.Err("AttrCache::deleteDirectory : could not find the cache map item due to the following error: ", err)
 
 	} else {
 		toBeDeleted.markDeleted(time)
