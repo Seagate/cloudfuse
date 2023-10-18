@@ -18,12 +18,11 @@ Please refer to the [Installation from source](https://github.com/Seagate/cloudf
 manually install Cloudfuse.
 
 ## Config
+The GUI will populate the default values for most of the settings when going through the initial config.
 
 * Launch the GUI from two different methods:
   - Open the Cloudfuse GUI provided in the installation package -- COMING SOON!
   - Open the GUI from source, which is explained [here](https://github.com/Seagate/cloudfuse/wiki/Running-the-GUI-from-source)
-
-The GUI will populate the default values for most of the settings when going through the initial config.
 * On the main window, select your desired type of cloud (Azure or S3) then click config.
 * Enter the credentials for your cloud
   - Go to [S3 Storage Configuration](https://github.com/Seagate/cloudfuse/wiki/S3-Storage-Configuration) to find S3 credential requirements.
