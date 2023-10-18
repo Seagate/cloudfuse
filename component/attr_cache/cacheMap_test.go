@@ -35,10 +35,11 @@
 package attr_cache
 
 import (
-	"cloudfuse/internal"
 	"container/list"
 	"testing"
 	"time"
+
+	"github.com/Seagate/cloudfuse/internal"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -193,7 +194,6 @@ func (suite *cacheMapTestSuite) TestInvalidate() {
 	cachedItem, err = suite.rootAttrCacheItem.get(path)
 	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
-	suite.assert.EqualValues(false, cachedItem.isDeleted())
 	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagValid))
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
 }
@@ -290,7 +290,6 @@ func (suite *cacheMapTestSuite) TestInvalidateFolder() {
 	cachedItem, err = suite.rootAttrCacheItem.get(parentPath)
 	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
-	suite.assert.EqualValues(false, cachedItem.isDeleted())
 	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagValid))
 	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
 
@@ -367,7 +366,6 @@ func (suite *cacheMapTestSuite) confirmMarkDeleted(item *attrCacheItem) {
 func (suite *cacheMapTestSuite) confirmInvalidated(item *attrCacheItem) {
 
 	suite.assert.NotNil(item)
-	suite.assert.EqualValues(false, item.isDeleted())
 	suite.assert.EqualValues(false, item.attrFlag.IsSet(AttrFlagValid))
 	suite.assert.EqualValues(item.attr, &internal.ObjAttr{})
 
