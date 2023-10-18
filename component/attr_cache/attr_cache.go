@@ -177,7 +177,7 @@ func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 	toBeDeleted, err := ac.cacheMap.get(path)
 
 	// delete the path itself and children.
-	if err != nil {
+	if err != nil || !toBeDeleted.exists() {
 		log.Err("AttrCache::deleteDirectory : directory %s not found in cache", path)
 		return
 	}
