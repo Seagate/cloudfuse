@@ -178,11 +178,10 @@ func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 
 	// delete the path itself and children.
 	if err != nil {
-		log.Err("AttrCache::deleteDirectory : could not find the cache map item due to the following error: ", err)
-
-	} else {
-		toBeDeleted.markDeleted(time)
+		log.Err("AttrCache::deleteDirectory : directory %s not found in cache", path)
+		return
 	}
+	toBeDeleted.markDeleted(time)
 
 }
 
@@ -333,9 +332,10 @@ func (ac *AttrCache) renameCachedDirectoryHelper(itemSrc *attrCacheItem, srcDir 
 				dstDirCacheItem, err = ac.cacheMap.get(dstDirAttr.Path)
 				if err != nil {
 					log.Err("could not find the destination attr cached item to rename directory due to the following error: ", err)
-				} else {
-					dstDirCacheItem.markInCloud(childSrc.isInCloud())
+					return
 				}
+				dstDirCacheItem.markInCloud(childSrc.isInCloud())
+
 			} else {
 				// invalidate files so attributes get refreshed from the backend
 				if dstDirCacheItem != nil {
