@@ -75,6 +75,7 @@ The general format of the Cloudfuse Windows commands is `cloudfuse [service] [co
   * `cloudfuse service stop` - Stop the Windows service
   * `cloudfuse service mount \<mount path>  --config-file=\<config file>` - Mount an instance that will persist in Windows when restarted
   * `cloudfuse service unmount \<mount path>` - Unmount mount of Cloudfuse running as a Windows service
+
 To use security options the general format for cloudfuse commands is `cloudfuse [command] [aruments] --[flag-name]=[flag-value]`
 * `secure decrypt` - Decrypts a config file.
 * `secure encrypt` - Encrypts a config file.
