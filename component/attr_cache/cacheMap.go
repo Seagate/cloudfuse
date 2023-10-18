@@ -65,7 +65,7 @@ func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *
 	return item
 }
 
-func (value *attrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) {
+func (value *attrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {
 	var path string
 	if (attr.Path != "" && attr.Name == "") || attr != nil {
 		path = attr.Path // home/user/folder/file
@@ -73,11 +73,13 @@ func (value *attrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt
 	}
 	var itemPath string
 	//start recursion
-	value.insertHelper(attr, exists, cachedAt, path, itemPath)
+	cachedItem := value.insertHelper(attr, exists, cachedAt, path, itemPath)
+	return cachedItem
 }
 
 // TODO: write unit tests for this
-func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string, itemPath string) {
+func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string, itemPath string) *attrCacheItem {
+	var cachedItem *attrCacheItem
 	paths := strings.SplitN(path, "/", 2) // paths[0] is home paths[1] is user/folder/file
 	if value.children == nil {
 		value.children = make(map[string]*attrCacheItem)
@@ -85,7 +87,8 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 	if len(paths) < 2 {
 		// this is a leaf
 		// we end up with string key being a single folder name instead of a full path. This also will take care of using the folder attribute data.
-		value.children[paths[0]] = newAttrCacheItem(attr, exists, cachedAt)
+		cachedItem = newAttrCacheItem(attr, exists, cachedAt)
+		value.children[paths[0]] = cachedItem
 	} else {
 		itemPath += paths[0] + "/"
 		//see if the directory exists. if not, create it.
@@ -95,6 +98,7 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 		}
 		value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1], itemPath)
 	}
+	return cachedItem
 }
 
 // input: full path to item or file as string
