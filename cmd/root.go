@@ -151,15 +151,6 @@ func beginDetectNewVersion() chan interface{} {
 			log.Info("beginDetectNewVersion: A new version of Cloudfuse is available. Current Version=%s, Latest Version=%s", common.CloudfuseVersion, remoteVersion)
 			fmt.Fprintf(stderr, "*** "+executableName+": A new version [%s] is available. Consider upgrading to latest version for bug-fixes & new features. ***\n", remoteVersion)
 			log.Info("*** "+executableName+": A new version [%s] is available. Consider upgrading to latest version for bug-fixes & new features. ***\n", remoteVersion)
-
-			warningsUrl := common.CloudfuseListContainerURL + "/securitywarnings/" + common.CloudfuseVersion
-			hasWarnings := checkVersionExists(warningsUrl)
-
-			if hasWarnings {
-				warningsPage := common.CloudfuseWarningsURL + "#" + strings.ReplaceAll(common.CloudfuseVersion, ".", "")
-				fmt.Fprintf(stderr, "Visit %s to see the list of vulnerabilities associated with your current version [%s]\n", warningsPage, common.CloudfuseVersion)
-				log.Warn("Visit %s to see the list of vulnerabilities associated with your current version [%s]\n", warningsPage, common.CloudfuseVersion)
-			}
 			completed <- "A new version of Cloudfuse is available"
 		}
 	}()

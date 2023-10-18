@@ -120,13 +120,6 @@ func (suite *rootCmdSuite) TestCheckVersionExistsInvalidURL() {
 	suite.assert.False(found)
 }
 
-func (suite *rootCmdSuite) TestNoSecurityWarnings() {
-	defer suite.cleanupTest()
-	warningsUrl := common.CloudfuseListContainerURL + "/securitywarnings/" + common.CloudfuseVersion
-	found := checkVersionExists(warningsUrl)
-	suite.assert.False(found)
-}
-
 func (suite *rootCmdSuite) TestGetRemoteVersionInvalidURL() {
 	defer suite.cleanupTest()
 	out, err := getRemoteVersion("abcd")
