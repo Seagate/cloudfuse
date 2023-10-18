@@ -11,7 +11,7 @@ Please submit an issue
 [here](https://github.com/Seagate/cloudfuse/issues) for any issues/feature
 requests/questions.
 
-## Setup
+## Installation
 Download the provided installation packages for your preferred operating system.  -- COMING SOON!
 
 Please refer to the [Installation from source](https://github.com/Seagate/cloudfuse/wiki/Installation-From-Source) to 
