@@ -67,8 +67,8 @@ The general format of the Cloudfuse Linux commands is `cloudfuse [command] [argu
 
 ### Windows Only Commands:
 
-The general format of the Cloudfuse Windows commands is `cloudfuse [service] [command] [arguments]
---[flag-name]=[flag-value]`
+The general format of the Cloudfuse Windows commands is:
+ `cloudfuse service [command] [arguments] --[flag-name]=[flag-value]`
   * `cloudfuse service install` - Install as a Windows service
   * `cloudfuse service uninstall` - Uninstall cloudfuse from a Windows service
   * `cloudfuse service start` - Start the Windows service
