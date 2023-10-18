@@ -23,8 +23,9 @@ The GUI will populate the default values for most of the settings when going thr
 * Launch the GUI from two different methods:
   - Open the Cloudfuse GUI provided in the installation package -- COMING SOON!
   - Open the GUI from source, which is explained [here](https://github.com/Seagate/cloudfuse/wiki/Running-the-GUI-from-source)
-* On the main window, select your desired type of cloud (Azure or S3) then click config.
-* Enter the credentials for your cloud
+* Select the desired type of cloud (Azure or S3).
+* Click config which opens a new window for settings.
+* Enter the credentials for your cloud:
   - Go to [S3 Storage Configuration](https://github.com/Seagate/cloudfuse/wiki/S3-Storage-Configuration) to find S3 credential requirements.
   - Go to [Azure Storage Configuration](https://github.com/Seagate/cloudfuse/wiki/Azure-Storage-Configuration) to find Azure credential requirements.
 * Select you desired pipeline mode:
@@ -32,7 +33,7 @@ The GUI will populate the default values for most of the settings when going thr
   - Streaming: If 0MB are selected, streaming will not cache any blocks.
 * Save your changes for the GUI to write your new config file.
 
-If you wish to manually configure the config file without the GUI, you can find instructions [here]https://github.com/Seagate/cloudfuse/wiki/Config-File.
+If you wish to manually configure the config file without the GUI, you can find instructions [here](https://github.com/Seagate/cloudfuse/wiki/Config-File).
 
 ## Basic Use
 ### Linux
