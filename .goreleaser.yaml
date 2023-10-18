@@ -40,7 +40,7 @@ builds:
     ldflags:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
   
-  - id: linux-arm
+  - id: linux-arm64
     goos:
       - linux
     goarch:
