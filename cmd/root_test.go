@@ -134,9 +134,9 @@ func (suite *rootCmdSuite) TestGetRemoteVersionInvalidURL() {
 	suite.assert.NotNil(err)
 }
 
-func (suite *rootCmdSuite) TestGetRemoteVersionInvalidContainer() {
+func (suite *rootCmdSuite) TestGetRemoteVersionInvalidRelease() {
 	defer suite.cleanupTest()
-	latestVersionUrl := common.CloudfuseListContainerURL + "?restype=container&comp=list&prefix=latest1/"
+	latestVersionUrl := common.CloudfuseReleaseURL + "/latest1"
 	out, err := getRemoteVersion(latestVersionUrl)
 	suite.assert.Empty(out)
 	suite.assert.NotNil(err)
@@ -144,12 +144,12 @@ func (suite *rootCmdSuite) TestGetRemoteVersionInvalidContainer() {
 }
 
 func getDummyVersion() string {
-	return "1.0.0"
+	return "0.0.0"
 }
 
-func (suite *rootCmdSuite) TestGetRemoteVersionValidContainer() {
+func (suite *rootCmdSuite) TestGetRemoteVersionValidURL() {
 	defer suite.cleanupTest()
-	latestVersionUrl := common.CloudfuseListContainerURL + "?restype=container&comp=list&prefix=latest/"
+	latestVersionUrl := common.CloudfuseReleaseURL + "/latest"
 	out, err := getRemoteVersion(latestVersionUrl)
 	suite.assert.NotEmpty(out)
 	suite.assert.Nil(err)

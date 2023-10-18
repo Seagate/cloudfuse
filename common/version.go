@@ -31,6 +31,7 @@ import (
 	"strings"
 )
 
+const CloudfuseReleaseURL = "https://api.github.com/repos/Seagate/cloudfuse/releases"
 const CloudfuseListContainerURL = "https://blobfuse2.blob.core.windows.net/release"
 const CloudfuseWarningsURL = "https://aka.ms/blobfuse2warnings"
 

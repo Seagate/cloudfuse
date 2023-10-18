@@ -26,6 +26,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -41,9 +42,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type VersionFilesList struct {
-	XMLName xml.Name `xml:"EnumerationResults"`
-	Blobs   []Blob   `xml:"Blobs>Blob"`
+type GithubApiReleaseData struct {
+	TagName string `json:"tag_name"`
+	Name    string `json:"name"`
 }
 
 type Blob struct {
@@ -82,12 +83,16 @@ func checkVersionExists(versionUrl string) bool {
 	return resp.StatusCode != 404
 }
 
-// getRemoteVersion : From public container get the latest blobfuse version
+// getRemoteVersion : From public release get the latest cloudfuse version
 func getRemoteVersion(req string) (string, error) {
 	resp, err := http.Get(req)
 	if err != nil {
-		log.Err("getRemoteVersion: error listing version file from container [%s]", err.Error())
+		log.Err("getRemoteVersion: error getting release version from Github: [%s]", err.Error())
 		return "", err
+	}
+	if resp.StatusCode != 200 {
+		log.Err("getRemoteVersion: [got status %d from URL %s]", resp.StatusCode, req)
+		return "", fmt.Errorf("unable to get latest version: GET %s failed with status %d", req, resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -96,19 +101,16 @@ func getRemoteVersion(req string) (string, error) {
 		return "", err
 	}
 
-	var versionList VersionFilesList
-	err = xml.Unmarshal(body, &versionList)
+	var releaseData GithubApiReleaseData
+	err = json.Unmarshal(body, &releaseData)
 	if err != nil {
-		log.Err("getRemoteVersion: error unmarshalling xml response [%s]", err.Error())
+		log.Err("getRemoteVersion: error parsing json response [%s]", err.Error())
 		return "", err
 	}
 
-	if len(versionList.Blobs) != 1 {
-		return "", fmt.Errorf("unable to get latest version")
-	}
-
-	versionName := strings.Split(versionList.Blobs[0].Name, "/")[1]
-	return versionName, nil
+	// trim the leading "v"
+	versionNumber := strings.TrimPrefix(releaseData.Name, "v")
+	return versionNumber, nil
 }
 
 // beginDetectNewVersion : Get latest release version and compare if user needs an upgrade or not
@@ -118,7 +120,7 @@ func beginDetectNewVersion() chan interface{} {
 	go func() {
 		defer close(completed)
 
-		latestVersionUrl := common.CloudfuseListContainerURL + "?restype=container&comp=list&prefix=latest/"
+		latestVersionUrl := common.CloudfuseReleaseURL + "/latest"
 		remoteVersion, err := getRemoteVersion(latestVersionUrl)
 		if err != nil {
 			log.Err("beginDetectNewVersion: error getting latest version [%s]", err.Error())
