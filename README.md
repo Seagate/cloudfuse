@@ -43,7 +43,7 @@ Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it
 ## Command Line Interface Operations
 The general format of the Cloudfuse commands is `cloudfuse [command] [arguments]
 --[flag-name]=[flag-value]`
-* commands:
+** commands:
 * `help` - Help about any command
 * `mount` - Mounts a cloud storage container as a filesystem. The supported
   containers include:
