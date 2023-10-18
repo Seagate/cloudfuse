@@ -28,12 +28,29 @@ to configure the Config file.
 To configure you setup for a specific cloud bucket refer to [Azure Storage Configuration](https://github.com/Seagate/cloudfuse/wiki/Azure-Storage-Configuration) or [S3 Storage Configuration](https://github.com/Seagate/cloudfuse/wiki/S3-Storage-Configuration) wiki's.
 
 ## Basic Use
-COMING SOON!
+### Linux
+Launch the provided GUI and check the configs are set from the above instructions in Config.
+* `To mount`
+  - Through the main window in the GUI, browse to the location you want your cloud to be mounted, then select the EMPTY folder you want.
+  - In the drop down menue, select the type of cloud you have, either an S3 Bucket or Azure Blob Storage, then mount the cloud.
+  - You should now see your data in the folder you selected.
+* `To unmount`
+  - Through the main window in the GUI, browse to the folder your mounted cloud resides and select it.
+  - Click the unmount mutton
+  - The folder the cloud was in should now be empty
 
-- Through GUI
-  * Windows run as admin
-  * Linux
-- Through command line
+### Windows
+Note: Make sure WinSFP is installed in the setup section dedicated to Windows.
+* `To Mount`
+  - Launch the provided GUI escalated with admin rights (this is for the windows service option).
+  - To attach your cloud to a folder, browse to the location you want your cloud to mount and make sure that directory is empty, then select mount.
+  - You will see an error if you did not launch the GUI with admin rights, if this happens just relaunch the GUI by right-clicking and selecting 'Run as Administrator'
+
+* `To Unmount`
+  - Launch the provided GUI with admin rights
+  - Through the main window of the GUI, browse to the cloud you want unmounted and select that folder, then click unmount
+
+If you do not desure to use the GUI to mount/unmount your cloud, please reger to Command Line Interface Operations further down
 
 ## Health Monitor
 Cloudfuse also supports a health monitor. It allows customers gain more insight
