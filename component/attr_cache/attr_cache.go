@@ -173,11 +173,8 @@ func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 	// When we delete directory a, we only want to delete a/, a/b, and a/c.
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
-	// Add a trailing / so that we only delete child paths under the directory and not paths that have the same prefix
-	prefix := dirToPrefix(path)
-
 	//get attrCacheItem
-	toBeDeleted, err := ac.cacheMap.get(prefix)
+	toBeDeleted, err := ac.cacheMap.get(path)
 
 	// delete the path itself and children.
 	if err != nil {
@@ -187,14 +184,6 @@ func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 		toBeDeleted.markDeleted(time)
 	}
 
-}
-
-func dirToPrefix(dir string) string {
-	prefix := internal.ExtendDirName(dir)
-	if prefix == "/" {
-		prefix = ""
-	}
-	return prefix
 }
 
 // deleteCachedDirectory: marks a directory and all its contents deleted
@@ -209,13 +198,11 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	// When we delete directory a, we only want to delete a/, a/b, and a/c.
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
-	// Add a trailing '/' so that we only delete child paths under the directory and not paths that have the same prefix
-	prefix := dirToPrefix(path)
 	// remember whether we actually found any contents
 	foundCachedContents := false
 
 	//get attrCacheItem
-	toBeDeleted, err := ac.cacheMap.get(prefix)
+	toBeDeleted, err := ac.cacheMap.get(path)
 
 	// delete the path itself and children.
 	if err != nil {
@@ -269,10 +256,7 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 	// When we invalidate directory a, we only want to invalidate a/, a/b, and a/c.
 	// If we do not conditionally extend a, we would accidentally invalidate aa/ and ab
 
-	// Add a trailing / so that we only invalidate child paths under the directory and not paths that have the same prefix
-	prefix := dirToPrefix(path)
-
-	toBeInvalid, err := ac.cacheMap.get(prefix)
+	toBeInvalid, err := ac.cacheMap.get(path)
 	if err != nil {
 		log.Err("could not invalidate cached attr item due to the following error: ", err)
 	} else {
@@ -304,11 +288,6 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	// When we rename directory a, we only want to rename a/, a/b, and a/c.
 	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
-	// Add a trailing / so that we only rename child paths under the directory,
-	// and not paths that have the same prefix
-	srcDir = dirToPrefix(srcDir)
-	// Add a trailing / to destination (for string replacement)
-	dstDir = dirToPrefix(dstDir)
 	// remember whether we actually found any contents
 	foundCachedContents := false
 	srcItem, err := ac.cacheMap.get(srcDir)
@@ -578,13 +557,9 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 
 // merge results from our cache into pathMap
 func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*internal.ObjAttr) ([]*internal.ObjAttr, int) {
-	prefix := dirToPrefix(listPath)
-	if prefix == "/" {
-		prefix = ""
-	}
 	numAdded := 0
 
-	nonCloudItem, err := ac.cacheMap.get(prefix)
+	nonCloudItem, err := ac.cacheMap.get(listPath)
 
 	if err != nil {
 		log.Err("could not find the attr cached item: ", err)
@@ -688,8 +663,6 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 }
 
 func (ac *AttrCache) anyContentsInCache(prefix string) bool {
-	// Add a trailing / so that we only find child paths under the directory and not paths that have the same prefix
-	prefix = dirToPrefix(prefix)
 	ac.cacheLock.RLock()
 	defer ac.cacheLock.RUnlock()
 
