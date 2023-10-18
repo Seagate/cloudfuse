@@ -114,12 +114,6 @@ func (suite *rootCmdSuite) TestNoMountPath() {
 	suite.assert.NotNil(err)
 }
 
-func (suite *rootCmdSuite) TestCheckVersionExistsInvalidURL() {
-	defer suite.cleanupTest()
-	found := checkVersionExists("abcd")
-	suite.assert.False(found)
-}
-
 func (suite *rootCmdSuite) TestGetRemoteVersionInvalidURL() {
 	defer suite.cleanupTest()
 	out, err := getRemoteVersion("abcd")

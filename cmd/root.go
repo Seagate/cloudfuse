@@ -72,17 +72,6 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-// check if the version file exists in the container
-func checkVersionExists(versionUrl string) bool {
-	resp, err := http.Get(versionUrl)
-	if err != nil {
-		log.Err("checkVersionExists: error getting version file from container [%s]", err.Error())
-		return false
-	}
-
-	return resp.StatusCode != 404
-}
-
 // getRemoteVersion : From public release get the latest cloudfuse version
 func getRemoteVersion(req string) (string, error) {
 	resp, err := http.Get(req)
