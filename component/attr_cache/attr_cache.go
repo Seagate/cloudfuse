@@ -443,6 +443,7 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 			if chldNonCloudItem.exists() && !chldNonCloudItem.isInCloud() {
 				pathList = append(pathList, chldNonCloudItem.attr)
 				numAdded++
+				ac.addDirsNotInCloudToListing(chldNonCloudItem.attr.Path, pathList)
 			}
 		}
 		ac.cacheLock.RUnlock()
@@ -536,7 +537,14 @@ func (ac *AttrCache) anyContentsInCache(prefix string) bool {
 	if err != nil {
 		return false
 	} else { //TODO: this isn't looking at each child or not going through the sub tree. is that an issue?
-		if cachedContentItem.children != nil && cachedContentItem.valid() && cachedContentItem.exists() {
+		if cachedContentItem.exists() {
+			for _, chldCachedContentItem := range cachedContentItem.children {
+				if chldCachedContentItem.exists() {
+					ac.anyContentsInCache(chldCachedContentItem.attr.Path)
+				}
+			}
+		}
+		if cachedContentItem.children != nil && cachedContentItem.exists() {
 			return true
 		}
 	}
