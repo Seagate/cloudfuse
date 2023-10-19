@@ -534,7 +534,7 @@ func (ac *AttrCache) anyContentsInCache(prefix string) bool {
 
 	cachedContentItem, err := ac.cacheMap.get(prefix)
 	if err != nil {
-		log.Err("can't find cache map item due to following error: ", err)
+		return false
 	} else { //TODO: this isn't looking at each child or not going through the sub tree. is that an issue?
 		if cachedContentItem.children != nil && cachedContentItem.valid() && cachedContentItem.exists() {
 			return true
