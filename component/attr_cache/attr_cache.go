@@ -363,13 +363,8 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 				return os.ErrExist
 			}
 			newDirAttr := internal.CreateObjAttrDir(newDirPath)
-			ac.cacheMap.insert(newDirAttr, true, time.Now())
-			newDirAttrCacheItem, err := ac.cacheMap.get(newDirPath)
-			if err != nil {
-				log.Err("could not find the attr cached item: ", err)
-			} else {
-				newDirAttrCacheItem.markInCloud(false)
-			}
+			newDirAttrCacheItem := ac.cacheMap.insert(newDirAttr, true, time.Now())
+			newDirAttrCacheItem.markInCloud(false)
 
 		} else {
 			dirAttrCacheItem, err := ac.cacheMap.get(internal.TruncateDirName(options.Name))
@@ -439,19 +434,20 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 
 	if err != nil {
 		log.Err("could not find the attr cached item: ", err)
-	} else {
-		if nonCloudItem.valid() && nonCloudItem.exists() && nonCloudItem.attr.IsDir() && !nonCloudItem.isInCloud() {
-			ac.cacheLock.RLock()
-			if nonCloudItem.children != nil {
-				for _, item := range nonCloudItem.children {
-					if !item.attr.IsDir() {
-						pathList = append(pathList, item.attr)
-						numAdded++
-					}
+		return nil, 0
+	}
+
+	if nonCloudItem.valid() && nonCloudItem.exists() && nonCloudItem.attr.IsDir() && !nonCloudItem.isInCloud() {
+		ac.cacheLock.RLock()
+		if nonCloudItem.children != nil {
+			for _, item := range nonCloudItem.children {
+				if !item.attr.IsDir() {
+					pathList = append(pathList, item.attr)
+					numAdded++
 				}
 			}
-			ac.cacheLock.RUnlock()
 		}
+		ac.cacheLock.RUnlock()
 	}
 
 	// values should be returned in ascending order by key
