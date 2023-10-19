@@ -38,7 +38,7 @@ import (
 
 // Standard config default values
 const (
-	cloudfuseVersion_ = "2.1.0"
+	cloudfuseVersion_ = "0.1.0"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
