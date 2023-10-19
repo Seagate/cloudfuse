@@ -40,7 +40,7 @@ If you wish to manually configure the config file without the GUI, you can find 
 Launch the provided GUI and check the configs are set from the above instructions in Config.
 * `To mount`
   - Through the main window in the GUI, browse to the location you want your cloud to be mounted, then select the EMPTY folder you want.
-  - In the drop down menue, select the type of cloud you have, either an S3 Bucket or Azure Blob Storage, then mount the cloud.
+  - In the drop down menu, select the type of cloud you have, either an S3 Bucket or Azure Blob Storage, then mount the cloud.
   - You should now see your data in the folder you selected.
 * `To unmount`
   - Through the main window in the GUI, browse to the folder your mounted cloud resides and select it.
@@ -106,7 +106,7 @@ The general format of the Cloudfuse Windows commands is:
   * `cloudfuse service mount \<mount path>  --config-file=\<config file>` - Mount an instance that will persist in Windows when restarted
   * `cloudfuse service unmount \<mount path>` - Unmount mount of Cloudfuse running as a Windows service
 
-To use security options the general format for cloudfuse commands is `cloudfuse [command] [aruments] --[flag-name]=[flag-value]`
+To use security options the general format for cloudfuse commands is `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
 * `secure decrypt` - Decrypts a config file.
 * `secure encrypt` - Encrypts a config file.
 * `secure get` - Gets value of a config parameter from an encrypted config file.
