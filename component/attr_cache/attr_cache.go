@@ -647,13 +647,11 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 
 		var anyChildrenInCloud bool
 
-		if ancestorCacheItem.children != nil {
-			for _, item := range ancestorCacheItem.children {
-				if item.exists() && item.valid() && item.isInCloud() {
-					anyChildrenInCloud = item.isInCloud()
-					if anyChildrenInCloud {
-						break
-					}
+		for _, item := range ancestorCacheItem.children {
+			if item.exists() && item.isInCloud() {
+				anyChildrenInCloud = true
+				if anyChildrenInCloud {
+					break
 				}
 			}
 		}
@@ -663,6 +661,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		} else if !anyChildrenInCloud && ancestorCacheItem.isInCloud() {
 			ancestorCacheItem.markInCloud(anyChildrenInCloud)
 		} else {
+			//both the ancestorCacheItem and the child ancestorCacheItem are in cloud, so we break.
 			break
 		}
 
