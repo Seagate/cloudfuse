@@ -31,6 +31,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -294,17 +295,40 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	return nil
 }
 
-func (ac *AttrCache) renameCachedDirectoryHelper(itemSrc *attrCacheItem, srcDir string, dstDir string, time time.Time) {
+func (ac *AttrCache) renameCachedDirectoryHelper(srcItem *attrCacheItem, srcDir string, dstDir string, time time.Time) {
 	// we have the source item. look at everything in the source item as reference
 	// for each item in the subtree of itemSrc, create the destination item based on the source item information.
-	// 1.) check that source item isInCloud and is valid
-	// 2.) take the source name and change it to the destination name
-	// 3.) create an attribute using the destination name
-	// 4.) insert the attribute from previous step into the cacheMap
-	// 5.) mark that inserted item in the cloud
-	// 6.) repeat steps 1 - 5 for any children in the current source Item
-	// 7.) if step 1 is true, markAncestorsIncloud(destination name)
 
+	// 1.) check that source item exists
+	if !srcItem.exists() {
+		return
+	}
+
+	// 2.) take the source name and change it to the destination name
+	dstPath := strings.Replace(srcItem.attr.Path, srcDir, dstDir, 1)
+
+	// 3.) create an attribute using the destination name
+	var dstAttr *internal.ObjAttr
+	if srcItem.attr.IsDir() {
+		dstAttr = internal.CreateObjAttrDir(dstPath)
+	} else {
+		dstAttr = internal.CreateObjAttr(dstPath, srcItem.attr.Size, srcItem.attr.Mtime)
+	}
+
+	// 4.) insert the attribute from previous step into the cacheMap
+	dstItem := ac.cacheMap.insert(dstAttr, srcItem.exists(), srcItem.cachedAt)
+
+	// 5.) mark that inserted item in the cloud
+	dstItem.markInCloud(srcItem.isInCloud())
+
+	// 6.) repeat steps 1 - 5 for any children in the current source Item
+
+	for _, srcChildItm := range srcItem.children {
+		ac.renameCachedDirectoryHelper(srcChildItm, srcDir, dstDir, time)
+	}
+
+	// 7.) if step 1 is true, markAncestorsIncloud(destination name)
+	ac.markAncestorsInCloud(dstPath, time)
 }
 
 func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
