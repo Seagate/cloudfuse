@@ -491,11 +491,7 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 		defer ac.cacheLock.Unlock()
 		for _, attr := range pathList {
 
-			// TODO: call the insert in cacheMap.go to guild out a nested map tree.
-
-			// TODO: will this cause a bug when cacheDirs is enabled?
 			// TODO: this will require a tree traversal / scan to get cachedItems count
-
 			ac.cacheMap.insert(attr, true, currTime)
 
 		}
