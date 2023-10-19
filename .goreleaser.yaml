@@ -60,7 +60,10 @@ checksum:
   algorithm: sha256
 
 archives:
-  - format: tar.gz
+  - id: linux-amd64
+    builds:
+      - linux-amd64
+    format: tar.gz
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_
@@ -69,21 +72,84 @@ archives:
       {{- if eq .Arch "amd64" }}x86_64
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
-    format_overrides:
-      - goos: windows
-        format: zip
     files:
       - LICENSE
       - README.md
       - NOTICE
-      - setup/baseConfig.yaml
-      - sampleFileCacheConfigAzure.yaml
-      - sampleFileCacheWithSASConfigAzure.yaml
-      - sampleFileCacheConfigS3.yaml
-      - sampleStreamingConfigS3.yaml
-      - sampleStreamingConfigAzure.yaml
+      - src: "./gui/dist/cloudfuseGUI_linux/*"
+        dst: "./"
+      - src: "setup/baseConfig.yaml"
+        dst: "./samples/baseConfig.yaml"
+      - src: "sampleFileCacheConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheConfigAzure.yaml"
+      - src: "sampleFileCacheWithSASConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheWithSASConfigAzure.yaml"
+      - src: "sampleFileCacheConfigS3.yaml"
+        dst: "./samples/sampleFileCacheConfigS3.yaml"
+      - src: "sampleStreamingConfigS3.yaml"
+        dst: "./samples/sampleStreamingConfigS3.yaml"
+      - src: "sampleStreamingConfigAzure.yaml"
+        dst: "./samples/sampleStreamingConfigAzure.yaml"
 
+  - id: linux-arm64
+    builds:
+      - linux-arm64
+    format: tar.gz
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{ .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - LICENSE
+      - README.md
+      - NOTICE
+      - src: "setup/baseConfig.yaml"
+        dst: "./samples/baseConfig.yaml"
+      - src: "sampleFileCacheConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheConfigAzure.yaml"
+      - src: "sampleFileCacheWithSASConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheWithSASConfigAzure.yaml"
+      - src: "sampleFileCacheConfigS3.yaml"
+        dst: "./samples/sampleFileCacheConfigS3.yaml"
+      - src: "sampleStreamingConfigS3.yaml"
+        dst: "./samples/sampleStreamingConfigS3.yaml"
+      - src: "sampleStreamingConfigAzure.yaml"
+        dst: "./samples/sampleStreamingConfigAzure.yaml"
+
+  - id: windows
+    builds:
+      - windows
+    format: zip
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{ .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - LICENSE
+      - README.md
+      - NOTICE
+      - src: "./gui/dist/cloudfuseGUI_windows/*"
+        dst: "./"
+      - src: "setup/baseConfig.yaml"
+        dst: "./samples/baseConfig.yaml"
+      - src: "sampleFileCacheConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheConfigAzure.yaml"
+      - src: "sampleFileCacheWithSASConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheWithSASConfigAzure.yaml"
+      - src: "sampleFileCacheConfigS3.yaml"
+        dst: "./samples/sampleFileCacheConfigS3.yaml"
+      - src: "sampleStreamingConfigS3.yaml"
+        dst: "./samples/sampleStreamingConfigS3.yaml"
+      - src: "sampleStreamingConfigAzure.yaml"
+        dst: "./samples/sampleStreamingConfigAzure.yaml"
 nfpms:
   - id: default
 
