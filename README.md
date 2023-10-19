@@ -107,7 +107,7 @@ To use security options the general format for cloudfuse commands is `cloudfuse 
 * `secure set` - Updates value of a config parameter.
 
 Note - If you do not have admin rights, you can still mount your cloud without Windows Service, however
-the process will stay in the foreground. You may mount the cloud in the foreground using the command line arguments by removing 'service'.
+the process will stay in the foreground. Use `cloudfuse mount \<mount path>  --config-file=\<config file>` to mount, use Ctrl+C to unmount.
 
 ## Find help from your command prompt
 To see a list of commands, type `cloudfuse -h`. To
