@@ -859,7 +859,6 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
 			return value.getAttr(), nil
 		}
-
 	}
 
 	// Get the attributes from next component and cache them
