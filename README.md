@@ -32,7 +32,7 @@ You can also manually configure the config file without the GUI, you can find in
 
 ## Basic Use
 ### Linux
-Launch the provided GUI and use the [Config instructions above](/Config) to configure the settings.
+Launch the provided GUI and use the [Config instructions above](#Config) to configure the settings.
 * `To mount`
   - Through the main window in the GUI, browse to the location you want your cloud to be mounted, then select the EMPTY folder you want.
     You may need to create this folder.
@@ -45,7 +45,7 @@ Launch the provided GUI and use the [Config instructions above](/Config) to conf
   - The mount folder should now be empty.
 
 ### Windows
-Note: Make sure WinSFP is installed in the [install instructions](/Installation).
+Note: Make sure WinSFP is installed in the [install instructions](#Installation).
 * `To Mount`
   - Run the provided GUI with admin rights (this is for the windows service option).
   - To attach your cloud to a folder, browse to the location you want your cloud to mount and make sure that directory is empty.
@@ -59,7 +59,7 @@ Note: Make sure WinSFP is installed in the [install instructions](/Installation)
   - Select the type of cloud you have mounted, either S3 or Azure.
   - Click unmount.
 
-You can also use the [command line interface](/command-line-interface-operations) to mount and unmount.
+You can also use the [command line interface](#Command Line Interface) to mount and unmount.
 
 ## Health Monitor
 Cloudfuse also supports a health monitor. It allows customers gain more insight
