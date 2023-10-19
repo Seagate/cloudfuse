@@ -32,7 +32,7 @@ You can also manually configure the config file without the GUI, you can find in
 
 ## Basic Use
 ### Linux
-Launch the provided GUI and and use the [Config instructions above](/Config) to configure the settings.
+Launch the provided GUI and use the [Config instructions above](/Config) to configure the settings.
 * `To mount`
   - Through the main window in the GUI, browse to the location you want your cloud to be mounted, then select the EMPTY folder you want.
     You may need to create this folder.
