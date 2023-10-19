@@ -31,3 +31,4 @@ cloudfuse-logs.txt
 ui_*.py
 test/scripts/dirIterate.go
 **/logfile.txt
+dist/
