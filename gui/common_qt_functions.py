@@ -141,7 +141,7 @@ class defaultSettingsManager():
         })
         self.settings.setValue('logging',{
             'type' : 'syslog',
-            'level' : 'log_warning',        
+            'level' : 'log_err',        
             'file-path' : '$HOME/.cloudfuse/cloudfuse.log',         
             'max-file-size-mb' : 512,                                       
             'file-count' : 10 ,                                             
