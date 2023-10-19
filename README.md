@@ -46,7 +46,7 @@ Launch the provided GUI and use the [Config instructions above](#Config) to conf
   - The mount folder should now be empty.
 
 ### Windows
-Note: Make sure WinSFP is installed in the [install instructions](#Installation).
+Note: Make sure WinSFP is installed, found in the [install instructions](#Installation).
 * `To Mount`
   - Run the provided GUI with admin rights (this is for the windows service option).
   - To attach your cloud to a folder, browse to the location you want your cloud to mount and make sure that directory is empty.
