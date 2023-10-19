@@ -96,7 +96,7 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 		if !ok {
 			value.children[paths[0]] = newAttrCacheItem(internal.CreateObjAttrDir(itemPath), exists, cachedAt)
 		}
-		value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1], itemPath)
+		cachedItem = value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1], itemPath)
 	}
 	return cachedItem
 }

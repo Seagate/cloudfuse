@@ -322,13 +322,14 @@ func (ac *AttrCache) renameCachedDirectoryHelper(srcItem *attrCacheItem, srcDir 
 	dstItem.markInCloud(srcItem.isInCloud())
 
 	// 6.) repeat steps 1 - 5 for any children in the current source Item
-
 	for _, srcChildItm := range srcItem.children {
 		ac.renameCachedDirectoryHelper(srcChildItm, srcDir, dstDir, time)
 	}
 
 	// 7.) if step 1 is true, markAncestorsIncloud(destination name)
 	ac.markAncestorsInCloud(dstPath, time)
+
+	srcItem.markDeleted(time)
 }
 
 func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
