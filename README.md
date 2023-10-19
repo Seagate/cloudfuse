@@ -26,6 +26,7 @@ The GUI can help you quickly configure Cloudfuse.
 * Select you desired pipeline mode:
   - File Caching: Browse to a folder you wish to have you temp file caching.
   - Streaming: If 0MB are selected, streaming will not cache any blocks.
+  - Go to [File-Cache](https://github.com/Seagate/cloudfuse/wiki/File-Cache) and [Streaming](https://github.com/Seagate/cloudfuse/wiki/Streaming) for details.
 * Save your changes for the GUI to write your new config file.
 
 You can also manually configure the config file without the GUI, you can find instructions [here](https://github.com/Seagate/cloudfuse/wiki/Config-File).
