@@ -851,11 +851,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	if err == nil {
 		// Retrieved attributes so cache them
-		if pathAttr == nil {
-			ac.cacheMap.insert(&internal.ObjAttr{Path: options.Name}, true, time.Now())
-		} else {
-			ac.cacheMap.insert(pathAttr, true, time.Now())
-		}
+		ac.cacheMap.insert(pathAttr, true, time.Now())
 
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
