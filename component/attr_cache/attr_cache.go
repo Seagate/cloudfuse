@@ -212,7 +212,7 @@ func (ac *AttrCache) pathExistsInCache(path string) bool {
 	if err != nil {
 		return false
 	}
-	return (value.valid() && value.exists())
+	return value.exists()
 }
 
 func getParentDir(childPath string) string {
