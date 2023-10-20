@@ -851,8 +851,6 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	if err == nil {
 		// Retrieved attributes so cache them
-		// TODO: bug: when cacheDirs is true, the cache limit will cause some directories to be double-listed
-		// TODO: shouldn't this be an LRU? This sure looks like the opposite...
 		if pathAttr == nil {
 			ac.cacheMap.insert(&internal.ObjAttr{Path: options.Name}, true, time.Now())
 		} else {
