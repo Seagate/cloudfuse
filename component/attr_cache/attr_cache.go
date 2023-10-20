@@ -300,7 +300,7 @@ func (ac *AttrCache) renameCachedDirectoryHelper(srcItem *attrCacheItem, srcDir 
 	// 4.) insert the attribute from previous step into the cacheMap
 	dstItem := ac.cacheMap.insert(dstAttr, srcItem.exists(), srcItem.cachedAt)
 
-	// 5.) mark that inserted item in the cloud
+	// 5.) mark whether the item is in the cloud
 	dstItem.markInCloud(srcItem.isInCloud())
 
 	// 6.) repeat steps 1 - 5 for any children in the current source Item
