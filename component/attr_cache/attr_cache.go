@@ -169,9 +169,6 @@ func (ac *AttrCache) OnConfigChange() {
 // That way if a request came in for a deleted item, we can respond from the cache.
 func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 	// Delete all descendants of the path, then delete the path
-	// For example, filesystem: a/, a/b, a/c, aa/, ab.
-	// When we delete directory a, we only want to delete a/, a/b, and a/c.
-	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
 	//get attrCacheItem
 	toBeDeleted, err := ac.cacheMap.get(path)
@@ -193,9 +190,6 @@ func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 
 	// Delete all descendants of the path, then delete the path
-	// For example, filesystem: a/, a/b, a/c, aa/, ab.
-	// When we delete directory a, we only want to delete a/, a/b, and a/c.
-	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
 	//get attrCacheItem
 	toBeDeleted, err := ac.cacheMap.get(path)
@@ -239,9 +233,6 @@ func getParentDir(childPath string) string {
 // Do not use this with ac.cacheDirs set
 func (ac *AttrCache) invalidateDirectory(path string) {
 	// Invalidate all descendants of the path, then invalidate the path
-	// For example, filesystem: a/, a/b, a/c, aa/, ab.
-	// When we invalidate directory a, we only want to invalidate a/, a/b, and a/c.
-	// If we do not conditionally extend a, we would accidentally invalidate aa/ and ab
 
 	toBeInvalid, err := ac.cacheMap.get(path)
 	if err != nil {
@@ -271,9 +262,6 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	}
 
 	// Rename all descendants of srcDir, then rename the srcDir itself
-	// For example, filesystem: a/, a/b, a/c, aa/, ab.
-	// When we rename directory a, we only want to rename a/, a/b, and a/c.
-	// If we do not conditionally extend a, we would accidentally delete aa/ and ab
 
 	// remember whether we actually found any contents
 	srcItem, err := ac.cacheMap.get(srcDir)
