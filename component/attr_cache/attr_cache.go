@@ -858,7 +858,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
 	} else if err == syscall.ENOENT {
-		// Path does not exist so cache a no-entry item
+		// cache this entity not existing
 
 		// TODO: change the tests to no longer use empty structs. use internal.createAttr() to define a path instead of a litteral.
 		ac.cacheMap.insert(&internal.ObjAttr{Path: internal.TruncateDirName(options.Name)}, false, time.Now())
