@@ -1167,7 +1167,7 @@ func (suite *attrCacheTestSuite) TestWriteFileError() {
 	options := internal.WriteFileOptions{Handle: &handle, Metadata: nil}
 
 	// Error
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: true}).Return(nil, nil)
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: true}).Return(&internal.ObjAttr{Path: path}, nil)
 	suite.mock.EXPECT().WriteFile(options).Return(0, errors.New("Failed to write a file"))
 
 	_, err := suite.attrCache.WriteFile(options)
@@ -1187,7 +1187,7 @@ func (suite *attrCacheTestSuite) TestWriteFileDoesNotExist() {
 	options := internal.WriteFileOptions{Handle: &handle, Metadata: nil}
 	// Success
 	// Entry Does Not Already Exist
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: true}).Return(nil, nil)
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: true}).Return(&internal.ObjAttr{Path: path}, nil)
 	suite.mock.EXPECT().WriteFile(options).Return(0, nil)
 
 	_, err := suite.attrCache.WriteFile(options)
@@ -1262,7 +1262,7 @@ func (suite *attrCacheTestSuite) TestCopyFromFileError() {
 	path := "a"
 
 	options := internal.CopyFromFileOptions{Name: path, File: nil, Metadata: nil}
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: true}).Return(nil, nil)
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: true}).Return(&internal.ObjAttr{Path: path}, nil)
 	// Error
 	suite.mock.EXPECT().CopyFromFile(options).Return(errors.New("Failed to copy from file"))
 
@@ -1280,7 +1280,7 @@ func (suite *attrCacheTestSuite) TestCopyFromFileDoesNotExist() {
 	options := internal.CopyFromFileOptions{Name: path, File: nil, Metadata: nil}
 	// Success
 	// Entry Does Not Already Exist
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: true}).Return(nil, nil)
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: true}).Return(&internal.ObjAttr{Path: path}, nil)
 	suite.mock.EXPECT().CopyFromFile(options).Return(nil)
 
 	err := suite.attrCache.CopyFromFile(options)
@@ -1468,7 +1468,7 @@ func (suite *attrCacheTestSuite) TestGetAttrEnoentError() {
 			suite.assert.EqualValues(&internal.ObjAttr{}, result)
 			checkItem, err := suite.attrCache.cacheMap.get(truncatedPath)
 			suite.assert.Nil(err)
-			suite.assert.EqualValues(&internal.ObjAttr{}, checkItem.attr)
+			suite.assert.EqualValues(&internal.ObjAttr{Path: "a"}, checkItem.attr)
 			suite.assert.True(checkItem.valid())
 			suite.assert.False(checkItem.exists())
 			suite.assert.NotNil(checkItem.cachedAt)

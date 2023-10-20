@@ -851,18 +851,18 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	if err == nil {
 		// Retrieved attributes so cache them
+
 		ac.cacheMap.insert(pathAttr, true, time.Now())
 
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
 	} else if err == syscall.ENOENT {
-		// Path does not exist so cache a no-entry item
-		// this insert should involve the key of the cacheMap item being the truncatedPath. Do we have insert some how know the truncated path to use as the key? or do we do a key literal insert right here? the latter is mesyier for cacheMap access scope.
+		// cache this entity not existing
 
-		//ac.cacheMap.insert(&internal.ObjAttr{}, false, time.Now())
-		ac.cacheMap.children = make(map[string]*attrCacheItem)
-		ac.cacheMap.children[truncatedPath] = newAttrCacheItem(&internal.ObjAttr{}, false, time.Now())
+		// TODO: change the tests to no longer use empty structs. use internal.createAttr() to define a path instead of a litteral.
+		ac.cacheMap.insert(&internal.ObjAttr{Path: internal.TruncateDirName(options.Name)}, false, time.Now())
+
 	}
 
 	return pathAttr, err
