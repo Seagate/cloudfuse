@@ -202,12 +202,6 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 		toBeDeleted.markDeleted(time)
 	}
 
-	// check if the directory to be deleted exists
-	if toBeDeleted.children == nil && !ac.pathExistsInCache(path) {
-		log.Err("AttrCache::deleteCachedDirectory : directory %s does not exist in attr cache.", path)
-		return syscall.ENOENT
-	}
-
 	ac.updateAncestorsInCloud(getParentDir(path), time)
 	return nil
 }
