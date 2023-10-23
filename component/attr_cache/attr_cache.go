@@ -577,9 +577,7 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		// TODO: we assume that the OS will call GetAttr after this.
 		// 		if it doesn't, will invalidating this entry cause problems?
 		toBeInvalid, err := ac.cacheMap.get(options.Name)
-		if err != nil {
-			log.Err("AttrCache::CreateFile : cannot find the attr cache item due to the following error: ", err)
-		} else {
+		if err == nil {
 			toBeInvalid.invalidate()
 		}
 	}
