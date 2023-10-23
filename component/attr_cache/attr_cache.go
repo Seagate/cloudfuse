@@ -233,16 +233,14 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 		return
 	}
 	// don't invalidate directories when cacheDirs is true
-	if !ac.cacheDirs && toBeInvalid.attr.IsDir() {
+	if !ac.cacheDirs || !toBeInvalid.attr.IsDir() {
 		toBeInvalid.invalidate()
-	} else if ac.cacheDirs && !toBeInvalid.attr.IsDir() {
-		toBeInvalid.invalidate()
-	} else if ac.cacheDirs && toBeInvalid.attr.IsDir() {
-		if toBeInvalid.children != nil {
-			for _, childItem := range toBeInvalid.children {
-				ac.invalidateDirectory(childItem.attr.Path)
-			}
-		}
+		return
+	}
+
+	// recurse
+	for _, childItem := range toBeInvalid.children {
+		ac.invalidateDirectory(childItem.attr.Path)
 	}
 }
 
