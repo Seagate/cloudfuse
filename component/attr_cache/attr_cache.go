@@ -596,7 +596,7 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 		defer ac.cacheLock.RUnlock()
 		toBeDeleted, err := ac.cacheMap.get(options.Name)
 		if err != nil {
-			log.Err("AttrCache::DeleteFile : cannot find the attr cache item due to the following error: ", err)
+			log.Err("AttrCache::DeleteFile : %s", err)
 		} else {
 			toBeDeleted.markDeleted(deletionTime)
 		}
