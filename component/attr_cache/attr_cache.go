@@ -351,7 +351,7 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 		} else {
 			dirAttrCacheItem, err := ac.cacheMap.get(internal.TruncateDirName(options.Name))
 			if err != nil {
-				log.Err("could not find the attr cached item: ", err)
+				log.Err("AttrCache:: CreateDir : could not find the attr cached item: ", err)
 			} else {
 				dirAttrCacheItem.invalidate()
 			}
@@ -415,7 +415,7 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 	nonCloudItem, err := ac.cacheMap.get(listPath)
 
 	if err != nil {
-		log.Err("could not find the attr cached item: ", err)
+		log.Err("AttrCache:: addDirsNotInCloudToListing : could not find the attr cached item: ", err)
 		return nil, 0
 	}
 
@@ -581,7 +581,7 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		// 		if it doesn't, will invalidating this entry cause problems?
 		toBeInvalid, err := ac.cacheMap.get(options.Name)
 		if err != nil {
-			log.Err("cannot find the attr cache item due to the following error: ", err)
+			log.Err("AttrCache::CreateFile : cannot find the attr cache item due to the following error: ", err)
 		} else {
 			toBeInvalid.invalidate()
 		}
@@ -601,7 +601,7 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 		defer ac.cacheLock.RUnlock()
 		toBeDeleted, err := ac.cacheMap.get(options.Name)
 		if err != nil {
-			log.Err("cannot find the attr cache item due to the following error: ", err)
+			log.Err("AttrCache::DeleteFile : cannot find the attr cache item due to the following error: ", err)
 		} else {
 			toBeDeleted.markDeleted(deletionTime)
 		}
@@ -673,14 +673,14 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 
 		toBeDeleted, err := ac.cacheMap.get(options.Src)
 		if err != nil {
-			log.Err("could not find attr cache item due to following error: ", err)
+			log.Err("AttrCache::RenameFile : could not find attr cache item due to following error: ", err)
 		} else {
 			toBeDeleted.markDeleted(renameTime)
 		}
 
 		toBeInvalid, err := ac.cacheMap.get(options.Dst)
 		if err != nil {
-			log.Err("could not find attr cache item due to following error: ", err)
+			log.Err("AttrCache::RenameFile : could not find attr cache item due to following error: ", err)
 		} else {
 			toBeInvalid.invalidate()
 		}
@@ -718,7 +718,7 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 		}
 
 		if err != nil {
-			log.Err("could not find attribute item in cache to invalidate due to the following error: ", err)
+			log.Err("AttrCache::WriteFile : could not find attribute item in cache to invalidate due to the following error: ", err)
 		} else {
 			toBeInvalid.invalidate()
 		}
@@ -738,7 +738,7 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 		// no need to truncate the name of the file
 		value, err := ac.cacheMap.get(options.Name)
 		if err != nil {
-			log.Err("could not find attribute item in cache to truncate file due to the following error: ", err)
+			log.Err("AttrCache::TruncateFile : could not find attribute item in cache to truncate file due to the following error: ", err)
 		} else {
 			if value.valid() && value.exists() {
 				value.setSize(options.Size)
@@ -778,7 +778,7 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 
 		toBeInvalid, err := ac.cacheMap.get(options.Name) //empty for TestCopyFromFileDoesNotExist()
 		if err != nil {
-			log.Err("The attribute item could not be invalidated in the cache due to the following error: ", err)
+			log.Err("AttrCache::CopyFromFile : The attribute item could not be invalidated in the cache due to the following error: ", err)
 		} else {
 			toBeInvalid.invalidate()
 		}
@@ -795,7 +795,7 @@ func (ac *AttrCache) SyncFile(options internal.SyncFileOptions) error {
 		defer ac.cacheLock.RUnlock()
 		toBeInvalid, err := ac.cacheMap.get(options.Handle.Path)
 		if err != nil {
-			log.Err("The attribute item could not be invalidated in the cache due to the following error: ", err)
+			log.Err("AttrCache::SyncFile : The attribute item could not be invalidated in the cache due to the following error: ", err)
 		} else {
 			toBeInvalid.invalidate()
 		}
@@ -879,7 +879,7 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 		defer ac.cacheLock.RUnlock()
 		toBeInvalid, err := ac.cacheMap.get(options.Name)
 		if err != nil {
-			log.Err("The attribute item could not be invalidated in the cache due to the following error: ", err)
+			log.Err("AttrCache::CreateLink : The attribute item could not be invalidated in the cache due to the following error: ", err)
 		} else {
 			toBeInvalid.invalidate()
 			if ac.cacheDirs {
@@ -900,7 +900,7 @@ func (ac *AttrCache) FlushFile(options internal.FlushFileOptions) error {
 		defer ac.cacheLock.RUnlock()
 		toBeInvalid, err := ac.cacheMap.get(options.Handle.Path)
 		if err != nil {
-			log.Err("The attribute item could not be invalidated in the cache due to the following error: ", err)
+			log.Err("AttrCache::FlushFile : The attribute item could not be invalidated in the cache due to the following error: ", err)
 		} else {
 			toBeInvalid.invalidate()
 		}
@@ -920,7 +920,7 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 
 		value, err := ac.cacheMap.get(internal.TruncateDirName(options.Name))
 		if err != nil {
-			log.Err("The attribute item could not be retrieved from the cache due to the following error: ", err)
+			log.Err("AttrCache::Chmod : The attribute item could not be retrieved from the cache due to the following error: ", err)
 		} else {
 			if value.valid() && value.exists() {
 				value.setMode(options.Mode)
