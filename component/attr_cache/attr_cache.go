@@ -259,11 +259,11 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	if err != nil {
 		log.Err("AttrCache::renameCachedDirectory : source directory does not exist. ", err)
 		return err
-	} else {
-		srcDir = internal.TruncateDirName(srcDir)
-		dstDir = internal.TruncateDirName(dstDir)
-		ac.renameCachedDirectoryHelper(srcItem, srcDir, dstDir, time)
-	}
+
+	srcDir = internal.TruncateDirName(srcDir)
+	dstDir = internal.TruncateDirName(dstDir)
+	ac.renameCachedDirectoryHelper(srcItem, srcDir, dstDir, time)
+
 
 	// if there were no cached entries to move, does this directory even exist?
 	if srcItem.children == nil && !ac.pathExistsInCache(srcDir) {
