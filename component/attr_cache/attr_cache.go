@@ -198,9 +198,9 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	if err != nil {
 		log.Err("could not find the cache map item due to the following error: ", err)
 		return syscall.ENOENT
-	} else {
-		toBeDeleted.markDeleted(time)
-	}
+
+	toBeDeleted.markDeleted(time)
+
 
 	ac.updateAncestorsInCloud(getParentDir(path), time)
 	return nil
