@@ -514,22 +514,20 @@ func (ac *AttrCache) anyContentsInCache(prefix string) bool {
 	ac.cacheLock.RLock()
 	defer ac.cacheLock.RUnlock()
 
-	cachedContentItem, err := ac.cacheMap.get(prefix)
+	directory, err := ac.cacheMap.get(prefix)
 	if err != nil {
 		return false
-	} else { //TODO: this isn't looking at each child or not going through the sub tree. is that an issue?
-		if cachedContentItem.exists() {
-			for _, chldCachedContentItem := range cachedContentItem.children {
-				if chldCachedContentItem.exists() {
-					ac.anyContentsInCache(chldCachedContentItem.attr.Path)
-				}
+	}
+	if directory.exists() {
+		for _, chldItem := range directory.children {
+			if chldItem.exists() {
+				ac.anyContentsInCache(chldItem.attr.Path)
 			}
 		}
-		if cachedContentItem.children != nil && cachedContentItem.exists() {
-			return true
-		}
 	}
-
+	if directory.children != nil && directory.exists() {
+		return true
+	}
 	return false
 }
 
