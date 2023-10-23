@@ -474,7 +474,6 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 		defer ac.cacheLock.Unlock()
 		for _, attr := range pathList {
 
-			// TODO: this will require a tree traversal / scan to get cachedItems count
 			ac.cacheMap.insert(attr, true, currTime)
 
 		}
