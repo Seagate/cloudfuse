@@ -404,8 +404,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		// now let's add attributes for all the directories in dirList
 		for dir := range dirList {
 			dirName, _ := cl.getFile(dir)
-			dirName = internal.TruncateDirName(dirName)
-			if dirName == listPath {
+			if internal.TruncateDirName(dirName) == internal.TruncateDirName(listPath) {
 				continue
 			}
 			path := split(cl.Config.prefixPath, dirName)
