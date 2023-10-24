@@ -628,13 +628,6 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 	err := ac.NextComponent().RenameFile(options)
 	if err == nil {
 		renameTime := time.Now()
-		if ac.cacheDirs {
-			ac.cacheLock.Lock()
-			ac.updateAncestorsInCloud(getParentDir(options.Src), renameTime)
-			// mark the destination parent directory tree as containing objects
-			ac.markAncestorsInCloud(getParentDir(options.Dst), renameTime)
-			ac.cacheLock.Unlock()
-		}
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		// TODO: Can we just copy over the attributes from the source to the destination so we don't have to invalidate?
@@ -651,6 +644,11 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 			log.Err("AttrCache::RenameFile : could not find attr cache item due to following error: ", err)
 		} else {
 			toBeInvalid.invalidate()
+		}
+		if ac.cacheDirs {
+			ac.updateAncestorsInCloud(getParentDir(options.Src), renameTime)
+			// mark the destination parent directory tree as containing objects
+			ac.markAncestorsInCloud(getParentDir(options.Dst), renameTime)
 		}
 	}
 	return err
