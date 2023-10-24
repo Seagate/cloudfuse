@@ -300,9 +300,6 @@ func (ac *AttrCache) renameCachedDirectoryHelper(srcItem *attrCacheItem, srcDir 
 		ac.renameCachedDirectoryHelper(srcChildItm, srcDir, dstDir, time)
 	}
 
-	// 7.) if step 1 is true, markAncestorsIncloud(destination name)
-	ac.markAncestorsInCloud(dstPath, time)
-
 	srcItem.markDeleted(time)
 }
 
