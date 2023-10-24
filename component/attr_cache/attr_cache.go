@@ -611,9 +611,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		for _, item := range ancestorCacheItem.children {
 			if item.exists() && item.isInCloud() {
 				anyChildrenInCloud = true
-				if anyChildrenInCloud {
-					break
-				}
+				break
 			}
 		}
 
