@@ -304,7 +304,6 @@ func (ac *AttrCache) renameCachedDirectoryHelper(srcItem *attrCacheItem, srcDir 
 }
 
 func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
-	dirPath = internal.TruncateDirName(dirPath)
 	if len(dirPath) != 0 {
 		dirCacheItem, err := ac.cacheMap.get(dirPath)
 		if err != nil || !dirCacheItem.exists() {
@@ -323,28 +322,24 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("AttrCache::CreateDir : %s", options.Name)
 	err := ac.NextComponent().CreateDir(options)
-
 	if err == nil {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 		if ac.cacheDirs {
 			// check if directory already exists
-			newDirPath := internal.TruncateDirName(options.Name)
-			if ac.pathExistsInCache(newDirPath) {
+			if ac.pathExistsInCache(options.Name) {
 				return os.ErrExist
 			}
-			newDirAttr := internal.CreateObjAttrDir(newDirPath)
+			newDirAttr := internal.CreateObjAttrDir(options.Name)
 			newDirAttrCacheItem := ac.cacheMap.insert(newDirAttr, true, time.Now())
 			newDirAttrCacheItem.markInCloud(false)
-
 		} else {
-			dirAttrCacheItem, err := ac.cacheMap.get(internal.TruncateDirName(options.Name))
+			dirAttrCacheItem, err := ac.cacheMap.get(options.Name)
 			if err != nil {
 				log.Err("AttrCache:: CreateDir : could not find the attr cached item: ", err)
 			} else {
 				dirAttrCacheItem.invalidate()
 			}
-
 		}
 	}
 	return err
