@@ -240,6 +240,7 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 }
 
 // renameCachedDirectory: Renames a cached directory and all its contents when ac.cacheDirs is true.
+// input: string of source root of subtree folder name, string of destination name for root of subtree folder name, time.time for timestamp
 func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time time.Time) error {
 
 	// First, check if the destination directory already exists
@@ -255,8 +256,10 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 
 	srcDir = internal.TruncateDirName(srcDir)
 	dstDir = internal.TruncateDirName(dstDir)
-	ac.renameCachedDirectoryHelper(srcItem, srcDir, dstDir, time)
-
+	if !srcItem.exists() {
+		return nil
+	}
+	ac.moveAttrCachedItem(srcItem, srcDir, dstDir, time)
 	ac.updateAncestorsInCloud(srcDir, time)
 	ac.updateAncestorsInCloud(dstDir, time)
 
@@ -269,14 +272,9 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	return nil
 }
 
-func (ac *AttrCache) renameCachedDirectoryHelper(srcItem *attrCacheItem, srcDir string, dstDir string, time time.Time) {
-	// we have the source item. look at everything in the source item as reference
-	// for each item in the subtree of itemSrc, create the destination item based on the source item information.
-
-	// 1.) check that source item exists
-	if !srcItem.exists() {
-		return
-	}
+// moveAttrItem: used to move a subtree within cacheMap to a new location of the cacheMap tree.
+// input: attrCacheItem to be moved, string of the root
+func (ac *AttrCache) moveAttrCachedItem(srcItem *attrCacheItem, srcDir string, dstDir string, time time.Time) {
 
 	// 2.) take the source name and change it to the destination name
 	dstPath := strings.Replace(srcItem.attr.Path, srcDir, dstDir, 1)
@@ -297,10 +295,11 @@ func (ac *AttrCache) renameCachedDirectoryHelper(srcItem *attrCacheItem, srcDir 
 
 	// 6.) repeat steps 1 - 5 for any children in the current source Item
 	for _, srcChildItm := range srcItem.children {
-		ac.renameCachedDirectoryHelper(srcChildItm, srcDir, dstDir, time)
+		ac.moveAttrCachedItem(srcChildItm, srcDir, dstDir, time)
 	}
 
 	srcItem.markDeleted(time)
+
 }
 
 func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
