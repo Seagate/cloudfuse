@@ -400,7 +400,7 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 
 	if err != nil {
 		log.Err("AttrCache:: addDirsNotInCloudToListing : could not find the attr cached item: ", err)
-		return nil, 0
+		return pathList, 0
 	}
 
 	if nonCloudItem.exists() {
