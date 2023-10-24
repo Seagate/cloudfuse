@@ -613,7 +613,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		if ancestorCacheItem.isInCloud() != anyChildrenInCloud {
 			ancestorCacheItem.markInCloud(anyChildrenInCloud)
 		} else {
-			//both the ancestorCacheItem and the child ancestorCacheItem are in cloud, so we break.
+			//if the child and parent isInCloud() are the same, then we know the rest of the parents will have the same flag.
 			break
 		}
 		// move on to the next ancestor
