@@ -698,7 +698,7 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 		if err != nil {
 			log.Err("AttrCache::TruncateFile : could not find attribute item in cache to truncate file due to the following error: ", err)
 		} else {
-			if value.valid() && value.exists() {
+			if value.exists() {
 				value.setSize(options.Size)
 			}
 		}
