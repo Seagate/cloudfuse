@@ -639,8 +639,8 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 			toBeDeleted.markDeleted(renameTime)
 		}
 
-		toBeInvalid, err := ac.cacheMap.get(options.Dst)
-		if err != nil {
+		toBeInvalid, getErr := ac.cacheMap.get(options.Dst)
+		if getErr != nil {
 			log.Err("AttrCache::RenameFile : could not find attr cache item due to following error: ", err)
 		} else {
 			toBeInvalid.invalidate()
