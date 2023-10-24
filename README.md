@@ -10,7 +10,8 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 Download the provided installation packages for your preferred operating system.  -- COMING SOON!
 
 ### From Tar or Zip files
-In the release tab on GitHub, you can download and tar folder for Linux on x86 and a zip folder for Windows on x86 which bundles
+In the release tab on GitHub, you can download a tar folder for Linux on x86 and a zip folder for Windows on x86 which bundles
+
 the GUI and the Cloudfuse binary. Then run the `cloudfuseGUI` file on your system to launch the GUI or
 call the `cloudfuse` binary file on the command line to use Cloudfuse as a command line tool.
 
