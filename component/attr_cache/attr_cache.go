@@ -168,18 +168,13 @@ func (ac *AttrCache) OnConfigChange() {
 // This marks items deleted instead of invalidating them.
 // That way if a request came in for a deleted item, we can respond from the cache.
 func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
-	// Delete all descendants of the path, then delete the path
-
 	//get attrCacheItem
 	toBeDeleted, err := ac.cacheMap.get(path)
-
-	// delete the path itself and children.
 	if err != nil || !toBeDeleted.exists() {
 		log.Err("AttrCache::deleteDirectory : directory %s not found in cache", path)
 		return
 	}
 	toBeDeleted.markDeleted(time)
-
 }
 
 // deleteCachedDirectory: marks a directory and all its contents deleted
@@ -619,7 +614,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		ancestorCacheItem, err := ac.cacheMap.get(ancestorPath)
 		if err != nil {
 			ancestorObjAttr := internal.CreateObjAttrDir(ancestorPath)
-			ac.cacheMap.insert(ancestorObjAttr, true, time)
+			ancestorCacheItem = ac.cacheMap.insert(ancestorObjAttr, true, time)
 		}
 
 		var anyChildrenInCloud bool
