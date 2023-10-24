@@ -596,16 +596,12 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 // and search the contents of all of its ancestors,
 // to record which of them contain objects in their subtrees
 func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
-
-	ancestorPath := internal.TruncateDirName(dirPath)
-	for ancestorPath != "" {
-
-		ancestorCacheItem, err := ac.cacheMap.get(ancestorPath)
+	for dirPath != "" {
+		ancestorCacheItem, err := ac.cacheMap.get(dirPath)
 		if err != nil {
-			ancestorObjAttr := internal.CreateObjAttrDir(ancestorPath)
+			ancestorObjAttr := internal.CreateObjAttrDir(dirPath)
 			ancestorCacheItem = ac.cacheMap.insert(ancestorObjAttr, true, time)
 		}
-
 		var anyChildrenInCloud bool
 
 		for _, item := range ancestorCacheItem.children {
@@ -614,18 +610,15 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 				break
 			}
 		}
-
 		if ancestorCacheItem.isInCloud() != anyChildrenInCloud {
 			ancestorCacheItem.markInCloud(anyChildrenInCloud)
 		} else {
 			//both the ancestorCacheItem and the child ancestorCacheItem are in cloud, so we break.
 			break
 		}
-
 		// move on to the next ancestor
-		ancestorPath = getParentDir(ancestorPath)
+		dirPath = getParentDir(dirPath)
 	}
-
 }
 
 // RenameFile : Mark the source file deleted. Invalidate the destination file.
