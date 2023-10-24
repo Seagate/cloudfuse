@@ -55,7 +55,7 @@ import (
 //    ----------- Helper to create pipeline options ---------------
 
 var UserAgent = func() string {
-	return "Azure-Storage-Fuse/" + common.CloudfuseVersion
+	return "cloudfuse/" + common.CloudfuseVersion
 }
 
 const (
