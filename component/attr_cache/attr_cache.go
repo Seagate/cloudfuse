@@ -674,13 +674,7 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 		defer ac.cacheLock.RUnlock()
 		// TODO: Could we just update the size and mod time of the file here? Or can other attributes change here?
 
-		var toBeInvalid *attrCacheItem
-		var err error
-		if attr == nil {
-			toBeInvalid, err = ac.cacheMap.get(options.Handle.Path)
-		} else {
-			toBeInvalid, err = ac.cacheMap.get(attr.Path) //attr is nil here for TestWriteFileDoesNotExist()
-		}
+		toBeInvalid, err := ac.cacheMap.get(attr.Path)
 
 		if err != nil {
 			log.Err("AttrCache::WriteFile : could not find attribute item in cache to invalidate due to the following error: ", err)
