@@ -9,14 +9,24 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 ## Installation
 Download the provided installation packages for your preferred operating system.  -- COMING SOON!
 
+### From Tar or Zip files
+In the release tab on GitHub, you can download a tar folder for Linux on x86 and a zip folder for Windows on x86 which bundles
+
+the GUI and the Cloudfuse binary. Then run the `cloudfuseGUI` file on your system to launch the GUI or
+call the `cloudfuse` binary file on the command line to use Cloudfuse as a command line tool.
+
+On Windows, you will need to install WinFsp to use Cloudfuse. See [this](https://winfsp.dev/rel/) to install WinFSP.
+
+### Source Installation
 Please refer to the [Installation from source](https://github.com/Seagate/cloudfuse/wiki/Installation-From-Source) to 
 manually install Cloudfuse.
 
 ## Config
 The GUI can help you quickly configure Cloudfuse.
 
-* There are two ways to run the GUI:
+* There are three ways to run the GUI:
   - Open the Cloudfuse GUI provided in the installation package -- COMING SOON!
+  - Extract either the tar or zip files to your computer and launch the `cloudfuseGUI`.
   - Run the GUI from source, see instructions [here](https://github.com/Seagate/cloudfuse/wiki/Running-the-GUI-from-source)
 * Select the desired type of cloud (Azure or S3).
 * Click `config`, which opens a new window for settings.
