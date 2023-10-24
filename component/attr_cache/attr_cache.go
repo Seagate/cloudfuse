@@ -248,7 +248,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	}
 
 	srcItem, err := ac.cacheMap.get(srcDir)
-	if err != nil {
+	if err != nil || !srcItem.exists() {
 		log.Err("AttrCache::renameCachedDirectory : source directory does not exist. ", err)
 		return syscall.ENOENT
 	}
