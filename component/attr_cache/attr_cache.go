@@ -677,7 +677,7 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 		toBeInvalid, err := ac.cacheMap.get(attr.Path)
 
 		if err != nil {
-			log.Err("AttrCache::WriteFile : could not find attribute item in cache to invalidate due to the following error: ", err)
+			log.Err("AttrCache::WriteFile : %s: ", err)
 		} else {
 			toBeInvalid.invalidate()
 		}
