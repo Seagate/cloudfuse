@@ -341,7 +341,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	objectAttrList := make([]*internal.ObjAttr, 0)
 	// fetch and process result pages
 
-	if paginator.HasMorePages() {
+	for paginator.HasMorePages() && len(objectAttrList) < int(count) {
 		output, err := paginator.NextPage(context.Background())
 		if err != nil {
 			log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
@@ -412,13 +412,13 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 			objectAttrList = append(objectAttrList, attr)
 		}
 
-		// values should be returned in ascending order by key
-		// sort the list before returning it
-		sort.Slice(objectAttrList, func(i, j int) bool {
-			return objectAttrList[i].Path < objectAttrList[j].Path
-		})
-
 	}
+
+	// values should be returned in ascending order by key
+	// sort the list before returning it
+	sort.Slice(objectAttrList, func(i, j int) bool {
+		return objectAttrList[i].Path < objectAttrList[j].Path
+	})
 
 	return objectAttrList, newMarker, nil
 
