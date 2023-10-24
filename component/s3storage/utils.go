@@ -45,7 +45,7 @@ import (
 
 var UserAgent = func() string {
 	// TODO: if we can get the Go version for this, it would be nice.
-	return "cloudfuse/" + common.CloudfuseVersion + " (Language=Go)"
+	return "Seagate-Cloudfuse/" + common.CloudfuseVersion + " (Language=Go)"
 }
 
 const (
