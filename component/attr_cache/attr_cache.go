@@ -734,9 +734,9 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 		// TODO: Could we just update the size and mod time of the file here? Or can other attributes change here?
 		// TODO: we're RLocking the cache but we need to also lock this attr item because another thread could be reading this attr item
 
-		toBeInvalid, err := ac.cacheMap.get(options.Name) //empty for TestCopyFromFileDoesNotExist()
-		if err != nil {
-			log.Err("AttrCache::CopyFromFile : The attribute item could not be invalidated in the cache due to the following error: ", err)
+		toBeInvalid, getErr := ac.cacheMap.get(options.Name) //empty for TestCopyFromFileDoesNotExist()
+		if getErr != nil {
+			log.Err("AttrCache::CopyFromFile : %s: ", getErr)
 		} else {
 			toBeInvalid.invalidate()
 		}
