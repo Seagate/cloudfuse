@@ -869,7 +869,7 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 		if err != nil {
 			log.Err("AttrCache::Chmod : The attribute item could not be retrieved from the cache due to the following error: ", err)
 		} else {
-			if value.valid() && value.exists() {
+			if value.exists() {
 				value.setMode(options.Mode)
 			}
 		}
