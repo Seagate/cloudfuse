@@ -334,9 +334,7 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 			newDirAttrCacheItem.markInCloud(false)
 		} else {
 			dirAttrCacheItem, err := ac.cacheMap.get(options.Name)
-			if err != nil {
-				log.Err("AttrCache:: CreateDir : could not find the attr cached item: ", err)
-			} else {
+			if err == nil {
 				dirAttrCacheItem.invalidate()
 			}
 		}
@@ -504,7 +502,7 @@ func (ac *AttrCache) anyContentsInCache(prefix string) bool {
 	if directory.exists() {
 		for _, chldItem := range directory.children {
 			if chldItem.exists() {
-				ac.anyContentsInCache(chldItem.attr.Path)
+				return true
 			}
 		}
 	}
