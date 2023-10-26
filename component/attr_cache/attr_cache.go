@@ -506,9 +506,6 @@ func (ac *AttrCache) anyContentsInCache(prefix string) bool {
 			}
 		}
 	}
-	if directory.children != nil && directory.exists() {
-		return true
-	}
 	return false
 }
 
