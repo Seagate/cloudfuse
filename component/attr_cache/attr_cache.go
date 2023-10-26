@@ -810,7 +810,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		}
 	} else if err == syscall.ENOENT {
 		// cache this entity not existing
-		// TODO: change the tests to no longer use empty structs. use internal.createAttr() to define a path instead of a litteral.
+		// TODO: change the tests to no longer use empty structs. use internal.createAttr() to define a path instead of a literal.
 		ac.cacheMap.insert(&internal.ObjAttr{Path: internal.TruncateDirName(options.Name)}, false, time.Now())
 
 	}
