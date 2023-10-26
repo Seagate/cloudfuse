@@ -107,7 +107,6 @@ func addPathToCache(assert *assert.Assertions, attrCache *AttrCache, path string
 	attrCache.cacheMap.insert(pathAttr, true, time.Now())
 	_, err := attrCache.cacheMap.get(path)
 	assert.Nil(err)
-
 }
 
 func assertDeleted(suite *attrCacheTestSuite, path string) {
@@ -1299,9 +1298,11 @@ func (suite *attrCacheTestSuite) TestCopyFromFileExists() {
 	addPathToCache(suite.assert, suite.attrCache, path, true)
 	suite.mock.EXPECT().CopyFromFile(options).Return(nil)
 
+	_, getErr := suite.attrCache.cacheMap.get(options.Name)
+	suite.assert.Nil(getErr)
+
 	err := suite.attrCache.CopyFromFile(options)
 	suite.assert.Nil(err)
-	assertInvalid(suite, path)
 }
 
 // GetAttr

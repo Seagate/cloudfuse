@@ -734,11 +734,11 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 		// TODO: Could we just update the size and mod time of the file here? Or can other attributes change here?
 		// TODO: we're RLocking the cache but we need to also lock this attr item because another thread could be reading this attr item
 
-		toBeInvalid, getErr := ac.cacheMap.get(options.Name) //empty for TestCopyFromFileDoesNotExist()
+		toBeUpdated, getErr := ac.cacheMap.get(options.Name) //empty for TestCopyFromFileDoesNotExist()
 		if getErr != nil {
 			log.Err("AttrCache::CopyFromFile : %s: ", getErr)
 		} else {
-			toBeInvalid.invalidate()
+			ac.moveAttrCachedItem(toBeUpdated, options.Name, options.Name, time.Now())
 		}
 	}
 	return err
@@ -776,21 +776,16 @@ func (ac *AttrCache) SyncDir(options internal.SyncDirOptions) error {
 // GetAttr : Try to serve the request from the attribute cache, otherwise cache attributes of the path returned by next component
 func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
 	log.Trace("AttrCache::GetAttr : %s", options.Name)
-	truncatedPath := internal.TruncateDirName(options.Name)
-
 	ac.cacheLock.RLock()
-	value, err := ac.cacheMap.get(truncatedPath)
+	value, err := ac.cacheMap.get(options.Name)
 	ac.cacheLock.RUnlock()
-
 	if err == nil && value.valid() && time.Since(value.cachedAt).Seconds() < float64(ac.cacheTimeout) {
 		// Try to serve the request from the attribute cache
-
 		// Is the entry marked deleted?
 		if value.isDeleted() {
 			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
 			return &internal.ObjAttr{}, syscall.ENOENT
 		}
-
 		// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
 		// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
 		// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
@@ -809,20 +804,16 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	if err == nil {
 		// Retrieved attributes so cache them
-
 		ac.cacheMap.insert(pathAttr, true, time.Now())
-
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
 	} else if err == syscall.ENOENT {
 		// cache this entity not existing
-
 		// TODO: change the tests to no longer use empty structs. use internal.createAttr() to define a path instead of a litteral.
 		ac.cacheMap.insert(&internal.ObjAttr{Path: internal.TruncateDirName(options.Name)}, false, time.Now())
 
 	}
-
 	return pathAttr, err
 }
 
