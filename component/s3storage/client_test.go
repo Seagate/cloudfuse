@@ -645,6 +645,15 @@ func (s *clientTestSuite) TestList() {
 	s.assert.EqualValues(len(objects), 1)
 	s.assert.EqualValues(objects[0].Name, base+"c")
 	s.assert.False(objects[0].IsDir())
+
+	// When listing the root, List should not include the root
+	objects, _, err = s.client.List("", nil, 0)
+	s.assert.Nil(err)
+	s.assert.NotNil(objects)
+	s.assert.Greater(len(objects), 0)
+	s.assert.NotEqual(objects[0].Name, "")
+	s.assert.NotEqual(objects[0].Name, "/")
+	s.assert.NotEqual(objects[0].Name, ".")
 }
 func (s *clientTestSuite) TestReadToFile() {
 	defer s.cleanupTest()
