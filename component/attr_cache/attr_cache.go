@@ -250,7 +250,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 
 	srcItem, err := ac.cacheMap.get(srcDir)
 	if err != nil || !srcItem.exists() {
-		log.Err("AttrCache::renameCachedDirectory : source directory does not exist. ", err)
+		log.Err("AttrCache::renameCachedDirectory : %s ", err)
 		return syscall.ENOENT
 	}
 
@@ -262,13 +262,6 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 	ac.moveAttrCachedItem(srcItem, srcDir, dstDir, time)
 	ac.updateAncestorsInCloud(srcDir, time)
 	ac.updateAncestorsInCloud(dstDir, time)
-
-	// if there were no cached entries to move, does this directory even exist?
-	if srcItem.children == nil && !ac.pathExistsInCache(srcDir) {
-		log.Err("AttrCache::renameCachedDirectory : Source directory %s does not exist.", srcDir)
-		return syscall.ENOENT
-	}
-
 	return nil
 }
 
