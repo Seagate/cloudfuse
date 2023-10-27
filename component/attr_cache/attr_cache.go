@@ -682,13 +682,13 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 
-		value, err := ac.cacheMap.get(options.Name)
-		if err != nil {
-			log.Err("AttrCache::TruncateFile : could not find attribute item in cache to truncate file due to the following error: ", err)
-		} else {
-			if value.exists() {
-				value.setSize(options.Size)
-			}
+		value, getErr := ac.cacheMap.get(options.Name)
+		if getErr != nil {
+			log.Err("AttrCache::TruncateFile : could not truncate file due to the following error: ", getErr)
+			return getErr
+		}
+		if value.exists() {
+			value.setSize(options.Size)
 		}
 	}
 	return err
@@ -831,12 +831,12 @@ func (ac *AttrCache) FlushFile(options internal.FlushFileOptions) error {
 	if err == nil {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		toBeInvalid, err := ac.cacheMap.get(options.Handle.Path)
-		if err != nil {
-			log.Err("AttrCache::FlushFile : The attribute item could not be invalidated in the cache due to the following error: ", err)
-		} else {
-			toBeInvalid.invalidate()
+		toBeInvalid, getErr := ac.cacheMap.get(options.Handle.Path)
+		if getErr != nil {
+			log.Err("AttrCache::FlushFile : The attribute item could not be invalidated in the cache due to the following error: ", getErr)
+			return getErr
 		}
+		toBeInvalid.invalidate()
 	}
 	return err
 }

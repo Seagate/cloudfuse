@@ -1235,7 +1235,7 @@ func (suite *attrCacheTestSuite) TestTruncateFile() {
 	suite.mock.EXPECT().TruncateFile(options).Return(nil)
 
 	err = suite.attrCache.TruncateFile(options)
-	suite.assert.Nil(err)
+	suite.assert.NotNil(err)
 	_, err = suite.attrCache.cacheMap.get(path)
 	suite.assert.NotNil(err)
 
