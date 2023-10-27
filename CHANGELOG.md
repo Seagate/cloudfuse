@@ -1,5 +1,9 @@
 # Cloudfuse Changelog #
 
+## 0.2.0 (WIP) ##
+**Features**
+-- Include an installer on Windows
+
 ## 0.1.0 ##
 
 This release includes all features planned for the 1.0.0 release of cloudfuse, which will be released after additional bug fixes.
