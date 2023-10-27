@@ -315,8 +315,6 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// Check for an empty path to prevent indexing to [-1]
 	findCommonPrefixes := listPath == "" || listPath[len(listPath)-1] == '/'
 
-	// create a map to keep track of all directories
-	var dirList = make(map[string]bool)
 	var newMarker *string
 	var token *string
 
@@ -339,65 +337,64 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	paginator := s3.NewListObjectsV2Paginator(cl.awsS3Client, params)
 	// initialize list to be returned
 	objectAttrList := make([]*internal.ObjAttr, 0)
-	// fetch and process result pages
+	// fetch and process a single result page
+	output, err := paginator.NextPage(context.Background())
+	if err != nil {
+		log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
+		return objectAttrList, nil, err
+	}
 
-	for paginator.HasMorePages() && len(objectAttrList) < int(count) {
-		output, err := paginator.NextPage(context.Background())
-		if err != nil {
-			log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
-			return objectAttrList, nil, err
-		}
+	if output.IsTruncated {
+		newMarker = output.NextContinuationToken
+	} else {
+		newMarker = nil
+	}
 
-		if output.IsTruncated {
-			newMarker = output.NextContinuationToken
-		} else {
-			newMarker = nil
-		}
+	// documentation for this S3 data structure:
+	// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
+	for _, value := range output.Contents {
+		// push object info into the list
+		name, isSymLink := cl.getFile(*value.Key)
 
-		// documentation for this S3 data structure:
-		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
-		for _, value := range output.Contents {
-			// push object info into the list
-			name, isSymLink := cl.getFile(*value.Key)
+		path := split(cl.Config.prefixPath, name)
+		attr := createObjAttr(path, value.Size, *value.LastModified, isSymLink)
+		objectAttrList = append(objectAttrList, attr)
+	}
 
-			path := split(cl.Config.prefixPath, name)
-			attr := createObjAttr(path, value.Size, *value.LastModified, isSymLink)
-			objectAttrList = append(objectAttrList, attr)
-		}
-
-		if findCommonPrefixes {
-			// documentation for CommonPrefixes:
-			// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2/types#CommonPrefix
-			for _, value := range output.CommonPrefixes {
-				dir := *value.Prefix
-				dirList[dir] = true
-				// let's extract and add intermediate directories
-				// first cut the listPath (the full prefix path) off of the directory path
-				_, intermediatePath, listPathFound := strings.Cut(dir, listPath)
-				// if the listPath isn't here, that's weird
-				if !listPathFound {
-					log.Warn("Prefix mismatch with path %v when listing objects in %v.", dir, listPath)
+	if findCommonPrefixes {
+		// documentation for CommonPrefixes:
+		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2/types#CommonPrefix
+		// create a map to keep track of all directories
+		var dirList = make(map[string]bool)
+		for _, value := range output.CommonPrefixes {
+			dir := *value.Prefix
+			dirList[dir] = true
+			// let's extract and add intermediate directories
+			// first cut the listPath (the full prefix path) off of the directory path
+			_, intermediatePath, listPathFound := strings.Cut(dir, listPath)
+			// if the listPath isn't here, that's weird
+			if !listPathFound {
+				log.Warn("Prefix mismatch with path %v when listing objects in %v.", dir, listPath)
+			}
+			// get an array of intermediate directories
+			intermediateDirectories := strings.Split(intermediatePath, "/")
+			// walk up the tree and add each one until we find an already existing parent
+			// we have to iterate in descending order
+			suffixToTrim := ""
+			for i := len(intermediateDirectories) - 1; i >= 0; i-- {
+				// ignore empty strings (split does not omit them)
+				if intermediateDirectories[i] == "" {
+					continue
 				}
-				// get an array of intermediate directories
-				intermediateDirectories := strings.Split(intermediatePath, "/")
-				// walk up the tree and add each one until we find an already existing parent
-				// we have to iterate in descending order
-				suffixToTrim := ""
-				for i := len(intermediateDirectories) - 1; i >= 0; i-- {
-					// ignore empty strings (split does not omit them)
-					if intermediateDirectories[i] == "" {
-						continue
-					}
-					// add to the suffix we're trimming off
-					suffixToTrim = intermediateDirectories[i] + "/" + suffixToTrim
-					// get the trimmed (parent) directory
-					parentDir := strings.TrimSuffix(dir, suffixToTrim)
-					// have we seen this one already?
-					if dirList[parentDir] {
-						break
-					}
-					dirList[parentDir] = true
+				// add to the suffix we're trimming off
+				suffixToTrim = intermediateDirectories[i] + "/" + suffixToTrim
+				// get the trimmed (parent) directory
+				parentDir := strings.TrimSuffix(dir, suffixToTrim)
+				// have we seen this one already?
+				if dirList[parentDir] {
+					break
 				}
+				dirList[parentDir] = true
 			}
 		}
 
@@ -411,7 +408,6 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 			attr := internal.CreateObjAttrDir(path)
 			objectAttrList = append(objectAttrList, attr)
 		}
-
 	}
 
 	// values should be returned in ascending order by key
@@ -421,7 +417,6 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	})
 
 	return objectAttrList, newMarker, nil
-
 }
 
 // create an object attributes struct
