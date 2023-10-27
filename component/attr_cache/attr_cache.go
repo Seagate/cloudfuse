@@ -621,7 +621,7 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 
 		toBeDeleted, err := ac.cacheMap.get(options.Src)
 		if err != nil {
-			log.Err("AttrCache::RenameFile : %s: ", err)
+			log.Warn("AttrCache::RenameFile : %s: ", err)
 		} else {
 			ac.moveAttrCachedItem(toBeDeleted, options.Src, options.Dst, time.Now())
 		}
