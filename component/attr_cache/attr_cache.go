@@ -723,9 +723,7 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 		// TODO: we're RLocking the cache but we need to also lock this attr item because another thread could be reading this attr item
 
 		toBeUpdated, getErr := ac.cacheMap.get(options.Name) //empty for TestCopyFromFileDoesNotExist()
-		if getErr != nil {
-			log.Err("AttrCache::CopyFromFile : %s", getErr)
-		} else {
+		if getErr == nil {
 			ac.moveAttrCachedItem(toBeUpdated, options.Name, options.Name, time.Now())
 		}
 	}
