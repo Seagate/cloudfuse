@@ -448,7 +448,9 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 
 			ac.cacheMap.insert(attr, true, currTime)
 		}
-
+		// pathList was returned by the cloud storage component when listing a directory
+        // so that directory is clearly in the cloud
+		markAncestorsInCloud(getParentDir(pathList[0].Path), currTime)
 	}
 }
 
