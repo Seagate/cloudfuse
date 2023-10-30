@@ -238,9 +238,9 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	path := formatListDirName(options.Name)
 	var iteration int                   // = 0
 	var marker *string = &options.Token // = nil
-	var entriesFetched int32
-	for {
-		newList, newMarker, err := s3.storage.List(path, marker, options.Count-entriesFetched)
+	var totalEntriesFetched int32
+	for totalEntriesFetched < options.Count {
+		newList, newMarker, err := s3.storage.List(path, marker, options.Count-totalEntriesFetched)
 		if err != nil {
 			log.Err("S3Storage::StreamDir : %s Failed to read dir [%s]", options.Name, err)
 			return objectList, "", err
@@ -248,10 +248,10 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		objectList = append(objectList, newList...)
 		marker = newMarker
 		iteration++
-		entriesFetched = int32(len(objectList))
+		totalEntriesFetched += int32(len(objectList))
 
-		log.Debug("S3Storage::StreamDir : %s So far retrieved %d objects in %d iterations", options.Name, entriesFetched, iteration)
-		if marker == nil || *marker == "" || entriesFetched >= options.Count {
+		log.Debug("S3Storage::StreamDir : %s So far retrieved %d objects in %d iterations", options.Name, totalEntriesFetched, iteration)
+		if marker == nil || *marker == "" {
 			break
 		}
 	}
@@ -265,7 +265,7 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	if len(path) == 0 {
 		path = "/"
 	}
-	s3StatsCollector.PushEvents(streamDir, path, map[string]interface{}{count: entriesFetched})
+	s3StatsCollector.PushEvents(streamDir, path, map[string]interface{}{count: totalEntriesFetched})
 
 	// increment streamDir call count
 	s3StatsCollector.UpdateStats(stats_manager.Increment, streamDir, (int64)(1))
