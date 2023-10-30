@@ -616,7 +616,6 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 		renameTime := time.Now()
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		// TODO: Can we just copy over the attributes from the source to the destination so we don't have to invalidate?
 
 		toBeDeleted, getErr := ac.cacheMap.get(options.Src)
 		if getErr != nil {
