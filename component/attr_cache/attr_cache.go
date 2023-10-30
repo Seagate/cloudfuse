@@ -623,12 +623,6 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
             return
 		}
         ac.moveAttrCachedItem(toBeDeleted, options.Src, options.Dst, time.Now())
-		toBeInvalid, getErr := ac.cacheMap.get(options.Dst)
-		if getErr != nil {
-			log.Err("AttrCache::RenameFile : %s", err)
-		} else {
-			toBeInvalid.invalidate()
-		}
 		if ac.cacheDirs {
 			ac.updateAncestorsInCloud(getParentDir(options.Src), renameTime)
 			// mark the destination parent directory tree as containing objects
