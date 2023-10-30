@@ -841,12 +841,10 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 		defer ac.cacheLock.RUnlock()
 
 		value, getErr := ac.cacheMap.get(internal.TruncateDirName(options.Name))
-		if getErr != nil {
-			log.Err("AttrCache::Chmod : %s: ", getErr)
+		if getErr != nil || !value.exists() {
+			log.Err("AttrCache::Chmod : %s not in cache", options.Name)
 		} else {
-			if value.exists() {
-				value.setMode(options.Mode)
-			}
+			value.setMode(options.Mode)
 		}
 	}
 	return err
