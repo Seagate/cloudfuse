@@ -386,8 +386,8 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 
 	nonCloudItem, getErr := ac.cacheMap.get(listPath)
 
-	if getErr != nil {
-		log.Err("AttrCache:: addDirsNotInCloudToListing : %s: ", getErr)
+	if getErr != nil || !nonCloudItem.exists() {
+		log.Err("AttrCache:: addDirsNotInCloudToListing : %s does not exist in cache", listPath)
 		return pathList, 0
 	}
 
