@@ -385,16 +385,16 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*internal.ObjAttr) ([]*internal.ObjAttr, int) {
 	numAdded := 0
 
-	nonCloudItem, getErr := ac.cacheMap.get(listPath)
+	dir, getErr := ac.cacheMap.get(listPath)
 
-	if getErr != nil || !nonCloudItem.exists() {
+	if getErr != nil || !dir.exists() {
 		log.Err("AttrCache:: addDirsNotInCloudToListing : %s does not exist in cache", listPath)
 		return pathList, 0
 	}
 
-	if nonCloudItem.exists() {
+	if dir.exists() {
 		ac.cacheLock.RLock()
-		for _, chldNonCloudItem := range nonCloudItem.children {
+		for _, chldNonCloudItem := range dir.children {
 			if chldNonCloudItem.exists() && !chldNonCloudItem.isInCloud() {
 				pathList = append(pathList, chldNonCloudItem.attr)
 				numAdded++
