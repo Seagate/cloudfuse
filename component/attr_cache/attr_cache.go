@@ -822,7 +822,7 @@ func (ac *AttrCache) FlushFile(options internal.FlushFileOptions) error {
 		defer ac.cacheLock.RUnlock()
 		toBeInvalid, getErr := ac.cacheMap.get(options.Handle.Path)
 		if getErr != nil {
-			log.Err("AttrCache::FlushFile : could not invalidate item in cache due to the following error: %s", getErr)
+			log.Err("AttrCache::FlushFile : could not invalidate item in cache: %s", getErr)
 			return getErr
 		}
 		toBeInvalid.invalidate()
