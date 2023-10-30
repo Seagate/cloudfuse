@@ -239,8 +239,9 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 	}
 }
 
-// renameCachedDirectory: Renames a cached directory and all its contents when ac.cacheDirs is true.
-// input: string of source root of subtree folder name, string of destination name for root of subtree folder name, time.time for timestamp
+// renameCachedDirectory: Renames a cached directory and all its contents
+// this function assumes ac.cacheDirs is true
+// input: source folder path, destination folder path, rename timestamp
 func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time time.Time) error {
 
 	// First, check if the destination directory already exists
