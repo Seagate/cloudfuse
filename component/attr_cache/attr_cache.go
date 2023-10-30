@@ -264,7 +264,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 }
 
 // moveAttrItem: used to move a subtree within cacheMap to a new location of the cacheMap tree.
-// input: attrCacheItem to be moved, string of the root
+// input: attrCacheItem to be moved, source and destination path, move timestamp
 func (ac *AttrCache) moveAttrCachedItem(srcItem *attrCacheItem, srcDir string, dstDir string, time time.Time) {
 
 	// 2.) take the source name and change it to the destination name
