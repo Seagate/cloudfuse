@@ -190,7 +190,6 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	//get attrCacheItem
 	toBeDeleted, getErr := ac.cacheMap.get(path)
 
-	// delete the path itself and children.
 	if getErr != nil {
 		log.Err("AttrCache::deleteCachedDirectory : %s", getErr)
 		return syscall.ENOENT
