@@ -284,7 +284,7 @@ func (ac *AttrCache) moveAttrCachedItem(srcItem *attrCacheItem, srcDir string, d
 	// mark whether the item is in the cloud
 	dstItem.markInCloud(srcItem.isInCloud())
 
-	// repeat previous steps for any children in the current source Item
+	// recurse over children
 	for _, srcChildItm := range srcItem.children {
 		ac.moveAttrCachedItem(srcChildItm, srcDir, dstDir, time)
 	}
