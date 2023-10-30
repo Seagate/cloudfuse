@@ -447,7 +447,6 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 		for _, attr := range pathList {
 
 			ac.cacheMap.insert(attr, true, currTime)
-
 		}
 
 	}
