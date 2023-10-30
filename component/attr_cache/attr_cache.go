@@ -172,7 +172,7 @@ func (ac *AttrCache) deleteDirectory(path string, time time.Time) {
 	//get attrCacheItem
 	toBeDeleted, getErr := ac.cacheMap.get(path)
 	if getErr != nil || !toBeDeleted.exists() {
-		log.Err("AttrCache::deleteDirectory : %s", path)
+		log.Warn("AttrCache::deleteDirectory : %s directory does not exist", path)
 		return
 	}
 	toBeDeleted.markDeleted(time)
