@@ -267,10 +267,10 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 // input: attrCacheItem to be moved, source and destination path, move timestamp
 func (ac *AttrCache) moveAttrCachedItem(srcItem *attrCacheItem, srcDir string, dstDir string, time time.Time) {
 
-	// 2.) take the source name and change it to the destination name
+	// take the source name and change it to the destination name
 	dstPath := strings.Replace(srcItem.attr.Path, srcDir, dstDir, 1)
 
-	// 3.) create an attribute using the destination name
+	// create an attribute using the destination name
 	var dstAttr *internal.ObjAttr
 	if srcItem.attr.IsDir() {
 		dstAttr = internal.CreateObjAttrDir(dstPath)
@@ -278,13 +278,13 @@ func (ac *AttrCache) moveAttrCachedItem(srcItem *attrCacheItem, srcDir string, d
 		dstAttr = internal.CreateObjAttr(dstPath, srcItem.attr.Size, srcItem.attr.Mtime)
 	}
 
-	// 4.) insert the attribute from previous step into the cacheMap
+	// insert the attribute from previous step into the cacheMap
 	dstItem := ac.cacheMap.insert(dstAttr, srcItem.exists(), srcItem.cachedAt)
 
-	// 5.) mark whether the item is in the cloud
+	// mark whether the item is in the cloud
 	dstItem.markInCloud(srcItem.isInCloud())
 
-	// 6.) repeat steps 1 - 5 for any children in the current source Item
+	// repeat previous steps for any children in the current source Item
 	for _, srcChildItm := range srcItem.children {
 		ac.moveAttrCachedItem(srcChildItm, srcDir, dstDir, time)
 	}
