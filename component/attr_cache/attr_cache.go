@@ -449,8 +449,8 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 			ac.cacheMap.insert(attr, true, currTime)
 		}
 		// pathList was returned by the cloud storage component when listing a directory
-        // so that directory is clearly in the cloud
-		markAncestorsInCloud(getParentDir(pathList[0].Path), currTime)
+		// so that directory is clearly in the cloud
+		ac.markAncestorsInCloud(getParentDir(pathList[0].Path), currTime)
 	}
 }
 
@@ -620,9 +620,9 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 		toBeDeleted, getErr := ac.cacheMap.get(options.Src)
 		if getErr != nil || !toBeDeleted.exists() {
 			log.Warn("AttrCache::RenameFile : Source %s does not exist in cache", options.Src)
-            return
+			return fmt.Errorf("The Source : %s does not exist", options.Src)
 		}
-        ac.moveAttrCachedItem(toBeDeleted, options.Src, options.Dst, time.Now())
+		ac.moveAttrCachedItem(toBeDeleted, options.Src, options.Dst, time.Now())
 		if ac.cacheDirs {
 			ac.updateAncestorsInCloud(getParentDir(options.Src), renameTime)
 			// mark the destination parent directory tree as containing objects
