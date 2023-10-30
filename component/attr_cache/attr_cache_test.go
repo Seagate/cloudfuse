@@ -71,14 +71,14 @@ func newTestAttrCache(next internal.Component, configuration string) *AttrCache 
 }
 
 func getDirPathAttr(path string) *internal.ObjAttr {
-	objAttr := GetPathAttr(path, defaultSize, fs.FileMode(defaultMode), true)
+	objAttr := getPathAttr(path, defaultSize, fs.FileMode(defaultMode), true)
 	flags := internal.NewDirBitMap()
 	flags.Set(internal.PropFlagMetadataRetrieved)
 	objAttr.Flags = flags
 	return objAttr
 }
 
-func GetPathAttr(path string, size int64, mode os.FileMode, metadata bool) *internal.ObjAttr {
+func getPathAttr(path string, size int64, mode os.FileMode, metadata bool) *internal.ObjAttr {
 	flags := internal.NewFileBitMap()
 	if metadata {
 		flags.Set(internal.PropFlagMetadataRetrieved)
@@ -100,7 +100,7 @@ func GetPathAttr(path string, size int64, mode os.FileMode, metadata bool) *inte
 func addPathToCache(assert *assert.Assertions, attrCache *AttrCache, path string, metadata bool) {
 	isDir := path[len(path)-1] == '/'
 	path = internal.TruncateDirName(path)
-	pathAttr := GetPathAttr(path, defaultSize, fs.FileMode(defaultMode), metadata)
+	pathAttr := getPathAttr(path, defaultSize, fs.FileMode(defaultMode), metadata)
 	if isDir {
 		pathAttr = getDirPathAttr(path)
 	}
@@ -178,7 +178,7 @@ func assertNotInCloud(suite *attrCacheTestSuite, path string) {
 //	ab/c1
 //
 // ac
-func GenerateNestedDirectory(path string) (*list.List, *list.List, *list.List) {
+func generateDirectory(path string) (*list.List, *list.List, *list.List) {
 	path = internal.TruncateDirName(path)
 
 	aPaths := list.New()
@@ -199,14 +199,14 @@ func GenerateNestedDirectory(path string) (*list.List, *list.List, *list.List) {
 }
 
 func GenerateNestedPathAttr(path string, size int64, mode os.FileMode) []*internal.ObjAttr {
-	a, _, _ := GenerateNestedDirectory(path)
+	a, _, _ := generateDirectory(path)
 	pathAttrs := make([]*internal.ObjAttr, 0)
 	i := 0
 	for p := a.Front(); p != nil; p = p.Next() {
 		pString := p.Value.(string)
 		isDir := pString[len(pString)-1] == '/'
 		pString = internal.TruncateDirName(pString)
-		newPathAttr := GetPathAttr(pString, size, mode, true)
+		newPathAttr := getPathAttr(pString, size, mode, true)
 		if isDir {
 			newPathAttr = getDirPathAttr(pString)
 		}
@@ -218,7 +218,7 @@ func GenerateNestedPathAttr(path string, size int64, mode os.FileMode) []*intern
 
 func AddDirectoryToCache(assert *assert.Assertions, attrCache *AttrCache, path string, metadata bool) (*list.List, *list.List, *list.List) {
 	// TODO: flag directories as such, or else recursion based on IsDir() won't work...
-	aPaths, abPaths, acPaths := GenerateNestedDirectory(path)
+	aPaths, abPaths, acPaths := generateDirectory(path)
 
 	for p := aPaths.Front(); p != nil; p = p.Next() {
 		addPathToCache(assert, attrCache, p.Value.(string), metadata)
@@ -1394,7 +1394,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadata() {
 
 			options := internal.GetAttrOptions{Name: path}
 			// attributes should not be accessible so call the mock
-			suite.mock.EXPECT().GetAttr(options).Return(GetPathAttr(path, defaultSize, fs.FileMode(defaultMode), false), nil).AnyTimes()
+			suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode), false), nil).AnyTimes()
 
 			_, err := suite.attrCache.GetAttr(options)
 			suite.assert.Nil(err)
@@ -1416,7 +1416,7 @@ func (suite *attrCacheTestSuite) TestGetAttrDoesNotExist() {
 
 			options := internal.GetAttrOptions{Name: path}
 			// attributes should not be accessible so call the mock
-			suite.mock.EXPECT().GetAttr(options).Return(GetPathAttr(path, defaultSize, fs.FileMode(defaultMode), false), nil)
+			suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode), false), nil)
 
 			suite.assert.Empty(suite.attrCache.cacheMap.children) // cacheMap should be empty before call
 			_, err := suite.attrCache.GetAttr(options)
@@ -1488,7 +1488,7 @@ func (suite *attrCacheTestSuite) TestCacheTimeout() {
 	path := "a"
 	options := internal.GetAttrOptions{Name: path}
 	// attributes should not be accessible so call the mock
-	suite.mock.EXPECT().GetAttr(options).Return(GetPathAttr(path, defaultSize, fs.FileMode(defaultMode), true), nil)
+	suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode), true), nil)
 
 	suite.assert.Empty(suite.attrCache.cacheMap.children) // cacheMap should be empty before call
 	_, err := suite.attrCache.GetAttr(options)
@@ -1503,7 +1503,7 @@ func (suite *attrCacheTestSuite) TestCacheTimeout() {
 	time.Sleep(time.Second * time.Duration(cacheTimeout))
 
 	// After cache timeout elapses, subsequent get attr should need to call next component
-	suite.mock.EXPECT().GetAttr(options).Return(GetPathAttr(path, defaultSize, fs.FileMode(defaultMode), true), nil)
+	suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode), true), nil)
 	_, err = suite.attrCache.GetAttr(options)
 	suite.assert.Nil(err)
 }

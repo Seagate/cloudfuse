@@ -618,11 +618,18 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 
+		//get the source item
 		toBeDeleted, getErr := ac.cacheMap.get(options.Src)
-		if getErr != nil || !toBeDeleted.exists() {
+
+		//make sure item exists and check exist flag
+		if getErr != nil {
+			log.Err("Can't move the file due to: %s", getErr)
+			return getErr
+		} else if !toBeDeleted.exists() {
 			log.Warn("AttrCache::RenameFile : Source %s does not exist in cache", options.Src)
-			return fmt.Errorf("The Source : %s does not exist", options.Src)
 		}
+
+		// move source item to destination
 		ac.moveAttrCachedItem(toBeDeleted, options.Src, options.Dst, time.Now())
 		if ac.cacheDirs {
 			ac.updateAncestorsInCloud(getParentDir(options.Src), renameTime)
