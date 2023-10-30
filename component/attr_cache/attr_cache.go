@@ -227,7 +227,7 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 		log.Err("AttrCache::invalidateDirectory : could not invalidate cached attr item: %s", getErr)
 		return
 	}
-	// don't invalidate directories when cacheDirs is true
+	// only invalidate directories when cacheDirs is false
 	if !ac.cacheDirs || !toBeInvalid.attr.IsDir() {
 		toBeInvalid.invalidate()
 		return
