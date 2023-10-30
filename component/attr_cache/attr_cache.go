@@ -257,9 +257,6 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 
 	srcDir = internal.TruncateDirName(srcDir)
 	dstDir = internal.TruncateDirName(dstDir)
-	if !srcItem.exists() {
-		return nil
-	}
 	ac.moveAttrCachedItem(srcItem, srcDir, dstDir, time)
 	ac.updateAncestorsInCloud(srcDir, time)
 	ac.updateAncestorsInCloud(dstDir, time)
