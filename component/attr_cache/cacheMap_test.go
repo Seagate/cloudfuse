@@ -83,7 +83,7 @@ func (suite *cacheMapTestSuite) TestInsertFile() {
 	suite.assert.EqualValues(false, cachedItem.attr.IsDir())
 }
 
-func (suite *cacheMapTestSuite) TestInsertFolderCacheMap() {
+func (suite *cacheMapTestSuite) TestInsertFolder() {
 	//create path string in form of test/dir/file
 	path := "a/c1/TestFolder"
 	startTime := time.Now()
