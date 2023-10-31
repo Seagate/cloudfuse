@@ -394,9 +394,9 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 
 	if dir.exists() {
 		ac.cacheLock.RLock()
-		for _, chldNonCloudItem := range dir.children {
-			if chldNonCloudItem.exists() && !chldNonCloudItem.isInCloud() {
-				pathList = append(pathList, chldNonCloudItem.attr)
+		for _, child := range dir.children {
+			if child.exists() && !child.isInCloud() {
+				pathList = append(pathList, child.attr)
 				numAdded++
 			}
 		}
@@ -682,13 +682,13 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 
 		truncatedItem, getErr := ac.cacheMap.get(options.Name)
 		if getErr != nil || !truncatedItem.exists() {
-            log.Warn("AttrCache::TruncateFile : %s replacing missing cache entry", options.Name)
-            // replace the missing entry
-            entryTime := time.Now()
-            truncatedAttr := internal.CreateObjAttr(options.Name, options.Size, entryTime)
+			log.Warn("AttrCache::TruncateFile : %s replacing missing cache entry", options.Name)
+			// replace the missing entry
+			entryTime := time.Now()
+			truncatedAttr := internal.CreateObjAttr(options.Name, options.Size, entryTime)
 			truncatedItem = ac.cacheMap.insert(truncatedAttr, true, entryTime)
 		}
-        truncatedItem.setSize(options.Size)
+		truncatedItem.setSize(options.Size)
 	}
 	return err
 }
