@@ -106,7 +106,6 @@ func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
 	paths := strings.Split(path, "/")
 	var currentItem *attrCacheItem
 	var ok bool
-	currentItem = value
 	for _, pathElement := range paths {
 		//check if we are at the last element in the paths list
 		if path == "" {
