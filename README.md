@@ -92,10 +92,10 @@ The general format of the Cloudfuse Linux commands is `cloudfuse [command] [argu
 * `mount all` - Mounts all the containers in an S3 Account or Azure account supported by mount
   - Example: cloudfuse mount all \<mount path> --config-file=\<config file>
 * `mount list` - Lists all Cloudfuse filesystems.
-  - cloudfuse mount list
+  - Example: cloudfuse mount list
 * `unmount` - Unmounts the Cloudfuse filesystem.
-  - Example: cloudfuse unmount \<mount path>
-  - Note: add "-z" or "--lazy" to use lazy unmount (prevents busy errors)
+  - Add "--lazy" (or "-z") flag to use lazy unmount (prevents busy errors)
+  - Example: cloudfuse unmount --lazy \<mount path>
 * `unmount all` - Unmounts all Cloudfuse filesystems.
   - Example: cloudfuse unmount all
 
