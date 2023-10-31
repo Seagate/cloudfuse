@@ -65,7 +65,7 @@ func (suite *cacheMapTestSuite) SetupTest() {
 
 }
 
-func (suite *cacheMapTestSuite) TestInsertFileCacheMap() {
+func (suite *cacheMapTestSuite) TestInsertFile() {
 	//create path string in form of test/dir/file
 	path := "a/c1/TestFile.txt"
 	startTime := time.Now()
