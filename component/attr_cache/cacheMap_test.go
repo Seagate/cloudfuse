@@ -107,14 +107,11 @@ func (suite *cacheMapTestSuite) TestInsertDirsAndFiles() {
 	timestamp := time.Now()
 	attr := internal.CreateObjAttr(path, 1024, timestamp)
 
-	suite.rootAttrCacheItem.insert(attr, true, timestamp)
+	cachedItem := suite.rootAttrCacheItem.insert(attr, true, timestamp)
 
-	cachedItem, err := suite.rootAttrCacheItem.get(path)
-
-	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
 	suite.assert.Equal(path, cachedItem.attr.Path)
-	suite.assert.Equal(1024, cachedItem.attr.Size)
+	suite.assert.Equal(int64(1024), cachedItem.attr.Size)
 	suite.assert.False(cachedItem.attr.IsDir())
 }
 

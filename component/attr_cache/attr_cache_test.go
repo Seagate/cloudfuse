@@ -1290,9 +1290,16 @@ func (suite *attrCacheTestSuite) TestCopyFromFileDoesNotExist() {
 
 func (suite *attrCacheTestSuite) TestCopyFromFileExists() {
 	defer suite.cleanupTest()
-	path := "a"
 
-	options := internal.CopyFromFileOptions{Name: path, File: nil, Metadata: nil}
+	path := "a"
+	f, err := os.CreateTemp("", "testFile.txt")
+	suite.assert.Nil(err)
+	defer os.Remove(f.Name())
+	TestStr := []byte("This is a test string")
+	os.WriteFile(f.Name(), TestStr, 0644)
+	suite.assert.Nil(err)
+	options := internal.CopyFromFileOptions{Name: path, File: f, Metadata: nil}
+
 	// Entry Already Exists
 	addPathToCache(suite.assert, suite.attrCache, path, true)
 	suite.mock.EXPECT().CopyFromFile(options).Return(nil)
@@ -1300,7 +1307,7 @@ func (suite *attrCacheTestSuite) TestCopyFromFileExists() {
 	_, getErr := suite.attrCache.cacheMap.get(options.Name)
 	suite.assert.Nil(getErr)
 
-	err := suite.attrCache.CopyFromFile(options)
+	err = suite.attrCache.CopyFromFile(options)
 	suite.assert.Nil(err)
 }
 

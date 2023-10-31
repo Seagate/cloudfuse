@@ -265,7 +265,7 @@ func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time ti
 
 // moveAttrItem: used to move a subtree within cacheMap to a new location of the cacheMap tree.
 // input: attrCacheItem to be moved, source and destination path, move timestamp
-func (ac *AttrCache) moveAttrCachedItem(srcItem *attrCacheItem, srcDir string, dstDir string, time time.Time) {
+func (ac *AttrCache) moveAttrCachedItem(srcItem *attrCacheItem, srcDir string, dstDir string, time time.Time) *attrCacheItem {
 
 	// take the source name and change it to the destination name
 	dstPath := strings.Replace(srcItem.attr.Path, srcDir, dstDir, 1)
@@ -288,9 +288,8 @@ func (ac *AttrCache) moveAttrCachedItem(srcItem *attrCacheItem, srcDir string, d
 	for _, srcChildItm := range srcItem.children {
 		ac.moveAttrCachedItem(srcChildItm, srcDir, dstDir, time)
 	}
-
 	srcItem.markDeleted(time)
-
+	return dstItem
 }
 
 func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
@@ -718,13 +717,26 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 			// Mark ancestors as existing in cloud storage now
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
+
 		// TODO: Could we just update the size and mod time of the file here? Or can other attributes change here?
 		// TODO: we're RLocking the cache but we need to also lock this attr item because another thread could be reading this attr item
-
 		toBeUpdated, getErr := ac.cacheMap.get(options.Name)
-		if getErr == nil {
-			ac.moveAttrCachedItem(toBeUpdated, options.Name, options.Name, time.Now())
+		if getErr != nil {
+			log.Warn("file uploaded but, %s", getErr)
+			return nil
 		}
+
+		fileStat, statErr := options.File.Stat()
+		if statErr != nil {
+			log.Warn("file uploaded but can't find file size: %s", statErr)
+			toBeUpdated.invalidate()
+			return nil
+		}
+
+		// get the size of the source file
+		fileSize := fileStat.Size()
+		movedItem := ac.moveAttrCachedItem(toBeUpdated, options.Name, options.Name, time.Now())
+		movedItem.attr.Size = fileSize
 	}
 	return err
 }
