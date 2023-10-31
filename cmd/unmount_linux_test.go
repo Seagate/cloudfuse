@@ -100,6 +100,40 @@ func (suite *unmountTestSuite) TestUnmountCmd() {
 	suite.assert.Nil(err)
 }
 
+func (suite *unmountTestSuite) TestUnmountCmdLazy() {
+	defer suite.cleanupTest()
+
+	lazyFlags := []string{"--lazy", "-z"}
+	flagBeforePath := false
+	flagAfterPath := !flagBeforePath
+	possibleFlagPositions := []bool{flagBeforePath, flagAfterPath}
+	baseCommand := "unmount"
+
+	for _, lazyFlag := range lazyFlags {
+		for _, flagPosition := range possibleFlagPositions {
+			mountDirectory1, _ := os.MkdirTemp("", "TestUnMountTemp")
+			os.MkdirAll(mountDirectory1, 0777)
+			defer os.RemoveAll(mountDirectory1)
+
+			cmd := exec.Command("../cloudfuse", "mount", mountDirectory1, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+			_, err := cmd.Output()
+			suite.assert.Nil(err)
+
+			time.Sleep(time.Second)
+
+			args := []string{baseCommand}
+			if flagPosition == flagBeforePath {
+				args = append(args, lazyFlag, mountDirectory1)
+			} else {
+				args = append(args, mountDirectory1, lazyFlag)
+			}
+
+			_, err = executeCommandC(rootCmd, args...)
+			suite.assert.Nil(err)
+		}
+	}
+}
+
 func (suite *unmountTestSuite) TestUnmountCmdFail() {
 	defer suite.cleanupTest()
 
