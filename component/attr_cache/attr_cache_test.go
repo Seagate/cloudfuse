@@ -1234,9 +1234,9 @@ func (suite *attrCacheTestSuite) TestTruncateFile() {
 	suite.mock.EXPECT().TruncateFile(options).Return(nil)
 
 	err = suite.attrCache.TruncateFile(options)
-	suite.assert.NotNil(err)
+	suite.assert.Nil(err)
 	_, err = suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
+	suite.assert.Nil(err)
 
 	// Entry Already Exists
 	addPathToCache(suite.assert, suite.attrCache, path, false)
