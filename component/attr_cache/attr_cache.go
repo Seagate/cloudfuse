@@ -680,14 +680,15 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 
-		value, getErr := ac.cacheMap.get(options.Name)
-		if getErr != nil {
-			log.Err("AttrCache::TruncateFile : could not truncate file due to the following error: %s", getErr)
-			return getErr
+		truncatedItem, getErr := ac.cacheMap.get(options.Name)
+		if getErr != nil || !truncatedItem.exists() {
+            log.Warn("AttrCache::TruncateFile : %s replacing missing cache entry", options.Name)
+            // replace the missing entry
+            entryTime := time.Now()
+            truncatedAttr := internal.CreateObjAttr(options.Name, options.Size, entryTime)
+			truncatedItem = ac.cacheMap.insert(truncatedAttr, true, entryTime)
 		}
-		if value.exists() {
-			value.setSize(options.Size)
-		}
+        truncatedItem.setSize(options.Size)
 	}
 	return err
 }
