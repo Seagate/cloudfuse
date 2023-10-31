@@ -105,13 +105,13 @@ func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
 	path = internal.TruncateDirName(path)
 	paths := strings.Split(path, "/")
 	var currentItem *attrCacheItem
-	var ok bool
 	for _, pathElement := range paths {
 		//check if we are at the last element in the paths list
 		if path == "" {
 			break
 		}
-		currentItem, ok = currentItem.children[pathElement]
+		var ok bool
+		currentItem, ok = value.children[pathElement]
 		//check to see if directory (pathElement) exists
 		if !ok {
 			return nil, fmt.Errorf("The path element : %s does not exist", pathElement)
