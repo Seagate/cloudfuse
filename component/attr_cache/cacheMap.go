@@ -84,7 +84,6 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 	}
 	if len(paths) < 2 {
 		// this is a leaf
-		// we end up with string key being a single folder name instead of a full path. This also will take care of using the folder attribute data.
 		cachedItem = newAttrCacheItem(attr, exists, cachedAt)
 		value.children[paths[0]] = cachedItem
 	} else {
