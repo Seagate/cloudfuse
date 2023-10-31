@@ -37,8 +37,6 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-// look at s3wrappers tests for reference. look at common folder tests as well for reference. half way between s3wrappers and utils test
-
 type cacheMapTestSuite struct {
 	suite.Suite
 	assert            *assert.Assertions
