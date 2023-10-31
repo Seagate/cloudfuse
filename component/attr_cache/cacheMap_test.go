@@ -104,10 +104,10 @@ func (suite *cacheMapTestSuite) TestInsertFolder() {
 
 func (suite *cacheMapTestSuite) TestInsertDirsAndFiles() {
 	path := "a/c1/c12/c3p0/newfile.txt"
-	startTime := time.Now()
-	attr := internal.CreateObjAttr(path, 1024, startTime)
+	timestamp := time.Now()
+	attr := internal.CreateObjAttr(path, 1024, timestamp)
 
-	suite.rootAttrCacheItem.insert(attr, true, startTime)
+	suite.rootAttrCacheItem.insert(attr, true, timestamp)
 
 	cachedItem, err := suite.rootAttrCacheItem.get(path)
 
