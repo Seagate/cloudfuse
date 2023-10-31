@@ -398,7 +398,6 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 			if chldNonCloudItem.exists() && !chldNonCloudItem.isInCloud() {
 				pathList = append(pathList, chldNonCloudItem.attr)
 				numAdded++
-				ac.addDirsNotInCloudToListing(chldNonCloudItem.attr.Path, pathList)
 			}
 		}
 		ac.cacheLock.RUnlock()
