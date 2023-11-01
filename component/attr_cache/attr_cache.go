@@ -440,7 +440,6 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 		for _, attr := range pathList {
-
 			ac.cacheMap.insert(attr, true, currTime)
 		}
 		// pathList was returned by the cloud storage component when listing a directory
