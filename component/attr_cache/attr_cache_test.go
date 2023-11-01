@@ -576,7 +576,6 @@ func (suite *attrCacheTestSuite) TestReadDirExists() {
 				cachePath := internal.TruncateDirName(pString)
 				checkItem, err := suite.attrCache.cacheMap.get(cachePath)
 				suite.assert.Nil(err)
-
 				suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 				if !checkItem.attr.IsDir() {
 					suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
