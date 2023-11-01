@@ -969,11 +969,12 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 	log.Trace("FileCache::SyncFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
+
+	fc.syncLocalFile(options.Handle)
+
 	if fc.syncToFlush {
 		options.Handle.Flags.Set(handlemap.HandleFlagDirty)
 	} else {
-		// TODO: shouldn't we get the local cache fd and call fsync on that here?
-		// 		 otherwise, this does basically nothing.
 		err := fc.NextComponent().SyncFile(options)
 		if err != nil {
 			log.Err("FileCache::SyncFile : %s failed", options.Handle.Path)
@@ -984,6 +985,21 @@ func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 	}
 
 	return nil
+}
+
+// sync the file in local cache
+func (fc *FileCache) syncLocalFile(handle *handlemap.Handle) {
+	// get the local os file handle
+	f := handle.GetFileObject()
+	if f != nil {
+		log.Err("FileCache::syncLocalFile : error [couldn't find fd in handle] %s", handle.Path)
+		return
+	}
+	// call sync on the local handle
+	err := f.Sync()
+	if err != nil {
+		log.Err("FileCache::syncLocalFile : error [unable to sync local file] %s", handle.Path)
+	}
 }
 
 // in SyncDir we're not going to clear the file cache for now
@@ -1042,23 +1058,8 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 		}
 
 		// Write to storage
-		// Create a new handle for the SDK to use to upload (read local file)
-		// The local handle can still be used for read and write.
-		uploadHandle, err := common.Open(localPath)
-		if err != nil {
-			log.Err("FileCache::FlushFile : error [unable to open upload handle] %s [%s]", options.Handle.Path, err.Error())
-			return nil
-		}
-
-		err = fc.NextComponent().CopyFromFile(
-			internal.CopyFromFileOptions{
-				Name: options.Handle.Path,
-				File: uploadHandle,
-			})
-
-		uploadHandle.Close()
-		if err != nil {
-			log.Err("FileCache::FlushFile : %s upload failed [%s]", options.Handle.Path, err.Error())
+		ok, err := fc.uploadFile(options.Handle.Path, localPath)
+		if !ok {
 			return err
 		}
 
@@ -1088,6 +1089,33 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 	}
 
 	return nil
+}
+
+// Write to container storage
+// returns whether the upload succeeded, and an error
+func (fc *FileCache) uploadFile(name string, localPath string) (bool, error) {
+	// Create a new handle for the SDK to use to upload (read local file)
+	// The local handle can still be used for read and write.
+	uploadHandle, err := common.Open(localPath)
+	if err != nil {
+		log.Err("FileCache::FlushFile : error [unable to open upload handle] %s [%s]", name, err.Error())
+		// upload failed, but we don't return an error (TODO: why not?)
+		return false, nil
+	}
+
+	err = fc.NextComponent().CopyFromFile(
+		internal.CopyFromFileOptions{
+			Name: name,
+			File: uploadHandle,
+		})
+
+	uploadHandle.Close()
+	if err != nil {
+		log.Err("FileCache::FlushFile : %s upload failed [%s]", name, err.Error())
+		return false, err
+	}
+
+	return true, nil
 }
 
 // GetAttr: Consolidate attributes from storage and local cache
@@ -1160,46 +1188,61 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	dflock.Lock()
 	defer dflock.Unlock()
 
-	// check if the source file has a dirty handle
-	var dirtySrcHandle *handlemap.Handle
-	handlemap.GetHandles().Range(
-		func(key any, value any) bool {
-			handle := value.(*handlemap.Handle)
-			if options.Src == handle.Path && handle.Dirty() {
-				dirtySrcHandle = value.(*handlemap.Handle)
-				return false
-			} else {
-				return true
-			}
-		},
-	)
-	if dirtySrcHandle != nil {
-		log.Warn("FileCache::RenameFile : src=%s has a dirty file handle. Flushing...", options.Src)
-		// We can either flush here, or replace the remaining logic by flushing to the destination
-		// Although the performance will be worse, the first option is simplest.
-		flushErr := fc.FlushFile(internal.FlushFileOptions{Handle: dirtySrcHandle})
-		if flushErr != nil {
-			log.Err("FileCache::RenameFile : Flushing dirty src=%s failed. Here's why: %v", options.Src, flushErr)
-			// abort rename to avoid losing data
-			return flushErr
-		}
-	}
-
-	err := fc.NextComponent().RenameFile(options)
-	err = fc.validateStorageError(options.Src, err, "RenameFile", false)
-	if err != nil {
-		log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
-		return err
-	}
-
 	localSrcPath := common.JoinUnixFilepath(fc.tmpPath, options.Src)
 	localDstPath := common.JoinUnixFilepath(fc.tmpPath, options.Dst)
+
+	// If the source file has an open dirty handle,
+	//  then sending the rename call further down the pipeline
+	//  will cause an error (source file not in container)
+	//  or data loss (source file empty or stale in container).
+	// Checking for an open dirty handle requires searching the handlemap,
+	//  but that is expensive when there are many open files.
+	//  Instead, we can easily check if the file is open and local.
+
+	// check if the source file has an open handle
+	var srcIsLocal bool
+	if sflock.Count() > 0 {
+		// check if the source file exists locally
+		_, err := os.Stat(localSrcPath)
+		srcIsLocal = err == nil
+	}
+
+	if srcIsLocal {
+		// source exists locally and has a file handle open
+		// so the source file may have new local data
+		// flush the source file to the container before renaming
+		log.Warn("FileCache::RenameFile : src=%s is open locally. Uploading to dst=%s...", options.Src, options.Dst)
+		// write the local file to the destination in the container
+		ok, err := fc.uploadFile(options.Dst, localSrcPath)
+		if !ok {
+			// abort rename to avoid losing data
+			if err == nil {
+				err = syscall.EACCES
+			}
+			log.Err("FileCache::RenameFile : Uploading src=%s to dst=%s failed. Here's why: %v", options.Src, options.Dst, err)
+			return err
+		}
+		// now delete the source file in the container
+		err = fc.NextComponent().DeleteFile(internal.DeleteFileOptions{Name: options.Src})
+		err = fc.validateStorageError(options.Src, err, "DeleteFile", true)
+		if err != nil {
+			log.Err("FileCache::RenameFile : error deleting %s [%s]", options.Src, err.Error())
+			return err
+		}
+	} else {
+		err := fc.NextComponent().RenameFile(options)
+		err = fc.validateStorageError(options.Src, err, "RenameFile", false)
+		if err != nil {
+			log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
+			return err
+		}
+	}
 
 	// in case of git clone multiple rename requests come for which destination files already exists in system
 	// if we do not perform rename operation locally and those destination files are cached then next time they are read
 	// we will be serving the wrong content (as we did not rename locally, we still be having older destination files with
 	// stale content). We either need to remove dest file as well from cache or just run rename to replace the content.
-	err = os.Rename(localSrcPath, localDstPath)
+	err := os.Rename(localSrcPath, localDstPath)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("FileCache::RenameFile : %s failed to rename local file %s [%s]", localSrcPath, err.Error())
 	}
