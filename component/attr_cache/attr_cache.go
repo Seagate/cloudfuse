@@ -707,7 +707,6 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
 
-		// TODO: Could we just update the size and mod time of the file here? Or can other attributes change here?
 		// TODO: we're RLocking the cache but we need to also lock this attr item because another thread could be reading this attr item
 		toBeUpdated, getErr := ac.cacheMap.get(options.Name)
 		if getErr != nil {
