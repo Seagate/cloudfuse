@@ -123,7 +123,6 @@ func assertDeleted(suite *attrCacheTestSuite, path string) {
 func assertInvalid(suite *attrCacheTestSuite, path string) {
 	cacheItem, err := suite.attrCache.cacheMap.get(path)
 	suite.assert.Nil(err)
-
 	suite.assert.EqualValues(&internal.ObjAttr{}, cacheItem.attr)
 	suite.assert.False(cacheItem.valid())
 }
