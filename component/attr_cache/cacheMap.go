@@ -114,7 +114,7 @@ func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
 		currentItem, ok = currentItem.children[pathElement]
 		//check to see if directory (pathElement) exists
 		if !ok {
-			return nil, fmt.Errorf("The path element : %s does not exist", pathElement)
+			return nil, fmt.Errorf("Cache entry for path %s not found", path)
 		}
 		//TODO: side note: cacheLocks. channel, sync, semaphore.
 	}
