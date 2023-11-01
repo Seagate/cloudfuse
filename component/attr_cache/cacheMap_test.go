@@ -149,11 +149,9 @@ func (suite *cacheMapTestSuite) TestInvalidate() {
 	attr := internal.CreateObjAttr(path, 1024, startTime)
 
 	//insert path into suite.rootAttrCacheItem
-	suite.rootAttrCacheItem.insert(attr, true, startTime)
+	cachedItem := suite.rootAttrCacheItem.insert(attr, true, startTime)
 
 	//validate it is there
-	cachedItem, err := suite.rootAttrCacheItem.get(path)
-	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
 	suite.assert.EqualValues(path, cachedItem.attr.Path)
 	suite.assert.EqualValues(1024, cachedItem.attr.Size)
@@ -167,11 +165,7 @@ func (suite *cacheMapTestSuite) TestInvalidate() {
 	cachedItem.invalidate()
 
 	//verify it is invalid
-	cachedItem, err = suite.rootAttrCacheItem.get(path)
-	suite.assert.Nil(err)
-	suite.assert.NotNil(cachedItem)
-	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagValid))
-	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
+	suite.confirmInvalidated(cachedItem)
 }
 
 func (suite *cacheMapTestSuite) TestDeleteFolder() {
