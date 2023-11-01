@@ -139,7 +139,7 @@ func (suite *cacheMapTestSuite) TestMarkDeleted() {
 	cachedItem.markDeleted(deleteTime)
 
 	//verify it is marked deleted
-	suite.confirmMarkDeleted(cachedItem)
+	suite.confirmMarkedDeleted(cachedItem)
 }
 
 func (suite *cacheMapTestSuite) TestInvalidate() {
@@ -205,7 +205,7 @@ func (suite *cacheMapTestSuite) TestDeleteFolder() {
 	cachedItem.markDeleted(deleteTime)
 
 	//verify "c1" folder is marked deleted
-	suite.confirmMarkDeleted(cachedItem)
+	suite.confirmMarkedDeleted(cachedItem)
 }
 
 func (suite *cacheMapTestSuite) TestInvalidateFolder() {
@@ -307,7 +307,7 @@ func generateFSTree(path string) (*list.List, *list.List) {
 	return dirPaths, filePaths
 }
 
-func (suite *cacheMapTestSuite) confirmMarkDeleted(item *attrCacheItem) {
+func (suite *cacheMapTestSuite) confirmMarkedDeleted(item *attrCacheItem) {
 
 	suite.assert.NotNil(item)
 	suite.assert.EqualValues(true, item.isDeleted())
@@ -316,7 +316,7 @@ func (suite *cacheMapTestSuite) confirmMarkDeleted(item *attrCacheItem) {
 
 	if item.children != nil {
 		for _, val := range item.children {
-			suite.confirmMarkDeleted(val)
+			suite.confirmMarkedDeleted(val)
 		}
 	}
 }
