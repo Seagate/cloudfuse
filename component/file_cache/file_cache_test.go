@@ -1249,18 +1249,17 @@ func (suite *fileCacheTestSuite) TestRenameFileCase2() {
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0777})
 
 	err := suite.fileCache.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
-	suite.assert.NotNil(err)
-	suite.assert.Equal(err, syscall.EIO)
+	suite.assert.Nil(err)
 
-	// Src should be in local cache (since we failed the operation)
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, src))
+	// Path in fake storage and file cache should be updated
+	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, src)) // Src does not exist
+	suite.assert.True(os.IsNotExist(err))
+	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, dst)) // Dst shall exists in cache
 	suite.assert.True(err == nil || os.IsExist(err))
-	// Src should not be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, src))
+	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, src)) // Src does not exist
 	suite.assert.True(os.IsNotExist(err))
-	// Dst should not be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, dst))
-	suite.assert.True(os.IsNotExist(err))
+	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, dst)) // Dst does exist
+	suite.assert.True(err == nil || os.IsExist(err))
 }
 
 func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanup() {
