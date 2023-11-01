@@ -389,16 +389,14 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 		return pathList, 0
 	}
 
-	if dir.exists() {
-		ac.cacheLock.RLock()
-		for _, child := range dir.children {
-			if child.exists() && !child.isInCloud() {
-				pathList = append(pathList, child.attr)
-				numAdded++
-			}
+	ac.cacheLock.RLock()
+	for _, child := range dir.children {
+		if child.exists() && !child.isInCloud() {
+			pathList = append(pathList, child.attr)
+			numAdded++
 		}
-		ac.cacheLock.RUnlock()
 	}
+	ac.cacheLock.RUnlock()
 
 	// values should be returned in ascending order by key
 	// sort the list before returning it
