@@ -1106,7 +1106,7 @@ func (suite *attrCacheTestSuite) TestRenameFile() {
 	suite.mock.EXPECT().RenameFile(options).Return(nil)
 
 	err = suite.attrCache.RenameFile(options)
-	suite.assert.NotNil(err)
+	suite.assert.Nil(err)
 	assertNotInCache(suite.assert, suite.attrCache, src)
 	assertNotInCache(suite.assert, suite.attrCache, dst)
 
