@@ -482,10 +482,7 @@ func (ac *AttrCache) anyContentsInCache(prefix string) bool {
 	defer ac.cacheLock.RUnlock()
 
 	directory, getErr := ac.cacheMap.get(prefix)
-	if getErr != nil {
-		return false
-	}
-	if directory.exists() {
+	if getErr == nil && directory.exists() {
 		for _, chldItem := range directory.children {
 			if chldItem.exists() {
 				return true
