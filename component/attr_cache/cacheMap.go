@@ -149,10 +149,12 @@ func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
 }
 
 func (value *attrCacheItem) invalidate() {
-	value.attrFlag.Clear(AttrFlagValid)
-	value.attr = &internal.ObjAttr{}
-	for _, val := range value.children {
-		val.invalidate()
+	if value.valid() {
+		value.attrFlag.Clear(AttrFlagValid)
+		value.attr = &internal.ObjAttr{}
+		for _, val := range value.children {
+			val.invalidate()
+		}
 	}
 }
 
