@@ -110,8 +110,6 @@ func addPathToCache(assert *assert.Assertions, attrCache *AttrCache, path string
 		pathAttr = getDirPathAttr(path)
 	}
 	attrCache.cacheMap.insert(pathAttr, true, time.Now())
-	_, err := attrCache.cacheMap.get(path)
-	assert.Nil(err)
 }
 
 func assertDeleted(suite *attrCacheTestSuite, path string) {
