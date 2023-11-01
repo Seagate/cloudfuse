@@ -618,7 +618,7 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 		//get the source item
 		sourceItem, getErr := ac.cacheMap.get(options.Src)
 		if getErr != nil {
-			log.Err("Can't move the file due to: %s", getErr)
+			log.Err("AttrCache::RenameFile : %s", getErr)
 			return getErr
 		} else if !sourceItem.exists() {
 			log.Warn("AttrCache::RenameFile : Source %s does not exist in cache", options.Src)
