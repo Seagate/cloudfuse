@@ -97,6 +97,11 @@ func getPathAttr(path string, size int64, mode os.FileMode, metadata bool) *inte
 	}
 }
 
+func assertNotInCache(assert *assert.Assertions, attrCache *AttrCache, path string) {
+	_, err := attrCache.cacheMap.get(path)
+	assert.NotNil(err)
+}
+
 func addPathToCache(assert *assert.Assertions, attrCache *AttrCache, path string, metadata bool) {
 	isDir := path[len(path)-1] == '/'
 	path = internal.TruncateDirName(path)
@@ -323,8 +328,7 @@ func (suite *attrCacheTestSuite) TestCreateDir() {
 			err := suite.attrCache.CreateDir(options)
 			suite.assert.NotNil(err)
 
-			suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Success
 			// Entry Does Not Already Exist
@@ -373,8 +377,7 @@ func (suite *attrCacheTestSuite) TestCreateDirNoCacheDirs() {
 			err := suite.attrCache.CreateDir(options)
 			suite.assert.NotNil(err)
 
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Success
 			// Entry Does Not Already Exist
@@ -382,8 +385,7 @@ func (suite *attrCacheTestSuite) TestCreateDirNoCacheDirs() {
 
 			err = suite.attrCache.CreateDir(options)
 			suite.assert.Nil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Entry Already Exists
 			addPathToCache(suite.assert, suite.attrCache, extendedPath, false)
@@ -414,16 +416,14 @@ func (suite *attrCacheTestSuite) TestDeleteDir() {
 
 			err := suite.attrCache.DeleteDir(options)
 			suite.assert.NotNil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Entry Does Not Exist
 			suite.mock.EXPECT().DeleteDir(options).Return(nil)
 
 			err = suite.attrCache.DeleteDir(options)
 			suite.assert.True(os.IsNotExist(err))
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Entry Exists
 			a, ab, ac := AddDirectoryToCache(suite.assert, suite.attrCache, path, false)
@@ -468,8 +468,7 @@ func (suite *attrCacheTestSuite) TestDeleteDirNoCacheDirs() {
 
 			err := suite.attrCache.DeleteDir(options)
 			suite.assert.NotNil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Success
 			// Entry Does Not Already Exist
@@ -477,8 +476,7 @@ func (suite *attrCacheTestSuite) TestDeleteDirNoCacheDirs() {
 
 			err = suite.attrCache.DeleteDir(options)
 			suite.assert.Nil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Entry Already Exists
 			a, ab, ac := AddDirectoryToCache(suite.assert, suite.attrCache, path, false)
@@ -693,8 +691,7 @@ func (suite *attrCacheTestSuite) TestReadDirError() {
 
 			_, err := suite.attrCache.ReadDir(options)
 			suite.assert.NotNil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 		})
 	}
 }
@@ -768,10 +765,8 @@ func (suite *attrCacheTestSuite) TestRenameDir() {
 
 			err := suite.attrCache.RenameDir(options)
 			suite.assert.NotNil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedSrc)
-			suite.assert.NotNil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedDst)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedSrc)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedDst)
 
 			// Error
 			// Source Entry Does Not Exist
@@ -780,10 +775,8 @@ func (suite *attrCacheTestSuite) TestRenameDir() {
 			err = suite.attrCache.RenameDir(options)
 			suite.assert.NotNil(err)
 
-			_, err = suite.attrCache.cacheMap.get(truncatedSrc)
-			suite.assert.NotNil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedDst)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedSrc)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedDst)
 
 			// Error
 			// Destination Entry (ab) Already Exists
@@ -859,10 +852,8 @@ func (suite *attrCacheTestSuite) TestRenameDirNoCacheDirs() {
 			err := suite.attrCache.RenameDir(options)
 			suite.assert.NotNil(err)
 
-			_, err = suite.attrCache.cacheMap.get(truncatedSrc)
-			suite.assert.NotNil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedDst)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedSrc)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedDst)
 
 			// Success
 			// Entry Does Not Already Exist
@@ -870,10 +861,8 @@ func (suite *attrCacheTestSuite) TestRenameDirNoCacheDirs() {
 
 			err = suite.attrCache.RenameDir(options)
 			suite.assert.Nil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedSrc)
-			suite.assert.NotNil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedDst)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedSrc)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedDst)
 
 			// Entry Already Exists
 			a, ab, ac := AddDirectoryToCache(suite.assert, suite.attrCache, input.src, false)
@@ -913,8 +902,7 @@ func (suite *attrCacheTestSuite) TestCreateFile() {
 
 	_, err := suite.attrCache.CreateFile(options)
 	suite.assert.NotNil(err)
-	_, err = suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
+	assertNotInCache(suite.assert, suite.attrCache, path)
 
 	// Success
 	// Entry Does Not Already Exist
@@ -923,8 +911,7 @@ func (suite *attrCacheTestSuite) TestCreateFile() {
 	_, err = suite.attrCache.CreateFile(options)
 	suite.assert.Nil(err)
 
-	_, err = suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
+	assertNotInCache(suite.assert, suite.attrCache, path)
 
 	// Entry Already Exists
 	addPathToCache(suite.assert, suite.attrCache, path, false)
@@ -947,8 +934,7 @@ func (suite *attrCacheTestSuite) TestDeleteFile() {
 
 	err := suite.attrCache.DeleteFile(options)
 	suite.assert.NotNil(err)
-	_, err = suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
+	assertNotInCache(suite.assert, suite.attrCache, path)
 
 	// Success
 	// Entry Does Not Already Exist
@@ -956,8 +942,7 @@ func (suite *attrCacheTestSuite) TestDeleteFile() {
 
 	err = suite.attrCache.DeleteFile(options)
 	suite.assert.Nil(err)
-	_, err = suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
+	assertNotInCache(suite.assert, suite.attrCache, path)
 
 	// Entry Already Exists
 	addPathToCache(suite.assert, suite.attrCache, path, false)
@@ -983,8 +968,7 @@ func (suite *attrCacheTestSuite) TestSyncFile() {
 
 	err := suite.attrCache.SyncFile(options)
 	suite.assert.NotNil(err)
-	_, err = suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
+	assertNotInCache(suite.assert, suite.attrCache, path)
 
 	// Success
 	// Entry Does Not Already Exist
@@ -992,8 +976,7 @@ func (suite *attrCacheTestSuite) TestSyncFile() {
 
 	err = suite.attrCache.SyncFile(options)
 	suite.assert.Nil(err)
-	_, err = suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
+	assertNotInCache(suite.assert, suite.attrCache, path)
 
 	// Entry Already Exists
 	addPathToCache(suite.assert, suite.attrCache, path, false)
@@ -1021,8 +1004,7 @@ func (suite *attrCacheTestSuite) TestSyncDir() {
 
 			err := suite.attrCache.SyncDir(options)
 			suite.assert.NotNil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Success
 			// Entry Does Not Already Exist
@@ -1030,8 +1012,7 @@ func (suite *attrCacheTestSuite) TestSyncDir() {
 
 			err = suite.attrCache.SyncDir(options)
 			suite.assert.Nil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Entry Already Exists
 			a, ab, ac := AddDirectoryToCache(suite.assert, suite.attrCache, path, false)
@@ -1081,8 +1062,7 @@ func (suite *attrCacheTestSuite) TestSyncDirNoCacheDirs() {
 
 			err := suite.attrCache.SyncDir(options)
 			suite.assert.NotNil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Success
 			// Entry Does Not Already Exist
@@ -1090,8 +1070,7 @@ func (suite *attrCacheTestSuite) TestSyncDirNoCacheDirs() {
 
 			err = suite.attrCache.SyncDir(options)
 			suite.assert.Nil(err)
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Entry Already Exists
 			a, ab, ac := AddDirectoryToCache(suite.assert, suite.attrCache, path, false)
@@ -1127,10 +1106,8 @@ func (suite *attrCacheTestSuite) TestRenameFile() {
 
 	err := suite.attrCache.RenameFile(options)
 	suite.assert.NotNil(err)
-	_, err = suite.attrCache.cacheMap.get(src)
-	suite.assert.NotNil(err)
-	_, err = suite.attrCache.cacheMap.get(dst)
-	suite.assert.NotNil(err)
+	assertNotInCache(suite.assert, suite.attrCache, src)
+	assertNotInCache(suite.assert, suite.attrCache, dst)
 
 	// Success
 	// Entry Does Not Already Exist
@@ -1138,10 +1115,8 @@ func (suite *attrCacheTestSuite) TestRenameFile() {
 
 	err = suite.attrCache.RenameFile(options)
 	suite.assert.NotNil(err)
-	_, err = suite.attrCache.cacheMap.get(src)
-	suite.assert.NotNil(err)
-	_, err = suite.attrCache.cacheMap.get(dst)
-	suite.assert.NotNil(err)
+	assertNotInCache(suite.assert, suite.attrCache, src)
+	assertNotInCache(suite.assert, suite.attrCache, dst)
 
 	// Entry Already Exists
 	addPathToCache(suite.assert, suite.attrCache, src, false)
@@ -1225,8 +1200,7 @@ func (suite *attrCacheTestSuite) TestTruncateFile() {
 
 	err := suite.attrCache.TruncateFile(options)
 	suite.assert.NotNil(err)
-	_, err = suite.attrCache.cacheMap.get(path)
-	suite.assert.NotNil(err)
+	assertNotInCache(suite.assert, suite.attrCache, path)
 
 	// Success
 	// Entry Does Not Already Exist
@@ -1443,8 +1417,7 @@ func (suite *attrCacheTestSuite) TestGetAttrOtherError() {
 			result, err := suite.attrCache.GetAttr(options)
 			suite.assert.Equal(err, os.ErrNotExist)
 			suite.assert.EqualValues(&internal.ObjAttr{}, result)
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 		})
 	}
 }
@@ -1522,10 +1495,7 @@ func (suite *attrCacheTestSuite) TestCreateLink() {
 	err := suite.attrCache.CreateLink(options)
 	suite.assert.NotNil(err)
 
-	_, err = suite.attrCache.cacheMap.get(link)
-	suite.assert.NotNil(err)
-	_, err = suite.attrCache.cacheMap.get(link)
-	suite.assert.NotNil(err)
+	assertNotInCache(suite.assert, suite.attrCache, link)
 
 	// Success
 	// Entry Does Not Already Exist
@@ -1533,10 +1503,7 @@ func (suite *attrCacheTestSuite) TestCreateLink() {
 
 	err = suite.attrCache.CreateLink(options)
 	suite.assert.Nil(err)
-	_, err = suite.attrCache.cacheMap.get(link)
-	suite.assert.NotNil(err)
-	_, err = suite.attrCache.cacheMap.get(link)
-	suite.assert.NotNil(err)
+	assertNotInCache(suite.assert, suite.attrCache, link)
 
 	// Entry Already Exists
 	addPathToCache(suite.assert, suite.attrCache, link, false)
@@ -1569,8 +1536,7 @@ func (suite *attrCacheTestSuite) TestChmod() {
 			err := suite.attrCache.Chmod(options)
 			suite.assert.NotNil(err)
 
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Success
 			// Entry Does Not Already Exist
@@ -1579,8 +1545,7 @@ func (suite *attrCacheTestSuite) TestChmod() {
 			err = suite.attrCache.Chmod(options)
 			suite.assert.Nil(err)
 
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Entry Already Exists
 			addPathToCache(suite.assert, suite.attrCache, path, false)
@@ -1623,8 +1588,7 @@ func (suite *attrCacheTestSuite) TestChown() {
 			err := suite.attrCache.Chown(options)
 			suite.assert.NotNil(err)
 
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Success
 			// Entry Does Not Already Exist
@@ -1633,8 +1597,7 @@ func (suite *attrCacheTestSuite) TestChown() {
 			err = suite.attrCache.Chown(options)
 			suite.assert.Nil(err)
 
-			_, err = suite.attrCache.cacheMap.get(truncatedPath)
-			suite.assert.NotNil(err)
+			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Entry Already Exists
 			addPathToCache(suite.assert, suite.attrCache, path, false)
