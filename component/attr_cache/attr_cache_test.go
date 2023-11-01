@@ -130,7 +130,6 @@ func assertInvalid(suite *attrCacheTestSuite, path string) {
 func assertUntouched(suite *attrCacheTestSuite, path string) {
 	cacheItem, err := suite.attrCache.cacheMap.get(path)
 	suite.assert.Nil(err)
-
 	suite.assert.NotEqualValues(cacheItem.attr, &internal.ObjAttr{})
 	suite.assert.EqualValues(defaultSize, cacheItem.attr.Size)
 	suite.assert.EqualValues(defaultMode, cacheItem.attr.Mode)
