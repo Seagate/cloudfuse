@@ -124,11 +124,9 @@ func (suite *cacheMapTestSuite) TestMarkDeleted() {
 	attr := internal.CreateObjAttr(path, 1024, startTime)
 
 	//insert path into suite.rootAttrCacheItem
-	suite.rootAttrCacheItem.insert(attr, true, startTime)
+	cachedItem := suite.rootAttrCacheItem.insert(attr, true, startTime)
 
 	//validate it is there
-	cachedItem, err := suite.rootAttrCacheItem.get(path)
-	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
 	suite.assert.EqualValues(path, cachedItem.attr.Path)
 	suite.assert.EqualValues(1024, cachedItem.attr.Size)
@@ -141,16 +139,7 @@ func (suite *cacheMapTestSuite) TestMarkDeleted() {
 	cachedItem.markDeleted(deleteTime)
 
 	//verify it is marked deleted
-	cachedItem, err = suite.rootAttrCacheItem.get(path)
-	suite.assert.Nil(err)
-	suite.assert.NotNil(cachedItem)
-	suite.assert.EqualValues("", cachedItem.attr.Path)
-	suite.assert.EqualValues(true, cachedItem.isDeleted())
-	suite.assert.EqualValues(false, cachedItem.exists())
-	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
-	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
-	suite.assert.EqualValues(false, cachedItem.attrFlag.IsSet(AttrFlagExists))
-
+	suite.confirmMarkDeleted(cachedItem)
 }
 
 func (suite *cacheMapTestSuite) TestInvalidate() {
@@ -195,11 +184,9 @@ func (suite *cacheMapTestSuite) TestDeleteFolder() {
 	attr := internal.CreateObjAttr(path, 1024, startTime)
 
 	//insert path into suite.rootAttrCacheItem
-	suite.rootAttrCacheItem.insert(attr, true, startTime)
+	cachedItem := suite.rootAttrCacheItem.insert(attr, true, startTime)
 
 	//validate file is there
-	cachedItem, err := suite.rootAttrCacheItem.get(path)
-	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
 	suite.assert.EqualValues(path, cachedItem.attr.Path)
 	suite.assert.EqualValues(1024, cachedItem.attr.Size)
@@ -210,7 +197,7 @@ func (suite *cacheMapTestSuite) TestDeleteFolder() {
 	suite.assert.EqualValues(true, cachedItem.attrFlag.IsSet(AttrFlagValid))
 
 	//validate folder "c1"
-	cachedItem, err = suite.rootAttrCacheItem.get(parentPath)
+	cachedItem, err := suite.rootAttrCacheItem.get(parentPath)
 	suite.assert.Nil(err)
 	suite.assert.NotNil(cachedItem)
 	suite.assert.EqualValues(parentPath, cachedItem.attr.Path)
@@ -224,17 +211,7 @@ func (suite *cacheMapTestSuite) TestDeleteFolder() {
 	cachedItem.markDeleted(deleteTime)
 
 	//verify "c1" folder is marked deleted
-	cachedItem, err = suite.rootAttrCacheItem.get(parentPath)
-	suite.assert.Nil(err)
-	suite.assert.NotNil(cachedItem)
-	suite.assert.EqualValues(true, cachedItem.isDeleted())
-	suite.assert.EqualValues(false, cachedItem.exists())
-	suite.assert.EqualValues(cachedItem.attr, &internal.ObjAttr{})
-
-	// verify subtree is marked deleted
-	suite.assert.NotNil(cachedItem.children)
 	suite.confirmMarkDeleted(cachedItem)
-
 }
 
 func (suite *cacheMapTestSuite) TestInvalidateFolder() {
