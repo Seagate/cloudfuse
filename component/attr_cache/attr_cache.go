@@ -307,8 +307,8 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 }
 
 // ------------------------- Methods implemented by this component -------------------------------------------
-// CreateDir: Mark the directory invalid
-// upon cacheDirs being true, inserts the dir item into cache.
+// CreateDir: Mark the directory invalid, or
+// insert the dir item into cache when cacheDirs is true.
 func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("AttrCache::CreateDir : %s", options.Name)
 	err := ac.NextComponent().CreateDir(options)
