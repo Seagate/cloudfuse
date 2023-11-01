@@ -610,11 +610,9 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 
 		//get the source item
 		sourceItem, getErr := ac.cacheMap.get(options.Src)
-		if getErr != nil {
-			log.Err("AttrCache::RenameFile : %s", getErr)
+		if getErr != nil || !sourceItem.exists() {
+			log.Err("AttrCache::RenameFile : Source %s does not exist in cache", options.Src)
 			return getErr
-		} else if !sourceItem.exists() {
-			log.Warn("AttrCache::RenameFile : Source %s does not exist in cache", options.Src)
 		}
 
 		// move source item to destination
@@ -829,7 +827,7 @@ func (ac *AttrCache) FlushFile(options internal.FlushFileOptions) error {
 		defer ac.cacheLock.RUnlock()
 		toBeInvalid, getErr := ac.cacheMap.get(options.Handle.Path)
 		if getErr == nil {
-            toBeInvalid.invalidate()
+			toBeInvalid.invalidate()
 		}
 	}
 	return err
