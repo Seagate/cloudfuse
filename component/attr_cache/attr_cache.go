@@ -725,7 +725,7 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 
 		fileStat, statErr := options.File.Stat()
 		if statErr != nil {
-			log.Warn("file uploaded but can't find file size: %s", statErr)
+			log.Warn("AttrCache::CopyFromFile : Can't get new file size: %s", statErr)
 			toBeUpdated.invalidate()
 			return nil
 		}
