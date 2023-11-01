@@ -650,7 +650,6 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 		// TODO: Could we just update the size and mod time of the file here? Or can other attributes change here?
 
 		toBeInvalid, getErr := ac.cacheMap.get(attr.Path)
-
 		if getErr != nil {
 			log.Err("AttrCache::WriteFile : %s", getErr)
 		} else {
