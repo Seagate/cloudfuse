@@ -113,7 +113,6 @@ func addPathToCache(assert *assert.Assertions, attrCache *AttrCache, path string
 }
 
 func assertDeleted(suite *attrCacheTestSuite, path string) {
-
 	cacheItem, err := suite.attrCache.cacheMap.get(path)
 	suite.assert.Nil(err)
 	suite.assert.EqualValues(&internal.ObjAttr{}, cacheItem.attr)
