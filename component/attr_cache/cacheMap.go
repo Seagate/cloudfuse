@@ -116,7 +116,7 @@ func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
 		if !ok {
 			return nil, fmt.Errorf("The path element : %s does not exist", pathElement)
 		}
-		//TODO: side note: cacheLocks. channel, sync, semiphore.
+		//TODO: side note: cacheLocks. channel, sync, semaphore.
 	}
 	return currentItem, nil
 }
