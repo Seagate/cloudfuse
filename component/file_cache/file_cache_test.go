@@ -1426,6 +1426,195 @@ func (suite *fileCacheTestSuite) TestTruncateFileCase2() {
 	// suite.assert.True(os.IsNotExist(err))
 }
 
+func (suite *fileCacheTestSuite) TestChmodNotInCache() {
+	defer suite.cleanupTest()
+	// Setup
+	path := "file"
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+
+	_, err := os.Stat(suite.cache_path + "/" + path)
+	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
+		time.Sleep(time.Second)
+		_, err = os.Stat(suite.cache_path + "/" + path)
+	}
+	suite.assert.True(os.IsNotExist(err))
+
+	// Path should be in fake storage
+	_, err = os.Stat(suite.fake_storage_path + "/" + path)
+	suite.assert.True(err == nil || os.IsExist(err))
+
+	// Chmod
+	err = suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0666)})
+	suite.assert.Nil(err)
+
+	// Path in fake storage should be updated
+	info, _ := os.Stat(suite.fake_storage_path + "/" + path)
+	suite.assert.EqualValues(info.Mode(), 0666)
+}
+
+func (suite *fileCacheTestSuite) TestChmodInCache() {
+	defer suite.cleanupTest()
+	// Setup
+	path := "file"
+	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
+
+	// Path should be in the file cache
+	_, err := os.Stat(suite.cache_path + "/" + path)
+	suite.assert.True(err == nil || os.IsExist(err))
+	// Path should be in fake storage
+	_, err = os.Stat(suite.fake_storage_path + "/" + path)
+	suite.assert.True(err == nil || os.IsExist(err))
+
+	// Chmod
+	err = suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0755)})
+	suite.assert.Nil(err)
+	// Path in fake storage and file cache should be updated
+	info, _ := os.Stat(suite.cache_path + "/" + path)
+	suite.assert.EqualValues(info.Mode(), 0755)
+	info, _ = os.Stat(suite.fake_storage_path + "/" + path)
+	suite.assert.EqualValues(info.Mode(), 0755)
+
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
+}
+
+func (suite *fileCacheTestSuite) TestChmodCase2() {
+	defer suite.cleanupTest()
+	// Default is to not create empty files on create file to support immutable storage.
+	path := "file"
+	oldMode := os.FileMode(0511)
+
+	createHandle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
+	suite.assert.Nil(err)
+
+	newMode := os.FileMode(0666)
+	err = suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: newMode})
+	suite.assert.Nil(err)
+
+	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: createHandle})
+	suite.assert.Nil(err)
+
+	// Path should be in the file cache with old mode (since we failed the operation)
+	info, err := os.Stat(suite.cache_path + "/" + path)
+	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.EqualValues(info.Mode(), newMode)
+
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	suite.assert.Nil(err)
+
+	// loop until file does not exist - done due to async nature of eviction
+	_, err = os.Stat(suite.cache_path + "/" + path)
+	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
+		time.Sleep(time.Second)
+		_, err = os.Stat(suite.cache_path + "/" + path)
+	}
+	suite.assert.True(os.IsNotExist(err))
+
+	// Get the attributes and now and check file mode is set correctly or not
+	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.assert.Nil(err)
+	suite.assert.NotNil(attr)
+	suite.assert.EqualValues(path, attr.Path)
+	suite.assert.EqualValues(attr.Mode, newMode)
+}
+
+func (suite *fileCacheTestSuite) TestChownNotInCache() {
+	defer suite.cleanupTest()
+	// Setup
+	path := "file"
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+
+	_, err := os.Stat(suite.cache_path + "/" + path)
+	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
+		time.Sleep(time.Second)
+		_, err = os.Stat(suite.cache_path + "/" + path)
+	}
+	suite.assert.True(os.IsNotExist(err))
+
+	// Path should be in fake storage
+	_, err = os.Stat(suite.fake_storage_path + "/" + path)
+	suite.assert.True(err == nil || os.IsExist(err))
+
+	// Chown
+	owner := os.Getuid()
+	group := os.Getgid()
+	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	suite.assert.Nil(err)
+
+	// Path in fake storage should be updated
+	info, err := os.Stat(suite.fake_storage_path + "/" + path)
+	stat := info.Sys().(*syscall.Stat_t)
+	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.EqualValues(owner, stat.Uid)
+	suite.assert.EqualValues(group, stat.Gid)
+}
+
+func (suite *fileCacheTestSuite) TestChownInCache() {
+	defer suite.cleanupTest()
+	// Setup
+	path := "file"
+	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+
+	// Path should be in the file cache
+	_, err := os.Stat(suite.cache_path + "/" + path)
+	suite.assert.True(err == nil || os.IsExist(err))
+	// Path should be in fake storage
+	_, err = os.Stat(suite.fake_storage_path + "/" + path)
+	suite.assert.True(err == nil || os.IsExist(err))
+
+	// Chown
+	owner := os.Getuid()
+	group := os.Getgid()
+	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	suite.assert.Nil(err)
+	// Path in fake storage and file cache should be updated
+	info, err := os.Stat(suite.cache_path + "/" + path)
+	stat := info.Sys().(*syscall.Stat_t)
+	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.EqualValues(owner, stat.Uid)
+	suite.assert.EqualValues(group, stat.Gid)
+	info, err = os.Stat(suite.fake_storage_path + "/" + path)
+	stat = info.Sys().(*syscall.Stat_t)
+	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.EqualValues(owner, stat.Uid)
+	suite.assert.EqualValues(group, stat.Gid)
+
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
+}
+
+func (suite *fileCacheTestSuite) TestChownCase2() {
+	defer suite.cleanupTest()
+	// Default is to not create empty files on create file to support immutable storage.
+	path := "file"
+	oldMode := os.FileMode(0511)
+	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
+	info, _ := os.Stat(suite.cache_path + "/" + path)
+	stat := info.Sys().(*syscall.Stat_t)
+	oldOwner := stat.Uid
+	oldGroup := stat.Gid
+
+	owner := os.Getuid()
+	group := os.Getgid()
+	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	suite.assert.NotNil(err)
+	suite.assert.Equal(err, syscall.EIO)
+
+	// Path should be in the file cache with old group and owner (since we failed the operation)
+	info, err = os.Stat(suite.cache_path + "/" + path)
+	stat = info.Sys().(*syscall.Stat_t)
+	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.EqualValues(oldOwner, stat.Uid)
+	suite.assert.EqualValues(oldGroup, stat.Gid)
+	// Path should not be in fake storage
+	_, err = os.Stat(suite.fake_storage_path + "/" + path)
+	suite.assert.True(os.IsNotExist(err))
+}
+
 func (suite *fileCacheTestSuite) TestZZMountPathConflict() {
 	defer suite.cleanupTest()
 	cacheTimeout := 1
@@ -1568,6 +1757,69 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.assert.Equal(15, n)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
 	suite.assert.Nil(err)
+}
+
+func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
+	defer suite.cleanupTest()
+	// Configure to create empty files so we create the file in storage
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  hard-limit: true\n  max-size-mb: 2\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, suite.fake_storage_path)
+	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+
+	data := make([]byte, 3*MB)
+	pathbig := "filebig"
+	err := os.WriteFile(suite.fake_storage_path+"/"+pathbig, data, 0777)
+	suite.assert.Nil(err)
+
+	data = make([]byte, 1*MB)
+	pathsmall := "filesmall"
+	err = os.WriteFile(suite.fake_storage_path+"/"+pathsmall, data, 0777)
+	suite.assert.Nil(err)
+
+	// try opening small file
+	options := internal.OpenFileOptions{Name: pathsmall, Mode: 0777}
+	f, err := suite.fileCache.OpenFile(options)
+	suite.assert.Nil(err)
+	suite.assert.False(f.Dirty())
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
+	suite.assert.Nil(err)
+
+	// try opening bigger file which shall fail due to hardlimit
+	options = internal.OpenFileOptions{Name: pathbig, Mode: 0777}
+	f, err = suite.fileCache.OpenFile(options)
+	suite.assert.NotNil(err)
+	suite.assert.Nil(f)
+	suite.assert.Equal(err, syscall.ENOSPC)
+
+	// try writing a small file
+	options1 := internal.CreateFileOptions{Name: pathsmall + "_new", Mode: 0777}
+	f, err = suite.fileCache.CreateFile(options1)
+	suite.assert.Nil(err)
+	data = make([]byte, 1*MB)
+	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: f, Offset: 0, Data: data})
+	suite.assert.Nil(err)
+	suite.assert.Equal(n, 1*MB)
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
+	suite.assert.Nil(err)
+
+	// try writing a bigger file
+	options1 = internal.CreateFileOptions{Name: pathbig + "_new", Mode: 0777}
+	f, err = suite.fileCache.CreateFile(options1)
+	suite.assert.Nil(err)
+	data = make([]byte, 3*MB)
+	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: f, Offset: 0, Data: data})
+	suite.assert.NotNil(err)
+	suite.assert.Equal(n, 0)
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
+	suite.assert.Nil(err)
+
+	// try opening small file
+	err = suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: pathsmall, Size: 1 * MB})
+	suite.assert.Nil(err)
+
+	// try opening small file
+	err = suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: pathsmall, Size: 3 * MB})
+	suite.assert.NotNil(err)
 }
 
 // In order for 'go test' to run this suite, we need to create

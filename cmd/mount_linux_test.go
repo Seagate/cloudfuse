@@ -85,7 +85,7 @@ loopbackfs:
 var configPriorityTest string = `
 logging:
   type: syslog
-default-working-dir: /tmp/lyvecloudfuse
+default-working-dir: /tmp/cloudfuse
 file_cache:
   path: /tmp/fileCachePath
 libfuse:

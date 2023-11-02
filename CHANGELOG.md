@@ -1,6 +1,8 @@
 # Cloudfuse Changelog #
 
 ## 0.2.0 (WIP) ##
+
+This version is based on [blobfuse2 2.1.1](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.1) (upstream).
 **Features**
 -- Include an installer on Windows
 -- Linux installers now include the GUI and add it to the user applications.
