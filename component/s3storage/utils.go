@@ -43,6 +43,11 @@ import (
 // TODO: add AWS SDK customization options and helper functions here to write any relevant SDK-specific structures
 // TODO: add AWS SDK logging function code here (like getLogOptions)
 
+var UserAgent = func() string {
+	// TODO: if we can get the Go version for this, it would be nice.
+	return "Seagate-Cloudfuse/" + common.CloudfuseVersion + " (Language=Go)"
+}
+
 const (
 	DefaultPartSize     = 8 * common.MbToBytes
 	DefaultUploadCutoff = 100 * common.MbToBytes

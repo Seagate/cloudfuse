@@ -126,6 +126,7 @@ func (cl *Client) Configure(cfg Config) error {
 		config.WithSharedConfigProfile(cl.Config.authConfig.Profile),
 		config.WithCredentialsProvider(credentialsProvider),
 		config.WithEndpointResolverWithOptions(endpointResolver),
+		config.WithAppID(UserAgent()),
 	)
 	if err != nil {
 		log.Err("Client::Configure : config.LoadDefaultConfig() failed. Here's why: %v", err)

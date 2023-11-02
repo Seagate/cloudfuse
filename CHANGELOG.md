@@ -3,6 +3,7 @@
 ## 0.2.0 (WIP) ##
 **Features**
 -- Include an installer on Windows
+-- Linux installers now include the GUI and add it to the user applications.
 
 ## 0.1.0 ##
 
