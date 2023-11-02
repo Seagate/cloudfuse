@@ -185,7 +185,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             else:
                 # Create the mount command to send to subprocess. If shell=True is set and the command is not in one string
                 #   the subprocess will interpret the additional arguments as separate commands.
-                cmd = "./cloudfuse unmount " + directory
+                cmd = "./cloudfuse unmount --lazy " + directory
                 unmount = subprocess.run([cmd], shell=True, capture_output=True)
 
             # Print to the text edit window the results of the unmount
