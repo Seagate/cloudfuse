@@ -97,7 +97,8 @@ The general format of the Cloudfuse Linux commands is `cloudfuse [command] [argu
   - Add "--lazy" (or "-z") flag to use lazy unmount (prevents busy errors)
   - Example: cloudfuse unmount --lazy \<mount path>
 * `unmount all` - Unmounts all Cloudfuse filesystems.
-  - Example: cloudfuse unmount all
+  - Add "--lazy" (or "-z") flag to use lazy unmount (prevents busy errors)
+  - Example: cloudfuse unmount all --lazy
 
 ### Windows:
 
