@@ -33,3 +33,4 @@ test/scripts/dirIterate.go
 dist/
 **/Output/
 /gui/build/**
+/build/winfsp-*
