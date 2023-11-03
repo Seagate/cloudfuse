@@ -1588,7 +1588,6 @@ func (suite *attrCacheTestSuite) TestChown() {
 
 			err = suite.attrCache.Chown(options)
 			suite.assert.Nil(err)
-
 			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Entry Already Exists
