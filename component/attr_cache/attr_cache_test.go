@@ -1536,7 +1536,6 @@ func (suite *attrCacheTestSuite) TestChmod() {
 
 			err = suite.attrCache.Chmod(options)
 			suite.assert.Nil(err)
-
 			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Entry Already Exists
