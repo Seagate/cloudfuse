@@ -1579,7 +1579,6 @@ func (suite *attrCacheTestSuite) TestChown() {
 
 			err := suite.attrCache.Chown(options)
 			suite.assert.NotNil(err)
-
 			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
 
 			// Success
