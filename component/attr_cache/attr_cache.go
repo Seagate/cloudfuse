@@ -729,7 +729,6 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 
 func (ac *AttrCache) SyncFile(options internal.SyncFileOptions) error {
 	log.Trace("AttrCache::SyncFile : %s", options.Handle.Path)
-
 	err := ac.NextComponent().SyncFile(options)
 	if err == nil {
 		ac.cacheLock.RLock()
