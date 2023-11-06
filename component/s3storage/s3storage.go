@@ -233,46 +233,44 @@ func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 
 func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
 	log.Trace("S3Storage::StreamDir : %s, offset %d, count %d", options.Name, options.Offset, options.Count)
+	objectList := make([]*internal.ObjAttr, 0)
 
 	path := formatListDirName(options.Name)
+	var iteration int                   // = 0
+	var marker *string = &options.Token // = nil
+	var totalEntriesFetched int32
+	for totalEntriesFetched < options.Count {
+		newList, newMarker, err := s3.storage.List(path, marker, options.Count-totalEntriesFetched)
+		if err != nil {
+			log.Err("S3Storage::StreamDir : %s Failed to read dir [%s]", options.Name, err)
+			return objectList, "", err
+		}
+		objectList = append(objectList, newList...)
+		marker = newMarker
+		iteration++
+		totalEntriesFetched += int32(len(objectList))
 
-	newList, newMarker, err := s3.storage.List(path, &options.Token, options.Count)
-	if err != nil {
-		log.Err("S3Storage::StreamDir : %s Failed to read dir [%s]", options.Name, err)
-		return newList, "", err
-	}
-
-	log.Debug("S3Storage::StreamDir : %s Retrieved %d objects with marker %s", options.Name, len(newList), options.Token)
-
-	if newMarker != nil && *newMarker != "" {
-		log.Debug("S3Storage::StreamDir : %s next-marker %s", options.Name, *newMarker)
-		if len(newList) == 0 {
-			/* In some customer scenario we have seen that newList is empty but marker is not empty
-			   which means backend has not returned any items this time but there are more left.
-			   If we return back this empty list to fuse layer it will assume listing has completed
-			   and will terminate the readdir call. As there are more items left on the server side we
-			   need to retry getting a list here.
-			*/
-			log.Warn("S3Storage::StreamDir : %s next-marker %s but current list is empty. Need to retry listing", options.Name, *newMarker)
-			options.Token = *newMarker
-			return s3.StreamDir(options)
+		log.Debug("S3Storage::StreamDir : %s So far retrieved %d objects in %d iterations", options.Name, totalEntriesFetched, iteration)
+		if marker == nil || *marker == "" {
+			break
 		}
 	}
-	if newMarker == nil {
+
+	if marker == nil {
 		blnkStr := ""
-		newMarker = &blnkStr
+		marker = &blnkStr
 	}
 
 	// if path is empty, it means it is the root, relative to the mounted directory
 	if len(path) == 0 {
 		path = "/"
 	}
-	s3StatsCollector.PushEvents(streamDir, path, map[string]interface{}{count: len(newList)})
+	s3StatsCollector.PushEvents(streamDir, path, map[string]interface{}{count: totalEntriesFetched})
 
 	// increment streamDir call count
 	s3StatsCollector.UpdateStats(stats_manager.Increment, streamDir, (int64)(1))
 
-	return newList, *newMarker, nil
+	return objectList, *marker, nil
 }
 
 func (s3 *S3Storage) RenameDir(options internal.RenameDirOptions) error {
