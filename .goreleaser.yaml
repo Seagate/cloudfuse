@@ -150,6 +150,11 @@ archives:
         dst: "./samples/sampleStreamingConfigS3.yaml"
       - src: "sampleStreamingConfigAzure.yaml"
         dst: "./samples/sampleStreamingConfigAzure.yaml"
+
+release:
+  extra_files: 
+    - glob: ./build/Output/cloudfuse_install_Windows_x86_64.exe
+
 nfpms:
   - id: default
 
