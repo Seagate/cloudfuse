@@ -42,19 +42,20 @@ var umntAllCmd = &cobra.Command{
 	Long:              "Unmount all instances of Cloudfuse. Only available on Linux",
 	SuggestFor:        []string{"al", "all"},
 	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(_ *cobra.Command, _ []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		lstMnt, err := common.ListMountPoints()
 		if err != nil {
 			return fmt.Errorf("failed to list mount points [%s]", err.Error())
 		}
 
+		lazy, _ := cmd.Flags().GetBool("lazy")
 		mountfound := 0
 		unmounted := 0
 		errMsg := "failed to unmount - \n"
 
 		for _, mntPath := range lstMnt {
 			mountfound += 1
-			err := unmountCloudfuse(mntPath)
+			err := unmountCloudfuse(mntPath, lazy)
 			if err == nil {
 				unmounted += 1
 			} else {
