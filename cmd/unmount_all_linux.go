@@ -48,11 +48,7 @@ var umntAllCmd = &cobra.Command{
 			return fmt.Errorf("failed to list mount points [%s]", err.Error())
 		}
 
-		lazy, err := cmd.Flags().GetBool("lazy")
-		if err != nil {
-			lazy = false
-		}
-
+		lazy, _ := cmd.Flags().GetBool("lazy")
 		mountfound := 0
 		unmounted := 0
 		errMsg := "failed to unmount - \n"

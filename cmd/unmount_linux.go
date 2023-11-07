@@ -48,10 +48,7 @@ var unmountCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		lazy, err := cmd.Flags().GetBool("lazy")
-		if err != nil {
-			lazy = false
-		}
+		lazy, _ := cmd.Flags().GetBool("lazy")
 		if strings.Contains(args[0], "*") {
 			mntPathPrefix := args[0]
 
