@@ -98,9 +98,7 @@ func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, ca
 	return cachedItem
 }
 
-// input: full path to item or file as string
-// output: the attrCacheItem value for the key found in path
-// description: a lookup of any attrCacheItem based on any given full path.
+// get returns the *attrCacheItem from the cacheMap based on the provided path string
 func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
 	path = internal.TruncateDirName(path)
 	paths := strings.Split(path, "/")
