@@ -26,7 +26,9 @@
 package attr_cache
 
 import (
+	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -47,6 +49,7 @@ type attrCacheItem struct {
 	attr     *internal.ObjAttr
 	cachedAt time.Time
 	attrFlag common.BitMap16
+	children map[string]*attrCacheItem
 }
 
 func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {
@@ -55,13 +58,65 @@ func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *
 		attrFlag: 0,
 		cachedAt: cachedAt,
 	}
-
 	item.attrFlag.Set(AttrFlagValid)
 	if exists {
 		item.attrFlag.Set(AttrFlagExists)
 	}
-
 	return item
+}
+
+func (value *attrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {
+	if attr == nil {
+		return nil
+	}
+	path := internal.TruncateDirName(attr.Path)
+	//start recursion
+	cachedItem := value.insertHelper(attr, exists, cachedAt, path, "")
+	return cachedItem
+}
+
+// TODO: write unit tests for this
+func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string, itemPath string) *attrCacheItem {
+	var cachedItem *attrCacheItem
+	paths := strings.SplitN(path, "/", 2) // paths[0] is home paths[1] is user/folder/file
+	if value.children == nil {
+		value.children = make(map[string]*attrCacheItem)
+	}
+	if len(paths) < 2 {
+		// this is a leaf
+		cachedItem = newAttrCacheItem(attr, exists, cachedAt)
+		value.children[paths[0]] = cachedItem
+	} else {
+		itemPath += paths[0] + "/"
+		//see if the directory exists. if not, create it.
+		_, ok := value.children[paths[0]]
+		if !ok {
+			value.children[paths[0]] = newAttrCacheItem(internal.CreateObjAttrDir(itemPath), exists, cachedAt)
+		}
+		cachedItem = value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1], itemPath)
+	}
+	return cachedItem
+}
+
+// get returns the *attrCacheItem from the cacheMap based on the provided path string
+func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
+	path = internal.TruncateDirName(path)
+	paths := strings.Split(path, "/")
+	currentItem := value
+	for _, pathElement := range paths {
+		//check if we are at the last element in the paths list
+		if path == "" {
+			break
+		}
+		var ok bool
+		currentItem, ok = currentItem.children[pathElement]
+		//check to see if directory (pathElement) exists
+		if !ok {
+			return nil, fmt.Errorf("Cache entry for path %s not found", path)
+		}
+		//TODO: side note: cacheLocks. channel, sync, semaphore.
+	}
+	return currentItem, nil
 }
 
 func (value *attrCacheItem) valid() bool {
@@ -69,9 +124,10 @@ func (value *attrCacheItem) valid() bool {
 }
 
 func (value *attrCacheItem) exists() bool {
-	return value.attrFlag.IsSet(AttrFlagExists)
+	return value.valid() && value.attrFlag.IsSet(AttrFlagExists)
 }
 
+// TODO: don't return true for deleted files.
 func (value *attrCacheItem) isInCloud() bool {
 	isObject := !value.attr.IsDir()
 	isDirInCloud := value.attr.IsDir() && !value.attrFlag.IsSet(AttrFlagNotInCloud)
@@ -79,15 +135,25 @@ func (value *attrCacheItem) isInCloud() bool {
 }
 
 func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
-	value.attrFlag.Clear(AttrFlagExists)
-	value.attrFlag.Set(AttrFlagValid)
-	value.cachedAt = deletedTime
-	value.attr = &internal.ObjAttr{}
+	if !value.isDeleted() {
+		value.attrFlag.Clear(AttrFlagExists)
+		value.attrFlag.Set(AttrFlagValid)
+		value.cachedAt = deletedTime
+		value.attr = &internal.ObjAttr{}
+		for _, val := range value.children {
+			val.markDeleted(deletedTime)
+		}
+	}
 }
 
 func (value *attrCacheItem) invalidate() {
-	value.attrFlag.Clear(AttrFlagValid)
-	value.attr = &internal.ObjAttr{}
+	if value.valid() {
+		value.attrFlag.Clear(AttrFlagValid)
+		value.attr = &internal.ObjAttr{}
+		for _, val := range value.children {
+			val.invalidate()
+		}
+	}
 }
 
 func (value *attrCacheItem) markInCloud(inCloud bool) {
