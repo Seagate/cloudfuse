@@ -14,6 +14,7 @@ from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
 from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
 from aboutPage import aboutPage
+from under_Construction import underConstruction
 
 bucketOptions = ['s3storage', 'azstorage']
 mountTargetComponent = 3
@@ -80,7 +81,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.page.show()
 
     def showUnderConstructionPage(self):
-        self.page = 
+        self.page = underConstruction()
         self.page.show()
 
     # Wrapper/helper for the service install and start.
