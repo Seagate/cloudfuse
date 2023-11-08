@@ -241,6 +241,10 @@ func (s *utilsTestSuite) TestGetContentType() {
 		{val: "a.sh", result: "application/x-sh"},
 		{val: "a.exe", result: "application/x-msdownload"},
 		{val: "a.dll", result: "application/x-msdownload"},
+		{val: "a.cSS", result: "text/css"},
+		{val: "a.Mp4", result: "video/mp4"},
+		{val: "a.JPG", result: "image/jpeg"},
+		{val: "a.usdz", result: "application/zip"},
 	}
 	for _, i := range inputs {
 		s.Run(i.val, func() {

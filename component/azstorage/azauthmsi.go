@@ -53,7 +53,7 @@ type azAuthMSI struct {
 }
 
 // fetchToken : Generates a token based on the config
-func (azmsi *azAuthMSI) fetchToken() (*common.OAuthTokenInfo, error) {
+func (azmsi *azAuthMSI) fetchToken(endpoint string) (*common.OAuthTokenInfo, error) {
 	// Resource string is fixed and has no relation with any of the user inputs
 	// This is not the resource URL, rather a way to identify the resource type and tenant
 	// There are two options in the structure datalake and storage but datalake is not populated
@@ -66,6 +66,7 @@ func (azmsi *azAuthMSI) fetchToken() (*common.OAuthTokenInfo, error) {
 			ClientID: azmsi.config.ApplicationID,
 			ObjectID: azmsi.config.ObjectID,
 			MSIResID: azmsi.config.ResourceID},
+		ActiveDirectoryEndpoint: endpoint,
 	}
 
 	token, err := oAuthTokenInfo.GetNewTokenFromMSI(context.Background())
@@ -169,8 +170,13 @@ func (azmsi *azAuthBlobMSI) getCredential() interface{} {
 	}
 
 	if token == nil {
-		log.Debug("azAuthBlobMSI::getCredential : Going for conventional fetchToken")
-		token, err = azmsi.fetchToken()
+		log.Debug("azAuthBlobMSI::getCredential : Going for conventional fetchToken. MSI Endpoint : %s", msi_endpoint)
+		token, err = azmsi.fetchToken(msi_endpoint)
+
+		if token == nil {
+			log.Debug("azAuthBlobMSI::getCredential : Going for conventional fetchToken without endpoint")
+			token, err = azmsi.fetchToken("")
+		}
 	}
 
 	if err != nil {
@@ -195,7 +201,7 @@ func (azmsi *azAuthBlobMSI) getCredential() interface{} {
 			log.Debug("azAuthBlobMSI::getCredential : MSI Token retrieved %s (%d)", newToken.AccessToken, newToken.Expires())
 
 			// Get the next token slightly before the current one expires
-			return time.Until(newToken.Expires()) - 10*time.Second
+			return time.Until(newToken.Expires()) - 5*time.Minute
 		})
 	} else {
 		log.Info("azAuthBlobMSI::getCredential : MSI Token retrieved %s (%d)", token.AccessToken, token.Expires())
@@ -212,7 +218,7 @@ func (azmsi *azAuthBlobMSI) getCredential() interface{} {
 			log.Debug("azAuthBlobMSI::getCredential : MSI Token retrieved %s (%d)", newToken.AccessToken, newToken.Expires())
 
 			// Get the next token slightly before the current one expires
-			return time.Until(newToken.Expires()) - 10*time.Second
+			return time.Until(newToken.Expires()) - 5*time.Minute
 		})
 	}
 
@@ -243,8 +249,13 @@ func (azmsi *azAuthBfsMSI) getCredential() interface{} {
 	}
 
 	if token == nil {
-		log.Debug("azAuthBfsMSI::getCredential : Going for conventional fetchToken")
-		token, err = azmsi.fetchToken()
+		log.Debug("azAuthBfsMSI::getCredential : Going for conventional fetchToken. MSI Endpoint : %s", msi_endpoint)
+		token, err = azmsi.fetchToken(msi_endpoint)
+
+		if token == nil {
+			log.Debug("azAuthBfsMSI::getCredential : Going for conventional fetchToken without endpoint")
+			token, err = azmsi.fetchToken("")
+		}
 	}
 
 	if err != nil {
@@ -269,7 +280,7 @@ func (azmsi *azAuthBfsMSI) getCredential() interface{} {
 			log.Debug("azAuthBfsMSI::getCredential : MSI Token retrieved %s (%d)", newToken.AccessToken, newToken.Expires())
 
 			// Get the next token slightly before the current one expires
-			return time.Until(newToken.Expires()) - 10*time.Second
+			return time.Until(newToken.Expires()) - 5*time.Minute
 		})
 	} else {
 		log.Info("azAuthBfsMSI::getCredential : MSI Token retrieved %s (%d)", token.AccessToken, token.Expires())
@@ -286,7 +297,7 @@ func (azmsi *azAuthBfsMSI) getCredential() interface{} {
 			log.Debug("azAuthBfsMSI::getCredential : MSI Token retrieved %s (%d)", newToken.AccessToken, newToken.Expires())
 
 			// Get the next token slightly before the current one expires
-			return time.Until(newToken.Expires()) - 10*time.Second
+			return time.Until(newToken.Expires()) - 5*time.Minute
 		})
 	}
 
