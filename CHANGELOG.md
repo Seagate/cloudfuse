@@ -1,11 +1,18 @@
 # Cloudfuse Changelog #
 
-## 0.2.0 (WIP) ##
+## 0.2.1 (WIP) ##
 
 This version is based on [blobfuse2 2.1.1](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.1) (upstream).
+
+## 0.2.0 ##
+
 **Features**
 -- Include an installer on Windows
 -- Linux installers now include the GUI and add it to the user applications.
+-- Unmount now accepts --lazy as an argument to unmount in background
+**Bug Fixes**
+-- [#29](https://github.com/Seagate/cloudfuse/pull/29) Listing directories on S3 now correctly lists directories up until the maximum configured
+-- [#28](https://github.com/Seagate/cloudfuse/pull/28)  User-Agent header is now sent on S3 requests
 
 ## 0.1.0 ##
 
