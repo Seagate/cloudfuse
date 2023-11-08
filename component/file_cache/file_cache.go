@@ -862,13 +862,10 @@ func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
 
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
 
-	if options.Handle.Dirty() {
-		log.Info("FileCache::CloseFile : name=%s, handle=%d dirty. Flushing the file.", options.Handle.Path, options.Handle.ID)
-		err := fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle}) //nolint
-		if err != nil {
-			log.Err("FileCache::CloseFile : failed to flush file %s", options.Handle.Path)
-			return err
-		}
+	err := fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle}) //nolint
+	if err != nil {
+		log.Err("FileCache::CloseFile : failed to flush file %s", options.Handle.Path)
+		return err
 	}
 
 	f := options.Handle.GetFileObject()
@@ -882,7 +879,7 @@ func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	err := f.Close()
+	err = f.Close()
 	if err != nil {
 		log.Err("FileCache::CloseFile : error closing file %s(%d) [%s]", options.Handle.Path, int(f.Fd()), err.Error())
 		return err
@@ -1016,7 +1013,11 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 	log.Trace("FileCache::SyncFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 	if fc.syncToFlush {
-		options.Handle.Flags.Set(handlemap.HandleFlagDirty)
+		err := fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle}) //nolint
+		if err != nil {
+			log.Err("FileCache::SyncFile : failed to flush file %s", options.Handle.Path)
+			return err
+		}
 	} else if fc.syncToDelete {
 		err := fc.NextComponent().SyncFile(options)
 		if err != nil {

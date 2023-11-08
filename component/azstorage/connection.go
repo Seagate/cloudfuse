@@ -72,6 +72,9 @@ type AzStorageConfig struct {
 	HonourACL          bool
 
 	restrictedCharsWin bool
+	telemetry          string
+	honourACL          bool
+	disableSymlink     bool
 }
 
 type AzStorageConnection struct {
