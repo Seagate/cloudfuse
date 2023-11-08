@@ -5,9 +5,10 @@ import os
 import yaml
 
 # Import QT libraries
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QStandardPaths
 from PySide6 import QtWidgets, QtGui
 from PySide6.QtWidgets import QMainWindow
+
 
 # Import the custom class created with QtDesigner 
 from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
@@ -203,7 +204,15 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         
     # This function reads in the config file, modifies the components section, then writes the config file back
     def modifyPipeline(self,target):
-        currentDir = os.getcwd()
+
+        #if platform == "win32":
+
+
+        #currentDir = os.getcwd()
+        currentDir = QStandardPaths.standardLocations(QStandardPaths.AppLocalDataLocation)
+        print(currentDir[0])
+        return
+    
         errMsg = QtWidgets.QMessageBox()
         
         # Read in the configs as a dictionary. Notify user if failed
