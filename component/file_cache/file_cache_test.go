@@ -151,6 +151,7 @@ func (suite *fileCacheTestSuite) TestEmpty() {
 	suite.assert.Equal(suite.fileCache.allowNonEmpty, false)
 	suite.assert.EqualValues(suite.fileCache.cacheTimeout, 120)
 	suite.assert.Equal(suite.fileCache.cleanupOnStart, false)
+	suite.assert.Equal(suite.fileCache.syncToFlush, true)
 }
 
 // Tests configuration of file cache
@@ -166,8 +167,9 @@ func (suite *fileCacheTestSuite) TestConfig() {
 	createEmptyFile := true
 	allowNonEmptyTemp := true
 	cleanupOnStart := true
-	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  policy: %s\n  max-size-mb: %d\n  timeout-sec: %d\n  max-eviction: %d\n  high-threshold: %d\n  low-threshold: %d\n  create-empty-file: %t\n  allow-non-empty-temp: %t\n  cleanup-on-start: %t",
-		suite.cache_path, policy, maxSizeMb, cacheTimeout, maxDeletion, highThreshold, lowThreshold, createEmptyFile, allowNonEmptyTemp, cleanupOnStart)
+	syncToFlush := false
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  policy: %s\n  max-size-mb: %d\n  timeout-sec: %d\n  max-eviction: %d\n  high-threshold: %d\n  low-threshold: %d\n  create-empty-file: %t\n  allow-non-empty-temp: %t\n  cleanup-on-start: %t\n  sync-to-flush: %t",
+		suite.cache_path, policy, maxSizeMb, cacheTimeout, maxDeletion, highThreshold, lowThreshold, createEmptyFile, allowNonEmptyTemp, cleanupOnStart, syncToFlush)
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 
 	suite.assert.Equal(suite.fileCache.Name(), "file_cache")
@@ -183,6 +185,7 @@ func (suite *fileCacheTestSuite) TestConfig() {
 	suite.assert.Equal(suite.fileCache.allowNonEmpty, allowNonEmptyTemp)
 	suite.assert.EqualValues(suite.fileCache.cacheTimeout, cacheTimeout)
 	suite.assert.Equal(suite.fileCache.cleanupOnStart, cleanupOnStart)
+	suite.assert.Equal(suite.fileCache.syncToFlush, syncToFlush)
 }
 
 func (suite *fileCacheTestSuite) TestConfigPolicyTimeout() {
@@ -684,6 +687,8 @@ func (suite *fileCacheTestSuite) TestCreateFileInDirCreateEmptyFile() {
 
 func (suite *fileCacheTestSuite) TestSyncFile() {
 	defer suite.cleanupTest()
+
+	suite.fileCache.syncToFlush = false
 	path := "file3"
 
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
@@ -718,7 +723,6 @@ func (suite *fileCacheTestSuite) TestSyncFile() {
 	suite.assert.True(err == nil || os.IsExist(err))
 
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
-	suite.fileCache.syncToFlush = false
 }
 
 func (suite *fileCacheTestSuite) TestDeleteFile() {

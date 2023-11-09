@@ -1,6 +1,6 @@
 # MUST READ : 
 #   If you are creating a cloudfuse config file using this kindly take care of below points 
-#   1. All boolean configs (true|false config) (except ignore-open-flags, virtual-directory) are set to 'false' by default. 
+#   1. All boolean configs (true|false config) (except ignore-open-flags, virtual-directory, sync-to-flush) are set to 'false' by default. 
 #      No need to mention them in your config file unless you are setting them to true.
 #   2. 'loopbackfs' is purely for testing and shall not be used in production configuration.
 #   3. 'stream' and 'file_cache' can not co-exist and config file shall have only one of them based on your use case.
@@ -109,7 +109,7 @@ file_cache:
   cleanup-on-start: true|false <cleanup the temp directory on startup, if its not empty>
   policy-trace: true|false <generate eviction policy logs showing which files will expire soon>
   offload-io: true|false <by default libfuse will service reads/writes to files for better perf. Set to true to make file-cache component service read/write calls.>
-  sync-to-flush: true|false <sync call to a file will force upload of the contents to storage account>
+  sync-to-flush: true|false <sync call to a file will force upload of the contents to storage account. Default - true>
   refresh-sec: <number of seconds after which compare lmt of file in local cache and container and refresh file if container has the latest copy>
   ignore-sync: true|false <sync call will be ignored and locally cached file will not be deleted>
   hard-limit: true|false <if set to true, file-cache will not allow read/writes to file which exceed the configured limits>

@@ -98,7 +98,7 @@ type FileCacheOptions struct {
 	// v1 support
 	V1Timeout     uint32 `config:"file-cache-timeout-in-seconds" yaml:"-"`
 	EmptyDirCheck bool   `config:"empty-dir-check" yaml:"-"`
-	SyncToFlush   bool   `config:"sync-to-flush" yaml:"sync-to-flush,omitempty"`
+	SyncToFlush   bool   `config:"sync-to-flush" yaml:"sync-to-flush"`
 	SyncNoOp      bool   `config:"ignore-sync" yaml:"ignore-sync,omitempty"`
 
 	RefreshSec uint32 `config:"refresh-sec" yaml:"refresh-sec,omitempty"`
@@ -213,6 +213,7 @@ func (c *FileCache) Configure(_ bool) error {
 	log.Trace("FileCache::Configure : %s", c.Name())
 
 	conf := FileCacheOptions{}
+	conf.SyncToFlush = true
 	err := config.UnmarshalKey(compName, &conf)
 	if err != nil {
 		log.Err("FileCache: config error [invalid config attributes]")
@@ -327,6 +328,7 @@ func (c *FileCache) OnConfigChange() {
 	log.Trace("FileCache::OnConfigChange : %s", c.Name())
 
 	conf := FileCacheOptions{}
+	conf.SyncToFlush = true
 	err := config.UnmarshalKey(compName, &conf)
 	if err != nil {
 		log.Err("FileCache: config error [invalid config attributes]")
@@ -1442,7 +1444,7 @@ func init() {
 	config.BindPFlag(compName+".policy", cachePolicy)
 	cachePolicy.Hidden = true
 
-	syncToFlush := config.AddBoolFlag("sync-to-flush", false, "Sync call on file will force a upload of the file.")
+	syncToFlush := config.AddBoolFlag("sync-to-flush", true, "Sync call on file will force a upload of the file.")
 	config.BindPFlag(compName+".sync-to-flush", syncToFlush)
 
 	ignoreSync := config.AddBoolFlag("ignore-sync", false, "Just ignore sync call and do not invalidate locally cached file.")

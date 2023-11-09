@@ -564,6 +564,11 @@ func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
 }
 
 func (suite *fileTestSuite) TestListDirReadLink() {
+	// Symbolic link creation requires admin rights on Windows.
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
 	if suite.adlsTest && strings.ToLower(fileTestEnableSymlinkADLS) != "true" {
 		fmt.Printf("Skipping this test case for adls : %v, enable-symlink-adls : %v\n", suite.adlsTest, fileTestEnableSymlinkADLS)
 		return

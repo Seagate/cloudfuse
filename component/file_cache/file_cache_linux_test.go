@@ -97,7 +97,7 @@ func (suite *fileCacheLinuxTestSuite) cleanupTest() {
 	os.RemoveAll(suite.fake_storage_path)
 }
 
-func (suite *fileCacheTestSuite) TestChmodNotInCache() {
+func (suite *fileCacheLinuxTestSuite) TestChmodNotInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file33"
@@ -124,7 +124,7 @@ func (suite *fileCacheTestSuite) TestChmodNotInCache() {
 	suite.assert.EqualValues(info.Mode(), 0666)
 }
 
-func (suite *fileCacheTestSuite) TestChmodInCache() {
+func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file34"
@@ -151,7 +151,7 @@ func (suite *fileCacheTestSuite) TestChmodInCache() {
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
 }
 
-func (suite *fileCacheTestSuite) TestChmodCase2() {
+func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
 	defer suite.cleanupTest()
 	// Default is to not create empty files on create file to support immutable storage.
 	path := "file35"
