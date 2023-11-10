@@ -419,13 +419,14 @@ var ContentTypes = map[string]string{
 	".xls":  "application/vnd.ms-excel",
 	".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 
-	".gz":  "application/x-gzip",
-	".jar": "application/java-archive",
-	".rar": "application/vnd.rar",
-	".tar": "application/x-tar",
-	".zip": "application/x-zip-compressed",
-	".7z":  "application/x-7z-compressed",
-	".3g2": "video/3gpp2",
+	".gz":   "application/x-gzip",
+	".jar":  "application/java-archive",
+	".rar":  "application/vnd.rar",
+	".tar":  "application/x-tar",
+	".zip":  "application/x-zip-compressed",
+	".7z":   "application/x-7z-compressed",
+	".3g2":  "video/3gpp2",
+	".usdz": "application/zip",
 
 	".sh":  "application/x-sh",
 	".exe": "application/x-msdownload",
@@ -434,7 +435,7 @@ var ContentTypes = map[string]string{
 
 // getContentType : Based on the file extension retrieve the content type to be set
 func getContentType(key string) string {
-	value, found := ContentTypes[filepath.Ext(key)]
+	value, found := ContentTypes[strings.ToLower(filepath.Ext(key))]
 	if found {
 		return value
 	}

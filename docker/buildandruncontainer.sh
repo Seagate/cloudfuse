@@ -3,7 +3,7 @@
 ver=`../cloudfuse --version | cut -d " " -f 3`
 tag="azure-cloudfuse.$ver"
 
-./buildcontainer.sh
+./buildcontainer.sh Dockerfile x86_64
 
 # If build was successful then launch a container instance
 status=`docker images | grep $tag`

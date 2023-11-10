@@ -1,5 +1,9 @@
 # Cloudfuse Changelog #
 
+## 0.2.1 (WIP) ##
+
+This version is based on [blobfuse2 2.1.1](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.1) (upstream).
+
 ## 0.2.0 ##
 
 **Features**

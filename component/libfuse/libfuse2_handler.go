@@ -111,7 +111,7 @@ func (lf *Libfuse) initFuse() error {
 	}
 
 	// While reading a file let kernel do readahed for better perf
-	options += fmt.Sprintf(",max_readahead=%d", 8*1024*1024)
+	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)
 
 	// Max background thread on the fuse layer for high parallelism
 	options += fmt.Sprintf(",max_background=%d", lf.maxFuseThreads)
@@ -127,6 +127,10 @@ func (lf *Libfuse) initFuse() error {
 	}
 	if lf.nonEmptyMount {
 		options += ",nonempty"
+	}
+
+	if lf.umask != 0 {
+		options += fmt.Sprintf(",umask=%04d", lf.umask)
 	}
 
 	// direct_io option is used to bypass the kernel cache. It disables the use of
