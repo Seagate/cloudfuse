@@ -2121,6 +2121,11 @@ func (s *s3StorageTestSuite) TestStreamDirSmallCountNoDuplicates() {
 	}
 
 	s.assert.EqualValues(5, len(objectList))
+	if len(objectList) != 5 {
+		for _, item := range objectList {
+			fmt.Println(item.Path)
+		}
+	}
 }
 
 func (s *s3StorageTestSuite) TestRenameFile() {
