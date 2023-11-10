@@ -527,7 +527,12 @@ func (suite *dirTestSuite) TestGitStash() {
 }
 
 func (suite *dirTestSuite) TestReadDirLink() {
-	if runtime.GOOS == "windows" || suite.adlsTest && strings.ToLower(enableSymlinkADLS) != "true" {
+	// Symbolic link creation requires admin rights on Windows.
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test for Windows")
+		return
+	}
+	if suite.adlsTest && strings.ToLower(enableSymlinkADLS) != "true" {
 		fmt.Printf("Skipping this test case for adls : %v, enable-symlink-adls : %v\n", suite.adlsTest, enableSymlinkADLS)
 		return
 	}
