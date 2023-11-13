@@ -11,7 +11,7 @@ Download the provided installation packages for your preferred operating system.
 
 ### Windows
 
- Download and run (as administrator) the [.exe installer](https://github.com/Seagate/cloudfuse/releases/download/0.2.0/cloudfuse_install_Windows_x86_64.exe) from our the latest [release](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
+ Download and run (as administrator) the .exe installer from our the latest [release](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
 
 
 ### From Tar or Zip files
