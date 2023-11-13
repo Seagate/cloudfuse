@@ -98,7 +98,7 @@ type FileCacheOptions struct {
 	// v1 support
 	V1Timeout     uint32 `config:"file-cache-timeout-in-seconds" yaml:"-"`
 	EmptyDirCheck bool   `config:"empty-dir-check" yaml:"-"`
-	SyncToFlush   bool   `config:"sync-to-flush" yaml:"sync-to-flush,omitempty"`
+	SyncToFlush   bool   `config:"sync-to-flush" yaml:"sync-to-flush"`
 	SyncNoOp      bool   `config:"ignore-sync" yaml:"ignore-sync,omitempty"`
 
 	RefreshSec uint32 `config:"refresh-sec" yaml:"refresh-sec,omitempty"`
@@ -213,6 +213,7 @@ func (c *FileCache) Configure(_ bool) error {
 	log.Trace("FileCache::Configure : %s", c.Name())
 
 	conf := FileCacheOptions{}
+	conf.SyncToFlush = true
 	err := config.UnmarshalKey(compName, &conf)
 	if err != nil {
 		log.Err("FileCache: config error [invalid config attributes]")
@@ -327,6 +328,7 @@ func (c *FileCache) OnConfigChange() {
 	log.Trace("FileCache::OnConfigChange : %s", c.Name())
 
 	conf := FileCacheOptions{}
+	conf.SyncToFlush = true
 	err := config.UnmarshalKey(compName, &conf)
 	if err != nil {
 		log.Err("FileCache: config error [invalid config attributes]")
@@ -862,13 +864,10 @@ func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
 
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
 
-	if options.Handle.Dirty() {
-		log.Info("FileCache::CloseFile : name=%s, handle=%d dirty. Flushing the file.", options.Handle.Path, options.Handle.ID)
-		err := fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle}) //nolint
-		if err != nil {
-			log.Err("FileCache::CloseFile : failed to flush file %s", options.Handle.Path)
-			return err
-		}
+	err := fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle}) //nolint
+	if err != nil {
+		log.Err("FileCache::CloseFile : failed to flush file %s", options.Handle.Path)
+		return err
 	}
 
 	f := options.Handle.GetFileObject()
@@ -882,7 +881,7 @@ func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	err := f.Close()
+	err = f.Close()
 	if err != nil {
 		log.Err("FileCache::CloseFile : error closing file %s(%d) [%s]", options.Handle.Path, int(f.Fd()), err.Error())
 		return err
@@ -1016,7 +1015,11 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 	log.Trace("FileCache::SyncFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 	if fc.syncToFlush {
-		options.Handle.Flags.Set(handlemap.HandleFlagDirty)
+		err := fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle}) //nolint
+		if err != nil {
+			log.Err("FileCache::SyncFile : failed to flush file %s", options.Handle.Path)
+			return err
+		}
 	} else if fc.syncToDelete {
 		err := fc.NextComponent().SyncFile(options)
 		if err != nil {
@@ -1441,7 +1444,7 @@ func init() {
 	config.BindPFlag(compName+".policy", cachePolicy)
 	cachePolicy.Hidden = true
 
-	syncToFlush := config.AddBoolFlag("sync-to-flush", false, "Sync call on file will force a upload of the file.")
+	syncToFlush := config.AddBoolFlag("sync-to-flush", true, "Sync call on file will force a upload of the file.")
 	config.BindPFlag(compName+".sync-to-flush", syncToFlush)
 
 	ignoreSync := config.AddBoolFlag("ignore-sync", false, "Just ignore sync call and do not invalidate locally cached file.")

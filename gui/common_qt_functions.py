@@ -110,7 +110,7 @@ class defaultSettingsManager():
             'cleanup-on-start': False,
             'policy-trace': False,
             'offload-io': False,
-            'sync-to-flush': False,
+            'sync-to-flush': True,
             'refresh-sec': 60
         })
         self.settings.setValue('attr_cache',{
