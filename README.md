@@ -11,11 +11,7 @@ Download the provided installation packages for your preferred operating system.
 
 ### Windows
 
-Downloading:  
-  In order to download a prebuilt version of the software, you will need to access our [releases](https://github.com/Seagate/cloudfuse/releases) page and click the [cloudfuse_install_Windows_x86_64.exe](https://github.com/Seagate/cloudfuse/releases/download/0.2.0/cloudfuse_install_Windows_x86_64.exe) option to download the windows installer.
-
-Installing:
-	Run the downloaded .exe file as administrator and follow the installation prompts. Do not run the GUI from the installer as there is a config saving issue currently being investigated. Run the GUI separately as admin after the install completes.
+ Download and run (as administrator) the [.exe installer](https://github.com/Seagate/cloudfuse/releases/download/0.2.0/cloudfuse_install_Windows_x86_64.exe) from our the latest [release](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
 
 
 ### From Tar or Zip files
