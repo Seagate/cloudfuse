@@ -9,7 +9,7 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 ## Installation
 Download the provided installation packages for your preferred operating system.  -- COMING SOON!
 
-### from Windows .exe installer
+### Windows
 
 Downloading:  
   In order to download a prebuilt version of the software, you will need to access our [releases](https://github.com/Seagate/cloudfuse/releases) page and click the [cloudfuse_install_Windows_x86_64.exe](https://github.com/Seagate/cloudfuse/releases/download/0.2.0/cloudfuse_install_Windows_x86_64.exe) option to download the windows installer.
