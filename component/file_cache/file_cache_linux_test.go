@@ -97,10 +97,104 @@ func (suite *fileCacheLinuxTestSuite) cleanupTest() {
 	os.RemoveAll(suite.fake_storage_path)
 }
 
+func (suite *fileCacheLinuxTestSuite) TestChmodNotInCache() {
+	defer suite.cleanupTest()
+	// Setup
+	path := "file33"
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+
+	_, err := os.Stat(suite.cache_path + "/" + path)
+	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
+		time.Sleep(time.Second)
+		_, err = os.Stat(suite.cache_path + "/" + path)
+	}
+	suite.assert.True(os.IsNotExist(err))
+
+	// Path should be in fake storage
+	_, err = os.Stat(suite.fake_storage_path + "/" + path)
+	suite.assert.True(err == nil || os.IsExist(err))
+
+	// Chmod
+	err = suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0666)})
+	suite.assert.Nil(err)
+
+	// Path in fake storage should be updated
+	info, _ := os.Stat(suite.fake_storage_path + "/" + path)
+	suite.assert.EqualValues(info.Mode(), 0666)
+}
+
+func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
+	defer suite.cleanupTest()
+	// Setup
+	path := "file34"
+	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
+
+	// Path should be in the file cache
+	_, err := os.Stat(suite.cache_path + "/" + path)
+	suite.assert.True(err == nil || os.IsExist(err))
+	// Path should be in fake storage
+	_, err = os.Stat(suite.fake_storage_path + "/" + path)
+	suite.assert.True(err == nil || os.IsExist(err))
+
+	// Chmod
+	err = suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0755)})
+	suite.assert.Nil(err)
+	// Path in fake storage and file cache should be updated
+	info, _ := os.Stat(suite.cache_path + "/" + path)
+	suite.assert.EqualValues(info.Mode(), 0755)
+	info, _ = os.Stat(suite.fake_storage_path + "/" + path)
+	suite.assert.EqualValues(info.Mode(), 0755)
+
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
+}
+
+func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
+	defer suite.cleanupTest()
+	// Default is to not create empty files on create file to support immutable storage.
+	path := "file35"
+	oldMode := os.FileMode(0511)
+
+	createHandle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
+	suite.assert.Nil(err)
+
+	newMode := os.FileMode(0666)
+	err = suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: newMode})
+	suite.assert.Nil(err)
+
+	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: createHandle})
+	suite.assert.Nil(err)
+
+	// Path should be in the file cache with old mode (since we failed the operation)
+	info, err := os.Stat(suite.cache_path + "/" + path)
+	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.EqualValues(info.Mode(), newMode)
+
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	suite.assert.Nil(err)
+
+	// loop until file does not exist - done due to async nature of eviction
+	_, err = os.Stat(suite.cache_path + "/" + path)
+	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
+		time.Sleep(time.Second)
+		_, err = os.Stat(suite.cache_path + "/" + path)
+	}
+	suite.assert.True(os.IsNotExist(err))
+
+	// Get the attributes and now and check file mode is set correctly or not
+	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.assert.Nil(err)
+	suite.assert.NotNil(attr)
+	suite.assert.EqualValues(path, attr.Path)
+	suite.assert.EqualValues(attr.Mode, newMode)
+}
+
 func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
 	defer suite.cleanupTest()
 	// Setup
-	path := "file"
+	path := "file36"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 
@@ -132,7 +226,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
 func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	defer suite.cleanupTest()
 	// Setup
-	path := "file"
+	path := "file37"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
@@ -167,7 +261,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 func (suite *fileCacheLinuxTestSuite) TestChownCase2() {
 	defer suite.cleanupTest()
 	// Default is to not create empty files on create file to support immutable storage.
-	path := "file"
+	path := "file38"
 	oldMode := os.FileMode(0511)
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
 	info, _ := os.Stat(suite.cache_path + "/" + path)

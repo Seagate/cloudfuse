@@ -15,6 +15,7 @@ from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
 from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
 from aboutPage import aboutPage
+from under_Construction import underConstruction
 
 bucketOptions = ['s3storage', 'azstorage']
 mountTargetComponent = 3
@@ -41,6 +42,9 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.button_unmount.clicked.connect(self.unmountBucket)
         self.actionAbout_Qt.triggered.connect(self.showAboutQtPage)
         self.actionAbout_CloudFuse.triggered.connect(self.showAboutCloudFusePage)
+        self.action_debugHealthMonitor.triggered.connect(self.showUnderConstructionPage)
+        self.action_debugLogging.triggered.connect(self.showUnderConstructionPage)
+        self.action_debugTesting.triggered.connect(self.showUnderConstructionPage)
         
         if platform == "win32":
             self.lineEdit_mountPoint.setToolTip("Designate a new location to mount the bucket, do not create the directory")
@@ -75,6 +79,10 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     # Display the custom dialog box for the cloudfuse 'about' page.
     def showAboutCloudFusePage(self):
         self.page = aboutPage()
+        self.page.show()
+
+    def showUnderConstructionPage(self):
+        self.page = underConstruction()
         self.page.show()
 
     # Wrapper/helper for the service install and start.

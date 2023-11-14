@@ -68,10 +68,11 @@ type AzStorageConfig struct {
 	virtualDirectory   bool
 	maxResultsForList  int32
 	disableCompression bool
-	telemetry          string
-	HonourACL          bool
 
 	restrictedCharsWin bool
+	telemetry          string
+	honourACL          bool
+	disableSymlink     bool
 }
 
 type AzStorageConnection struct {

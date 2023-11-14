@@ -1,5 +1,5 @@
 # Create container based on Ubuntu-22.04 Jammy Jellyfish image
-FROM mcr.microsoft.com/mirror/docker/library/ubuntu:22.04 
+FROM mcr.microsoft.com/cbl-mariner/base/core:2.0
 
 # Create directory to hold samples
 RUN mkdir -p /usr/share/cloudfuse
@@ -9,17 +9,10 @@ COPY ./cloudfuse /usr/local/bin/
 COPY ./config.yaml /usr/share/cloudfuse/
 
 # Install fuse library
-RUN \
-	apt update && \
-	apt-get install -y ca-certificates vim rsyslog && \
-	apt-get install -y fuse3
+RUN tdnf update 
+RUN tdnf install -y ca-certificates fuse3
 
 RUN echo "user_allow_other" >> /etc/fuse.conf
-
-# Create syslog filter files
-COPY ./11-cloudfuse.conf /etc/rsyslog.d
-COPY ./cloudfuse-logrotate /etc/logrotate.d/cloudfuse
-
 
 # Create mount directory structure
 RUN \
@@ -31,7 +24,6 @@ RUN \
 
 # Create the mount script and set it to entry point once container start
 RUN \
-	echo "/sbin/rsyslogd" > /usr/share/cloudfuse/cloudfuse-mount.sh && \
 	echo "cloudfuse mount /mnt/blobfuse_mnt --config-file=/usr/share/cloudfuse/config.yaml  --ignore-open-flags --foreground=true" >> /usr/share/cloudfuse/cloudfuse-mount.sh && \
 	echo "cloudfuse unmount all" > /usr/share/cloudfuse/cloudfuse-umount.sh && \
 	chmod 777 /usr/share/cloudfuse/cloudfuse-mount.sh && \

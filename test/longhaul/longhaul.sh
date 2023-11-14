@@ -61,7 +61,7 @@ else
 	echo "`date`: Restart : `./cloudfuse --version`" >> ./restart2.log
 
 	# Send email that cloudfuse has crashed
-	echo "Cloudfuse Failure" | mail -s "Cloudfuse Restart" -A ./restart2.log -a "From: longhaul@blobfuse.com" <mail id here>
+	echo "Cloudfuse Failure" | mail -s "Cloudfuse Restart" -A ./restart2.log -a "From: longhaul@cloudfuse.com" <mail id here>
 	
 	cp /var/log/cloudfuse.log /home/vibhansa/blob_mnt2/
 	cp ./longhaul2.log  /home/vibhansa/blob_mnt2/
