@@ -9,7 +9,6 @@ from PySide6.QtCore import Qt, QStandardPaths
 from PySide6 import QtWidgets, QtGui
 from PySide6.QtWidgets import QMainWindow
 
-
 # Import the custom class created with QtDesigner 
 from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
 from s3_config_common import s3SettingsWidget
@@ -19,6 +18,8 @@ from under_Construction import underConstruction
 
 bucketOptions = ['s3storage', 'azstorage']
 mountTargetComponent = 3
+defaultFuseDir = '\Cloudfuse'
+
 class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def __init__(self):
         super().__init__()
@@ -213,13 +214,11 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     # This function reads in the config file, modifies the components section, then writes the config file back
     def modifyPipeline(self,target):
 
-        #if platform == "win32":
-
-
-        #currentDir = os.getcwd()
-        currentDir = QStandardPaths.standardLocations(QStandardPaths.AppLocalDataLocation)
-        print(currentDir[0])
-        return
+        if platform == "win32":
+            userDir = os.getenv('LOCALAPPDATA')
+            currentDir = userDir + defaultFuseDir
+        else:
+            currentDir = os.getcwd()
     
         errMsg = QtWidgets.QMessageBox()
         
