@@ -5,7 +5,7 @@ import os
 import yaml
 
 # Import QT libraries
-from PySide6.QtCore import Qt, QStandardPaths
+from PySide6.QtCore import Qt
 from PySide6 import QtWidgets, QtGui
 from PySide6.QtWidgets import QMainWindow
 
