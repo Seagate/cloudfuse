@@ -1428,7 +1428,7 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmaller() {
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
 	s.assert.Nil(err)
-	s.assert.EqualValues(testData[:truncatedLength], output)
+	s.assert.EqualValues(testData[:truncatedLength], output[:])
 }
 
 func (s *s3StorageTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
@@ -3204,6 +3204,93 @@ func (s *s3StorageTestSuite) TestUpdateConfig() {
 	})
 
 	s.assert.EqualValues(7*MB, s.s3Storage.storage.(*Client).Config.partSize)
+}
+
+func (s *s3StorageTestSuite) TestTruncateSmallFileToSmaller() {
+	s.UtilityFunctionTestTruncateFileToSmaller(2*MB, 1*MB)
+}
+
+func (s *s3StorageTestSuite) TestTruncateSmallFileToLarger() {
+	s.UtilityFunctionTruncateFileToLarger(1*MB, 2*MB)
+}
+
+func (s *s3StorageTestSuite) TestTruncateBlockFileToSmaller() {
+	s.UtilityFunctionTestTruncateFileToSmaller(10*MB, 8*MB)
+}
+
+func (s *s3StorageTestSuite) TestTruncateBlockFileToLarger() {
+	s.UtilityFunctionTruncateFileToLarger(8*MB, 10*MB)
+}
+
+func (s *s3StorageTestSuite) TestTruncateNoBlockFileToLarger() {
+	s.UtilityFunctionTruncateFileToLarger(10*MB, 20*MB)
+}
+
+func (s *s3StorageTestSuite) UtilityFunctionTestTruncateFileToSmaller(size int, truncatedLength int) {
+	defer s.cleanupTest()
+	// Setup
+	storageTestConfigurationParameters.PartSizeMb = 5
+	storageTestConfigurationParameters.UploadCutoffMb = 5
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	s.tearDownTestHelper(false)
+	s.setupTestHelper(vdConfig, s.bucket, true)
+	// // This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+
+	name := generateFileName()
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.Nil(err)
+
+	data := make([]byte, size)
+	s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+
+	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
+	s.assert.Nil(err)
+
+	// Object should have updated data
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, err := io.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(truncatedLength, len(output))
+	s.assert.EqualValues(data[:truncatedLength], output[:])
+}
+
+func (s *s3StorageTestSuite) UtilityFunctionTruncateFileToLarger(size int, truncatedLength int) {
+	defer s.cleanupTest()
+	// Setup
+	storageTestConfigurationParameters.PartSizeMb = 5
+	storageTestConfigurationParameters.UploadCutoffMb = 5
+	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	s.tearDownTestHelper(false)
+	s.setupTestHelper(vdConfig, s.bucket, true)
+
+	name := generateFileName()
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.Nil(err)
+
+	data := make([]byte, size)
+	s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+
+	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
+	s.assert.Nil(err)
+
+	// Object should have updated data
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+	s.assert.Nil(err)
+	defer result.Body.Close()
+	output, err := io.ReadAll(result.Body)
+	s.assert.Nil(err)
+	s.assert.EqualValues(truncatedLength, len(output))
+	s.assert.EqualValues(data[:], output[:size])
 }
 
 func TestS3Storage(t *testing.T) {

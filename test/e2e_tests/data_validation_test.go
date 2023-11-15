@@ -119,7 +119,7 @@ func (suite *dataValidationTestSuite) validateData(localFilePath string, remoteF
 // Test correct overwrite of file using echo command
 func (suite *dataValidationTestSuite) TestFileOverwriteWithEchoCommand() {
 
-	if strings.Contains(strings.ToUpper(distro), "UBUNTU-20.04") {
+	if strings.Contains(strings.ToUpper(fileTestDistro), "UBUNTU-20.04") {
 		fmt.Println("Skipping this test case for UBUNTU-20.04")
 		return
 	}

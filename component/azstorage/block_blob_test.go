@@ -3419,30 +3419,30 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnReadNoVaildate() {
 // }
 
 func (suite *blockBlobTestSuite) TestTruncateSmallFileToSmaller() {
-	suite.UtilityFunctionTestTruncateFileToSmaller(20*MB, 10*MB)
+	suite.UtilityFunctionTestTruncateFileToSmaller(2*MB, 1*MB)
 }
 
 func (suite *blockBlobTestSuite) TestTruncateSmallFileToLarger() {
-	suite.UtilityFunctionTruncateFileToLarger(10*MB, 20*MB)
+	suite.UtilityFunctionTruncateFileToLarger(1*MB, 2*MB)
 }
 
 func (suite *blockBlobTestSuite) TestTruncateBlockFileToSmaller() {
-	suite.UtilityFunctionTestTruncateFileToSmaller(300*MB, 290*MB)
+	suite.UtilityFunctionTestTruncateFileToSmaller(10*MB, 8*MB)
 }
 
 func (suite *blockBlobTestSuite) TestTruncateBlockFileToLarger() {
-	suite.UtilityFunctionTruncateFileToLarger(290*MB, 300*MB)
+	suite.UtilityFunctionTruncateFileToLarger(8*MB, 10*MB)
 }
 
 func (suite *blockBlobTestSuite) TestTruncateNoBlockFileToLarger() {
-	suite.UtilityFunctionTruncateFileToLarger(200*MB, 300*MB)
+	suite.UtilityFunctionTruncateFileToLarger(10*MB, 20*MB)
 }
 
 func (suite *blockBlobTestSuite) UtilityFunctionTestTruncateFileToSmaller(size int, truncatedLength int) {
 	defer suite.cleanupTest()
 	// Setup
-	vdConfig := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  virtual-directory: true",
-		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.BlockKey, suite.container)
+	vdConfig := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  virtual-directory: true",
+		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.BlockKey, suite.container)
 	// // This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 
 	suite.tearDownTestHelper(false)
@@ -3470,8 +3470,8 @@ func (suite *blockBlobTestSuite) UtilityFunctionTestTruncateFileToSmaller(size i
 func (suite *blockBlobTestSuite) UtilityFunctionTruncateFileToLarger(size int, truncatedLength int) {
 	defer suite.cleanupTest()
 	// Setup
-	vdConfig := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  virtual-directory: true",
-		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.BlockKey, suite.container)
+	vdConfig := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  virtual-directory: true",
+		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.BlockKey, suite.container)
 	// // This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 
 	suite.tearDownTestHelper(false)
