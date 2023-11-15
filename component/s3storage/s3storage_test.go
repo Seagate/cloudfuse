@@ -2087,16 +2087,6 @@ func (s *s3StorageTestSuite) TestReadDir() {
 
 func (s *s3StorageTestSuite) TestStreamDirSmallCountNoDuplicates() {
 	defer s.cleanupTest()
-
-	// due to LocalStack issue https://github.com/localstack/localstack/issues/9605
-	// LocalStack will list the subdirectory twice
-	// the only guess we have here for whether LocalStack is running is using the OS
-	//   since LocalStack only runs on Linux in our tests
-	if runtime.GOOS != "windows" {
-		fmt.Println("Skipping this test for LocalStack")
-		return
-	}
-
 	// Setup
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/object1.txt"})
 	s.assert.Nil(err)
