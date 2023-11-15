@@ -127,7 +127,7 @@ func (suite *dirTestSuite) TestDirCreateDuplicate() {
 // # Create Directory with special characters in name
 func (suite *dirTestSuite) TestDirCreateSplChar() {
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestDirCreateSplChar on Windows")
 		return
 	}
 	dirName := suite.testPath + "/" + "@#$^&*()_+=-{}[]|?><.,~"
@@ -141,7 +141,7 @@ func (suite *dirTestSuite) TestDirCreateSplChar() {
 // # Create Directory with slash in name
 func (suite *dirTestSuite) TestDirCreateSlashChar() {
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestDirCreateSlashChar on Windows")
 		return
 	}
 	dirName := suite.testPath + "/" + "PRQ\\STUV"
@@ -529,7 +529,7 @@ func (suite *dirTestSuite) TestGitStash() {
 func (suite *dirTestSuite) TestReadDirLink() {
 	// Symbolic link creation requires admin rights on Windows.
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestReadDirLink on Windows")
 		return
 	}
 	if suite.adlsTest && strings.ToLower(enableSymlinkADLS) != "true" {
