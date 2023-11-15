@@ -95,7 +95,7 @@ func (suite *unmountTestSuite) TestUnmountCmd() {
 	mountOutput, _ := cmd.CombinedOutput()
 	suite.assert.Nil(err)
 	if err != nil {
-		fmt.Printf("Mount failed with output: %s\n", string(mountOutput))
+		fmt.Printf("Mount failed with output: %s\n", mountOutput)
 	}
 
 	time.Sleep(2 * time.Second)
