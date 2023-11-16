@@ -117,8 +117,9 @@ func (suite *fileTestSuite) TestFileCreateUtf8Char() {
 }
 
 func (suite *fileTestSuite) TestFileCreatSpclChar() {
+	// special characters not supported on Windows
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestFileCreatSpclChar for Windows")
 		return
 	}
 	speclChar := "abcd%23ABCD%34123-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत.txt"
@@ -177,7 +178,7 @@ func (suite *fileTestSuite) TestFileCreatEncodeChar() {
 func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 	// Some of these characters are not allowed on Windows.
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestFileCreateMultiSpclCharWithinSpclDir on Windows")
 		return
 	}
 	speclChar := "abcd%23ABCD%34123-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत.txt"
@@ -227,7 +228,7 @@ func (suite *fileTestSuite) TestFileCreateLongName() {
 func (suite *fileTestSuite) TestFileCreateSlashName() {
 	// Backslashes are not allowed in filenames on Windows.
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestFileCreateSlashName on Windows")
 		return
 	}
 
@@ -374,7 +375,7 @@ func (suite *fileTestSuite) TestFileGetStat() {
 func (suite *fileTestSuite) TestFileChmod() {
 	// File permissions don't work on Windows.
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestFileChmod on Windows")
 		return
 	}
 	if suite.adlsTest {
@@ -427,7 +428,7 @@ func (suite *fileTestSuite) TestFileDeleteSingle() {
 func (suite *fileTestSuite) TestLinkCreate() {
 	// Symbolic link creation requires admin rights on Windows.
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestLinkCreate on Windows")
 		return
 	}
 
@@ -450,7 +451,7 @@ func (suite *fileTestSuite) TestLinkCreate() {
 func (suite *fileTestSuite) TestLinkRead() {
 	// Symbolic link creation requires admin rights on Windows.
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestLinkRead on Windows")
 		return
 	}
 
@@ -477,7 +478,7 @@ func (suite *fileTestSuite) TestLinkRead() {
 func (suite *fileTestSuite) TestLinkWrite() {
 	// Symbolic link creation requires admin rights on Windows.
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestLinkWrite on Windows")
 		return
 	}
 
@@ -502,7 +503,7 @@ func (suite *fileTestSuite) TestLinkWrite() {
 func (suite *fileTestSuite) TestLinkRenameTarget() {
 	// Symbolic link creation requires admin rights on Windows.
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestLinkRenameTarget on Windows")
 		return
 	}
 
@@ -535,7 +536,7 @@ func (suite *fileTestSuite) TestLinkRenameTarget() {
 func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
 	// Symbolic link creation requires admin rights on Windows.
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestLinkDeleteReadTarget on Windows")
 		return
 	}
 
@@ -566,7 +567,7 @@ func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
 func (suite *fileTestSuite) TestListDirReadLink() {
 	// Symbolic link creation requires admin rights on Windows.
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestListDirReadLink on Windows")
 		return
 	}
 	if suite.adlsTest && strings.ToLower(fileTestEnableSymlinkADLS) != "true" {
@@ -633,7 +634,7 @@ func (suite *fileTestSuite) TestReadOnlyFile() {
 func (suite *fileTestSuite) TestCreateReadOnlyFile() {
 	// File permissions not working on Windows.
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestCreateReadOnlyFile on Windows")
 		return
 	}
 	if suite.adlsTest == true {
@@ -651,7 +652,7 @@ func (suite *fileTestSuite) TestCreateReadOnlyFile() {
 func (suite *fileTestSuite) TestRenameSpecial() {
 	// This test is flaky on GitHub actions, often, but not always failing.
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows")
+		fmt.Println("Skipping TestRenameSpecial on Windows")
 		return
 	}
 
