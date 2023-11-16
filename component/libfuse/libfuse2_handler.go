@@ -32,6 +32,7 @@ import (
 	"io/fs"
 	"os"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -271,6 +272,14 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 
 	// Populate stat
 	fuseFS.fillStat(attr, stat)
+	if strings.Contains(name, "gEdit") {
+		log.Debug("Libfuse::Getattr : Returning attributes of %s: mode %x, Uid %x, Gid %x, Rdev %x, size %d, blocks %d, flags %x",
+			name, stat.Mode, stat.Uid, stat.Gid, stat.Rdev, stat.Size, stat.Blocks, stat.Flags)
+	}
+	if name == "" {
+		log.Debug("Libfuse::Getattr : Returning root attributes: mode %x, Uid %x, Gid %x, Rdev %x, size %d, blocks %d, flags %x",
+			stat.Mode, stat.Uid, stat.Gid, stat.Rdev, stat.Size, stat.Blocks, stat.Flags)
+	}
 	return 0
 }
 
@@ -401,6 +410,14 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 		cacheInfo.token = token
 		cacheInfo.children = cacheInfo.children[:0]
 		cacheInfo.children = attrs
+	}
+
+	// find our troubled file in the children
+	for _, child := range cacheInfo.children {
+		if strings.Contains(child.Name, "gEdit") {
+			log.Debug("Libfuse::Readdir : Path %s, handle: %d, offset %d. Returning gEdit child attributes: flags %x, mode %x, size %d",
+				handle.Path, handle.ID, ofst64, child.Flags, child.Mode, child.Size)
+		}
 	}
 
 	if ofst64 >= cacheInfo.eIndex {
