@@ -101,11 +101,11 @@ func (lf *Libfuse) initFuse() error {
 		lf.attributeExpiration,
 		lf.negativeTimeout)
 
-	// With WinFSP this will present all files as owned by the current user and group
+	// With WinFSP this will present all files as owned by the Authenticated Users group
 	if runtime.GOOS == "windows" {
 		options = fmt.Sprintf("uid=%d,gid=%d,entry_timeout=%d,attr_timeout=%d,negative_timeout=%d",
-			-1,
-			-1,
+			11,
+			11,
 			lf.entryExpiration,
 			lf.attributeExpiration,
 			lf.negativeTimeout)
