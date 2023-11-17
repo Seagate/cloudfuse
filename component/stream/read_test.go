@@ -28,6 +28,7 @@ package stream
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -86,7 +87,7 @@ func (suite *streamTestSuite) setupTestHelper(config string, ro bool) {
 func (suite *streamTestSuite) SetupTest() {
 	err := log.SetDefaultLogger("silent", common.LogConfig{})
 	if err != nil {
-		panic("Unable to set silent logger as default.")
+		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 	suite.setupTestHelper(emptyConfig, true)
 }

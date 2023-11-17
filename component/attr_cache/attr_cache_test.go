@@ -233,7 +233,7 @@ func addDirectoryToCache(assert *assert.Assertions, attrCache *AttrCache, path s
 func (suite *attrCacheTestSuite) SetupTest() {
 	err := log.SetDefaultLogger("silent", common.LogConfig{})
 	if err != nil {
-		panic("Unable to set silent logger as default.")
+		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 	suite.setupTestHelper(emptyConfig)
 }
