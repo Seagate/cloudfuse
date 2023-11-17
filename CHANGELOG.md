@@ -2,7 +2,7 @@
 
 ## 0.2.1 (WIP) ##
 
-This version is based on [blobfuse2 commit 41fa93b dated 2023-11-15](https://github.com/Azure/azure-storage-fuse/commit/41fa93b82fd03069ebeae0e037bdeba6f7737118) (upstream).
+This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
 **Changes**
 Changed sync-to-flush to true by default.
 
