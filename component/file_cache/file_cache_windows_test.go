@@ -56,7 +56,7 @@ type fileCacheWindowsTestSuite struct {
 func (suite *fileCacheWindowsTestSuite) SetupTest() {
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
-		panic("Unable to set silent logger as default.")
+		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 	rand := randomString(8)
 	suite.cache_path = common.JoinUnixFilepath(home_dir, "file_cache"+rand)

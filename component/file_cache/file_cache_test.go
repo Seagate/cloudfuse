@@ -71,7 +71,7 @@ func newTestFileCache(next internal.Component) *FileCache {
 	fileCache.SetNextComponent(next)
 	err := fileCache.Configure(true)
 	if err != nil {
-		panic("Unable to configure file cache.")
+		panic(fmt.Sprintf("Unable to configure file cache: %v", err))
 	}
 
 	return fileCache.(*FileCache)
@@ -88,7 +88,7 @@ func (suite *fileCacheTestSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
-		panic("Unable to set silent logger as default.")
+		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 	rand := randomString(8)
 	suite.cache_path = common.JoinUnixFilepath(home_dir, "file_cache"+rand)
