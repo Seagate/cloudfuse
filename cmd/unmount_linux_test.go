@@ -70,7 +70,7 @@ func (suite *unmountTestSuite) SetupTest() {
 	options = mountOptions{}
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
-		panic("Unable to set silent logger as default.")
+		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 
 }
@@ -92,12 +92,19 @@ func (suite *unmountTestSuite) TestUnmountCmd() {
 
 	cmd := exec.Command("../cloudfuse", "mount", mountDirectory1, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
 	_, err := cmd.Output()
+	mountOutput, _ := cmd.CombinedOutput()
 	suite.assert.Nil(err)
+	if err != nil {
+		fmt.Printf("Mount failed with output: %s\n", mountOutput)
+	}
 
 	time.Sleep(2 * time.Second)
 
-	_, err = executeCommandC(rootCmd, "unmount", mountDirectory1)
+	unmountOutput, err := executeCommandC(rootCmd, "unmount", mountDirectory1)
 	suite.assert.Nil(err)
+	if err != nil {
+		fmt.Printf("Unmount failed. Mount output:\n%s\nUnmount output:\n%s\n", mountOutput, unmountOutput)
+	}
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdLazy() {

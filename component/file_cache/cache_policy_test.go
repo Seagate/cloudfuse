@@ -26,6 +26,7 @@
 package file_cache
 
 import (
+	"fmt"
 	"io/fs"
 	"math"
 	"os"
@@ -46,7 +47,7 @@ type cachePolicyTestSuite struct {
 func (suite *cachePolicyTestSuite) SetupTest() {
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
-		panic("Unable to set silent logger as default.")
+		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 	suite.assert = assert.New(suite.T())
 	os.Mkdir(cache_path, fs.FileMode(0777))

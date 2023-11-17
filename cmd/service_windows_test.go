@@ -49,7 +49,7 @@ func (suite *serviceTestSuite) SetupTest() {
 	servOpts = serviceOptions{}
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
-		panic("Unable to set silent logger as default.")
+		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 }
 

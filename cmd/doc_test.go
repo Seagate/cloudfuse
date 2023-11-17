@@ -49,7 +49,7 @@ func (suite *docTestSuite) SetupTest() {
 	options = mountOptions{}
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
-		panic("Unable to set silent logger as default.")
+		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 }
 
@@ -73,7 +73,7 @@ func (suite *docTestSuite) TestDocsGeneration() {
 func (suite *docTestSuite) TestOutputDirCreationError() {
 	// TODO: Skip this test on Windows. Requires attempting to write to a folder with no write permission
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows. Should fix this later.")
+		fmt.Println("Skipping TestOutputDirCreationError on Windows. Should fix this later.")
 		return
 	}
 	defer suite.cleanupTest()
@@ -88,7 +88,7 @@ func (suite *docTestSuite) TestOutputDirCreationError() {
 func (suite *docTestSuite) TestDocsGenerationError() {
 	// TODO: Skip this test on Windows. Requires attempting to write to a folder with no write permission
 	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping test for Windows. Should fix this later.")
+		fmt.Println("Skipping TestDocsGenerationError on Windows. Should fix this later.")
 		return
 	}
 	defer suite.cleanupTest()

@@ -27,6 +27,7 @@ package libfuse
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"runtime"
 	"strings"
@@ -62,13 +63,13 @@ var cfuseFS *CgofuseFS
 func newTestLibfuse(next internal.Component, configuration string) *Libfuse {
 	err := config.ReadConfigFromReader(strings.NewReader(configuration))
 	if err != nil {
-		panic("Unable to read config from reader.")
+		panic(fmt.Sprintf("Unable to read config from reader: %v", err))
 	}
 	libfuse := NewLibfuseComponent()
 	libfuse.SetNextComponent(next)
 	err = libfuse.Configure(true)
 	if err != nil {
-		panic("Unable to configure for testing.")
+		panic(fmt.Sprintf("Unable to configure for testing: %v", err))
 	}
 
 	return libfuse.(*Libfuse)
@@ -77,7 +78,7 @@ func newTestLibfuse(next internal.Component, configuration string) *Libfuse {
 func (suite *libfuseTestSuite) SetupTest() {
 	err := log.SetDefaultLogger("silent", common.LogConfig{})
 	if err != nil {
-		panic("Unable to set silent logger as default.")
+		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 	suite.setupTestHelper(emptyConfig)
 }
