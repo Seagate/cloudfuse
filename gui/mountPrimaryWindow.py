@@ -15,10 +15,10 @@ from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
 from aboutPage import aboutPage
 from under_Construction import underConstruction
+from common_qt_functions import widgetCustomFunctions as widgetFuncs
 
 bucketOptions = ['s3storage', 'azstorage']
 mountTargetComponent = 3
-defaultFuseDir = '\Cloudfuse'
 
 class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def __init__(self):
@@ -214,12 +214,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     # This function reads in the config file, modifies the components section, then writes the config file back
     def modifyPipeline(self,target):
 
-        if platform == "win32":
-            userDir = os.getenv('LOCALAPPDATA')
-            currentDir = userDir + defaultFuseDir
-        else:
-            currentDir = os.getcwd()
-    
+        currentDir = widgetFuncs.getCurrentDir(self)
         errMsg = QtWidgets.QMessageBox()
         
         # Read in the configs as a dictionary. Notify user if failed

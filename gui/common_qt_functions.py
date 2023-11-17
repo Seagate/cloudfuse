@@ -10,7 +10,6 @@ from PySide6.QtCore import Qt, QSettings
 
 file_cache_eviction_choices = ['lru','lfu']
 libfusePermissions = [0o777,0o666,0o644,0o444]
-defaultFuseDir = '\Cloudfuse'
 
 class defaultSettingsManager():
     def __init__(self):
@@ -209,9 +208,10 @@ class widgetCustomFunctions(QWidget):
         pass
 
     def getCurrentDir(self):
+        defaultFuseDir = 'Cloudfuse'
         if platform == "win32":
             userDir = os.getenv('LOCALAPPDATA')
-            currentDir = userDir + defaultFuseDir
+            currentDir = os.path.join(userDir, defaultFuseDir)
         else:
             currentDir = os.getcwd()
         return currentDir
