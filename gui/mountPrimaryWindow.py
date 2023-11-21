@@ -89,7 +89,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     # Wrapper/helper for the service install and start.
     def windowsServiceInstall(self):
         # install the service
-        (stdOut, stdErr, exitCode, executableFound) = self.runCommand("cloudfuse.exe service install")
+        (stdOut, stdErr, exitCode, executableFound) = self.runCommand("cloudfuse.exe service install".split())
         if not executableFound:
             self.addOutputText("cloudfuse.exe not found! Is it installed?")
             self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
@@ -108,7 +108,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 self.addOutputText(stdErr)
                 return False
         # start the service
-        (stdOut, stdErr, exitCode, executableFound) = self.runCommand("cloudfuse.exe service start")
+        (stdOut, stdErr, exitCode, executableFound) = self.runCommand("cloudfuse.exe service start".split())
         if not executableFound:
             self.addOutputText("cloudfuse.exe not found! Is it installed?")
             self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
@@ -153,7 +153,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             isRunning = self.windowsServiceInstall()
         
             if isRunning:
-                (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"cloudfuse.exe service mount {directory} --config-file=config.yaml")
+                (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"cloudfuse.exe service mount {directory} --config-file=config.yaml".split())
                 if not executableFound:
                     self.addOutputText("cloudfuse.exe not found! Is it installed?")
                     self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
@@ -167,7 +167,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 else:
                     self.addOutputText("Successfully mounted container")
         else:
-            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"./cloudfuse mount {directory} --config-file=./config.yaml")
+            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"./cloudfuse mount {directory} --config-file=./config.yaml".split())
             if exitCode != 0:
                 self.addOutputText(f"Error mounting container: {stdErr}")
                 self.errorMessageBox(f"Error mounting container - check the settings and try again\n{stdErr}")
@@ -186,7 +186,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         else:
             commandString = f"./cloudfuse unmount --lazy {directory}"
         
-        (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandString)
+        (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandString.split())
         if not executableFound:
             self.addOutputText("cloudfuse.exe not found! Is it installed?")
             self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
@@ -240,9 +240,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     
     # run command and return tuple:
     # (stdOut, stdErr, exitCode, executableFound)
-    def runCommand(self, commandString):
-        # cut commandString into parts
-        commandParts = commandString.split(' ')
+    def runCommand(self, commandParts):
         if len(commandParts) < 1:
             return ('', '', -1, False)
         # run command
