@@ -252,6 +252,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             return (stdOut, stdErr, exitCode, True)
         except FileNotFoundError:
             return ('', '', -1, False)
+        except PermissionError:
+            return ('', '', -1, False)
     
     def addOutputText(self, textString):
         self.textEdit_output.setText(f"{self.textEdit_output.toPlainText()}{textString}\n")
