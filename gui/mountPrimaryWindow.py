@@ -96,12 +96,12 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             return False
         if exitCode != 0:
             # check if this is a permissions issue
-            if stdErr.toLower().find('admin') != -1:
+            if stdErr.find('admin') != -1:
                 self.addOutputText(stdErr)
                 self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
                 return False
             # check if the request was redundant
-            if stdErr.toLower().find('already') != -1:
+            if stdErr.find('already') != -1:
                 return True
             else:
                 # stop on any other error
@@ -115,12 +115,12 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             return False
         if exitCode != 0:
             # check if this is a permissions issue
-            if stdErr.toLower().find('admin') != -1:
+            if stdErr.find('admin') != -1:
                 self.addOutputText(stdErr)
                 self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
                 return False
             # check if the request was redundant
-            if stdErr.toLower().find('already') != -1:
+            if stdErr.find('already') != -1:
                 return True
             else:
                 # stop on any other error
@@ -147,10 +147,10 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         if platform == "win32":
             # Windows mount has a quirk where the folder shouldn't exist yet,
             #   add CloudFuse at the end of the directory 
-            directory = directory+'\cloudFuse'
+            directory = os.path.join(directory,'cloudFuse')
             
             # Install and start the service
-            isRunning = self.windowsServiceInstall()  
+            isRunning = self.windowsServiceInstall()
         
             if isRunning:
                 (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"cloudfuse.exe service mount {directory} --config-file=config.yaml")
@@ -160,9 +160,9 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 elif exitCode != 0:
                     self.addOutputText(stdErr)
                     # check if this is a permissions issue
-                    if stdErr.toLower().find('admin') != -1:
+                    if stdErr.find('admin') != -1:
                         self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
-                    elif stdErr.toLower().find("mount path exists") != -1:
+                    elif stdErr.find("mount path exists") != -1:
                         self.errorMessageBox("This container is already mounted at this directory.")
                 else:
                     self.addOutputText("Successfully mounted container")
@@ -181,7 +181,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         
         if platform == "win32":
             # for windows, 'cloudfuse' was added to the directory so add it back in for umount
-            directory = directory+'/cloudFuse'
+            directory = os.path.join(directory, 'cloudFuse')
             commandString = f"cloudfuse.exe service unmount {directory}"
         else:
             commandString = f"./cloudfuse unmount --lazy {directory}"
