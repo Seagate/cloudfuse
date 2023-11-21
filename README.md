@@ -8,12 +8,11 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 
 ### Windows installation
 
- Download and the .exe installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
+ Download and the .exe installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes. WinSFP is required for Cloudfuse.
 
 ### Linux installation
 
- Download the archive for your machine from our latest release [here](https://github.com/Seagate/cloudfuse/releases). copy the contents to [correct directory] and [set environment variables]
-
+ Download and the .deb or .rpm installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
 
 ### From Tar or Zip files
 In the release tab on GitHub, you can download a tar folder for Linux on x86 and a zip folder for Windows on x86 which bundles
