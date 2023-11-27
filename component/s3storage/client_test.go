@@ -381,7 +381,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Delete: &types.Delete{
 			Objects: keyList,
-			Quiet:   true,
+			Quiet:   aws.Bool(true),
 		},
 	})
 	s.assert.Nil(err)
