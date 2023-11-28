@@ -76,8 +76,14 @@ jobs:
           if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
       -
         name: Build
-        shell: bash
-        run: ./build.sh
+        shell: bash -x
+        run: |
+          commitDate=$(git log -1 --format=%cd --date=format:%Y-%m-%dT%H:%M:%S)
+          ldflags="-s -w -X main.version=${{ github.ref_name }} -X main.commit=${{ github.sha }} -X main.date=$commitDate"
+          go build -trimpath -ldflags '$ldflags' -o cloudfuse.exe
+          go build -trimpath -ldflags '$ldflags' -o cfusemon.exe ./tools/health-monitor/
+          touch -m -d $commitDate cloudfuse.exe
+          touch -m -d $commitDate cfusemon.exe
       -
         name: Get cached WinFSP installer
         id: restore-winfsp-installer
