@@ -165,11 +165,16 @@ jobs:
           key: windows-cloudfuse-installer-${{ github.sha }}
           fail-on-cache-miss: true
       -
+        name: Hash GUI files
+        id: fingerprintgui
+        run: |
+          echo "::set-output name=hash::${{ hashFiles('gui/*.ui', 'gui/*.py') }}"
+      -
         name: Restore Linux compiled GUI
         uses: actions/cache/restore@v3
         with:
           path: gui/dist/cloudfuseGUI_Linux
-          key: Linux-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
+          key: Linux-compiled-gui-${{ steps.fingerprintgui.outputs.hash }}
           fail-on-cache-miss: true
       -
         name: Restore Windows compiled GUI
@@ -177,7 +182,7 @@ jobs:
         with:
           enableCrossOsArchive: true
           path: gui/dist/cloudfuseGUI_Windows
-          key: Windows-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
+          key: Windows-compiled-gui-${{ steps.fingerprintgui.outputs.hash }}
           fail-on-cache-miss: true
       -
         name: Run GoReleaser
