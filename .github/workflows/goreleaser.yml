@@ -19,6 +19,7 @@ jobs:
         id: restore-compiled-gui
         uses: actions/cache/restore@v3
         with:
+          enableCrossOsArchive: true
           path: gui/dist/cloudfuseGUI_${{ runner.os }}
           key: ${{ runner.os }}-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
       -
