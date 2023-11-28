@@ -76,7 +76,7 @@ jobs:
           if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
       -
         name: Build
-        shell: bash -x
+        shell: bash
         run: |
           commitDate=$(git log -1 --format=%cd --date=format:%Y-%m-%dT%H:%M:%S)
           ldflags="-s -w -X main.version=${{ github.ref_name }} -X main.commit=${{ github.sha }} -X main.date=$commitDate"
