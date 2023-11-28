@@ -133,16 +133,6 @@ jobs:
       -
         name: Install ARM64 compilers
         run: |
-          sudo sed -i 's/^deb /deb \[arch=amd64\]/' /etc/apt/sources.list
-          echo "" >> /etc/apt/sources.list
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy main universe multiverse" >> /etc/apt/sources.list
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy-security main universe multiverse
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy-backports main universe multiverse
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy-updates main universe multiverse
-          sudo dpkg --add-architecture arm64
-          cat /etc/apt/sources.list | grep "^[^#]"
-          sudo apt-get update
-          sudo dpkg --print-foreign-architectures
           sudo apt-get install -y gcc-aarch64-linux-gnu libfuse3-dev:arm64
       -
         name: Checkout code
