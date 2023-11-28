@@ -1,7 +1,8 @@
 name: Release binaries
 on:
   push:
-    branches: 'goreleaser-action'
+    tags:
+      - '*'
 
 jobs:
   compile-gui:
@@ -182,6 +183,6 @@ jobs:
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
-          args: release --clean --skip-validate --skip-publish --debug
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
