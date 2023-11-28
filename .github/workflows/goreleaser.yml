@@ -149,7 +149,14 @@ jobs:
           key: windows-cloudfuse-installer-${{ github.sha }}
           fail-on-cache-miss: true
       -
-        name: Restore cached compiled GUI
+        name: Restore Linux compiled GUI
+        uses: actions/cache/restore@v3
+        with:
+          path: gui/dist/cloudfuseGUI_Linux
+          key: Linux-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
+          fail-on-cache-miss: true
+      -
+        name: Restore Windows compiled GUI
         uses: actions/cache/restore@v3
         with:
           enableCrossOsArchive: true
