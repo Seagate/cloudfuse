@@ -87,13 +87,13 @@ jobs:
           key: ${{ env.winfsp }}
       -
         name: Download WinFSP installer
+        if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
         shell: bash
         run: |
-          if [[ '${{ steps.restore-winfsp-installer.outputs.cache-hit }}' != 'true' ]]; then
-            curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.0/${{ env.winfsp }}
-          fi
+          curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.0/${{ env.winfsp }}
       -
         name: Cache WinFSP installer
+        if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
         uses: actions/cache/save@v3
         with:
           path: ${{ env.winfsp }}
@@ -133,7 +133,7 @@ jobs:
       -
         name: Install ARM64 compilers
         run: |
-          sudo apt-get install -y gcc-aarch64-linux-gnu libfuse3-dev:arm64
+          sudo apt-get install -y gcc-aarch64-linux-gnu
       -
         name: Checkout code
         uses: actions/checkout@v4
