@@ -130,6 +130,15 @@ jobs:
 
     steps:
       -
+        name: Install ARM64 compilers
+        run: |
+          sudo dpkg --add-architecture arm64
+          cat /etc/apt/sources.list | grep "^[^#]"
+          sudo apt update
+          sudo dpkg --print-foreign-architectures
+          sudo apt install -y gcc-aarch64-linux-gnu libfuse3-dev:arm64 
+          sudo apt-get -y install gcc-aarch64-linux-gnu gcc-x86-64-linux-gnu
+      -
         name: Checkout code
         uses: actions/checkout@v4
         with:
