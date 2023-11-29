@@ -2,6 +2,7 @@
 import subprocess
 from sys import platform
 import os
+import time
 import yaml
 
 # Import QT libraries
@@ -149,30 +150,48 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             #   add CloudFuse at the end of the directory 
             directory = os.path.join(directory,'cloudFuse')
             
+            # make sure the mount directory doesn't already exist
+            if os.path.exists(directory):
+                self.addOutputText(f"Directory {directory} already exists! Aborting new mount.")
+                self.errorMessageBox(f"Error: Cloudfuse needs to create the directory {directory}, but it already exists!")
+                return
+            
             # Install and start the service
-            isRunning = self.windowsServiceInstall()
-        
-            if isRunning:
-                (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"cloudfuse.exe service mount {directory} --config-file=config.yaml".split())
-                if not executableFound:
-                    self.addOutputText("cloudfuse.exe not found! Is it installed?")
-                    self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
-                elif exitCode != 0:
-                    self.addOutputText(stdErr)
-                    # check if this is a permissions issue
-                    if stdErr.find('admin') != -1:
-                        self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
-                    elif stdErr.find("mount path exists") != -1:
-                        self.errorMessageBox("This container is already mounted at this directory.")
-                else:
-                    self.addOutputText("Successfully mounted container")
+            if not self.windowsServiceInstall():
+                # don't mount, since we failed to install the service
+                return
+            
+            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"cloudfuse.exe service mount {directory} --config-file=config.yaml".split())
+            if not executableFound:
+                self.addOutputText("cloudfuse.exe not found! Is it installed?")
+                self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
+                return
+            
+            if exitCode != 0:
+                self.addOutputText(stdErr)
+                # check if this is a permissions issue
+                if stdErr.find('admin') != -1:
+                    self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
+                elif stdErr.find("mount path exists") != -1:
+                    self.errorMessageBox("This container is already mounted at this directory.")
+                return
+            
+            # check that mount succeeded by verifying that the mount directory exists
+            time.sleep(1)
+            if not os.path.exists(directory):
+                self.addOutputText(f"Failed to create mount directory {directory}")
+                self.errorMessageBox("Mount failed silently... Do you need to empty the file cache directory?")
+                return
+            
+            self.addOutputText("Successfully mounted container")
         else:
             (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"./cloudfuse mount {directory} --config-file=./config.yaml".split())
             if exitCode != 0:
                 self.addOutputText(f"Error mounting container: {stdErr}")
                 self.errorMessageBox(f"Error mounting container - check the settings and try again\n{stdErr}")
-            else:
-                self.addOutputText("Successfully mounted container\n")
+                return
+            
+            self.addOutputText("Successfully mounted container\n")
 
     def unmountBucket(self):
         directory = str(self.lineEdit_mountPoint.text())
