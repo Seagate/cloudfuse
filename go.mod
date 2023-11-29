@@ -9,12 +9,12 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.29
 	github.com/Azure/go-autorest/autorest/adal v0.9.23
 	github.com/JeffreyRichter/enum v0.0.0-20180725232043-2567042f9cda
-	github.com/aws/aws-sdk-go-v2 v1.23.1
-	github.com/aws/aws-sdk-go-v2/config v1.25.5
-	github.com/aws/aws-sdk-go-v2/credentials v1.16.4
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.14.3
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.45.0
-	github.com/aws/smithy-go v1.17.0
+	github.com/aws/aws-sdk-go-v2 v1.23.3
+	github.com/aws/aws-sdk-go-v2/config v1.25.9
+	github.com/aws/aws-sdk-go-v2/credentials v1.16.7
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.15.2
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.47.0
+	github.com/aws/smithy-go v1.18.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/golang/mock v1.6.0
 	github.com/mitchellh/mapstructure v1.5.0
@@ -47,19 +47,19 @@ require (
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
-	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.5.1 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.14.5 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.2.4 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.5.4 // indirect
+	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.5.2 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.14.7 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.2.6 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.5.6 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.7.1 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.2.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.10.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.2.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.10.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.16.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.17.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.20.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.25.4 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.2.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.10.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.2.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.10.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.16.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.18.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.21.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.26.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.3 // indirect
 	github.com/danieljoos/wincred v1.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
