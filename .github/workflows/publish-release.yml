@@ -1,6 +1,8 @@
 name: Release binaries
 on:
   push:
+    branches:
+      'goreleaser-action'
     tags:
       - '*'
 
@@ -17,6 +19,7 @@ jobs:
         uses: actions/checkout@v4
       -
         name: Fetch cached compiled GUI
+        if: false
         id: restore-compiled-gui
         uses: actions/cache/restore@v3
         with:
@@ -25,19 +28,16 @@ jobs:
           key: ${{ runner.os }}-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
       -
         name: Install Python
-        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
           cache: 'pip'
       -
         name: Instal pip dependencies
-        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         run: pip3 install -r gui/requirements.txt
         shell: bash
       -
         name: Compile GUI
-        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         shell: bash
         run: |
           cd gui
@@ -45,7 +45,7 @@ jobs:
           mv dist/cloudfuseGUI dist/cloudfuseGUI_${{ runner.os }}
       -
         name: Cache compiled GUI
-        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
+        if: false
         uses: actions/cache/save@v3
         with:
           enableCrossOsArchive: true
@@ -53,6 +53,7 @@ jobs:
           key: ${{ runner.os }}-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
 
   create-installer:
+    if: false
     name: Create Windows Installer
     needs: compile-gui
     runs-on: windows-latest
@@ -130,6 +131,7 @@ jobs:
           key: windows-cloudfuse-installer-${{ github.sha }}
 
   release:
+    if: false
     name: Release Binaries
     needs: create-installer
     runs-on: ubuntu-latest
