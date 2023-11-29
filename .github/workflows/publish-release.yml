@@ -31,7 +31,7 @@ jobs:
           python-version: '3.10'
           cache: 'pip'
       -
-        name: Instal pip dependencies
+        name: Install pip dependencies
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         run: pip3 install -r gui/requirements.txt
         shell: bash
