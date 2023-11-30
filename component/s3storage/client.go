@@ -127,7 +127,7 @@ func (cl *Client) Configure(cfg Config) error {
 		config.WithCredentialsProvider(credentialsProvider),
 		config.WithEndpointResolverWithOptions(endpointResolver),
 		config.WithAppID(UserAgent()),
-		config.WithRegion("auto"),
+		config.WithRegion(cl.Config.authConfig.Region),
 	)
 	if err != nil {
 		log.Err("Client::Configure : config.LoadDefaultConfig() failed. Here's why: %v", err)
