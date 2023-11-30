@@ -54,6 +54,10 @@ Source: "..\sampleStreamingConfigS3.yaml"; DestDir: "{app}"; Flags: ignoreversio
 Source: ".\winfsp-2.0.23075.msi"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
+[Dirs]
+; Create directory in AppData/Roaming
+Name: "{userappdata}\{#MyAppName}"; Flags: uninsalwaysuninstall
+
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
