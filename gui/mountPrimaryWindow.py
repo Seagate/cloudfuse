@@ -212,7 +212,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             self.addOutputText(f"Failed to unmount container: {stdErr}")
             self.errorMessageBox(f"Failed to unmount container: {stdErr}")
         else:
-            self.addOutputText(f"Successfully unmounted container\n{stdErr}")
+            self.addOutputText(f"Successfully unmounted container {stdErr}")
 
     # This function reads in the config file, modifies the components section, then writes the config file back
     def modifyPipeline(self,target):
