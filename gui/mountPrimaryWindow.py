@@ -205,7 +205,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             commandParts = "cloudfuse.exe service unmount".split()
         else:
             commandParts = "./cloudfuse unmount --lazy".split()
-        commandParts = commandParts.append(directory)
+        commandParts.append(directory)
         
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
