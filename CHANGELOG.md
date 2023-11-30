@@ -1,10 +1,12 @@
 # Cloudfuse Changelog #
 
-## 0.2.1 (WIP) ##
+## 0.2.1 ##
 
 This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
 **Changes**
-Changed sync-to-flush to true by default.
+-- Changed sync-to-flush to true by default.
+**Bug Fixes**
+-- [#48](https://github.com/Seagate/cloudfuse/pull/48) Prevent "Access Denied" when running as a Windows service
 
 ## 0.2.0 ##
 
