@@ -7,7 +7,7 @@ import yaml
 
 # Import QT libraries
 from PySide6.QtCore import Qt
-from PySide6 import QtWidgets, QtGui
+from PySide6 import QtWidgets, QtGui, QtCore
 from PySide6.QtWidgets import QMainWindow
 
 # Import the custom class created with QtDesigner 
@@ -175,14 +175,14 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     self.errorMessageBox("This container is already mounted at this directory.")
                 return
             
-            # check that mount succeeded by verifying that the mount directory exists
-            time.sleep(1)
-            if not os.path.exists(directory):
-                self.addOutputText(f"Failed to create mount directory {directory}")
-                self.errorMessageBox("Mount failed silently... Do you need to empty the file cache directory?")
-                return
-            
-            self.addOutputText("Successfully mounted container")
+            # wait for mount, then check that mount succeeded by verifying that the mount directory exists
+            self.addOutputText("Mount command successfully sent to Windows service.\nVerifying mount success...")
+            def verifyMountSuccess():
+                if not os.path.exists(directory):
+                    self.addOutputText(f"Failed to create mount directory {directory}")
+                    self.errorMessageBox("Mount failed silently... Do you need to empty the file cache directory?")
+                self.addOutputText("Successfully mounted container")
+            QtCore.QTimer.singleShot(5000, verifyMountSuccess)
         else:
             (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"./cloudfuse mount {directory} --config-file={configPath}".split())
             if exitCode != 0:
