@@ -130,8 +130,6 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         return True
 
     def mountBucket(self):
-        msg = QtWidgets.QMessageBox()
-        
         # Update the pipeline/components before mounting the target
         targetIndex = self.dropDown_bucketSelect.currentIndex() 
         success = self.modifyPipeline(bucketOptions[targetIndex])
@@ -261,6 +259,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     # (stdOut, stdErr, exitCode, executableFound)
     def runCommand(self, commandParts):
         if len(commandParts) < 1:
+            # (stdOut, stdErr, exitCode, executableFound)
             return ('', '', -1, False)
         # run command
         try:
