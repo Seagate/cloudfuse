@@ -160,7 +160,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 # don't mount, since we failed to install the service
                 return
             
-            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"cloudfuse.exe service mount {directory} --config-file={configPath}".split())
+            commandParts = ['cloudfuse.exe', 'service', 'mount', directory, f'--config-file={configPath}']
+            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
             if not executableFound:
                 self.addOutputText("cloudfuse.exe not found! Is it installed?")
                 self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
@@ -184,7 +185,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 self.addOutputText("Successfully mounted container")
             QtCore.QTimer.singleShot(5000, verifyMountSuccess)
         else:
-            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"./cloudfuse mount {directory} --config-file={configPath}".split())
+            commandParts = ['./cloudfuse', 'mount', directory, f'--config-file={configPath}']
+            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
             if exitCode != 0:
                 self.addOutputText(f"Error mounting container: {stdErr}")
                 self.errorMessageBox(f"Error mounting container - check the settings and try again\n{stdErr}")
@@ -194,17 +196,18 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
     def unmountBucket(self):
         directory = str(self.lineEdit_mountPoint.text())
-        commandString = ""
+        commandParts = []
         # TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
         
         if platform == "win32":
             # for windows, 'cloudfuse' was added to the directory so add it back in for umount
             directory = os.path.join(directory, 'cloudFuse')
-            commandString = f"cloudfuse.exe service unmount {directory}"
+            commandParts = "cloudfuse.exe service unmount".split()
         else:
-            commandString = f"./cloudfuse unmount --lazy {directory}"
+            commandParts = "./cloudfuse unmount --lazy".split()
+        commandParts = commandParts.append(directory)
         
-        (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandString.split())
+        (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
             self.addOutputText("cloudfuse.exe not found! Is it installed?")
             self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
