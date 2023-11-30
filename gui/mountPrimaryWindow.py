@@ -142,7 +142,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         except ValueError as e:
             self.addOutputText(f"Invalid mount path: {str(e)}")
             return
-        
+        configPath = os.path.join(widgetFuncs.getCurrentDir(self), 'config.yaml')
+
         if platform == "win32":
             # Windows mount has a quirk where the folder shouldn't exist yet,
             #   add CloudFuse at the end of the directory 
@@ -159,7 +160,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 # don't mount, since we failed to install the service
                 return
             
-            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"cloudfuse.exe service mount {directory} --config-file=config.yaml".split())
+            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"cloudfuse.exe service mount {directory} --config-file={configPath}".split())
             if not executableFound:
                 self.addOutputText("cloudfuse.exe not found! Is it installed?")
                 self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
@@ -183,7 +184,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             
             self.addOutputText("Successfully mounted container")
         else:
-            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"./cloudfuse mount {directory} --config-file=./config.yaml".split())
+            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(f"./cloudfuse mount {directory} --config-file={configPath}".split())
             if exitCode != 0:
                 self.addOutputText(f"Error mounting container: {stdErr}")
                 self.errorMessageBox(f"Error mounting container - check the settings and try again\n{stdErr}")
