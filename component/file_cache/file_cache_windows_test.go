@@ -108,7 +108,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 		time.Sleep(time.Second)
 		_, err = os.Stat(suite.cache_path + "/" + path)
 	}
-	// this check is flaky in our CI pipeline on Linux, so skip it
+	// this check is flaky in our CI pipeline on Windows, so skip it
 	fmt.Println("Skipping TestChownNotInCache IsNotExist check on Windows because it's flaky.")
 	// suite.assert.True(os.IsNotExist(err))
 
