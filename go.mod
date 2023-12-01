@@ -75,6 +75,8 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hillu/go-ntdll v0.0.0-20230408164318-f8894bfa00af // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/itchio/headway v0.0.0-20191015112415-46f64dd4d524 // indirect
+	github.com/itchio/ox v0.0.0-20200826161350-12c6ca18d236 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
