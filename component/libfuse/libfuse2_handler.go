@@ -92,6 +92,8 @@ func (lf *Libfuse) initFuse() error {
 	cf.gid = lf.ownerGID
 
 	lf.host = fuse.NewFileSystemHost(cf)
+	// prevent Windows from calling GetAttr redundantly
+	lf.host.SetCapReaddirPlus(true)
 
 	options := fmt.Sprintf("uid=%d,gid=%d,entry_timeout=%d,attr_timeout=%d,negative_timeout=%d",
 		lf.ownerUID,
