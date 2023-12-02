@@ -55,7 +55,7 @@ Source: "..\sampleFileCacheWithSASConfigAzure.yaml"; DestDir: "{app}"; Flags: ig
 Source: "..\sampleStreamingConfigAzure.yaml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\sampleStreamingConfigS3.yaml"; DestDir: "{app}"; Flags: ignoreversion
 ; Deploy default config
-Source: "..\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; DestName: "config.yaml"; Flags: ignoreversion
+Source: "..\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; DestName: "config.yaml"; Flags: onlyifdoesntexist
 
 Source: "..\winfsp-2.0.23075.msi"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
