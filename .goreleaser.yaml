@@ -88,6 +88,9 @@ archives:
         dst: "./samples/sampleStreamingConfigS3.yaml"
       - src: "sampleStreamingConfigAzure.yaml"
         dst: "./samples/sampleStreamingConfigAzure.yaml"
+        # default config
+      - src: "sampleFileCacheConfigS3.yaml"
+        dst: "./config.yaml"
 
   - id: linux-arm64
     builds:

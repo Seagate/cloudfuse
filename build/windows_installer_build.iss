@@ -38,6 +38,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
+[Dirs]
+; Create directory in AppData/Roaming
+Name: "{userappdata}\{#MyAppName}"; Flags: uninsalwaysuninstall
+
 [Files]
 Source: "..\gui\dist\cloudfuseGUI_Windows\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\gui\dist\cloudfuseGUI_Windows\_internal\*"; DestDir: "{app}\_internal\"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -50,13 +54,11 @@ Source: "..\sampleFileCacheConfigS3.yaml"; DestDir: "{app}"; Flags: ignoreversio
 Source: "..\sampleFileCacheWithSASConfigAzure.yaml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\sampleStreamingConfigAzure.yaml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\sampleStreamingConfigS3.yaml"; DestDir: "{app}"; Flags: ignoreversion
+; Deploy default config
+Source: "..\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; DestName: "config.yaml"; Flags: ignoreversion
 
 Source: "..\winfsp-2.0.23075.msi"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
-
-[Dirs]
-; Create directory in AppData/Roaming
-Name: "{userappdata}\{#MyAppName}"; Flags: uninsalwaysuninstall
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
