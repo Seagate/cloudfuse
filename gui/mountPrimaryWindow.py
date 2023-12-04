@@ -107,7 +107,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 self.textEdit_output.setText("!!Error starting service before mounting container!!\n")# + mount.stdout.decode())
                 # Get the users attention by popping open a new window on an error
                 msg.setWindowTitle("Error")
-                msg.setText("Error mounting container - Run this application as administrator. uninstall the service and try again")
+                msg.setText("Error mounting container - Run this application as administrator. uninstall the service and try again. Make sure that WinFSP is installed")
                 # Show the message box
                 msg.exec()
                 return False
