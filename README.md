@@ -6,13 +6,15 @@ Cloudfuse uses file caching to provide the performance of local storage, or you 
 Cloudfuse is a fork of [blobfuse2](https://github.com/Azure/azure-storage-fuse), and adds S3 support, a GUI, and Windows support.
 Cloudfuse supports clouds with an S3 or Azure interface.
 
-### Windows installation
+## Installation
+
+### Windows 
 
  Download and the .exe installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes. WinSFP is required for Cloudfuse.
 
-### Linux installation
+### Linux 
 
- Download and the .deb or .rpm installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
+ Download the .deb or .rpm installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
 
 ### From Tar or Zip files
 In the release tab on GitHub, you can download a tar folder for Linux on x86 and a zip folder for Windows on x86 which bundles
