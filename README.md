@@ -10,7 +10,7 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 
 ### Windows 
 
- Download and the .exe installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
+ Download the .exe installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
 
 ### Linux 
 
