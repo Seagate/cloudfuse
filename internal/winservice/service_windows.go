@@ -201,6 +201,8 @@ func writeCommandToUtf16(cmd uint16, args ...string) []byte {
 		}
 	}
 
+	_ = binary.Write(&buf, binary.LittleEndian, uint16(0))
+
 	return buf.Bytes()
 }
 
@@ -215,7 +217,7 @@ func winFspCommand(command []byte) ([]string, error) {
 	// Open the named pipe for WinFSP
 	handle, err := windows.CreateFile(
 		winPipe,
-		windows.GENERIC_WRITE|windows.GENERIC_READ,
+		windows.GENERIC_READ|windows.FILE_WRITE_DATA|windows.FILE_WRITE_ATTRIBUTES,
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
 		nil,
 		windows.OPEN_EXISTING,
@@ -228,7 +230,7 @@ func winFspCommand(command []byte) ([]string, error) {
 	defer windows.CloseHandle(handle) //nolint
 
 	// Send the command to WinFSP
-	var overlapped windows.Overlapped
+	overlapped := windows.Overlapped{}
 	err = windows.WriteFile(handle, command, nil, &overlapped)
 	if err == windows.ERROR_IO_PENDING {
 		err = windows.GetOverlappedResult(handle, &overlapped, nil, true)

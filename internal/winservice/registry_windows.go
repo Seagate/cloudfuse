@@ -153,34 +153,6 @@ func RemoveWinFspRegistry() error {
 	return nil
 }
 
-// CreateRegistryMount adds an entry to our registry with the mount path and config
-// file location.
-func CreateRegistryMount(mountPath string, configFile string) error {
-	registryPath := instanceRegistry + mountPath
-	key, _, err := registry.CreateKey(registry.LOCAL_MACHINE, registryPath, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-
-	err = key.SetStringValue("ConfigFile", configFile)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// RemoveRegistryMount removes the entry from our registry
-func RemoveRegistryMount(name string) error {
-	registryPath := instanceRegistry + name
-	err := registry.DeleteKey(registry.LOCAL_MACHINE, registryPath)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // RemoveRegistryMount removes the entire cloudfuse registry
 func RemoveAllRegistryMount() error {
 	err := registry.DeleteKey(registry.LOCAL_MACHINE, cfRegistry)

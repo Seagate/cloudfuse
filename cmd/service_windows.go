@@ -34,6 +34,7 @@ import (
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal/winservice"
 
 	"github.com/spf13/cobra"
@@ -160,30 +161,15 @@ var mountServiceCmd = &cobra.Command{
 			return fmt.Errorf("failed to validate options [%s]", err.Error())
 		}
 
-		// Only allow mounts if the service is running
-		running, err := isServiceRunning()
-		if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
-			return errors.New("this action requires admin rights")
-		}
-		if !running {
-			return fmt.Errorf("windows service is not running")
-		}
-
 		err = mountInstance()
 		if err != nil {
-			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
-				return errors.New("this action requires admin rights")
-			}
 			return fmt.Errorf("failed to mount instance [%s]", err.Error())
 		}
 
-		// Add the mount to the registry so it persists on restart.
-		err = winservice.CreateRegistryMount(servOpts.MountPath, servOpts.ConfigFile)
+		// Add the mount to the JSON file so it persists on restart.
+		err = winservice.AddMountJSON(servOpts.MountPath, servOpts.ConfigFile)
 		if err != nil {
-			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
-				return errors.New("this action requires admin rights")
-			}
-			return fmt.Errorf("failed to create registry entry [%s]", err.Error())
+			return fmt.Errorf("failed to add entry to json file [%s]", err.Error())
 		}
 
 		return nil
@@ -212,15 +198,11 @@ var unmountServiceCmd = &cobra.Command{
 			return fmt.Errorf("nothing is mounted here")
 		}
 
-		// Remove the mount from the registry so it does not remount on restart.
-		err = winservice.RemoveRegistryMount(servOpts.MountPath)
-		// If error is something else other than an access error then ignore it, as if unmount fails
-		// then the user will be unable to unmount because the registry will complain that the key
-		//  does not exist.
+		// Remove the mount from json file so it does not remount on restart.
+		err = winservice.RemoveMountJSON(servOpts.MountPath)
+		// If error is not nill then ignore it
 		if err != nil {
-			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
-				return errors.New("this action requires admin rights")
-			}
+			log.Err("failed to remove entry from json file [%s]", err.Error())
 		}
 
 		err = unmountInstance()
