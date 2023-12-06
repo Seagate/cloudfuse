@@ -14,7 +14,17 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 
 ### Linux 
 
- Download the .deb or .rpm installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Run the GUI separately with elevated permissions after the install completes.
+#### Debian /Ubuntu:
+
+Download the .deb file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal: 
+
+sudo apt-get install -f ./path/to/your/.deb
+
+#### CentOS / RHEL:
+
+Download the .rpm file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal: 
+
+sudo rpm -i ./path/to/your/.rpm
 
 ### From Tar or Zip files
 In the release tab on GitHub, you can download a tar folder for Linux on x86 and a zip folder for Windows on x86 which bundles
