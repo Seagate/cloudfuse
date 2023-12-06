@@ -34,7 +34,7 @@ import (
 
 type Instance struct {
 	MountPath  string `json:"mountPath"`
-	ConfigPath string `json:"configPath"`
+	ConfigFile string `json:"configFile"`
 }
 
 type Instances struct {
@@ -103,6 +103,20 @@ func writeInstances(filePath string, instances Instances) error {
 	return os.WriteFile(filePath, data, 0644)
 }
 
+func readInstancesFromInstanceFile() ([]Instance, error) {
+	instancePath, err := getInstanceTrackerFile()
+	if err != nil {
+		return nil, err
+	}
+
+	instances, err := readInstances(instancePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return instances.Instances, nil
+}
+
 // AddMountJSON adds an entry to our json file with the mount path and config
 // file location.
 func AddMountJSON(mountPath string, configFile string) error {
@@ -116,7 +130,7 @@ func AddMountJSON(mountPath string, configFile string) error {
 		return err
 	}
 
-	newInstance := Instance{MountPath: mountPath, ConfigPath: configFile}
+	newInstance := Instance{MountPath: mountPath, ConfigFile: configFile}
 	instances.Instances = append(instances.Instances, newInstance)
 
 	return writeInstances(instancePath, instances)

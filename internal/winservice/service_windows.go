@@ -144,7 +144,7 @@ func IsMounted(mountPath string) (bool, error) {
 // startService starts cloudfuse by instructing WinFsp to launch it.
 func startServices() error {
 	// Read registry to get names of the instances we need to start
-	instances, err := readRegistryEntry()
+	instances, err := readInstancesFromInstanceFile()
 	// If there is nothing in our registry to mount then continue
 	if err == registry.ErrNotExist {
 		return nil
@@ -165,7 +165,7 @@ func startServices() error {
 // stopServicess stops cloudfuse by instructing WinFsp to stop it.
 func stopServices() error {
 	// Read registry to get names of the instances we need to stop
-	instances, err := readRegistryEntry()
+	instances, err := readInstancesFromInstanceFile()
 	// If there is nothing in our registry to mount then continue
 	if err == registry.ErrNotExist {
 		return nil
