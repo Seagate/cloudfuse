@@ -1,8 +1,12 @@
+# System imports
+import yaml
+import os
+from sys import platform
+
+# Import QT libraries
 from PySide6 import QtWidgets
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import Qt, QSettings
-import yaml
-import os
 
 file_cache_eviction_choices = ['lru','lfu']
 libfusePermissions = [0o777,0o666,0o644,0o444]
@@ -203,15 +207,24 @@ class widgetCustomFunctions(QWidget):
         # Each individual widget will need to override this function
         pass
 
+    def getCurrentDir(self):
+        defaultFuseDir = 'Cloudfuse'
+        if platform == "win32":
+            userDir = os.getenv('APPDATA')
+            currentDir = os.path.join(userDir, defaultFuseDir)
+        else:
+            currentDir = os.getcwd()
+        return currentDir
+
     def writeConfigFile(self):
         self.updateSettingsFromUIChoices()
         dictForConfigs = self.constructDictForConfig()
-        currentDir = os.getcwd()
+        currentDir = self.getCurrentDir()
         with open(currentDir+'/config.yaml','w') as file:
             yaml.safe_dump(dictForConfigs,file)
             
     def getConfigs(self,useDefault=False):
-        currentDir = os.getcwd()
+        currentDir = self.getCurrentDir()
         if useDefault:
             try:
                 with open(currentDir+'/default_config.yaml','r') as file:

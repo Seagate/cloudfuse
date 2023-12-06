@@ -10,21 +10,9 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 
 ### Windows 
 
- Download the .exe installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
+Download and the .exe installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
 
-### Linux 
-
-#### Debian /Ubuntu:
-
-Download the .deb file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal: 
-
-sudo apt-get install -f ./path/to/your/.deb
-
-#### CentOS / RHEL:
-
-Download the .rpm file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal: 
-
-sudo rpm -i ./path/to/your/.rpm
+Cloudfuse will store the config file in `	C:\Users\{username}\AppData\Roaming`.
 
 ### From Tar or Zip files
 In the release tab on GitHub, you can download a tar folder for Linux on x86 and a zip folder for Windows on x86 which bundles
@@ -105,17 +93,17 @@ The general format of the Cloudfuse Linux commands is `cloudfuse [command] [argu
   - [S3 Bucket Storage](https://aws.amazon.com/s3/)
   - [Azure Blob Storage](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction)
   - [Azure Datalake Storage Gen2](https://docs.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction)
-  - Example: cloudfuse mount \<mount path> --config-file=\<config file>
+  - Example: `cloudfuse mount <mount path> --config-file=<config file>`
 * `mount all` - Mounts all the containers in an S3 Account or Azure account supported by mount
-  - Example: cloudfuse mount all \<mount path> --config-file=\<config file>
+  - Example: `cloudfuse mount all <mount path> --config-file=<config file>`
 * `mount list` - Lists all Cloudfuse filesystems.
-  - Example: cloudfuse mount list
+  - Example: `cloudfuse mount list`
 * `unmount` - Unmounts the Cloudfuse filesystem.
-  - Add "--lazy" (or "-z") flag to use lazy unmount (prevents busy errors)
-  - Example: cloudfuse unmount --lazy \<mount path>
+  - Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors)
+  - Example: `cloudfuse unmount --lazy <mount path>`
 * `unmount all` - Unmounts all Cloudfuse filesystems.
-  - Add "--lazy" (or "-z") flag to use lazy unmount (prevents busy errors)
-  - Example: cloudfuse unmount all --lazy
+  - Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors)
+  - Example: `cloudfuse unmount all --lazy`
 
 ### Windows:
 
@@ -125,8 +113,8 @@ The general format of the Cloudfuse Windows commands is:
   * `cloudfuse service uninstall` - Uninstall cloudfuse from a Windows service
   * `cloudfuse service start` - Start the Windows service
   * `cloudfuse service stop` - Stop the Windows service
-  * `cloudfuse service mount \<mount path>  --config-file=\<config file>` - Mount an instance that will persist in Windows when restarted
-  * `cloudfuse service unmount \<mount path>` - Unmount mount of Cloudfuse running as a Windows service
+  * `cloudfuse service mount <mount path>  --config-file=<config file>` - Mount an instance that will persist in Windows when restarted
+  * `cloudfuse service unmount <mount path>` - Unmount mount of Cloudfuse running as a Windows service
 
 ### Secure options for both Windows and Linux
 To use security options the general format for cloudfuse commands is `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
@@ -136,7 +124,7 @@ To use security options the general format for cloudfuse commands is `cloudfuse 
 * `secure set` - Updates value of a config parameter.
 
 Note - If you do not have admin rights, you can still mount your cloud without Windows Service, however
-the process will stay in the foreground. Use `cloudfuse mount \<mount path>  --config-file=\<config file>` to mount, use Ctrl+C to unmount.
+the process will stay in the foreground. Use `cloudfuse mount <mount path>  --config-file=<config file>` to mount, use Ctrl+C to unmount.
 
 ## Find help from your command prompt
 To see a list of commands, type `cloudfuse -h`. To

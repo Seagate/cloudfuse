@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Cloudfuse"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.2.1"
 #define MyAppPublisher "Seagate Technology"
 #define MyAppURL "https://github.com/Seagate/cloudfuse"
 #define MyAppExeName "cloudfuseGUI.exe"
@@ -22,7 +22,7 @@ AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
-LicenseFile=C:\Users\721190\code\cloudfuse\LICENSE
+LicenseFile=..\LICENSE
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 ;PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=commandline
@@ -39,8 +39,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "..\gui\dist\cloudfuseGUI\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\gui\dist\cloudfuseGUI\_internal\*"; DestDir: "{app}\_internal\"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\gui\dist\cloudfuseGUI_Windows\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\gui\dist\cloudfuseGUI_Windows\_internal\*"; DestDir: "{app}\_internal\"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\cloudfuse.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
@@ -51,8 +51,12 @@ Source: "..\sampleFileCacheWithSASConfigAzure.yaml"; DestDir: "{app}"; Flags: ig
 Source: "..\sampleStreamingConfigAzure.yaml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\sampleStreamingConfigS3.yaml"; DestDir: "{app}"; Flags: ignoreversion
 
-Source: ".\winfsp-2.0.23075.msi"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\winfsp-2.0.23075.msi"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
+
+[Dirs]
+; Create directory in AppData/Roaming
+Name: "{userappdata}\{#MyAppName}"; Flags: uninsalwaysuninstall
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

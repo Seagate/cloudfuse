@@ -2,11 +2,12 @@
 import subprocess
 from sys import platform
 import os
+import time
 import yaml
 
 # Import QT libraries
 from PySide6.QtCore import Qt
-from PySide6 import QtWidgets, QtGui
+from PySide6 import QtWidgets, QtGui, QtCore
 from PySide6.QtWidgets import QMainWindow
 
 # Import the custom class created with QtDesigner 
@@ -15,9 +16,11 @@ from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
 from aboutPage import aboutPage
 from under_Construction import underConstruction
+from common_qt_functions import widgetCustomFunctions as widgetFuncs
 
 bucketOptions = ['s3storage', 'azstorage']
 mountTargetComponent = 3
+
 class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def __init__(self):
         super().__init__()
@@ -86,132 +89,138 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
     # Wrapper/helper for the service install and start.
     def windowsServiceInstall(self):
-        msg = QtWidgets.QMessageBox()
-
-        # Use the completedProcess object in mount var to determine next steps 
-        #   if service already installed, run cloudfuse.exe service start
-        #   if start successful, run cloudfuse.exe service mount
-
-        try:
-            windowsServiceCmd = subprocess.run([".\cloudfuse.exe", "service", "install"], capture_output=True, check=False)
-        except:
+        # install the service
+        (stdOut, stdErr, exitCode, executableFound) = self.runCommand("cloudfuse.exe service install".split())
+        if not executableFound:
+            self.addOutputText("cloudfuse.exe not found! Is it installed?")
+            self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
             return False
-
-        if windowsServiceCmd.returncode == 0 or windowsServiceCmd.stderr.decode().find("cloudfuse service already exists") != -1: #we found this message
-            windowsServiceCmd = (subprocess.run([".\cloudfuse.exe", "service", "start"], capture_output=True))
-            if windowsServiceCmd.stderr.decode().find("An instance of the service is already running.") != -1:
-                return True
-            elif windowsServiceCmd.returncode == 1: 
-                self.textEdit_output.setText("!!Error starting service before mounting container!!\n")# + mount.stdout.decode())
-                # Get the users attention by popping open a new window on an error
-                msg.setWindowTitle("Error")
-                msg.setText("Error mounting container - Run this application as administrator. uninstall the service and try again")
-                # Show the message box
-                msg.exec()
+        if exitCode != 0:
+            # check if this is a permissions issue
+            if stdErr.find('admin') != -1:
+                self.addOutputText(stdErr)
+                self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
                 return False
+            # check if the request was redundant
+            if stdErr.find('already') != -1:
+                return True
             else:
-                # Started just fine
-                return True 
-        else:
-            self.textEdit_output.setText("!!Error installing service to mount container!!\n")# + mount.stdout.decode())
-            # Get the users attention by popping open a new window on an error
-            msg.setWindowTitle("Error")
-            msg.setText("Error installing service to mount container - Run application as administrator and try again")
-            # Show the message box
-            msg.exec()
+                # stop on any other error
+                self.addOutputText(stdErr)
+                return False
+        # start the service
+        (stdOut, stdErr, exitCode, executableFound) = self.runCommand("cloudfuse.exe service start".split())
+        if not executableFound:
+            self.addOutputText("cloudfuse.exe not found! Is it installed?")
+            self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
             return False
+        if exitCode != 0:
+            # check if this is a permissions issue
+            if stdErr.find('admin') != -1:
+                self.addOutputText(stdErr)
+                self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
+                return False
+            # check if the request was redundant
+            if stdErr.find('already') != -1:
+                return True
+            else:
+                # stop on any other error
+                self.addOutputText(stdErr)
+                return False
+        return True
+
     def mountBucket(self):
-        msg = QtWidgets.QMessageBox()
-        
         # Update the pipeline/components before mounting the target
         targetIndex = self.dropDown_bucketSelect.currentIndex() 
         success = self.modifyPipeline(bucketOptions[targetIndex])
         if not success:
             # Don't try mounting the container since the config file couldn't be modified for the pipeline setting
             return
+        
         try:
             directory = str(self.lineEdit_mountPoint.text())
-            
-            if platform == "win32":
-                # Windows mount has a quirk where the folder shouldn't exist yet,
-                #   add CloudFuse at the end of the directory 
-                directory = directory+'\cloudFuse'
-                
-                # Install and start the service
-                isRunning = self.windowsServiceInstall()  
-            
-                if isRunning:
-                    # ".\cloudfuse.exe", "service", "mount", directory, "--config-file=.\config.yaml"
-                    mount = (subprocess.run([".\cloudfuse.exe","service","mount", directory,"--config-file=.\config.yaml"],capture_output=True))
-                    if mount.returncode == 0:
-                        self.textEdit_output.setText("Successfully mounted container\n")
-                    elif mount.stderr.decode().find("mount path exists") != -1:
-                        self.textEdit_output.setText("!!The container is already mounted!!\n")# + mount.stdout.decode())
-                        # Get the users attention by popping open a new window on an error
-                        msg.setWindowTitle("Error")
-                        msg.setText("This container is already mounted at this directory.")
-                        # Show the message box
-                        msg.exec()
-                else:
-                    self.textEdit_output.setText("!!Error mounting container!!\n")# + mount.stdout.decode())
-                    # Get the users attention by popping open a new window on an error
-                    msg.setWindowTitle("Error")
-                    msg.setText("Error mounting container - check the settings and try again")
-                    # Show the message box
-                    msg.exec()
+        except ValueError as e:
+            self.addOutputText(f"Invalid mount path: {str(e)}")
+            return
+        configPath = os.path.join(widgetFuncs.getCurrentDir(self), 'config.yaml')
 
-                # TODO: For future use to get output on Popen
-                # for line in mount.stdout.readlines():    
-            else:
-                # Create the mount command to send to subprocess. If shell=True is set and the command is not in one string
-                #   the subprocess will interpret the additional arguments as separate commands. 
-                cmd = "./cloudfuse mount " + directory + " --config-file=./config.yaml"
-                mount = subprocess.run([cmd], shell=True, capture_output=True)
-
-                # Print to the text edit window the results of the mount
-                if mount.returncode == 0:
-                    self.textEdit_output.setText("Successfully mounted container\n")
-                else:
-                    self.textEdit_output.setText("!!Error mounting container!!\n" + mount.stderr.decode())
-                    # Get the users attention by popping open a new window on an error
-                    msg.setWindowTitle("Error")
-                    msg.setText("Error mounting container - check the settings and try again\n" + mount.stderr.decode())
-                    # Show the message box
-                    msg.exec()
-        except ValueError:
-            pass
+        if platform == "win32":
+            # Windows mount has a quirk where the folder shouldn't exist yet,
+            #   add CloudFuse at the end of the directory 
+            directory = os.path.join(directory,'cloudFuse')
+            
+            # make sure the mount directory doesn't already exist
+            if os.path.exists(directory):
+                self.addOutputText(f"Directory {directory} already exists! Aborting new mount.")
+                self.errorMessageBox(f"Error: Cloudfuse needs to create the directory {directory}, but it already exists!")
+                return
+            
+            # Install and start the service
+            if not self.windowsServiceInstall():
+                # don't mount, since we failed to install the service
+                return
+            
+            commandParts = ['cloudfuse.exe', 'service', 'mount', directory, f'--config-file={configPath}']
+            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
+            if not executableFound:
+                self.addOutputText("cloudfuse.exe not found! Is it installed?")
+                self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
+                return
+            
+            if exitCode != 0:
+                self.addOutputText(stdErr)
+                # check if this is a permissions issue
+                if stdErr.find('admin') != -1:
+                    self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
+                elif stdErr.find("mount path exists") != -1:
+                    self.errorMessageBox("This container is already mounted at this directory.")
+                return
+            
+            # wait for mount, then check that mount succeeded by verifying that the mount directory exists
+            self.addOutputText("Mount command successfully sent to Windows service.\nVerifying mount success...")
+            def verifyMountSuccess():
+                if not os.path.exists(directory):
+                    self.addOutputText(f"Failed to create mount directory {directory}")
+                    self.errorMessageBox("Mount failed silently... Do you need to empty the file cache directory?")
+                self.addOutputText("Successfully mounted container")
+            QtCore.QTimer.singleShot(5000, verifyMountSuccess)
+        else:
+            commandParts = ['./cloudfuse', 'mount', directory, f'--config-file={configPath}']
+            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
+            if exitCode != 0:
+                self.addOutputText(f"Error mounting container: {stdErr}")
+                self.errorMessageBox(f"Error mounting container - check the settings and try again\n{stdErr}")
+                return
+            
+            self.addOutputText("Successfully mounted container\n")
 
     def unmountBucket(self):
-        msg = QtWidgets.QMessageBox()
         directory = str(self.lineEdit_mountPoint.text())
+        commandParts = []
         # TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
-        try:
-            if platform == "win32":
-                # for windows, 'cloudfuse' was added to the directory so add it back in for umount
-                directory = directory+'/cloudFuse'
-                unmount = subprocess.run([".\cloudfuse.exe", "service", "unmount", directory], shell=True, capture_output=True)
-            else:
-                # Create the mount command to send to subprocess. If shell=True is set and the command is not in one string
-                #   the subprocess will interpret the additional arguments as separate commands.
-                cmd = "./cloudfuse unmount --lazy " + directory
-                unmount = subprocess.run([cmd], shell=True, capture_output=True)
+        
+        if platform == "win32":
+            # for windows, 'cloudfuse' was added to the directory so add it back in for umount
+            directory = os.path.join(directory, 'cloudFuse')
+            commandParts = "cloudfuse.exe service unmount".split()
+        else:
+            commandParts = "./cloudfuse unmount --lazy".split()
+        commandParts.append(directory)
+        
+        (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
+        if not executableFound:
+            self.addOutputText("cloudfuse.exe not found! Is it installed?")
+            self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
+        elif exitCode != 0:
+            self.addOutputText(f"Failed to unmount container: {stdErr}")
+            self.errorMessageBox(f"Failed to unmount container: {stdErr}")
+        else:
+            self.addOutputText(f"Successfully unmounted container {stdErr}")
 
-            # Print to the text edit window the results of the unmount
-            if unmount.returncode == 0:
-                self.textEdit_output.setText("Successfully unmounted container\n" + unmount.stderr.decode())
-            else:
-                self.textEdit_output.setText("!!Error unmounting container!!\n" + unmount.stderr.decode())
-                msg.setWindowTitle("Error")
-                msg.setText("Error unmounting container - check the logs\n" + unmount.stderr.decode())
-                # Show the message box
-                msg.exec()
-        except ValueError:
-            pass
-        
-        
     # This function reads in the config file, modifies the components section, then writes the config file back
     def modifyPipeline(self,target):
-        currentDir = os.getcwd()
+
+        currentDir = widgetFuncs.getCurrentDir(self)
         errMsg = QtWidgets.QMessageBox()
         
         # Read in the configs as a dictionary. Notify user if failed
@@ -249,3 +258,32 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         
         # If nothing failed so far, return true to proceed to the mount phase
         return True
+    
+    # run command and return tuple:
+    # (stdOut, stdErr, exitCode, executableFound)
+    def runCommand(self, commandParts):
+        if len(commandParts) < 1:
+            # (stdOut, stdErr, exitCode, executableFound)
+            return ('', '', -1, False)
+        # run command
+        try:
+            process = subprocess.run(commandParts, capture_output=True)
+            stdOut = process.stdout.decode().strip()
+            stdErr = process.stderr.decode().strip()
+            exitCode = process.returncode
+            return (stdOut, stdErr, exitCode, True)
+        except FileNotFoundError:
+            return ('', '', -1, False)
+        except PermissionError:
+            return ('', '', -1, False)
+    
+    def addOutputText(self, textString):
+        self.textEdit_output.setText(f"{self.textEdit_output.toPlainText()}{textString}\n")
+    
+    def errorMessageBox(self, messageString):
+        msg = QtWidgets.QMessageBox()
+        # Get the user's attention by popping open a new window
+        msg.setWindowTitle("Error")
+        msg.setText(messageString)
+        # Show the message box
+        msg.exec()

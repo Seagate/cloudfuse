@@ -38,7 +38,7 @@ import (
 
 // Standard config default values
 const (
-	cloudfuseVersion_ = "0.2.0"
+	cloudfuseVersion_ = "0.2.1"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
@@ -141,6 +141,7 @@ const (
 	BlockFlagUnknown uint16 = iota
 	DirtyBlock
 	TruncatedBlock
+	RemovedBlocks
 )
 
 type Block struct {
@@ -174,6 +175,10 @@ func (block *Block) Dirty() bool {
 // Truncated : block created on a truncate operation
 func (block *Block) Truncated() bool {
 	return block.Flags.IsSet(TruncatedBlock)
+}
+
+func (block *Block) Removed() bool {
+	return block.Flags.IsSet(RemovedBlocks)
 }
 
 // Flags for block offset list
