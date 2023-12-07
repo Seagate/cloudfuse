@@ -30,13 +30,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common/log"
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
-	"golang.org/x/sys/windows/svc"
 )
 
 const (
@@ -50,49 +48,6 @@ const (
 )
 
 type Cloudfuse struct{}
-
-func (m *Cloudfuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
-	// Notify the Service Control Manager that the service is starting
-	changes <- svc.Status{State: svc.StartPending}
-	log.Trace("Starting %s service", SvcName)
-
-	// Send request to WinFSP to start the process
-	err := startServices()
-	// If unable to start, then stop the service
-	if err != nil {
-		changes <- svc.Status{State: svc.StopPending}
-		log.Err("Stopping %s service due to error when starting: %v", SvcName, err.Error())
-		return
-	}
-
-	// Notify the SCM that we are running and these are the commands we will respond to
-	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
-	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
-	log.Trace("Successfully started %s service", SvcName)
-
-	for { //nolint
-		select {
-		case c := <-r:
-			switch c.Cmd {
-			case svc.Interrogate:
-				changes <- c.CurrentStatus
-				// Testing deadlock from https://code.google.com/p/winsvc/issues/detail?id=4
-				time.Sleep(100 * time.Millisecond)
-				changes <- c.CurrentStatus
-			case svc.Stop, svc.Shutdown:
-				log.Trace("Stopping %s service", SvcName)
-				changes <- svc.Status{State: svc.StopPending}
-
-				// Tell WinFSP to stop the service
-				err := stopServices()
-				if err != nil {
-					log.Err("Error stopping %s service: %v", SvcName, err.Error())
-				}
-				return
-			}
-		}
-	}
-}
 
 // StartMount starts the mount if the name exists in our Windows registry.
 func StartMount(mountPath string, configFile string) error {
@@ -142,13 +97,11 @@ func IsMounted(mountPath string) (bool, error) {
 }
 
 // startService starts cloudfuse by instructing WinFsp to launch it.
-func startServices() error {
+func StartMounts() error {
 	// Read registry to get names of the instances we need to start
 	instances, err := readInstancesFromInstanceFile()
 	// If there is nothing in our registry to mount then continue
-	if err == registry.ErrNotExist {
-		return nil
-	} else if err != nil {
+	if err != nil {
 		return err
 	}
 

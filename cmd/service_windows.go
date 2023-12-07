@@ -36,11 +36,11 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal/winservice"
+	"github.com/go-ole/go-ole"
+	"github.com/go-ole/go-ole/oleutil"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/svc"
-	"golang.org/x/sys/windows/svc/mgr"
 )
 
 type serviceOptions struct {
@@ -55,8 +55,8 @@ var servOpts serviceOptions
 // Section defining all the command that we have in secure feature
 var serviceCmd = &cobra.Command{
 	Use:               "service",
-	Short:             "Manage cloudfuse as a Windows service. This requires Administrator rights to run.",
-	Long:              "Manage cloudfuse as a Windows service. This requires Administrator rights to run.",
+	Short:             "Manage cloudfuse mounts on Windows",
+	Long:              "Manage cloudfuse mounts on Windows",
 	SuggestFor:        []string{"ser", "serv"},
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
@@ -67,20 +67,22 @@ var serviceCmd = &cobra.Command{
 
 var installCmd = &cobra.Command{
 	Use:               "install",
-	Short:             "Install as a Windows service",
-	Long:              "Install as a Windows service",
+	Short:             "Installs the startup process for Cloudfuse",
+	Long:              "Installs the startup process for Cloudfuse which remounts any active previously active mounts on startup.",
 	SuggestFor:        []string{"ins", "inst"},
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := installService()
+		dir, err := os.Getwd()
 		if err != nil {
-			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
-				return errors.New("this action requires admin rights")
-			}
-			return fmt.Errorf("failed to install as a Windows service [%s]", err.Error())
+			return fmt.Errorf("unable to determine location of cloudfuse binary [%s]", err.Error())
 		}
-
+		programPath := filepath.Join(dir, "windows-startup.exe")
+		startupPath := filepath.Join(os.Getenv("APPDATA"), "Microsoft\\Windows\\Start Menu\\Programs\\Startup", "CloudfuseStartup.lnk")
+		err = makeLink(programPath, startupPath)
+		if err != nil {
+			return fmt.Errorf("unable to create startup link [%s]", err.Error())
+		}
 		return nil
 	},
 }
@@ -93,53 +95,13 @@ var uninstallCmd = &cobra.Command{
 	Example:           "cloudfuse service uninstall",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := removeService()
-		if err != nil {
-			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
-				return errors.New("this action requires admin rights")
-			}
-			return fmt.Errorf("failed to remove as a Windows service [%s]", err.Error())
-		}
-
-		return nil
-	},
-}
-
-var startCmd = &cobra.Command{
-	Use:               "start",
-	Short:             "start the Windows service",
-	Long:              "start the Windows service",
-	SuggestFor:        []string{"sta", "star"},
-	Example:           "cloudfuse service start",
-	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		err := startService()
-		if err != nil {
-			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
-				return errors.New("this action requires admin rights")
-			}
-			return fmt.Errorf("failed to start as a Windows service [%s]", err.Error())
-		}
-
-		return nil
-	},
-}
-
-var stopCmd = &cobra.Command{
-	Use:               "stop",
-	Short:             "stop the Windows service",
-	Long:              "stop the Windows service",
-	SuggestFor:        []string{"sto"},
-	Example:           "cloudfuse service stop",
-	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		err := stopService()
-		if err != nil {
-			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
-				return errors.New("this action requires admin rights")
-			}
-			return fmt.Errorf("failed to stop the Windows service [%s]", err.Error())
-		}
+		// err := removeService()
+		// if err != nil {
+		// 	if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+		// 		return errors.New("this action requires admin rights")
+		// 	}
+		// 	return fmt.Errorf("failed to remove as a Windows service [%s]", err.Error())
+		// }
 
 		return nil
 	},
@@ -216,110 +178,25 @@ var unmountServiceCmd = &cobra.Command{
 
 //--------------- command section ends
 
-// installService adds cloudfuse as a windows service.
-func installService() error {
-	exepath, err := os.Executable()
+func makeLink(src, dst string) error {
+	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED|ole.COINIT_SPEED_OVER_MEMORY)
+	oleShellObject, err := oleutil.CreateObject("WScript.Shell")
 	if err != nil {
 		return err
 	}
-
-	scm, err := mgr.Connect()
+	defer oleShellObject.Release()
+	wshell, err := oleShellObject.QueryInterface(ole.IID_IDispatch)
 	if err != nil {
 		return err
 	}
-	defer scm.Disconnect() //nolint
-
-	// Don't install the service if it already exists
-	service, err := scm.OpenService(SvcName)
-	if err == nil {
-		service.Close()
-		return fmt.Errorf("%s service already exists", SvcName)
-	}
-
-	service, err = scm.CreateService(SvcName, exepath, mgr.Config{DisplayName: "Cloudfuse", StartType: mgr.StartAutomatic})
+	defer wshell.Release()
+	cs, err := oleutil.CallMethod(wshell, "CreateShortcut", dst)
 	if err != nil {
 		return err
 	}
-	defer service.Close()
-
-	// Create the registry for WinFsp
-	err = winservice.CreateWinFspRegistry()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// removeService uninstall the cloudfuse windows service.
-func removeService() error {
-	scm, err := mgr.Connect()
-	if err != nil {
-		return err
-	}
-	defer scm.Disconnect() //nolint
-
-	service, err := scm.OpenService(SvcName)
-	if err != nil {
-		return fmt.Errorf("%s service is not installed", SvcName)
-	}
-	defer service.Close()
-
-	// Remove the registry for WinFsp
-	// Ignore error if unable to find
-	_ = winservice.RemoveWinFspRegistry()
-
-	// Remove all registry entries for cloudfuse
-	// Ignore error if registry path does not exist
-	_ = winservice.RemoveAllRegistryMount()
-
-	err = service.Delete()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// startService starts the windows service.
-func startService() error {
-	scm, err := mgr.Connect()
-	if err != nil {
-		return err
-	}
-	defer scm.Disconnect() //nolint
-
-	service, err := scm.OpenService(SvcName)
-	if err != nil {
-		return fmt.Errorf("%s service is not installed", SvcName)
-	}
-	defer service.Close()
-
-	err = service.Start()
-	if err != nil {
-		return fmt.Errorf("%s service could not be started: %v", SvcName, err)
-	}
-	return nil
-}
-
-// startService stops the windows service.
-func stopService() error {
-	scm, err := mgr.Connect()
-	if err != nil {
-		return err
-	}
-	defer scm.Disconnect() //nolint
-
-	service, err := scm.OpenService(SvcName)
-	if err != nil {
-		return fmt.Errorf("%s service is not installed", SvcName)
-	}
-	defer service.Close()
-
-	_, err = service.Control(svc.Stop)
-	if err != nil {
-		return fmt.Errorf("%s service could not be stopped: %v", SvcName, err)
-	}
-
+	idispatch := cs.ToIDispatch()
+	oleutil.PutProperty(idispatch, "TargetPath", src)
+	oleutil.CallMethod(idispatch, "Save")
 	return nil
 }
 
@@ -336,31 +213,6 @@ func unmountInstance() error {
 // isMounted returns if the current mountPath is mounted using cloudfuse.
 func isMounted() (bool, error) {
 	return winservice.IsMounted(servOpts.MountPath)
-}
-
-// isServiceRunning returns whether the cloudfuse service is currently running.
-func isServiceRunning() (bool, error) {
-	scm, err := mgr.Connect()
-	if err != nil {
-		return false, err
-	}
-	defer scm.Disconnect() //nolint
-
-	service, err := scm.OpenService(SvcName)
-	if err != nil {
-		return false, err
-	}
-	defer service.Close()
-
-	status, err := service.Query()
-	if err != nil {
-		return false, err
-	}
-
-	if status.State == windows.SERVICE_RUNNING {
-		return true, nil
-	}
-	return false, nil
 }
 
 // validateMountPath checks whether the mountpath is correct and does not exist.
@@ -401,8 +253,6 @@ func init() {
 	rootCmd.AddCommand(serviceCmd)
 	serviceCmd.AddCommand(installCmd)
 	serviceCmd.AddCommand(uninstallCmd)
-	serviceCmd.AddCommand(startCmd)
-	serviceCmd.AddCommand(stopCmd)
 	serviceCmd.AddCommand(mountServiceCmd)
 	serviceCmd.AddCommand(unmountServiceCmd)
 
