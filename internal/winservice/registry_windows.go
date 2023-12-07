@@ -56,9 +56,12 @@ type KeyData struct {
 }
 
 // Specific mount command used in cloudfuse. This is the command that is executed when WinFsp launches our service.
-// %1 and %2 are strings that are added when mounting where %1 represents the mount directory and %2 the location of the
-// config file.
-const mountCmd = `mount %1 --config-file=%2`
+// %1-%4 are strings that are added when mounting where:
+// %1 is the mount directory
+// %2 is the location of the config file
+// %3 is the current user's Windows user ID
+// %4 is the current user's Windows group ID
+const mountCmd = `mount %1 --config-file=%2 --uid=%3 --gid=%4`
 
 func ReadRegistryInstanceEntry(name string) (KeyData, error) {
 	registryPath := instanceRegistry + name
