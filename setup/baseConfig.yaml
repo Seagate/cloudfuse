@@ -61,9 +61,6 @@ components:
 
 # Libfuse configuration
 libfuse:
-  owner-uid: <user id to set as owner of all files by default. Linux default - -1 (current user). Windows default - 11 (Authenticated Users Group)>
-  owner-gid: <group id to set as owner of all files by default. Linux default - -1 (current user). Windows default - 11 (Authenticated Users Group)>
-  file-security-sddl: <use SDDL string to set default file permissions. Example - "D:P(A;;FA;;;<your-SID>)". Default - disabled>
   default-permission: 0777|0666|0644|0444 <default permissions to be presented for block blobs>
   attribute-expiration-sec: <time kernel can cache inode attributes (in sec). Default - 120 sec>
   entry-expiration-sec: <time kernel can cache directory listing attributes (in sec). Default - 120 sec>
