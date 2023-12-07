@@ -105,9 +105,18 @@ func (lf *Libfuse) initFuse() error {
 	// With WinFSP this will present all files as owned by the Authenticated Users group
 	if runtime.GOOS == "windows" {
 		// TODO: add SDDL file security option: https://github.com/rclone/rclone/issues/4717
+		// if uid & gid were not specified, pass -1 for both (which will cause WinFSP to look up the current user)
+		uid := int64(-1)
+		gid := int64(-1)
+		if lf.ownerUID != 0 {
+			uid = int64(lf.ownerUID)
+		}
+		if lf.ownerGID != 0 {
+			gid = int64(lf.ownerGID)
+		}
 		options = fmt.Sprintf("uid=%d,gid=%d,entry_timeout=%d,attr_timeout=%d,negative_timeout=%d",
-			11,
-			11,
+			uid,
+			gid,
 			lf.entryExpiration,
 			lf.attributeExpiration,
 			lf.negativeTimeout)
