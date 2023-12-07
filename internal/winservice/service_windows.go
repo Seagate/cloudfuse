@@ -30,6 +30,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -106,7 +107,7 @@ func StartMount(mountPath string, configFile string) error {
 
 	instanceName := mountPath
 
-	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, userId, groupId)
+	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId))
 	_, err = winFspCommand(buf)
 	if err != nil {
 		return err
