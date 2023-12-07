@@ -30,6 +30,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"os/exec"
+	"regexp"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common/log"
@@ -96,9 +98,16 @@ func (m *Cloudfuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan
 
 // StartMount starts the mount if the name exists in our Windows registry.
 func StartMount(mountPath string, configFile string) error {
+	// get the current user uid and gid to set file permissions
+	idMap := getCurrentUserIds()
+	// These keys come from fsptool: https://github.com/winfsp/winfsp/blob/master/src/fsptool/fsptool.c#L420
+	// The "User" and "Owner" ID have been the same in my experience
+	userId := idMap["User"]
+	groupId := idMap["Group"]
+
 	instanceName := mountPath
 
-	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile)
+	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, userId, groupId)
 	_, err := winFspCommand(buf)
 	if err != nil {
 		return err
@@ -298,4 +307,23 @@ func bytesToUint16(buf []byte) []uint16 {
 		ubuf = append(ubuf, binary.LittleEndian.Uint16(buf[i:i+2]))
 	}
 	return ubuf
+}
+
+// returns a map with three sid numbers: 'User', 'Owner', and 'Group'
+func getCurrentUserIds() map[string]string {
+	r := regexp.MustCompile(`(?P<type>[A-Za-z]+)=[^\(]+\([^\)]+\) \([ug]id=(?P<id>[0-9]+)\)`)
+
+	out, err := exec.Command(`C:\Program Files (x86)\WinFsp\bin\fsptool-x64.exe`, "id").Output()
+	if err != nil {
+		log.Err("'fsptool id' failed with error: %v\n", err)
+	}
+
+	idMap := make(map[string]string)
+	for _, subMatches := range r.FindAllSubmatch(out, -1) {
+		entityType := string(subMatches[r.SubexpIndex("type")])
+		entityId := string(subMatches[r.SubexpIndex("id")])
+		idMap[entityType] = entityId
+	}
+
+	return idMap
 }
