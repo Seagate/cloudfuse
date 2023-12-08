@@ -32,16 +32,16 @@ import (
 	"path/filepath"
 )
 
-type Instance struct {
+type Mount struct {
 	MountPath  string `json:"mountPath"`
 	ConfigFile string `json:"configFile"`
 }
 
-type Instances struct {
-	Instances []Instance `json:"instances"`
+type Mounts struct {
+	Mounts []Mount `json:"mounts"`
 }
 
-const instanceFile = "instances.json"
+const mountFile = "mounts.json"
 
 func getAppDataFolder() (string, error) {
 	appDataPath, err := os.UserConfigDir()
@@ -53,13 +53,13 @@ func getAppDataFolder() (string, error) {
 	return fullPath, nil
 }
 
-func getInstanceTrackerFile() (string, error) {
+func getMountTrackerFile() (string, error) {
 	appDataPath, err := getAppDataFolder()
 	if err != nil {
 		return "", err
 	}
 
-	fullPath := filepath.Join(appDataPath, instanceFile)
+	fullPath := filepath.Join(appDataPath, mountFile)
 
 	// If the file does not exist, then create it
 	_, err = os.Stat(fullPath)
@@ -69,7 +69,7 @@ func getInstanceTrackerFile() (string, error) {
 			return "", err
 		}
 
-		data, err := json.MarshalIndent(Instances{}, "", " ")
+		data, err := json.MarshalIndent(Mounts{}, "", " ")
 		if err != nil {
 			return "", err
 		}
@@ -83,19 +83,19 @@ func getInstanceTrackerFile() (string, error) {
 	return fullPath, nil
 }
 
-func readInstances(filePath string) (Instances, error) {
+func readMounts(filePath string) (Mounts, error) {
 	file, err := os.ReadFile(filePath)
 	if err != nil {
-		return Instances{}, err
+		return Mounts{}, err
 	}
 
-	var instances Instances
-	err = json.Unmarshal(file, &instances)
-	return instances, err
+	var mounts Mounts
+	err = json.Unmarshal(file, &mounts)
+	return mounts, err
 }
 
-func writeInstances(filePath string, instances Instances) error {
-	data, err := json.MarshalIndent(instances, "", " ")
+func writeMounts(filePath string, mounts Mounts) error {
+	data, err := json.MarshalIndent(mounts, "", " ")
 	if err != nil {
 		return err
 	}
@@ -103,58 +103,58 @@ func writeInstances(filePath string, instances Instances) error {
 	return os.WriteFile(filePath, data, 0644)
 }
 
-func readInstancesFromInstanceFile() ([]Instance, error) {
-	instancePath, err := getInstanceTrackerFile()
+func readMountsFromFile() ([]Mount, error) {
+	mountPath, err := getMountTrackerFile()
 	if err != nil {
 		return nil, err
 	}
 
-	instances, err := readInstances(instancePath)
+	mounts, err := readMounts(mountPath)
 	if err != nil {
 		return nil, err
 	}
 
-	return instances.Instances, nil
+	return mounts.Mounts, nil
 }
 
 // AddMountJSON adds an entry to our json file with the mount path and config
 // file location.
 func AddMountJSON(mountPath string, configFile string) error {
-	instancePath, err := getInstanceTrackerFile()
+	mountPath, err := getMountTrackerFile()
 	if err != nil {
 		return err
 	}
 
-	instances, err := readInstances(instancePath)
+	mounts, err := readMounts(mountPath)
 	if err != nil {
 		return err
 	}
 
-	newInstance := Instance{MountPath: mountPath, ConfigFile: configFile}
-	instances.Instances = append(instances.Instances, newInstance)
+	newMount := Mount{MountPath: mountPath, ConfigFile: configFile}
+	mounts.Mounts = append(mounts.Mounts, newMount)
 
-	return writeInstances(instancePath, instances)
+	return writeMounts(mountPath, mounts)
 }
 
 // RemoveMountJSON removes an entry to from our json file.
 func RemoveMountJSON(mountPath string) error {
-	instancePath, err := getInstanceTrackerFile()
+	mountPath, err := getMountTrackerFile()
 	if err != nil {
 		return err
 	}
 
-	instances, err := readInstances(instancePath)
+	mounts, err := readMounts(mountPath)
 	if err != nil {
 		return err
 	}
 
-	filtered := make([]Instance, 0)
-	for _, instance := range instances.Instances {
-		if instance.MountPath != mountPath {
-			filtered = append(filtered, instance)
+	filtered := make([]Mount, 0)
+	for _, mount := range mounts.Mounts {
+		if mount.MountPath != mountPath {
+			filtered = append(filtered, mount)
 		}
 	}
 
-	instances.Instances = filtered
-	return writeInstances(instancePath, instances)
+	mounts.Mounts = filtered
+	return writeMounts(mountPath, mounts)
 }
