@@ -88,13 +88,13 @@ begin
     end;
 
     // Add cloudfuse to the path
-    if not Exec('cmd.exe', '/C SETX PATH "%PATH%;' + ExpandConstant('{app}') + '" /M', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    if not Exec('cmd.exe', '/C SETX PATH "%PATH%;' + ExpandConstant('{app}') +'"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
       MsgBox('Failed to update PATH. You may need to add the path manually to use Cloudfuse on the command line.', mbError, MB_OK);
     end;
 
     // Install the Cloudfuse Startup Tool
-    if not Exec('cmd.exe', '/C cloudfuse service install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    if not Exec(ExpandConstant('{app}\{#MyAppExeCLIName}'), 'service install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
       MsgBox('Failed to install cloudfuse as a service. You may need to do this manually from the command line.', mbError, MB_OK);
     end;
