@@ -1,5 +1,3 @@
-//go:build windows
-
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
@@ -30,34 +28,17 @@ package main
 import (
 	"github.com/Seagate/cloudfuse/cmd"
 	"github.com/Seagate/cloudfuse/common/log"
-	"github.com/Seagate/cloudfuse/internal/winservice"
-
-	"golang.org/x/sys/windows/svc"
 )
 
 //go:generate ./cmd/componentGenerator.sh $NAME
 //  To use go:generate run command   "NAME="component" go generate"
 
 func main() {
-	isService, err := svc.IsWindowsService()
-	if err != nil {
-		log.Err("Unable to determine if running as Windows service: %v", err.Error())
-	}
-
-	if isService {
-		handler := &winservice.Cloudfuse{}
-		run := svc.Run
-		err = run(cmd.SvcName, handler)
-		if err != nil {
-			log.Err("Unable to start Windows service: %v", err.Error())
+	_ = cmd.Execute()
+	defer func() {
+		if panicErr := recover(); panicErr != nil {
+			log.Err("PANIC: %v", panicErr)
+			panic(panicErr)
 		}
-	} else {
-		_ = cmd.Execute()
-		defer func() {
-			if panicErr := recover(); panicErr != nil {
-				log.Err("PANIC: %v", panicErr)
-				panic(panicErr)
-			}
-		}()
-	}
+	}()
 }

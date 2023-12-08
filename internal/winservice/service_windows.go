@@ -34,7 +34,6 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/registry"
 )
 
 const (
@@ -109,27 +108,6 @@ func StartMounts() error {
 		err := StartMount(inst.MountPath, inst.ConfigFile)
 		if err != nil {
 			log.Err("Unable to start mount with mountpath: ", inst.MountPath)
-		}
-	}
-
-	return nil
-}
-
-// stopServicess stops cloudfuse by instructing WinFsp to stop it.
-func stopServices() error {
-	// Read registry to get names of the instances we need to stop
-	instances, err := readInstancesFromInstanceFile()
-	// If there is nothing in our registry to mount then continue
-	if err == registry.ErrNotExist {
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	for _, inst := range instances {
-		err := StopMount(inst.MountPath)
-		if err != nil {
-			log.Err("Unable to stop mount with mountpath: ", inst.MountPath)
 		}
 	}
 
