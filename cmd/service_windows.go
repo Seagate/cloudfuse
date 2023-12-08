@@ -40,7 +40,6 @@ import (
 	"github.com/go-ole/go-ole/oleutil"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/sys/windows"
 )
 
 type serviceOptions struct {
@@ -89,8 +88,8 @@ var installCmd = &cobra.Command{
 
 var uninstallCmd = &cobra.Command{
 	Use:               "uninstall",
-	Short:             "Remove the startup process for Cloudfuse",
-	Long:              "Remove  the startup process for Cloudfuse",
+	Short:             "Uninstall the startup process for Cloudfuse",
+	Long:              "Uninstall the startup process for Cloudfuse",
 	SuggestFor:        []string{"uninst", "uninstal"},
 	Example:           "cloudfuse service uninstall",
 	FlagErrorHandling: cobra.ExitOnError,
@@ -150,9 +149,6 @@ var unmountServiceCmd = &cobra.Command{
 		// Check with winfsp to see if this is currently mounted
 		ret, err := isMounted()
 		if err != nil {
-			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
-				return errors.New("this action requires admin rights")
-			}
 			return fmt.Errorf("failed to validate options [%s]", err.Error())
 		} else if !ret {
 			return fmt.Errorf("nothing is mounted here")

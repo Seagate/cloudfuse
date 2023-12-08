@@ -1,10 +1,10 @@
 ## cloudfuse service uninstall
 
-Remove the startup process for Cloudfuse
+Uninstall the startup process for Cloudfuse
 
 ### Synopsis
 
-Remove  the startup process for Cloudfuse
+Uninstall the startup process for Cloudfuse
 
 ```
 cloudfuse service uninstall [flags]
