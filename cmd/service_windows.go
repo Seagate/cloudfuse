@@ -89,19 +89,17 @@ var installCmd = &cobra.Command{
 
 var uninstallCmd = &cobra.Command{
 	Use:               "uninstall",
-	Short:             "Remove as a Windows service",
-	Long:              "Remove as a Windows service",
+	Short:             "Remove the startup process for Cloudfuse",
+	Long:              "Remove  the startup process for Cloudfuse",
 	SuggestFor:        []string{"uninst", "uninstal"},
 	Example:           "cloudfuse service uninstall",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// err := removeService()
-		// if err != nil {
-		// 	if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
-		// 		return errors.New("this action requires admin rights")
-		// 	}
-		// 	return fmt.Errorf("failed to remove as a Windows service [%s]", err.Error())
-		// }
+		startupPath := filepath.Join(os.Getenv("APPDATA"), "Microsoft\\Windows\\Start Menu\\Programs\\Startup", "CloudfuseStartup.lnk")
+		err := os.Remove(startupPath)
+		if err != nil {
+			return fmt.Errorf("failed to delete startup process [%s]", err.Error())
+		}
 
 		return nil
 	},
