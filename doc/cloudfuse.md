@@ -21,7 +21,6 @@ cloudfuse [flags]
 
 * [cloudfuse completion](cloudfuse_completion.md)	 - Generate the autocompletion script for the specified shell
 * [cloudfuse mount](cloudfuse_mount.md)	 - Mounts the azure container as a filesystem
-* [cloudfuse mountv1](cloudfuse_mountv1.md)	 - Generate a configuration file for Cloudfuse from Blobfuse configuration file/flags
 * [cloudfuse secure](cloudfuse_secure.md)	 - Encrypt / Decrypt your config file
 * [cloudfuse service](cloudfuse_service.md)	 - Manage cloudfuse mounts on Windows
 * [cloudfuse unmount](cloudfuse_unmount.md)	 - Unmount Cloudfuse
