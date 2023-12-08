@@ -42,6 +42,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "..\gui\dist\cloudfuseGUI_Windows\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\gui\dist\cloudfuseGUI_Windows\_internal\*"; DestDir: "{app}\_internal\"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\cloudfuse.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\cfusemon.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\windows-startup.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\sampleDataSetFuseConfig.json"; DestDir: "{app}"; Flags: ignoreversion
@@ -91,14 +93,10 @@ begin
       MsgBox('Failed to update PATH. You may need to add the path manually to use Cloudfuse on the command line.', mbError, MB_OK);
     end;
 
-    // Install and start the Windows service
+    // Install the Cloudfuse Startup Tool
     if not Exec('cmd.exe', '/C cloudfuse service install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
       MsgBox('Failed to install cloudfuse as a service. You may need to do this manually from the command line.', mbError, MB_OK);
-    end;
-    if not Exec('cmd.exe', '/C cloudfuse service start', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-    begin
-      MsgBox('Failed to start cloudfuse as a service. You may need to do this manually from the command line.', mbError, MB_OK);
     end;
   end;
 end;
