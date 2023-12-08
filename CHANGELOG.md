@@ -1,5 +1,12 @@
 # Cloudfuse Changelog #
 
+## 0.3.0 (Unreleased) ##
+
+This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
+**Changes**
+-- Removed ability to run as a Windows service, instead a new Windows startup tool is provided to restart mounts on system login.
+-- Running mounts are now stored in AppData on Windows rather than the registry.
+
 ## 0.2.1 ##
 
 This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
