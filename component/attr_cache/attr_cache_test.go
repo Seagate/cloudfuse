@@ -375,7 +375,7 @@ func (suite *attrCacheTestSuite) TestCreateDirNoCacheDirs() {
 
 			err = suite.attrCache.CreateDir(options)
 			suite.assert.Nil(err)
-			assertNotInCache(suite.assert, suite.attrCache, truncatedPath)
+			assertExists(suite, truncatedPath)
 
 			// Entry Already Exists
 			addPathToCache(suite.assert, suite.attrCache, extendedPath, false)
@@ -383,7 +383,7 @@ func (suite *attrCacheTestSuite) TestCreateDirNoCacheDirs() {
 
 			err = suite.attrCache.CreateDir(options)
 			suite.assert.Nil(err)
-			assertInvalid(suite, truncatedPath)
+			assertExists(suite, truncatedPath)
 		})
 	}
 }
@@ -609,7 +609,7 @@ func (suite *attrCacheTestSuite) TestDirInCloud() {
 
 	_, err = suite.attrCache.CreateFile(createOptions)
 	suite.assert.Nil(err)
-	assertInvalid(suite, deepPath)
+	assertExists(suite, deepPath)
 	assertInCloud(suite, "a/b/c")
 	assertInCloud(suite, "a/b")
 	assertInCloud(suite, "a")
@@ -867,7 +867,7 @@ func (suite *attrCacheTestSuite) TestRenameDirNoCacheDirs() {
 			// ab paths should be invalidated
 			for p := ab.Front(); p != nil; p = p.Next() {
 				truncatedPath := internal.TruncateDirName(p.Value.(string))
-				assertInvalid(suite, truncatedPath)
+				assertExists(suite, truncatedPath)
 			}
 			// ac paths should be untouched
 			for p := ac.Front(); p != nil; p = p.Next() {
@@ -898,7 +898,10 @@ func (suite *attrCacheTestSuite) TestCreateFile() {
 
 	_, err = suite.attrCache.CreateFile(options)
 	suite.assert.Nil(err)
-	assertNotInCache(suite.assert, suite.attrCache, path)
+	assertExists(suite, options.Name)
+	checkItem, err := suite.attrCache.cacheMap.get(path)
+	suite.assert.Nil(err)
+	suite.assert.EqualValues(0, checkItem.attr.Size)
 
 	// Entry Already Exists
 	addPathToCache(suite.assert, suite.attrCache, path, false)
@@ -906,7 +909,11 @@ func (suite *attrCacheTestSuite) TestCreateFile() {
 
 	_, err = suite.attrCache.CreateFile(options)
 	suite.assert.Nil(err)
-	assertInvalid(suite, path)
+	checkItem, err = suite.attrCache.cacheMap.get(path)
+	suite.assert.Nil(err)
+	suite.assert.True(checkItem.exists())
+	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
+	suite.assert.EqualValues(0, checkItem.attr.Size)
 }
 
 // Tests Delete File
@@ -929,7 +936,7 @@ func (suite *attrCacheTestSuite) TestDeleteFile() {
 
 	err = suite.attrCache.DeleteFile(options)
 	suite.assert.Nil(err)
-	assertNotInCache(suite.assert, suite.attrCache, path)
+	assertDeleted(suite, path)
 
 	// Entry Already Exists
 	addPathToCache(suite.assert, suite.attrCache, path, false)
@@ -1171,7 +1178,7 @@ func (suite *attrCacheTestSuite) TestWriteFileExists() {
 
 	_, err := suite.attrCache.WriteFile(options)
 	suite.assert.Nil(err)
-	assertInvalid(suite, path)
+	assertExists(suite, path)
 }
 
 // Tests Truncate File
