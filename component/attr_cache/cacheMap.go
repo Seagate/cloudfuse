@@ -174,10 +174,10 @@ func (value *attrCacheItem) isDeleted() bool {
 	return !value.exists()
 }
 
-func (value *attrCacheItem) setSize(size int64) {
-	value.attr.Mtime = time.Now()
+func (value *attrCacheItem) setSize(size int64, changedAt time.Time) {
+	value.attr.Mtime = changedAt
 	value.attr.Size = size
-	value.cachedAt = time.Now()
+	value.cachedAt = changedAt
 }
 
 func (value *attrCacheItem) setMode(mode os.FileMode) {
