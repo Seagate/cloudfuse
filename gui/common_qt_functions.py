@@ -193,8 +193,10 @@ class widgetCustomFunctions(QWidget):
         elif ret == QtWidgets.QMessageBox.Save:
             # Insert all settings to yaml file
             self.exitWindowCleanup()
-            self.writeConfigFile()
-            event.accept()
+            if self.writeConfigFile():
+                event.accept()
+            else:
+                event.ignore()
         
     def constructDictForConfig(self):
         optionKeys = self.settings.allKeys()
@@ -220,8 +222,12 @@ class widgetCustomFunctions(QWidget):
         self.updateSettingsFromUIChoices()
         dictForConfigs = self.constructDictForConfig()
         currentDir = self.getCurrentDir()
-        with open(currentDir+'/config.yaml','w') as file:
-            yaml.safe_dump(dictForConfigs,file)
+        with open(currentDir+'/config.yaml','w') as (file, err):
+            if err:
+                return False
+            else:
+                yaml.safe_dump(dictForConfigs,file)
+                return True
             
     def getConfigs(self,useDefault=False):
         currentDir = self.getCurrentDir()
