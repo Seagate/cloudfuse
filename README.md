@@ -20,7 +20,7 @@ Cloudfuse will store the config file in `	C:\Users\{username}\AppData\Roaming`.
 
 Download the .deb file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal: 
 
-```sudo apt-get install -f ./cloudfuse*.deb```
+```sudo apt-get install ./cloudfuse*.deb```
 
 #### CentOS / RHEL:
 
