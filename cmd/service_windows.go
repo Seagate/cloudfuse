@@ -31,6 +31,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -172,8 +173,14 @@ var unmountServiceCmd = &cobra.Command{
 
 //--------------- command section ends
 
-func makeLink(src, dst string) error {
-	ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED|ole.COINIT_SPEED_OVER_MEMORY)
+func makeLink(src string, dst string) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	err := ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED|ole.COINIT_SPEED_OVER_MEMORY)
+	if err != nil {
+		return err
+	}
 	oleShellObject, err := oleutil.CreateObject("WScript.Shell")
 	if err != nil {
 		return err
@@ -189,8 +196,14 @@ func makeLink(src, dst string) error {
 		return err
 	}
 	idispatch := cs.ToIDispatch()
-	oleutil.PutProperty(idispatch, "TargetPath", src)
-	oleutil.CallMethod(idispatch, "Save")
+	_, err = oleutil.PutProperty(idispatch, "TargetPath", src)
+	if err != nil {
+		return err
+	}
+	_, err = oleutil.CallMethod(idispatch, "Save")
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
