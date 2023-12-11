@@ -222,12 +222,16 @@ class widgetCustomFunctions(QWidget):
         self.updateSettingsFromUIChoices()
         dictForConfigs = self.constructDictForConfig()
         currentDir = self.getCurrentDir()
-        with open(currentDir+'/config.yaml','w') as (file, err):
-            if err:
-                return False
-            else:
+        try:
+            with open(currentDir+'/config.yaml','w') as file:
                 yaml.safe_dump(dictForConfigs,file)
                 return True
+        except:
+            msg = QtWidgets.QMessageBox()
+            msg.setWindowTitle("Write Failed")
+            msg.setInformativeText("Writing the config file failed. Check file permissions and try again.")
+            msg.exec()
+            return False
             
     def getConfigs(self,useDefault=False):
         currentDir = self.getCurrentDir()
@@ -260,6 +264,8 @@ class widgetCustomFunctions(QWidget):
     #   settings defined in defaultSettingManager.
     def initSettingsFromConfig(self):
         dictForConfigs = self.getConfigs()
+        if dictForConfigs is None:
+            dictForConfigs = self.getConfigs(True)
         for option in dictForConfigs:
             if type(dictForConfigs[option]) == dict:
                 tempDict = self.settings.value(option)
