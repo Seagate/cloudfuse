@@ -1,6 +1,6 @@
 #!/bin/sh -x
 
-rm ui*.py || true
+rm ui_*.py || true
 
 pyside6-uic mountPrimaryWindow.ui > ui_mountPrimaryWindow.py
 pyside6-uic s3_config_common.ui > ui_s3_config_common.py

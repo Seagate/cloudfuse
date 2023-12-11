@@ -10,8 +10,6 @@ before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod tidy
-    # you may remove this if you don't need go generate
-    - go generate ./...
 
 builds:
   - id: windows
@@ -76,7 +74,7 @@ archives:
       - LICENSE
       - README.md
       - NOTICE
-      - src: "./gui/dist/cloudfuseGUI_linux/*"
+      - src: "./gui/dist/cloudfuseGUI_Linux/*"
         dst: "./"
       - src: "setup/baseConfig.yaml"
         dst: "./samples/baseConfig.yaml"
@@ -136,7 +134,7 @@ archives:
       - LICENSE
       - README.md
       - NOTICE
-      - src: "./gui/dist/cloudfuseGUI_windows/*"
+      - src: "./gui/dist/cloudfuseGUI_Windows/*"
         dst: "./"
       - src: "setup/baseConfig.yaml"
         dst: "./samples/baseConfig.yaml"
@@ -204,7 +202,7 @@ nfpms:
 
       - src: ./gui/cloudfuse.desktop
         dst: /usr/share/applications/cloudfuse.desktop
-      - src: "./gui/dist/cloudfuseGUI_linux/*"
+      - src: "./gui/dist/cloudfuseGUI_Linux/*"
         dst: "/opt/cloudfuse"
   
     overrides:

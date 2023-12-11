@@ -1,0 +1,203 @@
+name: Release binaries
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  compile-gui:
+    # Compile the GUI on Windows & Linux, and write the GUI binaries to actions/cache
+    name: Compile GUI
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      -
+        name: Checkout code
+        uses: actions/checkout@v4
+      -
+        name: Fetch cached compiled GUI
+        id: restore-compiled-gui
+        uses: actions/cache/restore@v3
+        with:
+          # enableCrossOsArchive always needs to be set on cached items in Windows jobs
+          # see cache documentation: https://github.com/actions/cache#inputs
+          enableCrossOsArchive: true
+          path: gui/dist/cloudfuseGUI_${{ runner.os }}
+          key: ${{ runner.os }}-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
+      -
+        name: Install Python
+        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      -
+        name: Install pip dependencies
+        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
+        run: pip3 install -r gui/requirements.txt
+        shell: bash
+      -
+        name: Compile GUI
+        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
+        shell: bash
+        run: |
+          cd gui
+          ./create_gui.sh
+          mv dist/cloudfuseGUI dist/cloudfuseGUI_${{ runner.os }}
+      -
+        name: Cache compiled GUI
+        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
+        uses: actions/cache/save@v3
+        with:
+          enableCrossOsArchive: true
+          path: gui/dist/cloudfuseGUI_${{ runner.os }}
+          key: ${{ runner.os }}-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
+
+  create-installer:
+    # Run Inno Setup to create the Windows app installer, then write it to actions/cache
+    name: Create Windows Installer
+    needs: compile-gui
+    runs-on: windows-latest
+    env:
+      go: '1.20'
+      cgo: '0'
+      winfsp: winfsp-2.0.23075.msi
+    steps:
+      - # Build the command-line program
+        name: Checkout code
+        uses: actions/checkout@v4
+      -
+        name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.go }}
+          check-latest: true
+      -
+        name: Set CGO
+        shell: bash
+        run: |
+          if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
+      -
+        name: Build
+        shell: bash
+        run: |
+          commitDate=$(git log -1 --format=%cd --date=format:%Y-%m-%dT%H:%M:%S)
+          ldflags="-s -w -X main.version=${{ github.ref_name }} -X main.commit=${{ github.sha }} -X main.date=$commitDate"
+          go build -trimpath -ldflags ''"$ldflags"'' -o cloudfuse.exe
+          go build -trimpath -ldflags ''"$ldflags"'' -o cfusemon.exe ./tools/health-monitor/
+          touch -m -d $commitDate cloudfuse.exe
+          touch -m -d $commitDate cfusemon.exe
+      - # Get the WinFSP installer (from cache or download)
+        name: Get cached WinFSP installer
+        id: restore-winfsp-installer
+        uses: actions/cache/restore@v3
+        with:
+          path: ${{ env.winfsp }}
+          key: ${{ env.winfsp }}
+      -
+        name: Download WinFSP installer
+        if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
+        shell: bash
+        run: |
+          curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.0/${{ env.winfsp }}
+      -
+        name: Cache WinFSP installer
+        if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
+        uses: actions/cache/save@v3
+        with:
+          path: ${{ env.winfsp }}
+          key: ${{ env.winfsp }}
+      -
+        name: Fetch cached compiled GUI
+        uses: actions/cache/restore@v3
+        with:
+          enableCrossOsArchive: true
+          path: gui/dist/cloudfuseGUI_${{ runner.os }}
+          key: ${{ runner.os }}-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
+          fail-on-cache-miss: true
+        # don't continue if we fail get the compiled GUI for the Windows installer
+        continue-on-error: false
+      - # Build the installer and save it to actions/cache
+        name: Run Inno Setup
+        # Inno Setup is pre-installed on GitHub's windows-latest image
+        # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
+        run: |
+          & "C:/Program Files (x86)/Inno Setup 6/iscc.exe" build/windows_installer_build.iss
+      -
+        name: Rename installer
+        run: |
+          mv build/Output/cloudfuse.exe build/Output/cloudfuse_install_Windows_x86_64.exe
+      -
+        name: Cache windows installer
+        uses: actions/cache/save@v3
+        with:
+          enableCrossOsArchive: true
+          path: build/Output/cloudfuse_install_Windows_x86_64.exe
+          key: windows-cloudfuse-installer-${{ github.sha }}
+
+  release:
+    # Use GoReleaser to package and publish Linux releases along with the Windows installer
+    name: Release Binaries
+    needs: create-installer
+    runs-on: ubuntu-latest
+    env:
+      go: '1.20'
+
+    steps:
+      - # libfuse-dev is required to build our command-line program
+        name: Install Libfuse
+        run: |
+          sudo apt-get install -y libfuse-dev
+      - # enable GoReleaser to build for ARM64
+        name: Install ARM64 compilers
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+      - # Get code and Go ready
+        name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      -
+        name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.go }}
+          check-latest: true
+      - # Get cached intermediate build products
+        name: Restore cached Windows installer
+        uses: actions/cache/restore@v3
+        with:
+          enableCrossOsArchive: true
+          path: build/Output/cloudfuse_install_Windows_x86_64.exe
+          key: windows-cloudfuse-installer-${{ github.sha }}
+          fail-on-cache-miss: true
+        continue-on-error: false
+      -
+        name: Restore Linux compiled GUI
+        uses: actions/cache/restore@v3
+        with:
+          path: gui/dist/cloudfuseGUI_Linux
+          key: Linux-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
+          fail-on-cache-miss: true
+        continue-on-error: false
+      -
+        name: Restore Windows compiled GUI
+        uses: actions/cache/restore@v3
+        with:
+          enableCrossOsArchive: true
+          path: gui/dist/cloudfuseGUI_Windows
+          key: Windows-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
+          # the hash value comes out different on Linux vs Windows
+          # so we need to use restore-keys to match the Windows compiled GUI
+          # see documentation: https://github.com/actions/cache/blob/main/restore/README.md#inputs
+          restore-keys: Windows-compiled-gui-
+        continue-on-error: false
+      - # Run GoReleaser (see .goreleaser.yaml)
+        name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

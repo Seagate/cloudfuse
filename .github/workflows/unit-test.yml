@@ -137,6 +137,7 @@ jobs:
           if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
 
       - name: Build
+        shell: bash
         run: |
           ./build.sh
 
