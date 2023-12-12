@@ -30,7 +30,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 
 	"golang.org/x/sys/windows"
@@ -50,10 +52,17 @@ type Cloudfuse struct{}
 
 // StartMount starts the mount if the name exists in our Windows registry.
 func StartMount(mountPath string, configFile string) error {
+	// get the current user uid and gid to set file permissions
+	userId, groupId, err := common.GetCurrentUser()
+	if err != nil {
+		log.Err("StartMount : GetCurrentUser() failed with error: %v", err)
+		return err
+	}
+
 	instanceName := mountPath
 
-	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile)
-	_, err := winFspCommand(buf)
+	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId))
+	_, err = winFspCommand(buf)
 	if err != nil {
 		return err
 	}
