@@ -803,14 +803,14 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 	err := ac.NextComponent().CreateLink(options)
 
 	if err == nil {
+		currentTime := time.Now()
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		toBeInvalid, getErr := ac.cacheMap.get(options.Name)
-		if getErr == nil {
-			toBeInvalid.invalidate()
-		}
+		linkAttr := internal.CreateObjAttr(options.Name, int64(len([]byte(options.Target))), currentTime)
+		linkAttr.Flags.Set(internal.PropFlagSymlink)
+		ac.cacheMap.insert(linkAttr, true, currentTime)
 		if ac.cacheDirs {
-			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
+			ac.markAncestorsInCloud(getParentDir(options.Name), currentTime)
 		}
 	}
 
