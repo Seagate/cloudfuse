@@ -805,8 +805,6 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 	if err == nil {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		// Creating a new symlink objAttr here would be doable, but messy
-		// it's easier and cleaner to invalidate here
 		toBeInvalid, getErr := ac.cacheMap.get(options.Name)
 		if getErr == nil {
 			toBeInvalid.invalidate()
