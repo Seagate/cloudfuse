@@ -19,7 +19,7 @@ background and will also automatically restart existing mounts on system restart
 
         cloudfuse.exe service install
 
-2. Now we can start a mount that is managed by Cloudfuse. Once you mount the bucket or container the mount will persit
+2. Now we can start a mount that is managed by Cloudfuse. Once you mount the bucket or container the mount will persist
    on restart or shutdowns while the Cloudfuse service is running. Cloudfuse can also support any number of mounts
    running on Windows.
 
