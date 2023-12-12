@@ -239,6 +239,10 @@ class widgetCustomFunctions(QWidget):
             try:
                 with open(currentDir+'/default_config.yaml','r') as file:
                     configs = yaml.safe_load(file)
+                    if configs is None:
+                        # The default file is empty, use programmed defaults
+                        defaultSettingsManager.setAllDefaultSettings(self)
+                        configs = self.constructDictForConfig()
             except:
                 # There is no default config file, use programmed defaults
                 defaultSettingsManager.setAllDefaultSettings(self)
@@ -247,7 +251,11 @@ class widgetCustomFunctions(QWidget):
             try:
                 with open(currentDir+'/config.yaml', 'r') as file:
                     configs = yaml.safe_load(file)
+                    if configs is None:
+                       # The configs file exists, but is empty, use default settings
+                       configs = self.getConfigs(True) 
             except:
+                # Could not open or config file does not exist, use default settings
                 configs = self.getConfigs(True)
         return configs
     
@@ -264,8 +272,6 @@ class widgetCustomFunctions(QWidget):
     #   settings defined in defaultSettingManager.
     def initSettingsFromConfig(self):
         dictForConfigs = self.getConfigs()
-        if dictForConfigs is None:
-            dictForConfigs = self.getConfigs(True)
         for option in dictForConfigs:
             if type(dictForConfigs[option]) == dict:
                 tempDict = self.settings.value(option)
