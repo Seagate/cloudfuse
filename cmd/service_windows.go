@@ -49,6 +49,7 @@ type serviceOptions struct {
 }
 
 const SvcName = "cloudfuse"
+const StartupName = "CloudfuseStartup.lnk"
 
 var servOpts serviceOptions
 
@@ -78,7 +79,7 @@ var installCmd = &cobra.Command{
 			return fmt.Errorf("unable to determine location of cloudfuse binary [%s]", err.Error())
 		}
 		programPath := filepath.Join(dir, "windows-startup.exe")
-		startupPath := filepath.Join(os.Getenv("APPDATA"), "Microsoft\\Windows\\Start Menu\\Programs\\Startup", "CloudfuseStartup.lnk")
+		startupPath := filepath.Join(os.Getenv("APPDATA"), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", StartupName)
 		err = makeLink(programPath, startupPath)
 		if err != nil {
 			return fmt.Errorf("unable to create startup link [%s]", err.Error())
@@ -95,7 +96,7 @@ var uninstallCmd = &cobra.Command{
 	Example:           "cloudfuse service uninstall",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startupPath := filepath.Join(os.Getenv("APPDATA"), "Microsoft\\Windows\\Start Menu\\Programs\\Startup", "CloudfuseStartup.lnk")
+		startupPath := filepath.Join(os.Getenv("APPDATA"), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", StartupName)
 		err := os.Remove(startupPath)
 		if err != nil {
 			return fmt.Errorf("failed to delete startup process [%s]", err.Error())
