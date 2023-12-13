@@ -421,12 +421,12 @@ var mountCmd = &cobra.Command{
 			return Destroy(fmt.Sprintf("failed to initialize new pipeline [%s]", err.Error()))
 		}
 
-		// A dry run needs to be in the foreground
-		if !options.Foreground && options.DryRun {
-			log.Debug("mount: foreground enabled")
-			options.Foreground = true
+		// Dry run ends here
+		if options.DryRun {
+			log.Err("mount: dry-run configuration checks complete. Exiting...")
+			return nil
 		}
-		common.DryRunMount = options.DryRun
+
 		common.ForegroundMount = options.Foreground
 
 		log.Info("mount: Mounting cloudfuse on %s", options.MountPath)
@@ -620,9 +620,9 @@ func init() {
 	mountCmd.PersistentFlags().Bool("read-only", false, "Mount the system in read only mode. Default value false.")
 	config.BindPFlag("read-only", mountCmd.PersistentFlags().Lookup("read-only"))
 
-	mountCmd.PersistentFlags().Bool("dry-run", false,
+	mountCmd.Flags().Bool("dry-run", false,
 		"Test mount configuration, credentials, etc., but don't make any changes to the container or the local file system. Implies foreground.")
-	config.BindPFlag("dry-run", mountCmd.PersistentFlags().Lookup("dry-run"))
+	config.BindPFlag("dry-run", mountCmd.Flags().Lookup("dry-run"))
 
 	mountCmd.PersistentFlags().String("default-working-dir", "", "Default working directory for storing log files and other cloudfuse information")
 	mountCmd.PersistentFlags().Lookup("default-working-dir").Hidden = true
