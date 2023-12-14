@@ -827,7 +827,14 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 func (ac *AttrCache) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("AttrCache::FlushFile : %s", options.Handle.Path)
 	err := ac.NextComponent().FlushFile(options)
-	// we already updated the cache when WriteFile was called, so don't invalidate the entry
+	if err == nil {
+		ac.cacheLock.RLock()
+		defer ac.cacheLock.RUnlock()
+		toBeInvalid, getErr := ac.cacheMap.get(options.Handle.Path)
+		if getErr == nil {
+			toBeInvalid.invalidate()
+		}
+	}
 	return err
 }
 
