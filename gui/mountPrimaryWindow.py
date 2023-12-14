@@ -87,47 +87,6 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.page = underConstruction()
         self.page.show()
 
-    # Wrapper/helper for the service install and start.
-    def windowsServiceInstall(self):
-        # install the service
-        (stdOut, stdErr, exitCode, executableFound) = self.runCommand("cloudfuse.exe service install".split())
-        if not executableFound:
-            self.addOutputText("cloudfuse.exe not found! Is it installed?")
-            self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
-            return False
-        if exitCode != 0:
-            # check if this is a permissions issue
-            if stdErr.find('admin') != -1:
-                self.addOutputText(stdErr)
-                self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
-                return False
-            # check if the request was redundant
-            if stdErr.find('already') != -1:
-                return True
-            else:
-                # stop on any other error
-                self.addOutputText(stdErr)
-                return False
-        # start the service
-        (stdOut, stdErr, exitCode, executableFound) = self.runCommand("cloudfuse.exe service start".split())
-        if not executableFound:
-            self.addOutputText("cloudfuse.exe not found! Is it installed?")
-            self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
-            return False
-        if exitCode != 0:
-            # check if this is a permissions issue
-            if stdErr.find('admin') != -1:
-                self.addOutputText(stdErr)
-                self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
-                return False
-            # check if the request was redundant
-            if stdErr.find('already') != -1:
-                return True
-            else:
-                # stop on any other error
-                self.addOutputText(stdErr)
-                return False
-        return True
 
     def mountBucket(self):
         # Update the pipeline/components before mounting the target
@@ -155,11 +114,6 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 self.errorMessageBox(f"Error: Cloudfuse needs to create the directory {directory}, but it already exists!")
                 return
             
-            # Install and start the service
-            if not self.windowsServiceInstall():
-                # don't mount, since we failed to install the service
-                return
-            
             commandParts = ['cloudfuse.exe', 'service', 'mount', directory, f'--config-file={configPath}']
             (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
             if not executableFound:
@@ -169,10 +123,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             
             if exitCode != 0:
                 self.addOutputText(stdErr)
-                # check if this is a permissions issue
-                if stdErr.find('admin') != -1:
-                    self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
-                elif stdErr.find("mount path exists") != -1:
+                if stdErr.find("mount path exists") != -1:
                     self.errorMessageBox("This container is already mounted at this directory.")
                 return
             
