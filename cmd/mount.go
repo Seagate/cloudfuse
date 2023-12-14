@@ -234,8 +234,8 @@ func parseConfig() error {
 // Look at https://cobra.dev/ for more information
 var mountCmd = &cobra.Command{
 	Use:               "mount [path]",
-	Short:             "Mounts the azure container as a filesystem",
-	Long:              "Mounts the azure container as a filesystem",
+	Short:             "Mounts the container as a filesystem",
+	Long:              "Mounts the container as a filesystem",
 	SuggestFor:        []string{"mnt", "mout"},
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
@@ -409,7 +409,6 @@ var mountCmd = &cobra.Command{
 
 		// If on Linux start with the go daemon
 		// If on Windows, don't use the daemon since it is not supported
-		// TODO: Enable running as a service on Windows
 		if runtime.GOOS == "windows" {
 			pipeline, err = internal.NewPipeline(options.Components, true)
 		} else {
@@ -424,7 +423,6 @@ var mountCmd = &cobra.Command{
 
 		log.Info("mount: Mounting cloudfuse on %s", options.MountPath)
 		// Prevent mounting in background on Windows
-		// TODO: Enable background support using windows services
 		if !options.Foreground && runtime.GOOS != "windows" {
 			pidFile := strings.Replace(options.MountPath, "/", "_", -1) + ".pid"
 			pidFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), pidFile)
