@@ -114,6 +114,23 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 self.errorMessageBox(f"Error: Cloudfuse needs to create the directory {directory}, but it already exists!")
                 return
             
+            # do a dry run to validate options and credentials
+            commandParts = ['cloudfuse.exe', 'mount', directory, f'--config-file={configPath}', '--dry-run']
+            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
+            if not executableFound:
+                self.addOutputText("cloudfuse.exe not found! Is it installed?")
+                self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
+                return
+            
+            if exitCode != 0:
+                self.addOutputText(stdErr)
+                self.errorMessageBox("Mount failed: " + stdErr)
+                return
+            
+            if stdOut != "":
+                self.addOutputText(stdOut)
+
+            # now actually mount
             commandParts = ['cloudfuse.exe', 'service', 'mount', directory, f'--config-file={configPath}']
             (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
             if not executableFound:
@@ -126,6 +143,9 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 if stdErr.find("mount path exists") != -1:
                     self.errorMessageBox("This container is already mounted at this directory.")
                 return
+            
+            if stdOut != "":
+                self.addOutputText(stdOut)
             
             # wait for mount, then check that mount succeeded by verifying that the mount directory exists
             self.addOutputText("Mount command successfully sent to Windows service.\nVerifying mount success...")
