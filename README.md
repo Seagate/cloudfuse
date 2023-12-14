@@ -11,7 +11,7 @@ Download the provided installation packages for your preferred operating system.
 
 ### Windows
 
-Download and the .exe installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
+Download and the .exe installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases).
 
 Cloudfuse will store the config file in `	C:\Users\{username}\AppData\Roaming`.
 
@@ -64,14 +64,13 @@ Launch the provided GUI and use the [Config instructions above](#Config) to conf
 ### Windows
 Note: Make sure WinSFP is installed, found in the [install instructions](#Installation).
 * `To Mount`
-  - Run the provided GUI with admin rights (this is for the windows service option).
+  - Run the provided GUI.
   - To attach your cloud to a folder, browse to the location you want your cloud to mount and make sure that directory is empty.
   - Select the type of cloud you want, either S3 or Azure.
   - Click mount.
-  - You will see an error if you did not launch the GUI with admin rights, if this happens just relaunch the GUI by right-clicking the GUI icon and selecting 'Run as Administrator'.
 
 * `To Unmount`
-  - Launch the provided GUI with admin rights.
+  - Launch the provided GUI.
   - Through the main window of the GUI, browse to the folder you want unmounted and select it.
   - Select the type of cloud you have mounted, either S3 or Azure.
   - Click unmount.
@@ -110,10 +109,8 @@ The general format of the Cloudfuse Linux commands is `cloudfuse [command] [argu
 
 The general format of the Cloudfuse Windows commands is:
  `cloudfuse service [command] [arguments] --[flag-name]=[flag-value]`
-  * `cloudfuse service install` - Install as a Windows service
-  * `cloudfuse service uninstall` - Uninstall cloudfuse from a Windows service
-  * `cloudfuse service start` - Start the Windows service
-  * `cloudfuse service stop` - Stop the Windows service
+  * `cloudfuse service install` - Installs the startup process for Cloudfuse
+  * `cloudfuse service uninstall` - Uninstall the startup process for Cloudfuse
   * `cloudfuse service mount <mount path>  --config-file=<config file>` - Mount an instance that will persist in Windows when restarted
   * `cloudfuse service unmount <mount path>` - Unmount mount of Cloudfuse running as a Windows service
 
@@ -123,9 +120,6 @@ To use security options the general format for cloudfuse commands is `cloudfuse 
 * `secure encrypt` - Encrypts a config file.
 * `secure get` - Gets value of a config parameter from an encrypted config file.
 * `secure set` - Updates value of a config parameter.
-
-Note - If you do not have admin rights, you can still mount your cloud without Windows Service, however
-the process will stay in the foreground. Use `cloudfuse mount <mount path>  --config-file=<config file>` to mount, use Ctrl+C to unmount.
 
 ## Find help from your command prompt
 To see a list of commands, type `cloudfuse -h`. To

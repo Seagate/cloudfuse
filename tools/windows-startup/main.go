@@ -4,7 +4,6 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -28,36 +27,13 @@
 package main
 
 import (
-	"github.com/Seagate/cloudfuse/cmd"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal/winservice"
-
-	"golang.org/x/sys/windows/svc"
 )
 
-//go:generate ./cmd/componentGenerator.sh $NAME
-//  To use go:generate run command   "NAME="component" go generate"
-
 func main() {
-	isService, err := svc.IsWindowsService()
+	err := winservice.StartMounts()
 	if err != nil {
-		log.Err("Unable to determine if running as Windows service: %v", err.Error())
-	}
-
-	if isService {
-		handler := &winservice.Cloudfuse{}
-		run := svc.Run
-		err = run(cmd.SvcName, handler)
-		if err != nil {
-			log.Err("Unable to start Windows service: %v", err.Error())
-		}
-	} else {
-		_ = cmd.Execute()
-		defer func() {
-			if panicErr := recover(); panicErr != nil {
-				log.Err("PANIC: %v", panicErr)
-				panic(panicErr)
-			}
-		}()
+		log.Err("Error starting mounts on startup")
 	}
 }
