@@ -234,8 +234,8 @@ func parseConfig() error {
 // Look at https://cobra.dev/ for more information
 var mountCmd = &cobra.Command{
 	Use:               "mount [path]",
-	Short:             "Mounts the azure container as a filesystem",
-	Long:              "Mounts the azure container as a filesystem",
+	Short:             "Mounts the container as a filesystem",
+	Long:              "Mounts the container as a filesystem",
 	SuggestFor:        []string{"mnt", "mout"},
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
