@@ -301,9 +301,12 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 				dirAttrCacheItem.invalidate()
 			}
 		}
+		// add the directory to the cache - this is an easily preventable cache miss
 		newDirAttr := internal.CreateObjAttrDir(options.Name)
 		newDirAttrCacheItem := ac.cacheMap.insert(newDirAttr, true, time.Now())
-		newDirAttrCacheItem.markInCloud(false)
+		if ac.cacheDirs {
+			newDirAttrCacheItem.markInCloud(false)
+		}
 	}
 	return err
 }
