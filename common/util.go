@@ -50,7 +50,6 @@ const SectorSize = 4096
 
 var RootMount bool
 var ForegroundMount bool
-var DryRunMount bool
 
 // IsDirectoryMounted is a utility function that returns true if the directory is already mounted using fuse
 func IsDirectoryMounted(path string) bool {
