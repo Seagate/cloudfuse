@@ -89,6 +89,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
 
     def mountBucket(self):
+        self.addOutputText("Validating configuration...")
         # Update the pipeline/components before mounting the target
         targetIndex = self.dropDown_bucketSelect.currentIndex() 
         success = self.modifyPipeline(bucketOptions[targetIndex])
@@ -115,7 +116,6 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 return
             
             # do a dry run to validate options and credentials
-            self.addOutputText("Validating configuration...")
             commandParts = ['cloudfuse.exe', 'mount', directory, f'--config-file={configPath}', '--dry-run']
             (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
             if not executableFound:
@@ -193,16 +193,15 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def modifyPipeline(self,target):
 
         currentDir = widgetFuncs.getCurrentDir(self)
-        errMsg = QtWidgets.QMessageBox()
         
         # Read in the configs as a dictionary. Notify user if failed
         try:
             with open(currentDir+'/config.yaml', 'r') as file:
                 configs = yaml.safe_load(file)
         except:
-            errMsg.setWindowTitle("Could not read config file")
-            errMsg.setText(f"Could not read the config file in {currentDir}. Consider going through the settings for selected target.")
-            errMsg.exec()
+            self.errorMessageBox(
+                f"Could not read the config file in {currentDir}. Consider going through the settings for selected target.",
+                "Could not read config file")
             return False
         
         # Modify the components (pipeline) in the config file. 
@@ -213,9 +212,9 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             components[mountTargetComponent] = target
             configs['components'] = components
         else:
-            errMsg.setWindowTitle("Components in config missing")
-            errMsg.setText(f"The components is missing in {currentDir}/config.yaml. Consider Going through the settings to create one.")
-            errMsg.exec()            
+            self.errorMessageBox(
+                f"The components is missing in {currentDir}/config.yaml. Consider Going through the settings to create one.",
+                "Components in config missing")
             return False
         
         # Write the config file with the modified components 
@@ -223,9 +222,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             with open(currentDir+'/config.yaml','w') as file:
                 yaml.safe_dump(configs,file)
         except:
-            errMsg.setWindowTitle("Could not modify config file")
-            errMsg.setText(f"Could not modify {currentDir}/config.yaml.")
-            errMsg.exec()
+            self.errorMessageBox(f"Could not modify {currentDir}/config.yaml.", "Could not modify config file")
             return False
         
         # If nothing failed so far, return true to proceed to the mount phase
@@ -252,10 +249,10 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def addOutputText(self, textString):
         self.textEdit_output.setText(f"{self.textEdit_output.toPlainText()}{textString}\n")
     
-    def errorMessageBox(self, messageString):
+    def errorMessageBox(self, messageString, titleString="Error"):
         msg = QtWidgets.QMessageBox()
         # Get the user's attention by popping open a new window
-        msg.setWindowTitle("Error")
+        msg.setWindowTitle(titleString)
         msg.setText(messageString)
         # Show the message box
         msg.exec()
