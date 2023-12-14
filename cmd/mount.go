@@ -423,7 +423,7 @@ var mountCmd = &cobra.Command{
 
 		// Dry run ends here
 		if options.DryRun {
-			log.Crit("Dry-run complete")
+			log.Trace("Dry-run complete")
 			return nil
 		}
 
