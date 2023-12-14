@@ -193,8 +193,10 @@ class widgetCustomFunctions(QWidget):
         elif ret == QtWidgets.QMessageBox.Save:
             # Insert all settings to yaml file
             self.exitWindowCleanup()
-            self.writeConfigFile()
-            event.accept()
+            if self.writeConfigFile():
+                event.accept()
+            else:
+                event.ignore()
         
     def constructDictForConfig(self):
         optionKeys = self.settings.allKeys()
@@ -220,8 +222,16 @@ class widgetCustomFunctions(QWidget):
         self.updateSettingsFromUIChoices()
         dictForConfigs = self.constructDictForConfig()
         currentDir = self.getCurrentDir()
-        with open(currentDir+'/config.yaml','w') as file:
-            yaml.safe_dump(dictForConfigs,file)
+        try:
+            with open(currentDir+'/config.yaml','w') as file:
+                yaml.safe_dump(dictForConfigs,file)
+                return True
+        except:
+            msg = QtWidgets.QMessageBox()
+            msg.setWindowTitle("Write Failed")
+            msg.setInformativeText("Writing the config file failed. Check file permissions and try again.")
+            msg.exec()
+            return False
             
     def getConfigs(self,useDefault=False):
         currentDir = self.getCurrentDir()
@@ -229,6 +239,10 @@ class widgetCustomFunctions(QWidget):
             try:
                 with open(currentDir+'/default_config.yaml','r') as file:
                     configs = yaml.safe_load(file)
+                    if configs is None:
+                        # The default file is empty, use programmed defaults
+                        defaultSettingsManager.setAllDefaultSettings(self)
+                        configs = self.constructDictForConfig()
             except:
                 # There is no default config file, use programmed defaults
                 defaultSettingsManager.setAllDefaultSettings(self)
@@ -237,7 +251,11 @@ class widgetCustomFunctions(QWidget):
             try:
                 with open(currentDir+'/config.yaml', 'r') as file:
                     configs = yaml.safe_load(file)
+                    if configs is None:
+                       # The configs file exists, but is empty, use default settings
+                       configs = self.getConfigs(True) 
             except:
+                # Could not open or config file does not exist, use default settings
                 configs = self.getConfigs(True)
         return configs
     

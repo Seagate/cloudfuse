@@ -22,6 +22,7 @@ test/manual_scripts/cachetest.go
 lint.log
 azure-storage-fuse
 cfusemon
+windows-startup.exe
 **/cloudfuse-logs.txt
 test-scripts/helper/var.env
 gui/__pycache__/

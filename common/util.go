@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"regexp"
@@ -118,6 +119,26 @@ func GetCurrentUser() (uint32, uint32, error) {
 	currentUser, err := user.Current()
 	if err != nil {
 		return 0, 0, err
+	}
+
+	if runtime.GOOS == "windows" {
+		r := regexp.MustCompile(`(?P<type>[A-Za-z]+)=[^\(]+\([^\)]+\) \([ug]id=(?P<id>[0-9]+)\)`)
+
+		out, err := exec.Command(`C:\Program Files (x86)\WinFsp\bin\fsptool-x64.exe`, "id").Output()
+		if err != nil {
+			fmt.Printf("Is WinFSP installed? 'fsptool-x64.exe id' failed with error: %v\n", err)
+		}
+
+		idMap := make(map[string]string)
+		for _, subMatches := range r.FindAllSubmatch(out, -1) {
+			entityType := string(subMatches[r.SubexpIndex("type")])
+			entityId := string(subMatches[r.SubexpIndex("id")])
+			idMap[entityType] = entityId
+		}
+		// These keys come from fsptool: https://github.com/winfsp/winfsp/blob/master/src/fsptool/fsptool.c#L420
+		// The "User" and "Owner" ID have been the same in my experience
+		currentUser.Uid = idMap["User"]
+		currentUser.Gid = idMap["Group"]
 	}
 
 	userUID, err = strconv.ParseUint(currentUser.Uid, 10, 32)

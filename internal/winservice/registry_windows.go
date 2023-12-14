@@ -56,9 +56,12 @@ type KeyData struct {
 }
 
 // Specific mount command used in cloudfuse. This is the command that is executed when WinFsp launches our service.
-// %1 and %2 are strings that are added when mounting where %1 represents the mount directory and %2 the location of the
-// config file.
-const mountCmd = `mount %1 --config-file=%2`
+// %1-%4 are strings that are added when mounting where:
+// %1 is the mount directory
+// %2 is the location of the config file
+// %3 is the current user's Windows user ID
+// %4 is the current user's Windows group ID
+const mountCmd = `mount %1 --config-file=%2 -o uid=%3,gid=%4`
 
 func ReadRegistryInstanceEntry(name string) (KeyData, error) {
 	registryPath := instanceRegistry + name
@@ -145,34 +148,6 @@ func CreateWinFspRegistry() error {
 // RemoveWinFspRegistry removes the entry in the registry for WinFsp.
 func RemoveWinFspRegistry() error {
 	registryPath := winFspRegistry + SvcName
-	err := registry.DeleteKey(registry.LOCAL_MACHINE, registryPath)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// CreateRegistryMount adds an entry to our registry with the mount path and config
-// file location.
-func CreateRegistryMount(mountPath string, configFile string) error {
-	registryPath := instanceRegistry + mountPath
-	key, _, err := registry.CreateKey(registry.LOCAL_MACHINE, registryPath, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-
-	err = key.SetStringValue("ConfigFile", configFile)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// RemoveRegistryMount removes the entry from our registry
-func RemoveRegistryMount(name string) error {
-	registryPath := instanceRegistry + name
 	err := registry.DeleteKey(registry.LOCAL_MACHINE, registryPath)
 	if err != nil {
 		return err
