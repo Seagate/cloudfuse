@@ -63,10 +63,10 @@ type mountOptions struct {
 	MountPath  string
 	ConfigFile string
 
+	DryRun            bool
 	Logging           LogOptions     `config:"logging"`
 	Components        []string       `config:"components"`
 	Foreground        bool           `config:"foreground"`
-	DryRun            bool           `config:"dry-run"`
 	NonEmpty          bool           `config:"nonempty"`
 	DefaultWorkingDir string         `config:"default-working-dir"`
 	CPUProfile        string         `config:"cpu-profile"`
@@ -620,7 +620,7 @@ func init() {
 	mountCmd.PersistentFlags().Bool("read-only", false, "Mount the system in read only mode. Default value false.")
 	config.BindPFlag("read-only", mountCmd.PersistentFlags().Lookup("read-only"))
 
-	mountCmd.Flags().Bool("dry-run", false,
+	mountCmd.Flags().BoolVar(&options.DryRun, "dry-run", false,
 		"Test mount configuration, credentials, etc., but don't make any changes to the container or the local file system. Implies foreground.")
 	config.BindPFlag("dry-run", mountCmd.Flags().Lookup("dry-run"))
 
