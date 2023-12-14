@@ -166,7 +166,7 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(ctx context.Context, reader 
 		partResp, err := s.awsS3Client.UploadPart(context.Background(), &s3.UploadPartInput{
 			Bucket:     aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 			Key:        aws.String(key),
-			PartNumber: partNumber,
+			PartNumber: &partNumber,
 			UploadId:   &uploadID,
 			Body:       io.NewSectionReader(reader, int64(partNumber-1)*partSizeBytes, endSize),
 		})
@@ -196,7 +196,7 @@ func (s *s3StorageTestSuite) uploadReaderAtToObject(ctx context.Context, reader 
 			etag := strings.Trim(*partResp.ETag, "\"")
 			cPart := types.CompletedPart{
 				ETag:       &etag,
-				PartNumber: partNum,
+				PartNumber: &partNum,
 			}
 			parts = append(parts, cPart)
 		}

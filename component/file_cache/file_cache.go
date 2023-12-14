@@ -181,7 +181,9 @@ func (c *FileCache) Stop() error {
 	log.Trace("Stopping component : %s", c.Name())
 
 	_ = c.policy.ShutdownPolicy()
-	_ = c.TempCacheCleanup()
+	if !c.allowNonEmpty {
+		_ = c.TempCacheCleanup()
+	}
 
 	fileCacheStatsCollector.Destroy()
 

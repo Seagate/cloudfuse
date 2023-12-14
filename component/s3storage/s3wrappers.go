@@ -182,7 +182,7 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 		Bucket: &cl.Config.authConfig.BucketName,
 		Delete: &types.Delete{
 			Objects: keyList,
-			Quiet:   true,
+			Quiet:   aws.Bool(true),
 		},
 	})
 	if err != nil {
@@ -212,7 +212,7 @@ func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, er
 		return nil, parseS3Err(err, attemptedAction)
 	}
 
-	object := createObjAttr(name, result.ContentLength, *result.LastModified, isSymlink)
+	object := createObjAttr(name, *result.ContentLength, *result.LastModified, isSymlink)
 	return object, nil
 }
 
@@ -329,7 +329,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	}
 	params := &s3.ListObjectsV2Input{
 		Bucket:            aws.String(bucketName),
-		MaxKeys:           count,
+		MaxKeys:           &count,
 		Prefix:            aws.String(listPath),
 		Delimiter:         aws.String("/"), // delimiter limits results and provides CommonPrefixes
 		ContinuationToken: token,
@@ -344,7 +344,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		return objectAttrList, nil, err
 	}
 
-	if output.IsTruncated {
+	if output.IsTruncated != nil && *output.IsTruncated {
 		newMarker = output.NextContinuationToken
 	} else {
 		newMarker = nil
@@ -357,7 +357,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 		name, isSymLink := cl.getFile(*value.Key)
 
 		path := split(cl.Config.prefixPath, name)
-		attr := createObjAttr(path, value.Size, *value.LastModified, isSymLink)
+		attr := createObjAttr(path, *value.Size, *value.LastModified, isSymLink)
 		objectAttrList = append(objectAttrList, attr)
 	}
 

@@ -667,16 +667,6 @@ jobs:
     
     - name: Build coverage binary
       run: go test -coverpkg="./..." -covermode=count -c -o cloudfuse.test
-
-    - name: Install Windows Service
-      run: |-
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_service_mount.cov service install
-        sleep 5
-
-    - name: Start Windows Service
-      run: |-
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_service_start.cov service start
-        sleep 5
     
     - name: Create Config File - Block Blob
       shell: bash

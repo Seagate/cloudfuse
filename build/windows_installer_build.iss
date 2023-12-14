@@ -38,10 +38,16 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
+[Dirs]
+; Create directory in AppData/Roaming
+Name: "{userappdata}\{#MyAppName}"; Flags: uninsalwaysuninstall
+
 [Files]
 Source: "..\gui\dist\cloudfuseGUI_Windows\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\gui\dist\cloudfuseGUI_Windows\_internal\*"; DestDir: "{app}\_internal\"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\cloudfuse.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\cfusemon.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\windows-startup.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\sampleDataSetFuseConfig.json"; DestDir: "{app}"; Flags: ignoreversion
@@ -50,13 +56,11 @@ Source: "..\sampleFileCacheConfigS3.yaml"; DestDir: "{app}"; Flags: ignoreversio
 Source: "..\sampleFileCacheWithSASConfigAzure.yaml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\sampleStreamingConfigAzure.yaml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\sampleStreamingConfigS3.yaml"; DestDir: "{app}"; Flags: ignoreversion
+; Deploy default config
+Source: "..\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; DestName: "config.yaml"; Flags: onlyifdoesntexist
 
 Source: "..\winfsp-2.0.23075.msi"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
-
-[Dirs]
-; Create directory in AppData/Roaming
-Name: "{userappdata}\{#MyAppName}"; Flags: uninsalwaysuninstall
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -74,7 +78,7 @@ begin
   if CurStep = ssPostInstall then
   begin
     // Install WinFSP if it is not already installed
-    if not RegKeyExists(HKLM, 'SOFTWARE\WOW6432Node\WinFsp\Services\memfs64') then
+    if not RegKeyExists(HKLM, 'SOFTWARE\WOW6432Node\WinFsp\Services') then
     begin
       if MsgBox('WinFSP is required for Cloudfuse. Do you want to install it now?', mbConfirmation, MB_YESNO) = idYes then
       begin
@@ -86,19 +90,15 @@ begin
     end;
 
     // Add cloudfuse to the path
-    if not Exec('cmd.exe', '/C SETX PATH "%PATH%;' + ExpandConstant('{app}') + '" /M', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    if not Exec('cmd.exe', '/C SETX PATH "%PATH%;' + ExpandConstant('{app}') +'"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
       MsgBox('Failed to update PATH. You may need to add the path manually to use Cloudfuse on the command line.', mbError, MB_OK);
     end;
 
-    // Install and start the Windows service
-    if not Exec('cmd.exe', '/C cloudfuse service install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    // Install the Cloudfuse Startup Tool
+    if not Exec(ExpandConstant('{app}\{#MyAppExeCLIName}'), 'service install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
       MsgBox('Failed to install cloudfuse as a service. You may need to do this manually from the command line.', mbError, MB_OK);
-    end;
-    if not Exec('cmd.exe', '/C cloudfuse service start', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-    begin
-      MsgBox('Failed to start cloudfuse as a service. You may need to do this manually from the command line.', mbError, MB_OK);
     end;
   end;
 end;
