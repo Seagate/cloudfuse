@@ -115,6 +115,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 return
             
             # do a dry run to validate options and credentials
+            self.addOutputText("Validating configuration...")
             commandParts = ['cloudfuse.exe', 'mount', directory, f'--config-file={configPath}', '--dry-run']
             (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
             if not executableFound:
@@ -154,7 +155,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     self.addOutputText(f"Failed to create mount directory {directory}")
                     self.errorMessageBox("Mount failed silently... Do you need to empty the file cache directory?")
                 self.addOutputText("Successfully mounted container")
-            QtCore.QTimer.singleShot(5000, verifyMountSuccess)
+            QtCore.QTimer.singleShot(4000, verifyMountSuccess)
         else:
             commandParts = ['./cloudfuse', 'mount', directory, f'--config-file={configPath}']
             (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
