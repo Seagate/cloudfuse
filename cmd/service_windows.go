@@ -124,7 +124,7 @@ var mountServiceCmd = &cobra.Command{
 
 		err = mountInstance()
 		if err != nil {
-			return fmt.Errorf("failed to mount instance [%s]", err.Error())
+			return fmt.Errorf("failed to mount instance [%s]\n Verify WinFSP is installed correctly", err.Error())
 		}
 
 		// Add the mount to the JSON file so it persists on restart.
