@@ -126,7 +126,7 @@ func GetCurrentUser() (uint32, uint32, error) {
 
 		out, err := exec.Command(`C:\Program Files (x86)\WinFsp\bin\fsptool-x64.exe`, "id").Output()
 		if err != nil {
-			fmt.Printf("Is WinFSP installed? 'fsptool-x64.exe id' failed with error: %v\n", err)
+			return 0, 0, fmt.Errorf("Is WinFSP installed? 'fsptool-x64.exe id' failed with error: %w", err)
 		}
 
 		idMap := make(map[string]string)
