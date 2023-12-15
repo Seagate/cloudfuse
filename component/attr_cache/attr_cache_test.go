@@ -609,7 +609,7 @@ func (suite *attrCacheTestSuite) TestDirInCloud() {
 
 	_, err = suite.attrCache.CreateFile(createOptions)
 	suite.assert.Nil(err)
-	suite.assertExists(deepPath)
+	suite.assertInvalid(deepPath)
 	suite.assertInCloud("a/b/c")
 	suite.assertInCloud("a/b")
 	suite.assertInCloud("a")
@@ -898,10 +898,7 @@ func (suite *attrCacheTestSuite) TestCreateFile() {
 
 	_, err = suite.attrCache.CreateFile(options)
 	suite.assert.Nil(err)
-	suite.assertExists(options.Name)
-	checkItem, err := suite.attrCache.cacheMap.get(path)
-	suite.assert.Nil(err)
-	suite.assert.EqualValues(0, checkItem.attr.Size)
+	suite.assertNotInCache(path)
 
 	// Entry Already Exists
 	suite.addPathToCache(path, false)
@@ -909,11 +906,7 @@ func (suite *attrCacheTestSuite) TestCreateFile() {
 
 	_, err = suite.attrCache.CreateFile(options)
 	suite.assert.Nil(err)
-	checkItem, err = suite.attrCache.cacheMap.get(path)
-	suite.assert.Nil(err)
-	suite.assert.True(checkItem.exists())
-	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
-	suite.assert.EqualValues(0, checkItem.attr.Size)
+	suite.assertInvalid(path)
 }
 
 // Tests Delete File

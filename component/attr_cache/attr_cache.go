@@ -514,28 +514,26 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 	return err
 }
 
-// CreateFile: Cache a new entry for the file
+// CreateFile: Mark the file invalid
 func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	log.Trace("AttrCache::CreateFile : %s", options.Name)
 	h, err := ac.NextComponent().CreateFile(options)
 
 	if err == nil {
-		currentTime := time.Now()
 		// TODO: the cache locks are used incorrectly here
 		// They routinely lock the cache for reading, but then write to it
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		if ac.cacheDirs {
 			// record that the parent directory tree contains at least one object
-			ac.markAncestorsInCloud(getParentDir(options.Name), currentTime)
+			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
-		newFileEntry, getErr := ac.cacheMap.get(options.Name)
-		if getErr != nil || !newFileEntry.exists() {
-			// add new entry
-			newFileAttr := internal.CreateObjAttr(options.Name, 0, currentTime)
-			newFileEntry = ac.cacheMap.insert(newFileAttr, true, currentTime)
+		// TODO: we assume that the OS will call GetAttr after this.
+		// 		if it doesn't, will invalidating this entry cause problems?
+		toBeInvalid, getErr := ac.cacheMap.get(options.Name)
+		if getErr == nil {
+			toBeInvalid.invalidate()
 		}
-		newFileEntry.setSize(0, currentTime)
 	}
 
 	return h, err
