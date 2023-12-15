@@ -375,7 +375,7 @@ func (suite *attrCacheTestSuite) TestCreateDirNoCacheDirs() {
 
 			err = suite.attrCache.CreateDir(options)
 			suite.assert.Nil(err)
-			suite.assertNotInCache(truncatedPath)
+			suite.assertExists(truncatedPath)
 
 			// Entry Already Exists
 			suite.addPathToCache(extendedPath, false)
@@ -383,7 +383,7 @@ func (suite *attrCacheTestSuite) TestCreateDirNoCacheDirs() {
 
 			err = suite.attrCache.CreateDir(options)
 			suite.assert.Nil(err)
-			suite.assertInvalid(truncatedPath)
+			suite.assertExists(truncatedPath)
 		})
 	}
 }
