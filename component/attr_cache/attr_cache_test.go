@@ -936,7 +936,7 @@ func (suite *attrCacheTestSuite) TestDeleteFile() {
 
 	err = suite.attrCache.DeleteFile(options)
 	suite.assert.Nil(err)
-	suite.assertNotInCache(path)
+	suite.assertDeleted(path)
 
 	// Entry Already Exists
 	suite.addPathToCache(path, false)

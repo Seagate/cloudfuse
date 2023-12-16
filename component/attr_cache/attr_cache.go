@@ -222,7 +222,7 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 	// Invalidate all descendants of the path, then invalidate the path
 
 	toBeInvalid, getErr := ac.cacheMap.get(path)
-	if getErr != nil {
+	if getErr != nil || !toBeInvalid.valid() {
 		log.Err("AttrCache::invalidateDirectory : could not invalidate cached attr item: %s", getErr)
 		return
 	}
@@ -551,11 +551,13 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		toBeDeleted, getErr := ac.cacheMap.get(options.Name)
-		if getErr != nil {
+		if getErr != nil || !toBeDeleted.valid() {
 			log.Err("AttrCache::DeleteFile : %s", getErr)
-		} else {
-			toBeDeleted.markDeleted(deletionTime)
+			// add deleted file entry
+			attr := internal.CreateObjAttr(options.Name, 0, deletionTime)
+			toBeDeleted = ac.cacheMap.insert(attr, true, deletionTime)
 		}
+		toBeDeleted.markDeleted(deletionTime)
 		if ac.cacheDirs {
 			ac.updateAncestorsInCloud(getParentDir(options.Name), deletionTime)
 		}
@@ -570,7 +572,7 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 	for dirPath != "" {
 		ancestorCacheItem, getErr := ac.cacheMap.get(dirPath)
-		if getErr != nil {
+		if getErr != nil || !ancestorCacheItem.exists() {
 			ancestorObjAttr := internal.CreateObjAttrDir(dirPath)
 			ancestorCacheItem = ac.cacheMap.insert(ancestorObjAttr, true, time)
 		}
