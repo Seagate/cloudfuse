@@ -182,6 +182,7 @@ func (value *attrCacheItem) setSize(size int64, changedAt time.Time) {
 
 func (value *attrCacheItem) setMode(mode os.FileMode) {
 	value.attr.Mode = mode
+	value.attr.Flags.Clear(internal.PropFlagModeDefault)
 	value.attr.Ctime = time.Now()
 	value.cachedAt = time.Now()
 }
