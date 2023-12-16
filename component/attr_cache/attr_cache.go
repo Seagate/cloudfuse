@@ -682,7 +682,7 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 	return err
 }
 
-// CopyFromFile : Mark the file invalid
+// CopyFromFile : Upload file and update cache entry
 func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("AttrCache::CopyFromFile : %s", options.Name)
 
@@ -700,19 +700,22 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 
 	err = ac.NextComponent().CopyFromFile(options)
 	if err == nil {
+		uploadTime := time.Now()
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		if ac.cacheDirs {
 			// This call needs to be treated like it's creating a new file
 			// Mark ancestors as existing in cloud storage now
-			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
+			ac.markAncestorsInCloud(getParentDir(options.Name), uploadTime)
 		}
 
 		// TODO: we're RLocking the cache but we need to also lock this attr item because another thread could be reading this attr item
 		toBeUpdated, getErr := ac.cacheMap.get(options.Name)
-		if getErr != nil {
+		if getErr != nil || !toBeUpdated.exists() {
 			log.Warn("AttrCache::CopyFromFile : %s", getErr)
-			return nil
+			// replace missing entry
+			attr := internal.CreateObjAttr(options.Name, 0, uploadTime)
+			ac.cacheMap.insert(attr, true, uploadTime)
 		}
 
 		fileStat, statErr := options.File.Stat()
@@ -722,10 +725,8 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 			return nil
 		}
 
-		// get the size of the source file
-		fileSize := fileStat.Size()
-		movedItem := ac.moveAttrCachedItem(toBeUpdated, options.Name, options.Name, time.Now())
-		movedItem.attr.Size = fileSize
+		// set the new size
+		toBeUpdated.setSize(fileStat.Size())
 	}
 	return err
 }
