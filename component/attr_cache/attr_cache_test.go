@@ -867,7 +867,7 @@ func (suite *attrCacheTestSuite) TestRenameDirNoCacheDirs() {
 			// ab paths should be invalidated
 			for p := ab.Front(); p != nil; p = p.Next() {
 				truncatedPath := internal.TruncateDirName(p.Value.(string))
-				suite.assertInvalid(truncatedPath)
+				suite.assertExists(truncatedPath)
 			}
 			// ac paths should be untouched
 			for p := ac.Front(); p != nil; p = p.Next() {

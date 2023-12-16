@@ -238,30 +238,6 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 	}
 }
 
-// renameCachedDirectory: Renames a cached directory and all its contents
-// this function assumes ac.cacheDirs is true
-// input: source folder path, destination folder path, rename timestamp
-func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time time.Time) error {
-
-	// First, check if the destination directory already exists
-	if ac.pathExistsInCache(dstDir) {
-		return os.ErrExist
-	}
-
-	srcItem, getErr := ac.cacheMap.get(srcDir)
-	if getErr != nil || !srcItem.exists() {
-		log.Err("AttrCache::renameCachedDirectory : %s ", getErr)
-		return syscall.ENOENT
-	}
-
-	srcDir = internal.TruncateDirName(srcDir)
-	dstDir = internal.TruncateDirName(dstDir)
-	ac.moveAttrCachedItem(srcItem, srcDir, dstDir, time)
-	ac.updateAncestorsInCloud(srcDir, time)
-	ac.updateAncestorsInCloud(dstDir, time)
-	return nil
-}
-
 // moveAttrItem: used to move a subtree within cacheMap to a new location of the cacheMap tree.
 // input: attrCacheItem to be moved, source and destination path, move timestamp
 func (ac *AttrCache) moveAttrCachedItem(srcItem *attrCacheItem, srcDir string, dstDir string, time time.Time) *attrCacheItem {
@@ -504,20 +480,34 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 	err := ac.NextComponent().RenameDir(options)
 
 	if err == nil {
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
+
+		// TLDR: Dst is guaranteed to be non-existent or empty.
+		// Note: We do not need to invalidate children of Dst due to the logic in our FUSE connector, see comments there,
+		// but it is always safer to double check than not.
+		ac.invalidateDirectory(options.Dst)
+
+		// if attr_cache is tracking directories, validate this rename
 		if ac.cacheDirs {
-			// renameCachedDirectory may cache the parent directory
-			// so lock the cache for writing
-			ac.cacheLock.Lock()
-			defer ac.cacheLock.Unlock()
-			err = ac.renameCachedDirectory(options.Src, options.Dst, currentTime)
-		} else {
-			ac.cacheLock.RLock()
-			defer ac.cacheLock.RUnlock()
-			ac.deleteDirectory(options.Src, currentTime)
-			// TLDR: Dst is guaranteed to be non-existent or empty.
-			// Note: We do not need to invalidate children of Dst due to the logic in our FUSE connector, see comments there,
-			// but it is always safer to double check than not.
-			ac.invalidateDirectory(options.Dst)
+			// First, check if the destination directory already exists
+			if ac.pathExistsInCache(options.Dst) {
+				return os.ErrExist
+			}
+			// get the source directory
+			srcItem, getErr := ac.cacheMap.get(options.Src)
+			if getErr != nil || !srcItem.exists() {
+				log.Err("AttrCache::renameCachedDirectory : %s ", getErr)
+				return syscall.ENOENT
+			}
+		}
+
+		// move everything over
+		srcItem, getErr := ac.cacheMap.get(options.Src)
+		if getErr == nil && srcItem.exists() {
+			srcDir := internal.TruncateDirName(options.Src)
+			dstDir := internal.TruncateDirName(options.Dst)
+			ac.moveAttrCachedItem(srcItem, srcDir, dstDir, currentTime)
 		}
 	}
 
