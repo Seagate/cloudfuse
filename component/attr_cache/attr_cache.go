@@ -595,7 +595,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 	}
 }
 
-// RenameFile : Mark the source file deleted. Invalidate the destination file.
+// RenameFile : Move item in cache
 func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("AttrCache::RenameFile : %s -> %s", options.Src, options.Dst)
 
@@ -613,7 +613,7 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 		}
 
 		// move source item to destination
-		ac.moveAttrCachedItem(sourceItem, options.Src, options.Dst, time.Now())
+		ac.moveAttrCachedItem(sourceItem, options.Src, options.Dst, renameTime)
 		if ac.cacheDirs {
 			ac.updateAncestorsInCloud(getParentDir(options.Src), renameTime)
 			// mark the destination parent directory tree as containing objects
@@ -639,17 +639,22 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	}
 
 	size, err := ac.NextComponent().WriteFile(options)
+
 	if err == nil {
+		modifyTime := time.Now()
+		newSize := options.Offset + int64(len(options.Data))
+
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		// TODO: Could we just update the size and mod time of the file here? Or can other attributes change here?
 
-		toBeInvalid, getErr := ac.cacheMap.get(attr.Path)
-		if getErr != nil {
-			log.Err("AttrCache::WriteFile : %s", getErr)
-		} else {
-			toBeInvalid.invalidate()
+		modifiedEntry, getErr := ac.cacheMap.get(options.Handle.Path)
+		if getErr != nil || !modifiedEntry.exists() {
+			log.Warn("AttrCache::WriteFile : %s replacing missing cache entry", options.Handle.Path)
+			// replace the missing entry
+			modifiedAttr := internal.CreateObjAttr(options.Handle.Path, newSize, modifyTime)
+			modifiedEntry = ac.cacheMap.insert(modifiedAttr, true, modifyTime)
 		}
+		modifiedEntry.setSize(newSize)
 	}
 	return size, err
 }
@@ -660,6 +665,8 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 
 	err := ac.NextComponent().TruncateFile(options)
 	if err == nil {
+		modifyTime := time.Now()
+
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 
@@ -667,9 +674,8 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 		if getErr != nil || !truncatedItem.exists() {
 			log.Warn("AttrCache::TruncateFile : %s replacing missing cache entry", options.Name)
 			// replace the missing entry
-			entryTime := time.Now()
-			truncatedAttr := internal.CreateObjAttr(options.Name, options.Size, entryTime)
-			truncatedItem = ac.cacheMap.insert(truncatedAttr, true, entryTime)
+			truncatedAttr := internal.CreateObjAttr(options.Name, options.Size, modifyTime)
+			truncatedItem = ac.cacheMap.insert(truncatedAttr, true, modifyTime)
 		}
 		truncatedItem.setSize(options.Size)
 	}

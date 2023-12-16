@@ -1178,7 +1178,7 @@ func (suite *attrCacheTestSuite) TestWriteFileExists() {
 
 	_, err := suite.attrCache.WriteFile(options)
 	suite.assert.Nil(err)
-	suite.assertInvalid(path)
+	suite.assertExists(path)
 }
 
 // Tests Truncate File
