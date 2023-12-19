@@ -527,13 +527,9 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 			// record that the parent directory tree contains at least one object
 			ac.markAncestorsInCloud(getParentDir(options.Name), currentTime)
 		}
-		newFileEntry, getErr := ac.cacheMap.get(options.Name)
-		if getErr != nil || !newFileEntry.exists() {
-			// add new entry
-			newFileAttr := internal.CreateObjAttr(options.Name, 0, currentTime)
-			newFileEntry = ac.cacheMap.insert(newFileAttr, true, currentTime)
-		}
-		newFileEntry.setSize(0, currentTime)
+		// add new entry
+		newFileAttr := internal.CreateObjAttr(options.Name, 0, currentTime)
+		newFileEntry := ac.cacheMap.insert(newFileAttr, true, currentTime)
 		newFileEntry.setMode(options.Mode)
 	}
 
