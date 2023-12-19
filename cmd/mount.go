@@ -63,6 +63,7 @@ type mountOptions struct {
 	MountPath  string
 	ConfigFile string
 
+	DryRun            bool
 	Logging           LogOptions     `config:"logging"`
 	Components        []string       `config:"components"`
 	Foreground        bool           `config:"foreground"`
@@ -380,6 +381,7 @@ var mountCmd = &cobra.Command{
 			}
 		}
 
+		// TODO: remove v1 switches, which were never used as part of cloudfuse.
 		if config.IsSet("invalidate-on-sync") {
 			log.Warn("mount: unsupported v1 CLI parameter: invalidate-on-sync is always true in cloudfuse.")
 		}
@@ -417,6 +419,12 @@ var mountCmd = &cobra.Command{
 		if err != nil {
 			log.Err("mount : failed to initialize new pipeline [%v]", err)
 			return Destroy(fmt.Sprintf("failed to initialize new pipeline [%s]", err.Error()))
+		}
+
+		// Dry run ends here
+		if options.DryRun {
+			log.Trace("Dry-run complete")
+			return nil
 		}
 
 		common.ForegroundMount = options.Foreground
@@ -611,6 +619,10 @@ func init() {
 
 	mountCmd.PersistentFlags().Bool("read-only", false, "Mount the system in read only mode. Default value false.")
 	config.BindPFlag("read-only", mountCmd.PersistentFlags().Lookup("read-only"))
+
+	mountCmd.Flags().BoolVar(&options.DryRun, "dry-run", false,
+		"Test mount configuration, credentials, etc., but don't make any changes to the container or the local file system. Implies foreground.")
+	config.BindPFlag("dry-run", mountCmd.Flags().Lookup("dry-run"))
 
 	mountCmd.PersistentFlags().String("default-working-dir", "", "Default working directory for storing log files and other cloudfuse information")
 	mountCmd.PersistentFlags().Lookup("default-working-dir").Hidden = true
