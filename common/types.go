@@ -45,6 +45,7 @@ const (
 	FileSystemName        = "cloudfuse"
 
 	DefaultConfigFilePath = "config.yaml"
+	DefaultConfigVersion  = 1
 
 	MaxConcurrency     = 40
 	DefaultConcurrency = 20

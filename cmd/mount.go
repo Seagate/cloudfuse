@@ -64,6 +64,7 @@ type mountOptions struct {
 	ConfigFile string
 
 	DryRun            bool
+	ConfigVersion     int            `config:"config-version"`
 	Logging           LogOptions     `config:"logging"`
 	Components        []string       `config:"components"`
 	Foreground        bool           `config:"foreground"`
@@ -291,6 +292,15 @@ var mountCmd = &cobra.Command{
 		}
 
 		skipNonEmpty := false
+
+		if !config.IsSet("config-version") {
+			options.ConfigVersion = common.DefaultConfigVersion
+		}
+
+		if options.ConfigVersion != common.DefaultConfigVersion {
+			return fmt.Errorf("Cloudfuse v%s supports config-version %d, but got config-version=%d.",
+				common.CloudfuseVersion, common.DefaultConfigVersion, options.ConfigVersion)
+		}
 
 		if config.IsSet("libfuse-options") {
 			for _, v := range options.LibfuseOptions {

@@ -25,6 +25,8 @@
 #      flag to false in mount command.
 # -----------------------------------------------------------------------------------------------------------------------
 
+# Config version
+config-version: <config version number. Default - 1>
 
 # Daemon configuration
 foreground: true|false <run cloudfuse in foreground or background>
