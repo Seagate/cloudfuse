@@ -142,9 +142,7 @@ func (handle *Handle) RemoveValue(key string) (interface{}, bool) {
 
 // Cleanup : Delete all user defined parameter from handle
 func (handle *Handle) Cleanup() {
-	for key := range handle.values {
-		delete(handle.values, key)
-	}
+	clear(handle.values)
 }
 
 // defaultHandleMap holds a synchronized map[ HandleID ]*Handle
