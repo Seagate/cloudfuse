@@ -656,9 +656,7 @@ func (bb *BlockBlob) List(prefix string, marker *string, count int32) ([]*intern
 	}
 
 	// Clean up the temp map as its no more needed
-	for k := range dirList {
-		delete(dirList, k)
-	}
+	clear(dirList)
 
 	return blobList, listBlob.NextMarker.Val, nil
 }

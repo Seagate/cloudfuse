@@ -1,6 +1,6 @@
 module github.com/Seagate/cloudfuse
 
-go 1.20
+go 1.21
 
 require (
 	github.com/Azure/azure-pipeline-go v0.2.4-0.20220425205405-09e6f201e1e4
@@ -31,7 +31,6 @@ require (
 	github.com/vibhansa-msft/tlru v0.0.0-20230621165448-dbd42234ad22
 	github.com/winfsp/cgofuse v1.5.0
 	go.uber.org/atomic v1.11.0
-	golang.org/x/exp v0.0.0-20231206192017-f3f8817b8deb
 	golang.org/x/sys v0.15.0
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -102,7 +101,8 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.15.0 // indirect
+	golang.org/x/crypto v0.17.0 // indirect
+	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/net v0.18.0 // indirect
 	golang.org/x/oauth2 v0.14.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect

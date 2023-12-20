@@ -32,6 +32,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -43,7 +44,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v2"
 )
 

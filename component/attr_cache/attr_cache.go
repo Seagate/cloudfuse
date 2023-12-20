@@ -190,7 +190,7 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 	//get attrCacheItem
 	toBeDeleted, getErr := ac.cacheMap.get(path)
 	if getErr != nil || !toBeDeleted.exists() {
-		log.Err("AttrCache::deleteCachedDirectory : %s", getErr)
+		log.Err("AttrCache::deleteCachedDirectory : %s not found", path)
 		return syscall.ENOENT
 	}
 	toBeDeleted.markDeleted(time)
@@ -201,7 +201,7 @@ func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
 
 // pathExistsInCache: check if path is in cache, is valid, and not marked deleted
 func (ac *AttrCache) pathExistsInCache(path string) bool {
-	value, getErr := ac.cacheMap.get(internal.TruncateDirName(path))
+	value, getErr := ac.cacheMap.get(path)
 	if getErr != nil {
 		return false
 	}
@@ -222,8 +222,8 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 	// Invalidate all descendants of the path, then invalidate the path
 
 	toBeInvalid, getErr := ac.cacheMap.get(path)
-	if getErr != nil {
-		log.Err("AttrCache::invalidateDirectory : could not invalidate cached attr item: %s", getErr)
+	if getErr != nil || !toBeInvalid.valid() {
+		log.Warn("AttrCache::invalidateDirectory : %s entry not found or already invalid", path)
 		return
 	}
 	// only invalidate directories when cacheDirs is false
@@ -236,30 +236,6 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 	for _, childItem := range toBeInvalid.children {
 		ac.invalidateDirectory(childItem.attr.Path)
 	}
-}
-
-// renameCachedDirectory: Renames a cached directory and all its contents
-// this function assumes ac.cacheDirs is true
-// input: source folder path, destination folder path, rename timestamp
-func (ac *AttrCache) renameCachedDirectory(srcDir string, dstDir string, time time.Time) error {
-
-	// First, check if the destination directory already exists
-	if ac.pathExistsInCache(dstDir) {
-		return os.ErrExist
-	}
-
-	srcItem, getErr := ac.cacheMap.get(srcDir)
-	if getErr != nil || !srcItem.exists() {
-		log.Err("AttrCache::renameCachedDirectory : %s ", getErr)
-		return syscall.ENOENT
-	}
-
-	srcDir = internal.TruncateDirName(srcDir)
-	dstDir = internal.TruncateDirName(dstDir)
-	ac.moveAttrCachedItem(srcItem, srcDir, dstDir, time)
-	ac.updateAncestorsInCloud(srcDir, time)
-	ac.updateAncestorsInCloud(dstDir, time)
-	return nil
 }
 
 // moveAttrItem: used to move a subtree within cacheMap to a new location of the cacheMap tree.
@@ -295,6 +271,7 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 	if len(dirPath) != 0 {
 		dirCacheItem, getErr := ac.cacheMap.get(dirPath)
 		if getErr != nil || !dirCacheItem.exists() {
+			log.Warn("AttrCache::markAncestorsInCloud : Adding parent directory %s", dirPath)
 			dirObjAttr := internal.CreateObjAttrDir(dirPath)
 			dirCacheItem = ac.cacheMap.insert(dirObjAttr, true, time)
 		}
@@ -315,18 +292,18 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 		if ac.cacheDirs {
+			// the cloud is not directory-aware
 			// check if directory already exists
-			if ac.pathExistsInCache(options.Name) {
+			dirAttrCacheItem, getErr := ac.cacheMap.get(options.Name)
+			if getErr == nil && dirAttrCacheItem.exists() {
 				return os.ErrExist
 			}
-			newDirAttr := internal.CreateObjAttrDir(options.Name)
-			newDirAttrCacheItem := ac.cacheMap.insert(newDirAttr, true, time.Now())
+		}
+		// add the directory to the cache
+		newDirAttr := internal.CreateObjAttrDir(options.Name)
+		newDirAttrCacheItem := ac.cacheMap.insert(newDirAttr, true, time.Now())
+		if ac.cacheDirs {
 			newDirAttrCacheItem.markInCloud(false)
-		} else {
-			dirAttrCacheItem, getErr := ac.cacheMap.get(options.Name)
-			if getErr == nil {
-				dirAttrCacheItem.invalidate()
-			}
 		}
 	}
 	return err
@@ -501,46 +478,59 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 	err := ac.NextComponent().RenameDir(options)
 
 	if err == nil {
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
+
+		// TLDR: Dst is guaranteed to be non-existent or empty.
+		// Note: We do not need to invalidate children of Dst due to the logic in our FUSE connector, see comments there,
+		// but it is always safer to double check than not.
+		ac.invalidateDirectory(options.Dst)
+
+		// if attr_cache is tracking directories, validate this rename
 		if ac.cacheDirs {
-			// renameCachedDirectory may cache the parent directory
-			// so lock the cache for writing
-			ac.cacheLock.Lock()
-			defer ac.cacheLock.Unlock()
-			err = ac.renameCachedDirectory(options.Src, options.Dst, currentTime)
+			// First, check if the destination directory already exists
+			if ac.pathExistsInCache(options.Dst) {
+				return os.ErrExist
+			}
+		}
+
+		// get the source directory
+		srcItem, getErr := ac.cacheMap.get(options.Src)
+		if getErr != nil || !srcItem.exists() {
+			log.Err("AttrCache::RenameDir : %s source not found", options.Src)
+			if ac.cacheDirs {
+				return syscall.ENOENT
+			}
 		} else {
-			ac.cacheLock.RLock()
-			defer ac.cacheLock.RUnlock()
-			ac.deleteDirectory(options.Src, currentTime)
-			// TLDR: Dst is guaranteed to be non-existent or empty.
-			// Note: We do not need to invalidate children of Dst due to the logic in our FUSE connector, see comments there,
-			// but it is always safer to double check than not.
-			ac.invalidateDirectory(options.Dst)
+			// move everything over
+			srcDir := internal.TruncateDirName(options.Src)
+			dstDir := internal.TruncateDirName(options.Dst)
+			ac.moveAttrCachedItem(srcItem, srcDir, dstDir, currentTime)
 		}
 	}
 
 	return err
 }
 
-// CreateFile: Mark the file invalid
+// CreateFile: Cache a new entry for the file
 func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	log.Trace("AttrCache::CreateFile : %s", options.Name)
 	h, err := ac.NextComponent().CreateFile(options)
 
 	if err == nil {
+		currentTime := time.Now()
 		// TODO: the cache locks are used incorrectly here
 		// They routinely lock the cache for reading, but then write to it
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		if ac.cacheDirs {
 			// record that the parent directory tree contains at least one object
-			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
+			ac.markAncestorsInCloud(getParentDir(options.Name), currentTime)
 		}
-		// TODO: we assume that the OS will call GetAttr after this.
-		// 		if it doesn't, will invalidating this entry cause problems?
-		toBeInvalid, getErr := ac.cacheMap.get(options.Name)
-		if getErr == nil {
-			toBeInvalid.invalidate()
-		}
+		// add new entry
+		newFileAttr := internal.CreateObjAttr(options.Name, 0, currentTime)
+		newFileEntry := ac.cacheMap.insert(newFileAttr, true, currentTime)
+		newFileEntry.setMode(options.Mode)
 	}
 
 	return h, err
@@ -556,11 +546,13 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 		toBeDeleted, getErr := ac.cacheMap.get(options.Name)
-		if getErr != nil {
-			log.Err("AttrCache::DeleteFile : %s", getErr)
-		} else {
-			toBeDeleted.markDeleted(deletionTime)
+		if getErr != nil || !toBeDeleted.valid() {
+			log.Warn("AttrCache::DeleteFile : %s no valid entry found. Adding entry...", options.Name)
+			// add deleted file entry
+			attr := internal.CreateObjAttr(options.Name, 0, deletionTime)
+			toBeDeleted = ac.cacheMap.insert(attr, true, deletionTime)
 		}
+		toBeDeleted.markDeleted(deletionTime)
 		if ac.cacheDirs {
 			ac.updateAncestorsInCloud(getParentDir(options.Name), deletionTime)
 		}
@@ -575,7 +567,8 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 	for dirPath != "" {
 		ancestorCacheItem, getErr := ac.cacheMap.get(dirPath)
-		if getErr != nil {
+		if getErr != nil || !ancestorCacheItem.exists() {
+			log.Warn("AttrCache::updateAncestorsInCloud : Adding directory entry %s", dirPath)
 			ancestorObjAttr := internal.CreateObjAttrDir(dirPath)
 			ancestorCacheItem = ac.cacheMap.insert(ancestorObjAttr, true, time)
 		}
@@ -598,7 +591,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 	}
 }
 
-// RenameFile : Mark the source file deleted. Invalidate the destination file.
+// RenameFile : Move item in cache
 func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("AttrCache::RenameFile : %s -> %s", options.Src, options.Dst)
 
@@ -612,11 +605,12 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 		sourceItem, getErr := ac.cacheMap.get(options.Src)
 		if getErr != nil || !sourceItem.exists() {
 			log.Warn("AttrCache::RenameFile : Source %s does not exist in cache", options.Src)
+			// don't return an error - cloud storage still succeeded
 			return nil
 		}
 
 		// move source item to destination
-		ac.moveAttrCachedItem(sourceItem, options.Src, options.Dst, time.Now())
+		ac.moveAttrCachedItem(sourceItem, options.Src, options.Dst, renameTime)
 		if ac.cacheDirs {
 			ac.updateAncestorsInCloud(getParentDir(options.Src), renameTime)
 			// mark the destination parent directory tree as containing objects
@@ -642,17 +636,23 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	}
 
 	size, err := ac.NextComponent().WriteFile(options)
+
 	if err == nil {
+		modifyTime := time.Now()
+		newSize := options.Offset + int64(len(options.Data))
+
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		// TODO: Could we just update the size and mod time of the file here? Or can other attributes change here?
 
-		toBeInvalid, getErr := ac.cacheMap.get(attr.Path)
-		if getErr != nil {
-			log.Err("AttrCache::WriteFile : %s", getErr)
-		} else {
-			toBeInvalid.invalidate()
+		modifiedEntry, getErr := ac.cacheMap.get(options.Handle.Path)
+		if getErr != nil || !modifiedEntry.exists() {
+			log.Warn("AttrCache::WriteFile : %s replacing missing cache entry", options.Handle.Path)
+			// replace the missing entry
+			modifiedAttr := internal.CreateObjAttr(options.Handle.Path, newSize, modifyTime)
+			modifiedEntry = ac.cacheMap.insert(modifiedAttr, true, modifyTime)
 		}
+		modifiedEntry.setSize(newSize, modifyTime)
+		modifiedEntry.attr.Metadata = options.Metadata
 	}
 	return size, err
 }
@@ -663,6 +663,8 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 
 	err := ac.NextComponent().TruncateFile(options)
 	if err == nil {
+		modifyTime := time.Now()
+
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 
@@ -670,16 +672,15 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 		if getErr != nil || !truncatedItem.exists() {
 			log.Warn("AttrCache::TruncateFile : %s replacing missing cache entry", options.Name)
 			// replace the missing entry
-			entryTime := time.Now()
-			truncatedAttr := internal.CreateObjAttr(options.Name, options.Size, entryTime)
-			truncatedItem = ac.cacheMap.insert(truncatedAttr, true, entryTime)
+			truncatedAttr := internal.CreateObjAttr(options.Name, options.Size, modifyTime)
+			truncatedItem = ac.cacheMap.insert(truncatedAttr, true, modifyTime)
 		}
-		truncatedItem.setSize(options.Size)
+		truncatedItem.setSize(options.Size, modifyTime)
 	}
 	return err
 }
 
-// CopyFromFile : Mark the file invalid
+// CopyFromFile : Upload file and update cache entry
 func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("AttrCache::CopyFromFile : %s", options.Name)
 
@@ -697,36 +698,37 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 
 	err = ac.NextComponent().CopyFromFile(options)
 	if err == nil {
+		uploadTime := time.Now()
+		// TODO: we're RLocking the cache but we need to also lock this attr item because another thread could be reading this attr item
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
+
 		if ac.cacheDirs {
 			// This call needs to be treated like it's creating a new file
 			// Mark ancestors as existing in cloud storage now
-			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
+			ac.markAncestorsInCloud(getParentDir(options.Name), uploadTime)
 		}
 
-		// TODO: we're RLocking the cache but we need to also lock this attr item because another thread could be reading this attr item
-		toBeUpdated, getErr := ac.cacheMap.get(options.Name)
-		if getErr != nil {
-			log.Warn("AttrCache::CopyFromFile : %s", getErr)
-			return nil
-		}
-
+		// use local file to update the attribute cache entry
 		fileStat, statErr := options.File.Stat()
 		if statErr != nil {
-			log.Warn("AttrCache::CopyFromFile : Can't get new file size: %s", statErr)
-			toBeUpdated.invalidate()
-			return nil
+			// if we can't stat the local file, we know nothing
+			log.Err("AttrCache::CopyFromFile : %s Can't stat local file: %s", options.Name, statErr)
+			entry, getErr := ac.cacheMap.get(options.Name)
+			if getErr == nil {
+				entry.invalidate()
+			}
+		} else {
+			// replace entry
+			attr := internal.CreateObjAttr(options.Name, fileStat.Size(), fileStat.ModTime())
+			entry := ac.cacheMap.insert(attr, true, uploadTime)
+			entry.setMode(fileStat.Mode())
 		}
-
-		// get the size of the source file
-		fileSize := fileStat.Size()
-		movedItem := ac.moveAttrCachedItem(toBeUpdated, options.Name, options.Name, time.Now())
-		movedItem.attr.Size = fileSize
 	}
 	return err
 }
 
+// SyncFile : Refresh attributes from storage
 func (ac *AttrCache) SyncFile(options internal.SyncFileOptions) error {
 	log.Trace("AttrCache::SyncFile : %s", options.Handle.Path)
 	err := ac.NextComponent().SyncFile(options)
@@ -741,6 +743,7 @@ func (ac *AttrCache) SyncFile(options internal.SyncFileOptions) error {
 	return err
 }
 
+// SyncDir : Refresh attributes from storage
 func (ac *AttrCache) SyncDir(options internal.SyncDirOptions) error {
 	log.Trace("AttrCache::SyncDir : %s", options.Name)
 
@@ -763,7 +766,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// Try to serve the request from the attribute cache
 		// Is the entry marked deleted?
 		if value.isDeleted() {
-			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
+			log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
 			return &internal.ObjAttr{}, syscall.ENOENT
 		}
 		// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
@@ -796,21 +799,21 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	return pathAttr, getErr
 }
 
-// CreateLink : Mark the link and target invalid
+// CreateLink : Mark the new link invalid
 func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 	log.Trace("AttrCache::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
 
 	err := ac.NextComponent().CreateLink(options)
 
 	if err == nil {
+		currentTime := time.Now()
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
-		toBeInvalid, getErr := ac.cacheMap.get(options.Name)
-		if getErr == nil {
-			toBeInvalid.invalidate()
-		}
+		linkAttr := internal.CreateObjAttr(options.Name, int64(len([]byte(options.Target))), currentTime)
+		linkAttr.Flags.Set(internal.PropFlagSymlink)
+		ac.cacheMap.insert(linkAttr, true, currentTime)
 		if ac.cacheDirs {
-			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
+			ac.markAncestorsInCloud(getParentDir(options.Name), currentTime)
 		}
 	}
 
@@ -842,9 +845,12 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 
-		value, getErr := ac.cacheMap.get(internal.TruncateDirName(options.Name))
-		if getErr != nil || !value.exists() {
-			log.Err("AttrCache::Chmod : %s not in cache", options.Name)
+		value, getErr := ac.cacheMap.get(options.Name)
+		if getErr != nil {
+			log.Err("AttrCache::Chmod : %v", getErr)
+		} else if !value.exists() {
+			log.Err("AttrCache::Chmod : invalidating deleted entry %s", options.Name)
+			value.invalidate()
 		} else {
 			value.setMode(options.Mode)
 		}
