@@ -51,11 +51,11 @@ Source: "..\windows-startup.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\sampleDataSetFuseConfig.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\sampleFileCacheConfigAzure.yaml"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\sampleFileCacheConfigS3.yaml"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\sampleFileCacheWithSASConfigAzure.yaml"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\sampleStreamingConfigAzure.yaml"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\sampleStreamingConfigS3.yaml"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\sampleFileCacheConfigAzure.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
+Source: "..\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
+Source: "..\sampleFileCacheWithSASConfigAzure.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
+Source: "..\sampleStreamingConfigAzure.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
+Source: "..\sampleStreamingConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
 ; Deploy default config
 Source: "..\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; DestName: "config.yaml"; Flags: onlyifdoesntexist
 
