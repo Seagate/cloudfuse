@@ -7,6 +7,7 @@ from sys import platform
 from PySide6 import QtWidgets
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import Qt, QSettings
+from PySide6.QtGui import QScreen
 
 file_cache_eviction_choices = ['lru','lfu']
 libfusePermissions = [0o777,0o666,0o644,0o444]
@@ -265,7 +266,10 @@ class widgetCustomFunctions(QWidget):
             self.resize(self.myWindow.value("window size"))
             self.move(self.myWindow.value("window position"))
         except:
-            pass
+            desktopCenter = QScreen.availableGeometry(QtWidgets.QApplication.primaryScreen()).center()
+            myWindowGeometry = self.frameGeometry()
+            myWindowGeometry.moveCenter(desktopCenter)
+            self.move(myWindowGeometry.topLeft())
         
     # defaultSettingsManager has set the settings to all default, now the code needs to pull in
     #   all the changes from the config file the user provides. This may not include all the 
