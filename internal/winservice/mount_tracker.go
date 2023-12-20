@@ -83,8 +83,13 @@ func getMountTrackerFile() (string, error) {
 	return fullPath, nil
 }
 
-func readMounts(filePath string) (Mounts, error) {
-	file, err := os.ReadFile(filePath)
+func readMounts() (Mounts, error) {
+	trackerFile, err := getMountTrackerFile()
+	if err != nil {
+		return Mounts{}, err
+	}
+
+	file, err := os.ReadFile(trackerFile)
 	if err != nil {
 		return Mounts{}, err
 	}
@@ -94,60 +99,21 @@ func readMounts(filePath string) (Mounts, error) {
 	return mounts, err
 }
 
-func writeMounts(filePath string, mounts Mounts) error {
+func writeMounts(mounts Mounts) error {
+	trackerFile, err := getMountTrackerFile()
+	if err != nil {
+		return err
+	}
+
 	data, err := json.MarshalIndent(mounts, "", " ")
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(filePath, data, 0644)
+	return os.WriteFile(trackerFile, data, 0644)
 }
 
-func readMountsFromFile() ([]Mount, error) {
-	mountPath, err := getMountTrackerFile()
-	if err != nil {
-		return nil, err
-	}
-
-	mounts, err := readMounts(mountPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return mounts.Mounts, nil
-}
-
-// AddMountJSON adds an entry to our json file with the mount path and config
-// file location.
-func AddMountJSON(mountPath string, configFile string) error {
-	mountPath, err := getMountTrackerFile()
-	if err != nil {
-		return err
-	}
-
-	mounts, err := readMounts(mountPath)
-	if err != nil {
-		return err
-	}
-
-	newMount := Mount{MountPath: mountPath, ConfigFile: configFile}
-	mounts.Mounts = append(mounts.Mounts, newMount)
-
-	return writeMounts(mountPath, mounts)
-}
-
-// RemoveMountJSON removes an entry to from our json file.
-func RemoveMountJSON(mountPath string) error {
-	mountPath, err := getMountTrackerFile()
-	if err != nil {
-		return err
-	}
-
-	mounts, err := readMounts(mountPath)
-	if err != nil {
-		return err
-	}
-
+func removeMount(mounts Mounts, mountPath string) Mounts {
 	filtered := make([]Mount, 0)
 	for _, mount := range mounts.Mounts {
 		if mount.MountPath != mountPath {
@@ -155,6 +121,36 @@ func RemoveMountJSON(mountPath string) error {
 		}
 	}
 
-	mounts.Mounts = filtered
-	return writeMounts(mountPath, mounts)
+	filteredMounts := Mounts{Mounts: filtered}
+	return filteredMounts
+}
+
+// AddMountJSON adds an entry to our json file with the mount path and config
+// file location.
+func AddMountJSON(mountPath string, configFile string) error {
+	mounts, err := readMounts()
+	if err != nil {
+		return err
+	}
+
+	// If a the path to the current mount is already in the mounts.json file
+	// then remove it.
+	removeMount(mounts, mountPath)
+
+	newMount := Mount{MountPath: mountPath, ConfigFile: configFile}
+	mounts.Mounts = append(mounts.Mounts, newMount)
+
+	return writeMounts(mounts)
+}
+
+// RemoveMountJSON removes an entry to from our json file.
+func RemoveMountJSON(mountPath string) error {
+	mounts, err := readMounts()
+	if err != nil {
+		return err
+	}
+
+	mounts = removeMount(mounts, mountPath)
+
+	return writeMounts(mounts)
 }

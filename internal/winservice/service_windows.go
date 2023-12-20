@@ -107,13 +107,13 @@ func IsMounted(mountPath string) (bool, error) {
 // startService starts cloudfuse by instructing WinFsp to launch it.
 func StartMounts() error {
 	// Read mount file to get names of the mounts we need to start
-	mounts, err := readMountsFromFile()
+	mounts, err := readMounts()
 	// If there is nothing in our file to mount then continue
 	if err != nil {
 		return err
 	}
 
-	for _, inst := range mounts {
+	for _, inst := range mounts.Mounts {
 		err := StartMount(inst.MountPath, inst.ConfigFile)
 		if err != nil {
 			log.Err("Unable to start mount with mountpath: ", inst.MountPath)

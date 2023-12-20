@@ -68,8 +68,8 @@ var serviceCmd = &cobra.Command{
 
 var installCmd = &cobra.Command{
 	Use:               "install",
-	Short:             "Installs the startup process for Cloudfuse",
-	Long:              "Installs the startup process for Cloudfuse which remounts any active previously active mounts on startup.",
+	Short:             "Installs the startup process for Cloudfuse. Requires running as admin.",
+	Long:              "Installs the startup process for Cloudfuse which remounts any active previously active mounts on startup. . Requires running as admin.",
 	SuggestFor:        []string{"ins", "inst"},
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
@@ -84,14 +84,20 @@ var installCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("unable to create startup link [%s]", err.Error())
 		}
+
+		// Create the registry for WinFsp
+		err = winservice.CreateWinFspRegistry()
+		if err != nil {
+			return fmt.Errorf("error adding Windows registry for WinFSP support [%s]", err.Error())
+		}
 		return nil
 	},
 }
 
 var uninstallCmd = &cobra.Command{
 	Use:               "uninstall",
-	Short:             "Uninstall the startup process for Cloudfuse",
-	Long:              "Uninstall the startup process for Cloudfuse",
+	Short:             "Uninstall the startup process for Cloudfuse. Requires running as admin.",
+	Long:              "Uninstall the startup process for Cloudfuse. Requires running as admin.",
 	SuggestFor:        []string{"uninst", "uninstal"},
 	Example:           "cloudfuse service uninstall",
 	FlagErrorHandling: cobra.ExitOnError,
@@ -100,6 +106,12 @@ var uninstallCmd = &cobra.Command{
 		err := os.Remove(startupPath)
 		if err != nil {
 			return fmt.Errorf("failed to delete startup process [%s]", err.Error())
+		}
+
+		// Remove the registry for WinFsp
+		err = winservice.RemoveWinFspRegistry()
+		if err != nil {
+			return fmt.Errorf("error removing Windows registry from WinFSP [%s]", err.Error())
 		}
 
 		return nil
