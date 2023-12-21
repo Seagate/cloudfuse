@@ -1,5 +1,20 @@
 # Cloudfuse Changelog #
 
+## 0.3.0 ##
+
+This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
+**Changes**
+-- Windows mount no longer requires admin rights
+-- Replaced service dedicated to restart mounts on bootup, with a new Windows startup tool that restarts mounts on login.
+-- Persistent mounts are now stored in AppData on Windows rather than the registry.
+-- Add --dry-run option
+-- Bump golang.org/x/crypto from 0.15.0 to 0.17.0
+**Bug Fixes**
+-- [#58](https://github.com/Seagate/cloudfuse/pull/58) Fix Windows permissions
+-- [#61](https://github.com/Seagate/cloudfuse/pull/61) Keep window open on failed config write
+-- [#62](https://github.com/Seagate/cloudfuse/pull/62) Don't delete file cache on unmount when allow-non-empty-temp is set
+-- [#70](https://github.com/Seagate/cloudfuse/pull/70) Fix window position issue
+
 ## 0.2.1 ##
 
 This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).

@@ -127,6 +127,7 @@ func (cl *Client) Configure(cfg Config) error {
 		config.WithCredentialsProvider(credentialsProvider),
 		config.WithEndpointResolverWithOptions(endpointResolver),
 		config.WithAppID(UserAgent()),
+		config.WithRegion("auto"),
 	)
 	if err != nil {
 		log.Err("Client::Configure : config.LoadDefaultConfig() failed. Here's why: %v", err)
@@ -874,7 +875,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 			uploadPartInput := &s3.UploadPartInput{
 				Bucket:     aws.String(cl.Config.authConfig.BucketName),
 				Key:        aws.String(key),
-				PartNumber: partNumber,
+				PartNumber: &partNumber,
 				UploadId:   &uploadID,
 				Body:       bytes.NewReader(data),
 			}
@@ -904,7 +905,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 				Key:             aws.String(key),
 				CopySource:      aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, key)),
 				CopySourceRange: aws.String("bytes=" + fmt.Sprint(blk.StartIndex) + "-" + fmt.Sprint(blk.EndIndex-1)),
-				PartNumber:      partNumber,
+				PartNumber:      &partNumber,
 				UploadId:        &uploadID,
 			})
 			eTag = partResp.CopyPartResult.ETag
@@ -931,7 +932,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 			etag := strings.Trim(*eTag, "\"")
 			cPart := types.CompletedPart{
 				ETag:       &etag,
-				PartNumber: partNum,
+				PartNumber: &partNum,
 			}
 			if cl.Config.enableChecksum {
 				cPart.ChecksumCRC32 = checksumCRC32

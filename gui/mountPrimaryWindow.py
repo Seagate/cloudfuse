@@ -87,49 +87,9 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.page = underConstruction()
         self.page.show()
 
-    # Wrapper/helper for the service install and start.
-    def windowsServiceInstall(self):
-        # install the service
-        (stdOut, stdErr, exitCode, executableFound) = self.runCommand("cloudfuse.exe service install".split())
-        if not executableFound:
-            self.addOutputText("cloudfuse.exe not found! Is it installed?")
-            self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
-            return False
-        if exitCode != 0:
-            # check if this is a permissions issue
-            if stdErr.find('admin') != -1:
-                self.addOutputText(stdErr)
-                self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
-                return False
-            # check if the request was redundant
-            if stdErr.find('already') != -1:
-                return True
-            else:
-                # stop on any other error
-                self.addOutputText(stdErr)
-                return False
-        # start the service
-        (stdOut, stdErr, exitCode, executableFound) = self.runCommand("cloudfuse.exe service start".split())
-        if not executableFound:
-            self.addOutputText("cloudfuse.exe not found! Is it installed?")
-            self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
-            return False
-        if exitCode != 0:
-            # check if this is a permissions issue
-            if stdErr.find('admin') != -1:
-                self.addOutputText(stdErr)
-                self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
-                return False
-            # check if the request was redundant
-            if stdErr.find('already') != -1:
-                return True
-            else:
-                # stop on any other error
-                self.addOutputText(stdErr)
-                return False
-        return True
 
     def mountBucket(self):
+        self.addOutputText("Validating configuration...")
         # Update the pipeline/components before mounting the target
         targetIndex = self.dropDown_bucketSelect.currentIndex() 
         success = self.modifyPipeline(bucketOptions[targetIndex])
@@ -155,11 +115,23 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 self.errorMessageBox(f"Error: Cloudfuse needs to create the directory {directory}, but it already exists!")
                 return
             
-            # Install and start the service
-            if not self.windowsServiceInstall():
-                # don't mount, since we failed to install the service
+            # do a dry run to validate options and credentials
+            commandParts = ['cloudfuse.exe', 'mount', directory, f'--config-file={configPath}', '--dry-run']
+            (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
+            if not executableFound:
+                self.addOutputText("cloudfuse.exe not found! Is it installed?")
+                self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
                 return
             
+            if exitCode != 0:
+                self.addOutputText(stdErr)
+                self.errorMessageBox("Mount failed: " + stdErr)
+                return
+            
+            if stdOut != "":
+                self.addOutputText(stdOut)
+
+            # now actually mount
             commandParts = ['cloudfuse.exe', 'service', 'mount', directory, f'--config-file={configPath}']
             (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
             if not executableFound:
@@ -169,12 +141,12 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             
             if exitCode != 0:
                 self.addOutputText(stdErr)
-                # check if this is a permissions issue
-                if stdErr.find('admin') != -1:
-                    self.errorMessageBox("Error mounting container - Please re-launch this application as administrator.")
-                elif stdErr.find("mount path exists") != -1:
+                if stdErr.find("mount path exists") != -1:
                     self.errorMessageBox("This container is already mounted at this directory.")
                 return
+            
+            if stdOut != "":
+                self.addOutputText(stdOut)
             
             # wait for mount, then check that mount succeeded by verifying that the mount directory exists
             self.addOutputText("Mount command successfully sent to Windows service.\nVerifying mount success...")
@@ -183,7 +155,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                     self.addOutputText(f"Failed to create mount directory {directory}")
                     self.errorMessageBox("Mount failed silently... Do you need to empty the file cache directory?")
                 self.addOutputText("Successfully mounted container")
-            QtCore.QTimer.singleShot(5000, verifyMountSuccess)
+            QtCore.QTimer.singleShot(4000, verifyMountSuccess)
         else:
             commandParts = ['./cloudfuse', 'mount', directory, f'--config-file={configPath}']
             (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
@@ -221,16 +193,15 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def modifyPipeline(self,target):
 
         currentDir = widgetFuncs.getCurrentDir(self)
-        errMsg = QtWidgets.QMessageBox()
         
         # Read in the configs as a dictionary. Notify user if failed
         try:
             with open(currentDir+'/config.yaml', 'r') as file:
                 configs = yaml.safe_load(file)
         except:
-            errMsg.setWindowTitle("Could not read config file")
-            errMsg.setText(f"Could not read the config file in {currentDir}. Consider going through the settings for selected target.")
-            errMsg.exec()
+            self.errorMessageBox(
+                f"Could not read the config file in {currentDir}. Consider going through the settings for selected target.",
+                "Could not read config file")
             return False
         
         # Modify the components (pipeline) in the config file. 
@@ -241,9 +212,9 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             components[mountTargetComponent] = target
             configs['components'] = components
         else:
-            errMsg.setWindowTitle("Components in config missing")
-            errMsg.setText(f"The components is missing in {currentDir}/config.yaml. Consider Going through the settings to create one.")
-            errMsg.exec()            
+            self.errorMessageBox(
+                f"The components is missing in {currentDir}/config.yaml. Consider Going through the settings to create one.",
+                "Components in config missing")
             return False
         
         # Write the config file with the modified components 
@@ -251,9 +222,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             with open(currentDir+'/config.yaml','w') as file:
                 yaml.safe_dump(configs,file)
         except:
-            errMsg.setWindowTitle("Could not modify config file")
-            errMsg.setText(f"Could not modify {currentDir}/config.yaml.")
-            errMsg.exec()
+            self.errorMessageBox(f"Could not modify {currentDir}/config.yaml.", "Could not modify config file")
             return False
         
         # If nothing failed so far, return true to proceed to the mount phase
@@ -279,11 +248,12 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     
     def addOutputText(self, textString):
         self.textEdit_output.setText(f"{self.textEdit_output.toPlainText()}{textString}\n")
+        self.textEdit_output.repaint()
     
-    def errorMessageBox(self, messageString):
+    def errorMessageBox(self, messageString, titleString="Error"):
         msg = QtWidgets.QMessageBox()
         # Get the user's attention by popping open a new window
-        msg.setWindowTitle("Error")
+        msg.setWindowTitle(titleString)
         msg.setText(messageString)
         # Show the message box
         msg.exec()

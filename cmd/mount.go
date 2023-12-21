@@ -63,6 +63,7 @@ type mountOptions struct {
 	MountPath  string
 	ConfigFile string
 
+	DryRun            bool
 	Logging           LogOptions     `config:"logging"`
 	Components        []string       `config:"components"`
 	Foreground        bool           `config:"foreground"`
@@ -234,8 +235,8 @@ func parseConfig() error {
 // Look at https://cobra.dev/ for more information
 var mountCmd = &cobra.Command{
 	Use:               "mount [path]",
-	Short:             "Mounts the azure container as a filesystem",
-	Long:              "Mounts the azure container as a filesystem",
+	Short:             "Mounts the container as a filesystem",
+	Long:              "Mounts the container as a filesystem",
 	SuggestFor:        []string{"mnt", "mout"},
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
@@ -380,6 +381,7 @@ var mountCmd = &cobra.Command{
 			}
 		}
 
+		// TODO: remove v1 switches, which were never used as part of cloudfuse.
 		if config.IsSet("invalidate-on-sync") {
 			log.Warn("mount: unsupported v1 CLI parameter: invalidate-on-sync is always true in cloudfuse.")
 		}
@@ -409,7 +411,6 @@ var mountCmd = &cobra.Command{
 
 		// If on Linux start with the go daemon
 		// If on Windows, don't use the daemon since it is not supported
-		// TODO: Enable running as a service on Windows
 		if runtime.GOOS == "windows" {
 			pipeline, err = internal.NewPipeline(options.Components, true)
 		} else {
@@ -420,11 +421,16 @@ var mountCmd = &cobra.Command{
 			return Destroy(fmt.Sprintf("failed to initialize new pipeline [%s]", err.Error()))
 		}
 
+		// Dry run ends here
+		if options.DryRun {
+			log.Trace("Dry-run complete")
+			return nil
+		}
+
 		common.ForegroundMount = options.Foreground
 
 		log.Info("mount: Mounting cloudfuse on %s", options.MountPath)
 		// Prevent mounting in background on Windows
-		// TODO: Enable background support using windows services
 		if !options.Foreground && runtime.GOOS != "windows" {
 			pidFile := strings.Replace(options.MountPath, "/", "_", -1) + ".pid"
 			pidFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), pidFile)
@@ -613,6 +619,10 @@ func init() {
 
 	mountCmd.PersistentFlags().Bool("read-only", false, "Mount the system in read only mode. Default value false.")
 	config.BindPFlag("read-only", mountCmd.PersistentFlags().Lookup("read-only"))
+
+	mountCmd.Flags().BoolVar(&options.DryRun, "dry-run", false,
+		"Test mount configuration, credentials, etc., but don't make any changes to the container or the local file system. Implies foreground.")
+	config.BindPFlag("dry-run", mountCmd.Flags().Lookup("dry-run"))
 
 	mountCmd.PersistentFlags().String("default-working-dir", "", "Default working directory for storing log files and other cloudfuse information")
 	mountCmd.PersistentFlags().Lookup("default-working-dir").Hidden = true

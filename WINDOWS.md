@@ -10,18 +10,16 @@ automatically run in foreground.
 
         cloudfuse.exe mount <mount path> --config-file=<config file>
 
-## Running as a Windows service (recommended)
-To run as a Windows service you need to run the following commands in a terminal with administrator privileges.
+## Running in background mode (recommended)
+To run in background mode you need to use the `service` command. This uses the WinFSP launcher to run the mount in the
+background and will also automatically restart existing mounts on system restart.
 
-1. Install Cloudfuse as a Windows service.
+1. Install the Cloudfuse startup program. This is a program that launches on Windows login which will relaunch previous
+   mounts.
 
         cloudfuse.exe service install
 
-2. Start the Cloudfuse Windows service.
-
-        cloudfuse.exe service start
-
-3. Now we can start a mount that is managed by Cloudfuse. Once you mount the bucket or container the mount will persit
+2. Now we can start a mount that is managed by Cloudfuse. Once you mount the bucket or container the mount will persist
    on restart or shutdowns while the Cloudfuse service is running. Cloudfuse can also support any number of mounts
    running on Windows.
 
@@ -31,12 +29,7 @@ To unmount a specific instance use the unmount command. This will also prevent t
 
         cloudfuse.exe service unmount <mount path>
 
-To stop the Cloudfuse service use the stop command. Mounts that were running will reappear once the service is started
-again.
-
-        cloudfuse.exe service stop
-
-To uninstall Cloudfuse as a Windows service use the uninstall command.
+To uninstall the Cloudfuse startup program use the uninstall command.
 
         cloudfuse.exe service uninstall
 

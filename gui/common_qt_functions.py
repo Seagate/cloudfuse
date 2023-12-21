@@ -7,6 +7,7 @@ from sys import platform
 from PySide6 import QtWidgets
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import Qt, QSettings
+from PySide6.QtGui import QScreen
 
 file_cache_eviction_choices = ['lru','lfu']
 libfusePermissions = [0o777,0o666,0o644,0o444]
@@ -193,8 +194,10 @@ class widgetCustomFunctions(QWidget):
         elif ret == QtWidgets.QMessageBox.Save:
             # Insert all settings to yaml file
             self.exitWindowCleanup()
-            self.writeConfigFile()
-            event.accept()
+            if self.writeConfigFile():
+                event.accept()
+            else:
+                event.ignore()
         
     def constructDictForConfig(self):
         optionKeys = self.settings.allKeys()
@@ -220,8 +223,16 @@ class widgetCustomFunctions(QWidget):
         self.updateSettingsFromUIChoices()
         dictForConfigs = self.constructDictForConfig()
         currentDir = self.getCurrentDir()
-        with open(currentDir+'/config.yaml','w') as file:
-            yaml.safe_dump(dictForConfigs,file)
+        try:
+            with open(currentDir+'/config.yaml','w') as file:
+                yaml.safe_dump(dictForConfigs,file)
+                return True
+        except:
+            msg = QtWidgets.QMessageBox()
+            msg.setWindowTitle("Write Failed")
+            msg.setInformativeText("Writing the config file failed. Check file permissions and try again.")
+            msg.exec()
+            return False
             
     def getConfigs(self,useDefault=False):
         currentDir = self.getCurrentDir()
@@ -229,6 +240,10 @@ class widgetCustomFunctions(QWidget):
             try:
                 with open(currentDir+'/default_config.yaml','r') as file:
                     configs = yaml.safe_load(file)
+                    if configs is None:
+                        # The default file is empty, use programmed defaults
+                        defaultSettingsManager.setAllDefaultSettings(self)
+                        configs = self.constructDictForConfig()
             except:
                 # There is no default config file, use programmed defaults
                 defaultSettingsManager.setAllDefaultSettings(self)
@@ -237,7 +252,11 @@ class widgetCustomFunctions(QWidget):
             try:
                 with open(currentDir+'/config.yaml', 'r') as file:
                     configs = yaml.safe_load(file)
+                    if configs is None:
+                       # The configs file exists, but is empty, use default settings
+                       configs = self.getConfigs(True) 
             except:
+                # Could not open or config file does not exist, use default settings
                 configs = self.getConfigs(True)
         return configs
     
@@ -247,7 +266,10 @@ class widgetCustomFunctions(QWidget):
             self.resize(self.myWindow.value("window size"))
             self.move(self.myWindow.value("window position"))
         except:
-            pass
+            desktopCenter = QScreen.availableGeometry(QtWidgets.QApplication.primaryScreen()).center()
+            myWindowGeometry = self.frameGeometry()
+            myWindowGeometry.moveCenter(desktopCenter)
+            self.move(myWindowGeometry.topLeft())
         
     # defaultSettingsManager has set the settings to all default, now the code needs to pull in
     #   all the changes from the config file the user provides. This may not include all the 

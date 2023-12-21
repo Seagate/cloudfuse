@@ -30,13 +30,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"time"
+	"fmt"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/registry"
-	"golang.org/x/sys/windows/svc"
 )
 
 const (
@@ -51,55 +50,19 @@ const (
 
 type Cloudfuse struct{}
 
-func (m *Cloudfuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
-	// Notify the Service Control Manager that the service is starting
-	changes <- svc.Status{State: svc.StartPending}
-	log.Trace("Starting %s service", SvcName)
-
-	// Send request to WinFSP to start the process
-	err := startServices()
-	// If unable to start, then stop the service
-	if err != nil {
-		changes <- svc.Status{State: svc.StopPending}
-		log.Err("Stopping %s service due to error when starting: %v", SvcName, err.Error())
-		return
-	}
-
-	// Notify the SCM that we are running and these are the commands we will respond to
-	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
-	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
-	log.Trace("Successfully started %s service", SvcName)
-
-	for { //nolint
-		select {
-		case c := <-r:
-			switch c.Cmd {
-			case svc.Interrogate:
-				changes <- c.CurrentStatus
-				// Testing deadlock from https://code.google.com/p/winsvc/issues/detail?id=4
-				time.Sleep(100 * time.Millisecond)
-				changes <- c.CurrentStatus
-			case svc.Stop, svc.Shutdown:
-				log.Trace("Stopping %s service", SvcName)
-				changes <- svc.Status{State: svc.StopPending}
-
-				// Tell WinFSP to stop the service
-				err := stopServices()
-				if err != nil {
-					log.Err("Error stopping %s service: %v", SvcName, err.Error())
-				}
-				return
-			}
-		}
-	}
-}
-
 // StartMount starts the mount if the name exists in our Windows registry.
 func StartMount(mountPath string, configFile string) error {
+	// get the current user uid and gid to set file permissions
+	userId, groupId, err := common.GetCurrentUser()
+	if err != nil {
+		log.Err("StartMount : GetCurrentUser() failed with error: %v", err)
+		return err
+	}
+
 	instanceName := mountPath
 
-	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile)
-	_, err := winFspCommand(buf)
+	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId))
+	_, err = winFspCommand(buf)
 	if err != nil {
 		return err
 	}
@@ -142,41 +105,18 @@ func IsMounted(mountPath string) (bool, error) {
 }
 
 // startService starts cloudfuse by instructing WinFsp to launch it.
-func startServices() error {
-	// Read registry to get names of the instances we need to start
-	instances, err := readRegistryEntry()
-	// If there is nothing in our registry to mount then continue
-	if err == registry.ErrNotExist {
-		return nil
-	} else if err != nil {
+func StartMounts() error {
+	// Read mount file to get names of the mounts we need to start
+	mounts, err := readMounts()
+	// If there is nothing in our file to mount then continue
+	if err != nil {
 		return err
 	}
 
-	for _, inst := range instances {
+	for _, inst := range mounts.Mounts {
 		err := StartMount(inst.MountPath, inst.ConfigFile)
 		if err != nil {
 			log.Err("Unable to start mount with mountpath: ", inst.MountPath)
-		}
-	}
-
-	return nil
-}
-
-// stopServicess stops cloudfuse by instructing WinFsp to stop it.
-func stopServices() error {
-	// Read registry to get names of the instances we need to stop
-	instances, err := readRegistryEntry()
-	// If there is nothing in our registry to mount then continue
-	if err == registry.ErrNotExist {
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	for _, inst := range instances {
-		err := StopMount(inst.MountPath)
-		if err != nil {
-			log.Err("Unable to stop mount with mountpath: ", inst.MountPath)
 		}
 	}
 
@@ -201,6 +141,8 @@ func writeCommandToUtf16(cmd uint16, args ...string) []byte {
 		}
 	}
 
+	_ = binary.Write(&buf, binary.LittleEndian, uint16(0))
+
 	return buf.Bytes()
 }
 
@@ -215,7 +157,7 @@ func winFspCommand(command []byte) ([]string, error) {
 	// Open the named pipe for WinFSP
 	handle, err := windows.CreateFile(
 		winPipe,
-		windows.GENERIC_WRITE|windows.GENERIC_READ,
+		windows.GENERIC_READ|windows.FILE_WRITE_DATA|windows.FILE_WRITE_ATTRIBUTES,
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
 		nil,
 		windows.OPEN_EXISTING,
@@ -228,7 +170,7 @@ func winFspCommand(command []byte) ([]string, error) {
 	defer windows.CloseHandle(handle) //nolint
 
 	// Send the command to WinFSP
-	var overlapped windows.Overlapped
+	overlapped := windows.Overlapped{}
 	err = windows.WriteFile(handle, command, nil, &overlapped)
 	if err == windows.ERROR_IO_PENDING {
 		err = windows.GetOverlappedResult(handle, &overlapped, nil, true)
