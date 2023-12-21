@@ -262,17 +262,17 @@ nfpms:
       - src: LICENSE
         dst: /usr/share/doc/cloudfuse/LICENSE
       - src: setup/baseConfig.yaml
-        dst: /usr/share/cloudfuse/baseConfig.yaml
+        dst: /usr/share/doc/cloudfuse/examples/baseConfig.yaml
       - src: sampleFileCacheConfigAzure.yaml
-        dst: /usr/share/cloudfuse/sampleFileCacheConfigAzure.yaml
+        dst: /usr/share/doc/cloudfuse/examples/sampleFileCacheConfigAzure.yaml
       - src: sampleFileCacheConfigS3.yaml
-        dst: /usr/share/cloudfuse/sampleFileCacheConfigS3.yaml
+        dst: /usr/share/doc/cloudfuse/examples/sampleFileCacheConfigS3.yaml
       - src: sampleFileCacheWithSASConfigAzure.yaml
-        dst: /usr/share/cloudfuse/sampleFileCacheWithSASConfigAzure.yaml
+        dst: /usr/share/doc/cloudfuse/examples/sampleFileCacheWithSASConfigAzure.yaml
       - src: sampleStreamingConfigS3.yaml
-        dst: /usr/share/cloudfuse/sampleStreamingConfigS3.yaml
+        dst: /usr/share/doc/cloudfuse/examples/sampleStreamingConfigS3.yaml
       - src: sampleStreamingConfigAzure.yaml
-        dst: /usr/share/cloudfuse/sampleStreamingConfigAzure.yaml
+        dst: /usr/share/doc/cloudfuse/examples/sampleStreamingConfigAzure.yaml
 
       - src: ./gui/cloudfuse.desktop
         dst: /usr/share/applications/cloudfuse.desktop
