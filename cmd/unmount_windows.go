@@ -4,6 +4,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -27,29 +28,32 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"os"
 
-	"github.com/Seagate/cloudfuse/internal"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal/winservice"
 )
 
-// Create dummy function so that mount.go code can compile
-// This function is used only on Linux, so it creates an empty context here
-func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName string, pidFilePerm os.FileMode, umask int, fname string) error {
-	return nil
-}
+func unmountCloudfuseWindows(mountPath string) error {
+	// Check with winfsp to see if this is currently mounted
+	ret, err := isMounted()
+	if err != nil {
+		return fmt.Errorf("failed to validate options [%s]", err.Error())
+	} else if !ret {
+		return fmt.Errorf("nothing is mounted here")
+	}
 
-// Use WinFSP to mount and if successful, add instance to persistent mount list
-func createMountInstance() error {
-	err := winservice.StartMount(options.MountPath, options.ConfigFile)
+	// Remove the mount from json file so it does not remount on restart.
+	err = winservice.RemoveMountJSON(mountPath)
+	// If error is not nill then ignore it
 	if err != nil {
-		return err
+		log.Err("failed to remove entry from json file [%s]", err.Error())
 	}
-	// Add the mount to the JSON file so it persists on restart.
-	err = winservice.AddMountJSON(options.MountPath, options.ConfigFile)
+
+	err = winservice.StopMount(mountPath)
 	if err != nil {
-		return fmt.Errorf("failed to add entry to json file [%s]", err.Error())
+		return fmt.Errorf("failed to unmount instance [%s]", err.Error())
 	}
+
+	return nil
 }

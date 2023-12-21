@@ -30,6 +30,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -241,6 +242,38 @@ var mountCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, args []string) error {
+		// handle Windows background mount (formerly "service mount")
+		if !options.Foreground && runtime.GOOS == "windows" {
+			// validate mount path
+			options.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
+			if options.MountPath == "" {
+				return errors.New("mount path not provided")
+			}
+			if _, err := os.Stat(options.MountPath); errors.Is(err, fs.ErrExist) || err == nil {
+				return errors.New("mount path exists")
+			}
+			// Config file
+			if options.ConfigFile == "" {
+				return errors.New("config file not provided")
+			}
+			// Convert the path into a full path so WinFSP can see the config file
+			configPath, err := filepath.Abs(options.ConfigFile)
+			if err != nil {
+				return errors.New("config file does not exist")
+			}
+			options.ConfigFile = configPath
+			if _, err := os.Stat(options.ConfigFile); errors.Is(err, fs.ErrNotExist) {
+				return errors.New("config file does not exist")
+			}
+			// mount using WinFSP, and persist on reboot
+			err = createMountInstance()
+			if err != nil {
+				return fmt.Errorf("failed to mount instance [%s]", err.Error())
+			}
+
+			return nil
+		}
+
 		options.MountPath = common.ExpandPath(args[0])
 		configFileExists := true
 
@@ -430,7 +463,7 @@ var mountCmd = &cobra.Command{
 		common.ForegroundMount = options.Foreground
 
 		log.Info("mount: Mounting cloudfuse on %s", options.MountPath)
-		// Prevent mounting in background on Windows
+		// handle background mount on Linux
 		if !options.Foreground && runtime.GOOS != "windows" {
 			pidFile := strings.Replace(options.MountPath, "/", "_", -1) + ".pid"
 			pidFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), pidFile)
