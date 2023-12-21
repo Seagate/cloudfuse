@@ -273,7 +273,6 @@ nfpms:
         dst: /usr/share/doc/cloudfuse/examples/sampleStreamingConfigS3.yaml
       - src: sampleStreamingConfigAzure.yaml
         dst: /usr/share/doc/cloudfuse/examples/sampleStreamingConfigAzure.yaml
-        # TODO: deploy a copy of one config file to /home/<user>/.cloudfuse with "type: config|noreplace"
 
       - src: ./gui/cloudfuse.desktop
         dst: /usr/share/applications/cloudfuse.desktop
