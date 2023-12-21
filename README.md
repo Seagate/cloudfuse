@@ -1,12 +1,25 @@
 # Cloudfuse - An S3 and Azure Storage FUSE driver
 ##### Table of Contents  
-[about](#about)  
-[Installation](#installation)   
-[Config](#config)  
-[Basic Use](#basic-use)  
-[Health Monitor](#health-monitor)  
-[Command Line Interface](#command-line-interface)  
-[NOTICE](#notice)  
+- [about](#about)  
+- [Installation](#installation)
+  - [windows](#windows)   
+  - [From Tar or Zip files](#from-tar-or-zip-files)   
+  - [Source Installation](#source-installation)   
+- [Config](#config)  
+- [Basic Use](#basic-use)  
+  - [Linux](#linux)   
+  - [windows](#windows)   
+- [Health Monitor](#health-monitor)  
+- [Command Line Interface](#command-line-interface)  
+  - [Linux](#linux) 
+  - [windows](#windows)     
+  - [Secure options for both Windows and Linux](#secure-options-for-both-windows-and-linux)
+- [NOTICE](#notice)  
+- [Limitations](#limitations)
+- [Third-Party Notices](#third-party-notices)
+- [Support](#support)
+- [Contributing](#contributing)
+
 
 
 
@@ -138,7 +151,7 @@ To use security options the general format for cloudfuse commands is `cloudfuse 
 Note - If you do not have admin rights, you can still mount your cloud without Windows Service, however
 the process will stay in the foreground. Use `cloudfuse mount <mount path>  --config-file=<config file>` to mount, use Ctrl+C to unmount.
 
-## Find help from your command prompt
+### Find help from your command prompt
 To see a list of commands, type `cloudfuse -h`. To
 learn about a specific command, just include the name of the command (For
 example: `cloudfuse mount -h`).
