@@ -291,17 +291,22 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 	if err == nil {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
-		if ac.cacheDirs {
-			// the cloud is not directory-aware
-			// check if directory already exists
-			dirAttrCacheItem, getErr := ac.cacheMap.get(options.Name)
-			if getErr == nil && dirAttrCacheItem.exists() {
-				return os.ErrExist
-			}
+		// does the directory already exist?
+		oldDirAttrCacheItem, getErr := ac.cacheMap.get(options.Name)
+		directoryAlreadyExists := getErr == nil && oldDirAttrCacheItem.exists()
+		// if the attribute cache tracks directory existence
+		// then prevent redundant directory creation
+		if ac.cacheDirs && directoryAlreadyExists {
+			return os.ErrExist
 		}
-		// add the directory to the cache
+		// invalidate existing directory entry (this is redundant but readable)
+		if getErr != nil {
+			oldDirAttrCacheItem.invalidate()
+		}
+		// add (or replace) the directory entry
 		newDirAttr := internal.CreateObjAttrDir(options.Name)
 		newDirAttrCacheItem := ac.cacheMap.insert(newDirAttr, true, time.Now())
+		// update flags for tracking directory existence
 		if ac.cacheDirs {
 			newDirAttrCacheItem.markInCloud(false)
 		}
