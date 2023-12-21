@@ -300,7 +300,7 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 			return os.ErrExist
 		}
 		// invalidate existing directory entry (this is redundant but readable)
-		if getErr != nil {
+		if getErr == nil {
 			oldDirAttrCacheItem.invalidate()
 		}
 		// add (or replace) the directory entry
