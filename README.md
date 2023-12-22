@@ -8,12 +8,12 @@
   - [Source Installation](#source-installation)   
 - [Config](#config)  
 - [Basic Use](#basic-use)  
-  - [Linux](#linux)   
-  - [Windows](#windows)   
+  - [Linux](#linux-1)   
+  - [Windows](#windows-1)   
 - [Health Monitor](#health-monitor)  
 - [Command Line Interface](#command-line-interface)  
-  - [Linux](#linux) 
-  - [Windows](#windows)     
+  - [Linux](#linux-2) 
+  - [Windows](#windows-2)     
   - [Secure options for both Windows and Linux](#secure-options-for-both-windows-and-linux)
 - [NOTICE](#notice)  
 - [Limitations](#limitations)
@@ -47,7 +47,7 @@ Download the .deb file from our latest release [here](https://github.com/Seagate
 
 `sudo apt-get install ./cloudfuse*.deb`
 
-#### CentOS / RHEL:
+#### CentOS / RHEL
 
 Download the .rpm file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal: 
 
@@ -122,7 +122,7 @@ Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it
 
 ## Command Line Interface
 
-### Linux:
+### Linux
 The general format of the Cloudfuse Linux commands is `cloudfuse [command] [arguments]
 --[flag-name]=[flag-value]`
 * `help` - Help about any command
@@ -143,7 +143,7 @@ The general format of the Cloudfuse Linux commands is `cloudfuse [command] [argu
   - Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors)
   - Example: `cloudfuse unmount all --lazy`
 
-### Windows:
+### Windows
 
 The general format of the Cloudfuse Windows commands is:
  `cloudfuse service [command] [arguments] --[flag-name]=[flag-value]`
