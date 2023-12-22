@@ -94,7 +94,7 @@ func (suite *mountTestSuite) cleanupTest() {
 }
 
 // mount failure test where the mount directory does exist
-func (suite *mountTestSuite) TestForegroundDirDoesExist() {
+func (suite *mountTestSuite) TestForegroundMountDirDoesExist() {
 	defer suite.cleanupTest()
 
 	mntDir, err := os.MkdirTemp("", "mntdir")
@@ -112,7 +112,7 @@ func (suite *mountTestSuite) TestForegroundDirDoesExist() {
 }
 
 // mount failure test where the mount directory is not empty
-func (suite *mountTestSuite) TestForegroundDirNotEmpty() {
+func (suite *mountTestSuite) TestForegroundMountDirNotEmpty() {
 	defer suite.cleanupTest()
 
 	mntDir, err := os.MkdirTemp("", "mntdir")
@@ -133,7 +133,7 @@ func (suite *mountTestSuite) TestForegroundDirNotEmpty() {
 }
 
 // mount failure test where the mount path is not provided
-func (suite *mountTestSuite) TestForegroundPathNotProvided() {
+func (suite *mountTestSuite) TestForegroundMountPathNotProvided() {
 	defer suite.cleanupTest()
 
 	op, err := executeCommandC(rootCmd, "mount", "", fmt.Sprintf("--config-file=%s", confFileMntTest), "--foreground=true")
@@ -158,7 +158,7 @@ func (suite *mountTestSuite) TestForegroundConfigFileEmpty() {
 }
 
 // mount failure test where the config file type is unsupported
-func (suite *mountTestSuite) TestForegroundUnsupportedConfigFileType() {
+func (suite *mountTestSuite) TestForegroundConfigFileTypeUnsupported() {
 	defer suite.cleanupTest()
 
 	mntDir := filepath.Join("tmp", "mntdir")
@@ -394,7 +394,7 @@ func (suite *mountTestSuite) TestOptionsValidate() {
 	suite.assert.Equal(common.DefaultLogFilePath, opts.Logging.LogFilePath)
 }
 
-func (suite *mountTestSuite) TestBackgroundMountMissingArgs() {
+func (suite *mountTestSuite) TestBackgroundMissingArgs() {
 	defer suite.cleanupTest()
 
 	_, err := executeCommandC(rootCmd, "mount")

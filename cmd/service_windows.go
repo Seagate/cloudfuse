@@ -58,7 +58,7 @@ var serviceCmd = &cobra.Command{
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("missing command options\n\nDid you mean this?\n\tcloudfuse mount\n\nRun 'cloudfuse service --help' for usage")
+		return errors.New("missing command options\n\nDid you mean this?\n\tcloudfuse service install\n\nRun 'cloudfuse service --help' for usage")
 	},
 }
 
