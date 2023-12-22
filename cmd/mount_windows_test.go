@@ -398,7 +398,7 @@ func (suite *mountTestSuite) TestOptionsValidate() {
 func (suite *mountTestSuite) TestBackgroundMountMissingArgs() {
 	defer suite.cleanupTest()
 
-	_, err := executeCommandC(rootCmd, "service", "mount")
+	_, err := executeCommandC(rootCmd, "mount")
 	suite.assert.NotNil(err)
 }
 
@@ -408,7 +408,7 @@ func (suite *mountTestSuite) TestBackgroundMountPathEmpty() {
 	mntPath := ""
 	cfgFile := "cfgNotFound.yaml"
 
-	op, err := executeCommandC(rootCmd, "service", "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
+	op, err := executeCommandC(rootCmd, "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "mount path not provided]")
 }
@@ -419,7 +419,7 @@ func (suite *mountTestSuite) TestBackgroundConfigFileEmpty() {
 	mntPath := "mntdir" + randomString(8)
 	cfgFile := ""
 
-	op, err := executeCommandC(rootCmd, "service", "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
+	op, err := executeCommandC(rootCmd, "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "config file not provided")
 }
@@ -438,7 +438,7 @@ func (suite *mountTestSuite) TestBackgroundMountDirExist() {
 	cfgFile := confFile.Name()
 	defer os.Remove(cfgFile)
 
-	op, err := executeCommandC(rootCmd, "service", "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
+	op, err := executeCommandC(rootCmd, "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "mount path exists")
 }
@@ -449,7 +449,7 @@ func (suite *mountTestSuite) TestBackgroundConfigFileNotExist() {
 	mntPath := "mntdir" + randomString(8)
 	cfgFile := "cfgNotFound.yaml"
 
-	op, err := executeCommandC(rootCmd, "service", "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
+	op, err := executeCommandC(rootCmd, "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "config file does not exist")
 }
