@@ -647,7 +647,7 @@ func init() {
 	config.BindPFlag("logging.file-path", mountCmd.PersistentFlags().Lookup("log-file-path"))
 	_ = mountCmd.MarkPersistentFlagDirname("log-file-path")
 
-	mountCmd.PersistentFlags().Bool("foreground", false, "Mount the system in foreground mode. Default value false. (Ignored on Windows)")
+	mountCmd.PersistentFlags().Bool("foreground", false, "Mount the system in foreground mode. Default value false.")
 	config.BindPFlag("foreground", mountCmd.PersistentFlags().Lookup("foreground"))
 
 	mountCmd.PersistentFlags().Bool("read-only", false, "Mount the system in read only mode. Default value false.")
