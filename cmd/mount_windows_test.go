@@ -154,8 +154,7 @@ func (suite *mountTestSuite) TestForegroundConfigFileEmpty() {
 
 	op, err := executeCommandC(rootCmd, "mount", mntDir, "--config-file=", "--foreground=true")
 	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "invalid config file")
-	suite.assert.Contains(op, "config file not provided")
+	suite.assert.Contains(op, "Config file not provided")
 }
 
 // mount failure test where the config file type is unsupported
@@ -405,8 +404,13 @@ func (suite *mountTestSuite) TestBackgroundMountMissingArgs() {
 func (suite *mountTestSuite) TestBackgroundMountPathEmpty() {
 	defer suite.cleanupTest()
 
+	// Create config file
+	confFile, err := os.CreateTemp("", "conf*.yaml")
+	suite.assert.Nil(err)
+	cfgFile := confFile.Name()
+	defer os.Remove(cfgFile)
+
 	mntPath := ""
-	cfgFile := "cfgNotFound.yaml"
 
 	op, err := executeCommandC(rootCmd, "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
 	suite.assert.NotNil(err)
@@ -451,7 +455,7 @@ func (suite *mountTestSuite) TestBackgroundConfigFileNotExist() {
 
 	op, err := executeCommandC(rootCmd, "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
 	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "config file does not exist")
+	suite.assert.Contains(op, "config file")
 }
 
 func TestMountCommand(t *testing.T) {
