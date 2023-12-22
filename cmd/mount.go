@@ -272,7 +272,6 @@ var mountCmd = &cobra.Command{
 
 		// handle Windows background mount (formerly "service mount")
 		if !options.Foreground && runtime.GOOS == "windows" {
-			fmt.Println("Background windows mount")
 			// validate mount path
 			options.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
 			if options.MountPath == "" {
