@@ -2,7 +2,8 @@
 ##### Table of Contents  
 - [About](#about)  
 - [Installation](#installation)
-  - [Windows](#windows)   
+  - [Windows](#windows)  
+  - [Linux](#linux) 
   - [From Tar or Zip files](#from-tar-or-zip-files)   
   - [Source Installation](#source-installation)   
 - [Config](#config)  
