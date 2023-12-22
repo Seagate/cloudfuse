@@ -28,7 +28,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -62,76 +61,6 @@ func (suite *serviceTestSuite) TestHelp() {
 	defer suite.cleanupTest()
 	_, err := executeCommandC(rootCmd, "service", "-h")
 	suite.assert.Nil(err)
-}
-
-// Mount Tests
-
-func (suite *serviceTestSuite) TestMountMissingArgs() {
-	defer suite.cleanupTest()
-
-	_, err := executeCommandC(rootCmd, "service", "mount")
-	suite.assert.NotNil(err)
-}
-
-func (suite *serviceTestSuite) TestMountPathEmpty() {
-	defer suite.cleanupTest()
-
-	mntPath := ""
-	cfgFile := "cfgNotFound.yaml"
-
-	op, err := executeCommandC(rootCmd, "service", "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
-	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "mount path not provided]")
-}
-
-func (suite *serviceTestSuite) TestConfigFileEmpty() {
-	defer suite.cleanupTest()
-
-	mntPath := "mntdir" + randomString(8)
-	cfgFile := ""
-
-	op, err := executeCommandC(rootCmd, "service", "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
-	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "config file not provided")
-}
-
-func (suite *serviceTestSuite) TestMountDirExist() {
-	defer suite.cleanupTest()
-
-	// Create Mount Directory
-	mntPath, err := os.MkdirTemp("", "mntdir")
-	suite.assert.Nil(err)
-	defer os.RemoveAll(mntPath)
-
-	// Create config file
-	confFile, err := os.CreateTemp("", "conf*.yaml")
-	suite.assert.Nil(err)
-	cfgFile := confFile.Name()
-	defer os.Remove(cfgFile)
-
-	op, err := executeCommandC(rootCmd, "service", "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
-	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "mount path exists")
-}
-
-func (suite *serviceTestSuite) TestConfigFileNotExist() {
-	defer suite.cleanupTest()
-
-	mntPath := "mntdir" + randomString(8)
-	cfgFile := "cfgNotFound.yaml"
-
-	op, err := executeCommandC(rootCmd, "service", "mount", mntPath, fmt.Sprintf("--config-file=%s", cfgFile))
-	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "config file does not exist")
-}
-
-// Unmount Tests
-
-func (suite *serviceTestSuite) TestUnmountMountPathEmpty() {
-	defer suite.cleanupTest()
-
-	_, err := executeCommandC(rootCmd, "service", "unmount")
-	suite.assert.NotNil(err)
 }
 
 func TestServiceCommand(t *testing.T) {
