@@ -49,30 +49,30 @@ var unmountCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if runtime.GOOS == "windows" {
 			options.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
-			return unmountCloudfuse(options.MountPath, false)
-		} else {
-			lazy, _ := cmd.Flags().GetBool("lazy")
-			if strings.Contains(args[0], "*") {
-				mntPathPrefix := args[0]
+			return unmountCloudfuseWindows(options.MountPath)
+		}
 
-				lstMnt, _ := common.ListMountPoints()
-				for _, mntPath := range lstMnt {
-					match, _ := regexp.MatchString(mntPathPrefix, mntPath)
-					if match {
-						err := unmountCloudfuse(mntPath, lazy)
-						if err != nil {
-							return fmt.Errorf("failed to unmount %s [%s]", mntPath, err.Error())
-						}
+		lazy, _ := cmd.Flags().GetBool("lazy")
+		if strings.Contains(args[0], "*") {
+			mntPathPrefix := args[0]
+
+			lstMnt, _ := common.ListMountPoints()
+			for _, mntPath := range lstMnt {
+				match, _ := regexp.MatchString(mntPathPrefix, mntPath)
+				if match {
+					err := unmountCloudfuse(mntPath, lazy)
+					if err != nil {
+						return fmt.Errorf("failed to unmount %s [%s]", mntPath, err.Error())
 					}
 				}
-			} else {
-				err := unmountCloudfuse(args[0], lazy)
-				if err != nil {
-					return err
-				}
 			}
-			return nil
+		} else {
+			err := unmountCloudfuse(args[0], lazy)
+			if err != nil {
+				return err
+			}
 		}
+		return nil
 	},
 	ValidArgsFunction: func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if toComplete == "" {
@@ -85,10 +85,6 @@ var unmountCmd = &cobra.Command{
 
 // Attempts to unmount the directory and returns true if the operation succeeded
 func unmountCloudfuse(mntPath string, lazy bool) error {
-	if runtime.GOOS == "windows" {
-		return unmountCloudfuseWindows(mntPath)
-	}
-
 	unmountCmd := []string{"fusermount3", "fusermount"}
 
 	var errb bytes.Buffer
