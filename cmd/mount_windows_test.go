@@ -395,14 +395,14 @@ func (suite *mountTestSuite) TestOptionsValidate() {
 	suite.assert.Equal(common.DefaultLogFilePath, opts.Logging.LogFilePath)
 }
 
-func (suite *mountTestSuite) TestMountMissingArgs() {
+func (suite *mountTestSuite) TestBackgroundMountMissingArgs() {
 	defer suite.cleanupTest()
 
 	_, err := executeCommandC(rootCmd, "service", "mount")
 	suite.assert.NotNil(err)
 }
 
-func (suite *mountTestSuite) TestMountPathEmpty() {
+func (suite *mountTestSuite) TestBackgroundMountPathEmpty() {
 	defer suite.cleanupTest()
 
 	mntPath := ""
@@ -413,7 +413,7 @@ func (suite *mountTestSuite) TestMountPathEmpty() {
 	suite.assert.Contains(op, "mount path not provided]")
 }
 
-func (suite *mountTestSuite) TestConfigFileEmpty() {
+func (suite *mountTestSuite) TestBackgroundConfigFileEmpty() {
 	defer suite.cleanupTest()
 
 	mntPath := "mntdir" + randomString(8)
@@ -424,7 +424,7 @@ func (suite *mountTestSuite) TestConfigFileEmpty() {
 	suite.assert.Contains(op, "config file not provided")
 }
 
-func (suite *mountTestSuite) TestMountDirExist() {
+func (suite *mountTestSuite) TestBackgroundMountDirExist() {
 	defer suite.cleanupTest()
 
 	// Create Mount Directory
@@ -443,7 +443,7 @@ func (suite *mountTestSuite) TestMountDirExist() {
 	suite.assert.Contains(op, "mount path exists")
 }
 
-func (suite *mountTestSuite) TestConfigFileNotExist() {
+func (suite *mountTestSuite) TestBackgroundConfigFileNotExist() {
 	defer suite.cleanupTest()
 
 	mntPath := "mntdir" + randomString(8)
