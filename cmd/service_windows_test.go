@@ -55,7 +55,6 @@ func (suite *serviceTestSuite) SetupTest() {
 
 func (suite *serviceTestSuite) cleanupTest() {
 	resetCLIFlags(*serviceCmd)
-	resetCLIFlags(*mountServiceCmd)
 	viper.Reset()
 }
 

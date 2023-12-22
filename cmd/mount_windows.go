@@ -52,4 +52,5 @@ func createMountInstance() error {
 	if err != nil {
 		return fmt.Errorf("failed to add entry to json file [%s]", err.Error())
 	}
+	return nil
 }
