@@ -242,8 +242,37 @@ var mountCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, args []string) error {
+		options.MountPath = common.ExpandPath(args[0])
+		configFileExists := true
+
+		if options.ConfigFile == "" {
+			// Config file is not set in cli parameters
+			// Cloudfuse defaults to config.yaml in current directory
+			// If the file does not exists then user might have configured required things in env variables
+			// Fall back to defaults and let components fail if all required env variables are not set.
+			_, err := os.Stat(common.DefaultConfigFilePath)
+			if err != nil && os.IsNotExist(err) {
+				configFileExists = false
+			} else {
+				options.ConfigFile = common.DefaultConfigFilePath
+			}
+		}
+
+		if configFileExists {
+			err := parseConfig()
+			if err != nil {
+				return err
+			}
+		}
+
+		err := config.Unmarshal(&options)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal config [%s]", err.Error())
+		}
+
 		// handle Windows background mount (formerly "service mount")
 		if !options.Foreground && runtime.GOOS == "windows" {
+			fmt.Println("Background windows mount")
 			// validate mount path
 			options.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
 			if options.MountPath == "" {
@@ -272,34 +301,6 @@ var mountCmd = &cobra.Command{
 			}
 
 			return nil
-		}
-
-		options.MountPath = common.ExpandPath(args[0])
-		configFileExists := true
-
-		if options.ConfigFile == "" {
-			// Config file is not set in cli parameters
-			// Cloudfuse defaults to config.yaml in current directory
-			// If the file does not exists then user might have configured required things in env variables
-			// Fall back to defaults and let components fail if all required env variables are not set.
-			_, err := os.Stat(common.DefaultConfigFilePath)
-			if err != nil && os.IsNotExist(err) {
-				configFileExists = false
-			} else {
-				options.ConfigFile = common.DefaultConfigFilePath
-			}
-		}
-
-		if configFileExists {
-			err := parseConfig()
-			if err != nil {
-				return err
-			}
-		}
-
-		err := config.Unmarshal(&options)
-		if err != nil {
-			return fmt.Errorf("failed to unmarshal config [%s]", err.Error())
 		}
 
 		if !configFileExists || len(options.Components) == 0 {
