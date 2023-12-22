@@ -36,7 +36,7 @@ import (
 
 func unmountCloudfuseWindows(mountPath string) error {
 	// Check with winfsp to see if this is currently mounted
-	ret, err := isMounted()
+	ret, err := winservice.IsMounted(mountPath)
 	if err != nil {
 		return fmt.Errorf("failed to validate options [%s]", err.Error())
 	} else if !ret {

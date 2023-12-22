@@ -28,7 +28,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -148,41 +147,6 @@ func makeLink(src string, dst string) error {
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-// isMounted returns if the current mountPath is mounted using cloudfuse.
-func isMounted() (bool, error) {
-	return winservice.IsMounted(servOpts.MountPath)
-}
-
-// validateMountPath checks whether the mountpath is correct and does not exist.
-func validateMountOptions() error {
-	// Mount Path
-	if servOpts.MountPath == "" {
-		return errors.New("mount path not provided")
-	}
-
-	if _, err := os.Stat(servOpts.MountPath); errors.Is(err, fs.ErrExist) || err == nil {
-		return errors.New("mount path exists")
-	}
-
-	// Config file
-	if servOpts.ConfigFile == "" {
-		return errors.New("config file not provided")
-	}
-
-	// Convert the path into a full path so WinFSP can see the config file
-	configPath, err := filepath.Abs(servOpts.ConfigFile)
-	if err != nil {
-		return errors.New("config file does not exist")
-	}
-	servOpts.ConfigFile = configPath
-
-	if _, err := os.Stat(servOpts.ConfigFile); errors.Is(err, fs.ErrNotExist) {
-		return errors.New("config file does not exist")
-	}
-
 	return nil
 }
 
