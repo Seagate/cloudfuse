@@ -124,8 +124,8 @@ The general format of the Cloudfuse Windows commands is:
  `cloudfuse service [command] [arguments] --[flag-name]=[flag-value]`
   * `cloudfuse service install` - Installs the startup process for Cloudfuse
   * `cloudfuse service uninstall` - Uninstall the startup process for Cloudfuse
-  * `cloudfuse service mount <mount path>  --config-file=<config file>` - Mount an instance that will persist in Windows when restarted
-  * `cloudfuse service unmount <mount path>` - Unmount mount of Cloudfuse running as a Windows service
+  * `cloudfuse mount <mount path>  --config-file=<config file>` - Mount an instance that will persist on reboot
+  * `cloudfuse unmount <mount path>` - Unmount an instance of Cloudfuse that is running as a Windows service, and prevent it from remounting on reboot
 
 ### Secure options for both Windows and Linux
 To use security options the general format for cloudfuse commands is `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`

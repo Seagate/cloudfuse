@@ -53,13 +53,13 @@ var servOpts serviceOptions
 // Section defining all the command that we have in secure feature
 var serviceCmd = &cobra.Command{
 	Use:               "service",
-	Short:             "Manage cloudfuse mounts on Windows",
-	Long:              "Manage cloudfuse mounts on Windows",
+	Short:             "Manage cloudfuse startup process on Windows",
+	Long:              "Manage cloudfuse startup process on Windows",
 	SuggestFor:        []string{"ser", "serv"},
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("missing command options\n\nDid you mean this?\n\tcloudfuse service mount\n\nRun 'cloudfuse service --help' for usage")
+		return errors.New("missing command options\n\nDid you mean this?\n\tcloudfuse mount\n\nRun 'cloudfuse service --help' for usage")
 	},
 }
 
