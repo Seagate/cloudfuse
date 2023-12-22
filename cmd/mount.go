@@ -243,6 +243,7 @@ var mountCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, args []string) error {
 		options.MountPath = common.ExpandPath(args[0])
+		configFileProvided := options.ConfigFile != ""
 		configFileExists := true
 
 		if options.ConfigFile == "" {
@@ -451,8 +452,14 @@ var mountCmd = &cobra.Command{
 			pipeline, err = internal.NewPipeline(options.Components, !daemon.WasReborn())
 		}
 		if err != nil {
-			log.Err("mount : failed to initialize new pipeline [%v]", err)
-			return Destroy(fmt.Sprintf("failed to initialize new pipeline [%s]", err.Error()))
+			errorMessage := ""
+			if !configFileProvided {
+				errorMessage += "Config file not provided."
+			} else if !configFileExists {
+				errorMessage += "Config file " + options.ConfigFile + " not found."
+			}
+			log.Err("mount : "+errorMessage+" failed to initialize new pipeline [%v]", err)
+			return Destroy(fmt.Sprintf("%s failed to initialize new pipeline [%s]", errorMessage, err.Error()))
 		}
 
 		// Dry run ends here
