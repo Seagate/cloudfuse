@@ -99,6 +99,7 @@ Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it
 
 The general format of the Cloudfuse Linux commands is `cloudfuse [command] [arguments]
 --[flag-name]=[flag-value]`
+
 - `help` - Help about any command
 - `mount` - Mounts a cloud storage container as a filesystem. The supported
   containers include:
@@ -118,15 +119,19 @@ The general format of the Cloudfuse Linux commands is `cloudfuse [command] [argu
   - Example: `cloudfuse unmount all --lazy`
 
 ### Windows
+
 The general format of the Cloudfuse Windows commands is:
  `cloudfuse service [command] [arguments] --[flag-name]=[flag-value]`
-  - `cloudfuse service install` - Installs the startup process for Cloudfuse
-  - `cloudfuse service uninstall` - Uninstall the startup process for Cloudfuse
-  - `cloudfuse service mount <mount path>  --config-file=<config file>` - Mount an instance that will persist in Windows when restarted
-  - `cloudfuse service unmount <mount path>` - Unmount mount of Cloudfuse running as a Windows service
+
+- `cloudfuse service install` - Installs the startup process for Cloudfuse
+- `cloudfuse service uninstall` - Uninstall the startup process for Cloudfuse
+- `cloudfuse service mount <mount path>  --config-file=<config file>` - Mount an instance that will persist in Windows when restarted
+- `cloudfuse service unmount <mount path>` - Unmount mount of Cloudfuse running as a Windows service
 
 ### Secure options for both Windows and Linux
+
 To use security options the general format for cloudfuse commands is `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
+
 - `secure decrypt` - Decrypts a config file.
 - `secure encrypt` - Encrypts a config file.
 - `secure get` - Gets value of a config parameter from an encrypted config file.
@@ -136,6 +141,7 @@ Note - If you do not have admin rights, you can still mount your cloud without W
 the process will stay in the foreground. Use `cloudfuse mount <mount path>  --config-file=<config file>` to mount, use Ctrl+C to unmount.
 
 ### Find help from your command prompt
+
 To see a list of commands, type `cloudfuse -h`. To
 learn about a specific command, just include the name of the command (For
 example: `cloudfuse mount -h`).
@@ -143,9 +149,11 @@ example: `cloudfuse mount -h`).
 ## Limitations
 
 ### NOTICE
+
 - We have seen some customer issues around files getting corrupted when `streaming` is used in write mode. Kindly avoid using this feature for write while we investigate and resolve it.
 
 ### Un-Supported File system operations
+
 - mkfifo : fifo creation is not supported by cloudfuse and this will result in
   "function not implemented" error
 - chown  : Change of ownership is not supported by Azure Storage hence Cloudfuse
@@ -155,6 +163,7 @@ example: `cloudfuse mount -h`).
 - Cloudfuse does not support lseek() operation on directory handles. No error is thrown but it will not work as expected.
 
 ### Un-Supported Scenarios
+
 - Cloudfuse does not support overlapping mount paths. While running multiple
   instances of Cloudfuse make sure each instance has a unique and
   non-overlapping mount point.
@@ -174,6 +183,7 @@ example: `cloudfuse mount -h`).
   this.
 
 ### Other Limitations
+
 - In case of Azure BlockBlob accounts, ACLs are not supported by Azure Storage
   so Cloudfuse will by default return success for 'chmod' operation. However it
   will work fine for Gen2 (DataLake) accounts. ACLs are not currently supported
@@ -185,6 +195,7 @@ example: `cloudfuse mount -h`).
     apparmor:unconfined <environment variables> <docker image>`
 
 ### Syslog security warning
+
 By default, Cloudfuse will log to syslog. The default settings will, in some
 cases, log relevant file paths to syslog. If this is sensitive information, turn
 off logging or set log-level to LOG_ERR.  
@@ -194,24 +205,29 @@ off logging or set log-level to LOG_ERR.
 The Cloudfuse project is licensed under MIT.
 
 ### Third-Party Notices
+
 See [notices](./NOTICE) for third party license notices.
 
-Qt is licensed under the GNU Lesser General Public License version 3, which is available at https://doc.qt.io/qt-6/lgpl.html
+Qt is licensed under the GNU Lesser General Public License version 3, which is available [here](https://doc.qt.io/qt-6/lgpl.html)
 
-WinFSP is licensed under the GPLv3 license with a special exception for Free/Libre and Open Source Software, which is available at https://github.com/winfsp/winfsp/blob/master/License.txt
+WinFSP is licensed under the GPLv3 license with a special exception for Free/Libre and Open Source Software, which is available [here](https://github.com/winfsp/winfsp/blob/master/)License.txt
 
 ### Attribution
-WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos https://github.com/winfsp/winfsp
+
+WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos - [link](https://github.com/winfsp/winfsp)
 
 ## Support
 
 ### Frequently Asked Questions
+
 A list of FAQs can be found [here](https://github.com/Seagate/cloudfuse/wiki/Frequently-Asked-Questions)
 
 ### Report Issues and Request Features
+
 We welcome all feedback! Please submit [issues and requests here](https://github.com/Seagate/cloudfuse/issues).
 
 ## Contributing
+
 This project welcomes contributions and suggestions.
 
 This project is governed by the [code of conduct](CODE_OF_CONDUCT.md). You are
