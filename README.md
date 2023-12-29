@@ -4,20 +4,16 @@
 - [Installation](#installation)
   - [Windows](#windows)  
   - [Linux](#linux) 
-  - [From Tar or Zip files](#from-tar-or-zip-files)   
-  - [Source Installation](#source-installation)   
-- [Config](#config)  
+  - [From Tar or Zip files](#from-tar-or-zip-files)  
+  - [Source Installation](#source-installation)  
 - [Basic Use](#basic-use)  
-  - [Linux](#linux-1)   
-  - [Windows](#windows-1)   
 - [Health Monitor](#health-monitor)  
 - [Command Line Interface](#command-line-interface)  
-  - [Linux](#linux-2) 
-  - [Windows](#windows-2)     
+  - [Linux](#linux-1)  
+  - [Windows](#windows-1)  
   - [Secure options for both Windows and Linux](#secure-options-for-both-windows-and-linux)
-- [NOTICE](#notice)  
-- [Limitations](#limitations)
-- [Third-Party Notices](#third-party-notices)
+- [Limitations](#limitations)  
+- [License](#license)
 - [Support](#support)
 - [Contributing](#contributing)
 
@@ -25,6 +21,7 @@
 
 
 ## About
+
 Cloudfuse provides the ability to mount a cloud bucket in your local filesystem on Linux and Windows with a GUI for easy configuration.
 With Cloudfuse you can easily read and write to the cloud, and connect programs on your computer to the cloud even if they're not cloud-aware.
 Cloudfuse uses file caching to provide the performance of local storage, or you can use streaming mode to efficiently access small parts of large files (e.g. video playback).
@@ -34,23 +31,15 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 ## Installation
 
 ### Windows 
-
 Download and run the .exe installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
 
-Cloudfuse will store the config file in `	C:\Users\{username}\AppData\Roaming`.
-
 ### Linux 
-
-#### Debian /Ubuntu:
-
-Download the .deb file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal: 
-
+#### Debian /Ubuntu
+Download the .deb file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal:  
 `sudo apt-get install ./cloudfuse*.deb`
 
 #### CentOS / RHEL
-
-Download the .rpm file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal: 
-
+Download the .rpm file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal:  
 `sudo rpm -i ./cloudfuse*.rpm`
 
 ### From Tar or Zip files
@@ -65,57 +54,38 @@ On Windows, you will need to install WinFsp to use Cloudfuse. See [this](https:/
 Please refer to the [Installation from source](https://github.com/Seagate/cloudfuse/wiki/Installation-From-Source) to 
 manually install Cloudfuse.
 
-## Config
-The GUI can help you quickly configure Cloudfuse.
-
-* There are three ways to run the GUI:
-  - Open the Cloudfuse GUI provided in the installation package -- COMING SOON!
-  - Extract either the tar or zip files to your computer and launch the `cloudfuseGUI`.
-  - Run the GUI from source, see instructions [here](https://github.com/Seagate/cloudfuse/wiki/Running-the-GUI-from-source)
-* Select the desired type of cloud (Azure or S3).
-* Click `config`, which opens a new window for settings.
-* Enter the credentials for your cloud:
-  - Go to [S3 Storage Configuration](https://github.com/Seagate/cloudfuse/wiki/S3-Storage-Configuration) to find S3 credential requirements.
-  - Go to [Azure Storage Configuration](https://github.com/Seagate/cloudfuse/wiki/Azure-Storage-Configuration) to find Azure credential requirements.
-* Select you desired pipeline mode:
-  - File Caching: Browse to a folder you wish to have you temp file caching.
-  - Streaming: If 0MB are selected, streaming will not cache any blocks.
-  - Go to [File-Cache](https://github.com/Seagate/cloudfuse/wiki/File-Cache) and [Streaming](https://github.com/Seagate/cloudfuse/wiki/Streaming) for details.
-* Save your changes for the GUI to write your new config file.
-
-You can also manually configure the config file without the GUI, you can find instructions [here](https://github.com/Seagate/cloudfuse/wiki/Config-File).
-
 ## Basic Use
-### Linux
-Launch the provided GUI and use the [Config instructions above](#Config) to configure the settings.
-* `To mount`
-  - Through the main window in the GUI, browse to the location you want your cloud to be mounted, then select the EMPTY folder you want.
-    You may need to create this folder.
-  - In the drop down menu, select the type of cloud you have, S3 or Azure, then click `mount`.
-  - You should now see your data in the folder you selected.
-* `To unmount`
-  - Through the main window in the GUI, browse to your mounted folder and select it.
-  - Select the type of cloud you have, S3 or Azure.
-  - Click the unmount mutton.
-  - The mount folder should now be empty.
 
-### Windows
-Note: Make sure WinSFP is installed, found in the [install instructions](#Installation).
-* `To Mount`
-  - Run the provided GUI.
-  - To attach your cloud to a folder, browse to the location you want your cloud to mount and make sure that directory is empty.
-  - Select the type of cloud you want, either S3 or Azure.
-  - Click mount.
+The quickest way to get started with Cloudfuse is to use the GUI. Open Cloudfuse from the desktop shortcut to launch it.  
+If you installed Cloudfuse from an archive, you can run the GUI by running `cloudfuseGUI` from the extracted archive. To run the GUI from source, see instructions [here](https://github.com/Seagate/cloudfuse/wiki/Running-the-GUI-from-source).  
 
-* `To Unmount`
-  - Launch the provided GUI.
-  - Through the main window of the GUI, browse to the folder you want unmounted and select it.
-  - Select the type of cloud you have mounted, either S3 or Azure.
-  - Click unmount.
+* Choose mount settings
+  - Select the desired type of cloud (Azure or S3).
+  - Click `config` to open the settings window.
+  - Enter the credentials for your cloud storage container  
+  (see [here for S3](https://github.com/Seagate/cloudfuse/wiki/S3-Storage-Configuration), or [here for Azure](https://github.com/Seagate/cloudfuse/wiki/Azure-Storage-Configuration) credential requirements).
+  - Select file caching or streaming mode (see [File-Cache](https://github.com/Seagate/cloudfuse/wiki/File-Cache) and [Streaming](https://github.com/Seagate/cloudfuse/wiki/Streaming) for details).
+  - Close the settings window and save your changes.  
+
+  Cloudfuse will store the config file in `	C:\Users\{username}\AppData\Roaming` on Windows and in `/opt/cloudfuse/` on Linux.  
+  You can also edit the config file directly (see [guide](https://github.com/Seagate/cloudfuse/wiki/Config-File)).  
+* Mount your container
+  - Click `Browse` Through the main window in the GUI, browse to the location you want your cloud to be mounted, then select the EMPTY folder you want. You may need to create this folder. 
+  - Click `Mount`.
+  - Watch for status messages below. On success, your files will appear in the mount directory.  
+    Note: if mount fails with an error mentioning WinFSP, you may need to install WinFSP (see [installation instructions](#Installation)).  
+
+  On Windows, mounted containers will persist across system restarts.
+* Unmount
+  - Make sure the mount directory you want to unmount is listed. If it isn't, click `browse` and select it.
+  - Click the `unmount` mutton.
+  - Watch for a status message below. On success, the mount directory will become empty.  
+    Note: If you enabled the `Persist File Cache` option, the local file cache for the container will be kept and reused when the container is mounted again.  
 
 You can also use the [command line interface](#Command-Line-Interface) to mount and unmount.
 
 ## Health Monitor
+
 Cloudfuse also supports a health monitor. It allows customers gain more insight
 into how their Cloudfuse instance is behaving with the rest of their machine.
 Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it up.
@@ -144,7 +114,6 @@ The general format of the Cloudfuse Linux commands is `cloudfuse [command] [argu
   - Example: `cloudfuse unmount all --lazy`
 
 ### Windows
-
 The general format of the Cloudfuse Windows commands is:
  `cloudfuse service [command] [arguments] --[flag-name]=[flag-value]`
   * `cloudfuse service install` - Installs the startup process for Cloudfuse
@@ -167,11 +136,12 @@ To see a list of commands, type `cloudfuse -h`. To
 learn about a specific command, just include the name of the command (For
 example: `cloudfuse mount -h`).
 
+## Limitations
 
-## NOTICE
+### NOTICE
 - We have seen some customer issues around files getting corrupted when `streaming` is used in write mode. Kindly avoid using this feature for write while we investigate and resolve it.
 
-## Un-Supported File system operations
+### Un-Supported File system operations
 - mkfifo : fifo creation is not supported by cloudfuse and this will result in
   "function not implemented" error
 - chown  : Change of ownership is not supported by Azure Storage hence Cloudfuse
@@ -180,7 +150,7 @@ example: `cloudfuse mount -h`).
 - Cloudfuse does not support extended-attributes (x-attrs) operations
 - Cloudfuse does not support lseek() operation on directory handles. No error is thrown but it will not work as expected.
 
-## Un-Supported Scenarios
+### Un-Supported Scenarios
 - Cloudfuse does not support overlapping mount paths. While running multiple
   instances of Cloudfuse make sure each instance has a unique and
   non-overlapping mount point.
@@ -199,15 +169,14 @@ example: `cloudfuse mount -h`).
   [here](https://github.com/Azure/azure-storage-fuse/issues/866) for details on
   this.
 
-## Limitations
+### Other Limitations
 - In case of Azure BlockBlob accounts, ACLs are not supported by Azure Storage
   so Cloudfuse will by default return success for 'chmod' operation. However it
   will work fine for Gen2 (DataLake) accounts. ACLs are not currently supported
   for S3 accounts.
-- When Cloudfuse is mounted on a container, SYS_ADMIN privileges are required
+- When Cloudfuse is mounted on a docker container, SYS_ADMIN privileges are required
   for it to interact with the fuse driver. If container is created without the
-  privilege, mount will fail. Sample command to spawn a docker container is
-
+  privilege, mount will fail. Sample command to spawn a docker container is  
     `docker run -it --rm --cap-add=SYS_ADMIN --device=/dev/fuse --security-opt
     apparmor:unconfined <environment variables> <docker image>`
 
@@ -216,26 +185,27 @@ By default, Cloudfuse will log to syslog. The default settings will, in some
 cases, log relevant file paths to syslog. If this is sensitive information, turn
 off logging or set log-level to LOG_ERR.  
 
-## Third-Party Notices
+## License
+
+The Cloudfuse project is licensed under MIT.
+
+### Third-Party Notices
 See [notices](./NOTICE) for third party license notices.
 
 Qt is licensed under the GNU Lesser General Public License version 3, which is available at https://doc.qt.io/qt-6/lgpl.html
 
 WinFSP is licensed under the GPLv3 license with a special exception for Free/Libre and Open Source Software, which is available at https://github.com/winfsp/winfsp/blob/master/License.txt
 
-## Attribution
+### Attribution
 WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos https://github.com/winfsp/winfsp
 
-## License
-The Cloudfuse project is licensed under MIT.
-
 ## Support
-Please submit an issue
-[here](https://github.com/Seagate/cloudfuse/issues) for any issues/feature
-requests/questions.
 
-## Frequently Asked Questions
+### Frequently Asked Questions
 A list of FAQs can be found [here](https://github.com/Seagate/cloudfuse/wiki/Frequently-Asked-Questions)
+
+### Report Issues and Request Features
+We welcome all feedback! Please submit [issues and requests here](https://github.com/Seagate/cloudfuse/issues).
 
 ## Contributing
 This project welcomes contributions and suggestions.
