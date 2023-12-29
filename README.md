@@ -1,26 +1,4 @@
 # Cloudfuse - An S3 and Azure Storage FUSE driver
-##### Table of Contents  
-- [About](#about)  
-- [Installation](#installation)
-  - [Windows](#windows)  
-  - [Linux](#linux) 
-  - [From Tar or Zip files](#from-tar-or-zip-files)  
-  - [Source Installation](#source-installation)  
-- [Basic Use](#basic-use)  
-- [Health Monitor](#health-monitor)  
-- [Command Line Interface](#command-line-interface)  
-  - [Linux](#linux-1)  
-  - [Windows](#windows-1)  
-  - [Secure options for both Windows and Linux](#secure-options-for-both-windows-and-linux)
-- [Limitations](#limitations)  
-- [License](#license)
-- [Support](#support)
-- [Contributing](#contributing)
-
-
-
-
-## About
 
 Cloudfuse provides the ability to mount a cloud bucket in your local filesystem on Linux and Windows with a GUI for easy configuration.
 With Cloudfuse you can easily read and write to the cloud, and connect programs on your computer to the cloud even if they're not cloud-aware.
@@ -28,21 +6,44 @@ Cloudfuse uses file caching to provide the performance of local storage, or you 
 Cloudfuse is a fork of [blobfuse2](https://github.com/Azure/azure-storage-fuse), and adds S3 support, a GUI, and Windows support.
 Cloudfuse supports clouds with an S3 or Azure interface.
 
+## Table of Contents  
+
+- [Installation](#installation)
+  - [Windows](#windows)
+  - [Linux](#linux)
+  - [From Tar or Zip files](#from-tar-or-zip-files)
+  - [Source Installation](#source-installation)
+- [Basic Use](#basic-use)
+- [Health Monitor](#health-monitor)
+- [Command Line Interface](#command-line-interface)
+  - [Linux](#linux-1)
+  - [Windows](#windows-1)
+  - [Secure options for both Windows and Linux](#secure-options-for-both-windows-and-linux)
+- [Limitations](#limitations)
+- [License](#license)
+- [Support](#support)
+- [Contributing](#contributing)
+
 ## Installation
 
-### Windows 
+### Windows
+
 Download and run the .exe installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
 
-### Linux 
+### Linux
+
 #### Debian /Ubuntu
+
 Download the .deb file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal:  
 `sudo apt-get install ./cloudfuse*.deb`
 
 #### CentOS / RHEL
+
 Download the .rpm file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal:  
 `sudo rpm -i ./cloudfuse*.rpm`
 
 ### From Tar or Zip files
+
 In the release tab on GitHub, you can download a tar folder for Linux on x86 and a zip folder for Windows on x86 which bundles
 
 the GUI and the Cloudfuse binary. Then run the `cloudfuseGUI` file on your system to launch the GUI or
@@ -51,7 +52,8 @@ call the `cloudfuse` binary file on the command line to use Cloudfuse as a comma
 On Windows, you will need to install WinFsp to use Cloudfuse. See [this](https://winfsp.dev/rel/) to install WinFSP.
 
 ### Source Installation
-Please refer to the [Installation from source](https://github.com/Seagate/cloudfuse/wiki/Installation-From-Source) to 
+
+Please refer to the [Installation from source](https://github.com/Seagate/cloudfuse/wiki/Installation-From-Source) to
 manually install Cloudfuse.
 
 ## Basic Use
@@ -59,7 +61,7 @@ manually install Cloudfuse.
 The quickest way to get started with Cloudfuse is to use the GUI. Open Cloudfuse from the desktop shortcut to launch it.  
 If you installed Cloudfuse from an archive, you can run the GUI by running `cloudfuseGUI` from the extracted archive. To run the GUI from source, see instructions [here](https://github.com/Seagate/cloudfuse/wiki/Running-the-GUI-from-source).  
 
-* Choose mount settings
+- Choose mount settings
   - Select the desired type of cloud (Azure or S3).
   - Click `config` to open the settings window.
   - Enter the credentials for your cloud storage container  
@@ -67,22 +69,23 @@ If you installed Cloudfuse from an archive, you can run the GUI by running `clou
   - Select file caching or streaming mode (see [File-Cache](https://github.com/Seagate/cloudfuse/wiki/File-Cache) and [Streaming](https://github.com/Seagate/cloudfuse/wiki/Streaming) for details).
   - Close the settings window and save your changes.  
 
-  Cloudfuse will store the config file in `	C:\Users\{username}\AppData\Roaming` on Windows and in `/opt/cloudfuse/` on Linux.  
+  Cloudfuse will store the config file in `C:\Users\{username}\AppData\Roaming` on Windows and in `/opt/cloudfuse/` on Linux.  
   You can also edit the config file directly (see [guide](https://github.com/Seagate/cloudfuse/wiki/Config-File)).  
-* Mount your container
-  - Click `Browse` Through the main window in the GUI, browse to the location you want your cloud to be mounted, then select the EMPTY folder you want. You may need to create this folder. 
+- Mount your container
+  - Click `Browse` Through the main window in the GUI, browse to the location you want your cloud to be mounted, then select the EMPTY folder you want. You may need to create this folder.
   - Click `Mount`.
   - Watch for status messages below. On success, your files will appear in the mount directory.  
-    Note: if mount fails with an error mentioning WinFSP, you may need to install WinFSP (see [installation instructions](#Installation)).  
+    Note: if mount fails with an error mentioning WinFSP, you may need to install WinFSP (see [installation instructions](#installation)).  
 
   On Windows, mounted containers will persist across system restarts.
-* Unmount
+  
+- Unmount
   - Make sure the mount directory you want to unmount is listed. If it isn't, click `browse` and select it.
   - Click the `unmount` mutton.
   - Watch for a status message below. On success, the mount directory will become empty.  
     Note: If you enabled the `Persist File Cache` option, the local file cache for the container will be kept and reused when the container is mounted again.  
 
-You can also use the [command line interface](#Command-Line-Interface) to mount and unmount.
+You can also use the [command line interface](#command-line-interface) to mount and unmount.
 
 ## Health Monitor
 
@@ -93,40 +96,41 @@ Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it
 ## Command Line Interface
 
 ### Linux
+
 The general format of the Cloudfuse Linux commands is `cloudfuse [command] [arguments]
 --[flag-name]=[flag-value]`
-* `help` - Help about any command
-* `mount` - Mounts a cloud storage container as a filesystem. The supported
+- `help` - Help about any command
+- `mount` - Mounts a cloud storage container as a filesystem. The supported
   containers include:
   - [S3 Bucket Storage](https://aws.amazon.com/s3/)
   - [Azure Blob Storage](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction)
   - [Azure Datalake Storage Gen2](https://docs.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction)
   - Example: `cloudfuse mount <mount path> --config-file=<config file>`
-* `mount all` - Mounts all the containers in an S3 Account or Azure account supported by mount
+- `mount all` - Mounts all the containers in an S3 Account or Azure account supported by mount
   - Example: `cloudfuse mount all <mount path> --config-file=<config file>`
-* `mount list` - Lists all Cloudfuse filesystems.
+- `mount list` - Lists all Cloudfuse filesystems.
   - Example: `cloudfuse mount list`
-* `unmount` - Unmounts the Cloudfuse filesystem.
+- `unmount` - Unmounts the Cloudfuse filesystem.
   - Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors)
   - Example: `cloudfuse unmount --lazy <mount path>`
-* `unmount all` - Unmounts all Cloudfuse filesystems.
+- `unmount all` - Unmounts all Cloudfuse filesystems.
   - Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors)
   - Example: `cloudfuse unmount all --lazy`
 
 ### Windows
 The general format of the Cloudfuse Windows commands is:
  `cloudfuse service [command] [arguments] --[flag-name]=[flag-value]`
-  * `cloudfuse service install` - Installs the startup process for Cloudfuse
-  * `cloudfuse service uninstall` - Uninstall the startup process for Cloudfuse
-  * `cloudfuse service mount <mount path>  --config-file=<config file>` - Mount an instance that will persist in Windows when restarted
-  * `cloudfuse service unmount <mount path>` - Unmount mount of Cloudfuse running as a Windows service
+  - `cloudfuse service install` - Installs the startup process for Cloudfuse
+  - `cloudfuse service uninstall` - Uninstall the startup process for Cloudfuse
+  - `cloudfuse service mount <mount path>  --config-file=<config file>` - Mount an instance that will persist in Windows when restarted
+  - `cloudfuse service unmount <mount path>` - Unmount mount of Cloudfuse running as a Windows service
 
 ### Secure options for both Windows and Linux
 To use security options the general format for cloudfuse commands is `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
-* `secure decrypt` - Decrypts a config file.
-* `secure encrypt` - Encrypts a config file.
-* `secure get` - Gets value of a config parameter from an encrypted config file.
-* `secure set` - Updates value of a config parameter.
+- `secure decrypt` - Decrypts a config file.
+- `secure encrypt` - Encrypts a config file.
+- `secure get` - Gets value of a config parameter from an encrypted config file.
+- `secure set` - Updates value of a config parameter.
 
 Note - If you do not have admin rights, you can still mount your cloud without Windows Service, however
 the process will stay in the foreground. Use `cloudfuse mount <mount path>  --config-file=<config file>` to mount, use Ctrl+C to unmount.
