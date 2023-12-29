@@ -97,7 +97,6 @@ Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it
 
 ## Command Line Interface
 
-### Linux:
 The general format of the Cloudfuse Linux commands is `cloudfuse [command] [arguments]
 --[flag-name]=[flag-value]`
 * `help` - Help about any command
@@ -107,6 +106,7 @@ The general format of the Cloudfuse Linux commands is `cloudfuse [command] [argu
   - [Azure Blob Storage](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction)
   - [Azure Datalake Storage Gen2](https://docs.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction)
   - Example: `cloudfuse mount <mount path> --config-file=<config file>`
+  - On Windows, mounted containers will be remounted on login after a restart
 * `mount all` - Mounts all the containers in an S3 Account or Azure account supported by mount
   - Example: `cloudfuse mount all <mount path> --config-file=<config file>`
 * `mount list` - Lists all Cloudfuse filesystems.
@@ -114,20 +114,17 @@ The general format of the Cloudfuse Linux commands is `cloudfuse [command] [argu
 * `unmount` - Unmounts the Cloudfuse filesystem.
   - Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors)
   - Example: `cloudfuse unmount --lazy <mount path>`
-* `unmount all` - Unmounts all Cloudfuse filesystems.
+  - On Windows, unmounting a container also stops it from being automatically remounted at login.
+* `unmount all` - Unmounts all Cloudfuse filesystems (Linux only)
   - Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors)
   - Example: `cloudfuse unmount all --lazy`
 
-### Windows:
+### Remount on Startup (Windows Only)
 
-The general format of the Cloudfuse Windows commands is:
- `cloudfuse service [command] [arguments] --[flag-name]=[flag-value]`
-  * `cloudfuse service install` - Installs the startup process for Cloudfuse
-  * `cloudfuse service uninstall` - Uninstall the startup process for Cloudfuse
-  * `cloudfuse mount <mount path>  --config-file=<config file>` - Mount an instance that will persist on reboot
-  * `cloudfuse unmount <mount path>` - Unmount an instance of Cloudfuse that is running as a Windows service, and prevent it from remounting on reboot
+  * `cloudfuse service install` - Installs the startup process for Cloudfuse which remounts containers on login after a restart.
+  * `cloudfuse service uninstall` - Uninstall the startup process for Cloudfuse and prevent containers from being remounted on login.
 
-### Secure options for both Windows and Linux
+### Secure options
 To use security options the general format for cloudfuse commands is `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
 * `secure decrypt` - Decrypts a config file.
 * `secure encrypt` - Encrypts a config file.
