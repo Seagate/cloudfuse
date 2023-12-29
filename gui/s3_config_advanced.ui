@@ -127,7 +127,7 @@
         <item>
          <widget class="QCheckBox" name="checkBox_fileCache_allowNonEmptyTmp">
           <property name="toolTip">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Keep local file cache on unmount and remount&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Keep local file cache on unmount and remount (allow-non-empty-temp)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
           </property>
           <property name="text">
            <string>Persist File Cache</string>
