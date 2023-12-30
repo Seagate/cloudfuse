@@ -44,11 +44,8 @@ Download the .rpm file from our latest release [here](https://github.com/Seagate
 
 ### From Tar or Zip files
 
-In the release tab on GitHub, you can download a tar folder for Linux on x86 and a zip folder for Windows on x86 which bundles
-
-the GUI and the Cloudfuse binary. Then run the `cloudfuseGUI` file on your system to launch the GUI or
-call the `cloudfuse` binary file on the command line to use Cloudfuse as a command line tool.
-
+Download the archive for your platform and architecture from the latest release [here](https://github.com/Seagate/cloudfuse/releases).
+The archive includes the GUI.  
 On Windows, you will need to install WinFsp to use Cloudfuse. See [this](https://winfsp.dev/rel/) to install WinFSP.
 
 ### Source Installation
@@ -59,27 +56,28 @@ manually install Cloudfuse.
 ## Basic Use
 
 The quickest way to get started with Cloudfuse is to use the GUI. Open Cloudfuse from the desktop shortcut to launch it.  
-If you installed Cloudfuse from an archive, you can run the GUI by running `cloudfuseGUI` from the extracted archive. To run the GUI from source, see instructions [here](https://github.com/Seagate/cloudfuse/wiki/Running-the-GUI-from-source).  
+If you installed Cloudfuse from an archive, run `cloudfuseGUI` from the extracted archive.
+To run the GUI from source, see instructions [here](https://github.com/Seagate/cloudfuse/wiki/Running-the-GUI-from-source).
 
-- Choose mount settings
+- Choose mount settings:
   - Select the desired type of cloud (Azure or S3).
   - Click `config` to open the settings window.
-  - Enter the credentials for your cloud storage container  
+  - Enter the credentials for your cloud storage container.  
   (see [here for S3](https://github.com/Seagate/cloudfuse/wiki/S3-Storage-Configuration), or [here for Azure](https://github.com/Seagate/cloudfuse/wiki/Azure-Storage-Configuration) credential requirements).
   - Select file caching or streaming mode (see [File-Cache](https://github.com/Seagate/cloudfuse/wiki/File-Cache) and [Streaming](https://github.com/Seagate/cloudfuse/wiki/Streaming) for details).
-  - Close the settings window and save your changes.  
+  - Close the settings window and save your changes.
 
-  Cloudfuse will store the config file in `C:\Users\{username}\AppData\Roaming` on Windows and in `/opt/cloudfuse/` on Linux.  
-  You can also edit the config file directly (see [guide](https://github.com/Seagate/cloudfuse/wiki/Config-File)).  
-- Mount your container
-  - Click `Browse` Through the main window in the GUI, browse to the location you want your cloud to be mounted, then select the EMPTY folder you want. You may need to create this folder.
+  The config file is written to this location on Windows: `C:\Users\{username}\AppData\Roaming`, and on Linux: `/opt/cloudfuse/`.  
+  You can view and edit the config file directly (see [guide](https://github.com/Seagate/cloudfuse/wiki/Config-File)).  
+- Mount your container:
+  - Click `Browse` in the main window and browse to the EMPTY folder you want to mount your container in. You may need to create this folder.
   - Click `Mount`.
   - Watch for status messages below. On success, your files will appear in the mount directory.  
     Note: if mount fails with an error mentioning WinFSP, you may need to install WinFSP (see [installation instructions](#installation)).  
 
   On Windows, mounted containers will persist across system restarts.
   
-- Unmount
+- Unmount:
   - Make sure the mount directory you want to unmount is listed. If it isn't, click `browse` and select it.
   - Click the `unmount` mutton.
   - Watch for a status message below. On success, the mount directory will become empty.  
@@ -89,68 +87,70 @@ You can also use the [command line interface](#command-line-interface) to mount 
 
 ## Health Monitor
 
-Cloudfuse also supports a health monitor. It allows customers gain more insight
-into how their Cloudfuse instance is behaving with the rest of their machine.
+Cloudfuse also supports a health monitor.  
+The health monitor allows customers gain more insight into how their Cloudfuse instance is behaving with the rest of their machine.  
 Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it up.
 
 ## Command Line Interface
 
 ### Linux
 
-The general format of the Cloudfuse Linux commands is `cloudfuse [command] [arguments]
---[flag-name]=[flag-value]`
+The general format of the Cloudfuse Linux commands is:  
+`cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
 
-- `help` - Help about any command
-- `mount` - Mounts a cloud storage container as a filesystem. The supported
-  containers include:
+Available commands:
+
+- `help` - Displays help about for any command
+- `mount` - Mounts a cloud storage container as a filesystem  
+  Example: `cloudfuse mount <mount path> --config-file=<config file>`  
+  Supported container types:
   - [S3 Bucket Storage](https://aws.amazon.com/s3/)
   - [Azure Blob Storage](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction)
   - [Azure Datalake Storage Gen2](https://docs.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction)
-  - Example: `cloudfuse mount <mount path> --config-file=<config file>`
-- `mount all` - Mounts all the containers in an S3 Account or Azure account supported by mount
-  - Example: `cloudfuse mount all <mount path> --config-file=<config file>`
-- `mount list` - Lists all Cloudfuse filesystems.
-  - Example: `cloudfuse mount list`
-- `unmount` - Unmounts the Cloudfuse filesystem.
-  - Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors)
-  - Example: `cloudfuse unmount --lazy <mount path>`
-- `unmount all` - Unmounts all Cloudfuse filesystems.
-  - Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors)
-  - Example: `cloudfuse unmount all --lazy`
+- `mount all` - Mounts all the containers in an S3 Account or Azure account supported by mount  
+  Example: `cloudfuse mount all <mount path> --config-file=<config file>`
+- `mount list` - Lists all Cloudfuse filesystems  
+  Example: `cloudfuse mount list`
+- `unmount` - Unmounts the Cloudfuse filesystem  
+  Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors).  
+  Example: `cloudfuse unmount --lazy <mount path>`
+- `unmount all` - Unmounts all Cloudfuse filesystems  
+  Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors).  
+  Example: `cloudfuse unmount all --lazy`
 
 ### Windows
 
-The general format of the Cloudfuse Windows commands is:
+The general format of the Cloudfuse Windows commands is:  
  `cloudfuse service [command] [arguments] --[flag-name]=[flag-value]`
 
+ Available commands:
+
 - `cloudfuse service install` - Installs the startup process for Cloudfuse
-- `cloudfuse service uninstall` - Uninstall the startup process for Cloudfuse
-- `cloudfuse service mount <mount path>  --config-file=<config file>` - Mount an instance that will persist in Windows when restarted
-- `cloudfuse service unmount <mount path>` - Unmount mount of Cloudfuse running as a Windows service
+- `cloudfuse service uninstall` - Uninstalls the startup process for Cloudfuse
+- `cloudfuse service mount <mount path>  --config-file=<config file>` - Mounts an instance that will persist in Windows when restarted
+- `cloudfuse service unmount <mount path>` - Unmounts mount of Cloudfuse running as a Windows service
 
 ### Secure options for both Windows and Linux
 
-To use security options the general format for cloudfuse commands is `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
+To use security options the general format for cloudfuse commands is:  
+`cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
 
-- `secure decrypt` - Decrypts a config file.
-- `secure encrypt` - Encrypts a config file.
-- `secure get` - Gets value of a config parameter from an encrypted config file.
-- `secure set` - Updates value of a config parameter.
-
-Note - If you do not have admin rights, you can still mount your cloud without Windows Service, however
-the process will stay in the foreground. Use `cloudfuse mount <mount path>  --config-file=<config file>` to mount, use Ctrl+C to unmount.
+- `secure decrypt` - Decrypts a config file
+- `secure encrypt` - Encrypts a config file
+- `secure get` - Gets value of a config parameter from an encrypted config file
+- `secure set` - Updates value of a config parameter
 
 ### Find help from your command prompt
 
-To see a list of commands, type `cloudfuse -h`. To
-learn about a specific command, just include the name of the command (For
-example: `cloudfuse mount -h`).
+To see a list of commands, type `cloudfuse -h`.
+To learn about a specific command, just include the name of the command (For example: `cloudfuse mount -h`).
 
 ## Limitations
 
 ### NOTICE
 
-- We have seen some customer issues around files getting corrupted when `streaming` is used in write mode. Kindly avoid using this feature for write while we investigate and resolve it.
+- We have seen some customer issues around files getting corrupted when `streaming` is used in write mode.
+Kindly avoid using this feature for write while we investigate and resolve it.
 
 ### Un-Supported File system operations
 
@@ -160,7 +160,8 @@ example: `cloudfuse mount -h`).
   does not support this.
 - Creation of device files or pipes is not supported by Cloudfuse.
 - Cloudfuse does not support extended-attributes (x-attrs) operations
-- Cloudfuse does not support lseek() operation on directory handles. No error is thrown but it will not work as expected.
+- Cloudfuse does not support lseek() operation on directory handles.
+  No error is thrown but it will not work as expected.
 
 ### Un-Supported Scenarios
 
@@ -208,9 +209,10 @@ The Cloudfuse project is licensed under MIT.
 
 See [notices](./NOTICE) for third party license notices.
 
-Qt is licensed under the GNU Lesser General Public License version 3, which is available [here](https://doc.qt.io/qt-6/lgpl.html)
+Qt is licensed under the GNU Lesser General Public License version 3, which is available [here](https://doc.qt.io/qt-6/lgpl.html).
 
-WinFSP is licensed under the GPLv3 license with a special exception for Free/Libre and Open Source Software, which is available [here](https://github.com/winfsp/winfsp/blob/master/)License.txt
+WinFSP is licensed under the GPLv3 license with a special exception for Free/Libre and Open Source Software,
+which is available [here](https://github.com/winfsp/winfsp/blob/master/License.txt).
 
 ### Attribution
 
@@ -220,7 +222,7 @@ WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos - [link](ht
 
 ### Frequently Asked Questions
 
-A list of FAQs can be found [here](https://github.com/Seagate/cloudfuse/wiki/Frequently-Asked-Questions)
+A list of FAQs can be found [here](https://github.com/Seagate/cloudfuse/wiki/Frequently-Asked-Questions).
 
 ### Report Issues and Request Features
 
@@ -230,7 +232,6 @@ We welcome all feedback! Please submit [issues and requests here](https://github
 
 This project welcomes contributions and suggestions.
 
-This project is governed by the [code of conduct](CODE_OF_CONDUCT.md). You are
-expected to follow this as you contribute to the project. Please report all
-unacceptable behavior to
-[opensource@seagate.com](mailto:opensource@seagate.com).
+This project is governed by the [code of conduct](CODE_OF_CONDUCT.md).  
+You are expected to follow this as you contribute to the project.  
+Please report all unacceptable behavior to [opensource@seagate.com](mailto:opensource@seagate.com).
