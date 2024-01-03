@@ -211,6 +211,9 @@ example: `cloudfuse mount -h`).
     `docker run -it --rm --cap-add=SYS_ADMIN --device=/dev/fuse --security-opt
     apparmor:unconfined <environment variables> <docker image>`
 
+- Listing a directory with symbolic links is slow as this requires reading the
+  object to determine the target of the link.
+
 ### Syslog security warning
 By default, Cloudfuse will log to syslog. The default settings will, in some
 cases, log relevant file paths to syslog. If this is sensitive information, turn
