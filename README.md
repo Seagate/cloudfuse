@@ -1,4 +1,29 @@
 # Cloudfuse - An S3 and Azure Storage FUSE driver
+##### Table of Contents  
+- [About](#about)  
+- [Installation](#installation)
+  - [Windows](#windows)  
+  - [Linux](#linux) 
+  - [From Tar or Zip files](#from-tar-or-zip-files)   
+  - [Source Installation](#source-installation)   
+- [Config](#config)  
+- [Basic Use](#basic-use)  
+  - [Linux](#linux-1)   
+  - [Windows](#windows-1)   
+- [Health Monitor](#health-monitor)  
+- [Command Line Interface](#command-line-interface)  
+  - [Linux](#linux-2) 
+  - [Windows](#windows-2)     
+  - [Secure options for both Windows and Linux](#secure-options-for-both-windows-and-linux)
+- [NOTICE](#notice)  
+- [Limitations](#limitations)
+- [Third-Party Notices](#third-party-notices)
+- [Support](#support)
+- [Contributing](#contributing)
+
+
+
+
 ## About
 Cloudfuse provides the ability to mount a cloud bucket in your local filesystem on Linux and Windows with a GUI for easy configuration.
 With Cloudfuse you can easily read and write to the cloud, and connect programs on your computer to the cloud even if they're not cloud-aware.
@@ -22,7 +47,7 @@ Download the .deb file from our latest release [here](https://github.com/Seagate
 
 `sudo apt-get install ./cloudfuse*.deb`
 
-#### CentOS / RHEL:
+#### CentOS / RHEL
 
 Download the .rpm file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal: 
 
@@ -131,7 +156,10 @@ To use security options the general format for cloudfuse commands is `cloudfuse 
 * `secure get` - Gets value of a config parameter from an encrypted config file.
 * `secure set` - Updates value of a config parameter.
 
-## Find help from your command prompt
+Note - If you do not have admin rights, you can still mount your cloud without Windows Service, however
+the process will stay in the foreground. Use `cloudfuse mount <mount path>  --config-file=<config file>` to mount, use Ctrl+C to unmount.
+
+### Find help from your command prompt
 To see a list of commands, type `cloudfuse -h`. To
 learn about a specific command, just include the name of the command (For
 example: `cloudfuse mount -h`).
