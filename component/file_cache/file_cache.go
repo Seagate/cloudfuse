@@ -491,7 +491,7 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 			return false
 		}
 
-		// If there are files in local cache then dont allow deletion of directory
+		// If there are files in local cache then don't allow deletion of directory
 		if err != io.EOF {
 			// Local directory is not empty fail the call
 			log.Debug("FileCache::IsDirEmpty : %s was not empty in local cache", options.Name)
@@ -602,7 +602,7 @@ func (fc *FileCache) validateStorageError(path string, err error, method string,
 			log.Debug("FileCache::%s : %s does not exist in storage", method, path)
 			if !fc.createEmptyFile {
 				// Check if the file exists in the local cache
-				// (policy might not think the file exists if the file is merely marked for evication and not actually evicted yet)
+				// (policy might not think the file exists if the file is merely marked for eviction and not actually evicted yet)
 				localPath := common.JoinUnixFilepath(fc.tmpPath, path)
 				_, err := os.Stat(localPath)
 				if os.IsNotExist(err) { // If the file is not in the local cache, then the file does not exist.
