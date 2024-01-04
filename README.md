@@ -16,9 +16,6 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 - [Basic Use](#basic-use)
 - [Health Monitor](#health-monitor)
 - [Command Line Interface](#command-line-interface)
-  - [Linux](#linux-1)
-  - [Windows](#windows-1)
-  - [Secure options for both Windows and Linux](#secure-options-for-both-windows-and-linux)
 - [Limitations](#limitations)
 - [License](#license)
 - [Support](#support)
@@ -123,7 +120,7 @@ Available commands:
 - `cloudfuse service install` - Installs the startup process for Cloudfuse which remounts containers on login after a restart.
 - `cloudfuse service uninstall` - Uninstalls the startup process for Cloudfuse and prevents containers from being remounted on login.
 
-### Secure options
+### Secure Options
 
 To use security options the general format for cloudfuse commands is:  
 `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
