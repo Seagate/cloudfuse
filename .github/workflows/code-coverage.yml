@@ -683,7 +683,7 @@ jobs:
       shell: bash
       run: |-
         rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         rm -rf ${{ env.MOUNT_DIR }}/*
@@ -707,7 +707,7 @@ jobs:
         echo "  monitor-disable-list:" >> /tmp/configBlockProfilerTemp.yaml
         echo "    - cloudfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
         cat /tmp/configBlockProfilerTemp.yaml
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configBlockProfilerTemp.yaml &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         rm -rf ${{ env.MOUNT_DIR }}/*
@@ -733,7 +733,7 @@ jobs:
       run: |-
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG }} &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG }} --foreground=true &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         rm -rf ${{ env.MOUNT_DIR }}/*
@@ -757,7 +757,7 @@ jobs:
         echo "  monitor-disable-list:" >> ${{ env.cloudfuse_ADLS_CFG_HMON }}
         echo "    - cloudfuse_stats" >> ${{ env.cloudfuse_ADLS_CFG_HMON }}
         cat ${{ env.cloudfuse_ADLS_CFG_HMON }}
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG_HMON }} &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG_HMON }} --foreground=true &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         rm -rf ${{ env.MOUNT_DIR }}/*
@@ -782,7 +782,7 @@ jobs:
       run: |-
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         cd test/e2e_tests
@@ -805,7 +805,7 @@ jobs:
         echo "  monitor-disable-list:" >> configBlockProfilerTemp.yaml
         echo "    - cloudfuse_stats" >> configBlockProfilerTemp.yaml
         cat /tmp/configBlockProfilerTemp.yaml
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configBlockProfilerTemp.yaml &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         cd test/e2e_tests
@@ -829,7 +829,7 @@ jobs:
       run: |-
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_lfu.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_lfu.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         rm -rf ${{ env.MOUNT_DIR }}/*
@@ -855,7 +855,7 @@ jobs:
       run: |-
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_lfu.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_lfu.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         cd test/e2e_tests
@@ -880,7 +880,7 @@ jobs:
     #   run: |-
     #     rm -rf ${{ env.MOUNT_DIR }}/*
     #     rm -rf ${{ env.TEMP_DIR }}/*
-    #     ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream_prep.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} &
+    #     ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream_prep.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} --foreground=true &
     #     sleep 10
     #     pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
     #     for i in {10,50,100}; do echo $i; done | parallel --will-cite -j 5 'head -c {}M < /dev/urandom > ${{ env.WORK_DIR }}/myfile_{}'
@@ -893,7 +893,7 @@ jobs:
     #   run: |-
     #     rm -rf ${{ env.MOUNT_DIR }}/*
     #     rm -rf ${{ env.TEMP_DIR }}/*
-    #     ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} &
+    #     ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_stream.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_STREAM_CFG }} --foreground=true &
     #     sleep 10
     #     pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
     #     rm -rf ${{ env.MOUNT_DIR }}/*
@@ -940,7 +940,7 @@ jobs:
       run: |-
         mkdir -p /abc
         set +x
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_neg.cov mount all /abc --config-file=${{ env.cloudfuse_CFG }} --log-level=log_debug
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_neg.cov mount all /abc --config-file=${{ env.cloudfuse_CFG }} --log-level=log_debug --foreground=true
         if [ $? -eq 0 ]; then
           exit 1
         fi
@@ -950,12 +950,12 @@ jobs:
       shell: bash {0}
       run: |-
         set +x
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_foreg.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --log-level=log_debug &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_foreg.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --log-level=log_debug --foreground=true &
         if [ $? -ne 0 ]; then
           exit 1
         fi
         sleep 5
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_remount.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --log-level=log_debug
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_remount.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --log-level=log_debug --foreground=true
         if [ $? -eq 0 ]; then
           exit 1
         fi
@@ -990,7 +990,7 @@ jobs:
         set +x
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_foreg_2.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --log-level=log_debug &
+        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_foreg_2.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --log-level=log_debug --foreground=true &
         if [ $? -ne 0 ]; then
           exit 1
         fi
@@ -1021,7 +1021,7 @@ jobs:
         if [ $? -ne 0 ]; then
           exit 1
         fi
-      # ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_secure.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.WORK_DIR }}/cloudfuse.azsec --passphrase=123123123123123123123123 &
+      # ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/mount_secure.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.WORK_DIR }}/cloudfuse.azsec --passphrase=123123123123123123123123 --foreground=true &
       # sleep 10
       # pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
       # rm -rf ${{ env.MOUNT_DIR }}/*
@@ -1039,7 +1039,7 @@ jobs:
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
         cat ${{ env.cloudfuse_ADLS_CFG_HMON }}
-        ./cloudfuse.test mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG_HMON }} &
+        ./cloudfuse.test mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG_HMON }} --foreground=true &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         win_pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f5`
@@ -1056,7 +1056,7 @@ jobs:
         rm -rf ${{ env.MOUNT_DIR }}/*
         rm -rf ${{ env.TEMP_DIR }}/*
         cat ${{ env.cloudfuse_ADLS_CFG_HMON }}
-        ./cloudfuse.test mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG_HMON }} &
+        ./cloudfuse.test mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG_HMON }} --foreground=true &
         sleep 10
         pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
         pid_mon=`ps -a | grep cfusemon | tr -s ' ' | cut -d ' ' -f2`
