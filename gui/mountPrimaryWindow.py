@@ -6,7 +6,7 @@ import time
 import yaml
 
 # Import QT libraries
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from PySide6 import QtWidgets, QtGui, QtCore
 from PySide6.QtWidgets import QMainWindow
 
@@ -26,7 +26,9 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("Cloud FUSE")
-        
+        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "primaryWindow")
+        self.initMountPoint()
+
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
@@ -54,6 +56,16 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         else:
             self.lineEdit_mountPoint.setToolTip("Designate a location to mount the bucket - the directory must already exist")
             self.button_browse.setToolTip("Browse to a pre-existing directory")
+
+
+    def initMountPoint(self):
+        try:
+            directory = self.settings.value("mountPoint")
+            self.lineEdit_mountPoint.setText(directory)
+        except:
+            # Nothing in the settings for mountDir, leave mountPoint blank
+            pass
+
 
     # Define the slots that will be triggered when the signals in Qt are activated
 
@@ -99,6 +111,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         
         try:
             directory = str(self.lineEdit_mountPoint.text())
+            self.settings.setValue("mountPoint", directory)
         except ValueError as e:
             self.addOutputText(f"Invalid mount path: {str(e)}")
             return
