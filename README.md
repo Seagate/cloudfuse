@@ -11,8 +11,8 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 - [Installation](#installation)
   - [Windows](#windows)
   - [Linux](#linux)
-  - [From Tar or Zip files](#from-tar-or-zip-files)
-  - [Source Installation](#source-installation)
+  - [From Archive](#from-archive)
+  - [From Source](#from-source)
 - [Basic Use](#basic-use)
 - [Health Monitor](#health-monitor)
 - [Command Line Interface](#command-line-interface)
@@ -39,13 +39,13 @@ Download the .deb file from our latest release [here](https://github.com/Seagate
 Download the .rpm file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal:  
 `sudo rpm -i ./cloudfuse*.rpm`
 
-### From Tar or Zip files
+### From Archive
 
 Download the archive for your platform and architecture from the latest release [here](https://github.com/Seagate/cloudfuse/releases).
 The archive includes the GUI.  
 On Windows, you will need to install WinFsp to use Cloudfuse. See [this](https://winfsp.dev/rel/) to install WinFSP.
 
-### Source Installation
+### From Source
 
 Please refer to the [Installation from source](https://github.com/Seagate/cloudfuse/wiki/Installation-From-Source) to
 manually install Cloudfuse.
