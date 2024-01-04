@@ -785,23 +785,22 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	}
 
 	// Get the attributes from next component and cache them
-	pathAttr, getErr := ac.NextComponent().GetAttr(options)
+	pathAttr, err := ac.NextComponent().GetAttr(options)
 
 	ac.cacheLock.Lock()
 	defer ac.cacheLock.Unlock()
 
-	if getErr == nil {
+	if err == nil {
 		// Retrieved attributes so cache them
 		ac.cacheMap.insert(pathAttr, true, time.Now())
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
-	} else if getErr == syscall.ENOENT {
+	} else if err == syscall.ENOENT {
 		// cache this entity not existing
-		// TODO: change the tests to no longer use empty structs. use internal.createAttr() to define a path instead of a literal.
-		ac.cacheMap.insert(&internal.ObjAttr{Path: internal.TruncateDirName(options.Name)}, false, time.Now())
+		ac.cacheMap.insert(internal.CreateObjAttr(options.Name, 0, time.Now()), false, time.Now())
 	}
-	return pathAttr, getErr
+	return pathAttr, err
 }
 
 // CreateLink : Mark the new link invalid

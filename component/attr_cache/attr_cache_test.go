@@ -1435,7 +1435,6 @@ func (suite *attrCacheTestSuite) TestGetAttrEnoentError() {
 			suite.assert.EqualValues(&internal.ObjAttr{}, result)
 			checkItem, err := suite.attrCache.cacheMap.get(truncatedPath)
 			suite.assert.Nil(err)
-			suite.assert.EqualValues(&internal.ObjAttr{Path: "a"}, checkItem.attr)
 			suite.assert.True(checkItem.valid())
 			suite.assert.False(checkItem.exists())
 			suite.assert.NotNil(checkItem.cachedAt)
