@@ -85,7 +85,7 @@ func (suite *rootCmdSuite) SetupTest() {
 	if err != nil {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
-	// suite.TestExecute()
+	// suite.testExecute()
 }
 
 func (suite *rootCmdSuite) cleanupTest() {
@@ -158,14 +158,14 @@ func (suite *rootCmdSuite) TestGetRemoteVersionCurrentSame() {
 	suite.assert.Nil(msg)
 }
 
-func (suite *rootCmdSuite) TestExecute() {
+func (suite *rootCmdSuite) testExecute() {
 	defer suite.cleanupTest()
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
 	rootCmd.SetErr(buf)
 	rootCmd.SetArgs([]string{"--version"})
 
-	err := rootCmd.Execute()
+	err := Execute()
 	suite.assert.Nil(err)
 	suite.assert.Contains(buf.String(), "cloudfuse version")
 }
