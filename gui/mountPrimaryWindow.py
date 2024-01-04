@@ -49,7 +49,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.action_debugHealthMonitor.triggered.connect(self.showUnderConstructionPage)
         self.action_debugLogging.triggered.connect(self.showUnderConstructionPage)
         self.action_debugTesting.triggered.connect(self.showUnderConstructionPage)
-        
+        self.lineEdit_mountPoint.editingFinished.connect(self.updateMountPointInSettings)
+
         if platform == "win32":
             self.lineEdit_mountPoint.setToolTip("Designate a new location to mount the bucket, do not create the directory")
             self.button_browse.setToolTip("Browse to a new location but don't create a new directory")
@@ -64,8 +65,15 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             self.lineEdit_mountPoint.setText(directory)
         except:
             # Nothing in the settings for mountDir, leave mountPoint blank
-            pass
-
+            return
+        
+    def updateMountPointInSettings(self):
+        try:
+            directory = str(self.lineEdit_mountPoint.text())
+            self.settings.setValue("mountPoint", directory)
+        except:
+            # Couldn't update the settings
+            return
 
     # Define the slots that will be triggered when the signals in Qt are activated
 
@@ -83,7 +91,11 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
-        self.lineEdit_mountPoint.setText('{}'.format(directory))
+        # getExistingDirectory() returns a null string when cancel is selected
+        #   don't update the lineEdit and settings if cancelled
+        if directory != '':
+            self.lineEdit_mountPoint.setText('{}'.format(directory))
+            self.updateMountPointInSettings()
 
 
     # Display the pre-baked about QT messagebox
@@ -107,11 +119,11 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         success = self.modifyPipeline(bucketOptions[targetIndex])
         if not success:
             # Don't try mounting the container since the config file couldn't be modified for the pipeline setting
+            self.addOutputText("Failed to update config file with new bucket selection, not mounting")
             return
         
         try:
             directory = str(self.lineEdit_mountPoint.text())
-            self.settings.setValue("mountPoint", directory)
         except ValueError as e:
             self.addOutputText(f"Invalid mount path: {str(e)}")
             return
