@@ -176,6 +176,11 @@ func ListMountPoints() ([]string, error) {
 	// TODO: Add support to list current mounts
 	// We cannot list mount points like we do on Linux
 	if runtime.GOOS == "windows" {
+		out, err := exec.Command(`C:\Program Files (x86)\WinFsp\bin\fsptool-x64.exe`, "lsvol").Output()
+		if err != nil {
+			fmt.Printf("Is WinFSP installed? 'fsptool-x64.exe id' failed with error: %v\n", err)
+		}
+		//TODO: collect a list from lsvol output for the return value
 		return nil, nil
 	}
 
