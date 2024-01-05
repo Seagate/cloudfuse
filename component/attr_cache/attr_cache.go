@@ -395,6 +395,14 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 
 	pathList, token, err := ac.NextComponent().StreamDir(options)
 	if err == nil {
+		// strip symlink attributes
+		if ac.noSymlinks {
+			for _, attr := range pathList {
+				if attr.IsSymlink() {
+					attr.Flags.Clear(internal.PropFlagSymlink)
+				}
+			}
+		}
 		// TODO: will limiting the number of items cached cause bugs when cacheDirs is enabled?
 		ac.cacheAttributes(pathList)
 
@@ -790,6 +798,10 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	defer ac.cacheLock.Unlock()
 
 	if err == nil {
+		// strip symlink attribute
+		if pathAttr.IsSymlink() {
+			pathAttr.Flags.Clear(internal.PropFlagSymlink)
+		}
 		// Retrieved attributes so cache them
 		ac.cacheMap.insert(pathAttr, true, time.Now())
 		if ac.cacheDirs {
