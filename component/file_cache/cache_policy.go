@@ -38,6 +38,7 @@ const DefaultEvictTime = 10
 
 type cachePolicyConfig struct {
 	tmpPath      string
+	persistent   bool
 	cacheTimeout uint32
 	maxEviction  uint32
 

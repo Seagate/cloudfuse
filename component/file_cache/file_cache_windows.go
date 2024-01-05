@@ -91,7 +91,7 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 		// and hence last change time on local disk will then represent the download time.
 
 		lmt = finfo.ModTime()
-		if time.Since(finfo.ModTime()).Seconds() > fc.cacheTimeout &&
+		if !fc.persistent && time.Since(finfo.ModTime()).Seconds() > fc.cacheTimeout &&
 			time.Since(time.Unix(0, stat.CreationTime.Nanoseconds())).Seconds() > fc.cacheTimeout {
 			log.Debug("FileCache::isDownloadRequired : %s not valid as per time checks", localPath)
 			downloadRequired = true

@@ -99,13 +99,14 @@ file_cache:
 
   # Optional 
   policy: lru|lfu <eviction policy to be engaged for cache eviction. lru = least recently used file to be deleted, lfu = least frequently used file to be deleted. Default - lru> 
+  persistent: true|false <Ignore cache timeout and keep using cached files indefinitely. Use with allow-non-empty-temp set true.>
   timeout-sec: <default cache eviction timeout (in sec). Default - 120 sec>
   max-eviction: <number of files that can be evicted at once. Default - 5000>
   max-size-mb: <maximum cache size allowed. Default - 0 (unlimited)>
   high-threshold: <% disk space consumed which triggers eviction. This parameter overrides 'timeout-sec' parameter and cached files will be removed even if they have not expired. Default - 80>
   low-threshold: <% disk space consumed which triggers eviction to stop when previously triggered by the high-threshold. Default - 60>
   create-empty-file: true|false <create an empty file on container when create call is received from kernel>
-  allow-non-empty-temp: true|false <allow non empty temp directory at startup. Set true to persist local cache across reboots.>
+  allow-non-empty-temp: true|false <allow non empty temp directory at startup>
   cleanup-on-start: true|false <cleanup the temp directory on startup, if it's not empty>
   policy-trace: true|false <generate eviction policy logs showing which files will expire soon>
   offload-io: true|false <by default libfuse will service reads/writes to files for better perf. Set to true to make file-cache component service read/write calls.>

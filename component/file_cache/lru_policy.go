@@ -128,9 +128,9 @@ func (p *lruPolicy) StartPolicy() error {
 
 	// Only start the timeoutMonitor if evictTime is non-zero.
 	// If evictTime=0, we delete on invalidate so there is no need for a timeout monitor signal to be sent.
-	log.Info("lruPolicy::StartPolicy : Policy set with %v timeout", p.cacheTimeout)
+	log.Info("lruPolicy::StartPolicy : Policy set with %v timeout and persistent=%t", p.cacheTimeout, p.persistent)
 
-	if p.cacheTimeout != 0 {
+	if !p.persistent && p.cacheTimeout != 0 {
 		p.cacheTimeoutMonitor = time.Tick(time.Duration(time.Duration(p.cacheTimeout) * time.Second))
 	}
 
@@ -170,6 +170,10 @@ func (p *lruPolicy) CacheValid(name string) {
 func (p *lruPolicy) CacheInvalidate(name string) {
 	log.Trace("lruPolicy::CacheInvalidate : %s", name)
 
+	// don't invalidate entries if cache is persistent
+	if p.persistent {
+		return
+	}
 	// We check if the file is not in the nodeMap to deal with the case
 	// where timeout is 0 and there are multiple handles open to the file.
 	// When the first close comes, we will remove the entry from the map

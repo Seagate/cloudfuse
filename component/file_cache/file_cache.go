@@ -56,6 +56,7 @@ type FileCache struct {
 	policy    cachePolicy
 
 	createEmptyFile bool
+	persistent      bool
 	allowNonEmpty   bool
 	cacheTimeout    float64
 	cleanupOnStart  bool
@@ -81,6 +82,7 @@ type FileCacheOptions struct {
 	TmpPath string `config:"path" yaml:"path,omitempty"`
 	Policy  string `config:"policy" yaml:"policy,omitempty"`
 
+	Persistent  bool   `config:"persistent" yaml:"persistent,omitempty"`
 	Timeout     uint32 `config:"timeout-sec" yaml:"timeout-sec,omitempty"`
 	MaxEviction uint32 `config:"max-eviction" yaml:"max-eviction,omitempty"`
 
@@ -235,6 +237,7 @@ func (c *FileCache) Configure(_ bool) error {
 	} else {
 		c.allowNonEmpty = conf.AllowNonEmpty
 	}
+	c.persistent = conf.Persistent
 	c.cleanupOnStart = conf.CleanupOnStart
 	c.policyTrace = conf.EnablePolicyTrace
 	c.offloadIO = conf.OffloadIO
@@ -319,8 +322,8 @@ func (c *FileCache) Configure(_ bool) error {
 		c.diskHighWaterMark = (((conf.MaxSizeMB * MB) * float64(cacheConfig.highThreshold)) / 100)
 	}
 
-	log.Info("FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v",
-		c.createEmptyFile, int(c.cacheTimeout), c.tmpPath, int(cacheConfig.maxSizeMB), int(cacheConfig.highThreshold), int(cacheConfig.lowThreshold), c.refreshSec, cacheConfig.maxEviction, c.hardLimit)
+	log.Info("FileCache::Configure : create-empty %t, persistent %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v",
+		c.createEmptyFile, c.persistent, int(c.cacheTimeout), c.tmpPath, int(cacheConfig.maxSizeMB), int(cacheConfig.highThreshold), int(cacheConfig.lowThreshold), c.refreshSec, cacheConfig.maxEviction, c.hardLimit)
 
 	return nil
 }
@@ -363,6 +366,7 @@ func (c *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 		maxEviction:   conf.MaxEviction,
 		highThreshold: float64(conf.HighThreshold),
 		lowThreshold:  float64(conf.LowThreshold),
+		persistent:    conf.Persistent,
 		cacheTimeout:  uint32(c.cacheTimeout),
 		maxSizeMB:     conf.MaxSizeMB,
 		fileLocks:     c.fileLocks,
@@ -1247,7 +1251,7 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 
 	fc.policy.CachePurge(localSrcPath)
 
-	if fc.cacheTimeout == 0 {
+	if !fc.persistent && fc.cacheTimeout == 0 {
 		// Destination file needs to be deleted immediately
 		fc.policy.CachePurge(localDstPath)
 	} else {
@@ -1437,6 +1441,9 @@ func init() {
 	cachePollTimeout := config.AddUint64Flag("cache-poll-timeout-msec", 0, "Time in milliseconds in order to poll for possible expired files awaiting cache eviction.")
 	config.BindPFlag(compName+".cache-poll-timeout-msec", cachePollTimeout)
 	cachePollTimeout.Hidden = true
+
+	persistent := config.AddBoolFlag("persistent", false, "Keep cached files regardless of file cache timeout.")
+	config.BindPFlag(compName+".persistent", persistent)
 
 	uploadModifiedOnly := config.AddBoolFlag("upload-modified-only", false, "Flag to turn off unnecessary uploads to storage.")
 	config.BindPFlag(compName+".upload-modified-only", uploadModifiedOnly)

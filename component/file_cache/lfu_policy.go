@@ -69,7 +69,9 @@ func (l *lfuPolicy) UpdateConfig(config cachePolicyConfig) error {
 	l.list.maxSizeMB = config.maxSizeMB
 	l.list.upperThresh = config.highThreshold
 	l.list.lowerThresh = config.lowThreshold
-	l.list.cacheTimeout = config.cacheTimeout
+	if !config.persistent {
+		l.list.cacheTimeout = config.cacheTimeout
+	}
 
 	l.policyTrace = config.policyTrace
 	return nil
@@ -87,7 +89,7 @@ func (l *lfuPolicy) CacheValid(name string) {
 func (l *lfuPolicy) CacheInvalidate(name string) {
 	log.Trace("lfuPolicy::CacheInvalidate : %s", name)
 
-	if l.cacheTimeout == 0 {
+	if !l.persistent && l.cacheTimeout == 0 {
 		l.CachePurge(name)
 	}
 }
@@ -178,7 +180,7 @@ func NewLFUPolicy(cfg cachePolicyConfig) cachePolicy {
 		removeFiles:       make(chan string, 10),
 		closeChan:         make(chan int, 10),
 	}
-	pol.list = newLFUList(cfg.maxSizeMB, cfg.lowThreshold, cfg.highThreshold, pol.removeFiles, cfg.tmpPath, cfg.cacheTimeout)
+	pol.list = newLFUList(cfg.maxSizeMB, cfg.lowThreshold, cfg.highThreshold, pol.removeFiles, cfg.tmpPath, cfg.cacheTimeout, cfg.persistent)
 	return pol
 }
 
@@ -460,7 +462,10 @@ func (list *lfuList) setTimerIfValid(node *dataNode) {
 	}
 }
 
-func newLFUList(maxSizMB float64, lowerThresh float64, upperThresh float64, deleteChan chan string, cachePath string, cacheTimeout uint32) *lfuList {
+func newLFUList(maxSizMB float64, lowerThresh float64, upperThresh float64, deleteChan chan string, cachePath string, cacheTimeout uint32, persistent bool) *lfuList {
+	if persistent {
+		cacheTimeout = 0
+	}
 	return &lfuList{
 		dataNodeMap:  make(map[string]*dataNode),
 		freqNodeMap:  make(map[uint64]*frequencyNode),
