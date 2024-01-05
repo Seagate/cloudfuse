@@ -121,3 +121,8 @@ func sigusrHandler(pipeline *internal.Pipeline, ctx context.Context) daemon.Sign
 		return err
 	}
 }
+
+// stub for compilation
+func createMountInstance() error {
+	return nil
+}
