@@ -1,5 +1,12 @@
 # Cloudfuse Changelog #
 
+## 1.0.0 (Unreleased) ##
+
+This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
+**Changes**
+-- service mount & unmount commands removed (just use mount & unmount)
+-- mount now runs as a service by default (foreground flag is respected) on Windows
+
 ## 0.3.0 ##
 
 This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
