@@ -173,24 +173,6 @@ func NormalizeObjectName(name string) string {
 
 // List all mount points which were mounted using cloudfuse
 func ListMountPoints() ([]string, error) {
-	if runtime.GOOS == "windows" {
-		out, err := exec.Command(`C:\Program Files (x86)\WinFsp\bin\launchctl-x64.exe`, "list").Output()
-		if err != nil {
-			fmt.Printf("Is WinFSP installed? 'launchctl-x64.exe list' failed with error: %v\n", err)
-			return nil, err
-		}
-		var mntList []string
-		outList := strings.Split(string(out), "\n")
-		for _, item := range outList {
-			if strings.HasPrefix(item, "cloudfuse") {
-				// Extract the mount path from this line
-				mntPath := strings.Split(item, " ")[1]
-				mntList = append(mntList, mntPath)
-			}
-		}
-		return mntList, nil
-	}
-
 	file, err := os.Open("/etc/mtab")
 	if err != nil {
 		return nil, err
@@ -211,7 +193,6 @@ func ListMountPoints() ([]string, error) {
 			mntList = append(mntList, mntPath)
 		}
 	}
-
 	return mntList, nil
 }
 
