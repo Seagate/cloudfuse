@@ -173,10 +173,7 @@ func NormalizeObjectName(name string) string {
 
 // List all mount points which were mounted using cloudfuse
 func ListMountPoints() ([]string, error) {
-	// TODO: Add support to list current mounts
-	// We cannot list mount points like we do on Linux
 	if runtime.GOOS == "windows" {
-
 		out, err := exec.Command(`C:\Program Files (x86)\WinFsp\bin\launchctl-x64.exe`, "list").Output()
 		if err != nil {
 			fmt.Printf("Is WinFSP installed? 'launchctl-x64.exe list' failed with error: %v\n", err)
