@@ -180,6 +180,7 @@ func ListMountPoints() ([]string, error) {
 		out, err := exec.Command(`C:\Program Files (x86)\WinFsp\bin\launchctl-x64.exe`, "list").Output()
 		if err != nil {
 			fmt.Printf("Is WinFSP installed? 'launchctl-x64.exe list' failed with error: %v\n", err)
+			return nil, err
 		}
 		var mntList []string
 		outList := strings.Split(string(out), "\n")
