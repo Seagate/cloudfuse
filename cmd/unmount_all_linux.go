@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
@@ -28,6 +30,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"runtime"
 
 	"github.com/Seagate/cloudfuse/common"
 
