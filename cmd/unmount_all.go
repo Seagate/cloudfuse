@@ -1,5 +1,3 @@
-//go:build windows
-
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
@@ -48,14 +46,14 @@ var umntAllCmd = &cobra.Command{
 			return fmt.Errorf("failed to list mount points [%s]", err.Error())
 		}
 
+		lazy, _ := cmd.Flags().GetBool("lazy")
 		mountfound := 0
 		unmounted := 0
 		errMsg := "failed to unmount - \n"
 
 		for _, mntPath := range lstMnt {
 			mountfound += 1
-
-			err := unmountCloudfuseWindows(mntPath)
+			err := unmountCloudfuse(mntPath, lazy)
 			if err == nil {
 				unmounted += 1
 			} else {

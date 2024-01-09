@@ -109,6 +109,7 @@ func unmountCloudfuse(mntPath string, lazy bool) error {
 			break
 		}
 	}
+
 	return fmt.Errorf("%s", errb.String()+" "+err.Error())
 }
 
