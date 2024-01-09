@@ -194,7 +194,7 @@ archives:
 
 release:
   extra_files: 
-    - glob: ./build/Output/cloudfuse_install_Windows_x86_64.exe
+    - glob: ./build/Output/cloudfuse_{{.Version}}_windows_amd64.exe
 
 nfpms:
   - id: default
