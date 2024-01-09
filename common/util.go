@@ -26,7 +26,6 @@
 package common
 
 import (
-	"bufio"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -169,38 +168,6 @@ func JoinUnixFilepath(elem ...string) string {
 // normalizeObjectName : If file contains \\ in name replace it with ..
 func NormalizeObjectName(name string) string {
 	return strings.ReplaceAll(name, "\\", "/")
-}
-
-// List all mount points which were mounted using cloudfuse
-func ListMountPoints() ([]string, error) {
-	// TODO: Add support to list current mounts
-	// We cannot list mount points like we do on Linux
-	if runtime.GOOS == "windows" {
-		return nil, nil
-	}
-
-	file, err := os.Open("/etc/mtab")
-	if err != nil {
-		return nil, err
-	}
-
-	defer file.Close()
-
-	// Read /etc/mtab file line by line
-	var mntList []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// If there is any directory mounted using cloudfuse its of our interest
-		if strings.HasPrefix(line, "cloudfuse") {
-			// Extract the mount path from this line
-			mntPath := strings.Split(line, " ")[1]
-			mntList = append(mntList, mntPath)
-		}
-	}
-
-	return mntList, nil
 }
 
 // Encrypt given data using the key provided
