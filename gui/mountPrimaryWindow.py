@@ -157,7 +157,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 self.addOutputText(stdOut)
 
             # now actually mount
-            commandParts = ['cloudfuse.exe', 'service', 'mount', directory, f'--config-file={configPath}']
+            commandParts = ['cloudfuse.exe', 'mount', directory, f'--config-file={configPath}']
             (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
             if not executableFound:
                 self.addOutputText("cloudfuse.exe not found! Is it installed?")
@@ -199,7 +199,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         if platform == "win32":
             # for windows, 'cloudfuse' was added to the directory so add it back in for umount
             directory = os.path.join(directory, 'cloudFuse')
-            commandParts = "cloudfuse.exe service unmount".split()
+            commandParts = "cloudfuse.exe unmount".split()
         else:
             commandParts = "./cloudfuse unmount --lazy".split()
         commandParts.append(directory)

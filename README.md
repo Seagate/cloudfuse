@@ -11,14 +11,11 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 - [Installation](#installation)
   - [Windows](#windows)
   - [Linux](#linux)
-  - [From Tar or Zip files](#from-tar-or-zip-files)
-  - [Source Installation](#source-installation)
+  - [From Archive](#from-archive)
+  - [From Source](#from-source)
 - [Basic Use](#basic-use)
 - [Health Monitor](#health-monitor)
 - [Command Line Interface](#command-line-interface)
-  - [Linux](#linux-1)
-  - [Windows](#windows-1)
-  - [Secure options for both Windows and Linux](#secure-options-for-both-windows-and-linux)
 - [Limitations](#limitations)
 - [License](#license)
 - [Support](#support)
@@ -42,13 +39,13 @@ Download the .deb file from our latest release [here](https://github.com/Seagate
 Download the .rpm file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal:  
 `sudo rpm -i ./cloudfuse*.rpm`
 
-### From Tar or Zip files
+### From Archive
 
 Download the archive for your platform and architecture from the latest release [here](https://github.com/Seagate/cloudfuse/releases).
 The archive includes the GUI.  
 On Windows, you will need to install WinFsp to use Cloudfuse. See [this](https://winfsp.dev/rel/) to install WinFSP.
 
-### Source Installation
+### From Source
 
 Please refer to the [Installation from source](https://github.com/Seagate/cloudfuse/wiki/Installation-From-Source) to
 manually install Cloudfuse.
@@ -93,14 +90,12 @@ Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it
 
 ## Command Line Interface
 
-### Linux
-
 The general format of the Cloudfuse Linux commands is:  
 `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
 
 Available commands:
 
-- `help` - Displays help about for any command
+- `help [command]` - Displays general help, or help for the specified command
 - `mount` - Mounts a cloud storage container as a filesystem  
   Example: `cloudfuse mount <mount path> --config-file=<config file>`  
   Supported container types:
@@ -108,29 +103,24 @@ Available commands:
   - [Azure Blob Storage](https://docs.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction)
   - [Azure Datalake Storage Gen2](https://docs.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction)
 - `mount all` - Mounts all the containers in an S3 Account or Azure account supported by mount  
-  Example: `cloudfuse mount all <mount path> --config-file=<config file>`
+  Example: `cloudfuse mount all <mount path> --config-file=<config file>`  
+  On Windows, mounted containers will be remounted on login after a restart.
 - `mount list` - Lists all Cloudfuse filesystems  
   Example: `cloudfuse mount list`
 - `unmount` - Unmounts the Cloudfuse filesystem  
   Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors).  
-  Example: `cloudfuse unmount --lazy <mount path>`
+  Example: `cloudfuse unmount --lazy <mount path>`  
+  On Windows, unmounting a container also stops it from being automatically remounted at login.
 - `unmount all` - Unmounts all Cloudfuse filesystems  
   Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors).  
   Example: `cloudfuse unmount all --lazy`
 
-### Windows
+### Remount on Startup (Windows Only)
 
-The general format of the Cloudfuse Windows commands is:  
- `cloudfuse service [command] [arguments] --[flag-name]=[flag-value]`
+- `cloudfuse service install` - Installs the startup process for Cloudfuse which remounts containers on login after a restart.
+- `cloudfuse service uninstall` - Uninstalls the startup process for Cloudfuse and prevents containers from being remounted on login.
 
- Available commands:
-
-- `cloudfuse service install` - Installs the startup process for Cloudfuse
-- `cloudfuse service uninstall` - Uninstalls the startup process for Cloudfuse
-- `cloudfuse service mount <mount path>  --config-file=<config file>` - Mounts an instance that will persist in Windows when restarted
-- `cloudfuse service unmount <mount path>` - Unmounts mount of Cloudfuse running as a Windows service
-
-### Secure options for both Windows and Linux
+### Secure Options
 
 To use security options the general format for cloudfuse commands is:  
 `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
