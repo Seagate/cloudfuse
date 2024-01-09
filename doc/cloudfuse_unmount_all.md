@@ -4,7 +4,7 @@ Unmount all instances of Cloudfuse
 
 ### Synopsis
 
-Unmount all instances of Cloudfuse. Only available on Linux
+Unmount all instances of Cloudfuse. 
 
 ```
 cloudfuse unmount all [flags]
