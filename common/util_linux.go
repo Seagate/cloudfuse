@@ -28,6 +28,7 @@
 package common
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"os"
@@ -143,4 +144,29 @@ func GetDiskUsageFromStatfs(path string) (float64, float64, error) {
 	totalSpace := stat.Blocks * uint64(stat.Frsize)
 	usedSpace := float64(totalSpace - availableSpace)
 	return usedSpace, float64(usedSpace) / float64(totalSpace) * 100, nil
+}
+
+// List all mount points which were mounted using cloudfuse
+func ListMountPoints() ([]string, error) {
+	file, err := os.Open("/etc/mtab")
+	if err != nil {
+		return nil, err
+	}
+
+	defer file.Close()
+
+	// Read /etc/mtab file line by line
+	var mntList []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// If there is any directory mounted using cloudfuse its of our interest
+		if strings.HasPrefix(line, "cloudfuse") {
+			// Extract the mount path from this line
+			mntPath := strings.Split(line, " ")[1]
+			mntList = append(mntList, mntPath)
+		}
+	}
+	return mntList, nil
 }

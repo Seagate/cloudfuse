@@ -151,15 +151,12 @@ func (suite *rootCmdSuite) TestGetRemoteVersionCurrentOlder() {
 	suite.assert.Contains(msg, "A new version of Cloudfuse is available")
 }
 
-// Test failing until we update
-// TODO: We need to move this to our own version checking system rather than the one
-// linked to microsoft
-// func (suite *rootCmdSuite) TestGetRemoteVersionCurrentSame() {
-// 	defer suite.cleanupTest()
-// 	common.CloudfuseVersion = common.CloudfuseVersion_()
-// 	msg := <-beginDetectNewVersion()
-// 	suite.assert.Nil(msg)
-// }
+func (suite *rootCmdSuite) TestGetRemoteVersionCurrentSame() {
+	defer suite.cleanupTest()
+	common.CloudfuseVersion = common.CloudfuseVersion_()
+	msg := <-beginDetectNewVersion()
+	suite.assert.Nil(msg)
+}
 
 func (suite *rootCmdSuite) testExecute() {
 	defer suite.cleanupTest()

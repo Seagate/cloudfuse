@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"testing"
 	"time"
 
@@ -84,6 +85,10 @@ func (suite *unmountTestSuite) cleanupTest() {
 
 // mount failure test where the mount directory does not exists
 func (suite *unmountTestSuite) TestUnmountCmd() {
+	if runtime.GOOS == "windows" {
+		// WinFSP is not installed in our CI pipeline
+		return
+	}
 	defer suite.cleanupTest()
 
 	mountDirectory1, _ := os.MkdirTemp("", "TestUnMountTemp")
@@ -108,6 +113,10 @@ func (suite *unmountTestSuite) TestUnmountCmd() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdLazy() {
+	if runtime.GOOS == "windows" {
+		// lazy unmount is not supported (or necessary) on Windows
+		return
+	}
 	defer suite.cleanupTest()
 
 	lazyFlags := []string{"--lazy", "-z"}
@@ -159,6 +168,10 @@ func (suite *unmountTestSuite) TestUnmountCmdLazy() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdFail() {
+	if runtime.GOOS == "windows" {
+		// WinFSP is not installed in our CI pipeline
+		return
+	}
 	defer suite.cleanupTest()
 
 	mountDirectory2, _ := os.MkdirTemp("", "TestUnMountTemp")
@@ -183,6 +196,10 @@ func (suite *unmountTestSuite) TestUnmountCmdFail() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
+	if runtime.GOOS == "windows" {
+		// WinFSP is not installed in our CI pipeline
+		return
+	}
 	defer suite.cleanupTest()
 
 	mountDirectory3, _ := os.MkdirTemp("", "TestUnMountTemp")
@@ -199,6 +216,10 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
+	if runtime.GOOS == "windows" {
+		// WinFSP is not installed in our CI pipeline
+		return
+	}
 	defer suite.cleanupTest()
 
 	mountDirectory4, _ := os.MkdirTemp("", "TestUnMountTemp")
@@ -227,6 +248,10 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
+	if runtime.GOOS == "windows" {
+		// WinFSP is not installed in our CI pipeline
+		return
+	}
 	defer suite.cleanupTest()
 
 	mountDirectory5, _ := os.MkdirTemp("", "TestUnMountTemp")

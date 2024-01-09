@@ -28,14 +28,10 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
-	"github.com/Seagate/cloudfuse/common"
-	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal/winservice"
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
@@ -56,13 +52,13 @@ var servOpts serviceOptions
 // Section defining all the command that we have in secure feature
 var serviceCmd = &cobra.Command{
 	Use:               "service",
-	Short:             "Manage cloudfuse mounts on Windows",
-	Long:              "Manage cloudfuse mounts on Windows",
+	Short:             "Manage cloudfuse startup process on Windows",
+	Long:              "Manage cloudfuse startup process on Windows",
 	SuggestFor:        []string{"ser", "serv"},
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("missing command options\n\nDid you mean this?\n\tcloudfuse service mount\n\nRun 'cloudfuse service --help' for usage")
+		return errors.New("missing command options\n\nDid you mean this?\n\tcloudfuse service install\n\nRun 'cloudfuse service --help' for usage")
 	},
 }
 
@@ -118,72 +114,6 @@ var uninstallCmd = &cobra.Command{
 	},
 }
 
-var mountServiceCmd = &cobra.Command{
-	Use:               "mount",
-	Short:             "mount an instance that will persist in Windows when restarted",
-	Long:              "mount an instance that will persist in Windows when restarted",
-	SuggestFor:        []string{"mnt", "mout"},
-	Args:              cobra.ExactArgs(1),
-	Example:           "cloudfuse service mount Z: --config-file=C:\\config.yaml",
-	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		servOpts.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
-
-		err := validateMountOptions()
-		if err != nil {
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
-		}
-
-		err = mountInstance()
-		if err != nil {
-			return fmt.Errorf("failed to mount instance [%s]", err.Error())
-		}
-
-		// Add the mount to the JSON file so it persists on restart.
-		err = winservice.AddMountJSON(servOpts.MountPath, servOpts.ConfigFile)
-		if err != nil {
-			return fmt.Errorf("failed to add entry to json file [%s]", err.Error())
-		}
-
-		return nil
-	},
-}
-
-var unmountServiceCmd = &cobra.Command{
-	Use:               "unmount",
-	Short:             "unmount an instance and remove entry from Windows service",
-	Long:              "unmount an instance and remove entry from Windows service",
-	SuggestFor:        []string{"umount", "unmoun"},
-	Args:              cobra.ExactArgs(1),
-	Example:           "cloudfuse service unmount Z:",
-	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		servOpts.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
-
-		// Check with winfsp to see if this is currently mounted
-		ret, err := isMounted()
-		if err != nil {
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
-		} else if !ret {
-			return fmt.Errorf("nothing is mounted here")
-		}
-
-		// Remove the mount from json file so it does not remount on restart.
-		err = winservice.RemoveMountJSON(servOpts.MountPath)
-		// If error is not nill then ignore it
-		if err != nil {
-			log.Err("failed to remove entry from json file [%s]", err.Error())
-		}
-
-		err = unmountInstance()
-		if err != nil {
-			return fmt.Errorf("failed to unmount instance [%s]", err.Error())
-		}
-
-		return nil
-	},
-}
-
 //--------------- command section ends
 
 func makeLink(src string, dst string) error {
@@ -220,63 +150,8 @@ func makeLink(src string, dst string) error {
 	return nil
 }
 
-// mountInstance mounts the given instance.
-func mountInstance() error {
-	return winservice.StartMount(servOpts.MountPath, servOpts.ConfigFile)
-}
-
-// unmountInstance unmounts the given instance.
-func unmountInstance() error {
-	return winservice.StopMount(servOpts.MountPath)
-}
-
-// isMounted returns if the current mountPath is mounted using cloudfuse.
-func isMounted() (bool, error) {
-	return winservice.IsMounted(servOpts.MountPath)
-}
-
-// validateMountPath checks whether the mountpath is correct and does not exist.
-func validateMountOptions() error {
-	// Mount Path
-	if servOpts.MountPath == "" {
-		return errors.New("mount path not provided")
-	}
-
-	if strings.Contains(servOpts.MountPath, "\\") {
-		return errors.New("mount path contains '\\' which is not allowed")
-	}
-
-	if _, err := os.Stat(servOpts.MountPath); errors.Is(err, fs.ErrExist) || err == nil {
-		return errors.New("mount path exists")
-	}
-
-	// Config file
-	if servOpts.ConfigFile == "" {
-		return errors.New("config file not provided")
-	}
-
-	// Convert the path into a full path so WinFSP can see the config file
-	configPath, err := filepath.Abs(servOpts.ConfigFile)
-	if err != nil {
-		return errors.New("config file does not exist")
-	}
-	servOpts.ConfigFile = configPath
-
-	if _, err := os.Stat(servOpts.ConfigFile); errors.Is(err, fs.ErrNotExist) {
-		return errors.New("config file does not exist")
-	}
-
-	return nil
-}
-
 func init() {
 	rootCmd.AddCommand(serviceCmd)
 	serviceCmd.AddCommand(installCmd)
 	serviceCmd.AddCommand(uninstallCmd)
-	serviceCmd.AddCommand(mountServiceCmd)
-	serviceCmd.AddCommand(unmountServiceCmd)
-
-	mountServiceCmd.Flags().StringVar(&servOpts.ConfigFile, "config-file", "",
-		"Configures the path for the file where the account credentials are provided.")
-	_ = mountServiceCmd.MarkFlagRequired("config-file")
 }

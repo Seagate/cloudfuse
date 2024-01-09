@@ -61,7 +61,7 @@ type KeyData struct {
 // %2 is the location of the config file
 // %3 is the current user's Windows user ID
 // %4 is the current user's Windows group ID
-const mountCmd = `mount %1 --config-file=%2 -o uid=%3,gid=%4`
+const mountCmd = `mount %1 --config-file=%2 -o uid=%3,gid=%4 --foreground=true`
 
 func ReadRegistryInstanceEntry(name string) (KeyData, error) {
 	registryPath := instanceRegistry + name

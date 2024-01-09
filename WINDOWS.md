@@ -1,33 +1,29 @@
 # Windows Support
 
 Cloudfuse supports running on Windows either as an executable in foreground mode or as a Windows services. Cloudfuse
-requires the third party utility [WinFsp](https://winfsp.dev/). To download WinFsp, please run the WinFsp installer
-found [here](https://winfsp.dev/rel/).
+requires the third party utility [WinFsp](https://winfsp.dev/). WinFSP installs automatically with Cloudfuse, but you
+can also run the WinFsp installer found [here](https://winfsp.dev/rel/) yourself.
 
 ## Running in foreground mode
-To run in foreground mode simply start the mount using the `mount` command. All mounts on Windows started this way
-automatically run in foreground.
+To run in foreground mode, you must pass the option `--foreground=true` when using the `mount` command.
+
+        cloudfuse.exe mount <mount path> --config-file=<config file> --foreground=true
+
+## Running in background mode (recommended)
+Cloudfuse runs in the background by default. It uses the WinFSP launcher to run the mount in the background.
+Cloudfuse will also automatically restart existing mounts on user login.
 
         cloudfuse.exe mount <mount path> --config-file=<config file>
 
-## Running in background mode (recommended)
-To run in background mode you need to use the `service` command. This uses the WinFSP launcher to run the mount in the
-background and will also automatically restart existing mounts on system restart.
+To unmount a specific instance, use the unmount command. This will also prevent this mount from persisting on restarts.
 
-1. Install the Cloudfuse startup program. This is a program that launches on Windows login which will relaunch previous
-   mounts.
+        cloudfuse.exe unmount <mount path>
+
+Cloudfuse supports mounting any number of buckets.
+
+If the container is not automatically mounted on user login after a reboot, you may need to (re)install the Cloudfuse startup program:
 
         cloudfuse.exe service install
-
-2. Now we can start a mount that is managed by Cloudfuse. Once you mount the bucket or container the mount will persist
-   on restart or shutdowns while the Cloudfuse service is running. Cloudfuse can also support any number of mounts
-   running on Windows.
-
-        cloudfuse.exe service mount <mount path> --config-file=<config file>
-
-To unmount a specific instance use the unmount command. This will also prevent this mount from persisting on restarts.
-
-        cloudfuse.exe service unmount <mount path>
 
 To uninstall the Cloudfuse startup program use the uninstall command.
 

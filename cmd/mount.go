@@ -30,6 +30,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -242,6 +243,7 @@ var mountCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, args []string) error {
 		options.MountPath = common.ExpandPath(args[0])
+		configFileProvided := options.ConfigFile != ""
 		configFileExists := true
 
 		if options.ConfigFile == "" {
@@ -267,6 +269,38 @@ var mountCmd = &cobra.Command{
 		err := config.Unmarshal(&options)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal config [%s]", err.Error())
+		}
+
+		// handle Windows background mount (formerly "service mount")
+		if !options.Foreground && runtime.GOOS == "windows" {
+			// validate mount path
+			options.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
+			if options.MountPath == "" {
+				return errors.New("mount path not provided")
+			}
+			if _, err := os.Stat(options.MountPath); errors.Is(err, fs.ErrExist) || err == nil {
+				return errors.New("mount path exists")
+			}
+			// Config file
+			if options.ConfigFile == "" {
+				return errors.New("config file not provided")
+			}
+			// Convert the path into a full path so WinFSP can see the config file
+			configPath, err := filepath.Abs(options.ConfigFile)
+			if err != nil {
+				return errors.New("config file does not exist")
+			}
+			options.ConfigFile = configPath
+			if _, err := os.Stat(options.ConfigFile); errors.Is(err, fs.ErrNotExist) {
+				return errors.New("config file does not exist")
+			}
+			// mount using WinFSP, and persist on reboot
+			err = createMountInstance()
+			if err != nil {
+				return fmt.Errorf("failed to mount instance [%s]", err.Error())
+			}
+
+			return nil
 		}
 
 		if !configFileExists || len(options.Components) == 0 {
@@ -417,8 +451,14 @@ var mountCmd = &cobra.Command{
 			pipeline, err = internal.NewPipeline(options.Components, !daemon.WasReborn())
 		}
 		if err != nil {
-			log.Err("mount : failed to initialize new pipeline [%v]", err)
-			return Destroy(fmt.Sprintf("failed to initialize new pipeline [%s]", err.Error()))
+			errorMessage := ""
+			if !configFileProvided {
+				errorMessage += "Config file not provided."
+			} else if !configFileExists {
+				errorMessage += "Config file " + options.ConfigFile + " not found."
+			}
+			log.Err("mount : "+errorMessage+" failed to initialize new pipeline [%v]", err)
+			return Destroy(fmt.Sprintf("%s failed to initialize new pipeline [%s]", errorMessage, err.Error()))
 		}
 
 		// Dry run ends here
@@ -430,7 +470,7 @@ var mountCmd = &cobra.Command{
 		common.ForegroundMount = options.Foreground
 
 		log.Info("mount: Mounting cloudfuse on %s", options.MountPath)
-		// Prevent mounting in background on Windows
+		// handle background mount on Linux
 		if !options.Foreground && runtime.GOOS != "windows" {
 			pidFile := strings.Replace(options.MountPath, "/", "_", -1) + ".pid"
 			pidFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), pidFile)
@@ -614,7 +654,7 @@ func init() {
 	config.BindPFlag("logging.file-path", mountCmd.PersistentFlags().Lookup("log-file-path"))
 	_ = mountCmd.MarkPersistentFlagDirname("log-file-path")
 
-	mountCmd.PersistentFlags().Bool("foreground", false, "Mount the system in foreground mode. Default value false. (Ignored on Windows)")
+	mountCmd.PersistentFlags().Bool("foreground", false, "Mount the system in foreground mode. Default value false.")
 	config.BindPFlag("foreground", mountCmd.PersistentFlags().Lookup("foreground"))
 
 	mountCmd.PersistentFlags().Bool("read-only", false, "Mount the system in read only mode. Default value false.")

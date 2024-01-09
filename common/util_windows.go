@@ -27,8 +27,11 @@
 package common
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/sys/windows"
 )
@@ -94,4 +97,23 @@ func GetDiskUsageFromStatfs(path string) (float64, float64, error) {
 
 	usedSpace := float64(total - avail)
 	return usedSpace, float64(usedSpace) / float64(total) * 100, nil
+}
+
+// List all mount points which were mounted using cloudfuse
+func ListMountPoints() ([]string, error) {
+	out, err := exec.Command(`C:\Program Files (x86)\WinFsp\bin\launchctl-x64.exe`, "list").Output()
+	if err != nil {
+		fmt.Printf("Is WinFSP installed? 'launchctl-x64.exe list' failed with error: %v\n", err)
+		return nil, err
+	}
+	var mntList []string
+	outList := strings.Split(string(out), "\n")
+	for _, item := range outList {
+		if strings.HasPrefix(item, "cloudfuse") {
+			// Extract the mount path from this line
+			mntPath := strings.Split(item, " ")[1]
+			mntList = append(mntList, mntPath)
+		}
+	}
+	return mntList, nil
 }
