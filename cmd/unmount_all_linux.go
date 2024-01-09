@@ -30,7 +30,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"runtime"
 
 	"github.com/Seagate/cloudfuse/common"
 
