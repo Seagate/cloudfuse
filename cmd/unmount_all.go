@@ -28,6 +28,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"runtime"
 
 	"github.com/Seagate/cloudfuse/common"
 
@@ -53,7 +54,12 @@ var umntAllCmd = &cobra.Command{
 
 		for _, mntPath := range lstMnt {
 			mountfound += 1
-			err := unmountCloudfuse(mntPath, lazy)
+			var err error
+			if runtime.GOOS == "windows" {
+				err = unmountCloudfuseWindows(mntPath)
+			} else {
+				err = unmountCloudfuse(mntPath, lazy)
+			}
 			if err == nil {
 				unmounted += 1
 			} else {
