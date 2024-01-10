@@ -2,7 +2,7 @@ name: Release binaries
 on:
   push:
     tags:
-      - '*'
+      - 'v*'
 
 jobs:
   compile-gui:
@@ -128,15 +128,19 @@ jobs:
         run: |
           & "C:/Program Files (x86)/Inno Setup 6/iscc.exe" build/windows_installer_build.iss
       -
+        name: Set Version
+        id: get_version
+        run: echo ::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )
+      -
         name: Rename installer
         run: |
-          mv build/Output/cloudfuse.exe build/Output/cloudfuse_install_Windows_x86_64.exe
+          mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
       -
         name: Cache windows installer
         uses: actions/cache/save@v3
         with:
           enableCrossOsArchive: true
-          path: build/Output/cloudfuse_install_Windows_x86_64.exe
+          path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
 
   release:
@@ -172,7 +176,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           enableCrossOsArchive: true
-          path: build/Output/cloudfuse_install_Windows_x86_64.exe
+          path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
           fail-on-cache-miss: true
         continue-on-error: false
