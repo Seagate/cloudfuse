@@ -526,8 +526,8 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		currentTime := time.Now()
 		// TODO: the cache locks are used incorrectly here
 		// They routinely lock the cache for reading, but then write to it
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		if ac.cacheDirs {
 			// record that the parent directory tree contains at least one object
 			ac.markAncestorsInCloud(getParentDir(options.Name), currentTime)
