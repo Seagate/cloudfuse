@@ -754,8 +754,8 @@ func (ac *AttrCache) SyncDir(options internal.SyncDirOptions) error {
 
 	err := ac.NextComponent().SyncDir(options)
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		ac.invalidateDirectory(options.Name)
 	}
 	return err
