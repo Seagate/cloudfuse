@@ -548,8 +548,8 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 	err := ac.NextComponent().DeleteFile(options)
 	if err == nil {
 		deletionTime := time.Now()
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		toBeDeleted, getErr := ac.cacheMap.get(options.Name)
 		if getErr != nil || !toBeDeleted.valid() {
 			log.Warn("AttrCache::DeleteFile : %s no valid entry found. Adding entry...", options.Name)
