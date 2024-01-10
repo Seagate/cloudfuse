@@ -670,8 +670,8 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 	if err == nil {
 		modifyTime := time.Now()
 
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 
 		truncatedItem, getErr := ac.cacheMap.get(options.Name)
 		if getErr != nil || !truncatedItem.exists() {
