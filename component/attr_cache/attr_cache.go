@@ -646,8 +646,8 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 		modifyTime := time.Now()
 		newSize := options.Offset + int64(len(options.Data))
 
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 
 		modifiedEntry, getErr := ac.cacheMap.get(options.Handle.Path)
 		if getErr != nil || !modifiedEntry.exists() {
