@@ -811,8 +811,8 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 
 	if err == nil {
 		currentTime := time.Now()
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		linkAttr := internal.CreateObjAttr(options.Name, int64(len([]byte(options.Target))), currentTime)
 		linkAttr.Flags.Set(internal.PropFlagSymlink)
 		ac.cacheMap.insert(linkAttr, true, currentTime)
