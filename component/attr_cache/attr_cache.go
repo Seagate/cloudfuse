@@ -846,8 +846,8 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 	err := ac.NextComponent().Chmod(options)
 
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 
 		value, getErr := ac.cacheMap.get(options.Name)
 		if getErr != nil {
