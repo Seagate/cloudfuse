@@ -329,8 +329,8 @@ func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 			defer ac.cacheLock.Unlock()
 			err = ac.deleteCachedDirectory(options.Name, deletionTime)
 		} else {
-			ac.cacheLock.RLock()
-			defer ac.cacheLock.RUnlock()
+			ac.cacheLock.Lock()
+			defer ac.cacheLock.Unlock()
 			ac.deleteDirectory(options.Name, deletionTime)
 		}
 	}
