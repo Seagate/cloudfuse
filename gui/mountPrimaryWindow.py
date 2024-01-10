@@ -6,7 +6,7 @@ import time
 import yaml
 
 # Import QT libraries
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from PySide6 import QtWidgets, QtGui, QtCore
 from PySide6.QtWidgets import QMainWindow
 
@@ -26,7 +26,9 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("Cloud FUSE")
-        
+        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "primaryWindow")
+        self.initMountPoint()
+
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
@@ -47,13 +49,31 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.action_debugHealthMonitor.triggered.connect(self.showUnderConstructionPage)
         self.action_debugLogging.triggered.connect(self.showUnderConstructionPage)
         self.action_debugTesting.triggered.connect(self.showUnderConstructionPage)
-        
+        self.lineEdit_mountPoint.editingFinished.connect(self.updateMountPointInSettings)
+
         if platform == "win32":
             self.lineEdit_mountPoint.setToolTip("Designate a new location to mount the bucket, do not create the directory")
             self.button_browse.setToolTip("Browse to a new location but don't create a new directory")
         else:
             self.lineEdit_mountPoint.setToolTip("Designate a location to mount the bucket - the directory must already exist")
             self.button_browse.setToolTip("Browse to a pre-existing directory")
+
+
+    def initMountPoint(self):
+        try:
+            directory = self.settings.value("mountPoint")
+            self.lineEdit_mountPoint.setText(directory)
+        except:
+            # Nothing in the settings for mountDir, leave mountPoint blank
+            return
+        
+    def updateMountPointInSettings(self):
+        try:
+            directory = str(self.lineEdit_mountPoint.text())
+            self.settings.setValue("mountPoint", directory)
+        except:
+            # Couldn't update the settings
+            return
 
     # Define the slots that will be triggered when the signals in Qt are activated
 
@@ -71,7 +91,11 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
-        self.lineEdit_mountPoint.setText('{}'.format(directory))
+        # getExistingDirectory() returns a null string when cancel is selected
+        #   don't update the lineEdit and settings if cancelled
+        if directory != '':
+            self.lineEdit_mountPoint.setText('{}'.format(directory))
+            self.updateMountPointInSettings()
 
 
     # Display the pre-baked about QT messagebox
@@ -95,6 +119,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         success = self.modifyPipeline(bucketOptions[targetIndex])
         if not success:
             # Don't try mounting the container since the config file couldn't be modified for the pipeline setting
+            self.addOutputText("Failed to update config file with new bucket selection, not mounting")
             return
         
         try:
