@@ -705,8 +705,8 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 	if err == nil {
 		uploadTime := time.Now()
 		// TODO: we're RLocking the cache but we need to also lock this attr item because another thread could be reading this attr item
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 
 		if ac.cacheDirs {
 			// This call needs to be treated like it's creating a new file
