@@ -603,8 +603,8 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 	err := ac.NextComponent().RenameFile(options)
 	if err == nil {
 		renameTime := time.Now()
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 
 		//get the source item
 		sourceItem, getErr := ac.cacheMap.get(options.Src)
