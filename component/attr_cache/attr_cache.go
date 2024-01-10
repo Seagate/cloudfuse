@@ -738,8 +738,8 @@ func (ac *AttrCache) SyncFile(options internal.SyncFileOptions) error {
 	log.Trace("AttrCache::SyncFile : %s", options.Handle.Path)
 	err := ac.NextComponent().SyncFile(options)
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		toBeInvalid, getErr := ac.cacheMap.get(options.Handle.Path)
 		if getErr == nil {
 			toBeInvalid.invalidate()
