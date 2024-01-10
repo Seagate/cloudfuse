@@ -115,8 +115,8 @@ func unmountCloudfuse(mntPath string, lazy bool) error {
 
 func init() {
 	rootCmd.AddCommand(unmountCmd)
+	unmountCmd.AddCommand(umntAllCmd)
 	if runtime.GOOS != "windows" {
 		unmountCmd.PersistentFlags().BoolP("lazy", "z", false, "Use lazy unmount")
-		unmountCmd.AddCommand(umntAllCmd)
 	}
 }
