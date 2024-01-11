@@ -150,17 +150,19 @@ jobs:
         continue-on-error: false
       - # Build the installer and save it to actions/cache
         name: Create PFX KeyCert File
+        working-directory: ./build
         shell: bash
         run: |
-          cd build
           echo "${{ secrets.INSTALLER_SIGNATURE_PRIVATE_KEY }}" >> combined.pem
           cat codeSigning.crt >> combined.pem
           cat combined.pem | openssl pkcs12 -export -out signingKey.pfx -passout pass:
           rm combined.pem
-          cd ..
       -
         name: Prep Inno Setup Script
+        working-directory: ./build
         shell: bash
+        # Inno Setup is pre-installed on GitHub's windows-latest image
+        # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
         run: |
           cd build
           printf '%s ' >run-iscc.bat \
@@ -172,10 +174,8 @@ jobs:
           cat run-iscc.bat
       -
         name: Run Inno Setup
-        # Inno Setup is pre-installed on GitHub's windows-latest image
-        # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
+        working-directory: ./build
         run: |
-          cd build
           .\run-iscc.bat
       -
         name: Rename installer
