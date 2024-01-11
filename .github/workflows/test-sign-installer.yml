@@ -167,6 +167,7 @@ jobs:
             '''/Ssigntool=$qC:\Program Files (x86)\Windows Kits\10\App Certification Kit\signtool.exe$q' \
             'sign /fd SHA256 /a /f $q${{ github.workspace }}\build\appSigningCert.pfx$q' \
             '/n $qSEAGATE TECHNOLOGY LLC$q /t http://timestamp.digicert.com $p'' build/windows_installer_build.iss'
+          cat build/run-iscc.bat
       -
         name: Run Inno Setup
         # Inno Setup is pre-installed on GitHub's windows-latest image
