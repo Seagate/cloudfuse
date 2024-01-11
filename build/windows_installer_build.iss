@@ -31,7 +31,7 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
-SignTool=signtool
+SignTool=signtool sign /fd SHA256 /a /f $qsigningKey.pfx$q /n $qSEAGATE TECHNOLOGY LLC$q /t http://timestamp.digicert.com /d $qCloudfuse$q $f
 SignedUninstaller=yes
 
 [Languages]
