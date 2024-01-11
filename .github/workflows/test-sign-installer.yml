@@ -119,6 +119,16 @@ jobs:
           fail-on-cache-miss: true
         # don't continue if we fail get the compiled GUI for the Windows installer
         continue-on-error: false
+      -
+        name: Create PFX KeyCert File
+        shell: bash
+        run: |
+          cd build  
+          echo "${{ secrets.INSTALLER_SIGNATURE_PRIVATE_KEY }}" >> combined.pem
+          cat codeSigning.crt >> combined.pem
+          cat combined.pem | openssl pkcs12 -export -out signingKey.pfx -passout pass:
+          rm combined.pem
+          cd ..
       - # Build the installer and save it to actions/cache
         name: Run Inno Setup
         # Inno Setup is pre-installed on GitHub's windows-latest image
