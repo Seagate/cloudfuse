@@ -69,18 +69,34 @@ jobs:
         name: Checkout code
         uses: actions/checkout@v4
       -
+        name: Fetch cached build
+        id: restore-compiled-build
+        uses: actions/cache/restore@v3
+        with:
+          # enableCrossOsArchive always needs to be set on cached items in Windows jobs
+          # see cache documentation: https://github.com/actions/cache#inputs
+          enableCrossOsArchive: true
+          path: |
+            cloudfuse.exe
+            cfusemon.exe
+            windows-startup.exe
+          key: test-installer-signature-cached-build
+      -
         name: Install Go
+        if: ${{ ! steps.restore-compiled-build.outputs.cache-hit }}
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.go }}
           check-latest: true
       -
         name: Set CGO
+        if: ${{ ! steps.restore-compiled-build.outputs.cache-hit }}
         shell: bash
         run: |
           if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
       -
         name: Build
+        if: ${{ ! steps.restore-compiled-build.outputs.cache-hit }}
         shell: bash
         run: |
           commitDate=$(git log -1 --format=%cd --date=format:%Y-%m-%dT%H:%M:%S)
@@ -91,6 +107,17 @@ jobs:
           touch -m -d $commitDate cloudfuse.exe
           touch -m -d $commitDate cfusemon.exe
           touch -m -d $commitDate windows-startup.exe
+      -
+        name: Cache compiled GUI
+        if: ${{ ! steps.restore-compiled-build.outputs.cache-hit }}
+        uses: actions/cache/save@v3
+        with:
+          enableCrossOsArchive: true
+          path: |
+            cloudfuse.exe
+            cfusemon.exe
+            windows-startup.exe
+          key: test-installer-signature-cached-build
       - # Get the WinFSP installer (from cache or download)
         name: Get cached WinFSP installer
         id: restore-winfsp-installer
