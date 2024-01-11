@@ -175,6 +175,7 @@ jobs:
         # Inno Setup is pre-installed on GitHub's windows-latest image
         # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
         run: |
+          cd build
           .\run-iscc.bat
       -
         name: Rename installer
