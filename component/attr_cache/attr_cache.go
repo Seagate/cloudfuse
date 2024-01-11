@@ -329,8 +329,8 @@ func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 			defer ac.cacheLock.Unlock()
 			err = ac.deleteCachedDirectory(options.Name, deletionTime)
 		} else {
-			ac.cacheLock.RLock()
-			defer ac.cacheLock.RUnlock()
+			ac.cacheLock.Lock()
+			defer ac.cacheLock.Unlock()
 			ac.deleteDirectory(options.Name, deletionTime)
 		}
 	}
@@ -526,8 +526,8 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		currentTime := time.Now()
 		// TODO: the cache locks are used incorrectly here
 		// They routinely lock the cache for reading, but then write to it
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		if ac.cacheDirs {
 			// record that the parent directory tree contains at least one object
 			ac.markAncestorsInCloud(getParentDir(options.Name), currentTime)
@@ -548,8 +548,8 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 	err := ac.NextComponent().DeleteFile(options)
 	if err == nil {
 		deletionTime := time.Now()
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		toBeDeleted, getErr := ac.cacheMap.get(options.Name)
 		if getErr != nil || !toBeDeleted.valid() {
 			log.Warn("AttrCache::DeleteFile : %s no valid entry found. Adding entry...", options.Name)
@@ -603,8 +603,8 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 	err := ac.NextComponent().RenameFile(options)
 	if err == nil {
 		renameTime := time.Now()
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 
 		//get the source item
 		sourceItem, getErr := ac.cacheMap.get(options.Src)
@@ -646,8 +646,8 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 		modifyTime := time.Now()
 		newSize := options.Offset + int64(len(options.Data))
 
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 
 		modifiedEntry, getErr := ac.cacheMap.get(options.Handle.Path)
 		if getErr != nil || !modifiedEntry.exists() {
@@ -670,8 +670,8 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 	if err == nil {
 		modifyTime := time.Now()
 
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 
 		truncatedItem, getErr := ac.cacheMap.get(options.Name)
 		if getErr != nil || !truncatedItem.exists() {
@@ -704,9 +704,8 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 	err = ac.NextComponent().CopyFromFile(options)
 	if err == nil {
 		uploadTime := time.Now()
-		// TODO: we're RLocking the cache but we need to also lock this attr item because another thread could be reading this attr item
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 
 		if ac.cacheDirs {
 			// This call needs to be treated like it's creating a new file
@@ -738,8 +737,8 @@ func (ac *AttrCache) SyncFile(options internal.SyncFileOptions) error {
 	log.Trace("AttrCache::SyncFile : %s", options.Handle.Path)
 	err := ac.NextComponent().SyncFile(options)
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		toBeInvalid, getErr := ac.cacheMap.get(options.Handle.Path)
 		if getErr == nil {
 			toBeInvalid.invalidate()
@@ -754,8 +753,8 @@ func (ac *AttrCache) SyncDir(options internal.SyncDirOptions) error {
 
 	err := ac.NextComponent().SyncDir(options)
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		ac.invalidateDirectory(options.Name)
 	}
 	return err
@@ -811,8 +810,8 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 
 	if err == nil {
 		currentTime := time.Now()
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		linkAttr := internal.CreateObjAttr(options.Name, int64(len([]byte(options.Target))), currentTime)
 		linkAttr.Flags.Set(internal.PropFlagSymlink)
 		ac.cacheMap.insert(linkAttr, true, currentTime)
@@ -829,8 +828,8 @@ func (ac *AttrCache) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("AttrCache::FlushFile : %s", options.Handle.Path)
 	err := ac.NextComponent().FlushFile(options)
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 		toBeInvalid, getErr := ac.cacheMap.get(options.Handle.Path)
 		if getErr == nil {
 			toBeInvalid.invalidate()
@@ -846,8 +845,8 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 	err := ac.NextComponent().Chmod(options)
 
 	if err == nil {
-		ac.cacheLock.RLock()
-		defer ac.cacheLock.RUnlock()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
 
 		value, getErr := ac.cacheMap.get(options.Name)
 		if getErr != nil {
