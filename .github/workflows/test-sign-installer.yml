@@ -124,7 +124,7 @@ jobs:
         # Inno Setup is pre-installed on GitHub's windows-latest image
         # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
         run: |
-          & "C:/Program Files (x86)/Inno Setup 6/iscc.exe" build/windows_installer_build.iss
+          & "C:/Program Files (x86)/Inno Setup 6/iscc.exe" /Ssigntool="C:\Program Files (x86)\Windows Kits\10\bin\10.0.17763.0\x86\signtool.exe sign /fd SHA256 /a /f $qbuild/signingKey.pfx$q /n $qSEAGATE TECHNOLOGY LLC$q /t http://timestamp.digicert.com /d $qCloudfuse$q $f" build/windows_installer_build.iss
       -
         name: Rename installer
         run: |
@@ -136,4 +136,3 @@ jobs:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_install_Windows_x86_64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
-          

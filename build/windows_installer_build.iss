@@ -31,8 +31,7 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
-;mystandard=signtool.exe sign /fd SHA256 /a /f $qC:\Users\465803\cloudfuse\build\appSigningCert.pfx$q /p <PFX_PASSWORD> /n $qSEAGATE TECHNOLOGY LLC$q /t http://timestamp.digicert.com /d $qCloudfuse$q $f
-SignTool=mystandard
+SignTool=signtool
 SignedUninstaller=yes
 
 [Languages]
