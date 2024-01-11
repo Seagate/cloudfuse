@@ -1,5 +1,7 @@
 name: Test Windows Installer Signing
 on:
+  push:
+    branches: sign-windows-installer
   workflow_dispatch:
 
 jobs:
