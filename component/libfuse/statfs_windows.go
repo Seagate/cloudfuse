@@ -32,7 +32,6 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/winfsp/cgofuse/fuse"
-	"golang.org/x/sys/windows"
 )
 
 // Statfs sets file system statistics. It returns 0 if successful.
@@ -59,18 +58,9 @@ func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 		stat.Namemax = attr.Namemax
 	} else {
 		var free, total, avail uint64
-
-		// Get path to the cache
-		pathPtr, err := windows.UTF16PtrFromString("/")
-		if err != nil {
-			log.Err("Libfuse::Statfs: Failed to get stats %s [%s]", name, err.Error())
-			return -fuse.EIO
-		}
-		err = windows.GetDiskFreeSpaceEx(pathPtr, &free, &total, &avail)
-		if err != nil {
-			log.Err("Libfuse::Statfs: Failed to get stats %s [%s]", name, err.Error())
-			return -fuse.EIO
-		}
+		total = common.PbToBytes
+		avail = total
+		free = total
 
 		const blockSize = 4096
 
