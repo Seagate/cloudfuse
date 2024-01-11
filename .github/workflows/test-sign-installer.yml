@@ -172,7 +172,7 @@ jobs:
         # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
         run: |
           cd build
-          & .\run-iscc.bat
+          .\run-iscc.bat
       -
         name: Rename installer
         run: |
