@@ -31,7 +31,7 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
-SignTool=signtool sign /fd SHA256 /a /f signingKey.pfx /n $qSEAGATE TECHNOLOGY LLC$q /t http://timestamp.digicert.com /d $q{#MyAppName} {#MyAppVersion}$q $f
+SignTool=signtool sign /fd SHA256 /a /f build\signingKey.pfx /n $qSEAGATE TECHNOLOGY LLC$q /t http://timestamp.digicert.com /d $q{#MyAppName} v{#MyAppVersion}$q $f
 SignedUninstaller=yes
 
 [Languages]

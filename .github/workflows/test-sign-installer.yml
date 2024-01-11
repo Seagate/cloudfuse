@@ -166,8 +166,6 @@ jobs:
             '"C:/Program Files (x86)/Inno Setup 6/iscc.exe"' \
             '"/Ssigntool=$qC:\Program Files (x86)\Windows Kits\10\App Certification Kit\signtool.exe$q $p"' \
             'windows_installer_build.iss'
-          pwd
-          cat build/run-iscc.bat
       -
         name: Run Inno Setup
         # Inno Setup is pre-installed on GitHub's windows-latest image
