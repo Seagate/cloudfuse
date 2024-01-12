@@ -11,15 +11,12 @@ components:
   - azstorage
 
 libfuse:
-  attribute-expiration-sec: 120
-  entry-expiration-sec: 120
-  negative-entry-expiration-sec: 240
 
 file_cache:
   path: /<PATH>/<TO>/<CACHE_DIR>
-  timeout-sec: 120
-  max-size-mb: 4096
+  timeout-sec: 64000000
   allow-non-empty-temp: true
+  ignore-sync: true
 
 attr_cache:
   timeout-sec: 7200
