@@ -105,23 +105,24 @@ class defaultSettingsManager():
         self.settings.setValue('file_cache',{
             'path': '',
             'policy': 'lru',
-            'timeout-sec' : 120,
+            'timeout-sec' : 64000000,
             'max-eviction': 5000,
             'max-size-mb': 0,
             'high-threshold': 80,
             'low-threshold': 60,
             'create-empty-file': False,
-            'allow-non-empty-temp': False,
+            'allow-non-empty-temp': True,
             'cleanup-on-start': False,
             'policy-trace': False,
             'offload-io': False,
             'sync-to-flush': True,
-            'refresh-sec': 60
+            'refresh-sec': 60,
+            'ignore-sync': True
         })
         self.settings.setValue('attr_cache',{
             'timeout-sec': 120,
             'no-cache-on-list': False,
-            'no-symlinks': False
+            'no-symlinks': True
         })
         self.settings.setValue('loopbackfs',{
             'path': ''
