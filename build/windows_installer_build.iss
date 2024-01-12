@@ -3,7 +3,7 @@
 
 #define MyAppName "Cloudfuse"
 #define MyAppVersion "0.3.0"
-#define MyAppPublisher "Seagate Technology"
+#define MyAppPublisher "SEAGATE TECHNOLOGY LLC"
 #define MyAppURL "https://github.com/Seagate/cloudfuse"
 #define MyAppExeName "cloudfuseGUI.exe"
 #define MyAppExeCLIName "cloudfuse.exe"
@@ -31,6 +31,8 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
+SignTool=signtool /d $q{#MyAppName} v{#MyAppVersion}$q $f
+SignedUninstaller=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
