@@ -143,7 +143,6 @@ jobs:
             'sign /fd SHA256 /a /f $q${{ github.workspace }}\build\signingKey.pfx$q' \
             '/n $qSEAGATE TECHNOLOGY LLC$q /t http://timestamp.digicert.com $p"' \
             "windows_installer_build.iss"
-          cat run-iscc.bat
       -
         name: Run Inno Setup
         working-directory: ./build
