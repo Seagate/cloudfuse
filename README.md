@@ -112,7 +112,7 @@ Available commands:
   Example: `cloudfuse unmount --lazy <mount path>`  
   On Windows, unmounting a container also stops it from being automatically remounted at login.
 - `unmount all` - Unmounts all Cloudfuse filesystems  
-  Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors).  
+  Add `--lazy` (or `-z`) flag to use lazy unmount (prevents busy errors) - Linux only.  
   Example: `cloudfuse unmount all --lazy`
 
 ### Remount on Startup (Windows Only)
