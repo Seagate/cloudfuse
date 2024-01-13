@@ -798,8 +798,8 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	defer ac.cacheLock.Unlock()
 
 	if err == nil {
-		// strip symlink attribute
-		if pathAttr.IsSymlink() {
+		if ac.noSymlinks {
+			// strip symlink attribute
 			pathAttr.Flags.Clear(internal.PropFlagSymlink)
 		}
 		// Retrieved attributes so cache them
