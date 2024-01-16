@@ -9,6 +9,9 @@ This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storag
 -- `mount list` and `unmount all` added to Windows CLI
 -- GUI now restores most recent mount directory on launch
 -- sample config files now install to %APPDATA%cloudfuse\ on Windows or /usr/share/doc/examples/ on Linux
+-- config defaults in GUI and samples set for persistent file_cache and improved performance
+**Bug Fixes**
+-- [#93](https://github.com/Seagate/cloudfuse/pull/93) Respect no-symlinks Flag
 
 ## 0.3.0 ##
 
