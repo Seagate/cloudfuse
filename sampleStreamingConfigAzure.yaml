@@ -22,6 +22,7 @@ stream:
 
 attr_cache:
   timeout-sec: 7200
+  no-symlinks: true
 
 azstorage:
   type: block
