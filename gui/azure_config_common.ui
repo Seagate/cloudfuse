@@ -191,6 +191,11 @@
            <string>Streaming</string>
           </property>
          </item>
+         <item>
+          <property name="text">
+           <string>Block Cache</string>
+          </property>
+         </item>
         </widget>
        </item>
       </layout>
