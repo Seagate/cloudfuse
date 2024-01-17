@@ -111,6 +111,8 @@ const defaultEntryExpiration = 120
 const defaultAttrExpiration = 120
 const defaultNegativeEntryExpiration = 120
 const defaultMaxFuseThreads = 128
+const maxNameSize = 255
+const blockSize = 4096
 
 var fuseFS *Libfuse
 
