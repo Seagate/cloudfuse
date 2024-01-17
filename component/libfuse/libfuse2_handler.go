@@ -286,6 +286,47 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 	return 0
 }
 
+// Statfs sets file system statistics. It returns 0 if successful.
+func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
+	name := trimFusePath(path)
+	name = common.NormalizeObjectName(name)
+	log.Trace("Libfuse::libfuse_statfs : %s", name)
+
+	attr, populated, err := fuseFS.NextComponent().StatFs()
+	if err != nil {
+		log.Err("Libfuse::Statfs: Failed to get stats %s [%s]", name, err.Error())
+		return -fuse.EIO
+	}
+
+	// if populated then we need to overwrite root attributes
+	if populated {
+		stat.Bsize = uint64(attr.Bsize)
+		stat.Frsize = uint64(attr.Frsize)
+		stat.Blocks = attr.Blocks
+		stat.Bavail = attr.Bavail
+		stat.Bfree = attr.Bfree
+		stat.Files = attr.Files
+		stat.Ffree = attr.Ffree
+		stat.Namemax = attr.Namemax
+	} else {
+		var free, total, avail uint64
+		total = common.PbToBytes
+		avail = total
+		free = total
+
+		stat.Bsize = blockSize
+		stat.Frsize = blockSize
+		stat.Blocks = total / blockSize
+		stat.Bavail = avail / blockSize
+		stat.Bfree = free / blockSize
+		stat.Files = 1e9
+		stat.Ffree = 1e9
+		stat.Namemax = maxNameSize
+	}
+
+	return 0
+}
+
 // Mkdir creates a new directory at the path with the given mode.
 func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 	name := trimFusePath(path)
