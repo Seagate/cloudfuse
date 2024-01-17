@@ -284,7 +284,8 @@ class widgetCustomFunctions(QWidget):
                     tempDict[suboption] = dictForConfigs[option][suboption]
                 self.settings.setValue(option,tempDict)
             else:
-                self.settings.setValue(option,dictForConfigs[option])
+                if dictForConfigs[option] is not None:
+                    self.settings.setValue(option,dictForConfigs[option])
 
     # Check for a true/false setting and set the checkbox state as appropriate. 
     #   Note, Checked/UnChecked are NOT True/False data types, hence the need to check what the values are.
