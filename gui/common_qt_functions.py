@@ -278,14 +278,19 @@ class widgetCustomFunctions(QWidget):
     def initSettingsFromConfig(self):
         dictForConfigs = self.getConfigs()
         for option in dictForConfigs:
+            # check default settings to enforce YAML schema
+            invalidOption = not self.settings.contains(option)
+            invalidType = type(self.settings.value(option)) != type(dictForConfigs[option])
+            if invalidOption or invalidType:
+                print(f"WARNING: Ignoring invalid config option: {option} (type mismatch)")
+                continue
             if type(dictForConfigs[option]) == dict:
                 tempDict = self.settings.value(option)
                 for suboption in dictForConfigs[option]:
                     tempDict[suboption] = dictForConfigs[option][suboption]
                 self.settings.setValue(option,tempDict)
             else:
-                if dictForConfigs[option] is not None:
-                    self.settings.setValue(option,dictForConfigs[option])
+                self.settings.setValue(option,dictForConfigs[option])
 
     # Check for a true/false setting and set the checkbox state as appropriate. 
     #   Note, Checked/UnChecked are NOT True/False data types, hence the need to check what the values are.
