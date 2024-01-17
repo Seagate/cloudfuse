@@ -4,7 +4,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -41,6 +41,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -1859,29 +1860,30 @@ func (s *datalakeTestSuite) TestGetAttrFileSize() {
 func (s *datalakeTestSuite) TestGetAttrFileTime() {
 	// TODO: why has this been flaky in the CI on both platforms?
 	fmt.Println("Skipping TestGetAttrFileTime. Should fix this later.")
+	return
 
-	// defer s.cleanupTest()
-	// // Setup
-	// name := generateFileName()
-	// h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
-	// testData := "test data"
-	// data := []byte(testData)
-	// s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	defer s.cleanupTest()
+	// Setup
+	name := generateFileName()
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	testData := "test data"
+	data := []byte(testData)
+	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
-	// before, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-	// s.assert.Nil(err)
-	// s.assert.NotNil(before.Mtime)
+	before, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.NotNil(before.Mtime)
 
-	// time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
+	time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
 
-	// s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	// time.Sleep(time.Second * 1)
+	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	time.Sleep(time.Second * 1)
 
-	// after, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-	// s.assert.Nil(err)
-	// s.assert.NotNil(after.Mtime)
+	after, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.NotNil(after.Mtime)
 
-	// s.assert.True(after.Mtime.After(before.Mtime))
+	s.assert.True(after.Mtime.After(before.Mtime))
 }
 
 func (s *datalakeTestSuite) TestGetAttrError() {
