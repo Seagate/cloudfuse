@@ -151,7 +151,7 @@ jobs:
       -
         name: Set Version
         id: get_version
-        run: echo ::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )
+        run: echo "::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )"
       -
         name: Rename installer
         run: |
