@@ -3,8 +3,6 @@ on:
   push:
     tags:
       - 'v*'
-    branches:
-      - 'fix-release-pipeline'
 
 jobs:
   compile-gui:
@@ -170,7 +168,7 @@ jobs:
     # Use GoReleaser to package and publish Linux releases along with the Windows installer
     name: Release Binaries
     needs: create-installer
-    runs-on: do-not-run
+    runs-on: ubuntu-latest
     env:
       go: '1.21'
 
