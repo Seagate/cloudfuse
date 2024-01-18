@@ -192,6 +192,10 @@ jobs:
         with:
           go-version: ${{ env.go }}
           check-latest: true
+      -
+        name: Set Version
+        id: get_version
+        run: echo "::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )"
       - # Get cached intermediate build products
         name: Restore cached Windows installer
         uses: actions/cache/restore@v3
@@ -200,7 +204,6 @@ jobs:
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
           fail-on-cache-miss: true
-        continue-on-error: false
       -
         name: Restore Linux compiled GUI
         uses: actions/cache/restore@v3
