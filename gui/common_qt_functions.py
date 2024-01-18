@@ -57,7 +57,7 @@ class defaultSettingsManager():
             'subdirectory': '',
             # the following S3 options are not exposed in the GUI
             # TODO: which options should be exposed?
-            'profile': 'default',
+            'profile': '',
             'part-size-mb': 8,
             'upload-cutoff-mb': 100,
             'concurrency': 5,
