@@ -3,6 +3,8 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - 'fix-release-pipeline'
 
 jobs:
   compile-gui:
@@ -151,7 +153,7 @@ jobs:
       -
         name: Set Version
         id: get_version
-        run: echo ::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )
+        run: echo "::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )"
       -
         name: Rename installer
         run: |
@@ -168,7 +170,7 @@ jobs:
     # Use GoReleaser to package and publish Linux releases along with the Windows installer
     name: Release Binaries
     needs: create-installer
-    runs-on: ubuntu-latest
+    runs-on: do-not-run
     env:
       go: '1.21'
 
