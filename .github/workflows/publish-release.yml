@@ -21,7 +21,7 @@ jobs:
       -
         name: Fetch cached compiled GUI
         id: restore-compiled-gui
-        uses: actions/cache/restore@v3.3.2
+        uses: actions/cache/restore@v3
         with:
           # enableCrossOsArchive always needs to be set on cached items in Windows jobs
           # see cache documentation: https://github.com/actions/cache#inputs
@@ -51,7 +51,7 @@ jobs:
       -
         name: Cache compiled GUI
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
-        uses: actions/cache/save@v3.3.2
+        uses: actions/cache/save@v3
         with:
           enableCrossOsArchive: true
           path: gui/dist/cloudfuseGUI_${{ runner.os }}
@@ -96,7 +96,7 @@ jobs:
       - # Get the WinFSP installer (from cache or download)
         name: Get cached WinFSP installer
         id: restore-winfsp-installer
-        uses: actions/cache/restore@v3.3.2
+        uses: actions/cache/restore@v3
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
@@ -109,13 +109,13 @@ jobs:
       -
         name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
-        uses: actions/cache/save@v3.3.2
+        uses: actions/cache/save@v3
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
       -
         name: Fetch cached compiled GUI
-        uses: actions/cache/restore@v3.3.2
+        uses: actions/cache/restore@v3
         with:
           enableCrossOsArchive: true
           path: gui/dist/cloudfuseGUI_${{ runner.os }}
@@ -160,7 +160,7 @@ jobs:
           mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
       -
         name: Cache windows installer
-        uses: actions/cache/save@v3.3.2
+        uses: actions/cache/save@v3
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -194,9 +194,13 @@ jobs:
         with:
           go-version: ${{ env.go }}
           check-latest: true
+      -
+        name: Set Version
+        id: get_version
+        run: echo "::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )"
       - # Get cached intermediate build products
         name: Restore cached Windows installer
-        uses: actions/cache/restore@v3.3.2
+        uses: actions/cache/restore@v3
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -204,7 +208,7 @@ jobs:
           fail-on-cache-miss: true
       -
         name: Restore Linux compiled GUI
-        uses: actions/cache/restore@v3.3.2
+        uses: actions/cache/restore@v3
         with:
           path: gui/dist/cloudfuseGUI_Linux
           key: Linux-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
@@ -212,7 +216,7 @@ jobs:
         continue-on-error: false
       -
         name: Restore Windows compiled GUI
-        uses: actions/cache/restore@v3.3.2
+        uses: actions/cache/restore@v3
         with:
           enableCrossOsArchive: true
           path: gui/dist/cloudfuseGUI_Windows
