@@ -29,7 +29,7 @@ from ui_azure_config_common import Ui_Form
 from azure_config_advanced import azureAdvancedSettingsWidget
 from common_qt_functions import widgetCustomFunctions, defaultSettingsManager
 
-pipelineChoices = ['file_cache','stream']
+pipelineChoices = ['file_cache','stream','block_cache']
 bucketModeChoices = ["key", "sas", "spn", "msi"]
 azStorageType = ["block", "adls"]
 libfusePermissions = [0o777,0o666,0o644,0o444]

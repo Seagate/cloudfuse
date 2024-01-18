@@ -29,7 +29,7 @@ from ui_s3_config_common import Ui_Form
 from s3_config_advanced import s3AdvancedSettingsWidget
 from common_qt_functions import defaultSettingsManager,widgetCustomFunctions
 
-pipelineChoices = ['file_cache','stream']
+pipelineChoices = ['file_cache','stream','block_cache']
 libfusePermissions = [0o777,0o666,0o644,0o444]
 
 class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form): 

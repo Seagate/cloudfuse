@@ -54,7 +54,17 @@ class defaultSettingsManager():
             'secret-key': '',
             'region': '',
             'endpoint': '',
-            'subdirectory': ''
+            'subdirectory': '',
+            # the following S3 options are not exposed in the GUI
+            # TODO: which options should be exposed?
+            'profile': 'default',
+            'part-size-mb': 8,
+            'upload-cutoff-mb': 100,
+            'concurrency': 5,
+            'disable-concurrent-download': False,
+            'enable-checksum': False,
+            'checksum-algorithm': 'SHA1',
+            'usePathStyle': False,
         })
     
     def setAzureSettings(self):
@@ -73,6 +83,7 @@ class defaultSettingsManager():
             'tenantid': '',
             'clientid': '',
             'clientsecret': '',
+            'oauth-token-path': '', # not exposed
             'use-http': False,
             'aadendpoint': '',
             'subdirectory': '',
@@ -91,21 +102,31 @@ class defaultSettingsManager():
             'auth-resource': '',
             'update-md5': False,
             'validate-md5': False,
-            'virtual-directory': False,
-            'disable-compression': False
+            'virtual-directory': True,
+            'disable-compression': False,
+            # the following Azure options are not exposed in the GUI
+            'max-results-for-list': 2,
+            'telemetry': '',
+            'honour-acl': False
         })
     
     def setComponentSettings(self):
         # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
+        
         self.settings.setValue('foreground',False)
+        
+        # Common
         self.settings.setValue('allow-other',True)
         self.settings.setValue('read-only',False)
         self.settings.setValue('nonempty',False)
+        self.settings.setValue('restricted-characters-windows',False) # not exposed
+        # Profiler
         self.settings.setValue('dynamic-profile',False)
         self.settings.setValue('profiler-port',6060)
         self.settings.setValue('profiler-ip','localhost')
-        # This is the built pipeline name components 
-        self.settings.setValue('components',['libfuse','file_cache','attr_cache','azstorage'])
+        # Pipeline components
+        self.settings.setValue('components',['libfuse','file_cache','attr_cache','s3storage'])
+        # Sub-sections
         self.settings.setValue('libfuse',{
             'default-permission' : 0o777,
             'attribute-expiration-sec': 120,
@@ -116,6 +137,7 @@ class defaultSettingsManager():
             'disable-writeback-cache' : False,
             'ignore-open-flags' : True,
             'max-fuse-threads': 128,
+            'direct-io': False, # not exposed
             'network-share': False
         })
         self.settings.setValue('stream',{
@@ -123,6 +145,17 @@ class defaultSettingsManager():
             'max-buffers': 0,
             'buffer-size-mb': 0,
             'file-caching': False # false = handle level caching ON
+        })
+        # the block cache component and its settings are not exposed in the GUI
+        self.settings.setValue('block_cache',{
+            'block-size-mb': 16,
+            'mem-size-mb': 4192,
+            'path': '',
+            'disk-size-mb': 4192,
+            'disk-timeout-sec': 120,
+            'prefetch': 11,
+            'parallelism': 128,
+            'prefetch-on-open': False,
         })
         self.settings.setValue('file_cache',{
             'path': '',
@@ -139,12 +172,16 @@ class defaultSettingsManager():
             'offload-io': False,
             'sync-to-flush': True,
             'refresh-sec': 60,
-            'ignore-sync': True
+            'ignore-sync': True,
+            'hard-limit': False # not exposed
         })
         self.settings.setValue('attr_cache',{
             'timeout-sec': 120,
             'no-cache-on-list': False,
-            'no-symlinks': True
+            'no-symlinks': True,
+            # the following attr_cache settings are not exposed in the GUI
+            'max-files': 5000000,
+            'no-cache-dirs': False
         })
         self.settings.setValue('loopbackfs',{
             'path': ''
@@ -159,13 +196,7 @@ class defaultSettingsManager():
             'stats-poll-interval-sec': 10,
             'process-monitor-interval-sec': 30,
             'output-path':'',
-            'monitor-disable-list': [
-                'blobfuse_stats',
-                'file_cache_monitor',
-                'cpu_profiler',
-                'memory_profiler',
-                'network_profiler'
-                ]
+            'monitor-disable-list': []
         })
         self.settings.setValue('logging',{
             'type' : 'syslog',
@@ -300,6 +331,12 @@ class widgetCustomFunctions(QWidget):
     def initSettingsFromConfig(self):
         dictForConfigs = self.getConfigs()
         for option in dictForConfigs:
+            # check default settings to enforce YAML schema
+            invalidOption = not self.settings.contains(option)
+            invalidType = type(self.settings.value(option)) != type(dictForConfigs[option])
+            if invalidOption or invalidType:
+                print(f"WARNING: Ignoring invalid config option: {option} (type mismatch)")
+                continue
             if type(dictForConfigs[option]) == dict:
                 tempDict = self.settings.value(option)
                 for suboption in dictForConfigs[option]:
