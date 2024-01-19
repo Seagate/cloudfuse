@@ -4,6 +4,7 @@
 
 This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
 **Bug Fixes**
+-- [#102](https://github.com/Seagate/cloudfuse/pull/102) Fix S3 connection error caused by GUI defaulting profile to 'default'
 -- [#103](https://github.com/Seagate/cloudfuse/pull/103) Improve --dry-run to detect config errors on Windows properly
 
 ## 1.0.0 ##
