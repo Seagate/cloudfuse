@@ -200,7 +200,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             def verifyMountSuccess():
                 if not os.path.exists(directory):
                     self.addOutputText(f"Failed to create mount directory {directory}")
-                    self.errorMessageBox("Mount failed silently... Do you need to empty the file cache directory?")
+                    self.errorMessageBox("Mount failed. Please check error logs.")
                 else:
                     self.addOutputText("Successfully mounted container")
             QtCore.QTimer.singleShot(4000, verifyMountSuccess)

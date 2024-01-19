@@ -271,6 +271,8 @@ var mountCmd = &cobra.Command{
 			return fmt.Errorf("failed to unmarshal config [%s]", err.Error())
 		}
 
+		options.Foreground = options.Foreground || options.DryRun
+
 		// handle Windows background mount (formerly "service mount")
 		if !options.Foreground && runtime.GOOS == "windows" {
 			// validate mount path
