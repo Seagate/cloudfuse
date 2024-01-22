@@ -50,11 +50,20 @@ jobs:
 
         # For more details on CodeQL's query packs, refer to: https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
         # queries: security-extended,security-and-quality
+    
+    # Install latest version of Go. Codeql runs on an older version of go
+    - name: Install Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        check-latest: true
+      if: matrix.language == 'go'
+    - run: go version
 
     # Autobuild attempts to build any compiled languages (C/C++, C#, Go, Java, or Swift).
     # If this step fails, then you should remove it and run the build manually (see below)
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v3
+    # - name: Autobuild
+    #   uses: github/codeql-action/autobuild@v3
 
     # ℹ️ Command-line programs to run using the OS shell.
     # 📚 https://git.io/JvXDl
@@ -63,9 +72,16 @@ jobs:
     #    and modify them (or add more) to build your code if your project
     #    uses a compiled language
 
-    #- run: |
-    #   make bootstrap
-    #   make release
+    - name: Install libfuse
+      if: matrix.language == 'go'
+      run: |-
+        sudo apt-get update
+        sudo apt-get install fuse libfuse-dev -y
+    
+    - name: Build go binary
+      if: matrix.language == 'go'
+      run: |
+        ./build.sh
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
