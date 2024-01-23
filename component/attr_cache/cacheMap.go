@@ -26,9 +26,7 @@
 package attr_cache
 
 import (
-	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -52,6 +50,25 @@ type attrCacheItem struct {
 	children map[string]*attrCacheItem
 }
 
+// all cache entries are organized into this structure
+type cacheTreeMap struct {
+	cacheMap  map[string]*attrCacheItem
+	cacheTree *attrCacheItem
+}
+
+// initialize the cache data structure
+func newCacheTreeMap() *cacheTreeMap {
+	// initialize map
+	cacheMap := make(map[string]*attrCacheItem)
+	// create tree root node
+	rootAttr := internal.CreateObjAttrDir("")
+	rootNode := newAttrCacheItem(rootAttr, true, time.Now())
+	return &cacheTreeMap{
+		cacheMap:  cacheMap,
+		cacheTree: rootNode,
+	}
+}
+
 func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {
 	item := &attrCacheItem{
 		attr:     attr,
@@ -65,58 +82,51 @@ func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *
 	return item
 }
 
-func (value *attrCacheItem) insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {
+// return the attrCacheItem matching the given path
+func (ctm *cacheTreeMap) get(path string) (item *attrCacheItem, found bool) {
+	path = internal.TruncateDirName(path)
+	// get the entry from the map
+	item, found = ctm.cacheMap[path]
+	return item, found
+}
+
+// insert a new attrCacheItem and return a handle to it
+func (ctm *cacheTreeMap) insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {
 	if attr == nil {
 		return nil
 	}
-	path := internal.TruncateDirName(attr.Path)
-	//start recursion
-	cachedItem := value.insertHelper(attr, exists, cachedAt, path, "")
-	return cachedItem
+	// create the new record
+	newItem := newAttrCacheItem(attr, exists, cachedAt)
+	// insert it (recursively)
+	ctm.insertItem(newItem)
+	// return a handle to it
+	return newItem
 }
 
-// TODO: write unit tests for this
-func (value *attrCacheItem) insertHelper(attr *internal.ObjAttr, exists bool, cachedAt time.Time, path string, itemPath string) *attrCacheItem {
-	var cachedItem *attrCacheItem
-	paths := strings.SplitN(path, "/", 2) // paths[0] is home paths[1] is user/folder/file
-	if value.children == nil {
-		value.children = make(map[string]*attrCacheItem)
+// use efficient recursion to add an item to the cache
+// newChild must be a record for an entry that is in the parent directory (not in a subdirectory)
+func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem) {
+	// find the parent
+	path := internal.TruncateDirName(newItem.attr.Path)
+	parentPath := getParentDir(path)
+	parentItem, parentFound := ctm.get(parentPath)
+	// if there is no parent, create one and add it
+	if !parentFound {
+		newParentAttr := internal.CreateObjAttrDir(parentPath)
+		parentItem = newAttrCacheItem(newParentAttr, newItem.exists(), newItem.cachedAt)
+		// recurse
+		ctm.insertItem(parentItem)
 	}
-	if len(paths) < 2 {
-		// this is a leaf
-		cachedItem = newAttrCacheItem(attr, exists, cachedAt)
-		value.children[paths[0]] = cachedItem
-	} else {
-		itemPath += paths[0] + "/"
-		//see if the directory exists. if not, create it.
-		_, ok := value.children[paths[0]]
-		if !ok {
-			value.children[paths[0]] = newAttrCacheItem(internal.CreateObjAttrDir(itemPath), exists, cachedAt)
-		}
-		cachedItem = value.children[paths[0]].insertHelper(attr, exists, cachedAt, paths[1], itemPath)
+	// add the new item to the tree and the map
+	if parentItem.children == nil {
+		parentItem.children = make(map[string]*attrCacheItem)
 	}
-	return cachedItem
+	parentItem.children[newItem.attr.Name] = newItem
+	ctm.cacheMap[path] = newItem
 }
 
-// get returns the *attrCacheItem from the cacheMap based on the provided path string
-func (value *attrCacheItem) get(path string) (*attrCacheItem, error) {
-	path = internal.TruncateDirName(path)
-	paths := strings.Split(path, "/")
-	currentItem := value
-	for _, pathElement := range paths {
-		//check if we are at the last element in the paths list
-		if path == "" {
-			break
-		}
-		var ok bool
-		currentItem, ok = currentItem.children[pathElement]
-		//check to see if directory (pathElement) exists
-		if !ok {
-			return nil, fmt.Errorf("Cache entry for path %s not found", path)
-		}
-		//TODO: side note: cacheLocks. channel, sync, semaphore.
-	}
-	return currentItem, nil
+func (ctm *cacheTreeMap) empty() bool {
+	return len(ctm.cacheMap[""].children) == 0
 }
 
 func (value *attrCacheItem) valid() bool {
@@ -135,7 +145,7 @@ func (value *attrCacheItem) isInCloud() bool {
 }
 
 func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
-	if !value.isDeleted() {
+	if value.exists() {
 		value.attrFlag.Clear(AttrFlagExists)
 		value.attrFlag.Set(AttrFlagValid)
 		value.cachedAt = deletedTime
@@ -164,14 +174,6 @@ func (value *attrCacheItem) markInCloud(inCloud bool) {
 			value.attrFlag.Set(AttrFlagNotInCloud)
 		}
 	}
-}
-
-func (value *attrCacheItem) getAttr() *internal.ObjAttr {
-	return value.attr
-}
-
-func (value *attrCacheItem) isDeleted() bool {
-	return !value.exists()
 }
 
 func (value *attrCacheItem) setSize(size int64, changedAt time.Time) {
