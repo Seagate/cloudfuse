@@ -268,9 +268,9 @@ class widgetCustomFunctions(QWidget):
         defaultFuseDir = 'Cloudfuse'
         if platform == "win32":
             userDir = os.getenv('APPDATA')
-            currentDir = os.path.join(userDir, defaultFuseDir)
         else:
-            currentDir = os.getcwd()
+            userDir = '/etc'
+        currentDir = os.path.join(userDir, defaultFuseDir)
         return currentDir
 
     def writeConfigFile(self):
