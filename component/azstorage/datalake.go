@@ -265,6 +265,9 @@ func (dl *Datalake) CreateDirectory(name string) error {
 		if serr == InvalidPermission {
 			log.Err("Datalake::CreateDirectory : Insufficient permissions for %s [%s]", name, err.Error())
 			return syscall.EACCES
+		} else if serr == ErrFileAlreadyExists {
+			log.Err("Datalake::CreateDirectory : Path already exists for %s [%s]", name, err.Error())
+			return syscall.EEXIST
 		} else {
 			log.Err("Datalake::CreateDirectory : Failed to create directory %s [%s]", name, err.Error())
 			return err
@@ -659,6 +662,21 @@ func (dl *Datalake) ChangeOwner(name string, _ int, _ int) error {
 	// 	return err
 	// }
 	return syscall.ENOTSUP
+}
+
+// GetCommittedBlockList : Get the list of committed blocks
+func (dl *Datalake) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
+	return dl.BlockBlob.GetCommittedBlockList(name)
+}
+
+// StageBlock : stages a block and returns its blockid
+func (dl *Datalake) StageBlock(name string, data []byte, id string) error {
+	return dl.BlockBlob.StageBlock(name, data, id)
+}
+
+// CommitBlocks : persists the block list
+func (dl *Datalake) CommitBlocks(name string, blockList []string) error {
+	return dl.BlockBlob.CommitBlocks(name, blockList)
 }
 
 // getDirectoryURL returns a new directory url. On Windows this will also convert special characters.

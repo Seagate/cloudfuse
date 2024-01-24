@@ -348,6 +348,8 @@ func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 		log.Err("Libfuse::Mkdir : Failed to create %s [%s]", name, err.Error())
 		if os.IsPermission(err) {
 			return -fuse.EACCES
+		} else if os.IsExist(err) {
+			return -fuse.EEXIST
 		} else {
 			return -fuse.EIO
 		}

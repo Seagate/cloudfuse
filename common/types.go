@@ -29,6 +29,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sync"
 	"time"
@@ -309,4 +310,14 @@ func NewUUID() (u uuid) {
 func GetIdLength(id string) int64 {
 	existingBlockId, _ := base64.StdEncoding.DecodeString(id)
 	return int64(len(existingBlockId))
+}
+
+func init() {
+	val, present := os.LookupEnv("HOME")
+	if !present {
+		val = "./"
+	}
+	DefaultWorkDir = filepath.Join(val, ".cloudfuse")
+	DefaultLogFilePath = filepath.Join(DefaultWorkDir, "cloudfuse.log")
+	StatsConfigFilePath = filepath.Join(DefaultWorkDir, "stats_monitor.cfg")
 }

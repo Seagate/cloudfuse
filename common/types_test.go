@@ -34,6 +34,8 @@
 package common
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -94,4 +96,12 @@ func (suite *typesTestSuite) TestFindBlocksToModify() {
 	suite.assert.Equal(size, int64(0))
 	suite.assert.Equal(largerThanFile, true)
 	suite.assert.Equal(appendOnly, true)
+}
+
+func (suite *typesTestSuite) TestDefaultWorkDir() {
+	val, err := os.UserHomeDir()
+	suite.assert.Nil(err)
+	suite.assert.Equal(DefaultWorkDir, filepath.Join(val, ".cloudfuse"))
+	suite.assert.Equal(DefaultLogFilePath, filepath.Join(val, ".cloudfuse/cloudfuse.log"))
+	suite.assert.Equal(StatsConfigFilePath, filepath.Join(val, ".cloudfuse/stats_monitor.cfg"))
 }

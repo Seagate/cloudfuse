@@ -89,7 +89,7 @@ type mountOptions struct {
 
 var options mountOptions
 
-func (opt *mountOptions) validate(skipEmptyMount bool) error {
+func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 	if opt.MountPath == "" {
 		return fmt.Errorf("mount path not provided")
 	}
@@ -105,13 +105,15 @@ func (opt *mountOptions) validate(skipEmptyMount bool) error {
 	} else {
 		if _, err := os.Stat(opt.MountPath); os.IsNotExist(err) {
 			return fmt.Errorf("mount directory does not exists")
-		} else if !skipEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
+		} else if !skipNonEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
 			return fmt.Errorf("mount directory is not empty")
 		}
 	}
 
 	if common.IsDirectoryMounted(opt.MountPath) {
 		return fmt.Errorf("directory is already mounted")
+	} else if !skipNonEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
+		return fmt.Errorf("mount directory is not empty")
 	}
 
 	if err := common.ELogLevel.Parse(opt.Logging.LogLevel); err != nil {
@@ -326,8 +328,6 @@ var mountCmd = &cobra.Command{
 			options.Components = pipeline
 		}
 
-		skipNonEmpty := false
-
 		if config.IsSet("libfuse-options") {
 			for _, v := range options.LibfuseOptions {
 				parameter := strings.Split(v, "=")
@@ -350,8 +350,11 @@ var mountCmd = &cobra.Command{
 					config.Set("read-only", "true")
 				} else if v == "allow_root" || v == "allow_root=true" {
 					config.Set("allow-root", "true")
-				} else if v == "nonempty" {
-					skipNonEmpty = true
+				} else if v == "nonempty" || v == "nonempty=true" {
+					// For fuse3, -o nonempty mount option has been removed and
+					// mounting over non-empty directories is now always allowed.
+					// For fuse2, this option is supported.
+					options.NonEmpty = true
 					config.Set("nonempty", "true")
 				} else if strings.HasPrefix(v, "umask=") {
 					umask, err := strconv.ParseUint(parameter[1], 10, 32)
@@ -387,7 +390,7 @@ var mountCmd = &cobra.Command{
 			options.Logging.LogLevel = "LOG_WARNING"
 		}
 
-		err = options.validate(options.NonEmpty || skipNonEmpty)
+		err = options.validate(options.NonEmpty)
 		if err != nil {
 			return err
 		}
@@ -444,6 +447,7 @@ var mountCmd = &cobra.Command{
 
 		log.Crit("Starting Cloudfuse Mount : %s on [%s]", common.CloudfuseVersion, common.GetCurrentDistro())
 		log.Crit("Logging level set to : %s", logLevel.String())
+		log.Debug("Mount allowed on nonempty path : %v", options.NonEmpty)
 
 		// If on Linux start with the go daemon
 		// If on Windows, don't use the daemon since it is not supported
@@ -452,6 +456,7 @@ var mountCmd = &cobra.Command{
 		} else {
 			pipeline, err = internal.NewPipeline(options.Components, !daemon.WasReborn())
 		}
+
 		if err != nil {
 			errorMessage := ""
 			if !configFileProvided {

@@ -151,8 +151,8 @@ func (ac *AttrCache) Configure(_ bool) error {
 	ac.noSymlinks = conf.NoSymlinks
 	ac.cacheDirs = !conf.NoCacheDirs
 
-	log.Info("AttrCache::Configure : cache-timeout %d, symlink %t, cache-on-list %t",
-		ac.cacheTimeout, ac.noSymlinks, ac.cacheOnList)
+	log.Info("AttrCache::Configure : cache-timeout %d, symlink %t, cache-on-list %t, max-files %d",
+		ac.cacheTimeout, ac.noSymlinks, ac.cacheOnList, ac.maxFiles)
 
 	return nil
 }
@@ -288,7 +288,7 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("AttrCache::CreateDir : %s", options.Name)
 	err := ac.NextComponent().CreateDir(options)
-	if err == nil {
+	if err == nil || err == syscall.EEXIST {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 		// does the directory already exist?
@@ -880,6 +880,21 @@ func (ac *AttrCache) Chown(options internal.ChownOptions) error {
 	err := ac.NextComponent().Chown(options)
 	// TODO: Implement when datalake chown is supported.
 
+	return err
+}
+
+func (ac *AttrCache) CommitData(options internal.CommitDataOptions) error {
+	log.Trace("AttrCache::CommitData : %s", options.Name)
+	err := ac.NextComponent().CommitData(options)
+	if err == nil {
+		ac.cacheLock.RLock()
+		defer ac.cacheLock.RUnlock()
+
+		entry, getErr := ac.cacheMap.get(options.Name)
+		if getErr == nil {
+			entry.invalidate()
+		}
+	}
 	return err
 }
 

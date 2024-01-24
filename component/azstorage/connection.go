@@ -73,6 +73,11 @@ type AzStorageConfig struct {
 	telemetry          string
 	honourACL          bool
 	disableSymlink     bool
+
+	// CPK related config
+	cpkEnabled             bool
+	cpkEncryptionKey       string
+	cpkEncryptionKeySha256 string
 }
 
 type AzStorageConnection struct {
@@ -123,6 +128,10 @@ type AzConnection interface {
 	ChangeOwner(string, int, int) error
 	TruncateFile(string, int64) error
 	StageAndCommit(name string, bol *common.BlockOffsetList) error
+
+	GetCommittedBlockList(string) (*internal.CommittedBlockList, error)
+	StageBlock(string, []byte, string) error
+	CommitBlocks(string, []string) error
 
 	NewCredentialKey(_, _ string) error
 }

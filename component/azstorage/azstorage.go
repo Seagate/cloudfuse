@@ -542,6 +542,18 @@ func (az *AzStorage) FlushFile(options internal.FlushFileOptions) error {
 	return az.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
 }
 
+func (az *AzStorage) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
+	return az.storage.GetCommittedBlockList(name)
+}
+
+func (az *AzStorage) StageData(opt internal.StageDataOptions) error {
+	return az.storage.StageBlock(opt.Name, opt.Data, opt.Id)
+}
+
+func (az *AzStorage) CommitData(opt internal.CommitDataOptions) error {
+	return az.storage.CommitBlocks(opt.Name, opt.List)
+}
+
 // TODO : Below methods are pending to be implemented
 // SetAttr(string, internal.ObjAttr) error
 // UnlinkFile(string) error
@@ -645,6 +657,9 @@ func init() {
 
 	restrictedCharsWin := config.AddBoolFlag("restricted-characters-windows", false, "Enable support for displaying restricted characters on Windows.")
 	config.BindPFlag("restricted-characters-windows", restrictedCharsWin)
+
+	cpkEnabled := config.AddBoolFlag("cpk-enabled", false, "Enable client provided key.")
+	config.BindPFlag(compName+".cpk-enabled", cpkEnabled)
 
 	config.RegisterFlagCompletionFunc("container-name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveNoFileComp

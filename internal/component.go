@@ -128,4 +128,8 @@ type Component interface {
 
 	FileUsed(name string) error
 	StatFs() (*common.Statfs_t, bool, error)
+
+	GetCommittedBlockList(string) (*CommittedBlockList, error)
+	StageData(StageDataOptions) error
+	CommitData(CommitDataOptions) error
 }

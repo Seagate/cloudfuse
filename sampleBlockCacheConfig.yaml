@@ -2,11 +2,11 @@
 
 logging:
   type: syslog
-  level: log_warning
+  level: log_debug
 
 components:
   - libfuse
-  - stream
+  - block_cache
   - attr_cache
   - azstorage
 
@@ -15,14 +15,14 @@ libfuse:
   entry-expiration-sec: 120
   negative-entry-expiration-sec: 240
 
-stream:
-  block-size-mb: 8
-  max-buffers: 64
-  buffer-size-mb: 36
+block_cache:
+  block-size-mb: 32
+  mem-size-mb: 4096
+  prefetch: 80
+  parallelism: 128
 
 attr_cache:
   timeout-sec: 7200
-  no-symlinks: true
 
 azstorage:
   type: block
