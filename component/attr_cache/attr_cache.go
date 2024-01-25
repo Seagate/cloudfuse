@@ -229,12 +229,25 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 		log.Warn("AttrCache::invalidateDirectory : %s entry not found or already invalid", path)
 		return
 	}
-	// TODO: make this more readable (e.g. this function gets called when cacheDirs is true)
+
 	// only invalidate directories when cacheDirs is false
-	if !ac.cacheDirs || !item.attr.IsDir() {
+	if ac.cacheDirs {
+		// invalidating anything when cacheDirs=true is risky
+		// TODO: should we do nothing here?
+		// let's compromise: recursively invalidate only file items
+		for _, childItem := range item.children {
+			if !childItem.attr.IsDir() {
+				childItem.invalidate()
+			} else {
+				ac.invalidateDirectory(childItem.attr.Path)
+			}
+		}
+	} else {
+		// invalidate the whole directory, recursively
 		item.invalidate()
 		return
 	}
+
 }
 
 // move an item to a new location, and return the destination item
