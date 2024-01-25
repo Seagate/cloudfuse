@@ -109,7 +109,7 @@ func (suite *cacheMapTestSuite) TestInsert() {
 	suite.assert.True(found)
 	suite.assert.NotNil(cachedItem)
 	suite.assert.Equal(dirPath, cachedItem.attr.Path)
-	suite.assert.Equal(4096, cachedItem.attr.Size)
+	suite.assert.Equal(int64(4096), cachedItem.attr.Size)
 	suite.assert.True(cachedItem.attr.IsDir())
 	suite.assert.Same(insertedItem, cachedItem)
 
@@ -226,7 +226,7 @@ func (suite *cacheMapTestSuite) TestMarkDeletedFolder() {
 	cachedItem, found = suite.cache.get(parentPath)
 	suite.assert.True(found)
 	suite.assert.NotNil(cachedItem)
-	suite.assert.Equal(filePath, cachedItem.attr.Path)
+	suite.assert.Equal(parentPath, cachedItem.attr.Path)
 	suite.assert.True(cachedItem.exists())
 	suite.assert.True(cachedItem.attr.IsDir())
 
@@ -260,7 +260,7 @@ func (suite *cacheMapTestSuite) TestInvalidateFolder() {
 	cachedItem, found = suite.cache.get(parentPath)
 	suite.assert.True(found)
 	suite.assert.NotNil(cachedItem)
-	suite.assert.Equal(filePath, cachedItem.attr.Path)
+	suite.assert.Equal(parentPath, cachedItem.attr.Path)
 	suite.assert.True(cachedItem.valid())
 	suite.assert.True(cachedItem.attr.IsDir())
 
