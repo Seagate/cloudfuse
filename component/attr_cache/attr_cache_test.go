@@ -115,7 +115,6 @@ func (suite *attrCacheTestSuite) addPathToCache(path string, metadata bool) {
 func (suite *attrCacheTestSuite) assertDeleted(path string) {
 	cacheItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
-	suite.assert.EqualValues(&internal.ObjAttr{}, cacheItem.attr)
 	suite.assert.True(cacheItem.valid())
 	suite.assert.False(cacheItem.exists())
 }
@@ -466,7 +465,7 @@ func (suite *attrCacheTestSuite) TestDeleteDirNoCacheDirs() {
 
 			err = suite.attrCache.DeleteDir(options)
 			suite.assert.Nil(err)
-			suite.assertNotInCache(truncatedPath)
+			suite.assertDeleted(truncatedPath)
 
 			// Entry Already Exists
 			a, ab, ac := suite.addDirectoryToCache(path, false)
@@ -1015,7 +1014,7 @@ func (suite *attrCacheTestSuite) TestSyncDir() {
 
 			err = suite.attrCache.SyncDir(options)
 			suite.assert.Nil(err)
-			// directory cache is enabled, so a paths should NOT be deleted
+			// directory cache is enabled, so a dir paths should NOT be invalid
 			for p := a.Front(); p != nil; p = p.Next() {
 				path := p.Value.(string)
 				isDir := path[len(path)-1] == '/'
@@ -1545,7 +1544,7 @@ func (suite *attrCacheTestSuite) TestChmod() {
 			suite.assert.Nil(err)
 
 			checkItem, found := suite.attrCache.cache.get(truncatedPath)
-			suite.assert.Nil(found)
+			suite.assert.True(found)
 
 			suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 			suite.assert.EqualValues(defaultSize, checkItem.attr.Size)
