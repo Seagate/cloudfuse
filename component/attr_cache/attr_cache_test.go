@@ -97,6 +97,10 @@ func getPathAttr(path string, size int64, mode os.FileMode, metadata bool) *inte
 	}
 }
 
+func (suite *attrCacheTestSuite) assertCacheEmpty() bool {
+	return len(suite.attrCache.cache.cacheMap[""].children) == 0
+}
+
 func (suite *attrCacheTestSuite) assertNotInCache(path string) {
 	_, found := suite.attrCache.cache.get(path)
 	suite.assert.False(found)
@@ -508,7 +512,7 @@ func (suite *attrCacheTestSuite) TestReadDirDoesNotExist() {
 			// Entries Do Not Already Exist
 			suite.mock.EXPECT().ReadDir(options).Return(aAttr, nil)
 
-			suite.assert.True(suite.attrCache.cache.empty()) // cacheMap should be empty before call
+			suite.assertCacheEmpty() // cacheMap should be empty before call
 			returnedAttr, err := suite.attrCache.ReadDir(options)
 			suite.assert.Nil(err)
 			suite.assert.Equal(aAttr, returnedAttr)
@@ -629,7 +633,7 @@ func (suite *attrCacheTestSuite) TestReadDirNoCacheOnList() {
 	options := internal.ReadDirOptions{Name: path}
 	suite.mock.EXPECT().ReadDir(options).Return(aAttr, nil)
 
-	suite.assert.True(suite.attrCache.cache.empty()) // cacheMap should be empty before call
+	suite.assertCacheEmpty() // cacheMap should be empty before call
 	returnedAttr, err := suite.attrCache.ReadDir(options)
 	suite.assert.Nil(err)
 	suite.assert.Equal(aAttr, returnedAttr)
@@ -655,12 +659,12 @@ func (suite *attrCacheTestSuite) TestReadDirNoCacheOnListNoCacheDirs() {
 	options := internal.ReadDirOptions{Name: path}
 	suite.mock.EXPECT().ReadDir(options).Return(aAttr, nil)
 
-	suite.assert.True(suite.attrCache.cache.empty()) // cacheMap should be empty before call
+	suite.assertCacheEmpty() // cacheMap should be empty before call
 	returnedAttr, err := suite.attrCache.ReadDir(options)
 	suite.assert.Nil(err)
 	suite.assert.Equal(aAttr, returnedAttr)
 
-	suite.assert.True(suite.attrCache.cache.empty()) // cacheMap should be empty after call
+	suite.assertCacheEmpty() // cacheMap should be empty after call
 }
 
 func (suite *attrCacheTestSuite) TestReadDirError() {
@@ -1385,7 +1389,7 @@ func (suite *attrCacheTestSuite) TestGetAttrDoesNotExist() {
 			// attributes should not be accessible so call the mock
 			suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode), false), nil)
 
-			suite.assert.True(suite.attrCache.cache.empty()) // cacheMap should be empty before call
+			suite.assertCacheEmpty() // cacheMap should be empty before call
 			_, err := suite.attrCache.GetAttr(options)
 			suite.assert.Nil(err)
 			suite.assertUntouched(truncatedPath) // item added to cache after
@@ -1455,7 +1459,7 @@ func (suite *attrCacheTestSuite) TestCacheTimeout() {
 	// attributes should not be accessible so call the mock
 	suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode), true), nil)
 
-	suite.assert.True(suite.attrCache.cache.empty()) // cacheMap should be empty before call
+	suite.assertCacheEmpty() // cacheMap should be empty before call
 	_, err := suite.attrCache.GetAttr(options)
 	suite.assert.Nil(err)
 	suite.assertUntouched(path) // item added to cache after

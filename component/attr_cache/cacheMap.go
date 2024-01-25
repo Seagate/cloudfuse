@@ -128,10 +128,6 @@ func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem) {
 	ctm.cacheMap[path] = newItem
 }
 
-func (ctm *cacheTreeMap) empty() bool {
-	return len(ctm.cacheMap[""].children) == 0
-}
-
 func (value *attrCacheItem) valid() bool {
 	return value.attrFlag.IsSet(AttrFlagValid)
 }
