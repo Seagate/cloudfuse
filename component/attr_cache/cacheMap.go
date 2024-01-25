@@ -63,6 +63,9 @@ func newCacheTreeMap() *cacheTreeMap {
 	// create tree root node
 	rootAttr := internal.CreateObjAttrDir("")
 	rootNode := newAttrCacheItem(rootAttr, true, time.Now())
+	// add to cacheMap
+	cacheMap[""] = rootNode
+	// build struct
 	return &cacheTreeMap{
 		cacheMap:  cacheMap,
 		cacheTree: rootNode,
