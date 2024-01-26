@@ -28,7 +28,7 @@ package attr_cache
 
 import (
 	"container/list"
-	"path/filepath"
+	"path"
 	"testing"
 	"time"
 
@@ -66,7 +66,7 @@ func (suite *cacheMapTestSuite) TestInsert() {
 	workingPath := "a/c1"
 	// file
 	fileName := "testFile.txt"
-	filePath := filepath.Join(workingPath, fileName)
+	filePath := path.Join(workingPath, fileName)
 	fileSize := int64(1024)
 	insertTime := time.Now()
 	fileAttr := internal.CreateObjAttr(filePath, fileSize, insertTime)
@@ -99,7 +99,7 @@ func (suite *cacheMapTestSuite) TestInsert() {
 
 	// directory
 	dirName := "testFolder"
-	dirPath := filepath.Join(workingPath, dirName)
+	dirPath := path.Join(workingPath, dirName)
 	insertTime = time.Now()
 	dirAttr := internal.CreateObjAttrDir(dirPath)
 	// insert
@@ -117,7 +117,7 @@ func (suite *cacheMapTestSuite) TestInsert() {
 	nestedDir1Name := "outer"
 	nestedDir2Name := "inner"
 	nestedFileName := "nestedFile.txt"
-	nestedFilePath := filepath.Join(workingPath, nestedDir1Name, nestedDir2Name, nestedFileName)
+	nestedFilePath := path.Join(workingPath, nestedDir1Name, nestedDir2Name, nestedFileName)
 	insertTime = time.Now()
 	nestedFileAttr := internal.CreateObjAttr(nestedFilePath, fileSize, insertTime)
 	insertedItem = suite.cache.insert(nestedFileAttr, true, insertTime)
@@ -151,14 +151,14 @@ func (suite *cacheMapTestSuite) TestInsert() {
 	treeItem, found = workingDir.children[nestedDir1Name]
 	suite.assert.True(found)
 	suite.assert.True(treeItem.attr.IsDir())
-	mapItem, found = suite.cache.get(filepath.Join(workingPath, nestedDir1Name))
+	mapItem, found = suite.cache.get(path.Join(workingPath, nestedDir1Name))
 	suite.assert.True(found)
 	suite.assert.Same(treeItem, mapItem)
 	// dir1/dir2
 	treeItem, found = treeItem.children[nestedDir2Name]
 	suite.assert.True(found)
 	suite.assert.True(treeItem.attr.IsDir())
-	mapItem, found = suite.cache.get(filepath.Join(workingPath, nestedDir1Name, nestedDir2Name))
+	mapItem, found = suite.cache.get(path.Join(workingPath, nestedDir1Name, nestedDir2Name))
 	suite.assert.True(found)
 	suite.assert.Same(treeItem, mapItem)
 	// dir1/dir2/file
