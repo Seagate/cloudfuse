@@ -424,53 +424,79 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 
 	ofst64 := uint64(ofst)
 	cacheInfo := val.(*dirChildCache)
-	if ofst64 == 0 ||
-		(ofst64 >= cacheInfo.eIndex && cacheInfo.token != "") {
-		attrs, token, err := fuseFS.NextComponent().StreamDir(internal.StreamDirOptions{
-			Name:   handle.Path,
-			Offset: ofst64,
-			Token:  cacheInfo.token,
-			Count:  common.MaxDirListCount,
-		})
-
-		if err != nil {
-			log.Err("Libfuse::Readdir : Path %s, handle: %d, offset %d. Error in retrieval", handle.Path, handle.ID, ofst64)
-			if os.IsNotExist(err) {
-				return -fuse.ENOENT
-			} else if os.IsPermission(err) {
-				return -fuse.EACCES
+	log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d - cached %d-%d (token=%s)",
+		path, ofst, fh, cacheInfo.sIndex, cacheInfo.eIndex, cacheInfo.token)
+	requestingNextEntries := ofst64 == 0 || (ofst64 >= cacheInfo.eIndex && cacheInfo.token != "")
+	stbuf := fuse.Stat_t{}
+	for {
+		var segmentIdx uint64
+		if requestingNextEntries {
+			attrs := make([]*internal.ObjAttr, 0)
+			// start responding immediately
+			if ofst64 == 0 {
+				attrs = append([]*internal.ObjAttr{{Flags: fuseFS.lsFlags, Name: "."}, {Flags: fuseFS.lsFlags, Name: ".."}}, attrs...)
+				for _, attr := range attrs {
+					fuseFS.fillStat(attr, &stbuf)
+					fill(attr.Name, &stbuf, ofst)
+					segmentIdx++
+				}
 			}
 
-			return -fuse.EIO
+			returnedAttrs, token, err := fuseFS.NextComponent().StreamDir(internal.StreamDirOptions{
+				Name:   handle.Path,
+				Offset: ofst64,
+				Token:  cacheInfo.token,
+				Count:  500,
+			})
+
+			if err != nil {
+				log.Err("Libfuse::Readdir : Path %s, handle: %d, offset %d. Error in retrieval", handle.Path, handle.ID, ofst64)
+				if os.IsNotExist(err) {
+					return -fuse.ENOENT
+				} else if os.IsPermission(err) {
+					return -fuse.EACCES
+				}
+
+				return -fuse.EIO
+			}
+
+			attrs = append(attrs, returnedAttrs...)
+
+			cacheInfo.sIndex = ofst64
+			cacheInfo.eIndex = ofst64 + uint64(len(attrs))
+			cacheInfo.length = uint64(len(attrs))
+			cacheInfo.token = token
+			cacheInfo.children = cacheInfo.children[:0]
+			cacheInfo.children = attrs
+		} else {
+			// set index to serve cached entries
+			segmentIdx = ofst64 - cacheInfo.sIndex
 		}
 
-		if ofst64 == 0 {
-			attrs = append([]*internal.ObjAttr{{Flags: fuseFS.lsFlags, Name: "."}, {Flags: fuseFS.lsFlags, Name: ".."}}, attrs...)
+		if ofst64 >= cacheInfo.eIndex {
+			// If offset is still beyond the end index limit then we are done iterating
+			return 0
 		}
 
-		cacheInfo.sIndex = ofst64
-		cacheInfo.eIndex = ofst64 + uint64(len(attrs))
-		cacheInfo.length = uint64(len(attrs))
-		cacheInfo.token = token
-		cacheInfo.children = cacheInfo.children[:0]
-		cacheInfo.children = attrs
+		// Populate the stat by calling filler
+		for ; segmentIdx < cacheInfo.length; segmentIdx++ {
+			fuseFS.fillStat(cacheInfo.children[segmentIdx], &stbuf)
+
+			name := cacheInfo.children[segmentIdx].Name
+			fill(name, &stbuf, ofst)
+		}
+
+		// everything has already been listed
+		if requestingNextEntries {
+			if cacheInfo.token == "" {
+				break
+			}
+		} else {
+			// either the request was limited to cacheInfo,
+			// or we have no token matching this request
+			break
+		}
 	}
-
-	if ofst64 >= cacheInfo.eIndex {
-		// If offset is still beyond the end index limit then we are done iterating
-		return 0
-	}
-
-	stbuf := fuse.Stat_t{}
-
-	// Populate the stat by calling filler
-	for segmentIdx := ofst64 - cacheInfo.sIndex; segmentIdx < cacheInfo.length; segmentIdx++ {
-		fuseFS.fillStat(cacheInfo.children[segmentIdx], &stbuf)
-
-		name := cacheInfo.children[segmentIdx].Name
-		fill(name, &stbuf, ofst)
-	}
-
 	return 0
 }
 
