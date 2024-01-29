@@ -446,7 +446,7 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 				Name:   handle.Path,
 				Offset: ofst64,
 				Token:  cacheInfo.token,
-				Count:  500,
+				Count:  1000,
 			})
 
 			if err != nil {
