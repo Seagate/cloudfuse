@@ -46,10 +46,12 @@ const (
 
 // attrCacheItem : Structure of each item in attr cache
 type attrCacheItem struct {
-	attr     *internal.ObjAttr
-	cachedAt time.Time
-	attrFlag common.BitMap16
-	children map[string]*attrCacheItem
+	attr      *internal.ObjAttr
+	cachedAt  time.Time
+	listedAt  time.Time
+	listToken string
+	attrFlag  common.BitMap16
+	children  map[string]*attrCacheItem
 }
 
 func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {
