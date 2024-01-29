@@ -164,42 +164,37 @@ func (ac *AttrCache) OnConfigChange() {
 
 // Helper Methods
 
-// Record that the directory and all its contents have been deleted from the file system.
-// This should only be called when cacheDirs is false.
-// If cacheDirs is true, use deleteCachedDirectory instead.
-func (ac *AttrCache) deleteDirectory(path string, deletedAt time.Time) {
+// Record that the directory and all its contents have been deleted from the file system
+func (ac *AttrCache) deleteDirectory(path string, deletedAt time.Time) error {
 	// get the entry to be marked deleted
-	value, found := ac.cache.get(path)
-	if !found {
-		// the directory is not in the cache
-		log.Warn("AttrCache::deleteDirectory : %s no cache record of directory", path)
-		// record the fact that the directory has been deleted
-		ac.cache.insert(internal.CreateObjAttrDir(path), false, deletedAt)
-	} else if !value.exists() {
-		// the directory has already been marked deleted
-		// cacheDirs=false, so attr_cache is not responsible for returning ENOENT
-		// log a warning but do nothing
-		log.Warn("AttrCache::deleteDirectory : %s directory does not exist", path)
-	} else {
-		// record that the entry and all its children have been deleted
-		value.markDeleted(deletedAt)
-	}
-}
-
-// Record that the directory and all its contents have been deleted from the file system.
-// This should only be called when cacheDirs is true.
-func (ac *AttrCache) deleteCachedDirectory(path string, time time.Time) error {
-	// get the item
 	item, found := ac.cache.get(path)
-	if !found || !item.exists() {
-		// the record is either not in the cache, or has already been marked deleted
-		// either way, complain and return ENOENT
-		log.Err("AttrCache::deleteCachedDirectory : %s does not exist", path)
-		return syscall.ENOENT
+	// handle errors and unexpected behavior
+	dirExists := found && item.exists()
+	if !dirExists {
+		if ac.cacheDirs {
+			// when cacheDirs is true, deleting a non-existent directory should return ENOENT
+			log.Err("AttrCache::deleteCachedDirectory : %s does not exist", path)
+			return syscall.ENOENT
+		} else {
+			// when cacheDirs is false, attr_cache is not responsible for returning ENOENT
+			// just log a warning for this unexpected behavior
+			log.Warn("AttrCache::deleteDirectory : %s directory does not exist", path)
+			// if not already done, record the fact that the directory has been deleted
+			if !found {
+				log.Info("AttrCache::deleteDirectory : %s recording directory as deleted", path)
+				ac.cache.insert(internal.CreateObjAttrDir(path), false, deletedAt)
+			}
+			return nil
+		}
 	}
-	item.markDeleted(time)
-	// update whether cloud storage has any record of the parent directory's existence
-	ac.updateAncestorsInCloud(getParentDir(path), time)
+
+	// record that the entry and all its children have been deleted
+	item.markDeleted(deletedAt)
+	if ac.cacheDirs {
+		// update whether cloud storage has any record of the parent directory's existence
+		ac.updateAncestorsInCloud(getParentDir(path), deletedAt)
+	}
+
 	return nil
 }
 
@@ -335,17 +330,11 @@ func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 	err := ac.NextComponent().DeleteDir(options)
 
 	if err == nil {
-		if ac.cacheDirs {
-			// deleteCachedDirectory may add the parent directory to the cache
-			// so we must lock the cache for writing
-			ac.cacheLock.Lock()
-			defer ac.cacheLock.Unlock()
-			err = ac.deleteCachedDirectory(options.Name, deletionTime)
-		} else {
-			ac.cacheLock.Lock()
-			defer ac.cacheLock.Unlock()
-			ac.deleteDirectory(options.Name, deletionTime)
-		}
+		// deleteCachedDirectory may add the parent directory to the cache
+		// so we must lock the cache for writing
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
+		err = ac.deleteDirectory(options.Name, deletionTime)
 	}
 
 	return err
