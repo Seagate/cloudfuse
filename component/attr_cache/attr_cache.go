@@ -487,6 +487,10 @@ func (ac *AttrCache) fetchCachedDirList(path string, token string) ([]*internal.
 	log.Trace("AttrCache::fetchCachedDirList : %s token=\"%s\"", path, token)
 
 	var pathList []*internal.ObjAttr
+	if !ac.cacheOnList {
+		log.Debug("AttrCache::fetchCachedDirList : %s cache on list is disabled", path)
+		return pathList, "", fmt.Errorf("cache on list is disabled")
+	}
 	listDirCache, found := ac.cache.get(path)
 	if !found {
 		log.Debug("AttrCache::fetchCachedDirList : %s directory not found in cache", path)
@@ -519,30 +523,32 @@ func (ac *AttrCache) fetchCachedDirList(path string, token string) ([]*internal.
 // this will lock and release the mutex for writing
 func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr, listDirPath string, token string) {
 	// Check whether or not we are supposed to cache on list
-	if ac.cacheOnList {
-		log.Debug("AttrCache::cacheAttributes : %s token=\"%s\" caching %d attributes", listDirPath, token, len(pathList))
-		// Putting this inside loop is heavy as for each item we will do a kernel call to get current time
-		// If there are millions of blobs then cost of this is very high.
-		currTime := time.Now()
-
-		ac.cacheLock.Lock()
-		defer ac.cacheLock.Unlock()
-		for _, attr := range pathList {
-			ac.cache.insert(attr, true, currTime)
-		}
-		// pathList was returned by the cloud storage component when listing a directory
-		// so that directory is clearly in the cloud
-		ac.markAncestorsInCloud(listDirPath, currTime)
-		// record when the directory was listed, an up to what token
-		// this will allow us to serve directory listings from this cache
-		listDirItem, found := ac.cache.get(listDirPath)
-		if !found {
-			log.Err("AttrCache::cacheAttributes : %s failed to cache directory listing state", listDirPath)
-			return
-		}
-		listDirItem.listedAt = currTime
-		listDirItem.listToken = token
+	if !ac.cacheOnList {
+		return
 	}
+
+	log.Debug("AttrCache::cacheAttributes : %s token=\"%s\" caching %d attributes", listDirPath, token, len(pathList))
+	// Putting this inside loop is heavy as for each item we will do a kernel call to get current time
+	// If there are millions of blobs then cost of this is very high.
+	currTime := time.Now()
+
+	ac.cacheLock.Lock()
+	defer ac.cacheLock.Unlock()
+	for _, attr := range pathList {
+		ac.cache.insert(attr, true, currTime)
+	}
+	// pathList was returned by the cloud storage component when listing a directory
+	// so that directory is clearly in the cloud
+	ac.markAncestorsInCloud(listDirPath, currTime)
+	// record when the directory was listed, an up to what token
+	// this will allow us to serve directory listings from this cache
+	listDirItem, found := ac.cache.get(listDirPath)
+	if !found {
+		log.Err("AttrCache::cacheAttributes : %s failed to cache directory listing state", listDirPath)
+		return
+	}
+	listDirItem.listedAt = currTime
+	listDirItem.listToken = token
 }
 
 // IsDirEmpty: Whether or not the directory is empty
