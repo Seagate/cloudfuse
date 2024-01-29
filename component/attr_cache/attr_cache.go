@@ -484,13 +484,15 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 // and the token for the next page (if there is one).
 // If page requests are repeated or backtrack, this may cause unexpected OS behavior.
 func (ac *AttrCache) fetchCachedDirList(path string, token string) ([]*internal.ObjAttr, string, error) {
-	log.Trace("AttrCache::fetchCachedDirList : %s token=\"%s\"", path, token)
-
 	var pathList []*internal.ObjAttr
+
 	if !ac.cacheOnList {
 		log.Debug("AttrCache::fetchCachedDirList : %s cache on list is disabled", path)
 		return pathList, "", fmt.Errorf("cache on list is disabled")
 	}
+
+	log.Trace("AttrCache::fetchCachedDirList : %s token=\"%s\"", path, token)
+
 	listDirCache, found := ac.cache.get(path)
 	if !found {
 		log.Debug("AttrCache::fetchCachedDirList : %s directory not found in cache", path)

@@ -255,7 +255,7 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		if marker == nil || *marker == "" {
 			break
 		} else {
-			log.Debug("S3Storage::StreamDir : %s %d nextMarker=\"%s\"",
+			log.Debug("S3Storage::StreamDir : %s List iteration %d nextMarker=\"%s\"",
 				options.Name, iteration, *nextMarker)
 		}
 	}
