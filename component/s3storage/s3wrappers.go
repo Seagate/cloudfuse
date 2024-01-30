@@ -289,12 +289,12 @@ func (cl *Client) ListBuckets() ([]string, error) {
 // If count=0 - fetch max entries.
 // the *string being returned is the token / marker and will be nil when the listing is complete.
 func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
-	log.Trace("Client::List : prefix %s, marker %s", prefix, func(marker *string) string {
+	log.Trace("Client::List : prefix %s, marker %s, count %d", prefix, func(marker *string) string {
 		if marker != nil {
 			return *marker
 		}
 		return ""
-	}(marker))
+	}(marker), count)
 
 	// prepare parameters
 	bucketName := cl.Config.authConfig.BucketName
@@ -415,6 +415,8 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	sort.Slice(objectAttrList, func(i, j int) bool {
 		return objectAttrList[i].Path < objectAttrList[j].Path
 	})
+
+	log.Debug("Client::List : %s returning %d entries", prefix, len(objectAttrList))
 
 	return objectAttrList, newMarker, nil
 }

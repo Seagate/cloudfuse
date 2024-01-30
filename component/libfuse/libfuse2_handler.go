@@ -384,6 +384,7 @@ func (cf *CgofuseFS) Opendir(path string) (int, uint64) {
 	})
 
 	fh := handlemap.Add(handle)
+	log.Debug("Libfuse::Opendir : %s fh=%d", name, fh)
 
 	// This needs to return a uint64 representing the filehandle
 	// We have to do a casting here to make the Go compiler happy but
@@ -410,6 +411,7 @@ func (cf *CgofuseFS) Releasedir(path string, fh uint64) int {
 // Readdir reads a directory at the path.
 func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat_t, ofst int64) bool,
 	ofst int64, fh uint64) int {
+	log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d", path, ofst, fh)
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
 		log.Trace("Libfuse::Readdir : Failed to read %s, handle: %d", path, fh)
@@ -426,6 +428,8 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 
 	ofst64 := uint64(ofst)
 	cacheInfo := val.(*dirChildCache)
+	log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d - cached %d-%d (token=%s)",
+		path, ofst, fh, cacheInfo.sIndex, cacheInfo.eIndex, cacheInfo.token)
 	if ofst64 == 0 ||
 		(ofst64 >= cacheInfo.eIndex && cacheInfo.token != "") {
 		attrs, token, err := fuseFS.NextComponent().StreamDir(internal.StreamDirOptions{
