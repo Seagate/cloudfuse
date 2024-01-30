@@ -382,6 +382,7 @@ func (cf *CgofuseFS) Opendir(path string) (int, uint64) {
 	})
 
 	fh := handlemap.Add(handle)
+	log.Debug("Libfuse::Opendir : %s fh=%d", name, fh)
 
 	// This needs to return a uint64 representing the filehandle
 	// We have to do a casting here to make the Go compiler happy but
@@ -408,6 +409,7 @@ func (cf *CgofuseFS) Releasedir(path string, fh uint64) int {
 // Readdir reads a directory at the path.
 func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat_t, ofst int64) bool,
 	ofst int64, fh uint64) int {
+	log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d", path, ofst, fh)
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
 		log.Trace("Libfuse::Readdir : Failed to read %s, handle: %d", path, fh)

@@ -240,19 +240,23 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	var marker *string = &options.Token // = nil
 	var totalEntriesFetched int32
 	for totalEntriesFetched+1 < options.Count {
-		newList, newMarker, err := s3.storage.List(path, marker, options.Count-totalEntriesFetched)
+		newList, nextMarker, err := s3.storage.List(path, marker, options.Count-totalEntriesFetched)
 		if err != nil {
 			log.Err("S3Storage::StreamDir : %s Failed to read dir [%s]", options.Name, err)
 			return objectList, "", err
 		}
 		objectList = append(objectList, newList...)
-		marker = newMarker
+		marker = nextMarker
 		iteration++
 		totalEntriesFetched += int32(len(newList))
 
-		log.Debug("S3Storage::StreamDir : %s So far retrieved %d objects in %d iterations", options.Name, totalEntriesFetched, iteration)
+		log.Debug("S3Storage::StreamDir : %s So far retrieved %d objects in %d iterations",
+			options.Name, totalEntriesFetched, iteration)
 		if marker == nil || *marker == "" {
 			break
+		} else {
+			log.Debug("S3Storage::StreamDir : %s List iteration %d nextMarker=\"%s\"",
+				options.Name, iteration, *nextMarker)
 		}
 	}
 
