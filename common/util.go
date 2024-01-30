@@ -34,6 +34,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -162,7 +163,7 @@ func GetCurrentUser() (uint32, uint32, error) {
 // JoinUnixFilepath uses filepath.join to join a path and ensures that
 // path only uses unix path delimiters.
 func JoinUnixFilepath(elem ...string) string {
-	return NormalizeObjectName(filepath.Join(elem...))
+	return NormalizeObjectName(path.Join(elem...))
 }
 
 // normalizeObjectName : If file contains \\ in name replace it with ..
