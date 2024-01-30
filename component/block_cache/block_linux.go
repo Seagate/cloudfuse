@@ -39,9 +39,9 @@ package block_cache
 import (
 	"container/list"
 	"fmt"
-	"syscall"
 
 	"github.com/Seagate/cloudfuse/common"
+	"golang.org/x/sys/unix"
 )
 
 // Various flags denoting state of a block
@@ -71,8 +71,8 @@ func AllocateBlock(size uint64) (*Block, error) {
 		return nil, fmt.Errorf("invalid size")
 	}
 
-	prot, flags := syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_ANON|syscall.MAP_PRIVATE
-	addr, err := syscall.Mmap(-1, 0, int(size), prot, flags)
+	prot, flags := unix.PROT_READ|unix.PROT_WRITE, unix.MAP_ANON|unix.MAP_PRIVATE
+	addr, err := unix.Mmap(-1, 0, int(size), prot, flags)
 
 	if err != nil {
 		return nil, fmt.Errorf("mmap error: %v", err)
@@ -98,7 +98,7 @@ func (b *Block) Delete() error {
 		return fmt.Errorf("invalid buffer")
 	}
 
-	err := syscall.Munmap(b.data)
+	err := unix.Munmap(b.data)
 	b.data = nil
 	if err != nil {
 		// if we get here, there is likely memory corruption.

@@ -892,8 +892,8 @@ func (ac *AttrCache) CommitData(options internal.CommitDataOptions) error {
 		ac.cacheLock.RLock()
 		defer ac.cacheLock.RUnlock()
 
-		entry, getErr := ac.cacheMap.get(options.Name)
-		if getErr == nil {
+		entry, found := ac.cache.get(options.Name)
+		if !found {
 			entry.invalidate()
 		}
 	}

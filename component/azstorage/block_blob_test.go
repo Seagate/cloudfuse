@@ -3408,7 +3408,7 @@ func (s *blockBlobTestSuite) TestDownloadBlobWithCPKEnabled() {
 	CPKEncryptionKey, CPKEncryptionKeySha256 := generateCPKInfo()
 
 	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n",
-		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.BlockKey, s.container, CPKEncryptionKey, CPKEncryptionKeySha256)
+		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.BlockKey, s.container, CPKEncryptionKey, CPKEncryptionKeySha256)
 	s.setupTestHelper(config, s.container, false)
 
 	blobCPKOpt := azblob.ClientProvidedKeyOptions{
@@ -3455,7 +3455,7 @@ func (s *blockBlobTestSuite) TestUploadBlobWithCPKEnabled() {
 	CPKEncryptionKey, CPKEncryptionKeySha256 := generateCPKInfo()
 
 	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n  account-key: %s\n  mode: key\n  container: %s\n",
-		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.BlockAccount, CPKEncryptionKey, CPKEncryptionKeySha256, storageTestConfigurationParameters.BlockKey, s.container)
+		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.Endpoint, CPKEncryptionKey, CPKEncryptionKeySha256, storageTestConfigurationParameters.BlockKey, s.container)
 	s.setupTestHelper(config, s.container, false)
 
 	blobCPKOpt := azblob.ClientProvidedKeyOptions{

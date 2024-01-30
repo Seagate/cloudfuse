@@ -39,7 +39,6 @@ package block_cache
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -270,7 +269,7 @@ func (suite *blockCacheTestSuite) TestFileOpneClose() {
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 5*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -296,7 +295,7 @@ func (suite *blockCacheTestSuite) TestFileRead() {
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 50*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -343,7 +342,7 @@ func (suite *blockCacheTestSuite) TestFileReadSerial() {
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 50*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -385,7 +384,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandom() {
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 100*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -426,7 +425,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 100*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -483,7 +482,7 @@ func (suite *blockCacheTestSuite) TestDiskUsageCheck() {
 	}
 
 	for i := 0; i < 13; i++ {
-		ioutil.WriteFile(localfiles[i].name, data, 0777)
+		os.WriteFile(localfiles[i].name, data, 0777)
 		usage, err := common.GetUsage(tobj.disk_cache_path)
 		suite.assert.Nil(err)
 		fmt.Printf("%d : %v (%v : %v) Usage %v\n", i, localfiles[i].name, localfiles[i].diskflag, tobj.blockCache.checkDiskUsage(), usage)
@@ -543,7 +542,7 @@ func (suite *blockCacheTestSuite) TestOpenWithTruncate() {
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 5*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
