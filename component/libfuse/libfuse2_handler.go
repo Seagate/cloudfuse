@@ -484,12 +484,8 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 			name := cacheInfo.children[cacheIndex].Name
 			// call fill with name, stat buffer, and the offset for the *next* entry
 			nextOffset++
-			if cacheIndex != cacheInfo.length-1 || cacheInfo.token != "" {
-				// more entries yet to go, so pass the next entry's offset
-				osWantsMore = fill(name, &stbuf, int64(nextOffset))
-			} else {
-				// no more entries to list - pass zero for the next entry offset
-				osWantsMore = fill(name, &stbuf, 0)
+			osWantsMore = fill(name, &stbuf, int64(nextOffset))
+			if cacheIndex == cacheInfo.length-1 && cacheInfo.token == "" {
 				listingComplete = true
 			}
 		}
