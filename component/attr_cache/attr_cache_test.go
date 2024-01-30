@@ -201,7 +201,6 @@ func generateDirectory(path string) (*list.List, *list.List, *list.List) {
 func generateNestedPathAttr(path string, size int64, mode os.FileMode) []*internal.ObjAttr {
 	a, _, _ := generateDirectory(path)
 	pathAttrs := make([]*internal.ObjAttr, 0)
-	i := 0
 	for p := a.Front(); p != nil; p = p.Next() {
 		pString := p.Value.(string)
 		isDir := pString[len(pString)-1] == '/'
@@ -211,7 +210,17 @@ func generateNestedPathAttr(path string, size int64, mode os.FileMode) []*intern
 			newPathAttr = getDirPathAttr(pString)
 		}
 		pathAttrs = append(pathAttrs, newPathAttr)
-		i++
+	}
+	return pathAttrs
+}
+
+func generateListPathAttr(path string, numEntries int) []*internal.ObjAttr {
+	path = internal.TruncateDirName(path)
+	pathAttrs := make([]*internal.ObjAttr, 0)
+	for i := 0; i < numEntries; i++ {
+		filename := fmt.Sprintf("%s/file%d", path, i)
+		newPathAttr := getPathAttr(filename, defaultSize, fs.FileMode(defaultMode), true)
+		pathAttrs = append(pathAttrs, newPathAttr)
 	}
 	return pathAttrs
 }
@@ -510,7 +519,7 @@ func (suite *attrCacheTestSuite) TestReadDirDoesNotExist() {
 
 			// Success
 			// Entries Do Not Already Exist
-			suite.mock.EXPECT().ReadDir(options).Return(aAttr, nil)
+			suite.mock.EXPECT().ReadDir(options).Return(aAttr, nil).Times(1)
 
 			suite.assertCacheEmpty() // cacheMap should be empty before call
 			returnedAttr, err := suite.attrCache.ReadDir(options)
@@ -529,6 +538,12 @@ func (suite *attrCacheTestSuite) TestReadDirDoesNotExist() {
 				suite.assert.True(checkItem.valid())
 				suite.assert.True(checkItem.exists())
 			}
+
+			// test same result from subsequent call without using cloud storage
+			returnedAttr, err = suite.attrCache.ReadDir(options)
+			suite.assert.Nil(err)
+			aDepth1Attr := append(aAttr[1:2], aAttr[3])
+			suite.assert.Equal(aDepth1Attr, returnedAttr)
 		})
 	}
 }
@@ -556,7 +571,7 @@ func (suite *attrCacheTestSuite) TestReadDirExists() {
 			for _, p := range aAttr {
 				suite.assertUntouched(p.Path)
 			}
-			suite.mock.EXPECT().ReadDir(options).Return(aAttr, nil)
+			suite.mock.EXPECT().ReadDir(options).Return(aAttr, nil).Times(1)
 			returnedAttr, err := suite.attrCache.ReadDir(options)
 			suite.assert.Nil(err)
 			suite.assert.Equal(aAttr, returnedAttr)
@@ -583,39 +598,14 @@ func (suite *attrCacheTestSuite) TestReadDirExists() {
 				cachePath := internal.TruncateDirName(pString)
 				suite.assertUntouched(cachePath)
 			}
+
+			// test same result from subsequent call without using cloud storage
+			returnedAttr, err = suite.attrCache.ReadDir(options)
+			suite.assert.Nil(err)
+			aDepth1Attr := append(aAttr[1:2], aAttr[3])
+			suite.assert.Equal(aDepth1Attr, returnedAttr)
 		})
 	}
-}
-
-// Test whether the attribute cache correctly tracks which directories are in cloud storage
-func (suite *attrCacheTestSuite) TestDirInCloud() {
-	defer suite.cleanupTest()
-	// build up the attribute cache
-	suite.addDirectoryToCache("a", true)
-	deepPath := "a/b/c/d"
-	suite.addPathToCache(deepPath, true)
-
-	// delete file a/b/c/d and make sure a/b/ and a/b/c/ are marked not in cloud storage
-	delOptions := internal.DeleteFileOptions{Name: deepPath}
-	suite.mock.EXPECT().DeleteFile(delOptions).Return(nil)
-
-	err := suite.attrCache.DeleteFile(delOptions)
-	suite.assert.Nil(err)
-	suite.assertDeleted(deepPath)
-	suite.assertNotInCloud("a/b/c")
-	suite.assertNotInCloud("a/b")
-	suite.assertInCloud("a")
-
-	// add file a/b/c/d back in and make sure all its ancestors are marked in cloud storage
-	createOptions := internal.CreateFileOptions{Name: deepPath}
-	suite.mock.EXPECT().CreateFile(createOptions).Return(&handlemap.Handle{}, nil)
-
-	_, err = suite.attrCache.CreateFile(createOptions)
-	suite.assert.Nil(err)
-	suite.assertExists(deepPath)
-	suite.assertInCloud("a/b/c")
-	suite.assertInCloud("a/b")
-	suite.assertInCloud("a")
 }
 
 func (suite *attrCacheTestSuite) TestReadDirNoCacheOnList() {
@@ -687,6 +677,266 @@ func (suite *attrCacheTestSuite) TestReadDirError() {
 			suite.assertNotInCache(truncatedPath)
 		})
 	}
+}
+
+// Tests Stream Directory
+func (suite *attrCacheTestSuite) TestStreamDirDoesNotExist() {
+	defer suite.cleanupTest()
+	var paths = []string{"a", "a/"}
+	size := int64(1024)
+	mode := os.FileMode(0)
+
+	for _, path := range paths {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		suite.cleanupTest()
+		suite.SetupTest()
+		suite.Run(path, func() {
+			aAttr := generateNestedPathAttr(path, size, mode)
+
+			options := internal.StreamDirOptions{Name: path}
+
+			// Success
+			// Entries Do Not Already Exist
+			suite.mock.EXPECT().StreamDir(options).Return(aAttr, "", nil).Times(1)
+
+			suite.assertCacheEmpty() // cacheMap should be empty before call
+			returnedAttr, token, err := suite.attrCache.StreamDir(options)
+			suite.assert.Nil(err)
+			suite.assert.Equal(aAttr, returnedAttr)
+			suite.assert.Empty(token)
+
+			// Entries should now be in the cache
+			for _, p := range aAttr {
+				checkItem, found := suite.attrCache.cache.get(p.Path)
+				suite.assert.True(found)
+				suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
+				if !p.IsDir() {
+					suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
+					suite.assert.EqualValues(mode, checkItem.attr.Mode) // new mode should be set
+				}
+				suite.assert.True(checkItem.valid())
+				suite.assert.True(checkItem.exists())
+			}
+
+			// test same result from subsequent call without using cloud storage
+			returnedAttr, token, err = suite.attrCache.StreamDir(options)
+			suite.assert.Nil(err)
+			suite.assert.Empty(token)
+			aDepth1Attr := append(aAttr[1:2], aAttr[3])
+			suite.assert.Equal(aDepth1Attr, returnedAttr)
+		})
+	}
+}
+
+func (suite *attrCacheTestSuite) TestStreamDirPaginated() {
+	defer suite.cleanupTest()
+	path := "a"
+	manyAttr := generateListPathAttr(path, 6)
+	mockTokens := []string{"firstPair", "secondPair"}
+
+	// return first two results
+	options := internal.StreamDirOptions{Name: path, Token: "", Count: 2}
+	suite.mock.EXPECT().StreamDir(options).Return(manyAttr[0:2], mockTokens[0], nil).Times(1)
+
+	suite.assertCacheEmpty() // cacheMap should be empty before call
+	returnedAttr, token, err := suite.attrCache.StreamDir(options)
+	suite.assert.Nil(err)
+	suite.assert.Equal(mockTokens[0], token)
+	suite.assert.Equal(manyAttr[0:2], returnedAttr)
+
+	// return second pair of results
+	options = internal.StreamDirOptions{Name: path, Token: mockTokens[0], Count: 2}
+	suite.mock.EXPECT().StreamDir(options).Return(manyAttr[2:4], mockTokens[1], nil).Times(1)
+
+	returnedAttr, token, err = suite.attrCache.StreamDir(options)
+	suite.assert.Nil(err)
+	suite.assert.Equal(mockTokens[1], token)
+	suite.assert.Equal(manyAttr[2:4], returnedAttr)
+
+	// return last pair of results
+	options = internal.StreamDirOptions{Name: path, Token: mockTokens[1], Count: 2}
+	suite.mock.EXPECT().StreamDir(options).Return(manyAttr[4:6], "", nil).Times(1)
+
+	returnedAttr, token, err = suite.attrCache.StreamDir(options)
+	suite.assert.Nil(err)
+	suite.assert.Empty(token)
+	suite.assert.Equal(manyAttr[4:6], returnedAttr)
+
+	// request the first page again
+	options = internal.StreamDirOptions{Name: path, Token: "", Count: 2}
+	// there should be no cloud requests
+	suite.mock.EXPECT().StreamDir(options).Times(0)
+
+	returnedAttr, token, err = suite.attrCache.StreamDir(options)
+	// the entire listing should be returned from cache
+	suite.assert.Nil(err)
+	suite.assert.Empty(token)
+	suite.assert.Equal(manyAttr, returnedAttr)
+}
+
+func (suite *attrCacheTestSuite) TestStreamDirExists() {
+	defer suite.cleanupTest()
+	var paths = []string{"a", "a/"}
+	size := int64(1024)
+	mode := os.FileMode(0)
+
+	for _, path := range paths {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		suite.cleanupTest()
+		suite.SetupTest()
+		suite.Run(path, func() {
+			aAttr := generateNestedPathAttr(path, size, mode)
+
+			options := internal.StreamDirOptions{Name: path}
+
+			// Success
+			// Entries Already Exist
+			a, ab, ac := suite.addDirectoryToCache(path, false)
+
+			// cache entries should be untouched before read dir call
+			for _, p := range aAttr {
+				suite.assertUntouched(p.Path)
+			}
+			suite.mock.EXPECT().StreamDir(options).Return(aAttr, "", nil).Times(1)
+			returnedAttr, token, err := suite.attrCache.StreamDir(options)
+			suite.assert.Nil(err)
+			suite.assert.Empty(token)
+			suite.assert.Equal(aAttr, returnedAttr)
+
+			// a paths should now be updated in the cache
+			for p := a.Front(); p != nil; p = p.Next() {
+				pString := p.Value.(string)
+				cachePath := internal.TruncateDirName(pString)
+				checkItem, found := suite.attrCache.cache.get(cachePath)
+				suite.assert.True(found)
+				suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
+				if !checkItem.attr.IsDir() {
+					suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
+					suite.assert.EqualValues(mode, checkItem.attr.Mode) // new mode should be set
+				}
+				suite.assert.True(checkItem.valid())
+				suite.assert.True(checkItem.exists())
+			}
+
+			// ab and ac paths should be untouched
+			ab.PushBackList(ac)
+			for p := ab.Front(); p != nil; p = p.Next() {
+				pString := p.Value.(string)
+				cachePath := internal.TruncateDirName(pString)
+				suite.assertUntouched(cachePath)
+			}
+
+			// test same result from subsequent call without using cloud storage
+			returnedAttr, token, err = suite.attrCache.StreamDir(options)
+			suite.assert.Nil(err)
+			suite.assert.Empty(token)
+			aDepth1Attr := append(aAttr[1:2], aAttr[3])
+			suite.assert.Equal(aDepth1Attr, returnedAttr)
+		})
+	}
+}
+
+func (suite *attrCacheTestSuite) TestStreamDirNoCacheOnList() {
+	defer suite.cleanupTest()
+	suite.cleanupTest() // clean up the default attr cache generated
+	cacheOnList := false
+	config := fmt.Sprintf("attr_cache:\n  no-cache-on-list: %t", !cacheOnList)
+	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
+	suite.assert.EqualValues(cacheOnList, suite.attrCache.cacheOnList)
+	path := "a"
+	size := int64(1024)
+	mode := os.FileMode(0)
+	aAttr := generateNestedPathAttr(path, size, mode)
+
+	options := internal.StreamDirOptions{Name: path}
+	suite.mock.EXPECT().StreamDir(options).Return(aAttr, "", nil).Times(1)
+
+	suite.assertCacheEmpty() // cacheMap should be empty before call
+	returnedAttr, token, err := suite.attrCache.StreamDir(options)
+	suite.assert.Nil(err)
+	suite.assert.Empty(token)
+	suite.assert.Equal(aAttr, returnedAttr)
+
+	// cacheMap should only have the listed after the call
+	suite.assertExists(path)
+}
+
+func (suite *attrCacheTestSuite) TestStreamDirNoCacheOnListNoCacheDirs() {
+	defer suite.cleanupTest()
+	suite.cleanupTest() // clean up the default attr cache generated
+	cacheOnList := false
+	cacheDirs := false
+	config := fmt.Sprintf("attr_cache:\n  no-cache-on-list: %t\n  no-cache-dirs: %t", !cacheOnList, !cacheDirs)
+	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
+	suite.assert.EqualValues(cacheOnList, suite.attrCache.cacheOnList)
+	suite.assert.EqualValues(cacheDirs, suite.attrCache.cacheDirs)
+	path := "a"
+	size := int64(1024)
+	mode := os.FileMode(0)
+	aAttr := generateNestedPathAttr(path, size, mode)
+
+	options := internal.StreamDirOptions{Name: path}
+	suite.mock.EXPECT().StreamDir(options).Return(aAttr, "", nil)
+
+	suite.assertCacheEmpty() // cacheMap should be empty before call
+	returnedAttr, _, err := suite.attrCache.StreamDir(options)
+	suite.assert.Nil(err)
+	suite.assert.Equal(aAttr, returnedAttr)
+
+	suite.assertCacheEmpty() // cacheMap should be empty after call
+}
+
+func (suite *attrCacheTestSuite) TestStreamDirError() {
+	defer suite.cleanupTest()
+	var paths = []string{"a", "a/", "ab", "ab/"}
+
+	for _, path := range paths {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		suite.cleanupTest()
+		suite.SetupTest()
+		suite.Run(path, func() {
+			truncatedPath := internal.TruncateDirName(path)
+			options := internal.StreamDirOptions{Name: path}
+
+			// Error
+			suite.mock.EXPECT().StreamDir(options).Return(make([]*internal.ObjAttr, 0), "", errors.New("Failed to read a directory"))
+
+			_, _, err := suite.attrCache.StreamDir(options)
+			suite.assert.NotNil(err)
+			suite.assertNotInCache(truncatedPath)
+		})
+	}
+}
+
+// Test whether the attribute cache correctly tracks which directories are in cloud storage
+func (suite *attrCacheTestSuite) TestDirInCloud() {
+	defer suite.cleanupTest()
+	// build up the attribute cache
+	suite.addDirectoryToCache("a", true)
+	deepPath := "a/b/c/d"
+	suite.addPathToCache(deepPath, true)
+
+	// delete file a/b/c/d and make sure a/b/ and a/b/c/ are marked not in cloud storage
+	delOptions := internal.DeleteFileOptions{Name: deepPath}
+	suite.mock.EXPECT().DeleteFile(delOptions).Return(nil)
+
+	err := suite.attrCache.DeleteFile(delOptions)
+	suite.assert.Nil(err)
+	suite.assertDeleted(deepPath)
+	suite.assertNotInCloud("a/b/c")
+	suite.assertNotInCloud("a/b")
+	suite.assertInCloud("a")
+
+	// add file a/b/c/d back in and make sure all its ancestors are marked in cloud storage
+	createOptions := internal.CreateFileOptions{Name: deepPath}
+	suite.mock.EXPECT().CreateFile(createOptions).Return(&handlemap.Handle{}, nil)
+
+	_, err = suite.attrCache.CreateFile(createOptions)
+	suite.assert.Nil(err)
+	suite.assertExists(deepPath)
+	suite.assertInCloud("a/b/c")
+	suite.assertInCloud("a/b")
+	suite.assertInCloud("a")
 }
 
 func (suite *attrCacheTestSuite) TestIsDirEmpty() {

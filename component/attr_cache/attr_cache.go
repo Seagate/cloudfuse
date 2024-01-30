@@ -30,7 +30,7 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -345,9 +345,29 @@ func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*internal.ObjAttr, err error) {
 	log.Trace("AttrCache::ReadDir : %s", options.Name)
 
+	// try to fetch listing from cache
+	cachedPathList, cachedToken, err := ac.fetchCachedDirList(options.Name, "")
+	if err == nil && cachedToken == "" {
+		// sort and return
+		slices.SortFunc[[]*internal.ObjAttr, *internal.ObjAttr](cachedPathList, func(a, b *internal.ObjAttr) int {
+			return strings.Compare(a.Path, b.Path)
+		})
+		return cachedPathList, err
+	}
+	// listing is not cached, call cloud storage
 	pathList, err = ac.NextComponent().ReadDir(options)
 	if err == nil {
-		ac.cacheAttributes(pathList)
+		// strip symlink attributes
+		if ac.noSymlinks {
+			for _, attr := range pathList {
+				if attr.IsSymlink() {
+					attr.Flags.Clear(internal.PropFlagSymlink)
+				}
+			}
+		}
+		// cache returned list
+		ac.cacheAttributes(pathList, options.Name, "")
+		//
 		if ac.cacheDirs {
 			// remember that this directory is in cloud storage
 			if len(pathList) > 0 {
@@ -356,10 +376,17 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 			// merge directory cache into the results
 			var numAdded int // prevent shadowing pathList in following line
 			pathList, numAdded = ac.addDirsNotInCloudToListing(options.Name, pathList)
-			log.Trace("AttrCache::ReadDir : %s +%d from cache = %d",
+			log.Info("AttrCache::ReadDir : %s +%d from cache = %d",
 				options.Name, numAdded, len(pathList))
 		}
 	}
+
+	// values should be returned in ascending order by key, without duplicates
+	// sort
+	slices.SortFunc[[]*internal.ObjAttr, *internal.ObjAttr](pathList, func(a, b *internal.ObjAttr) int {
+		return strings.Compare(a.Path, b.Path)
+	})
+
 	return pathList, err
 }
 
@@ -382,21 +409,32 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 	}
 	ac.cacheLock.RUnlock()
 
-	// values should be returned in ascending order by key
-	// sort the list before returning it
-	sort.Slice(pathList, func(i, j int) bool {
-		return pathList[i].Path < pathList[j].Path
-	})
-
 	return pathList, numAdded
 }
 
 // StreamDir : Optionally cache attributes of paths returned by next component
 func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
-	log.Trace("AttrCache::StreamDir : %s", options.Name)
+	log.Trace("AttrCache::StreamDir : %s, token=\"%s\"", options.Name, options.Token)
 
+	// try to fetch listing from cache
+	cachedPathList, cachedToken, err := ac.fetchCachedDirList(options.Name, options.Token)
+	if err == nil {
+		// if we have all of it, return it
+		if cachedToken == "" {
+			// sort and return
+			slices.SortFunc[[]*internal.ObjAttr, *internal.ObjAttr](cachedPathList, func(a, b *internal.ObjAttr) int {
+				return strings.Compare(a.Path, b.Path)
+			})
+			return cachedPathList, cachedToken, err
+		}
+		// if there is more, let's get more
+		options.Token = cachedToken
+	}
+	// listing cache is not complete, so call cloud storage
 	pathList, token, err := ac.NextComponent().StreamDir(options)
 	if err == nil {
+		log.Debug("AttrCache::StreamDir : %s got %d entries from cloud, token=\"%s\"",
+			options.Name, len(pathList), token)
 		// strip symlink attributes
 		if ac.noSymlinks {
 			for _, attr := range pathList {
@@ -405,39 +443,114 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 				}
 			}
 		}
-		// TODO: will limiting the number of items cached cause bugs when cacheDirs is enabled?
-		ac.cacheAttributes(pathList)
+		// cache returned list
+		ac.cacheAttributes(pathList, options.Name, token)
+		//
+		if ac.cacheDirs {
+			// remember that this directory is in cloud storage
+			if len(pathList) > 0 {
+				ac.markAncestorsInCloud(options.Name, time.Now())
+			}
+			// merge missing directory cache into the last page of results
+			if ac.cacheDirs && token == "" {
+				var numAdded int // prevent shadowing pathList in following line
+				pathList, numAdded = ac.addDirsNotInCloudToListing(options.Name, pathList)
+				log.Info("AttrCache::StreamDir : %s +%d from cache = %d",
+					options.Name, numAdded, len(pathList))
+			}
+		}
+	}
+	// add cached items in
+	if len(cachedPathList) > 0 {
+		log.Info("AttrCache::StreamDir : %s merging in %d list cache entries...", options.Name, len(cachedPathList))
+		pathList = append(pathList, cachedPathList...)
+	}
+	// values should be returned in ascending order by key, without duplicates
+	// sort
+	slices.SortFunc[[]*internal.ObjAttr, *internal.ObjAttr](pathList, func(a, b *internal.ObjAttr) int {
+		return strings.Compare(a.Path, b.Path)
+	})
+	// remove duplicates
+	pathList = slices.CompactFunc[[]*internal.ObjAttr, *internal.ObjAttr](pathList, func(a, b *internal.ObjAttr) bool {
+		return a.Path == b.Path
+	})
 
-		// merge missing directory cache into the last page of results
-		if ac.cacheDirs && token == "" {
-			var numAdded int // prevent shadowing pathList in following line
-			pathList, numAdded = ac.addDirsNotInCloudToListing(options.Name, pathList)
-			log.Trace("AttrCache::StreamDir : %s +%d from cache = %d",
-				options.Name, numAdded, len(pathList))
+	log.Trace("AttrCache::StreamDir : %s returning %d entries", options.Name, len(pathList))
+	return pathList, token, err
+}
+
+// Return directory listing from cache
+// Any request other than a request for the next page will return all children,
+// and the token for the next page (if there is one).
+// If page requests are repeated or backtrack, this may cause unexpected OS behavior.
+func (ac *AttrCache) fetchCachedDirList(path string, token string) ([]*internal.ObjAttr, string, error) {
+	var pathList []*internal.ObjAttr
+
+	if !ac.cacheOnList {
+		log.Debug("AttrCache::fetchCachedDirList : %s cache on list is disabled", path)
+		return pathList, "", fmt.Errorf("cache on list is disabled")
+	}
+
+	log.Trace("AttrCache::fetchCachedDirList : %s token=\"%s\"", path, token)
+
+	listDirCache, found := ac.cache.get(path)
+	if !found {
+		log.Debug("AttrCache::fetchCachedDirList : %s directory not found in cache", path)
+		return pathList, "", fmt.Errorf("%s directory not found in cache", path)
+	}
+	log.Debug("AttrCache::fetchCachedDirList : %s listing token=\"%s\"", path, listDirCache.listToken)
+	// check timeout
+	if time.Since(listDirCache.listedAt).Seconds() >= float64(ac.cacheTimeout) {
+		log.Debug("AttrCache::fetchCachedDirList : %s listing cache expired", path)
+		return pathList, "", fmt.Errorf("%s directory listing expired", path)
+	}
+	// don't provide cached data when new (uncached) data is being requested
+	if token != "" && token == listDirCache.listToken {
+		log.Debug("AttrCache::fetchCachedDirList : %s listing incomplete (requested token=\"%s\")", path, token)
+		return pathList, "", fmt.Errorf("%s directory listing is incomplete (%s token requested)", path, token)
+	}
+	// convert directory contents from map to slice
+	for _, item := range listDirCache.children {
+		if item.exists() {
+			pathList = append(pathList, item.attr)
 		}
 	}
 
-	return pathList, token, err
+	log.Debug("AttrCache::fetchCachedDirList : %s token=\"%s\"->\"%s\" serving %d items from cache",
+		path, token, listDirCache.listToken, len(listDirCache.children))
+	return pathList, listDirCache.listToken, nil
 }
 
 // cacheAttributes : On dir listing cache the attributes for all files
 // this will lock and release the mutex for writing
-func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr) {
+func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr, listDirPath string, token string) {
 	// Check whether or not we are supposed to cache on list
-	if ac.cacheOnList && len(pathList) > 0 {
-		// Putting this inside loop is heavy as for each item we will do a kernel call to get current time
-		// If there are millions of blobs then cost of this is very high.
-		currTime := time.Now()
-
-		ac.cacheLock.Lock()
-		defer ac.cacheLock.Unlock()
-		for _, attr := range pathList {
-			ac.cache.insert(attr, true, currTime)
-		}
-		// pathList was returned by the cloud storage component when listing a directory
-		// so that directory is clearly in the cloud
-		ac.markAncestorsInCloud(getParentDir(pathList[0].Path), currTime)
+	if !ac.cacheOnList {
+		return
 	}
+
+	log.Debug("AttrCache::cacheAttributes : %s token=\"%s\" caching %d attributes", listDirPath, token, len(pathList))
+	// Putting this inside loop is heavy as for each item we will do a kernel call to get current time
+	// If there are millions of blobs then cost of this is very high.
+	currTime := time.Now()
+
+	ac.cacheLock.Lock()
+	defer ac.cacheLock.Unlock()
+	for _, attr := range pathList {
+		ac.cache.insert(attr, true, currTime)
+	}
+	// pathList was returned by the cloud storage component when listing a directory
+	// so that directory is clearly in the cloud
+	ac.markAncestorsInCloud(listDirPath, currTime)
+	// record when the directory was listed, an up to what token
+	// this will allow us to serve directory listings from this cache
+	listDirItem, found := ac.cache.get(listDirPath)
+	if !found {
+		log.Err("AttrCache::cacheAttributes : %s failed to cache directory listing state", listDirPath)
+		return
+	}
+	listDirItem.listedAt = currTime
+	listDirItem.listToken = token
 }
 
 // IsDirEmpty: Whether or not the directory is empty
