@@ -122,7 +122,7 @@ func (lf *Libfuse) initFuse() error {
 			lf.negativeTimeout)
 	}
 
-	// While reading a file let kernel do readahed for better perf
+	// While reading a file let kernel do readahead for better perf
 	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)
 
 	// Max background thread on the fuse layer for high parallelism
@@ -426,29 +426,28 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 	cacheInfo := val.(*dirChildCache)
 	log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d - cached %d-%d (token=%s)",
 		path, ofst, fh, cacheInfo.sIndex, cacheInfo.eIndex, cacheInfo.token)
-	requestingNextEntries := ofst64 == 0 || (ofst64 >= cacheInfo.eIndex && cacheInfo.token != "")
 	stbuf := fuse.Stat_t{}
 	for {
-		var segmentIdx uint64
-		if requestingNextEntries {
+		getMoreEntries := ofst64 == 0 || (ofst64 >= cacheInfo.eIndex && cacheInfo.token != "")
+		numDots := int64(0)
+		if getMoreEntries {
 			attrs := make([]*internal.ObjAttr, 0)
-			// start responding immediately
+			// call fill with . and .. right away
 			if ofst64 == 0 {
 				attrs = append([]*internal.ObjAttr{{Flags: fuseFS.lsFlags, Name: "."}, {Flags: fuseFS.lsFlags, Name: ".."}}, attrs...)
 				for _, attr := range attrs {
+					numDots++
 					fuseFS.fillStat(attr, &stbuf)
-					fill(attr.Name, &stbuf, ofst)
-					segmentIdx++
+					fill(attr.Name, &stbuf, numDots)
 				}
 			}
-
+			// get 1k entries from the pipeline (1k is the max per request for our S3 ListObjects call)
 			returnedAttrs, token, err := fuseFS.NextComponent().StreamDir(internal.StreamDirOptions{
 				Name:   handle.Path,
 				Offset: ofst64,
 				Token:  cacheInfo.token,
 				Count:  1000,
 			})
-
 			if err != nil {
 				log.Err("Libfuse::Readdir : Path %s, handle: %d, offset %d. Error in retrieval", handle.Path, handle.ID, ofst64)
 				if os.IsNotExist(err) {
@@ -456,21 +455,16 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 				} else if os.IsPermission(err) {
 					return -fuse.EACCES
 				}
-
 				return -fuse.EIO
 			}
-
+			// compile results and update cache
 			attrs = append(attrs, returnedAttrs...)
-
 			cacheInfo.sIndex = ofst64
 			cacheInfo.eIndex = ofst64 + uint64(len(attrs))
 			cacheInfo.length = uint64(len(attrs))
 			cacheInfo.token = token
 			cacheInfo.children = cacheInfo.children[:0]
 			cacheInfo.children = attrs
-		} else {
-			// set index to serve cached entries
-			segmentIdx = ofst64 - cacheInfo.sIndex
 		}
 
 		if ofst64 >= cacheInfo.eIndex {
@@ -479,23 +473,32 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 		}
 
 		// Populate the stat by calling filler
-		for ; segmentIdx < cacheInfo.length; segmentIdx++ {
-			fuseFS.fillStat(cacheInfo.children[segmentIdx], &stbuf)
-
-			name := cacheInfo.children[segmentIdx].Name
-			fill(name, &stbuf, ofst)
-		}
-
-		// everything has already been listed
-		if requestingNextEntries {
-			if cacheInfo.token == "" {
-				break
+		osWantsMore := true
+		nextOffset := ofst64 + uint64(numDots)
+		listingComplete := false
+		for cacheIndex := nextOffset - cacheInfo.sIndex; cacheIndex < cacheInfo.length && osWantsMore; cacheIndex++ {
+			// prepare entry
+			fuseFS.fillStat(cacheInfo.children[cacheIndex], &stbuf)
+			name := cacheInfo.children[cacheIndex].Name
+			// call fill with name, stat buffer, and the offset for the *next* entry
+			nextOffset++
+			if cacheIndex != cacheInfo.length-1 || cacheInfo.token != "" {
+				// more entries yet to go, so pass the next entry's offset
+				osWantsMore = fill(name, &stbuf, int64(nextOffset))
+			} else {
+				// no more entries to list - pass zero for the next entry offset
+				osWantsMore = fill(name, &stbuf, 0)
+				listingComplete = true
 			}
-		} else {
-			// either the request was limited to cacheInfo,
-			// or we have no token matching this request
+		}
+		log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d - returned entries %d-%d to OS",
+			path, ofst, fh, ofst64, nextOffset-1)
+		// don't keep fetching entries when there's nowhere to send them or there are no more
+		if !osWantsMore || listingComplete {
 			break
 		}
+		// prepare for to fetch more entries
+		ofst64 = nextOffset
 	}
 	return 0
 }
