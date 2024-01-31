@@ -42,14 +42,20 @@ const (
 	AttrFlagNotInCloud
 )
 
+// list token cache
+type tokenCache struct {
+	entries   []*internal.ObjAttr
+	nextToken string
+}
+
 // attrCacheItem : Structure of each item in attr cache
 type attrCacheItem struct {
-	attr      *internal.ObjAttr
-	cachedAt  time.Time
-	listedAt  time.Time
-	listToken string
-	attrFlag  common.BitMap16
-	children  map[string]*attrCacheItem
+	attr     *internal.ObjAttr
+	cachedAt time.Time
+	listedAt time.Time
+	tokens   map[string]tokenCache
+	attrFlag common.BitMap16
+	children map[string]*attrCacheItem
 }
 
 // all cache entries are organized into this structure
