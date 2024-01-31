@@ -213,7 +213,7 @@ func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 	var iteration int  // = 0
 	var marker *string // = nil
 	for {
-		newList, nextMarker, err := s3.storage.List(path, marker, common.MaxDirListCount)
+		newList, nextMarker, err := s3.storage.List(path, marker, maxResultsPerListCall)
 		if err != nil {
 			log.Err("S3Storage::ReadDir : Failed to read dir [%s]", err)
 			return objectList, err
@@ -240,6 +240,9 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	var marker *string = &options.Token // = nil
 	var totalEntriesFetched int32
 	entriesRemaining := options.Count
+	if options.Count == 0 {
+		entriesRemaining = maxResultsPerListCall
+	}
 	for entriesRemaining > 0 {
 		newList, nextMarker, err := s3.storage.List(path, marker, entriesRemaining)
 		if err != nil {

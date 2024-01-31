@@ -300,7 +300,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// prepare parameters
 	bucketName := cl.Config.authConfig.BucketName
 	if count == 0 {
-		count = common.MaxDirListCount
+		count = maxResultsPerListCall
 	}
 
 	// combine the configured prefix and the prefix being given to List to get a full listPath
