@@ -409,7 +409,7 @@ func (cf *CgofuseFS) Releasedir(path string, fh uint64) int {
 // Readdir reads a directory at the path.
 func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat_t, ofst int64) bool,
 	ofst int64, fh uint64) int {
-	log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d", path, ofst, fh)
+	// log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d", path, ofst, fh)
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
 		log.Trace("Libfuse::Readdir : Failed to read %s, handle: %d", path, fh)
@@ -426,8 +426,8 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 
 	ofst64 := uint64(ofst)
 	cacheInfo := val.(*dirChildCache)
-	log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d - cached %d-%d (token=%s)",
-		path, ofst, fh, cacheInfo.sIndex, cacheInfo.eIndex, cacheInfo.token)
+	// log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d - cached %d-%d (token=%s)",
+	// 	path, ofst, fh, cacheInfo.sIndex, cacheInfo.eIndex, cacheInfo.token)
 	stbuf := fuse.Stat_t{}
 	for {
 		getMoreEntries := ofst64 == 0 || (ofst64 >= cacheInfo.eIndex && cacheInfo.token != "")
@@ -489,7 +489,7 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 				listingComplete = true
 			}
 		}
-		log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d - returned entries %d-%d to OS",
+		log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d - returned entries %d-%d",
 			path, ofst, fh, ofst64, nextOffset-1)
 		// don't keep fetching entries when there's nowhere to send them or there are no more
 		if !osWantsMore || listingComplete {
