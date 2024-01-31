@@ -735,43 +735,62 @@ func (suite *attrCacheTestSuite) TestStreamDirPaginated() {
 	mockTokens := []string{"firstPair", "secondPair"}
 
 	// return first two results
-	options := internal.StreamDirOptions{Name: path, Token: "", Count: 2}
-	suite.mock.EXPECT().StreamDir(options).Return(manyAttr[0:2], mockTokens[0], nil).Times(1)
+	options0 := internal.StreamDirOptions{Name: path, Token: "", Count: 2}
+	suite.mock.EXPECT().StreamDir(options0).Return(manyAttr[0:2], mockTokens[0], nil).Times(1)
 
 	suite.assertCacheEmpty() // cacheMap should be empty before call
-	returnedAttr, token, err := suite.attrCache.StreamDir(options)
+	returnedAttr, token, err := suite.attrCache.StreamDir(options0)
+	suite.assert.Nil(err)
+	suite.assert.Equal(mockTokens[0], token)
+	suite.assert.Equal(manyAttr[0:2], returnedAttr)
+
+	returnedAttr, token, err = suite.attrCache.StreamDir(options0)
 	suite.assert.Nil(err)
 	suite.assert.Equal(mockTokens[0], token)
 	suite.assert.Equal(manyAttr[0:2], returnedAttr)
 
 	// return second pair of results
-	options = internal.StreamDirOptions{Name: path, Token: mockTokens[0], Count: 2}
-	suite.mock.EXPECT().StreamDir(options).Return(manyAttr[2:4], mockTokens[1], nil).Times(1)
+	options1 := internal.StreamDirOptions{Name: path, Token: mockTokens[0], Count: 2}
+	suite.mock.EXPECT().StreamDir(options1).Return(manyAttr[2:4], mockTokens[1], nil).Times(1)
 
-	returnedAttr, token, err = suite.attrCache.StreamDir(options)
+	returnedAttr, token, err = suite.attrCache.StreamDir(options1)
+	suite.assert.Nil(err)
+	suite.assert.Equal(mockTokens[1], token)
+	suite.assert.Equal(manyAttr[2:4], returnedAttr)
+
+	returnedAttr, token, err = suite.attrCache.StreamDir(options0)
+	suite.assert.Nil(err)
+	suite.assert.Equal(mockTokens[0], token)
+	suite.assert.Equal(manyAttr[0:2], returnedAttr)
+
+	returnedAttr, token, err = suite.attrCache.StreamDir(options1)
 	suite.assert.Nil(err)
 	suite.assert.Equal(mockTokens[1], token)
 	suite.assert.Equal(manyAttr[2:4], returnedAttr)
 
 	// return last pair of results
-	options = internal.StreamDirOptions{Name: path, Token: mockTokens[1], Count: 2}
-	suite.mock.EXPECT().StreamDir(options).Return(manyAttr[4:6], "", nil).Times(1)
+	options2 := internal.StreamDirOptions{Name: path, Token: mockTokens[1], Count: 2}
+	suite.mock.EXPECT().StreamDir(options2).Return(manyAttr[4:6], "", nil).Times(1)
 
-	returnedAttr, token, err = suite.attrCache.StreamDir(options)
+	returnedAttr, token, err = suite.attrCache.StreamDir(options2)
 	suite.assert.Nil(err)
 	suite.assert.Empty(token)
 	suite.assert.Equal(manyAttr[4:6], returnedAttr)
 
-	// request the first page again
-	options = internal.StreamDirOptions{Name: path, Token: "", Count: 2}
-	// there should be no cloud requests
-	suite.mock.EXPECT().StreamDir(options).Times(0)
+	returnedAttr, token, err = suite.attrCache.StreamDir(options0)
+	suite.assert.Nil(err)
+	suite.assert.Equal(mockTokens[0], token)
+	suite.assert.Equal(manyAttr[0:2], returnedAttr)
 
-	returnedAttr, token, err = suite.attrCache.StreamDir(options)
-	// the entire listing should be returned from cache
+	returnedAttr, token, err = suite.attrCache.StreamDir(options1)
+	suite.assert.Nil(err)
+	suite.assert.Equal(mockTokens[1], token)
+	suite.assert.Equal(manyAttr[2:4], returnedAttr)
+
+	returnedAttr, token, err = suite.attrCache.StreamDir(options2)
 	suite.assert.Nil(err)
 	suite.assert.Empty(token)
-	suite.assert.Equal(manyAttr, returnedAttr)
+	suite.assert.Equal(manyAttr[4:6], returnedAttr)
 }
 
 func (suite *attrCacheTestSuite) TestStreamDirExists() {

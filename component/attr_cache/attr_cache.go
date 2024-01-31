@@ -366,7 +366,7 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 			}
 		}
 		// cache returned list
-		ac.cacheAttributes(pathList, options.Name, "")
+		ac.cacheAttributes(pathList, options.Name, "", "")
 		//
 		if ac.cacheDirs {
 			// remember that this directory is in cloud storage
@@ -419,16 +419,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	// try to fetch listing from cache
 	cachedPathList, cachedToken, err := ac.fetchCachedDirList(options.Name, options.Token)
 	if err == nil {
-		// if we have all of it, return it
-		if cachedToken == "" {
-			// sort and return
-			slices.SortFunc[[]*internal.ObjAttr, *internal.ObjAttr](cachedPathList, func(a, b *internal.ObjAttr) int {
-				return strings.Compare(a.Path, b.Path)
-			})
-			return cachedPathList, cachedToken, err
-		}
-		// if there is more, let's get more
-		options.Token = cachedToken
+		return cachedPathList, cachedToken, err
 	}
 	// listing cache is not complete, so call cloud storage
 	pathList, token, err := ac.NextComponent().StreamDir(options)
@@ -444,7 +435,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			}
 		}
 		// cache returned list
-		ac.cacheAttributes(pathList, options.Name, token)
+		ac.cacheAttributes(pathList, options.Name, options.Token, token)
 		//
 		if ac.cacheDirs {
 			// remember that this directory is in cloud storage
@@ -498,50 +489,39 @@ func (ac *AttrCache) fetchCachedDirList(path string, token string) ([]*internal.
 		log.Debug("AttrCache::fetchCachedDirList : %s directory not found in cache", path)
 		return pathList, "", fmt.Errorf("%s directory not found in cache", path)
 	}
-	log.Debug("AttrCache::fetchCachedDirList : %s listing token=\"%s\"", path, listDirCache.listToken)
 	// check timeout
 	if time.Since(listDirCache.listedAt).Seconds() >= float64(ac.cacheTimeout) {
 		log.Debug("AttrCache::fetchCachedDirList : %s listing cache expired", path)
 		return pathList, "", fmt.Errorf("%s directory listing expired", path)
 	}
-	// don't provide cached data when new (uncached) data is being requested
-	if token != "" && token == listDirCache.listToken {
+	// is the requested data cached?
+	tokenCache, found := listDirCache.tokens[token]
+	if !found {
+		// the data for this token is not in the cache
+		// don't provide cached data when new (uncached) data is being requested
 		log.Debug("AttrCache::fetchCachedDirList : %s listing incomplete (requested token=\"%s\")", path, token)
 		return pathList, "", fmt.Errorf("%s directory listing is incomplete (%s token requested)", path, token)
 	}
-	// convert directory contents from map to slice
-	for _, item := range listDirCache.children {
-		if item.exists() {
-			pathList = append(pathList, item.attr)
-		}
-	}
-
 	log.Debug("AttrCache::fetchCachedDirList : %s token=\"%s\"->\"%s\" serving %d items from cache",
-		path, token, listDirCache.listToken, len(listDirCache.children))
-	return pathList, listDirCache.listToken, nil
+		path, token, tokenCache.nextToken, len(tokenCache.entries))
+	return tokenCache.entries, tokenCache.nextToken, nil
 }
 
 // cacheAttributes : On dir listing cache the attributes for all files
 // this will lock and release the mutex for writing
-func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr, listDirPath string, token string) {
+func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr, listDirPath string, token, nextToken string) {
 	// Check whether or not we are supposed to cache on list
 	if !ac.cacheOnList {
 		return
 	}
-
-	log.Debug("AttrCache::cacheAttributes : %s token=\"%s\" caching %d attributes", listDirPath, token, len(pathList))
-	// Putting this inside loop is heavy as for each item we will do a kernel call to get current time
+	// Putting time.Now() inside a loop is heavy as for each item we will do a kernel call to get current time
 	// If there are millions of blobs then cost of this is very high.
 	currTime := time.Now()
-
-	ac.cacheLock.Lock()
-	defer ac.cacheLock.Unlock()
-	for _, attr := range pathList {
-		ac.cache.insert(attr, true, currTime)
+	// if a non-empty pathList was returned by the cloud storage component when listing a directory
+	// then that directory is clearly in the cloud
+	if len(pathList) > 0 {
+		ac.markAncestorsInCloud(listDirPath, currTime)
 	}
-	// pathList was returned by the cloud storage component when listing a directory
-	// so that directory is clearly in the cloud
-	ac.markAncestorsInCloud(listDirPath, currTime)
 	// record when the directory was listed, an up to what token
 	// this will allow us to serve directory listings from this cache
 	listDirItem, found := ac.cache.get(listDirPath)
@@ -549,8 +529,22 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr, listDirPath s
 		log.Err("AttrCache::cacheAttributes : %s failed to cache directory listing state", listDirPath)
 		return
 	}
+
+	log.Debug("AttrCache::cacheAttributes : %s caching token \"%s\"-\"%s\" (%d items)",
+		listDirPath, token, nextToken, len(pathList))
+
+	ac.cacheLock.Lock()
+	defer ac.cacheLock.Unlock()
+	newTokenCache := tokenCache{entries: make([]*internal.ObjAttr, 0), nextToken: nextToken}
+	for _, attr := range pathList {
+		ac.cache.insert(attr, true, currTime)
+		newTokenCache.entries = append(newTokenCache.entries, attr)
+	}
+	if listDirItem.tokens == nil {
+		listDirItem.tokens = make(map[string]tokenCache)
+	}
+	listDirItem.tokens[token] = newTokenCache
 	listDirItem.listedAt = currTime
-	listDirItem.listToken = token
 }
 
 // IsDirEmpty: Whether or not the directory is empty
