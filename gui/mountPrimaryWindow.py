@@ -247,7 +247,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         # Update the pipeline/components before mounting the target
 
         targetBucket = bucketOptions[self.dropDown_bucketSelect.currentIndex()]
-        currentDir = widgetFuncs.getCurrentDir(self)
+        currentDir = widgetFuncs.getWorkingDir(self)
 
         # Read in the configs as a dictionary. Notify user if failed
         try:

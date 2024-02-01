@@ -256,7 +256,7 @@ class widgetCustomFunctions(QWidget):
     def constructDictForConfig(self):
         optionKeys = self.settings.allKeys()
         configDict = {}
-        for key in optionKeys:
+        for key in optigetWorkingDironKeys:
             configDict[key] = self.settings.value(key)
         return configDict
     
@@ -264,7 +264,7 @@ class widgetCustomFunctions(QWidget):
         # Each individual widget will need to override this function
         pass
 
-    def getCurrentDir(self):
+    def getWorkingDir(self):
         if platform == "win32":
             defaultFuseDir = 'Cloudfuse'
             userDir = os.getenv('APPDATA')
@@ -277,7 +277,7 @@ class widgetCustomFunctions(QWidget):
     def writeConfigFile(self):
         self.updateSettingsFromUIChoices()
         dictForConfigs = self.constructDictForConfig()
-        currentDir = self.getCurrentDir()
+        currentDir = self.getWorkingDir()
         try:
             with open(currentDir+'/config.yaml','w') as file:
                 yaml.safe_dump(dictForConfigs,file)
@@ -290,7 +290,7 @@ class widgetCustomFunctions(QWidget):
             return False
             
     def getConfigs(self,useDefault=False):
-        currentDir = self.getCurrentDir()
+        currentDir = self.getWorkingDir()
         if useDefault:
             try:
                 with open(currentDir+'/default_config.yaml','r') as file:
