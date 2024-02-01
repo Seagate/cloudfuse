@@ -84,11 +84,11 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
     def checkConfigDirectory(self):
         currentDir = widgetFuncs.getCurrentDir(self)
-        if os.path.isdir(currentDir):
-            print('true')
-        else:
-            os.mkdir(currentDir)
-            print('false')
+        if not os.path.isdir(currentDir):
+            try:
+                os.mkdir(currentDir)
+            except OSError as e:
+                self.addOutputText(f"Failed to make own path: {str(e)}")
 
     def initMountPoint(self):
         try:
