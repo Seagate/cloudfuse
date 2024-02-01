@@ -265,11 +265,12 @@ class widgetCustomFunctions(QWidget):
         pass
 
     def getCurrentDir(self):
-        defaultFuseDir = 'Cloudfuse'
         if platform == "win32":
+            defaultFuseDir = 'Cloudfuse'
             userDir = os.getenv('APPDATA')
         else:
-            userDir = '/etc'
+            defaultFuseDir = '.Cloudfuse'
+            userDir = os.getenv('HOME')
         currentDir = os.path.join(userDir, defaultFuseDir)
         return currentDir
 
