@@ -182,7 +182,11 @@ func (ac *AttrCache) deleteDirectory(path string, deletedAt time.Time) error {
 			// if not already done, record the fact that the directory has been deleted
 			if !found {
 				log.Info("AttrCache::deleteDirectory : %s recording directory as deleted", path)
-				ac.cache.insert(internal.CreateObjAttrDir(path), false, deletedAt)
+				ac.cache.insert(insertOptions{
+					attr:     internal.CreateObjAttrDir(path),
+					exists:   false,
+					cachedAt: deletedAt,
+				})
 			}
 			return nil
 		}
@@ -257,7 +261,11 @@ func (ac *AttrCache) moveAttrCachedItem(srcItem *attrCacheItem, srcDir string, d
 		dstAttr = internal.CreateObjAttr(dstPath, srcItem.attr.Size, srcItem.attr.Mtime)
 	}
 	// add the destination item to the cache
-	dstItem := ac.cache.insert(dstAttr, srcItem.exists(), srcItem.cachedAt)
+	dstItem := ac.cache.insert(insertOptions{
+		attr:     dstAttr,
+		exists:   srcItem.exists(),
+		cachedAt: srcItem.cachedAt,
+	})
 	// copy the inCloud flag
 	dstItem.markInCloud(srcItem.isInCloud())
 	// recurse over any children
@@ -278,7 +286,11 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 		if !found || !dirCacheItem.exists() {
 			log.Warn("AttrCache::markAncestorsInCloud : Adding parent directory %s", dirPath)
 			dirObjAttr := internal.CreateObjAttrDir(dirPath)
-			dirCacheItem = ac.cache.insert(dirObjAttr, true, time)
+			dirCacheItem = ac.cache.insert(insertOptions{
+				attr:     dirObjAttr,
+				exists:   true,
+				cachedAt: time,
+			})
 		} else if dirCacheItem.isInCloud() {
 			// flag is already updated - no need to continue
 			return
@@ -313,7 +325,11 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 		}
 		// add (or replace) the directory entry
 		newDirAttr := internal.CreateObjAttrDir(options.Name)
-		newDirAttrCacheItem := ac.cache.insert(newDirAttr, true, time.Now())
+		newDirAttrCacheItem := ac.cache.insert(insertOptions{
+			attr:     newDirAttr,
+			exists:   true,
+			cachedAt: time.Now(),
+		})
 		// update flags for tracking directory existence
 		if ac.cacheDirs {
 			newDirAttrCacheItem.markInCloud(false)
@@ -366,12 +382,14 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 			}
 		}
 		// cache returned list
-		ac.cacheAttributes(pathList, options.Name, "", "")
+		ac.cacheAttributes(pathList, options.Name)
 		//
 		if ac.cacheDirs {
 			// remember that this directory is in cloud storage
 			if len(pathList) > 0 {
+				ac.cacheLock.Lock()
 				ac.markAncestorsInCloud(options.Name, time.Now())
+				ac.cacheLock.Unlock()
 			}
 			// merge directory cache into the results
 			var numAdded int // prevent shadowing pathList in following line
@@ -386,6 +404,8 @@ func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*inter
 	slices.SortFunc[[]*internal.ObjAttr, *internal.ObjAttr](pathList, func(a, b *internal.ObjAttr) int {
 		return strings.Compare(a.Path, b.Path)
 	})
+	// cache the listing as one token
+	ac.cacheListSegment(pathList, options.Name, "", "")
 
 	return pathList, err
 }
@@ -422,10 +442,10 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		return cachedPathList, cachedToken, err
 	}
 	// listing cache is not complete, so call cloud storage
-	pathList, token, err := ac.NextComponent().StreamDir(options)
+	pathList, nextToken, err := ac.NextComponent().StreamDir(options)
 	if err == nil {
 		log.Debug("AttrCache::StreamDir : %s got %d entries from cloud, token=\"%s\"",
-			options.Name, len(pathList), token)
+			options.Name, len(pathList), nextToken)
 		// strip symlink attributes
 		if ac.noSymlinks {
 			for _, attr := range pathList {
@@ -435,15 +455,17 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			}
 		}
 		// cache returned list
-		ac.cacheAttributes(pathList, options.Name, options.Token, token)
+		ac.cacheAttributes(pathList, options.Name)
 		//
 		if ac.cacheDirs {
 			// remember that this directory is in cloud storage
 			if len(pathList) > 0 {
+				ac.cacheLock.Lock()
 				ac.markAncestorsInCloud(options.Name, time.Now())
+				ac.cacheLock.Unlock()
 			}
 			// merge missing directory cache into the last page of results
-			if ac.cacheDirs && token == "" {
+			if ac.cacheDirs && nextToken == "" {
 				var numAdded int // prevent shadowing pathList in following line
 				pathList, numAdded = ac.addDirsNotInCloudToListing(options.Name, pathList)
 				log.Info("AttrCache::StreamDir : %s +%d from cache = %d",
@@ -465,9 +487,9 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	pathList = slices.CompactFunc[[]*internal.ObjAttr, *internal.ObjAttr](pathList, func(a, b *internal.ObjAttr) bool {
 		return a.Path == b.Path
 	})
-
+	ac.cacheListSegment(pathList, options.Name, options.Token, nextToken)
 	log.Trace("AttrCache::StreamDir : %s returning %d entries", options.Name, len(pathList))
-	return pathList, token, err
+	return pathList, nextToken, err
 }
 
 // Return directory listing from cache
@@ -476,38 +498,44 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 // If page requests are repeated or backtrack, this may cause unexpected OS behavior.
 func (ac *AttrCache) fetchCachedDirList(path string, token string) ([]*internal.ObjAttr, string, error) {
 	var pathList []*internal.ObjAttr
-
 	if !ac.cacheOnList {
 		return pathList, "", fmt.Errorf("cache on list is disabled")
 	}
-
+	// start accessing the cache
+	ac.cacheLock.RLock()
+	defer ac.cacheLock.RUnlock()
+	// get directory cache item
 	listDirCache, found := ac.cache.get(path)
 	if !found {
 		log.Warn("AttrCache::fetchCachedDirList : %s directory not found in cache", path)
 		return pathList, "", fmt.Errorf("%s directory not found in cache", path)
 	}
-
-	// check timeout
-	if time.Since(listDirCache.listedAt).Seconds() >= float64(ac.cacheTimeout) {
-		log.Info("AttrCache::fetchCachedDirList : %s listing cache expired", path)
-		return pathList, "", fmt.Errorf("%s directory listing expired", path)
-	}
 	// is the requested data cached?
-	tokenCache, found := listDirCache.tokens[token]
+	if listDirCache.listCache == nil {
+		listDirCache.listCache = make(map[string]listCacheSegment)
+	}
+	cachedListSegment, found := listDirCache.listCache[token]
 	if !found {
 		// the data for this token is not in the cache
 		// don't provide cached data when new (uncached) data is being requested
-		log.Info("AttrCache::fetchCachedDirList : %s listing incomplete (requested token=\"%s\")", path, token)
-		return pathList, "", fmt.Errorf("%s directory listing is incomplete (%s token requested)", path, token)
+		log.Info("AttrCache::fetchCachedDirList : %s listing segment %s not cached", path, token)
+		return pathList, "", fmt.Errorf("%s directory listing segment %s not cached", path, token)
+	}
+	// check timeout
+	if time.Since(cachedListSegment.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
+		log.Info("AttrCache::fetchCachedDirList : %s listing segment %s cache expired", path, token)
+		// drop the invalid segment from the list cache
+		delete(listDirCache.listCache, token)
+		return pathList, "", fmt.Errorf("%s directory listing segment %s cache expired", path, token)
 	}
 	log.Trace("AttrCache::fetchCachedDirList : %s token=\"%s\"->\"%s\" serving %d items from cache",
-		path, token, tokenCache.nextToken, len(tokenCache.entries))
-	return tokenCache.entries, tokenCache.nextToken, nil
+		path, token, cachedListSegment.nextToken, len(cachedListSegment.entries))
+	return cachedListSegment.entries, cachedListSegment.nextToken, nil
 }
 
 // cacheAttributes : On dir listing cache the attributes for all files
 // this will lock and release the mutex for writing
-func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr, listDirPath string, token, nextToken string) {
+func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr, listDirPath string) {
 	// Check whether or not we are supposed to cache on list
 	if !ac.cacheOnList {
 		return
@@ -515,32 +543,56 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr, listDirPath s
 	// Putting time.Now() inside a loop is heavy as for each item we will do a kernel call to get current time
 	// If there are millions of blobs then cost of this is very high.
 	currTime := time.Now()
+	ac.cacheLock.Lock()
+	defer ac.cacheLock.Unlock()
 	// if a non-empty pathList was returned by the cloud storage component when listing a directory
 	// then that directory is clearly in the cloud
 	if len(pathList) > 0 {
 		ac.markAncestorsInCloud(listDirPath, currTime)
 	}
+	for _, attr := range pathList {
+		ac.cache.insert(insertOptions{
+			attr:        attr,
+			exists:      true,
+			cachedAt:    currTime,
+			fromDirList: true,
+		})
+	}
+	log.Trace("AttrCache::cacheAttributes : %s cached %d items", listDirPath, len(pathList))
+}
 
+// cacheListSegment : On dir listing cache the listing
+// this will lock and release the mutex for writing
+func (ac *AttrCache) cacheListSegment(pathList []*internal.ObjAttr, listDirPath string, token, nextToken string) {
+	// Check whether or not we are supposed to cache on list
+	if !ac.cacheOnList {
+		return
+	}
+	// Putting time.Now() inside a loop is heavy as for each item we will do a kernel call to get current time
+	// If there are millions of blobs then cost of this is very high.
+	currTime := time.Now()
 	ac.cacheLock.Lock()
 	defer ac.cacheLock.Unlock()
 	// record when the directory was listed, an up to what token
 	// this will allow us to serve directory listings from this cache
 	listDirItem, found := ac.cache.get(listDirPath)
 	if !found {
-		log.Err("AttrCache::cacheAttributes : %s directory not found in cache", listDirPath)
+		log.Err("AttrCache::cacheListSegment : %s directory not found in cache", listDirPath)
 		return
 	}
-	newTokenCache := tokenCache{entries: make([]*internal.ObjAttr, 0), nextToken: nextToken}
-	for _, attr := range pathList {
-		ac.cache.insert(attr, true, currTime)
-		newTokenCache.entries = append(newTokenCache.entries, attr)
+	newListCacheSegment := listCacheSegment{entries: pathList, nextToken: nextToken, cachedAt: currTime}
+	if listDirItem.listCache == nil {
+		listDirItem.listCache = make(map[string]listCacheSegment)
 	}
-	if listDirItem.tokens == nil {
-		listDirItem.tokens = make(map[string]tokenCache)
+	// scan the listing cache and remove expired entries
+	for k, v := range listDirItem.listCache {
+		if currTime.Sub(v.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
+			delete(listDirItem.listCache, k)
+		}
 	}
-	listDirItem.tokens[token] = newTokenCache
-	listDirItem.listedAt = currTime
-	log.Trace("AttrCache::cacheAttributes : %s cached token \"%s\"-\"%s\" (%d items)",
+	// add the new entry
+	listDirItem.listCache[token] = newListCacheSegment
+	log.Trace("AttrCache::cacheListSegment : %s cached list entries \"%s\"-\"%s\" (%d items)",
 		listDirPath, token, nextToken, len(pathList))
 }
 
@@ -648,7 +700,11 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		}
 		// add new entry
 		newFileAttr := internal.CreateObjAttr(options.Name, 0, currentTime)
-		newFileEntry := ac.cache.insert(newFileAttr, true, currentTime)
+		newFileEntry := ac.cache.insert(insertOptions{
+			attr:     newFileAttr,
+			exists:   true,
+			cachedAt: currentTime,
+		})
 		newFileEntry.setMode(options.Mode)
 	}
 
@@ -669,7 +725,11 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 			log.Warn("AttrCache::DeleteFile : %s no valid entry found. Adding entry...", options.Name)
 			// add deleted file entry
 			attr := internal.CreateObjAttr(options.Name, 0, deletionTime)
-			toBeDeleted = ac.cache.insert(attr, true, deletionTime)
+			toBeDeleted = ac.cache.insert(insertOptions{
+				attr:     attr,
+				exists:   true,
+				cachedAt: deletionTime,
+			})
 		}
 		toBeDeleted.markDeleted(deletionTime)
 		if ac.cacheDirs {
@@ -689,7 +749,11 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		if !found || !ancestorCacheItem.exists() {
 			log.Warn("AttrCache::updateAncestorsInCloud : Adding directory entry %s", dirPath)
 			ancestorObjAttr := internal.CreateObjAttrDir(dirPath)
-			ancestorCacheItem = ac.cache.insert(ancestorObjAttr, true, time)
+			ancestorCacheItem = ac.cache.insert(insertOptions{
+				attr:     ancestorObjAttr,
+				exists:   true,
+				cachedAt: time,
+			})
 		}
 		var anyChildrenInCloud bool
 
@@ -768,7 +832,11 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 			log.Warn("AttrCache::WriteFile : %s replacing missing cache entry", options.Handle.Path)
 			// replace the missing entry
 			modifiedAttr := internal.CreateObjAttr(options.Handle.Path, newSize, modifyTime)
-			modifiedEntry = ac.cache.insert(modifiedAttr, true, modifyTime)
+			modifiedEntry = ac.cache.insert(insertOptions{
+				attr:     modifiedAttr,
+				exists:   true,
+				cachedAt: modifyTime,
+			})
 		}
 		modifiedEntry.setSize(newSize, modifyTime)
 		modifiedEntry.attr.Metadata = options.Metadata
@@ -792,7 +860,11 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 			log.Warn("AttrCache::TruncateFile : %s replacing missing cache entry", options.Name)
 			// replace the missing entry
 			truncatedAttr := internal.CreateObjAttr(options.Name, options.Size, modifyTime)
-			truncatedItem = ac.cache.insert(truncatedAttr, true, modifyTime)
+			truncatedItem = ac.cache.insert(insertOptions{
+				attr:     truncatedAttr,
+				exists:   true,
+				cachedAt: modifyTime,
+			})
 		}
 		truncatedItem.setSize(options.Size, modifyTime)
 	}
@@ -839,7 +911,11 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 		} else {
 			// replace entry
 			attr := internal.CreateObjAttr(options.Name, fileStat.Size(), fileStat.ModTime())
-			entry := ac.cache.insert(attr, true, uploadTime)
+			entry := ac.cache.insert(insertOptions{
+				attr:     attr,
+				exists:   true,
+				cachedAt: uploadTime,
+			})
 			entry.setMode(fileStat.Mode())
 		}
 	}
@@ -909,13 +985,21 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			pathAttr.Flags.Clear(internal.PropFlagSymlink)
 		}
 		// Retrieved attributes so cache them
-		ac.cache.insert(pathAttr, true, time.Now())
+		ac.cache.insert(insertOptions{
+			attr:     pathAttr,
+			exists:   true,
+			cachedAt: time.Now(),
+		})
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
 	} else if err == syscall.ENOENT {
 		// cache this entity not existing
-		ac.cache.insert(internal.CreateObjAttr(options.Name, 0, time.Now()), false, time.Now())
+		ac.cache.insert(insertOptions{
+			attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
+			exists:   false,
+			cachedAt: time.Now(),
+		})
 	}
 	return pathAttr, err
 }
@@ -932,7 +1016,11 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 		defer ac.cacheLock.Unlock()
 		linkAttr := internal.CreateObjAttr(options.Name, int64(len([]byte(options.Target))), currentTime)
 		linkAttr.Flags.Set(internal.PropFlagSymlink)
-		ac.cache.insert(linkAttr, true, currentTime)
+		ac.cache.insert(insertOptions{
+			attr:     linkAttr,
+			exists:   true,
+			cachedAt: currentTime,
+		})
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), currentTime)
 		}

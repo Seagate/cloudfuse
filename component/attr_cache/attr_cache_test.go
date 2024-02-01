@@ -113,7 +113,11 @@ func (suite *attrCacheTestSuite) addPathToCache(path string, metadata bool) {
 	if isDir {
 		pathAttr = getDirPathAttr(path)
 	}
-	suite.attrCache.cache.insert(pathAttr, true, time.Now())
+	suite.attrCache.cache.insert(insertOptions{
+		attr:     pathAttr,
+		exists:   true,
+		cachedAt: time.Now(),
+	})
 }
 
 func (suite *attrCacheTestSuite) assertDeleted(path string) {
@@ -542,8 +546,7 @@ func (suite *attrCacheTestSuite) TestReadDirDoesNotExist() {
 			// test same result from subsequent call without using cloud storage
 			returnedAttr, err = suite.attrCache.ReadDir(options)
 			suite.assert.Nil(err)
-			aDepth1Attr := append(aAttr[1:2], aAttr[3])
-			suite.assert.Equal(aDepth1Attr, returnedAttr)
+			suite.assert.Equal(aAttr, returnedAttr)
 		})
 	}
 }
@@ -602,8 +605,7 @@ func (suite *attrCacheTestSuite) TestReadDirExists() {
 			// test same result from subsequent call without using cloud storage
 			returnedAttr, err = suite.attrCache.ReadDir(options)
 			suite.assert.Nil(err)
-			aDepth1Attr := append(aAttr[1:2], aAttr[3])
-			suite.assert.Equal(aDepth1Attr, returnedAttr)
+			suite.assert.Equal(aAttr, returnedAttr)
 		})
 	}
 }
@@ -722,8 +724,7 @@ func (suite *attrCacheTestSuite) TestStreamDirDoesNotExist() {
 			returnedAttr, token, err = suite.attrCache.StreamDir(options)
 			suite.assert.Nil(err)
 			suite.assert.Empty(token)
-			aDepth1Attr := append(aAttr[1:2], aAttr[3])
-			suite.assert.Equal(aDepth1Attr, returnedAttr)
+			suite.assert.Equal(aAttr, returnedAttr)
 		})
 	}
 }
@@ -849,8 +850,7 @@ func (suite *attrCacheTestSuite) TestStreamDirExists() {
 			returnedAttr, token, err = suite.attrCache.StreamDir(options)
 			suite.assert.Nil(err)
 			suite.assert.Empty(token)
-			aDepth1Attr := append(aAttr[1:2], aAttr[3])
-			suite.assert.Equal(aDepth1Attr, returnedAttr)
+			suite.assert.Equal(aAttr, returnedAttr)
 		})
 	}
 }
@@ -1182,7 +1182,7 @@ func (suite *attrCacheTestSuite) TestCreateFile() {
 	_, err = suite.attrCache.CreateFile(options)
 	suite.assert.Nil(err)
 	checkItem, found = suite.attrCache.cache.get(path)
-	suite.assert.Nil(err)
+	suite.assert.True(found)
 	suite.assert.True(checkItem.exists())
 	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 	suite.assert.EqualValues(0, checkItem.attr.Size)
