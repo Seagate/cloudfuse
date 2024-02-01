@@ -83,7 +83,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             self.button_browse.setToolTip("Browse to a pre-existing directory")
 
     def checkConfigDirectory(self):
-        currentDir = widgetFuncs.getCurrentDir(self)
+        currentDir = widgetFuncs.getWorkingDir(self)
         if not os.path.isdir(currentDir):
             try:
                 os.mkdir(currentDir)
@@ -150,7 +150,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         except ValueError as e:
             self.addOutputText(f"Invalid mount path: {str(e)}")
             return
-        configPath = os.path.join(widgetFuncs.getCurrentDir(self), 'config.yaml')
+        configPath = os.path.join(widgetFuncs.getWorkingDir(self), 'config.yaml')
 
         if platform == "win32":
             # Windows mount has a quirk where the folder shouldn't exist yet,

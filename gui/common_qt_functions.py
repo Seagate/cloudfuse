@@ -256,7 +256,7 @@ class widgetCustomFunctions(QWidget):
     def constructDictForConfig(self):
         optionKeys = self.settings.allKeys()
         configDict = {}
-        for key in optigetWorkingDironKeys:
+        for key in optionKeys:
             configDict[key] = self.settings.value(key)
         return configDict
     
