@@ -498,7 +498,6 @@ func serveDots(fill fillFunc) {
 
 // Fill the directory list cache with data from the next component
 func populateDirChildCache(handle *handlemap.Handle, cacheInfo *dirChildCache, offset uint64) (errorCode int) {
-	attrs := make([]*internal.ObjAttr, 0)
 	// get entries from the pipeline
 	returnedAttrs, token, err := fuseFS.NextComponent().StreamDir(internal.StreamDirOptions{
 		Name:  handle.Path,
@@ -513,13 +512,12 @@ func populateDirChildCache(handle *handlemap.Handle, cacheInfo *dirChildCache, o
 		return -fuse.EIO
 	}
 	// compile results and update cache
-	attrs = append(attrs, returnedAttrs...)
 	cacheInfo.sIndex = offset
-	cacheInfo.eIndex = offset + uint64(len(attrs))
-	cacheInfo.length = uint64(len(attrs))
+	cacheInfo.eIndex = offset + uint64(len(returnedAttrs))
+	cacheInfo.length = uint64(len(returnedAttrs))
 	cacheInfo.token = token
 	cacheInfo.children = cacheInfo.children[:0]
-	cacheInfo.children = attrs
+	cacheInfo.children = returnedAttrs
 
 	return 0
 }

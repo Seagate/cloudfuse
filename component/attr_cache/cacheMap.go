@@ -124,7 +124,7 @@ func (ctm *cacheTreeMap) insert(options insertOptions) *attrCacheItem {
 }
 
 // use efficient (bottom-up) recursion to add an item to the cache
-func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem, listCache bool) {
+func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem, fromDirList bool) {
 	// find the parent
 	path := internal.TruncateDirName(newItem.attr.Path)
 	parentPath := getParentDir(path)
@@ -134,13 +134,13 @@ func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem, listCache bool) {
 		newParentAttr := internal.CreateObjAttrDir(parentPath)
 		parentItem = newAttrCacheItem(newParentAttr, newItem.exists(), newItem.cachedAt)
 		// recurse
-		ctm.insertItem(parentItem, listCache)
+		ctm.insertItem(parentItem, fromDirList)
 	}
 	// add the parent to this item
 	newItem.parent = parentItem
 	// if this changes the parent directory's contents
 	// invalidate the parent's listing cache
-	if !listCache && newItem.exists() {
+	if !fromDirList && newItem.exists() {
 		parentItem.listCache = nil
 	}
 	// add the new item to the tree and the map

@@ -584,14 +584,14 @@ func (ac *AttrCache) cacheListSegment(pathList []*internal.ObjAttr, listDirPath 
 	if listDirItem.listCache == nil {
 		listDirItem.listCache = make(map[string]listCacheSegment)
 	}
+	// add the new entry
+	listDirItem.listCache[token] = newListCacheSegment
 	// scan the listing cache and remove expired entries
 	for k, v := range listDirItem.listCache {
 		if currTime.Sub(v.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
 			delete(listDirItem.listCache, k)
 		}
 	}
-	// add the new entry
-	listDirItem.listCache[token] = newListCacheSegment
 	log.Trace("AttrCache::cacheListSegment : %s cached list entries \"%s\"-\"%s\" (%d items)",
 		listDirPath, token, nextToken, len(pathList))
 }
