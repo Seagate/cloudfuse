@@ -90,8 +90,11 @@ func getFileTestDirName(n int) string {
 
 func (suite *fileTestSuite) fileTestCleanup(toRemove []string) {
 	for _, path := range toRemove {
-		// don't check err here, since it's flaky
-		os.RemoveAll(path)
+		// don't assert.Nil(err) here, since it's flaky
+		err := os.RemoveAll(path)
+		if err != nil {
+			fmt.Printf("FileTestSuite::fileTestCleanup : Cleanup failed with error %v\n", err)
+		}
 	}
 }
 
@@ -151,7 +154,7 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 	suite.fileTestCleanup([]string{fileName})
 }
 
-func (suite *fileTestSuite) TestFileCreatEncodeChar() {
+func (suite *fileTestSuite) TestFileCreateEncodeChar() {
 	speclChar := "%282%29+class_history_by_item.log"
 	fileName := suite.testPath + "/" + speclChar
 
@@ -713,7 +716,7 @@ func TestFileTestSuite(t *testing.T) {
 	// Sanity check in the off chance the same random name was generated twice and was still around somehow
 	err := os.RemoveAll(fileTest.testPath)
 	if err != nil {
-		fmt.Println("Could not cleanup feature dir before testing")
+		fmt.Printf("TestFileTestSuite : Could not cleanup feature dir before testing. Here's why: %v\n", err)
 	}
 
 	err = os.Mkdir(fileTest.testPath, 0777)

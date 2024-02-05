@@ -471,7 +471,7 @@ func TestMain(m *testing.M) {
 
 	err := os.RemoveAll(mntDir)
 	if err != nil {
-		fmt.Println("Could not cleanup mount directory before testing")
+		fmt.Printf("MountTest : Could not cleanup mount directory before testing. Here's why: %v\n", err)
 	}
 
 	// On Linux the folder must exist so we need to create it, on Windows it cannot exist.

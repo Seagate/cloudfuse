@@ -628,7 +628,7 @@ func TestDirTestSuite(t *testing.T) {
 	// Sanity check in the off chance the same random name was generated twice and was still around somehow
 	err := os.RemoveAll(dirTest.testPath)
 	if err != nil {
-		fmt.Println("Could not cleanup feature dir before testing")
+		fmt.Printf("TestDirTestSuite : Could not cleanup feature dir before testing. Here's why: %v\n", err)
 	}
 
 	err = os.Mkdir(dirTest.testPath, 0777)
@@ -645,7 +645,7 @@ func TestDirTestSuite(t *testing.T) {
 	//  Wipe out the test directory created for End to End test
 	err = os.RemoveAll(dirTest.testPath)
 	if err != nil {
-		fmt.Println("Could not cleanup feature dir after testing")
+		fmt.Printf("TestDirTestSuite : Could not cleanup feature dir after testing. Here's why: %v\n", err)
 	}
 }
 
