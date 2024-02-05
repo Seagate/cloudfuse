@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 )
 
@@ -130,7 +131,7 @@ func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem, fromDirList bool) {
 	parentPath := getParentDir(path)
 	parentItem, parentFound := ctm.get(parentPath)
 	// if there is no parent, create one and add it
-	if !parentFound || (!parentItem.exists() && newItem.exists()) {
+	if !parentFound || (!parentItem.isRoot() && !parentItem.exists() && newItem.exists()) {
 		newParentAttr := internal.CreateObjAttrDir(parentPath)
 		parentItem = newAttrCacheItem(newParentAttr, newItem.exists(), newItem.cachedAt)
 		// recurse
@@ -166,41 +167,77 @@ func (value *attrCacheItem) isInCloud() bool {
 	return isObject || isDirInCloud
 }
 
+func (value *attrCacheItem) isRoot() bool {
+	return value.attr.Path == ""
+}
+
 func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
-	if value.exists() {
-		value.attrFlag.Clear(AttrFlagExists)
-		value.attrFlag.Set(AttrFlagValid)
-		value.cachedAt = deletedTime
-		value.attr = &internal.ObjAttr{}
-		for _, val := range value.children {
-			val.markDeleted(deletedTime)
-		}
-		// invalidate the parent's listing cache
+	// don't allow the root directory to be deleted
+	if value.isRoot() {
+		log.Warn("AttrCache::markDeleted : Attempted to delete root directory")
+		return
+	}
+	// don't do work that's already done
+	if !value.exists() {
+		return
+	}
+	// recurse
+	for _, val := range value.children {
+		val.markDeleted(deletedTime)
+	}
+	// invalidate the parent's listing cache
+	if value.parent == nil {
+		log.Warn("AttrCache::markDeleted : %s has no pointer to its parent", value.attr.Path)
+	} else {
 		value.parent.listCache = nil
 	}
+	// update the item itself
+	value.attrFlag.Clear(AttrFlagExists)
+	value.attrFlag.Set(AttrFlagValid)
+	value.cachedAt = deletedTime
+	value.attr = &internal.ObjAttr{}
 }
 
 func (value *attrCacheItem) invalidate() {
-	if value.valid() {
-		value.attrFlag.Clear(AttrFlagValid)
-		value.attr = &internal.ObjAttr{}
-		for _, val := range value.children {
-			val.invalidate()
-		}
-		// invalidate the parent's listing cache
-		if value.exists() {
-			value.parent.listCache = nil
-		}
+	// never invalidate the root
+	if value.isRoot() {
+		log.Warn("AttrCache::invalidate : Attempted to invalidate root directory")
+		return
 	}
+	// don't do work that's already done
+	if !value.valid() {
+		return
+	}
+	// recurse
+	for _, val := range value.children {
+		val.invalidate()
+	}
+	// invalidate the parent's listing cache
+	if value.parent == nil {
+		log.Warn("AttrCache::invalidate : %s has no pointer to its parent", value.attr.Path)
+	} else {
+		value.parent.listCache = nil
+	}
+	// update the item itself
+	value.attrFlag.Clear(AttrFlagValid)
+	value.attr = &internal.ObjAttr{}
 }
 
 func (value *attrCacheItem) markInCloud(inCloud bool) {
-	if value.attr.IsDir() {
-		if inCloud {
-			value.attrFlag.Clear(AttrFlagNotInCloud)
-		} else {
-			value.attrFlag.Set(AttrFlagNotInCloud)
-		}
+	// never mark the root as not in cloud
+	if value.isRoot() && !inCloud {
+		log.Warn("AttrCache::markInCloud : Attempted to mark root directory as not in cloud")
+		return
+	}
+	// this is only relevant for directories
+	if !value.attr.IsDir() {
+		return
+	}
+	// update the flag
+	if inCloud {
+		value.attrFlag.Clear(AttrFlagNotInCloud)
+	} else {
+		value.attrFlag.Set(AttrFlagNotInCloud)
 	}
 }
 
