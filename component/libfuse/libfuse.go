@@ -81,6 +81,7 @@ type dirChildCache struct {
 	length   uint64              // Length of the children list
 	token    string              // Token to get next block of items from container
 	children []*internal.ObjAttr // Slice holding current block of children
+	lastPage bool                // Whether current block is the last one
 }
 
 // LibfuseOptions defines the config parameters.

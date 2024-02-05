@@ -428,33 +428,17 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 	offset := uint64(ofst)
 	// is this a brand new request (not the continuation of a previous one)?
 	newRequest := offset == 0
-	startOffset := offset
 	if newRequest {
-		// let's serve the first two entries ('.' & '..') immediately
-		serveDots(fill)
+		// cache the first two entries ('.' & '..')
+		cacheDots(cacheInfo)
 	}
+	startOffset := offset
 	// fetch and serve directory contents back to the OS in a loop until their buffer is full
 	for {
-		// is the entry at startOffset cached?
-		// or does it need to be fetched fetched by calling StreamDir?
-		var fetchDataFromPipeline bool
-		var validToken bool
-		if newRequest {
-			// always fetch fresh data for new requests
-			fetchDataFromPipeline = true
-			// new requests should have an empty token
-			validToken = cacheInfo.token == ""
-		} else { // this request is a continuation
-			// is the next offset we need already cached in our cacheInfo structure?
-			offsetCached := startOffset >= cacheInfo.sIndex && startOffset < cacheInfo.eIndex
-			fetchDataFromPipeline = !offsetCached
-			if fetchDataFromPipeline {
-				// we need to fetch data for a continuation
-				// do we have a valid token?
-				validToken = cacheInfo.token != ""
-			}
-		}
-		if fetchDataFromPipeline && validToken {
+		// is the next offset we need already cached in our cacheInfo structure?
+		offsetCached := startOffset >= cacheInfo.sIndex && startOffset < cacheInfo.eIndex
+		fetchDataFromPipeline := !offsetCached
+		if fetchDataFromPipeline {
 			// populate cache from pipeline
 			errorCode := populateDirChildCache(handle, cacheInfo, startOffset)
 			if errorCode != 0 {
@@ -473,9 +457,8 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 		nextOffset, done := serveCachedEntries(cacheInfo, startOffset, fill)
 		log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d - returned entries %d-%d",
 			path, offset, fh, startOffset, nextOffset-1)
-		// break when the OS is done with this call
+		// break when the OS is done with this Readdir call
 		if done {
-			// the OS is done with this Readdir call
 			break
 		}
 		// update offset for iteration
@@ -486,18 +469,25 @@ func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat
 
 type fillFunc = func(name string, stat *fuse.Stat_t, ofst int64) bool
 
-// serve the first two entries in any directory listing: '.' and '..'
-func serveDots(fill fillFunc) {
-	stbuf := fuse.Stat_t{}
-	attrs := []*internal.ObjAttr{{Flags: fuseFS.lsFlags, Name: "."}, {Flags: fuseFS.lsFlags, Name: ".."}}
-	for i, attr := range attrs {
-		fuseFS.fillStat(attr, &stbuf)
-		fill(attr.Name, &stbuf, int64(i+1))
-	}
+// add the first two entries in any directory listing ('.' and '..') to the cache
+// this replaces any existing cache
+func cacheDots(cacheInfo *dirChildCache) {
+	dotAttrs := []*internal.ObjAttr{{Flags: fuseFS.lsFlags, Name: "."}, {Flags: fuseFS.lsFlags, Name: ".."}}
+	cacheInfo.sIndex = 0
+	cacheInfo.eIndex = 2
+	cacheInfo.length = 2
+	cacheInfo.token = ""
+	cacheInfo.children = cacheInfo.children[:0]
+	cacheInfo.children = dotAttrs
+	cacheInfo.lastPage = false
 }
 
 // Fill the directory list cache with data from the next component
 func populateDirChildCache(handle *handlemap.Handle, cacheInfo *dirChildCache, offset uint64) (errorCode int) {
+	// don't get more entries if there are no more
+	if cacheInfo.lastPage {
+		return
+	}
 	// get entries from the pipeline
 	returnedAttrs, token, err := fuseFS.NextComponent().StreamDir(internal.StreamDirOptions{
 		Name:  handle.Path,
@@ -518,6 +508,7 @@ func populateDirChildCache(handle *handlemap.Handle, cacheInfo *dirChildCache, o
 	cacheInfo.token = token
 	cacheInfo.children = cacheInfo.children[:0]
 	cacheInfo.children = returnedAttrs
+	cacheInfo.lastPage = token == ""
 
 	return 0
 }
@@ -536,7 +527,7 @@ func serveCachedEntries(cacheInfo *dirChildCache, startOffset uint64, fill fillF
 		done = !fill(name, &stbuf, int64(nextOffset))
 	}
 	// also quit when the directory has no more entries
-	done = done || cacheInfo.token == ""
+	done = done || cacheInfo.lastPage
 
 	return nextOffset, done
 }
