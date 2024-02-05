@@ -173,7 +173,7 @@ func (ac *AttrCache) deleteDirectory(path string, deletedAt time.Time) error {
 	if !dirExists {
 		if ac.cacheDirs {
 			// when cacheDirs is true, deleting a non-existent directory should return ENOENT
-			log.Err("AttrCache::deleteCachedDirectory : %s does not exist", path)
+			log.Err("AttrCache::deleteDirectory : %s does not exist", path)
 			return syscall.ENOENT
 		} else {
 			// when cacheDirs is false, attr_cache is not responsible for returning ENOENT
@@ -250,7 +250,7 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 }
 
 // move an item to a new location, and return the destination item
-func (ac *AttrCache) moveAttrCachedItem(srcItem *attrCacheItem, srcDir string, dstDir string, movedAt time.Time) *attrCacheItem {
+func (ac *AttrCache) moveCachedItem(srcItem *attrCacheItem, srcDir string, dstDir string, movedAt time.Time) *attrCacheItem {
 	// generate the destination name
 	dstPath := strings.Replace(srcItem.attr.Path, srcDir, dstDir, 1)
 	// create the destination attr
@@ -270,7 +270,7 @@ func (ac *AttrCache) moveAttrCachedItem(srcItem *attrCacheItem, srcDir string, d
 	dstItem.markInCloud(srcItem.isInCloud())
 	// recurse over any children
 	for _, srcChildItm := range srcItem.children {
-		ac.moveAttrCachedItem(srcChildItm, srcDir, dstDir, movedAt)
+		ac.moveCachedItem(srcChildItm, srcDir, dstDir, movedAt)
 	}
 	// mark the source item deleted
 	srcItem.markDeleted(movedAt)
@@ -346,7 +346,7 @@ func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 	err := ac.NextComponent().DeleteDir(options)
 
 	if err == nil {
-		// deleteCachedDirectory may add the parent directory to the cache
+		// deleteDirectory may add the parent directory to the cache
 		// so we must lock the cache for writing
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
@@ -676,7 +676,7 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 			// move everything over
 			srcDir := internal.TruncateDirName(options.Src)
 			dstDir := internal.TruncateDirName(options.Dst)
-			ac.moveAttrCachedItem(srcItem, srcDir, dstDir, currentTime)
+			ac.moveCachedItem(srcItem, srcDir, dstDir, currentTime)
 		}
 	}
 
@@ -793,7 +793,7 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 		}
 
 		// move source item to destination
-		ac.moveAttrCachedItem(sourceItem, options.Src, options.Dst, renameTime)
+		ac.moveCachedItem(sourceItem, options.Src, options.Dst, renameTime)
 		if ac.cacheDirs {
 			ac.updateAncestorsInCloud(getParentDir(options.Src), renameTime)
 			// mark the destination parent directory tree as containing objects
