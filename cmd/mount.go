@@ -483,7 +483,7 @@ var mountCmd = &cobra.Command{
 			ctx, _ := context.WithCancel(context.Background()) //nolint
 			err := createDaemon(pipeline, ctx, pidFileName, 0644, 027, fname)
 			if err != nil {
-				log.Err("mount: failed to create daemon [%v]", err.Error())
+				return fmt.Errorf("mount: failed to create daemon [%v]", err.Error())
 			}
 		} else {
 			if options.CPUProfile != "" {
