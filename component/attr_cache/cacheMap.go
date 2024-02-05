@@ -116,6 +116,10 @@ func (ctm *cacheTreeMap) insert(options insertOptions) *attrCacheItem {
 	if options.attr == nil {
 		return nil
 	}
+	if options.attr.Path == "" {
+		log.Warn("AttrCache::insert : Attempted to insert root directory")
+		return nil
+	}
 	// create the new record
 	newItem := newAttrCacheItem(options.attr, options.exists, options.cachedAt)
 	// insert it (recursively)
@@ -131,7 +135,7 @@ func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem, fromDirList bool) {
 	parentPath := getParentDir(path)
 	parentItem, parentFound := ctm.get(parentPath)
 	// if there is no parent, create one and add it
-	if !parentFound || (!parentItem.isRoot() && !parentItem.exists() && newItem.exists()) {
+	if !parentFound || (!parentItem.exists() && newItem.exists()) {
 		newParentAttr := internal.CreateObjAttrDir(parentPath)
 		parentItem = newAttrCacheItem(newParentAttr, newItem.exists(), newItem.cachedAt)
 		// recurse
@@ -168,7 +172,7 @@ func (value *attrCacheItem) isInCloud() bool {
 }
 
 func (value *attrCacheItem) isRoot() bool {
-	return value.parent == nil
+	return value.attr.Path == ""
 }
 
 func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
@@ -181,21 +185,18 @@ func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
 	if !value.exists() {
 		return
 	}
-	// recurse
-	for _, val := range value.children {
-		val.markDeleted(deletedTime)
-	}
+	// drop children
+	value.children = nil
 	// invalidate the parent's listing cache
 	if value.parent == nil {
 		log.Warn("AttrCache::markDeleted : %s has no pointer to its parent", value.attr.Path)
 	} else {
 		value.parent.listCache = nil
 	}
-	// update the item itself
+	// update flags and timestamp
 	value.attrFlag.Clear(AttrFlagExists)
 	value.attrFlag.Set(AttrFlagValid)
 	value.cachedAt = deletedTime
-	value.attr = &internal.ObjAttr{}
 }
 
 func (value *attrCacheItem) invalidate() {
@@ -208,19 +209,16 @@ func (value *attrCacheItem) invalidate() {
 	if !value.valid() {
 		return
 	}
-	// recurse
-	for _, val := range value.children {
-		val.invalidate()
-	}
+	// drop all children (otherwise we leak memory)
+	value.children = nil
+	// set invalid
+	value.attrFlag.Clear(AttrFlagValid)
 	// invalidate the parent's listing cache
 	if value.parent == nil {
 		log.Warn("AttrCache::invalidate : %s has no pointer to its parent", value.attr.Path)
-	} else {
+	} else if value.exists() {
 		value.parent.listCache = nil
 	}
-	// update the item itself
-	value.attrFlag.Clear(AttrFlagValid)
-	value.attr = &internal.ObjAttr{}
 }
 
 func (value *attrCacheItem) markInCloud(inCloud bool) {

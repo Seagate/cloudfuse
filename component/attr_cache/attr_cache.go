@@ -251,6 +251,10 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 
 // move an item to a new location, and return the destination item
 func (ac *AttrCache) moveCachedItem(srcItem *attrCacheItem, srcDir string, dstDir string, movedAt time.Time) *attrCacheItem {
+	// don't move deleted items
+	if !srcItem.exists() {
+		return nil
+	}
 	// generate the destination name
 	dstPath := strings.Replace(srcItem.attr.Path, srcDir, dstDir, 1)
 	// create the destination attr
@@ -263,7 +267,7 @@ func (ac *AttrCache) moveCachedItem(srcItem *attrCacheItem, srcDir string, dstDi
 	// add the destination item to the cache
 	dstItem := ac.cache.insert(insertOptions{
 		attr:     dstAttr,
-		exists:   srcItem.exists(),
+		exists:   true,
 		cachedAt: srcItem.cachedAt,
 	})
 	// copy the inCloud flag
@@ -962,7 +966,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// Is the entry marked deleted?
 		if !value.exists() {
 			log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
-			return &internal.ObjAttr{}, syscall.ENOENT
+			return nil, syscall.ENOENT
 		}
 		// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
 		// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
