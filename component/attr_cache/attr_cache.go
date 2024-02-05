@@ -652,17 +652,18 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 
-		// TLDR: Dst is guaranteed to be non-existent or empty.
-		// Note: We do not need to invalidate children of Dst due to the logic in our FUSE connector, see comments there,
-		// but it is always safer to double check than not.
-		ac.invalidateDirectory(options.Dst)
-
-		// if attr_cache is tracking directories, validate this rename
+		// check if destination already exists in cache
 		if ac.cacheDirs {
+			// if attr_cache is tracking directories, validate this rename
 			// First, check if the destination directory already exists
 			if ac.pathExistsInCache(options.Dst) {
 				return os.ErrExist
 			}
+		} else {
+			// TLDR: Dst is guaranteed to be non-existent or empty.
+			// Note: We do not need to invalidate children of Dst due to the logic in our FUSE connector, see comments there,
+			// but it is always safer to double check than not.
+			ac.invalidateDirectory(options.Dst)
 		}
 
 		// get the source directory
