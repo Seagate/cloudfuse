@@ -168,7 +168,7 @@ func (value *attrCacheItem) isInCloud() bool {
 }
 
 func (value *attrCacheItem) isRoot() bool {
-	return value.attr.Path == ""
+	return value.parent == nil
 }
 
 func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
