@@ -89,7 +89,10 @@ func getTestDirName(n int) string {
 
 func (suite *dirTestSuite) dirTestCleanup(toRemove []string) {
 	for _, path := range toRemove {
-		os.RemoveAll(path)
+		err := os.RemoveAll(path)
+		if err != nil {
+			fmt.Printf("dirTestCleanup : %s failed [%v]\n", path, err)
+		}
 	}
 }
 
