@@ -73,12 +73,20 @@ func CloudfuseVersion_() string {
 	return cloudfuseVersion_
 }
 
-var DefaultWorkDir = "$HOME/.cloudfuse"
-var DefaultLogFilePath = JoinUnixFilepath(DefaultWorkDir, "cloudfuse.log")
-var StatsConfigFilePath = JoinUnixFilepath(DefaultWorkDir, "stats_monitor.cfg")
+var DefaultWorkDir string
+var DefaultLogFilePath string
+var StatsConfigFilePath string
 
 var EnableMonitoring = false
 var CfsDisabled = false
+
+func GetDefaultWorkDir() string {
+	val, err := os.UserHomeDir()
+	if err != nil {
+		return "./"
+	}
+	return val
+}
 
 // LogLevel enum
 type LogLevel int
@@ -313,11 +321,7 @@ func GetIdLength(id string) int64 {
 }
 
 func init() {
-	val, present := os.LookupEnv("HOME")
-	if !present {
-		val = "./"
-	}
-	DefaultWorkDir = filepath.Join(val, ".cloudfuse")
+	DefaultWorkDir = filepath.Join(GetDefaultWorkDir(), ".cloudfuse")
 	DefaultLogFilePath = filepath.Join(DefaultWorkDir, "cloudfuse.log")
 	StatsConfigFilePath = filepath.Join(DefaultWorkDir, "stats_monitor.cfg")
 }

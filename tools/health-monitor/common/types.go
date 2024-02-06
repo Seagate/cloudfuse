@@ -25,6 +25,11 @@
 
 package common
 
+import (
+	"os"
+	"path/filepath"
+)
+
 const (
 	CloudfuseStats    = "cloudfuse_stats"
 	FileCacheMon      = "file_cache_monitor"
@@ -61,8 +66,8 @@ var (
 
 const CfuseMonitorVersion = "1.0.0-preview.1"
 
-var DefaultWorkDir = "$HOME/.cloudfuse"
-var DefaultLogFile = DefaultWorkDir + "/CfuseMonitor.log"
+var DefaultWorkDir string
+var DefaultLogFile string
 
 type CacheEvent struct {
 	CacheEvent      string            `json:"cacheEvent"`
@@ -78,4 +83,17 @@ type CacheEvent struct {
 type CpuMemStat struct {
 	CpuUsage string
 	MemUsage string
+}
+
+func GetDefaultWorkDir() string {
+	val, err := os.UserHomeDir()
+	if err != nil {
+		return "./"
+	}
+	return val
+}
+
+func init() {
+	DefaultWorkDir = filepath.Join(GetDefaultWorkDir(), ".cloudfuse")
+	DefaultLogFile = filepath.Join(DefaultWorkDir, "CfuseMonitor.log")
 }

@@ -2,7 +2,7 @@
 
 logging:
   type: syslog
-  level: log_debug
+  level: log_warning
 
 components:
   - libfuse
