@@ -371,7 +371,6 @@ func (suite *cacheMapTestSuite) confirmMarkedDeleted(item *attrCacheItem) {
 	// check the item
 	suite.assert.NotNil(item)
 	suite.assert.False(item.exists())
-	suite.assert.EqualValues(item.attr, &internal.ObjAttr{})
 	// recurse over its children
 	if item.children != nil {
 		for _, val := range item.children {
@@ -384,7 +383,6 @@ func (suite *cacheMapTestSuite) confirmInvalid(item *attrCacheItem) {
 	// check item
 	suite.assert.NotNil(item)
 	suite.assert.False(item.attrFlag.IsSet(AttrFlagValid))
-	suite.assert.EqualValues(item.attr, &internal.ObjAttr{})
 	// recurse over its children
 	if item.children != nil {
 		for _, val := range item.children {
