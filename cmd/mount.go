@@ -126,10 +126,10 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 		if opt.Logging.LogFilePath == common.DefaultLogFilePath {
 			// If default-working-dir is set then default log path shall be set to that path
 			// Ignore if specific log-path is provided by user
-			opt.Logging.LogFilePath = filepath.Join(common.DefaultWorkDir, "cloudfuse.log")
+			opt.Logging.LogFilePath = common.JoinUnixFilepath(common.DefaultWorkDir, "cloudfuse.log")
 		}
 
-		common.DefaultLogFilePath = filepath.Join(common.DefaultWorkDir, "cloudfuse.log")
+		common.DefaultLogFilePath = common.JoinUnixFilepath(common.DefaultWorkDir, "cloudfuse.log")
 	}
 
 	f, err := os.Stat(common.ExpandPath(common.DefaultWorkDir))
