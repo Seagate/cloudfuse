@@ -29,7 +29,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"os"
-	"path/filepath"
 	"reflect"
 	"sync"
 	"time"
@@ -321,7 +320,7 @@ func GetIdLength(id string) int64 {
 }
 
 func init() {
-	DefaultWorkDir = filepath.Join(GetDefaultWorkDir(), ".cloudfuse")
-	DefaultLogFilePath = filepath.Join(DefaultWorkDir, "cloudfuse.log")
-	StatsConfigFilePath = filepath.Join(DefaultWorkDir, "stats_monitor.cfg")
+	DefaultWorkDir = JoinUnixFilepath(GetDefaultWorkDir(), ".cloudfuse")
+	DefaultLogFilePath = JoinUnixFilepath(DefaultWorkDir, "cloudfuse.log")
+	StatsConfigFilePath = JoinUnixFilepath(DefaultWorkDir, "stats_monitor.cfg")
 }

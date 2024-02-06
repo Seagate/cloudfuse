@@ -27,7 +27,8 @@ package common
 
 import (
 	"os"
-	"path/filepath"
+
+	"github.com/Seagate/cloudfuse/common"
 )
 
 const (
@@ -94,6 +95,6 @@ func GetDefaultWorkDir() string {
 }
 
 func init() {
-	DefaultWorkDir = filepath.Join(GetDefaultWorkDir(), ".cloudfuse")
-	DefaultLogFile = filepath.Join(DefaultWorkDir, "CfuseMonitor.log")
+	DefaultWorkDir = common.JoinUnixFilepath(GetDefaultWorkDir(), ".cloudfuse")
+	DefaultLogFile = common.JoinUnixFilepath(DefaultWorkDir, "CfuseMonitor.log")
 }

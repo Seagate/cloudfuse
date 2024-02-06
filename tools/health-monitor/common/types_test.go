@@ -27,9 +27,9 @@ package common
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -50,6 +50,6 @@ func TestGenerateConfig(t *testing.T) {
 func (suite *typesHMTestSuite) TestDefaultWorkDir() {
 	val, err := os.UserHomeDir()
 	suite.assert.Nil(err)
-	suite.assert.Equal(DefaultWorkDir, filepath.Join(val, ".cloudfuse"))
-	suite.assert.Equal(DefaultLogFile, filepath.Join(val, ".cloudfuse/CfuseMonitor.log"))
+	suite.assert.Equal(DefaultWorkDir, common.JoinUnixFilepath(val, ".cloudfuse"))
+	suite.assert.Equal(DefaultLogFile, common.JoinUnixFilepath(val, ".cloudfuse/CfuseMonitor.log"))
 }
