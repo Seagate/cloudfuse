@@ -502,12 +502,18 @@ func populateDirChildCache(handle *handlemap.Handle, cacheInfo *dirChildCache, o
 		return -fuse.EIO
 	}
 	// compile results and update cache
-	cacheInfo.sIndex = offset
-	cacheInfo.eIndex = offset + uint64(len(returnedAttrs))
-	cacheInfo.length = uint64(len(returnedAttrs))
+	// let the cache grow to MaxDirListCount
+	replaceCache := cacheInfo.length+uint64(len(returnedAttrs)) > common.MaxDirListCount
+	if replaceCache {
+		cacheInfo.sIndex = offset
+		cacheInfo.eIndex = offset
+		cacheInfo.children = cacheInfo.children[:0]
+		cacheInfo.length = 0
+	}
+	cacheInfo.eIndex += uint64(len(returnedAttrs))
+	cacheInfo.children = append(cacheInfo.children, returnedAttrs...)
+	cacheInfo.length += uint64(len(returnedAttrs))
 	cacheInfo.token = token
-	cacheInfo.children = cacheInfo.children[:0]
-	cacheInfo.children = returnedAttrs
 	cacheInfo.lastPage = token == ""
 
 	return 0
