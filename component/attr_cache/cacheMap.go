@@ -185,8 +185,10 @@ func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
 	if !value.exists() {
 		return
 	}
-	// drop children
-	value.children = nil
+	// recurse
+	for _, val := range value.children {
+		val.markDeleted(deletedTime)
+	}
 	// invalidate the parent's listing cache
 	if value.parent == nil {
 		log.Warn("AttrCache::markDeleted : %s has no pointer to its parent", value.attr.Path)
@@ -209,8 +211,10 @@ func (value *attrCacheItem) invalidate() {
 	if !value.valid() {
 		return
 	}
-	// drop all children (otherwise we leak memory)
-	value.children = nil
+	// recurse
+	for _, val := range value.children {
+		val.invalidate()
+	}
 	// set invalid
 	value.attrFlag.Clear(AttrFlagValid)
 	// invalidate the parent's listing cache
