@@ -1006,7 +1006,7 @@ func (ac *AttrCache) CommitData(options internal.CommitDataOptions) error {
 		defer ac.cacheLock.RUnlock()
 
 		entry, found := ac.cache.get(options.Name)
-		if !found {
+		if found {
 			entry.invalidate()
 		}
 	}
