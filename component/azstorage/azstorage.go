@@ -294,6 +294,9 @@ func (az *AzStorage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	}
 
 	path := formatListDirName(options.Name)
+	if options.Count == 0 {
+		options.Count = common.MaxDirListCount
+	}
 
 	new_list, new_marker, err := az.storage.List(path, &options.Token, options.Count)
 	if err != nil {

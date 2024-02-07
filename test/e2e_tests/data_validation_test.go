@@ -424,11 +424,11 @@ func TestDataValidationTestSuite(t *testing.T) {
 	// Sanity check in the off chance the same random name was generated twice and was still around somehow
 	err := os.RemoveAll(dataValidationTest.testMntPath)
 	if err != nil {
-		fmt.Println("Could not cleanup feature dir before testing")
+		fmt.Printf("TestDataValidationTestSuite : Could not cleanup mount dir before testing. Here's why: %v\n", err)
 	}
 	err = os.RemoveAll(dataValidationTest.testCachePath)
 	if err != nil {
-		fmt.Println("Could not cleanup cache dir before testing")
+		fmt.Printf("TestDataValidationTestSuite : Could not cleanup cache dir before testing. Here's why: %v\n", err)
 	}
 
 	err = os.Mkdir(dataValidationTest.testMntPath, 0777)

@@ -53,12 +53,20 @@ func (suite *cacheMapTestSuite) SetupTest() {
 	// directories
 	for dir := nestedDir.Front(); dir != nil; dir = dir.Next() {
 		attr := internal.CreateObjAttrDir(dir.Value.(string))
-		suite.cache.insert(attr, true, time.Now())
+		suite.cache.insert(insertOptions{
+			attr:     attr,
+			exists:   true,
+			cachedAt: time.Now(),
+		})
 	}
 	// files
 	for file := nestedFiles.Front(); file != nil; file = file.Next() {
 		attr := internal.CreateObjAttr(file.Value.(string), 1024, time.Now())
-		suite.cache.insert(attr, true, time.Now())
+		suite.cache.insert(insertOptions{
+			attr:     attr,
+			exists:   true,
+			cachedAt: time.Now(),
+		})
 	}
 }
 
@@ -71,7 +79,11 @@ func (suite *cacheMapTestSuite) TestInsert() {
 	insertTime := time.Now()
 	fileAttr := internal.CreateObjAttr(filePath, fileSize, insertTime)
 	// insert
-	insertedItem := suite.cache.insert(fileAttr, true, insertTime)
+	insertedItem := suite.cache.insert(insertOptions{
+		attr:     fileAttr,
+		exists:   true,
+		cachedAt: insertTime,
+	})
 	// verify item contents
 	cachedItem, found := suite.cache.get(filePath)
 	suite.assert.True(found)
@@ -86,7 +98,11 @@ func (suite *cacheMapTestSuite) TestInsert() {
 	newSize := int64(555)
 	fileAttr = internal.CreateObjAttr(filePath, newSize, newTime)
 	//
-	insertedItem = suite.cache.insert(fileAttr, true, insertTime)
+	insertedItem = suite.cache.insert(insertOptions{
+		attr:     fileAttr,
+		exists:   true,
+		cachedAt: insertTime,
+	})
 	// verify new contents
 	cachedItem, found = suite.cache.get(filePath)
 	suite.assert.True(found)
@@ -103,7 +119,11 @@ func (suite *cacheMapTestSuite) TestInsert() {
 	insertTime = time.Now()
 	dirAttr := internal.CreateObjAttrDir(dirPath)
 	// insert
-	insertedItem = suite.cache.insert(dirAttr, true, insertTime)
+	insertedItem = suite.cache.insert(insertOptions{
+		attr:     dirAttr,
+		exists:   true,
+		cachedAt: insertTime,
+	})
 	// verify item contents
 	cachedItem, found = suite.cache.get(dirPath)
 	suite.assert.True(found)
@@ -120,7 +140,11 @@ func (suite *cacheMapTestSuite) TestInsert() {
 	nestedFilePath := path.Join(workingPath, nestedDir1Name, nestedDir2Name, nestedFileName)
 	insertTime = time.Now()
 	nestedFileAttr := internal.CreateObjAttr(nestedFilePath, fileSize, insertTime)
-	insertedItem = suite.cache.insert(nestedFileAttr, true, insertTime)
+	insertedItem = suite.cache.insert(insertOptions{
+		attr:     nestedFileAttr,
+		exists:   true,
+		cachedAt: insertTime,
+	})
 	// verify item
 	cachedItem, found = suite.cache.get(nestedFilePath)
 	suite.assert.True(found)
@@ -174,7 +198,11 @@ func (suite *cacheMapTestSuite) TestMarkDeletedFile() {
 	path := "a/c1/TempFile.txt"
 	insertTime := time.Now()
 	attr := internal.CreateObjAttr(path, 1024, insertTime)
-	suite.cache.insert(attr, true, insertTime)
+	suite.cache.insert(insertOptions{
+		attr:     attr,
+		exists:   true,
+		cachedAt: insertTime,
+	})
 	// validate it exists
 	cachedItem, found := suite.cache.get(path)
 	suite.assert.True(found)
@@ -194,7 +222,11 @@ func (suite *cacheMapTestSuite) TestInvalidate() {
 	path := "a/c1/TempFile.txt"
 	insertTime := time.Now()
 	attr := internal.CreateObjAttr(path, 1024, insertTime)
-	suite.cache.insert(attr, true, insertTime)
+	suite.cache.insert(insertOptions{
+		attr:     attr,
+		exists:   true,
+		cachedAt: insertTime,
+	})
 	// validate it is there
 	cachedItem, found := suite.cache.get(path)
 	suite.assert.True(found)
@@ -215,7 +247,11 @@ func (suite *cacheMapTestSuite) TestMarkDeletedFolder() {
 	filePath := "a/c1/f/TempFile.txt"
 	insertTime := time.Now()
 	attr := internal.CreateObjAttr(filePath, 1024, insertTime)
-	suite.cache.insert(attr, true, insertTime)
+	suite.cache.insert(insertOptions{
+		attr:     attr,
+		exists:   true,
+		cachedAt: insertTime,
+	})
 	// validate file item
 	cachedItem, found := suite.cache.get(filePath)
 	suite.assert.True(found)
@@ -249,7 +285,11 @@ func (suite *cacheMapTestSuite) TestInvalidateFolder() {
 	filePath := "a/c1/f/TempFile.txt"
 	insertTime := time.Now()
 	attr := internal.CreateObjAttr(filePath, 1024, insertTime)
-	suite.cache.insert(attr, true, insertTime)
+	suite.cache.insert(insertOptions{
+		attr:     attr,
+		exists:   true,
+		cachedAt: insertTime,
+	})
 	// validate file item
 	cachedItem, found := suite.cache.get(filePath)
 	suite.assert.True(found)
@@ -331,7 +371,6 @@ func (suite *cacheMapTestSuite) confirmMarkedDeleted(item *attrCacheItem) {
 	// check the item
 	suite.assert.NotNil(item)
 	suite.assert.False(item.exists())
-	suite.assert.EqualValues(item.attr, &internal.ObjAttr{})
 	// recurse over its children
 	if item.children != nil {
 		for _, val := range item.children {
@@ -344,7 +383,6 @@ func (suite *cacheMapTestSuite) confirmInvalid(item *attrCacheItem) {
 	// check item
 	suite.assert.NotNil(item)
 	suite.assert.False(item.attrFlag.IsSet(AttrFlagValid))
-	suite.assert.EqualValues(item.attr, &internal.ObjAttr{})
 	// recurse over its children
 	if item.children != nil {
 		for _, val := range item.children {

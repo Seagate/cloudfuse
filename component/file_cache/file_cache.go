@@ -550,7 +550,7 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 
 		// If the local directory has a path in it, it is likely due to !createEmptyFile.
 		if err == nil && !fc.createEmptyFile && len(path) > 0 {
-			log.Debug("FileCache::IsDirEmpty : %s had a subpath in the local cache", options.Name)
+			log.Debug("FileCache::IsDirEmpty : %s had a subpath in the local cache (%s)", options.Name, path[0])
 			return false
 		}
 

@@ -89,7 +89,10 @@ func getTestDirName(n int) string {
 
 func (suite *dirTestSuite) dirTestCleanup(toRemove []string) {
 	for _, path := range toRemove {
-		os.RemoveAll(path)
+		err := os.RemoveAll(path)
+		if err != nil {
+			fmt.Printf("dirTestCleanup : %s failed [%v]\n", path, err)
+		}
 	}
 }
 
@@ -309,11 +312,6 @@ func (suite *dirTestSuite) TestDirGetStats() {
 
 // # List directory
 func (suite *dirTestSuite) TestDirList() {
-	// TODO: why does this sometimes only list 3 entries (on Windows)?
-	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping TestDirList test on Windows (flaky).")
-		return
-	}
 	testDir := suite.testPath + "/bigTestDir"
 	err := os.Mkdir(testDir, 0777)
 	suite.Equal(nil, err)
@@ -629,7 +627,7 @@ func TestDirTestSuite(t *testing.T) {
 	// Sanity check in the off chance the same random name was generated twice and was still around somehow
 	err := os.RemoveAll(dirTest.testPath)
 	if err != nil {
-		fmt.Println("Could not cleanup feature dir before testing")
+		fmt.Printf("TestDirTestSuite : Could not cleanup feature dir before testing. Here's why: %v\n", err)
 	}
 
 	err = os.Mkdir(dirTest.testPath, 0777)
@@ -646,7 +644,7 @@ func TestDirTestSuite(t *testing.T) {
 	//  Wipe out the test directory created for End to End test
 	err = os.RemoveAll(dirTest.testPath)
 	if err != nil {
-		fmt.Println("Could not cleanup feature dir after testing")
+		fmt.Printf("TestDirTestSuite : Could not cleanup feature dir after testing. Here's why: %v\n", err)
 	}
 }
 

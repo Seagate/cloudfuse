@@ -1,7 +1,7 @@
 .idea/
 .vscode/
 *.out
-config.yaml
+config*.yaml
 testcnf.yaml
 cloudfuse.log
 cloudfuse.test

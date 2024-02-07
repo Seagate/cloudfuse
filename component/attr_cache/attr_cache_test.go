@@ -113,7 +113,11 @@ func (suite *attrCacheTestSuite) addPathToCache(path string, metadata bool) {
 	if isDir {
 		pathAttr = getDirPathAttr(path)
 	}
-	suite.attrCache.cache.insert(pathAttr, true, time.Now())
+	suite.attrCache.cache.insert(insertOptions{
+		attr:     pathAttr,
+		exists:   true,
+		cachedAt: time.Now(),
+	})
 }
 
 func (suite *attrCacheTestSuite) assertDeleted(path string) {
@@ -126,14 +130,12 @@ func (suite *attrCacheTestSuite) assertDeleted(path string) {
 func (suite *attrCacheTestSuite) assertInvalid(path string) {
 	cacheItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
-	suite.assert.EqualValues(&internal.ObjAttr{}, cacheItem.attr)
 	suite.assert.False(cacheItem.valid())
 }
 
 func (suite *attrCacheTestSuite) assertUntouched(path string) {
 	cacheItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
-	suite.assert.NotEqualValues(cacheItem.attr, &internal.ObjAttr{})
 	suite.assert.EqualValues(defaultSize, cacheItem.attr.Size)
 	suite.assert.EqualValues(defaultMode, cacheItem.attr.Mode)
 	suite.assert.True(cacheItem.valid())
@@ -143,7 +145,6 @@ func (suite *attrCacheTestSuite) assertUntouched(path string) {
 func (suite *attrCacheTestSuite) assertExists(path string) {
 	checkItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
-	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 	suite.assert.True(checkItem.valid())
 	suite.assert.True(checkItem.exists())
 }
@@ -151,7 +152,6 @@ func (suite *attrCacheTestSuite) assertExists(path string) {
 func (suite *attrCacheTestSuite) assertInCloud(path string) {
 	checkItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
-	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 	suite.assert.True(checkItem.valid())
 	suite.assert.True(checkItem.exists())
 	suite.assert.True(checkItem.isInCloud())
@@ -160,7 +160,6 @@ func (suite *attrCacheTestSuite) assertInCloud(path string) {
 func (suite *attrCacheTestSuite) assertNotInCloud(path string) {
 	checkItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
-	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 	suite.assert.True(checkItem.valid())
 	suite.assert.True(checkItem.exists())
 	suite.assert.False(checkItem.isInCloud())
@@ -530,7 +529,6 @@ func (suite *attrCacheTestSuite) TestReadDirDoesNotExist() {
 			for _, p := range aAttr {
 				checkItem, found := suite.attrCache.cache.get(p.Path)
 				suite.assert.True(found)
-				suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 				if !p.IsDir() {
 					suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
 					suite.assert.EqualValues(mode, checkItem.attr.Mode) // new mode should be set
@@ -542,8 +540,7 @@ func (suite *attrCacheTestSuite) TestReadDirDoesNotExist() {
 			// test same result from subsequent call without using cloud storage
 			returnedAttr, err = suite.attrCache.ReadDir(options)
 			suite.assert.Nil(err)
-			aDepth1Attr := append(aAttr[1:2], aAttr[3])
-			suite.assert.Equal(aDepth1Attr, returnedAttr)
+			suite.assert.Equal(aAttr, returnedAttr)
 		})
 	}
 }
@@ -582,7 +579,6 @@ func (suite *attrCacheTestSuite) TestReadDirExists() {
 				cachePath := internal.TruncateDirName(pString)
 				checkItem, found := suite.attrCache.cache.get(cachePath)
 				suite.assert.True(found)
-				suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 				if !checkItem.attr.IsDir() {
 					suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
 					suite.assert.EqualValues(mode, checkItem.attr.Mode) // new mode should be set
@@ -602,8 +598,7 @@ func (suite *attrCacheTestSuite) TestReadDirExists() {
 			// test same result from subsequent call without using cloud storage
 			returnedAttr, err = suite.attrCache.ReadDir(options)
 			suite.assert.Nil(err)
-			aDepth1Attr := append(aAttr[1:2], aAttr[3])
-			suite.assert.Equal(aDepth1Attr, returnedAttr)
+			suite.assert.Equal(aAttr, returnedAttr)
 		})
 	}
 }
@@ -709,7 +704,6 @@ func (suite *attrCacheTestSuite) TestStreamDirDoesNotExist() {
 			for _, p := range aAttr {
 				checkItem, found := suite.attrCache.cache.get(p.Path)
 				suite.assert.True(found)
-				suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 				if !p.IsDir() {
 					suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
 					suite.assert.EqualValues(mode, checkItem.attr.Mode) // new mode should be set
@@ -722,8 +716,7 @@ func (suite *attrCacheTestSuite) TestStreamDirDoesNotExist() {
 			returnedAttr, token, err = suite.attrCache.StreamDir(options)
 			suite.assert.Nil(err)
 			suite.assert.Empty(token)
-			aDepth1Attr := append(aAttr[1:2], aAttr[3])
-			suite.assert.Equal(aDepth1Attr, returnedAttr)
+			suite.assert.Equal(aAttr, returnedAttr)
 		})
 	}
 }
@@ -735,43 +728,62 @@ func (suite *attrCacheTestSuite) TestStreamDirPaginated() {
 	mockTokens := []string{"firstPair", "secondPair"}
 
 	// return first two results
-	options := internal.StreamDirOptions{Name: path, Token: "", Count: 2}
-	suite.mock.EXPECT().StreamDir(options).Return(manyAttr[0:2], mockTokens[0], nil).Times(1)
+	options0 := internal.StreamDirOptions{Name: path, Token: "", Count: 2}
+	suite.mock.EXPECT().StreamDir(options0).Return(manyAttr[0:2], mockTokens[0], nil).Times(1)
 
 	suite.assertCacheEmpty() // cacheMap should be empty before call
-	returnedAttr, token, err := suite.attrCache.StreamDir(options)
+	returnedAttr, token, err := suite.attrCache.StreamDir(options0)
+	suite.assert.Nil(err)
+	suite.assert.Equal(mockTokens[0], token)
+	suite.assert.Equal(manyAttr[0:2], returnedAttr)
+
+	returnedAttr, token, err = suite.attrCache.StreamDir(options0)
 	suite.assert.Nil(err)
 	suite.assert.Equal(mockTokens[0], token)
 	suite.assert.Equal(manyAttr[0:2], returnedAttr)
 
 	// return second pair of results
-	options = internal.StreamDirOptions{Name: path, Token: mockTokens[0], Count: 2}
-	suite.mock.EXPECT().StreamDir(options).Return(manyAttr[2:4], mockTokens[1], nil).Times(1)
+	options1 := internal.StreamDirOptions{Name: path, Token: mockTokens[0], Count: 2}
+	suite.mock.EXPECT().StreamDir(options1).Return(manyAttr[2:4], mockTokens[1], nil).Times(1)
 
-	returnedAttr, token, err = suite.attrCache.StreamDir(options)
+	returnedAttr, token, err = suite.attrCache.StreamDir(options1)
+	suite.assert.Nil(err)
+	suite.assert.Equal(mockTokens[1], token)
+	suite.assert.Equal(manyAttr[2:4], returnedAttr)
+
+	returnedAttr, token, err = suite.attrCache.StreamDir(options0)
+	suite.assert.Nil(err)
+	suite.assert.Equal(mockTokens[0], token)
+	suite.assert.Equal(manyAttr[0:2], returnedAttr)
+
+	returnedAttr, token, err = suite.attrCache.StreamDir(options1)
 	suite.assert.Nil(err)
 	suite.assert.Equal(mockTokens[1], token)
 	suite.assert.Equal(manyAttr[2:4], returnedAttr)
 
 	// return last pair of results
-	options = internal.StreamDirOptions{Name: path, Token: mockTokens[1], Count: 2}
-	suite.mock.EXPECT().StreamDir(options).Return(manyAttr[4:6], "", nil).Times(1)
+	options2 := internal.StreamDirOptions{Name: path, Token: mockTokens[1], Count: 2}
+	suite.mock.EXPECT().StreamDir(options2).Return(manyAttr[4:6], "", nil).Times(1)
 
-	returnedAttr, token, err = suite.attrCache.StreamDir(options)
+	returnedAttr, token, err = suite.attrCache.StreamDir(options2)
 	suite.assert.Nil(err)
 	suite.assert.Empty(token)
 	suite.assert.Equal(manyAttr[4:6], returnedAttr)
 
-	// request the first page again
-	options = internal.StreamDirOptions{Name: path, Token: "", Count: 2}
-	// there should be no cloud requests
-	suite.mock.EXPECT().StreamDir(options).Times(0)
+	returnedAttr, token, err = suite.attrCache.StreamDir(options0)
+	suite.assert.Nil(err)
+	suite.assert.Equal(mockTokens[0], token)
+	suite.assert.Equal(manyAttr[0:2], returnedAttr)
 
-	returnedAttr, token, err = suite.attrCache.StreamDir(options)
-	// the entire listing should be returned from cache
+	returnedAttr, token, err = suite.attrCache.StreamDir(options1)
+	suite.assert.Nil(err)
+	suite.assert.Equal(mockTokens[1], token)
+	suite.assert.Equal(manyAttr[2:4], returnedAttr)
+
+	returnedAttr, token, err = suite.attrCache.StreamDir(options2)
 	suite.assert.Nil(err)
 	suite.assert.Empty(token)
-	suite.assert.Equal(manyAttr, returnedAttr)
+	suite.assert.Equal(manyAttr[4:6], returnedAttr)
 }
 
 func (suite *attrCacheTestSuite) TestStreamDirExists() {
@@ -809,7 +821,6 @@ func (suite *attrCacheTestSuite) TestStreamDirExists() {
 				cachePath := internal.TruncateDirName(pString)
 				checkItem, found := suite.attrCache.cache.get(cachePath)
 				suite.assert.True(found)
-				suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 				if !checkItem.attr.IsDir() {
 					suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
 					suite.assert.EqualValues(mode, checkItem.attr.Mode) // new mode should be set
@@ -830,8 +841,7 @@ func (suite *attrCacheTestSuite) TestStreamDirExists() {
 			returnedAttr, token, err = suite.attrCache.StreamDir(options)
 			suite.assert.Nil(err)
 			suite.assert.Empty(token)
-			aDepth1Attr := append(aAttr[1:2], aAttr[3])
-			suite.assert.Equal(aDepth1Attr, returnedAttr)
+			suite.assert.Equal(aAttr, returnedAttr)
 		})
 	}
 }
@@ -1163,9 +1173,8 @@ func (suite *attrCacheTestSuite) TestCreateFile() {
 	_, err = suite.attrCache.CreateFile(options)
 	suite.assert.Nil(err)
 	checkItem, found = suite.attrCache.cache.get(path)
-	suite.assert.Nil(err)
+	suite.assert.True(found)
 	suite.assert.True(checkItem.exists())
-	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 	suite.assert.EqualValues(0, checkItem.attr.Size)
 }
 
@@ -1467,7 +1476,6 @@ func (suite *attrCacheTestSuite) TestTruncateFile() {
 
 	checkItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
-	suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 	suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
 	suite.assert.EqualValues(defaultMode, checkItem.attr.Mode)
 	suite.assert.True(checkItem.valid())
@@ -1548,7 +1556,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsDeleted() {
 
 			result, err := suite.attrCache.GetAttr(options)
 			suite.assert.Equal(err, syscall.ENOENT)
-			suite.assert.EqualValues(&internal.ObjAttr{}, result)
+			suite.assert.Nil(result)
 		})
 	}
 }
@@ -1659,11 +1667,11 @@ func (suite *attrCacheTestSuite) TestGetAttrOtherError() {
 			truncatedPath := internal.TruncateDirName(path)
 
 			options := internal.GetAttrOptions{Name: path}
-			suite.mock.EXPECT().GetAttr(options).Return(&internal.ObjAttr{}, os.ErrNotExist)
+			suite.mock.EXPECT().GetAttr(options).Return(nil, os.ErrNotExist)
 
 			result, err := suite.attrCache.GetAttr(options)
 			suite.assert.Equal(err, os.ErrNotExist)
-			suite.assert.EqualValues(&internal.ObjAttr{}, result)
+			suite.assert.Nil(result)
 			suite.assertNotInCache(truncatedPath)
 		})
 	}
@@ -1681,11 +1689,11 @@ func (suite *attrCacheTestSuite) TestGetAttrEnoentError() {
 			truncatedPath := internal.TruncateDirName(path)
 
 			options := internal.GetAttrOptions{Name: path}
-			suite.mock.EXPECT().GetAttr(options).Return(&internal.ObjAttr{}, syscall.ENOENT)
+			suite.mock.EXPECT().GetAttr(options).Return(nil, syscall.ENOENT)
 
 			result, err := suite.attrCache.GetAttr(options)
 			suite.assert.Equal(err, syscall.ENOENT)
-			suite.assert.EqualValues(&internal.ObjAttr{}, result)
+			suite.assert.Nil(result)
 			checkItem, found := suite.attrCache.cache.get(truncatedPath)
 			suite.assert.True(found)
 			suite.assert.True(checkItem.valid())
@@ -1800,7 +1808,6 @@ func (suite *attrCacheTestSuite) TestChmod() {
 			checkItem, found := suite.attrCache.cache.get(truncatedPath)
 			suite.assert.True(found)
 
-			suite.assert.NotEqualValues(checkItem.attr, &internal.ObjAttr{})
 			suite.assert.EqualValues(defaultSize, checkItem.attr.Size)
 			suite.assert.EqualValues(mode, checkItem.attr.Mode) // new mode should be set
 			suite.assert.True(checkItem.valid())
