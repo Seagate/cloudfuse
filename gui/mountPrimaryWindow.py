@@ -83,10 +83,10 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             self.button_browse.setToolTip("Browse to a pre-existing directory")
 
     def checkConfigDirectory(self):
-        currentDir = widgetFuncs.getWorkingDir(self)
-        if not os.path.isdir(currentDir):
+        workingDir = widgetFuncs.getWorkingDir(self)
+        if not os.path.isdir(workingDir):
             try:
-                os.mkdir(currentDir)
+                os.mkdir(workingDir)
             except OSError as e:
                 self.addOutputText(f"Failed to make own path: {str(e)}")
 
@@ -247,15 +247,15 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         # Update the pipeline/components before mounting the target
 
         targetBucket = bucketOptions[self.dropDown_bucketSelect.currentIndex()]
-        currentDir = widgetFuncs.getWorkingDir(self)
+        workingDir = widgetFuncs.getWorkingDir(self)
 
         # Read in the configs as a dictionary. Notify user if failed
         try:
-            with open(currentDir+'/config.yaml', 'r') as file:
+            with open(workingDir+'/config.yaml', 'r') as file:
                 configs = yaml.safe_load(file)
         except:
             self.errorMessageBox(
-                f"Could not read the config file in {currentDir}. Consider going through the settings for selected target.",
+                f"Could not read the config file in {workingDir}. Consider going through the settings for selected target.",
                 "Could not read config file")
             return
         
@@ -268,16 +268,16 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             configs['components'] = components
         else:
             self.errorMessageBox(
-                f"The components is missing in {currentDir}/config.yaml. Consider Going through the settings to create one.",
+                f"The components is missing in {workingDir}/config.yaml. Consider Going through the settings to create one.",
                 "Components in config missing")
             return
         
         # Write the config file with the modified components 
         try:
-            with open(currentDir+'/config.yaml','w') as file:
+            with open(workingDir+'/config.yaml','w') as file:
                 yaml.safe_dump(configs,file)
         except:
-            self.errorMessageBox(f"Could not modify {currentDir}/config.yaml.", "Could not modify config file")
+            self.errorMessageBox(f"Could not modify {workingDir}/config.yaml.", "Could not modify config file")
             return
     
     # run command and return tuple:
