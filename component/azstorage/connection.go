@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -73,6 +73,11 @@ type AzStorageConfig struct {
 	telemetry          string
 	honourACL          bool
 	disableSymlink     bool
+
+	// CPK related config
+	cpkEnabled             bool
+	cpkEncryptionKey       string
+	cpkEncryptionKeySha256 string
 }
 
 type AzStorageConnection struct {
@@ -123,6 +128,10 @@ type AzConnection interface {
 	ChangeOwner(string, int, int) error
 	TruncateFile(string, int64) error
 	StageAndCommit(name string, bol *common.BlockOffsetList) error
+
+	GetCommittedBlockList(string) (*internal.CommittedBlockList, error)
+	StageBlock(string, []byte, string) error
+	CommitBlocks(string, []string) error
 
 	NewCredentialKey(_, _ string) error
 }

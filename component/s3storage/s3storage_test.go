@@ -5,7 +5,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -2108,14 +2108,14 @@ func (s *s3StorageTestSuite) TestStreamDirSmallCountNoDuplicates() {
 	objectList := make([]*internal.ObjAttr, 0)
 
 	for {
-		newList, newMarker, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/", Token: marker, Count: 1})
+		newList, nextMarker, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/", Token: marker, Count: 1})
 		s.assert.Nil(err)
 		objectList = append(objectList, newList...)
-		marker = newMarker
+		marker = nextMarker
 		iteration++
 
 		log.Debug("s3StorageTestSuite::TestStreamDirSmallCountNoDuplicates : So far retrieved %d objects in %d iterations", len(objectList), iteration)
-		if newMarker == "" {
+		if nextMarker == "" {
 			break
 		}
 	}

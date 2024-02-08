@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -279,6 +279,31 @@ func (suite *LoopbackFSTestSuite) TestGetAttr() {
 	assert.Equal(attr.Name, info.Name())
 	assert.Equal(attr.Mode, info.Mode())
 	assert.Equal(attr.IsDir(), info.IsDir())
+}
+
+func (suite *LoopbackFSTestSuite) TestStageAndCommitData() {
+	defer suite.cleanupTest()
+	assert := assert.New(suite.T())
+
+	lfs := &LoopbackFS{}
+
+	lfs.path = common.ExpandPath("~/blocklfstest")
+	err := os.MkdirAll(lfs.path, os.FileMode(0777))
+	assert.Nil(err)
+	defer os.RemoveAll(lfs.path)
+
+	err = lfs.StageData(internal.StageDataOptions{Name: "testBlock", Data: []byte(loremText), Id: "123", Offset: 0})
+	assert.Nil(err)
+
+	err = lfs.StageData(internal.StageDataOptions{Name: "testBlock", Data: []byte(loremText), Id: "456", Offset: 2})
+	assert.Nil(err)
+
+	err = lfs.StageData(internal.StageDataOptions{Name: "testBlock", Data: []byte(loremText), Id: "789", Offset: 1})
+	assert.Nil(err)
+
+	blockList := []string{"123", "789", "456"}
+	err = lfs.CommitData(internal.CommitDataOptions{Name: "testBlock", List: blockList})
+	assert.Nil(err)
 }
 
 func TestLoopbackFSTestSuite(t *testing.T) {

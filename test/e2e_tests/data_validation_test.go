@@ -5,7 +5,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -424,11 +424,11 @@ func TestDataValidationTestSuite(t *testing.T) {
 	// Sanity check in the off chance the same random name was generated twice and was still around somehow
 	err := os.RemoveAll(dataValidationTest.testMntPath)
 	if err != nil {
-		fmt.Println("Could not cleanup feature dir before testing")
+		fmt.Printf("TestDataValidationTestSuite : Could not cleanup mount dir before testing. Here's why: %v\n", err)
 	}
 	err = os.RemoveAll(dataValidationTest.testCachePath)
 	if err != nil {
-		fmt.Println("Could not cleanup cache dir before testing")
+		fmt.Printf("TestDataValidationTestSuite : Could not cleanup cache dir before testing. Here's why: %v\n", err)
 	}
 
 	err = os.Mkdir(dataValidationTest.testMntPath, 0777)

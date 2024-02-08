@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 )
 
@@ -42,20 +43,35 @@ const (
 	AttrFlagNotInCloud
 )
 
+// one cached StreamDir response
+type listCacheSegment struct {
+	entries   []*internal.ObjAttr
+	nextToken string
+	cachedAt  time.Time
+}
+
 // attrCacheItem : Structure of each item in attr cache
 type attrCacheItem struct {
 	attr      *internal.ObjAttr
 	cachedAt  time.Time
-	listedAt  time.Time
-	listToken string
+	listCache map[string]listCacheSegment
 	attrFlag  common.BitMap16
 	children  map[string]*attrCacheItem
+	parent    *attrCacheItem
 }
 
 // all cache entries are organized into this structure
 type cacheTreeMap struct {
 	cacheMap  map[string]*attrCacheItem
 	cacheTree *attrCacheItem
+}
+
+// type passed to insert
+type insertOptions struct {
+	attr        *internal.ObjAttr
+	exists      bool
+	cachedAt    time.Time
+	fromDirList bool
 }
 
 // initialize the cache data structure
@@ -96,31 +112,41 @@ func (ctm *cacheTreeMap) get(path string) (item *attrCacheItem, found bool) {
 }
 
 // insert a new attrCacheItem and return a handle to it
-func (ctm *cacheTreeMap) insert(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {
-	if attr == nil {
+func (ctm *cacheTreeMap) insert(options insertOptions) *attrCacheItem {
+	if options.attr == nil {
+		return nil
+	}
+	if options.attr.Path == "" {
+		log.Warn("AttrCache::insert : Attempted to insert root directory")
 		return nil
 	}
 	// create the new record
-	newItem := newAttrCacheItem(attr, exists, cachedAt)
+	newItem := newAttrCacheItem(options.attr, options.exists, options.cachedAt)
 	// insert it (recursively)
-	ctm.insertItem(newItem)
+	ctm.insertItem(newItem, options.fromDirList)
 	// return a handle to it
 	return newItem
 }
 
-// use efficient recursion to add an item to the cache
-// newChild must be a record for an entry that is in the parent directory (not in a subdirectory)
-func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem) {
+// use efficient (bottom-up) recursion to add an item to the cache
+func (ctm *cacheTreeMap) insertItem(newItem *attrCacheItem, fromDirList bool) {
 	// find the parent
 	path := internal.TruncateDirName(newItem.attr.Path)
 	parentPath := getParentDir(path)
 	parentItem, parentFound := ctm.get(parentPath)
 	// if there is no parent, create one and add it
-	if !parentFound {
+	if !parentFound || (!parentItem.exists() && newItem.exists()) {
 		newParentAttr := internal.CreateObjAttrDir(parentPath)
 		parentItem = newAttrCacheItem(newParentAttr, newItem.exists(), newItem.cachedAt)
 		// recurse
-		ctm.insertItem(parentItem)
+		ctm.insertItem(parentItem, fromDirList)
+	}
+	// add the parent to this item
+	newItem.parent = parentItem
+	// if this changes the parent directory's contents
+	// invalidate the parent's listing cache
+	if !fromDirList && newItem.exists() {
+		parentItem.listCache = nil
 	}
 	// add the new item to the tree and the map
 	if parentItem.children == nil {
@@ -145,35 +171,75 @@ func (value *attrCacheItem) isInCloud() bool {
 	return isObject || isDirInCloud
 }
 
+func (value *attrCacheItem) isRoot() bool {
+	return value.attr.Path == ""
+}
+
 func (value *attrCacheItem) markDeleted(deletedTime time.Time) {
-	if value.exists() {
-		value.attrFlag.Clear(AttrFlagExists)
-		value.attrFlag.Set(AttrFlagValid)
-		value.cachedAt = deletedTime
-		value.attr = &internal.ObjAttr{}
-		for _, val := range value.children {
-			val.markDeleted(deletedTime)
-		}
+	// don't allow the root directory to be deleted
+	if value.isRoot() {
+		log.Warn("AttrCache::markDeleted : Attempted to delete root directory")
+		return
 	}
+	// don't do work that's already done
+	if !value.exists() {
+		return
+	}
+	// recurse
+	for _, val := range value.children {
+		val.markDeleted(deletedTime)
+	}
+	// invalidate the parent's listing cache
+	if value.parent == nil {
+		log.Warn("AttrCache::markDeleted : %s has no pointer to its parent", value.attr.Path)
+	} else {
+		value.parent.listCache = nil
+	}
+	// update flags and timestamp
+	value.attrFlag.Clear(AttrFlagExists)
+	value.attrFlag.Set(AttrFlagValid)
+	value.cachedAt = deletedTime
 }
 
 func (value *attrCacheItem) invalidate() {
-	if value.valid() {
-		value.attrFlag.Clear(AttrFlagValid)
-		value.attr = &internal.ObjAttr{}
-		for _, val := range value.children {
-			val.invalidate()
-		}
+	// never invalidate the root
+	if value.isRoot() {
+		log.Warn("AttrCache::invalidate : Attempted to invalidate root directory")
+		return
+	}
+	// don't do work that's already done
+	if !value.valid() {
+		return
+	}
+	// recurse
+	for _, val := range value.children {
+		val.invalidate()
+	}
+	// set invalid
+	value.attrFlag.Clear(AttrFlagValid)
+	// invalidate the parent's listing cache
+	if value.parent == nil {
+		log.Warn("AttrCache::invalidate : %s has no pointer to its parent", value.attr.Path)
+	} else if value.exists() {
+		value.parent.listCache = nil
 	}
 }
 
 func (value *attrCacheItem) markInCloud(inCloud bool) {
-	if value.attr.IsDir() {
-		if inCloud {
-			value.attrFlag.Clear(AttrFlagNotInCloud)
-		} else {
-			value.attrFlag.Set(AttrFlagNotInCloud)
-		}
+	// never mark the root as not in cloud
+	if value.isRoot() && !inCloud {
+		log.Warn("AttrCache::markInCloud : Attempted to mark root directory as not in cloud")
+		return
+	}
+	// this is only relevant for directories
+	if !value.attr.IsDir() {
+		return
+	}
+	// update the flag
+	if inCloud {
+		value.attrFlag.Clear(AttrFlagNotInCloud)
+	} else {
+		value.attrFlag.Set(AttrFlagNotInCloud)
 	}
 }
 

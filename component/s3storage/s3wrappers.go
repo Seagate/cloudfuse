@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -50,6 +50,7 @@ import (
 )
 
 const symlinkStr = ".rclonelink"
+const maxResultsPerListCall = 1000
 
 // getObjectMultipartDownload downloads an object to a file using multipart download
 // which can be much faster for large objects.
@@ -299,7 +300,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// prepare parameters
 	bucketName := cl.Config.authConfig.BucketName
 	if count == 0 {
-		count = common.MaxDirListCount
+		count = maxResultsPerListCall
 	}
 
 	// combine the configured prefix and the prefix being given to List to get a full listPath
@@ -315,7 +316,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// Check for an empty path to prevent indexing to [-1]
 	findCommonPrefixes := listPath == "" || listPath[len(listPath)-1] == '/'
 
-	var newMarker *string
+	var nextMarker *string
 	var token *string
 
 	// using paginator from here: https://aws.github.io/aws-sdk-go-v2/docs/making-requests/#using-paginators
@@ -324,6 +325,10 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 
 	if marker != nil && *marker == "" {
 		token = nil
+		// when called without a token, S3 returns the directory being listed as the first entry
+		// but when we list a directory, we only want the directory's *contents*
+		// so we need to ask for one more entry than we want
+		count++
 	} else {
 		token = marker
 	}
@@ -345,9 +350,9 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	}
 
 	if output.IsTruncated != nil && *output.IsTruncated {
-		newMarker = output.NextContinuationToken
+		nextMarker = output.NextContinuationToken
 	} else {
-		newMarker = nil
+		nextMarker = nil
 	}
 
 	// documentation for this S3 data structure:
@@ -418,7 +423,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 
 	log.Debug("Client::List : %s returning %d entries", prefix, len(objectAttrList))
 
-	return objectAttrList, newMarker, nil
+	return objectAttrList, nextMarker, nil
 }
 
 // create an object attributes struct

@@ -57,6 +57,7 @@ azstorage:
   mode: key
   endpoint: myEndpoint
   container: myContainer
+  max-retries: 1
 components:
   - libfuse
   - file_cache
@@ -149,8 +150,7 @@ func (suite *mountTestSuite) TestForegroundMountPathNotProvided() {
 func (suite *mountTestSuite) TestForegroundConfigFileEmpty() {
 	defer suite.cleanupTest()
 
-	mntDir := filepath.Join("tmp", "mntdir")
-	defer os.RemoveAll(mntDir)
+	mntDir := "mntdir"
 
 	op, err := executeCommandC(rootCmd, "mount", mntDir, "--config-file=", "--foreground=true")
 	suite.assert.NotNil(err)
@@ -161,8 +161,7 @@ func (suite *mountTestSuite) TestForegroundConfigFileEmpty() {
 func (suite *mountTestSuite) TestForegroundConfigFileTypeUnsupported() {
 	defer suite.cleanupTest()
 
-	mntDir := filepath.Join("tmp", "mntdir")
-	defer os.RemoveAll(mntDir)
+	mntDir := "mntdir"
 
 	op, err := executeCommandC(rootCmd, "mount", mntDir, "--config-file=cfgInvalid.yam", "--foreground=true")
 	suite.assert.NotNil(err)
@@ -174,8 +173,7 @@ func (suite *mountTestSuite) TestForegroundConfigFileTypeUnsupported() {
 func (suite *mountTestSuite) TestForegroundConfigFileNotFound() {
 	defer suite.cleanupTest()
 
-	mntDir := filepath.Join("tmp", "mntdir")
-	defer os.RemoveAll(mntDir)
+	mntDir := "mntdir"
 
 	op, err := executeCommandC(rootCmd, "mount", mntDir, "--config-file=cfgNotFound.yaml", "--foreground=true")
 	suite.assert.NotNil(err)
@@ -192,8 +190,7 @@ func (suite *mountTestSuite) TestForegroundConfigFileNotFound() {
 func (suite *mountTestSuite) TestForegroundConfigFileNotProvided() {
 	defer suite.cleanupTest()
 
-	mntDir := filepath.Join("tmp", "mntdir")
-	defer os.RemoveAll(mntDir)
+	mntDir := "mntdir"
 
 	op, err := executeCommandC(rootCmd, "mount", mntDir, "--foreground=true")
 	suite.assert.NotNil(err)
@@ -203,8 +200,7 @@ func (suite *mountTestSuite) TestForegroundConfigFileNotProvided() {
 func (suite *mountTestSuite) TestForegroundDefaultConfigFile() {
 	defer suite.cleanupTest()
 
-	mntDir := filepath.Join("tmp", "mntdir")
-	defer os.RemoveAll(mntDir)
+	mntDir := "mntdir"
 
 	currDir, err := os.Getwd()
 	suite.assert.Nil(err)
@@ -235,8 +231,7 @@ func (suite *mountTestSuite) TestForegroundDefaultConfigFile() {
 func (suite *mountTestSuite) TestForegroundInvalidLogLevel() {
 	defer suite.cleanupTest()
 
-	mntDir := filepath.Join("tmp", "mntdir")
-	defer os.RemoveAll(mntDir)
+	mntDir := "mntdir"
 
 	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "--log-level=debug", "--foreground=true")
 	suite.assert.NotNil(err)
@@ -246,8 +241,7 @@ func (suite *mountTestSuite) TestForegroundInvalidLogLevel() {
 func (suite *mountTestSuite) TestForegroundCliParamsV1() {
 	defer suite.cleanupTest()
 
-	mntDir := filepath.Join("tmp", "mntdir")
-	defer os.RemoveAll(mntDir)
+	mntDir := "mntdir"
 
 	tempLogDir := "/tmp/templogs_" + randomString(6)
 	defer os.RemoveAll(tempLogDir)
@@ -261,8 +255,7 @@ func (suite *mountTestSuite) TestForegroundCliParamsV1() {
 func (suite *mountTestSuite) TestForegroundStreamAttrCacheOptionsV1() {
 	defer suite.cleanupTest()
 
-	mntDir := filepath.Join("tmp", "mntdir")
-	defer os.RemoveAll(mntDir)
+	mntDir := "mntdir"
 
 	tempLogDir := "/tmp/templogs_" + randomString(6)
 	defer os.RemoveAll(tempLogDir)
@@ -277,8 +270,7 @@ func (suite *mountTestSuite) TestForegroundStreamAttrCacheOptionsV1() {
 func (suite *mountTestSuite) TestForegroundInvalidUmaskValue() {
 	defer suite.cleanupTest()
 
-	mntDir := filepath.Join("tmp", "mntdir")
-	defer os.RemoveAll(mntDir)
+	mntDir := "mntdir"
 
 	// incorrect umask value
 	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "--foreground=true",

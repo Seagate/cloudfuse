@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -81,6 +81,7 @@ type dirChildCache struct {
 	length   uint64              // Length of the children list
 	token    string              // Token to get next block of items from container
 	children []*internal.ObjAttr // Slice holding current block of children
+	lastPage bool                // Whether current block is the last one
 }
 
 // LibfuseOptions defines the config parameters.
@@ -309,9 +310,9 @@ func (lf *Libfuse) Configure(_ bool) error {
 	}
 
 	log.Info("Libfuse::Configure : read-only %t, allow-other %t, allow-root %t, default-perm %d, entry-timeout %d, attr-time %d, negative-timeout %d, "+
-		"ignore-open-flags: %t, nonempty %t, network-share %t, direct_io %t",
+		"ignore-open-flags: %t, nonempty %t, network-share %t, direct_io %t, max-fuse-threads %d, fuse-trace %t, extension %s, disable-writeback-cache %t, dirPermission %v, mountPath %v, umask %v",
 		lf.readOnly, lf.allowOther, lf.allowRoot, lf.filePermission, lf.entryExpiration, lf.attributeExpiration, lf.negativeTimeout,
-		lf.ignoreOpenFlags, lf.nonEmptyMount, lf.networkShare, lf.directIO)
+		lf.ignoreOpenFlags, lf.nonEmptyMount, lf.networkShare, lf.directIO, lf.maxFuseThreads, lf.traceEnable, lf.extensionPath, lf.disableWritebackCache, lf.dirPermission, lf.mountPath, lf.umask)
 
 	return nil
 }

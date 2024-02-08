@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -294,6 +294,9 @@ func (az *AzStorage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	}
 
 	path := formatListDirName(options.Name)
+	if options.Count == 0 {
+		options.Count = common.MaxDirListCount
+	}
 
 	new_list, new_marker, err := az.storage.List(path, &options.Token, options.Count)
 	if err != nil {
@@ -542,6 +545,18 @@ func (az *AzStorage) FlushFile(options internal.FlushFileOptions) error {
 	return az.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
 }
 
+func (az *AzStorage) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
+	return az.storage.GetCommittedBlockList(name)
+}
+
+func (az *AzStorage) StageData(opt internal.StageDataOptions) error {
+	return az.storage.StageBlock(opt.Name, opt.Data, opt.Id)
+}
+
+func (az *AzStorage) CommitData(opt internal.CommitDataOptions) error {
+	return az.storage.CommitBlocks(opt.Name, opt.List)
+}
+
 // TODO : Below methods are pending to be implemented
 // SetAttr(string, internal.ObjAttr) error
 // UnlinkFile(string) error
@@ -645,6 +660,9 @@ func init() {
 
 	restrictedCharsWin := config.AddBoolFlag("restricted-characters-windows", false, "Enable support for displaying restricted characters on Windows.")
 	config.BindPFlag("restricted-characters-windows", restrictedCharsWin)
+
+	cpkEnabled := config.AddBoolFlag("cpk-enabled", false, "Enable client provided key.")
+	config.BindPFlag(compName+".cpk-enabled", cpkEnabled)
 
 	config.RegisterFlagCompletionFunc("container-name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveNoFileComp

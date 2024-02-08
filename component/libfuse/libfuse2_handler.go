@@ -4,7 +4,7 @@ package libfuse
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -122,7 +122,7 @@ func (lf *Libfuse) initFuse() error {
 			lf.negativeTimeout)
 	}
 
-	// While reading a file let kernel do readahed for better perf
+	// While reading a file let kernel do readahead for better perf
 	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)
 
 	// Max background thread on the fuse layer for high parallelism
@@ -348,6 +348,8 @@ func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 		log.Err("Libfuse::Mkdir : Failed to create %s [%s]", name, err.Error())
 		if os.IsPermission(err) {
 			return -fuse.EACCES
+		} else if os.IsExist(err) {
+			return -fuse.EEXIST
 		} else {
 			return -fuse.EIO
 		}
@@ -407,75 +409,135 @@ func (cf *CgofuseFS) Releasedir(path string, fh uint64) int {
 }
 
 // Readdir reads a directory at the path.
-func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat_t, ofst int64) bool,
-	ofst int64, fh uint64) int {
-	log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d", path, ofst, fh)
+func (cf *CgofuseFS) Readdir(path string, fill func(name string, stat *fuse.Stat_t, ofst int64) bool, ofst int64, fh uint64) int {
+	// Readdir is called with a file handle, which was created when the OS called Opendir
+	// Fetch our data for that file handle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
 		log.Trace("Libfuse::Readdir : Failed to read %s, handle: %d", path, fh)
 		return -fuse.EBADF
 	}
-
+	// Get the directory listing cache (cacheInfo) from the file handle
 	handle.RLock()
 	val, found := handle.GetValue("cache")
 	handle.RUnlock()
-
 	if !found {
 		return -fuse.EIO
 	}
-
-	ofst64 := uint64(ofst)
 	cacheInfo := val.(*dirChildCache)
-	log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d - cached %d-%d (token=%s)",
-		path, ofst, fh, cacheInfo.sIndex, cacheInfo.eIndex, cacheInfo.token)
-	if ofst64 == 0 ||
-		(ofst64 >= cacheInfo.eIndex && cacheInfo.token != "") {
-		attrs, token, err := fuseFS.NextComponent().StreamDir(internal.StreamDirOptions{
-			Name:   handle.Path,
-			Offset: ofst64,
-			Token:  cacheInfo.token,
-			Count:  common.MaxDirListCount,
-		})
 
-		if err != nil {
-			log.Err("Libfuse::Readdir : Path %s, handle: %d, offset %d. Error in retrieval", handle.Path, handle.ID, ofst64)
-			if os.IsNotExist(err) {
-				return -fuse.ENOENT
-			} else if os.IsPermission(err) {
-				return -fuse.EACCES
+	// figure out what we need to provide to the OS
+	offset := uint64(ofst)
+	// is this a brand new request (not the continuation of a previous one)?
+	newRequest := offset == 0
+	if newRequest {
+		// cache the first two entries ('.' & '..')
+		cacheDots(cacheInfo)
+	}
+	startOffset := offset
+	// fetch and serve directory contents back to the OS in a loop until their buffer is full
+	for {
+		// is the next offset we need already cached in our cacheInfo structure?
+		offsetCached := startOffset >= cacheInfo.sIndex && startOffset < cacheInfo.eIndex
+		fetchDataFromPipeline := !offsetCached
+		if fetchDataFromPipeline {
+			// populate cache from pipeline
+			errorCode := populateDirChildCache(handle, cacheInfo, startOffset)
+			if errorCode != 0 {
+				log.Err("Libfuse::Readdir : Path %s, handle: %d, offset %d. Error in retrieval", handle.Path, handle.ID, offset)
+				return errorCode
 			}
-
-			return -fuse.EIO
 		}
-
-		if ofst64 == 0 {
-			attrs = append([]*internal.ObjAttr{{Flags: fuseFS.lsFlags, Name: "."}, {Flags: fuseFS.lsFlags, Name: ".."}}, attrs...)
+		// we can't get the requested data (validToken is probably false)
+		if startOffset >= cacheInfo.eIndex {
+			log.Warn("Libfuse::Readdir : %s offset=%d but last cached offset is %d (token=%s)",
+				path, startOffset, cacheInfo.eIndex, cacheInfo.token)
+			// If offset is still beyond the end index limit then we are done iterating
+			return 0
 		}
+		// serve entries from cache
+		nextOffset, done := serveCachedEntries(cacheInfo, startOffset, fill)
+		log.Debug("Libfuse::Readdir : %s, offset: %d, handle: %d - returned entries %d-%d",
+			path, offset, fh, startOffset, nextOffset-1)
+		// break when the OS is done with this Readdir call
+		if done {
+			break
+		}
+		// update offset for iteration
+		startOffset = nextOffset
+	}
+	return 0
+}
 
-		cacheInfo.sIndex = ofst64
-		cacheInfo.eIndex = ofst64 + uint64(len(attrs))
-		cacheInfo.length = uint64(len(attrs))
-		cacheInfo.token = token
+type fillFunc = func(name string, stat *fuse.Stat_t, ofst int64) bool
+
+// add the first two entries in any directory listing ('.' and '..') to the cache
+// this replaces any existing cache
+func cacheDots(cacheInfo *dirChildCache) {
+	dotAttrs := []*internal.ObjAttr{{Flags: fuseFS.lsFlags, Name: "."}, {Flags: fuseFS.lsFlags, Name: ".."}}
+	cacheInfo.sIndex = 0
+	cacheInfo.eIndex = 2
+	cacheInfo.length = 2
+	cacheInfo.token = ""
+	cacheInfo.children = cacheInfo.children[:0]
+	cacheInfo.children = dotAttrs
+	cacheInfo.lastPage = false
+}
+
+// Fill the directory list cache with data from the next component
+func populateDirChildCache(handle *handlemap.Handle, cacheInfo *dirChildCache, offset uint64) (errorCode int) {
+	// don't get more entries if there are no more
+	if cacheInfo.lastPage {
+		return
+	}
+	// get entries from the pipeline
+	returnedAttrs, token, err := fuseFS.NextComponent().StreamDir(internal.StreamDirOptions{
+		Name:  handle.Path,
+		Token: cacheInfo.token,
+	})
+	if err != nil {
+		if os.IsNotExist(err) {
+			return -fuse.ENOENT
+		} else if os.IsPermission(err) {
+			return -fuse.EACCES
+		}
+		return -fuse.EIO
+	}
+	// compile results and update cache
+	// let the cache grow to MaxDirListCount
+	replaceCache := cacheInfo.length+uint64(len(returnedAttrs)) > common.MaxDirListCount
+	if replaceCache {
+		cacheInfo.sIndex = offset
+		cacheInfo.eIndex = offset
 		cacheInfo.children = cacheInfo.children[:0]
-		cacheInfo.children = attrs
+		cacheInfo.length = 0
 	}
-
-	if ofst64 >= cacheInfo.eIndex {
-		// If offset is still beyond the end index limit then we are done iterating
-		return 0
-	}
-
-	stbuf := fuse.Stat_t{}
-
-	// Populate the stat by calling filler
-	for segmentIdx := ofst64 - cacheInfo.sIndex; segmentIdx < cacheInfo.length; segmentIdx++ {
-		fuseFS.fillStat(cacheInfo.children[segmentIdx], &stbuf)
-
-		name := cacheInfo.children[segmentIdx].Name
-		fill(name, &stbuf, ofst)
-	}
+	cacheInfo.eIndex += uint64(len(returnedAttrs))
+	cacheInfo.children = append(cacheInfo.children, returnedAttrs...)
+	cacheInfo.length += uint64(len(returnedAttrs))
+	cacheInfo.token = token
+	cacheInfo.lastPage = token == ""
 
 	return 0
+}
+
+// call fill with cache entries from our cache of directory contents
+func serveCachedEntries(cacheInfo *dirChildCache, startOffset uint64, fill fillFunc) (nextOffset uint64, done bool) {
+	stbuf := fuse.Stat_t{}
+	// Populate the stat by calling filler
+	nextOffset = startOffset
+	for cacheIndex := nextOffset - cacheInfo.sIndex; cacheIndex < cacheInfo.length && !done; cacheIndex++ {
+		// prepare entry
+		fuseFS.fillStat(cacheInfo.children[cacheIndex], &stbuf)
+		name := cacheInfo.children[cacheIndex].Name
+		// call fill with name, stat buffer, and the offset for the *next* entry
+		nextOffset++
+		done = !fill(name, &stbuf, int64(nextOffset))
+	}
+	// also quit when the directory has no more entries
+	done = done || cacheInfo.lastPage
+
+	return nextOffset, done
 }
 
 // Rmdir deletes a directory.

@@ -4,7 +4,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -57,6 +57,7 @@ azstorage:
   mode: key
   endpoint: myEndpoint
   container: myContainer
+  max-retries: 1
 components:
   - libfuse
   - file_cache
@@ -66,20 +67,6 @@ health_monitor:
   monitor-disable-list:
     - network_profiler
     - cloudfuse_stats
-`
-
-var configMountLoopback string = `
-logging:
-  type: syslog
-default-working-dir: /tmp/cloudfuse
-components:
-  - libfuse
-  - loopbackfs
-libfuse:
-  attribute-expiration-sec: 120
-  entry-expiration-sec: 60
-loopbackfs:
-  path: /tmp/bfuseloopback
 `
 
 var configPriorityTest string = `
@@ -159,8 +146,9 @@ func (suite *mountTestSuite) TestMountDirNotEmpty() {
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "mount directory is not empty")
 
-	op, err = executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "-o", "nonempty", "--foreground")
+	op, err = executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "-o", "nonempty")
 	suite.assert.NotNil(err)
+	suite.assert.Contains(op, "failed to initialize new pipeline")
 }
 
 // mount failure test where the mount path is not provided
@@ -320,22 +308,6 @@ func (suite *mountTestSuite) TestStreamAttrCacheOptionsV1() {
 		"--streaming", "--use-attr-cache", "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check")
 	suite.assert.NotNil(err)
 	suite.assert.Contains(op, "failed to initialize new pipeline")
-}
-
-func (suite *mountTestSuite) TestBlockCacheMountWithoutRO() {
-	defer suite.cleanupTest()
-
-	mntDir, err := os.MkdirTemp("", "mntdir")
-	suite.assert.Nil(err)
-	defer os.RemoveAll(mntDir)
-
-	tempLogDir := "/tmp/templogs_" + randomString(6)
-	defer os.RemoveAll(tempLogDir)
-
-	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--log-file-path=%s", tempLogDir+"/blobfuse2.log"),
-		"--block-cache", "--use-attr-cache", "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check")
-	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "filesystem is not mounted in read-only mode")
 }
 
 // mount failure test where a libfuse option is incorrect

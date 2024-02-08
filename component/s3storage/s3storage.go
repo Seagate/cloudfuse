@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -213,17 +213,17 @@ func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAt
 	var iteration int  // = 0
 	var marker *string // = nil
 	for {
-		newList, newMarker, err := s3.storage.List(path, marker, common.MaxDirListCount)
+		newList, nextMarker, err := s3.storage.List(path, marker, maxResultsPerListCall)
 		if err != nil {
 			log.Err("S3Storage::ReadDir : Failed to read dir [%s]", err)
 			return objectList, err
 		}
 		objectList = append(objectList, newList...)
-		marker = newMarker
+		marker = nextMarker
 		iteration++
 
 		log.Debug("S3Storage::ReadDir : So far retrieved %d objects in %d iterations", len(objectList), iteration)
-		if newMarker == nil || *newMarker == "" {
+		if nextMarker == nil || *nextMarker == "" {
 			break
 		}
 	}
@@ -239,8 +239,12 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	var iteration int                   // = 0
 	var marker *string = &options.Token // = nil
 	var totalEntriesFetched int32
-	for totalEntriesFetched < options.Count {
-		newList, nextMarker, err := s3.storage.List(path, marker, options.Count-totalEntriesFetched)
+	entriesRemaining := options.Count
+	if options.Count == 0 {
+		entriesRemaining = maxResultsPerListCall
+	}
+	for entriesRemaining > 0 {
+		newList, nextMarker, err := s3.storage.List(path, marker, entriesRemaining)
 		if err != nil {
 			log.Err("S3Storage::StreamDir : %s Failed to read dir [%s]", options.Name, err)
 			return objectList, "", err
@@ -257,6 +261,13 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		} else {
 			log.Debug("S3Storage::StreamDir : %s List iteration %d nextMarker=\"%s\"",
 				options.Name, iteration, *nextMarker)
+		}
+		// decrement and loop
+		entriesRemaining -= totalEntriesFetched
+		// in one case, the response will be missing one entry (see comment above `count++` in Client::List)
+		if entriesRemaining == 1 && options.Token == "" && options.Count >= maxResultsPerListCall {
+			// don't make a request just for that one leftover entry
+			break
 		}
 	}
 
