@@ -264,21 +264,22 @@ class widgetCustomFunctions(QWidget):
         # Each individual widget will need to override this function
         pass
 
-    def getCurrentDir(self):
-        defaultFuseDir = 'Cloudfuse'
+    def getWorkingDir(self):
         if platform == "win32":
+            defaultFuseDir = 'Cloudfuse'
             userDir = os.getenv('APPDATA')
-            currentDir = os.path.join(userDir, defaultFuseDir)
         else:
-            currentDir = os.getcwd()
-        return currentDir
+            defaultFuseDir = '.Cloudfuse'
+            userDir = os.getenv('HOME')
+        workingDir = os.path.join(userDir, defaultFuseDir)
+        return workingDir
 
     def writeConfigFile(self):
         self.updateSettingsFromUIChoices()
         dictForConfigs = self.constructDictForConfig()
-        currentDir = self.getCurrentDir()
+        workingDir = self.getWorkingDir()
         try:
-            with open(currentDir+'/config.yaml','w') as file:
+            with open(workingDir+'/config.yaml','w') as file:
                 yaml.safe_dump(dictForConfigs,file)
                 return True
         except:
@@ -289,10 +290,10 @@ class widgetCustomFunctions(QWidget):
             return False
             
     def getConfigs(self,useDefault=False):
-        currentDir = self.getCurrentDir()
+        workingDir = self.getWorkingDir()
         if useDefault:
             try:
-                with open(currentDir+'/default_config.yaml','r') as file:
+                with open(workingDir+'/default_config.yaml','r') as file:
                     configs = yaml.safe_load(file)
                     if configs is None:
                         # The default file is empty, use programmed defaults
@@ -304,7 +305,7 @@ class widgetCustomFunctions(QWidget):
                 configs = self.constructDictForConfig()
         else:
             try:
-                with open(currentDir+'/config.yaml', 'r') as file:
+                with open(workingDir+'/config.yaml', 'r') as file:
                     configs = yaml.safe_load(file)
                     if configs is None:
                        # The configs file exists, but is empty, use default settings

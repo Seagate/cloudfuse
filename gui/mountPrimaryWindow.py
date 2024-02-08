@@ -50,6 +50,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.setWindowTitle("Cloud FUSE")
         self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "primaryWindow")
         self.initMountPoint()
+        self.checkConfigDirectory()
 
         if platform == 'win32':
             # Windows directory and filename conventions:
@@ -61,6 +62,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
             self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
        
+
         # Set up the signals for all the interactable intities
         self.button_browse.clicked.connect(self.getFileDirInput)
         self.button_config.clicked.connect(self.showSettingsWidget)
@@ -72,7 +74,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.action_debugLogging.triggered.connect(self.showUnderConstructionPage)
         self.action_debugTesting.triggered.connect(self.showUnderConstructionPage)
         self.lineEdit_mountPoint.editingFinished.connect(self.updateMountPointInSettings)
-
+        self.dropDown_bucketSelect.currentIndexChanged.connect(self.modifyPipeline)
         if platform == "win32":
             self.lineEdit_mountPoint.setToolTip("Designate a new location to mount the bucket, do not create the directory")
             self.button_browse.setToolTip("Browse to a new location but don't create a new directory")
@@ -80,6 +82,13 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             self.lineEdit_mountPoint.setToolTip("Designate a location to mount the bucket - the directory must already exist")
             self.button_browse.setToolTip("Browse to a pre-existing directory")
 
+    def checkConfigDirectory(self):
+        workingDir = widgetFuncs.getWorkingDir(self)
+        if not os.path.isdir(workingDir):
+            try:
+                os.mkdir(workingDir)
+            except OSError as e:
+                self.addOutputText(f"Failed to make own path: {str(e)}")
 
     def initMountPoint(self):
         try:
@@ -135,21 +144,13 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
 
     def mountBucket(self):
-        self.addOutputText("Validating configuration...")
-        # Update the pipeline/components before mounting the target
-        targetIndex = self.dropDown_bucketSelect.currentIndex() 
-        success = self.modifyPipeline(bucketOptions[targetIndex])
-        if not success:
-            # Don't try mounting the container since the config file couldn't be modified for the pipeline setting
-            self.addOutputText("Failed to update config file with new bucket selection, not mounting")
-            return
-        
+
         try:
             directory = str(self.lineEdit_mountPoint.text())
         except ValueError as e:
             self.addOutputText(f"Invalid mount path: {str(e)}")
             return
-        configPath = os.path.join(widgetFuncs.getCurrentDir(self), 'config.yaml')
+        configPath = os.path.join(widgetFuncs.getWorkingDir(self), 'config.yaml')
 
         if platform == "win32":
             # Windows mount has a quirk where the folder shouldn't exist yet,
@@ -237,44 +238,47 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         else:
             self.addOutputText(f"Successfully unmounted container {stdErr}")
 
-    # This function reads in the config file, modifies the components section, then writes the config file back
-    def modifyPipeline(self,target):
 
-        currentDir = widgetFuncs.getCurrentDir(self)
+
+    # This function reads in the config file, modifies the components section, then writes the config file back
+    def modifyPipeline(self):
         
+        self.addOutputText("Validating configuration...")
+        # Update the pipeline/components before mounting the target
+
+        targetBucket = bucketOptions[self.dropDown_bucketSelect.currentIndex()]
+        workingDir = widgetFuncs.getWorkingDir(self)
+
         # Read in the configs as a dictionary. Notify user if failed
         try:
-            with open(currentDir+'/config.yaml', 'r') as file:
+            with open(workingDir+'/config.yaml', 'r') as file:
                 configs = yaml.safe_load(file)
         except:
             self.errorMessageBox(
-                f"Could not read the config file in {currentDir}. Consider going through the settings for selected target.",
+                f"Could not read the config file in {workingDir}. Consider going through the settings for selected target.",
                 "Could not read config file")
-            return False
+            return
         
         # Modify the components (pipeline) in the config file. 
         #   If the components are not present, there's a chance the configs are wrong. Notify user.
 
         components = configs.get('components')
         if components != None:
-            components[mountTargetComponent] = target
+            components[mountTargetComponent] = targetBucket
             configs['components'] = components
         else:
             self.errorMessageBox(
-                f"The components is missing in {currentDir}/config.yaml. Consider Going through the settings to create one.",
+                f"The components is missing in {workingDir}/config.yaml. Consider Going through the settings to create one.",
                 "Components in config missing")
-            return False
+            return
         
         # Write the config file with the modified components 
         try:
-            with open(currentDir+'/config.yaml','w') as file:
+            with open(workingDir+'/config.yaml','w') as file:
                 yaml.safe_dump(configs,file)
         except:
-            self.errorMessageBox(f"Could not modify {currentDir}/config.yaml.", "Could not modify config file")
-            return False
-        
-        # If nothing failed so far, return true to proceed to the mount phase
-        return True
+            self.errorMessageBox(f"Could not modify {workingDir}/config.yaml.", "Could not modify config file")
+            return
     
     # run command and return tuple:
     # (stdOut, stdErr, exitCode, executableFound)
