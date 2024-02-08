@@ -5,7 +5,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -160,7 +160,7 @@ func (suite *mountSuite) TestMountDirNotExists() {
 }
 
 // mount failure test where the mount directory is not empty
-func (suite *mountSuite) TestMountDirNotEmpty() {
+func (suite *mountSuite) TestMountDirNotEmptyFailure() {
 	tempDir := filepath.Join(mntDir, "tempdir")
 	_ = os.Mkdir(tempDir, 0777)
 	mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--config-file="+configFile)
@@ -190,6 +190,32 @@ func (suite *mountSuite) TestMountDirNotEmpty() {
 
 	// unmount
 	cloudfuseUnmount(suite, "Nothing to unmount")
+}
+
+// mount non-empty directory using nonempty flag
+func (suite *mountSuite) TestMountDirNotEmptySuccess() {
+	tempDir := filepath.Join(mntDir, "tempdir")
+	_ = os.Mkdir(tempDir, 0777)
+
+	mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--config-file="+configFile, "-o", "nonempty")
+	cliOut, err := mountCmd.Output()
+	suite.Equal(0, len(cliOut))
+	suite.Equal(nil, err)
+
+	// wait for mount
+	time.Sleep(10 * time.Second)
+
+	// validate mount
+	cliOut = listCloudfuseMounts(suite)
+	suite.NotEqual(0, len(cliOut))
+	suite.Contains(string(cliOut), mntDir)
+
+	remountCheck(suite)
+
+	// unmount
+	cloudfuseUnmount(suite, mntDir)
+
+	os.RemoveAll(tempDir)
 }
 
 // mount failure test where the mount path is not provided

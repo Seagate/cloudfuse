@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -150,8 +150,8 @@ func (ac *AttrCache) Configure(_ bool) error {
 	ac.noSymlinks = conf.NoSymlinks
 	ac.cacheDirs = !conf.NoCacheDirs
 
-	log.Info("AttrCache::Configure : cache-timeout %d, symlink %t, cache-on-list %t",
-		ac.cacheTimeout, ac.noSymlinks, ac.cacheOnList)
+	log.Info("AttrCache::Configure : cache-timeout %d, symlink %t, cache-on-list %t, max-files %d",
+		ac.cacheTimeout, ac.noSymlinks, ac.cacheOnList, ac.maxFiles)
 
 	return nil
 }
@@ -312,7 +312,7 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("AttrCache::CreateDir : %s", options.Name)
 	err := ac.NextComponent().CreateDir(options)
-	if err == nil {
+	if err == nil || err == syscall.EEXIST {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 		// does the directory already exist?
@@ -1079,6 +1079,21 @@ func (ac *AttrCache) Chown(options internal.ChownOptions) error {
 	err := ac.NextComponent().Chown(options)
 	// TODO: Implement when datalake chown is supported.
 
+	return err
+}
+
+func (ac *AttrCache) CommitData(options internal.CommitDataOptions) error {
+	log.Trace("AttrCache::CommitData : %s", options.Name)
+	err := ac.NextComponent().CommitData(options)
+	if err == nil {
+		ac.cacheLock.RLock()
+		defer ac.cacheLock.RUnlock()
+
+		entry, found := ac.cache.get(options.Name)
+		if found {
+			entry.invalidate()
+		}
+	}
 	return err
 }
 

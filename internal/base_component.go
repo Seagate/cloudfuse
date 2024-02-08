@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -313,4 +313,26 @@ func (base *BaseComponent) StatFs() (*common.Statfs_t, bool, error) {
 		return base.next.StatFs()
 	}
 	return nil, false, nil
+}
+
+func (base *BaseComponent) GetCommittedBlockList(name string) (*CommittedBlockList, error) {
+	if base.next != nil {
+		return base.next.GetCommittedBlockList(name)
+	}
+
+	return nil, nil
+}
+
+func (base *BaseComponent) StageData(opt StageDataOptions) error {
+	if base.next != nil {
+		return base.next.StageData(opt)
+	}
+	return nil
+}
+
+func (base *BaseComponent) CommitData(opt CommitDataOptions) error {
+	if base.next != nil {
+		return base.next.CommitData(opt)
+	}
+	return nil
 }

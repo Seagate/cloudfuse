@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -202,6 +203,11 @@ func (lfs *LoopbackFS) RenameDir(options internal.RenameDirOptions) error {
 
 func (lfs *LoopbackFS) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	log.Trace("LoopbackFS::CreateFile : name=%s", options.Name)
+
+	if options.Name == "FailThis" {
+		return nil, fmt.Errorf("LoopbackFS::CreateFile : Failed to create file %s", options.Name)
+	}
+
 	path := common.JoinUnixFilepath(lfs.path, options.Name)
 
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, options.Mode)
@@ -465,6 +471,86 @@ func (lfs *LoopbackFS) Chown(options internal.ChownOptions) error {
 		return nil
 	}
 	return os.Chown(path, options.Owner, options.Group)
+}
+
+func (lfs *LoopbackFS) StageData(options internal.StageDataOptions) error {
+	log.Trace("LoopbackFS::StageData : name=%s, id=%s", options.Name, options.Id)
+	path := fmt.Sprintf("%s_%d_%s", filepath.Join(lfs.path, options.Name), options.Offset, strings.ReplaceAll(options.Id, "/", "_"))
+	return os.WriteFile(path, options.Data, 0777)
+}
+
+func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
+	log.Trace("LoopbackFS::StageData : name=%s", options.Name)
+
+	mainFilepath := filepath.Join(lfs.path, options.Name)
+
+	blob, err := os.OpenFile(mainFilepath, os.O_RDWR|os.O_CREATE, os.FileMode(0777))
+	if err != nil {
+		log.Err("LoopbackFS::CommitData : error opening [%s]", err)
+		return err
+	}
+
+	for idx, id := range options.List {
+		path := fmt.Sprintf("%s_%d_%s", filepath.Join(lfs.path, options.Name), idx, strings.ReplaceAll(id, "/", "_"))
+		info, err := os.Lstat(path)
+		if err == nil {
+			block, err := os.OpenFile(path, os.O_RDONLY, os.FileMode(0666))
+			if err != nil {
+				return err
+			}
+
+			data := make([]byte, info.Size())
+			n, err := block.Read(data)
+			if int64(n) != info.Size() {
+				log.Err("LoopbackFS::CommitData : error [could not read entire file]")
+				return err
+			}
+
+			n, err = blob.WriteAt(data, int64(idx*(int)(options.BlockSize)))
+			if err != nil {
+				return err
+			}
+			if int64(n) != info.Size() {
+				log.Err("LoopbackFS::CommitData : error [could not write file]")
+				return err
+			}
+
+			err = block.Close()
+			if err != nil {
+				return err
+			}
+
+			_ = os.Remove(path)
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+	}
+
+	err = blob.Close()
+	return err
+}
+
+func (lfs *LoopbackFS) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
+	mainFilepath := filepath.Join(lfs.path, name)
+
+	info, err := os.Lstat(mainFilepath)
+	if err != nil {
+		return nil, err
+	}
+
+	blockSize := uint64(1 * 1024 * 1024)
+	blocks := info.Size() / (int64)(blockSize)
+	list := make(internal.CommittedBlockList, 0)
+
+	for i := int64(0); i < blocks; i++ {
+		list = append(list, internal.CommittedBlock{
+			Id:     fmt.Sprintf("%d", i),
+			Offset: i * (int64)(blockSize),
+			Size:   blockSize,
+		})
+	}
+
+	return &list, nil
 }
 
 func NewLoopbackFSComponent() internal.Component {

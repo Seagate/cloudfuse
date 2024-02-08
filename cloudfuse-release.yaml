@@ -1501,7 +1501,6 @@ stages:
               artifactName: 'cloudfuse'
             displayName: 'Publish Artifacts'
   # TestArtifacts ends here
-
   - stage: ReleaseArtifacts
     dependsOn: TestArtifacts
     condition: succeeded('TestArtifacts')

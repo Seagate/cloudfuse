@@ -4,7 +4,7 @@ package libfuse
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -348,6 +348,8 @@ func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 		log.Err("Libfuse::Mkdir : Failed to create %s [%s]", name, err.Error())
 		if os.IsPermission(err) {
 			return -fuse.EACCES
+		} else if os.IsExist(err) {
+			return -fuse.EEXIST
 		} else {
 			return -fuse.EIO
 		}

@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -72,12 +72,20 @@ func CloudfuseVersion_() string {
 	return cloudfuseVersion_
 }
 
-var DefaultWorkDir = "$HOME/.cloudfuse"
-var DefaultLogFilePath = JoinUnixFilepath(DefaultWorkDir, "cloudfuse.log")
-var StatsConfigFilePath = JoinUnixFilepath(DefaultWorkDir, "stats_monitor.cfg")
+var DefaultWorkDir string
+var DefaultLogFilePath string
+var StatsConfigFilePath string
 
 var EnableMonitoring = false
 var CfsDisabled = false
+
+func GetDefaultWorkDir() string {
+	val, err := os.UserHomeDir()
+	if err != nil {
+		return "./"
+	}
+	return val
+}
 
 // LogLevel enum
 type LogLevel int
@@ -309,4 +317,10 @@ func NewUUID() (u uuid) {
 func GetIdLength(id string) int64 {
 	existingBlockId, _ := base64.StdEncoding.DecodeString(id)
 	return int64(len(existingBlockId))
+}
+
+func init() {
+	DefaultWorkDir = JoinUnixFilepath(GetDefaultWorkDir(), ".cloudfuse")
+	DefaultLogFilePath = JoinUnixFilepath(DefaultWorkDir, "cloudfuse.log")
+	StatsConfigFilePath = JoinUnixFilepath(DefaultWorkDir, "stats_monitor.cfg")
 }

@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -112,24 +112,26 @@ const DefaultMaxResultsForList int32 = 2
 // https://github.com/Azure/go-autorest/blob/a46566dfcbdc41e736295f94e9f690ceaf50094a/autorest/adal/token.go#L788
 // newServicePrincipalTokenFromMSI : reads them directly from env
 const (
-	EnvAzStorageAccount               = "AZURE_STORAGE_ACCOUNT"
-	EnvAzStorageAccountType           = "AZURE_STORAGE_ACCOUNT_TYPE"
-	EnvAzStorageAccessKey             = "AZURE_STORAGE_ACCESS_KEY"
-	EnvAzStorageSasToken              = "AZURE_STORAGE_SAS_TOKEN"
-	EnvAzStorageIdentityClientId      = "AZURE_STORAGE_IDENTITY_CLIENT_ID"
-	EnvAzStorageIdentityResourceId    = "AZURE_STORAGE_IDENTITY_RESOURCE_ID"
-	EnvAzStorageIdentityObjectId      = "AZURE_STORAGE_IDENTITY_OBJECT_ID"
-	EnvAzStorageSpnTenantId           = "AZURE_STORAGE_SPN_TENANT_ID"
-	EnvAzStorageSpnClientId           = "AZURE_STORAGE_SPN_CLIENT_ID"
-	EnvAzStorageSpnClientSecret       = "AZURE_STORAGE_SPN_CLIENT_SECRET"
-	EnvAzStorageSpnOAuthTokenFilePath = "AZURE_OAUTH_TOKEN_FILE"
-	EnvAzStorageAadEndpoint           = "AZURE_STORAGE_AAD_ENDPOINT"
-	EnvAzStorageAuthType              = "AZURE_STORAGE_AUTH_TYPE"
-	EnvAzStorageBlobEndpoint          = "AZURE_STORAGE_BLOB_ENDPOINT"
-	EnvHttpProxy                      = "http_proxy"
-	EnvHttpsProxy                     = "https_proxy"
-	EnvAzStorageAccountContainer      = "AZURE_STORAGE_ACCOUNT_CONTAINER"
-	EnvAzAuthResource                 = "AZURE_STORAGE_AUTH_RESOURCE"
+	EnvAzStorageAccount                = "AZURE_STORAGE_ACCOUNT"
+	EnvAzStorageAccountType            = "AZURE_STORAGE_ACCOUNT_TYPE"
+	EnvAzStorageAccessKey              = "AZURE_STORAGE_ACCESS_KEY"
+	EnvAzStorageSasToken               = "AZURE_STORAGE_SAS_TOKEN"
+	EnvAzStorageIdentityClientId       = "AZURE_STORAGE_IDENTITY_CLIENT_ID"
+	EnvAzStorageIdentityResourceId     = "AZURE_STORAGE_IDENTITY_RESOURCE_ID"
+	EnvAzStorageIdentityObjectId       = "AZURE_STORAGE_IDENTITY_OBJECT_ID"
+	EnvAzStorageSpnTenantId            = "AZURE_STORAGE_SPN_TENANT_ID"
+	EnvAzStorageSpnClientId            = "AZURE_STORAGE_SPN_CLIENT_ID"
+	EnvAzStorageSpnClientSecret        = "AZURE_STORAGE_SPN_CLIENT_SECRET"
+	EnvAzStorageSpnOAuthTokenFilePath  = "AZURE_OAUTH_TOKEN_FILE"
+	EnvAzStorageAadEndpoint            = "AZURE_STORAGE_AAD_ENDPOINT"
+	EnvAzStorageAuthType               = "AZURE_STORAGE_AUTH_TYPE"
+	EnvAzStorageBlobEndpoint           = "AZURE_STORAGE_BLOB_ENDPOINT"
+	EnvHttpProxy                       = "http_proxy"
+	EnvHttpsProxy                      = "https_proxy"
+	EnvAzStorageAccountContainer       = "AZURE_STORAGE_ACCOUNT_CONTAINER"
+	EnvAzAuthResource                  = "AZURE_STORAGE_AUTH_RESOURCE"
+	EnvAzStorageCpkEncryptionKey       = "AZURE_STORAGE_CPK_ENCRYPTION_KEY"
+	EnvAzStorageCpkEncryptionKeySha256 = "AZURE_STORAGE_CPK_ENCRYPTION_KEY_SHA256"
 )
 
 type AzStorageOptions struct {
@@ -171,6 +173,9 @@ type AzStorageOptions struct {
 	Telemetry               string `config:"telemetry" yaml:"telemetry"`
 	HonourACL               bool   `config:"honour-acl" yaml:"honour-acl"`
 	RestrictedCharsWin      bool   `config:"restricted-characters-windows" yaml:"-"`
+	CPKEnabled              bool   `config:"cpk-enabled" yaml:"cpk-enabled"`
+	CPKEncryptionKey        string `config:"cpk-encryption-key" yaml:"cpk-encryption-key"`
+	CPKEncryptionKeySha256  string `config:"cpk-encryption-key-sha256" yaml:"cpk-encryption-key-sha256"`
 
 	// v1 support
 	UseAdls        bool   `config:"use-adls" yaml:"-"`
@@ -210,6 +215,10 @@ func RegisterEnvVariables() {
 	config.BindEnv("azstorage.container", EnvAzStorageAccountContainer)
 
 	config.BindEnv("azstorage.auth-resource", EnvAzAuthResource)
+
+	config.BindEnv("azstorage.cpk-encryption-key", EnvAzStorageCpkEncryptionKey)
+	config.BindEnv("azstorage.cpk-encryption-key-sha256", EnvAzStorageCpkEncryptionKeySha256)
+
 }
 
 //    ----------- Config Parsing and Validation  ---------------
@@ -334,6 +343,16 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	}
 
 	az.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
+
+	if opt.CPKEnabled {
+		if opt.CPKEncryptionKey == "" || opt.CPKEncryptionKeySha256 == "" {
+			log.Err("ParseAndValidateConfig : CPK key or CPK key sha256 not provided")
+			return errors.New("CPK key or key sha256 not provided")
+		}
+		az.stConfig.cpkEnabled = opt.CPKEnabled
+		az.stConfig.cpkEncryptionKey = opt.CPKEncryptionKey
+		az.stConfig.cpkEncryptionKeySha256 = opt.CPKEncryptionKeySha256
+	}
 
 	// Validate endpoint
 	if opt.Endpoint == "" {
@@ -477,16 +496,14 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		log.Warn("unsupported v1 CLI parameter: debug-libcurl is not applicable in cloudfuse.")
 	}
 
-	log.Info("ParseAndValidateConfig : Account: %s, Container: %s, AccountType: %s, Auth: %s, Prefix: %s, Endpoint: %s, ListBlock: %d, MD5 : %v %v, "+
-		"Virtual Directory: %v, Max Results For List %v, Disable Compression: %v, Restricted Windows Characters: %v",
+	log.Info("ParseAndValidateConfig : account %s, container %s, account-type %s, auth %s, prefix %s, endpoint %s, MD5 %v %v, virtual-directory %v, disable-compression %v, CPK %v", "restricted-characters-windows %v",
 		az.stConfig.authConfig.AccountName, az.stConfig.container, az.stConfig.authConfig.AccountType, az.stConfig.authConfig.AuthMode,
-		az.stConfig.prefixPath, az.stConfig.authConfig.Endpoint, az.stConfig.cancelListForSeconds, az.stConfig.validateMD5, az.stConfig.updateMD5,
-		az.stConfig.virtualDirectory, az.stConfig.maxResultsForList, az.stConfig.disableCompression, az.stConfig.restrictedCharsWin)
-
-	log.Info("ParseAndValidateConfig : Retry Config: Retry count %d, Max Timeout %d, BackOff Time %d, Max Delay %d",
+		az.stConfig.prefixPath, az.stConfig.authConfig.Endpoint, az.stConfig.validateMD5, az.stConfig.updateMD5, az.stConfig.virtualDirectory, az.stConfig.disableCompression, az.stConfig.cpkEnabled, az.stConfig.restrictedCharsWin)
+	log.Info("ParseAndValidateConfig : use-HTTP %t, block-size %d, max-concurrency %d, default-tier %s, fail-unsupported-op %t, mount-all-containers %t", az.stConfig.authConfig.UseHTTP, az.stConfig.blockSize, az.stConfig.maxConcurrency, az.stConfig.defaultTier, az.stConfig.ignoreAccessModifiers, az.stConfig.mountAllContainers)
+	log.Info("ParseAndValidateConfig : Retry Config: retry-count %d, max-timeout %d, backoff-time %d, max-delay %d",
 		az.stConfig.maxRetries, az.stConfig.maxTimeout, az.stConfig.backoffTime, az.stConfig.maxRetryDelay)
 
-	log.Info("ParseAndValidateConfig : Telemetry : %s, Honour ACL: %v, disable symlink: %v", az.stConfig.telemetry, az.stConfig.honourACL, az.stConfig.disableSymlink)
+	log.Info("ParseAndValidateConfig : Telemetry : %s, honour-ACL %v, disable-symlink %v", az.stConfig.telemetry, az.stConfig.honourACL, az.stConfig.disableSymlink)
 
 	return nil
 }
