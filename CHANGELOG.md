@@ -1,8 +1,12 @@
 # Cloudfuse Changelog #
 
-## 1.0.2 ##
+## 1.1.0 ##
 
 This version is based on [blobfuse2 2.2.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.2.0) (upstream).
+**Changes**
+-- improved performance of directory listing
+-- merged upstream version 2.2.0
+
 
 ## 1.0.1 ##
 
