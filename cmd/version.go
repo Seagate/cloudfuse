@@ -40,11 +40,7 @@ var versionCmd = &cobra.Command{
 	Short:             "Command to print the current version along with optional check for latest version",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("cloudfuse version:", common.CloudfuseVersion)
-		fmt.Println("git commit:", common.GitCommit)
-		fmt.Println("build date:", common.BuildDate)
-		fmt.Println("go version:", common.GoVersion)
-		fmt.Println("OS/Arch:", common.OsArch)
+		fmt.Printf("cloudfuse version: %s\n", common.CloudfuseVersion)
 		if check {
 			return VersionCheck()
 		}
