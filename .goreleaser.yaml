@@ -23,7 +23,7 @@ builds:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+      - -s -w -X common.GitCommit={{.Commit}} -X common.BuildDate={{ .CommitDate }}
     
   - id: windows-startup
     main: ./tools/windows-startup/main.go
@@ -38,7 +38,7 @@ builds:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+      - -s -w -X common.GitCommit={{.Commit}} -X common.BuildDate={{ .CommitDate }}
     
   - id: windows-health-monitor
     main: ./tools/health-monitor/main.go
@@ -53,7 +53,7 @@ builds:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+      - -s -w -X common.GitCommit={{.Commit}} -X common.BuildDate={{ .CommitDate }}
 
   - id: linux-amd64
     goos:
@@ -66,7 +66,7 @@ builds:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+      - -s -w -X common.GitCommit={{.Commit}} -X common.BuildDate={{ .CommitDate }}
 
   - id: linux-amd64-health-monitor
     main: ./tools/health-monitor/main.go
@@ -81,7 +81,7 @@ builds:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+      - -s -w -X common.GitCommit={{.Commit}} -X common.BuildDate={{ .CommitDate }}
   
   - id: linux-arm64
     goos:
@@ -96,7 +96,7 @@ builds:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+      - -s -w -X common.GitCommit={{.Commit}} -X common.BuildDate={{ .CommitDate }}
 
   - id: linux-arm64-health-monitor
     main: ./tools/health-monitor/main.go
@@ -113,7 +113,7 @@ builds:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+      - -s -w -X common.GitCommit={{.Commit}} -X common.BuildDate={{ .CommitDate }}
 
 checksum:
   name_template: "checksums_sha256.txt"

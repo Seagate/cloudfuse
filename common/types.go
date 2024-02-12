@@ -28,8 +28,10 @@ package common
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"os"
 	"reflect"
+	"runtime"
 	"sync"
 	"time"
 
@@ -61,6 +63,11 @@ const (
 
 	FuseAllowedFlags = "invalid FUSE options. Allowed FUSE configurations are: `-o attr_timeout=TIMEOUT`, `-o negative_timeout=TIMEOUT`, `-o entry_timeout=TIMEOUT` `-o allow_other`, `-o allow_root`, `-o umask=PERMISSIONS -o default_permissions`, `-o ro`"
 )
+
+var GitCommit = "**local_build**"
+var BuildDate = "undated"
+var GoVersion = runtime.Version()
+var OsArch = fmt.Sprintf("%s %s", runtime.GOOS, runtime.GOARCH)
 
 func FuseIgnoredFlags() []string {
 	return []string{"default_permissions", "rw", "dev", "nodev", "suid", "nosuid", "delay_connect", "auto", "noauto", "user", "nouser", "exec", "noexec"}
