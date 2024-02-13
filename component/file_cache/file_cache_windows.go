@@ -77,8 +77,6 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 	}
 
 	finfo, err := os.Stat(localPath)
-	accessTime := time.Unix(int64(stat.Atim.Sec), int64(stat.Atim.Nsec))
-
 	if err == nil {
 		// The file exists in local cache
 		// The file needs to be downloaded if the cacheTimeout elapsed (check last change time and last modified time)
@@ -98,7 +96,7 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 			log.Debug("FileCache::isDownloadRequired : %s not valid as per time checks", localPath)
 			downloadRequired = true
 		}
-	} else if os.IsNotExist(err) && !accessTime.IsZero() {
+	} else if os.IsNotExist(err) {
 		// The file does not exist in the local cache so it needs to be downloaded
 		log.Debug("FileCache::isDownloadRequired : %s not present in local cache", localPath)
 		downloadRequired = true
