@@ -42,7 +42,7 @@ var versionCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("cloudfuse version:", common.CloudfuseVersion)
 		fmt.Println("git commit:", common.GitCommit)
-		fmt.Println("build date:", common.BuildDate)
+		fmt.Println("commit date:", common.CommitDate)
 		fmt.Println("go version:", common.GoVersion)
 		fmt.Println("OS/Arch:", common.OsArch)
 		if check {

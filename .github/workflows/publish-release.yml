@@ -83,8 +83,8 @@ jobs:
         name: Build
         shell: bash
         run: |
-          commitDate=$(git log -1 --format=%cd --date=format:%Y-%m-%dT%H:%M:%S)
-          ldflags="-s -w -X common.GitCommit=${{ github.sha }} -X common.BuildDate=$commitDate"
+          commitDate=$(TZ=UTC0 git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)
+          ldflags="-s -w -X github.com/Seagate/cloudfuse/common.GitCommit=${{ github.sha }} -X github.com/Seagate/cloudfuse/common.CommitDate=$commitDate"
           go build -trimpath -ldflags ''"$ldflags"'' -o cloudfuse.exe
           go build -trimpath -ldflags ''"$ldflags"'' -o cfusemon.exe ./tools/health-monitor/
           go build -trimpath -ldflags ''"$ldflags"'' -o windows-startup.exe ./tools/windows-startup/

@@ -65,7 +65,7 @@ const (
 )
 
 var GitCommit = "**local_build**"
-var BuildDate = "undated"
+var CommitDate = "undated"
 var GoVersion = runtime.Version()
 var OsArch = fmt.Sprintf("%s %s", runtime.GOOS, runtime.GOARCH)
 
