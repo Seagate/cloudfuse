@@ -121,20 +121,20 @@ func (suite *LoopbackFSTestSuite) TestDeleteDir() {
 	assert.NotNil(err, "DeleteDir: Failed to delete")
 }
 
-func (suite *LoopbackFSTestSuite) TestReadDir() {
+func (suite *LoopbackFSTestSuite) TestStreamDir() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
 	info, _ := os.Stat(common.JoinUnixFilepath(testPath, fileLorem))
 
-	attrs, err := suite.lfs.ReadDir(internal.ReadDirOptions{Name: dirOne})
-	assert.Nil(err, "ReadDir: Failed")
+	attrs, _, err := suite.lfs.StreamDir(internal.StreamDirOptions{Name: dirOne})
+	assert.Nil(err, "StreamDir: Failed")
 
 	attr := attrs[0]
 
-	assert.Equal(attr.Name, "lorem.txt", "ReadDir: FileName not equal")
-	assert.Equal(attr.Size, info.Size(), "ReadDir: File size not equal")
-	assert.Equal(attr.Mode, info.Mode(), "ReadDir: File Mode not equal")
+	assert.Equal(attr.Name, "lorem.txt", "StreamDir: FileName not equal")
+	assert.Equal(attr.Size, info.Size(), "StreamDir: File size not equal")
+	assert.Equal(attr.Mode, info.Mode(), "StreamDir: File Mode not equal")
 }
 
 func (suite *LoopbackFSTestSuite) TestRenameDir() {

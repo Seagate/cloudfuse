@@ -626,28 +626,7 @@ func (s *blockBlobTestSuite) TestIsDirEmptyError() {
 	s.assert.NotNil(err)
 }
 
-func (s *blockBlobTestSuite) TestReadDir() {
-	defer s.cleanupTest()
-	// This tests the default listBlocked = 0. It should return the expected paths.
-	// Setup
-	name := generateDirectoryName()
-	s.az.CreateDir(internal.CreateDirOptions{Name: name})
-	childName := name + "/" + generateFileName()
-	s.az.CreateFile(internal.CreateFileOptions{Name: childName})
-
-	// Testing dir and dir/
-	var paths = []string{name, name + "/"}
-	for _, path := range paths {
-		log.Debug(path)
-		s.Run(path, func() {
-			entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: path})
-			s.assert.Nil(err)
-			s.assert.EqualValues(1, len(entries))
-		})
-	}
-}
-
-func (s *blockBlobTestSuite) TestReadDirNoVirtualDirectory() {
+func (s *blockBlobTestSuite) TestStreamDirNoVirtualDirectory() {
 	defer s.cleanupTest()
 	// This tests the default listBlocked = 0. It should return the expected paths.
 	// Setup
@@ -660,7 +639,7 @@ func (s *blockBlobTestSuite) TestReadDirNoVirtualDirectory() {
 	for _, path := range paths {
 		log.Debug(path)
 		s.Run(path, func() {
-			entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: path})
+			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
 			s.assert.Nil(err)
 			s.assert.EqualValues(1, len(entries))
 			s.assert.EqualValues(name, entries[0].Path)
@@ -672,14 +651,14 @@ func (s *blockBlobTestSuite) TestReadDirNoVirtualDirectory() {
 	}
 }
 
-func (s *blockBlobTestSuite) TestReadDirHierarchy() {
+func (s *blockBlobTestSuite) TestStreamDirHierarchy() {
 	defer s.cleanupTest()
 	// Setup
 	base := generateDirectoryName()
 	s.setupHierarchy(base)
 
 	// ReadDir only reads the first level of the hierarchy
-	entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: base})
+	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: base})
 	s.assert.Nil(err)
 	s.assert.EqualValues(2, len(entries))
 	// Check the dir
@@ -696,7 +675,7 @@ func (s *blockBlobTestSuite) TestReadDirHierarchy() {
 	s.assert.True(entries[1].IsModeDefault())
 }
 
-func (s *blockBlobTestSuite) TestReadDirRoot() {
+func (s *blockBlobTestSuite) TestStreamDirRoot() {
 	defer s.cleanupTest()
 	// Setup
 	base := generateDirectoryName()
@@ -708,7 +687,7 @@ func (s *blockBlobTestSuite) TestReadDirRoot() {
 		log.Debug(path)
 		s.Run(path, func() {
 			// ReadDir only reads the first level of the hierarchy
-			entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: path})
+			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
 			s.assert.Nil(err)
 			s.assert.EqualValues(3, len(entries))
 			// Check the base dir
@@ -733,14 +712,14 @@ func (s *blockBlobTestSuite) TestReadDirRoot() {
 	}
 }
 
-func (s *blockBlobTestSuite) TestReadDirSubDir() {
+func (s *blockBlobTestSuite) TestStreamDirSubDir() {
 	defer s.cleanupTest()
 	// Setup
 	base := generateDirectoryName()
 	s.setupHierarchy(base)
 
 	// ReadDir only reads the first level of the hierarchy
-	entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: base + "/c1"})
+	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: base + "/c1"})
 	s.assert.Nil(err)
 	s.assert.EqualValues(1, len(entries))
 	// Check the dir
@@ -751,7 +730,7 @@ func (s *blockBlobTestSuite) TestReadDirSubDir() {
 	s.assert.True(entries[0].IsModeDefault())
 }
 
-func (s *blockBlobTestSuite) TestReadDirSubDirPrefixPath() {
+func (s *blockBlobTestSuite) TestStreamDirSubDirPrefixPath() {
 	defer s.cleanupTest()
 	// Setup
 	base := generateDirectoryName()
@@ -760,7 +739,7 @@ func (s *blockBlobTestSuite) TestReadDirSubDirPrefixPath() {
 	s.az.storage.SetPrefixPath(base)
 
 	// ReadDir only reads the first level of the hierarchy
-	entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: "/c1"})
+	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: "/c1"})
 	s.assert.Nil(err)
 	s.assert.EqualValues(1, len(entries))
 	// Check the dir
@@ -771,7 +750,7 @@ func (s *blockBlobTestSuite) TestReadDirSubDirPrefixPath() {
 	s.assert.True(entries[0].IsModeDefault())
 }
 
-func (s *blockBlobTestSuite) TestReadDirWindowsNameConvert() {
+func (s *blockBlobTestSuite) TestStreamDirWindowsNameConvert() {
 	// Skip test if not running on Windows
 	if runtime.GOOS != "windows" {
 		return
@@ -793,7 +772,7 @@ func (s *blockBlobTestSuite) TestReadDirWindowsNameConvert() {
 	for _, path := range paths {
 		log.Debug(path)
 		s.Run(path, func() {
-			entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: path})
+			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
 			s.assert.Nil(err)
 			s.assert.EqualValues(1, len(entries))
 			s.assert.Equal(windowsChildName, entries[0].Path)
@@ -801,12 +780,12 @@ func (s *blockBlobTestSuite) TestReadDirWindowsNameConvert() {
 	}
 }
 
-func (s *blockBlobTestSuite) TestReadDirError() {
+func (s *blockBlobTestSuite) TestStreamDirError() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateDirectoryName()
 
-	entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: name})
+	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: name})
 
 	s.assert.Nil(err) // Note: See comment in BlockBlob.List. BlockBlob behaves differently from Datalake
 	s.assert.Empty(entries)
@@ -816,7 +795,7 @@ func (s *blockBlobTestSuite) TestReadDirError() {
 	s.assert.NotNil(err)
 }
 
-func (s *blockBlobTestSuite) TestReadDirListBlocked() {
+func (s *blockBlobTestSuite) TestStreamDirListBlocked() {
 	defer s.cleanupTest()
 	// Setup
 	s.tearDownTestHelper(false) // Don't delete the generated container.
@@ -831,7 +810,7 @@ func (s *blockBlobTestSuite) TestReadDirListBlocked() {
 	childName := name + "/" + generateFileName()
 	s.az.CreateFile(internal.CreateFileOptions{Name: childName})
 
-	entries, err := s.az.ReadDir(internal.ReadDirOptions{Name: name})
+	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: name})
 	s.assert.Nil(err)
 	s.assert.EqualValues(0, len(entries)) // Since we block the list, it will return an empty list.
 }
