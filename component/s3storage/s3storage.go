@@ -205,32 +205,6 @@ func (s3 *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	return len(list) == 0
 }
 
-func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
-	log.Trace("S3Storage::ReadDir : %s", options.Name)
-	objectList := make([]*internal.ObjAttr, 0)
-
-	path := formatListDirName(options.Name)
-	var iteration int  // = 0
-	var marker *string // = nil
-	for {
-		newList, nextMarker, err := s3.storage.List(path, marker, maxResultsPerListCall)
-		if err != nil {
-			log.Err("S3Storage::ReadDir : Failed to read dir [%s]", err)
-			return objectList, err
-		}
-		objectList = append(objectList, newList...)
-		marker = nextMarker
-		iteration++
-
-		log.Debug("S3Storage::ReadDir : So far retrieved %d objects in %d iterations", len(objectList), iteration)
-		if nextMarker == nil || *nextMarker == "" {
-			break
-		}
-	}
-
-	return objectList, nil
-}
-
 func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
 	log.Trace("S3Storage::StreamDir : %s, offset %d, count %d", options.Name, options.Offset, options.Count)
 	objectList := make([]*internal.ObjAttr, 0)

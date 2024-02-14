@@ -109,13 +109,6 @@ func (base *BaseComponent) OpenDir(options OpenDirOptions) error {
 	return nil
 }
 
-func (base *BaseComponent) ReadDir(options ReadDirOptions) (attr []*ObjAttr, err error) {
-	if base.next != nil {
-		return base.next.ReadDir(options)
-	}
-	return attr, err
-}
-
 func (base *BaseComponent) StreamDir(options StreamDirOptions) ([]*ObjAttr, string, error) {
 	if base.next != nil {
 		return base.next.StreamDir(options)

@@ -242,43 +242,6 @@ func (az *AzStorage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	return false
 }
 
-func (az *AzStorage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
-	log.Trace("AzStorage::ReadDir : %s", options.Name)
-	blobList := make([]*internal.ObjAttr, 0)
-
-	if az.listBlocked {
-		diff := time.Since(az.startTime)
-		if diff.Seconds() > float64(az.stConfig.cancelListForSeconds) {
-			az.listBlocked = false
-			log.Info("AzStorage::ReadDir : Unblocked List API")
-		} else {
-			log.Info("AzStorage::ReadDir : Blocked List API for %d more seconds", int(az.stConfig.cancelListForSeconds)-int(diff.Seconds()))
-			return blobList, nil
-		}
-	}
-
-	path := formatListDirName(options.Name)
-	var iteration int = 0
-	var marker *string = nil
-	for {
-		new_list, new_marker, err := az.storage.List(path, marker, common.MaxDirListCount)
-		if err != nil {
-			log.Err("AzStorage::ReadDir : Failed to read dir [%s]", err)
-			return blobList, err
-		}
-		blobList = append(blobList, new_list...)
-		marker = new_marker
-		iteration++
-
-		log.Debug("AzStorage::ReadDir : So far retrieved %d objects in %d iterations", len(blobList), iteration)
-		if new_marker == nil || *new_marker == "" {
-			break
-		}
-	}
-
-	return blobList, nil
-}
-
 func (az *AzStorage) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
 	log.Trace("AzStorage::StreamDir : Path %s, offset %d, count %d", options.Name, options.Offset, options.Count)
 

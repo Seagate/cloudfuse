@@ -360,60 +360,6 @@ func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 	return err
 }
 
-// ReadDir : Optionally cache attributes of paths returned by next component
-// If cacheDirs is true, then directory cache results are merged into the results from the next component
-func (ac *AttrCache) ReadDir(options internal.ReadDirOptions) (pathList []*internal.ObjAttr, err error) {
-	log.Trace("AttrCache::ReadDir : %s", options.Name)
-
-	// try to fetch listing from cache
-	cachedPathList, cachedToken, err := ac.fetchCachedDirList(options.Name, "")
-	if err == nil && cachedToken == "" {
-		// sort and return
-		slices.SortFunc[[]*internal.ObjAttr, *internal.ObjAttr](cachedPathList, func(a, b *internal.ObjAttr) int {
-			return strings.Compare(a.Path, b.Path)
-		})
-		return cachedPathList, err
-	}
-	// listing is not cached, call cloud storage
-	pathList, err = ac.NextComponent().ReadDir(options)
-	if err == nil {
-		// strip symlink attributes
-		if ac.noSymlinks {
-			for _, attr := range pathList {
-				if attr.IsSymlink() {
-					attr.Flags.Clear(internal.PropFlagSymlink)
-				}
-			}
-		}
-		// cache returned list
-		ac.cacheAttributes(pathList, options.Name)
-		//
-		if ac.cacheDirs {
-			// remember that this directory is in cloud storage
-			if len(pathList) > 0 {
-				ac.cacheLock.Lock()
-				ac.markAncestorsInCloud(options.Name, time.Now())
-				ac.cacheLock.Unlock()
-			}
-			// merge directory cache into the results
-			var numAdded int // prevent shadowing pathList in following line
-			pathList, numAdded = ac.addDirsNotInCloudToListing(options.Name, pathList)
-			log.Info("AttrCache::ReadDir : %s +%d from cache = %d",
-				options.Name, numAdded, len(pathList))
-		}
-	}
-
-	// values should be returned in ascending order by key, without duplicates
-	// sort
-	slices.SortFunc[[]*internal.ObjAttr, *internal.ObjAttr](pathList, func(a, b *internal.ObjAttr) int {
-		return strings.Compare(a.Path, b.Path)
-	})
-	// cache the listing as one token
-	ac.cacheListSegment(pathList, options.Name, "", "")
-
-	return pathList, err
-}
-
 // merge results from our cache into pathMap
 func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*internal.ObjAttr) ([]*internal.ObjAttr, int) {
 	numAdded := 0
