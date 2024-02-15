@@ -237,7 +237,7 @@ func (cf *CgofuseFS) Init() {
 	}
 }
 
-// Destroy does nothing in blobfuse, so same here.
+// Destroy currently does nothing.
 func (cf *CgofuseFS) Destroy() {
 	log.Trace("Libfuse::Destroy : Destroy")
 }
@@ -342,7 +342,6 @@ func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 		}
 	}
 
-	// blobfuse uses a bitwise and trick to make sure mode is a uint32, we don't need that here
 	err := fuseFS.NextComponent().CreateDir(internal.CreateDirOptions{Name: name, Mode: fs.FileMode(mode)})
 	if err != nil {
 		log.Err("Libfuse::Mkdir : Failed to create %s [%s]", name, err.Error())
