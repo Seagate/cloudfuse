@@ -769,11 +769,6 @@ func (cf *CgofuseFS) Release(path string, fh uint64) int {
 	}
 	log.Trace("Libfuse::Release : %s, handle: %d", handle.Path, handle.ID)
 
-	// If the file handle is dirty then file-cache needs to flush this file
-	if handle.Dirty() {
-		handle.Flags.Set(handlemap.HandleFlagDirty)
-	}
-
 	err := fuseFS.NextComponent().CloseFile(internal.CloseFileOptions{Handle: handle})
 	if err != nil {
 		log.Err("Libfuse::Release : error closing file %s, handle: %d [%s]", handle.Path, handle.ID, err.Error())
