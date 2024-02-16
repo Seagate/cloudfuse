@@ -433,7 +433,7 @@ var mountCmd = &cobra.Command{
 
 		common.EnableMonitoring = options.MonitorOpt.EnableMon
 
-		// check if blobfuse stats monitor is added in the disable list
+		// check if cloudfuse stats monitor is added in the disable list
 		for _, mon := range options.MonitorOpt.DisableList {
 			if mon == common.CfuseStats {
 				common.CfsDisabled = true

@@ -426,7 +426,7 @@ func (s *utilsTestSuite) TestFormatEndpointProtocol() {
 		{endpoint: "https://account.blob.core.windows.net/", result: "https://account.blob.core.windows.net/", ustHttp: true},
 		{endpoint: "https://account.blob.core.windows.net/abc", result: "https://account.blob.core.windows.net/abc/", ustHttp: true},
 
-		// These are false positive test cases where we are forming the wrong URI and it shall fail for user when used in blobfuse
+		// These are false positive test cases where we are forming the wrong URI and it shall fail for user when used in cloudfuse
 		{endpoint: "://account.blob.core.windows.net", result: "https://://account.blob.core.windows.net/", ustHttp: false},
 		{endpoint: "://account.blob.core.windows.net", result: "http://://account.blob.core.windows.net/", ustHttp: true},
 		{endpoint: "https://://./account.blob.core.windows.net", result: "https://://./account.blob.core.windows.net/", ustHttp: true},

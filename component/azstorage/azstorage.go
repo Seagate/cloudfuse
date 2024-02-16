@@ -601,7 +601,7 @@ func init() {
 	containerNameFlag := config.AddStringFlag("container-name", "", "Configures the name of the container to be mounted")
 	config.BindPFlag(compName+".container", containerNameFlag)
 
-	useAdls := config.AddBoolFlag("use-adls", false, "Enables blobfuse to access Azure DataLake storage account.")
+	useAdls := config.AddBoolFlag("use-adls", false, "Enables cloudfuse to access Azure DataLake storage account.")
 	config.BindPFlag(compName+".use-adls", useAdls)
 	useAdls.Hidden = true
 
