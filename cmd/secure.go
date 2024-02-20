@@ -46,7 +46,7 @@ type secureOptions struct {
 }
 
 const SecureConfigEnvName string = "CLOUDFUSE_SECURE_CONFIG_PASSPHRASE"
-const SecureConfigExtension string = ".azsec"
+const SecureConfigExtension string = ".aes"
 
 var secOpts secureOptions
 
@@ -149,8 +149,7 @@ func encryptConfigFile(saveConfig bool) ([]byte, error) {
 	if saveConfig {
 		outputFileName := ""
 		if secOpts.OutputFile == "" {
-			outputFileName = filepath.Join(common.ExpandPath(common.DefaultWorkDir), filepath.Base(secOpts.ConfigFile))
-			outputFileName += SecureConfigExtension
+			outputFileName = secOpts.ConfigFile + SecureConfigExtension
 		} else {
 			outputFileName = secOpts.OutputFile
 		}
@@ -176,14 +175,14 @@ func decryptConfigFile(saveConfig bool) ([]byte, error) {
 	if saveConfig {
 		outputFileName := ""
 		if secOpts.OutputFile == "" {
-			outputFileName = filepath.Join(os.ExpandEnv(common.DefaultWorkDir), filepath.Base(secOpts.ConfigFile))
+			outputFileName = secOpts.ConfigFile
 			extension := filepath.Ext(outputFileName)
 			outputFileName = outputFileName[0 : len(outputFileName)-len(extension)]
 		} else {
 			outputFileName = secOpts.OutputFile
 		}
 
-		return plainText, saveToFile(outputFileName, plainText, false)
+		return plainText, saveToFile(outputFileName, plainText, true)
 	}
 
 	return plainText, nil
