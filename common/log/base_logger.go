@@ -38,6 +38,10 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 )
 
+// Uses format of Time.UnixDate with addition of milliseconds.
+// See https://pkg.go.dev/time#UnixDate
+const unixDateMilli = "Mon Jan _2 15:04:05.000 MST 2006"
+
 // LogConfig : Configuration to be provided to logging infra
 type LogFileConfig struct {
 	LogFile      string
@@ -212,7 +216,7 @@ func (l *BaseLogger) logEvent(lvl string, format string, args ...interface{}) {
 	_, fn, ln, _ := runtime.Caller(3)
 	msg := fmt.Sprintf(format, args...)
 	msg = fmt.Sprintf("%s : %s[%d] : %s [%s (%d)]: %s",
-		time.Now().Format(time.UnixDate),
+		time.Now().Format(unixDateMilli),
 		l.fileConfig.LogTag,
 		l.procPID,
 		lvl,
