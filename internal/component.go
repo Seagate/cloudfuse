@@ -76,9 +76,6 @@ type Component interface {
 	IsDirEmpty(IsDirEmptyOptions) bool
 
 	OpenDir(OpenDirOptions) error
-	//ReadDir: implementation expectations
-	//must return ErrNotExist for absence of the requested directory
-	ReadDir(ReadDirOptions) ([]*ObjAttr, error)
 	StreamDir(StreamDirOptions) ([]*ObjAttr, string, error)
 
 	CloseDir(CloseDirOptions) error
