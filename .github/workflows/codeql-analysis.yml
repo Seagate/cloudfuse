@@ -44,7 +44,7 @@ jobs:
 
     # Install latest version of Go. Codeql runs on an older version of go
     - name: Install Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version: '1.21'
         check-latest: true

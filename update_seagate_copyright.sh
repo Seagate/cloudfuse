@@ -2,7 +2,7 @@
 
 # URL of blobfuse2 repo
 blobfuse2_repo="https://github.com/Azure/azure-storage-fuse.git"
-tags="tags/blobfuse2-2.1.2"
+tags="tags/blobfuse2-2.2.0"
 year="2024"
 
 # Create temporary directory to clone into
@@ -44,7 +44,7 @@ do
             if ! grep -q "Copyright © .* Seagate Technology" "$file"
             then
                 # Add the new copyright notice above the one from Microsoft
-                sed -i "${line_number}i \ \ \ Copyright © $year Seagate Technology LLC and/or its Affiliates" "$file"
+                sed -i "${line_number}i \ \ \ Copyright © 2023-$year Seagate Technology LLC and/or its Affiliates" "$file"
             fi
         fi
     fi

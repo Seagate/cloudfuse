@@ -203,7 +203,7 @@ func parseArgs(cmdArgs []string) []string {
 				// Check if ',' exists in arguments or not. If so we assume it might be coming from /etc/fstab
 				opts := strings.Split(cmdArgs[i], ",")
 				for _, o := range opts {
-					// If we got comma separated list then all blobfuse specific options needs to be extracted out
+					// If we got comma separated list then all cloudfuse specific options needs to be extracted out
 					//  as those shall not be part of -o list which for us means libfuse options
 					if strings.HasPrefix(o, "--") {
 						bfuseArgs = append(bfuseArgs, o)
@@ -217,7 +217,7 @@ func parseArgs(cmdArgs []string) []string {
 					args = append(args, "-o", strings.Join(lfuseArgs, ","))
 				}
 
-				// Extract and add blobfuse specific options sepratly
+				// Extract and add cloudfuse specific options sepratly
 				if len(bfuseArgs) > 0 {
 					args = append(args, bfuseArgs...)
 				}

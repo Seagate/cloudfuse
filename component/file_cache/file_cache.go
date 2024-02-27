@@ -434,69 +434,6 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	return err
 }
 
-// ReadDir: Consolidate entries in storage and local cache to return the children under this path.
-func (fc *FileCache) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
-	log.Trace("FileCache::ReadDir : %s", options.Name)
-
-	// For read directory, there are three different child path situations we have to potentially handle.
-	// 1. Path in storage but not in local cache
-	// 2. Path not in storage but in local cache (this could happen if we recently created the file [and are currently writing to it]) (also supports immutable containers)
-	// 3. Path in storage and in local cache (this could result in dirty properties on the service if we recently wrote to the file)
-
-	// To cover case 1, grab all entries from storage
-	attrs, err := fc.NextComponent().ReadDir(options)
-	if err != nil {
-		log.Err("FileCache::ReadDir : error fetching storage attributes [%s]", err.Error())
-		// TODO : Should we return here if the directory failed to be read from storage?
-	}
-
-	// Create a mapping from path to index in the storage attributes array, so we can handle case 3 (conflicting attributes)
-	var pathToIndex = make(map[string]int)
-	for i, attr := range attrs {
-		pathToIndex[attr.Path] = i
-	}
-
-	// To cover cases 2 and 3, grab entries from the local cache
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
-	dirents, err := os.ReadDir(localPath)
-
-	// If the local ReadDir fails it means the directory falls under case 1.
-	// The directory will not exist locally even if it exists in the container
-	// if the directory was freshly created or no files have been updated in the directory recently.
-	if err == nil {
-		// Enumerate over the results from the local cache and update/add to attrs to return if necessary (to support case 2 and 3)
-		for _, entry := range dirents {
-			entryPath := common.JoinUnixFilepath(options.Name, entry.Name())
-			entryCachePath := common.JoinUnixFilepath(fc.tmpPath, entryPath)
-
-			info, err := os.Stat(entryCachePath) // Grab local cache attributes
-			// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
-			if err == nil && !info.IsDir() {
-				idx, ok := pathToIndex[common.JoinUnixFilepath(options.Name, entry.Name())] // Grab the index of the corresponding storage attributes
-
-				if ok { // Case 3 (file in storage and in local cache) so update the relevant attributes
-					// Return from local cache only if file is not under download or deletion
-					// If file is under download then taking size or mod time from it will be incorrect.
-					if !fc.fileLocks.Locked(entryPath) {
-						log.Debug("FileCache::ReadDir : updating %s from local cache", entryPath)
-						attrs[idx].Size = info.Size()
-						attrs[idx].Mtime = info.ModTime()
-					}
-				} else if !fc.createEmptyFile { // Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
-					log.Debug("FileCache::ReadDir : serving %s from local cache", entryPath)
-					attr := newObjAttr(entryPath, info)
-					attrs = append(attrs, attr)
-					pathToIndex[attr.Path] = len(attrs) - 1 // append adds to the end of an array
-				}
-			}
-		}
-	} else {
-		log.Debug("FileCache::ReadDir : error fetching local attributes [%s]", err.Error())
-	}
-
-	return attrs, nil
-}
-
 // StreamDir : Add local files to the list retrieved from storage container
 func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
 	attrs, token, err := fc.NextComponent().StreamDir(options)

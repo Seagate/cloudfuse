@@ -609,7 +609,7 @@ func (s *s3StorageTestSuite) TestIsDirEmptyError() {
 	// Directory should not be in the account
 }
 
-func (s *s3StorageTestSuite) TestReadDirNoVirtualDirectory() {
+func (s *s3StorageTestSuite) TestStreamDirNoVirtualDirectory() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateDirectoryName()
@@ -622,7 +622,7 @@ func (s *s3StorageTestSuite) TestReadDirNoVirtualDirectory() {
 	for _, path := range paths {
 		log.Debug(path)
 		s.Run(path, func() {
-			entries, err := s.s3Storage.ReadDir(internal.ReadDirOptions{Name: path})
+			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: path})
 			// this only works if the test can create an empty test bucket
 			s.assert.Nil(err)
 			s.assert.EqualValues(1, len(entries))
@@ -635,14 +635,14 @@ func (s *s3StorageTestSuite) TestReadDirNoVirtualDirectory() {
 	}
 }
 
-func (s *s3StorageTestSuite) TestReadDirHierarchy() {
+func (s *s3StorageTestSuite) TestStreamDirHierarchy() {
 	defer s.cleanupTest()
 	// Setup
 	base := generateDirectoryName()
 	s.setupHierarchy(base)
 
 	// ReadDir only reads the first level of the hierarchy
-	entries, err := s.s3Storage.ReadDir(internal.ReadDirOptions{Name: base})
+	entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: base})
 	s.assert.Nil(err)
 	s.assert.EqualValues(2, len(entries))
 	// Check the dir
@@ -659,7 +659,7 @@ func (s *s3StorageTestSuite) TestReadDirHierarchy() {
 	s.assert.True(entries[1].IsModeDefault())
 }
 
-func (s *s3StorageTestSuite) TestReadDirRoot() {
+func (s *s3StorageTestSuite) TestStreamDirRoot() {
 	defer s.cleanupTest()
 	// Setup
 	base := generateDirectoryName()
@@ -671,7 +671,7 @@ func (s *s3StorageTestSuite) TestReadDirRoot() {
 		log.Debug(path)
 		s.Run(path, func() {
 			// ReadDir only reads the first level of the hierarchy
-			entries, err := s.s3Storage.ReadDir(internal.ReadDirOptions{Name: path})
+			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: path})
 			s.assert.Nil(err)
 			s.assert.EqualValues(3, len(entries))
 			// Check the base dir
@@ -696,14 +696,14 @@ func (s *s3StorageTestSuite) TestReadDirRoot() {
 	}
 }
 
-func (s *s3StorageTestSuite) TestReadDirSubDir() {
+func (s *s3StorageTestSuite) TestStreamDirSubDir() {
 	defer s.cleanupTest()
 	// Setup
 	base := generateDirectoryName()
 	s.setupHierarchy(base)
 
 	// ReadDir only reads the first level of the hierarchy
-	entries, err := s.s3Storage.ReadDir(internal.ReadDirOptions{Name: base + "/c1"})
+	entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: base + "/c1"})
 	s.assert.Nil(err)
 	s.assert.EqualValues(1, len(entries))
 	// Check the dir
@@ -714,7 +714,7 @@ func (s *s3StorageTestSuite) TestReadDirSubDir() {
 	s.assert.True(entries[0].IsModeDefault())
 }
 
-func (s *s3StorageTestSuite) TestReadDirSubDirPrefixPath() {
+func (s *s3StorageTestSuite) TestStreamDirSubDirPrefixPath() {
 	defer s.cleanupTest()
 	// Setup
 	base := generateDirectoryName()
@@ -724,7 +724,7 @@ func (s *s3StorageTestSuite) TestReadDirSubDirPrefixPath() {
 	s.assert.Nil(err)
 
 	// ReadDir only reads the first level of the hierarchy
-	entries, err := s.s3Storage.ReadDir(internal.ReadDirOptions{Name: "/c1"})
+	entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: "/c1"})
 	s.assert.Nil(err)
 	s.assert.EqualValues(1, len(entries))
 	// Check the dir
@@ -735,7 +735,7 @@ func (s *s3StorageTestSuite) TestReadDirSubDirPrefixPath() {
 	s.assert.True(entries[0].IsModeDefault())
 }
 
-func (s *s3StorageTestSuite) TestReadDirWindowsNameConvert() {
+func (s *s3StorageTestSuite) TestStreamDirWindowsNameConvert() {
 	// Skip test if not running on Windows
 	if runtime.GOOS != "windows" {
 		return
@@ -759,7 +759,7 @@ func (s *s3StorageTestSuite) TestReadDirWindowsNameConvert() {
 	for _, path := range paths {
 		log.Debug(path)
 		s.Run(path, func() {
-			entries, err := s.s3Storage.ReadDir(internal.ReadDirOptions{Name: path})
+			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: path})
 			s.assert.Nil(err)
 			s.assert.EqualValues(1, len(entries))
 			s.assert.Equal(windowsChildName, entries[0].Path)
@@ -767,12 +767,12 @@ func (s *s3StorageTestSuite) TestReadDirWindowsNameConvert() {
 	}
 }
 
-func (s *s3StorageTestSuite) TestReadDirError() {
+func (s *s3StorageTestSuite) TestStreamDirError() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateDirectoryName()
 
-	entries, err := s.s3Storage.ReadDir(internal.ReadDirOptions{Name: name})
+	entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: name})
 
 	s.assert.Nil(err) // Note: See comment in BlockBlob.List. BlockBlob behaves differently from Datalake
 	s.assert.Empty(entries)
@@ -2063,7 +2063,7 @@ func (s *s3StorageTestSuite) TestCopyToFileError() {
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
-func (s *s3StorageTestSuite) TestReadDir() {
+func (s *s3StorageTestSuite) TestStreamDir() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateDirectoryName()
@@ -2078,7 +2078,7 @@ func (s *s3StorageTestSuite) TestReadDir() {
 	for _, path := range paths {
 		log.Debug(path)
 		s.Run(path, func() {
-			entries, err := s.s3Storage.ReadDir(internal.ReadDirOptions{Name: path})
+			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: path})
 			s.assert.Nil(err)
 			s.assert.EqualValues(1, len(entries))
 		})

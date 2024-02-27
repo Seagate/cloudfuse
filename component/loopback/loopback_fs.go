@@ -120,41 +120,6 @@ func (lfs *LoopbackFS) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	return err == io.EOF
 }
 
-func (lfs *LoopbackFS) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
-	log.Trace("LoopbackFS::ReadDir : name=%s", options.Name)
-	attrList := make([]*internal.ObjAttr, 0)
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
-
-	log.Debug("LoopbackFS::ReadDir : requested for %s", path)
-	files, err := os.ReadDir(path)
-	if err != nil {
-		log.Err("LoopbackFS::ReadDir : error[%s]", err)
-		return nil, err
-	}
-	log.Debug("LoopbackFS::ReadDir : on %s returned %d items", path, len(files))
-
-	for _, file := range files {
-		info, _ := file.Info()
-
-		attr := &internal.ObjAttr{
-			Path:  common.JoinUnixFilepath(options.Name, file.Name()),
-			Name:  file.Name(),
-			Size:  info.Size(),
-			Mode:  info.Mode(),
-			Mtime: info.ModTime(),
-		}
-		attr.Flags.Set(internal.PropFlagMetadataRetrieved)
-		attr.Flags.Set(internal.PropFlagModeDefault)
-
-		if file.IsDir() {
-			attr.Flags.Set(internal.PropFlagIsDir)
-		}
-
-		attrList = append(attrList, attr)
-	}
-	return attrList, nil
-}
-
 // TODO: we can make it more intricate by generating a token and splitting streamed dir mimicking storage
 func (lfs *LoopbackFS) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
 	if options.Token == "na" {
