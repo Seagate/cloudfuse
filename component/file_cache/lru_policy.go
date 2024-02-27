@@ -243,25 +243,24 @@ func (p *lruPolicy) cacheValidate(name string) {
 
 	node.deleted = false
 
+	// put node at head of linked list
 	if node == p.head {
 		return
 	}
-
+	// remove node from its current position
 	if node.next != nil {
 		node.next.prev = node.prev
 	}
-
 	if node.prev != nil {
 		node.prev.next = node.next
 	}
-
+	// set node as head
 	node.prev = nil
 	node.next = p.head
-
 	p.head.prev = node
 	p.head = node
-	node.usage++
 
+	node.usage++
 }
 
 // For all other timer based activities we check the stuff here

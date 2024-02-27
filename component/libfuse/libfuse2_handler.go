@@ -713,11 +713,6 @@ func (cf *CgofuseFS) Flush(path string, fh uint64) int {
 	log.Trace("Libfuse::Flush : %s, handle: %d", handle.Path, handle.ID)
 
 	// If the file handle is not dirty, there is no need to flush
-	// TODO: Fix handling the dirty flag
-	if handle.Dirty() {
-		handle.Flags.Set(handlemap.HandleFlagDirty)
-	}
-
 	if !handle.Dirty() {
 		return 0
 	}
