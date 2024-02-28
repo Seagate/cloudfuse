@@ -301,6 +301,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def addOutputText(self, textString):
         self.textEdit_output.setText(f"{self.textEdit_output.toPlainText()}{textString}\n")
         self.textEdit_output.repaint()
+        self.textEdit_output.moveCursor(QtGui.QTextCursor.End)
     
     def errorMessageBox(self, messageString, titleString="Error"):
         msg = QtWidgets.QMessageBox()
