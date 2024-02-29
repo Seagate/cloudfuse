@@ -1094,7 +1094,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			exists = false
 		} else {
 			log.Err("FileCache::GetAttr : Failed to get attr of %s [%s]", options.Name, err.Error())
-			return &internal.ObjAttr{}, err
+			return nil, err
 		}
 	} else {
 		exists = true
@@ -1128,7 +1128,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	}
 
 	if !exists {
-		return &internal.ObjAttr{}, syscall.ENOENT
+		return nil, syscall.ENOENT
 	}
 
 	return attrs, nil
