@@ -446,7 +446,13 @@ func (p *lruPolicy) deleteItem(name string) {
 	}
 
 	// There are no open handles for this file so its safe to remove this
-	err := deleteFile(name)
+	// Check if the file exists first, since this is often the second time we're calling deleteFile
+	_, err := os.Lstat(name)
+	if err == nil && os.IsNotExist(err) {
+		// file was already deleted - this is normal
+		return
+	}
+	err = deleteFile(name)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("lruPolicy::DeleteItem : failed to delete local file %s [%s]", name, err.Error())
 	}
