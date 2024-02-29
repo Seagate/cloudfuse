@@ -1104,7 +1104,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	info, err := os.Lstat(localPath)
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
-	if (err == nil || os.IsExist(err)) && !info.IsDir() {
+	if err == nil && !info.IsDir() {
 		if exists { // Case 3 (file in storage and in local cache) so update the relevant attributes
 			// Return from local cache only if file is not under download or deletion
 			// If file is under download then taking size or mod time from it will be incorrect.
@@ -1271,7 +1271,7 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 	// Update the mode of the file in the local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	info, err := os.Stat(localPath)
-	if err == nil || os.IsExist(err) {
+	if err == nil {
 		fc.policy.CacheValid(localPath)
 
 		if info.Mode() != options.Mode {
@@ -1301,7 +1301,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	// Update the owner and group of the file in the local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	_, err = os.Stat(localPath)
-	if err == nil || os.IsExist(err) {
+	if err == nil {
 		fc.policy.CacheValid(localPath)
 
 		if runtime.GOOS != "windows" {
