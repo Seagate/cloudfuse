@@ -456,7 +456,7 @@ func (s3 *S3Storage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 }
 
 func (s3 *S3Storage) Chmod(options internal.ChmodOptions) error {
-	log.Trace("S3Storage::Chmod : Change mod of file %s", options.Name)
+	log.Trace("S3Storage::Chmod : Change mode of file %s", options.Name)
 
 	s3StatsCollector.PushEvents(chmod, options.Name, map[string]interface{}{mode: options.Mode.String()})
 	s3StatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))

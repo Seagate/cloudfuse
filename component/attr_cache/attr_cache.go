@@ -1007,10 +1007,9 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 
 		value, found := ac.cache.get(options.Name)
 		if !found {
-			log.Err("AttrCache::Chmod : %v", found)
+			log.Err("AttrCache::Chmod : %s not found in cache", options.Name)
 		} else if !value.exists() {
-			log.Err("AttrCache::Chmod : invalidating deleted entry %s", options.Name)
-			value.invalidate()
+			log.Err("AttrCache::Chmod : %s is marked deleted", options.Name)
 		} else {
 			value.setMode(options.Mode)
 		}
