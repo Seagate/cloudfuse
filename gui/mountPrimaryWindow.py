@@ -142,7 +142,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
 
         if not executableFound:
-            cloudfuseVersion = 'CloudFUSE does not exist'
+            cloudfuseVersion = 'Cloudfuse program not present'
         
         if stdOut != "":
             cloudfuseVersion = stdOut
