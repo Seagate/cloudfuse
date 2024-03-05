@@ -662,6 +662,27 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	return h, err
 }
 
+// OpenFile: Update cache with Open results from cloud
+func (ac *AttrCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
+	log.Trace("AttrCache::OpenFile : %s", options.Name)
+
+	h, err := ac.NextComponent().OpenFile(options)
+	if err != nil && os.IsNotExist(err) {
+		currentTime := time.Now()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
+		cacheItem, found := ac.cache.get(options.Name)
+		if found && cacheItem.exists() {
+			cacheItem.markDeleted(currentTime)
+		}
+		if ac.cacheDirs {
+			ac.updateAncestorsInCloud(getParentDir(options.Name), currentTime)
+		}
+	}
+
+	return h, err
+}
+
 // DeleteFile : Mark the file deleted
 func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("AttrCache::DeleteFile : %s", options.Name)
