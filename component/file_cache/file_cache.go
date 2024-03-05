@@ -672,7 +672,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	}
 
 	if downloadRequired {
-		log.Debug("FileCache::OpenFile : Need to re-download %s", options.Name)
+		log.Debug("FileCache::OpenFile : Need to download %s", options.Name)
 
 		fileSize := int64(0)
 		if attr != nil {
