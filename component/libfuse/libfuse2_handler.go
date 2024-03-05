@@ -845,20 +845,20 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 	dstAttr, dstErr := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: dstPath})
 
 	// EISDIR
-	if (dstErr == nil || os.IsExist(dstErr)) && dstAttr.IsDir() && !srcAttr.IsDir() {
+	if dstErr == nil && dstAttr.IsDir() && !srcAttr.IsDir() {
 		log.Err("Libfuse::Rename : dst [%s] is an existing directory but src [%s] is not a directory", dstPath, srcPath)
 		return -fuse.EISDIR
 	}
 
 	// ENOTDIR
-	if (dstErr == nil || os.IsExist(dstErr)) && !dstAttr.IsDir() && srcAttr.IsDir() {
+	if dstErr == nil && !dstAttr.IsDir() && srcAttr.IsDir() {
 		log.Err("Libfuse::Rename : dst [%s] is an existing file but src [%s] is a directory", dstPath, srcPath)
 		return -fuse.ENOTDIR
 	}
 
 	if srcAttr.IsDir() {
 		// ENOTEMPTY
-		if dstErr == nil || os.IsExist(dstErr) {
+		if dstErr == nil {
 			empty := fuseFS.NextComponent().IsDirEmpty(internal.IsDirEmptyOptions{Name: dstPath})
 			if !empty {
 				return -fuse.ENOTEMPTY
