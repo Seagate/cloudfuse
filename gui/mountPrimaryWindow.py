@@ -143,10 +143,11 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
         if not executableFound:
             cloudfuseVersion = 'Cloudfuse program not present'
-        
-        if stdOut != "":
+        elif stdOut != "":
             cloudfuseVersion = stdOut
-
+        else:
+            cloudfuseVersion = 'Cloudfuse version not found'
+            
         self.page = aboutPage(cloudfuseVersion)
         self.page.show()
 
