@@ -34,7 +34,8 @@ class aboutPage(QWidget, Ui_About):
         # By default, hyperlinks are set to look for local files in the current directory; set the behavior to  open the
         #   external link in the system's default browser
         self.textBrowser.setOpenExternalLinks(True)
-        self.labelcloudfuseVersion.setText(str(cloudfuseVersion))
-        self.labelcloudfuseVersion.setFont(QFont('Arial',18))
+        self.labelcloudfuseVersion.setText(str(cloudfuseVersion).capitalize())
+        self.labelcloudfuseVersion.setFont(QFont('Arial',18,700))
+
         # Close the window when the ok button is clicked
         self.buttonBox.clicked.connect(self.close)
