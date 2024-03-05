@@ -21,6 +21,7 @@
 # SOFTWARE
 
 from PySide6.QtWidgets import QWidget
+from PySide6.QtGui import QFont
 
 # import the custom window class
 from ui_about_dialog import Ui_About
@@ -34,5 +35,6 @@ class aboutPage(QWidget, Ui_About):
         #   external link in the system's default browser
         self.textBrowser.setOpenExternalLinks(True)
         self.labelcloudfuseVersion.setText(str(cloudfuseVersion))
+        self.labelcloudfuseVersion.setFont(QFont('Arial',18))
         # Close the window when the ok button is clicked
         self.buttonBox.clicked.connect(self.close)
