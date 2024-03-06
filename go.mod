@@ -27,7 +27,7 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.2
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/vibhansa-msft/tlru v0.0.0-20230621165448-dbd42234ad22
 	github.com/winfsp/cgofuse v1.5.0
 	go.uber.org/atomic v1.11.0
