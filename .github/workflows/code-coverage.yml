@@ -32,6 +32,9 @@ jobs:
       cloudfuse_ADLS_CFG: "./cloudfuse.adls.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
+
+    # Skip for dependabot updates
+    if: ${{ github.triggering_actor != 'dependabot[bot]' }}
     
     timeout-minutes: 60
     steps:
@@ -580,6 +583,9 @@ jobs:
       cloudfuse_ADLS_CFG_HMON: "./cloudfuse.adls.hmon.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
+
+    # Skip for dependabot updates
+    if: ${{ github.triggering_actor != 'dependabot[bot]' }}
     
     timeout-minutes: 60
     steps:
