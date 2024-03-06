@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.25.2
 	github.com/aws/aws-sdk-go-v2/config v1.27.6
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.6
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.16.0
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.16.8
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.51.3
 	github.com/aws/smithy-go v1.20.1
 	github.com/fsnotify/fsnotify v1.7.0
@@ -23,7 +23,7 @@ require (
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/radovskyb/watcher v1.0.7
 	github.com/sevlyar/go-daemon v0.1.6
-	github.com/shirou/gopsutil/v3 v3.24.1
+	github.com/shirou/gopsutil/v3 v3.24.2
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.2
@@ -98,7 +98,7 @@ require (
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/wastore/keychain v0.0.0-20180920053336-f2c902a3d807 // indirect
 	github.com/wastore/keyctl v0.3.1 // indirect
-	github.com/yusufpapurcu/wmi v1.2.3 // indirect
+	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.17.0 // indirect
