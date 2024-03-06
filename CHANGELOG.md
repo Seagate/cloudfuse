@@ -1,5 +1,15 @@
 # Cloudfuse Changelog #
 
+## 1.1.2 ##
+
+This version is based on [blobfuse2 2.2.1](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.2.1) (upstream).
+**Changes**
+-- [#122](https://github.com/Seagate/cloudfuse/pull/122) Log file timestamps now include milliseconds
+-- cleanup CLI documentation
+-- update to latest go dependencies
+**Bug Fixes**
+-- [#125](https://github.com/Seagate/cloudfuse/pull/125) Fix scrolling of text window on GUI when new info appears
+
 ## 1.1.1 ##
 
 This version is based on [blobfuse2 2.2.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.2.0) (upstream).
