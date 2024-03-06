@@ -94,7 +94,7 @@ jobs:
       - # Get the WinFSP installer (from cache or download)
         name: Get cached WinFSP installer
         id: restore-winfsp-installer
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
