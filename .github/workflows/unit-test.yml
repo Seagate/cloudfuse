@@ -120,6 +120,9 @@ jobs:
       cgo: '0'
       containerName: 'test-cnt-win'
 
+    # Skip for dependabot updates
+    if: ${{ github.triggering_actor != 'dependabot[bot]' }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
