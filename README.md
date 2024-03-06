@@ -210,13 +210,18 @@ WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos - [link](ht
 
 ## Support
 
+### Contact Us
+
+We welcome your questions and feedback!  
+Email us: [cloudfuse@seagate.com](mailto:cloudfuse@seagate.com).
+
 ### Frequently Asked Questions
 
 A list of FAQs can be found [here](https://github.com/Seagate/cloudfuse/wiki/Frequently-Asked-Questions).
 
 ### Report Issues and Request Features
 
-We welcome all feedback! Please submit [issues and requests here](https://github.com/Seagate/cloudfuse/issues).
+Please submit [issues and requests here](https://github.com/Seagate/cloudfuse/issues).
 
 ## Contributing
 
