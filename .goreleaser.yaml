@@ -258,10 +258,12 @@ nfpms:
       deb:
         dependencies:
           - libfuse-dev
+          - libxcb-cursor0
 
       rpm:
         dependencies:
           - fuse-devel
+          - xcb-util
 
 metadata:
   mod_timestamp: "{{ .CommitTimestamp }}"
