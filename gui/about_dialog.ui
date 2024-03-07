@@ -7,14 +7,14 @@
     <x>0</x>
     <y>0</y>
     <width>1114</width>
-    <height>576</height>
+    <height>614</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>About CloudFUSE</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
-   <item row="0" column="0">
+   <item row="2" column="0">
     <widget class="QTextBrowser" name="textBrowser">
      <property name="styleSheet">
       <string notr="true">background-color: rgb(239, 239, 239);
@@ -50,10 +50,17 @@ p, li { white-space: pre-wrap; }
      </property>
     </widget>
    </item>
-   <item row="1" column="0">
+   <item row="4" column="0">
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="standardButtons">
       <set>QDialogButtonBox::Ok</set>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0">
+    <widget class="QLabel" name="labelcloudfuseVersion">
+     <property name="text">
+      <string>TextLabel</string>
      </property>
     </widget>
    </item>

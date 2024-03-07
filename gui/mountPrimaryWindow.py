@@ -135,7 +135,20 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
     # Display the custom dialog box for the cloudfuse 'about' page.
     def showAboutCloudFusePage(self):
-        self.page = aboutPage()
+        if platform == "win32":
+            commandParts = ['cloudfuse.exe', '--version']
+        else:
+            commandParts = ['./cloudfuse', '--version']
+        (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
+
+        if not executableFound:
+            cloudfuseVersion = 'Cloudfuse program not present'
+        elif stdOut != "":
+            cloudfuseVersion = stdOut
+        else:
+            cloudfuseVersion = 'Cloudfuse version not found'
+            
+        self.page = aboutPage(cloudfuseVersion)
         self.page.show()
 
     def showUnderConstructionPage(self):
