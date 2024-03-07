@@ -120,9 +120,6 @@ jobs:
       cgo: '0'
       containerName: 'test-cnt-win'
 
-    # Skip for dependabot updates
-    if: ${{ github.triggering_actor != 'dependabot[bot]' }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -190,7 +187,7 @@ jobs:
         shell: powershell
 
       - name: Run unit tests
-        run: go test -v -timeout=1h ./... --tags=unittest   
+        run: go test -v -timeout=1h ./... --tags=unittest,authtest   
     
   lint:
     name: Lint
