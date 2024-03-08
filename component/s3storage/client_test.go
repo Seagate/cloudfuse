@@ -1,5 +1,5 @@
-//go:build !authtest && !nos3
-// +build !authtest,!nos3
+//go:build !authtest
+// +build !authtest
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.

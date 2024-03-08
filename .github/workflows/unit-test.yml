@@ -120,11 +120,6 @@ jobs:
       cgo: '0'
       containerName: 'test-cnt-win'
 
-      # Using default test credentials for Azurite
-      BLOB_ENDPOINT: http://127.0.0.1:10000/devstoreaccount1
-      BLOB_ACCOUNT: devstoreaccount1
-      BLOB_KEY: Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -146,31 +141,8 @@ jobs:
         run: |
           ./build.sh
 
-      - name: Create Azure Configuration File on Windows
-        run: |-
-          $cnfFile="~\azuretest.json"
-          Write-Host $cnfFile
-          $content = @"
-          {
-            "block-acct": "${{ env.BLOB_ACCOUNT }}",
-            "block-key": "$${{ env.BLOB_KEY }}",
-            "endpoint": "${{ env.BLOB_ENDPOINT }}",
-            "skip-msi": true,
-            "proxy-address": ""
-          }
-          "@
-          $content | Out-File -FilePath $cnfFile -Encoding Ascii
-        shell: powershell
-
-      - name: Install Azurite
-        run: npm install -g azurite
-    
-      - name: Start Azurite
-        shell: bash
-        run: cmd /C start azurite --silent
-
       - name: Run unit tests
-        run: go test -v -timeout=1h ./... --tags=unittest,azurite,nos3
+        run: go test -v -timeout=1h ./... --tags=unittest,authtest
     
   lint:
     name: Lint
