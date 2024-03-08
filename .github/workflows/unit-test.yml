@@ -166,6 +166,7 @@ jobs:
         run: npm install -g azurite
     
       - name: Start Azurite
+        shell: bash
         run: azurite --silent &
 
       - name: Run unit tests
