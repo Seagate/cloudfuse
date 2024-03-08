@@ -120,6 +120,11 @@ jobs:
       cgo: '0'
       containerName: 'test-cnt-win'
 
+      # Using default test credentials for Azurite
+      BLOB_ENDPOINT: http://127.0.0.1:10000/devstoreaccount1
+      BLOB_ACCOUNT: devstoreaccount1
+      BLOB_KEY: Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -147,22 +152,9 @@ jobs:
           Write-Host $cnfFile
           $content = @"
           {
-            "block-acct": "${{ secrets.AZTEST_BLOCK_ACC_NAME }}",
-            "adls-acct": "${{ secrets.AZTEST_ADLS_ACC_NAME }}",
-            "block-cont": "${{ env.containerName }}",
-            "adls-cont": "${{ env.containerName }}",
-            "block-key": "${{ secrets.AZTEST_BLOCK_KEY }}",
-            "adls-key": "${{ secrets.AZTEST_ADLS_KEY }}",
-            "block-sas": "${{ secrets.AZTEST_BLOCK_SAS }}",
-            "block-cont-sas-ubn-18": "${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_18 }}",
-            "block-cont-sas-ubn-20": "${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_20 }}",
-            "adls-sas": "${{ secrets.AZTEST_ADLS_SAS }}",
-            "msi-appid": "${{ secrets.AZTEST_APP_ID }}",
-            "msi-resid": "${{ secrets.AZTEST_RES_ID }}",
-            "msi-objid": "${{ secrets.AZTEST_OBJ_ID }}",
-            "spn-client": "${{ secrets.AZTEST_CLIENT }}",
-            "spn-tenant": "${{ secrets.AZTEST_TENANT }}",
-            "spn-secret": "${{ secrets.AZTEST_SECRET }}",
+            "block-acct": "${{ env.BLOB_ACCOUNT }}",
+            "block-key": "$${{ env.BLOB_KEY }}",
+            "endpoint": "${{ env.BLOB_ENDPOINT }}",
             "skip-msi": true,
             "proxy-address": ""
           }
@@ -170,24 +162,14 @@ jobs:
           $content | Out-File -FilePath $cnfFile -Encoding Ascii
         shell: powershell
 
-      - name: Create S3 Configuration File on Windows
-        run: |-
-          $cnfFile="~\s3test.json"
-          Write-Host $cnfFile
-          $content = @"
-          {
-            "bucket-name": "${{ secrets.S3TEST_BUCKET_NAME }}",
-            "access-key": "${{ secrets.S3TEST_ACCESS_KEY }}",
-            "secret-key": "${{ secrets.S3TEST_SECRET_KEY }}",
-            "endpoint": "${{ secrets.S3TEST_ENDPOINT }}",
-            "region": "${{ secrets.S3TEST_REGION }}"
-          }
-          "@
-          $content | Out-File -FilePath $cnfFile -Encoding Ascii
-        shell: powershell
+      - name: Install Azurite
+        run: npm install -g azurite
+    
+      - name: Start Azurite
+        run: azurite --silent &
 
       - name: Run unit tests
-        run: go test -v -timeout=1h ./... --tags=unittest,authtest   
+        run: go test -v -timeout=1h ./... --tags=unittest,azurite,nos3
     
   lint:
     name: Lint
