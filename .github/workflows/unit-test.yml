@@ -167,7 +167,7 @@ jobs:
     
       - name: Start Azurite
         shell: bash
-        run: azurite --silent &
+        run: cmd /C start azurite --silent
 
       - name: Run unit tests
         run: go test -v -timeout=1h ./... --tags=unittest,azurite,nos3
