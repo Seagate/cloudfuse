@@ -316,12 +316,6 @@ func (s *blockBlobTestSuite) TestDefault() {
 	s.assert.False(s.az.stConfig.restrictedCharsWin)
 }
 
-func randomString(length int) string {
-	b := make([]byte, length)
-	rand.Read(b)
-	return fmt.Sprintf("%x", b)[:length]
-}
-
 func generateContainerName() string {
 	return "fuseutc" + randomString(8)
 }
