@@ -38,6 +38,12 @@ jobs:
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         run: pip3 install -r gui/requirements.txt
         shell: bash
+      - 
+        name: Install libxcb-cursor0
+        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit && matrix.os == 'ubuntu-latest' }}
+        run: |-
+          sudo apt-get update
+          sudo apt-get install libxcb-cursor0 -y
       -
         name: Compile GUI
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
