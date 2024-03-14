@@ -2,6 +2,7 @@
 
 ## **1.1.2** ##
 
+March 14th 2024  
 This version is based on [blobfuse2 2.2.1](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.2.1) (upstream).
 
 ### Changes ###
@@ -22,6 +23,7 @@ This version is based on [blobfuse2 2.2.1](https://github.com/Azure/azure-storag
 
 ## **1.1.1** ##
 
+February 13th 2024  
 This version is based on [blobfuse2 2.2.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.2.0) (upstream).
 
 ### Bug Fixes ###
@@ -30,6 +32,7 @@ This version is based on [blobfuse2 2.2.0](https://github.com/Azure/azure-storag
 
 ## **1.1.0** ##
 
+February 12th 2024  
 This version is based on [blobfuse2 2.2.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.2.0) (upstream).
 
 ### Changes ###
@@ -40,6 +43,7 @@ This version is based on [blobfuse2 2.2.0](https://github.com/Azure/azure-storag
 
 ## **1.0.1** ##
 
+January 19th 2024  
 This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
 
 ### Bug Fixes ###
@@ -49,6 +53,7 @@ This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storag
 
 ## **1.0.0** ##
 
+January 18th 2024  
 This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
 
 ### Changes ###
@@ -67,6 +72,7 @@ This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storag
 
 ## **0.3.0** ##
 
+December 20th 2023  
 This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
 
 ### Changes ###
@@ -86,6 +92,7 @@ This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storag
 
 ## **0.2.1** ##
 
+November 30th 2023  
 This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
 
 ### Changes ###
@@ -97,6 +104,9 @@ This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storag
 - [#48](https://github.com/Seagate/cloudfuse/pull/48) Prevent "Access Denied" when running as a Windows service
 
 ## **0.2.0** ##
+
+November 6th 2023  
+This version is based on [blobfuse2 2.1.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.0) (upstream).
 
 ### Features ###
 
@@ -111,6 +121,7 @@ This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storag
 
 ## **0.1.0** ##
 
+October 19th 2023  
 This release includes all features planned for the 1.0.0 release of cloudfuse, which will be released after additional bug fixes.
 This version is based on [blobfuse2 2.1.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.0) (upstream).
 
