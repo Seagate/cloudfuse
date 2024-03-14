@@ -51,6 +51,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "primaryWindow")
         self.initMountPoint()
         self.checkConfigDirectory()
+        self.textEdit_output.setReadOnly(True)
 
         if platform == 'win32':
             # Windows directory and filename conventions:
