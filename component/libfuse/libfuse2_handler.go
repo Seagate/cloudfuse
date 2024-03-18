@@ -545,13 +545,9 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 	log.Trace("Libfuse::Open : %s", name)
 
 	//Create an empty file and use a handle with it for now
-	err := os.MkdirAll(path, common.DefaultAllowOtherPermissionBits)
+	f, err := os.Create(name)
 	if err != nil {
 		log.Err("FileCache::OpenFile : error creating directory structure for file %s [%s]", name, err.Error())
-	}
-	f, err := common.OpenFile(path, os.O_CREATE|os.O_RDWR, common.DefaultAllowOtherPermissionBits)
-	if err != nil {
-		log.Err("FileCache::OpenFile : error creating new file %s [%s]", name, err.Error())
 	}
 
 	handle := handlemap.NewHandle(name)
@@ -649,16 +645,6 @@ func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int 
 		log.Trace("Libfuse::Write : error getting handle for path %s, handle: %d", path, fh)
 		return -fuse.EBADF
 	}
-
-	name := trimFusePath(path)
-	name = common.NormalizeObjectName(name)
-
-	handle, _ = fuseFS.NextComponent().OpenFile(
-		internal.OpenFileOptions{
-			Name:  name,
-			Flags: 0,
-			Mode:  fs.FileMode(fuseFS.filePermission),
-		})
 
 	bytesWritten, err := fuseFS.NextComponent().WriteFile(
 		internal.WriteFileOptions{
