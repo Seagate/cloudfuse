@@ -126,15 +126,15 @@ func testStatFs(suite *libfuseTestSuite) {
 	buf := &fuse.Statfs_t{}
 	ret := cfuseFS.Statfs(path, buf)
 
-	suite.assert.Equal(ret, 0)
-	suite.assert.Equal(int(buf.Frsize), 1)
-	suite.assert.Equal(int(buf.Blocks), 2)
-	suite.assert.Equal(int(buf.Bavail), 3)
-	suite.assert.Equal(int(buf.Bfree), 4)
-	suite.assert.Equal(int(buf.Bsize), 5)
-	suite.assert.Equal(int(buf.Files), 6)
-	suite.assert.Equal(int(buf.Ffree), 7)
-	suite.assert.Equal(int(buf.Namemax), 8)
+	suite.assert.Equal(0, ret)
+	suite.assert.Equal(1, int(buf.Frsize))
+	suite.assert.Equal(2, int(buf.Blocks))
+	suite.assert.Equal(3, int(buf.Bavail))
+	suite.assert.Equal(4, int(buf.Bfree))
+	suite.assert.Equal(5, int(buf.Bsize))
+	suite.assert.Equal(6, int(buf.Files))
+	suite.assert.Equal(7, int(buf.Ffree))
+	suite.assert.Equal(8, int(buf.Namemax))
 }
 
 func testStatFsNotPopulated(suite *libfuseTestSuite) {
@@ -144,7 +144,7 @@ func testStatFsNotPopulated(suite *libfuseTestSuite) {
 	buf := &fuse.Statfs_t{}
 	ret := cfuseFS.Statfs(path, buf)
 
-	suite.assert.Equal(ret, 0)
+	suite.assert.Equal(0, ret)
 
 	// By default these are all 0, so they should be populated by the system
 	// and thus each larger than 0
@@ -255,8 +255,8 @@ func testCreate(suite *libfuseTestSuite) {
 	stbuf := &fuse.Stat_t{}
 	err = cfuseFS.Getattr(path, stbuf, fh)
 	suite.assert.Equal(0, err)
-	suite.assert.Equal(stbuf.Mtim.Nsec, int64(0))
-	suite.assert.NotEqual(stbuf.Mtim.Sec, int64(0))
+	suite.assert.Equal(int64(0), stbuf.Mtim.Nsec)
+	suite.assert.NotEqual(int64(0), stbuf.Mtim.Sec)
 }
 
 func testCreateError(suite *libfuseTestSuite) {

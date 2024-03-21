@@ -49,7 +49,7 @@ func TestGenerateConfig(t *testing.T) {
 
 func (suite *typesHMTestSuite) TestDefaultWorkDir() {
 	val, err := os.UserHomeDir()
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.Equal(DefaultWorkDir, common.JoinUnixFilepath(val, ".cloudfuse"))
 	suite.assert.Equal(DefaultLogFile, common.JoinUnixFilepath(val, ".cloudfuse/CfuseMonitor.log"))
 }
