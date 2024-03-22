@@ -400,7 +400,7 @@ func writeConfigFile(contConfigFile string) error {
 			return fmt.Errorf("failed to encrypt yaml content [%s]", err.Error())
 		}
 
-		err = os.WriteFile(contConfigFile, cipherText, 0777)
+		err = os.WriteFile(contConfigFile, cipherText, 0644)
 		if err != nil {
 			return fmt.Errorf("failed to write encrypted file [%s]", err.Error())
 		}

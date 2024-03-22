@@ -96,7 +96,7 @@ var generateTestConfig = &cobra.Command{
 		}
 
 		// write the config with the params to the output file
-		err = os.WriteFile(opts.outputConfigPath, []byte(newConfig), 0700)
+		err = os.WriteFile(opts.outputConfigPath, []byte(newConfig), 0644)
 		if err != nil {
 			return fmt.Errorf("failed to write file [%s]", err.Error())
 		}

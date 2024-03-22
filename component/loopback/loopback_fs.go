@@ -441,7 +441,7 @@ func (lfs *LoopbackFS) Chown(options internal.ChownOptions) error {
 func (lfs *LoopbackFS) StageData(options internal.StageDataOptions) error {
 	log.Trace("LoopbackFS::StageData : name=%s, id=%s", options.Name, options.Id)
 	path := fmt.Sprintf("%s_%d_%s", filepath.Join(lfs.path, options.Name), options.Offset, strings.ReplaceAll(options.Id, "/", "_"))
-	return os.WriteFile(path, options.Data, 0777)
+	return os.WriteFile(path, options.Data, 0644)
 }
 
 func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {

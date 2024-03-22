@@ -56,8 +56,8 @@ var disableVersionCheck bool
 
 var rootCmd = &cobra.Command{
 	Use:               "cloudfuse",
-	Short:             "Cloudfuse is an open source project developed to provide a virtual filesystem backed by the Azure Storage.",
-	Long:              "Cloudfuse is an open source project developed to provide a virtual filesystem backed by the Azure Storage. It uses the fuse protocol to communicate with the Linux FUSE kernel module, and implements the filesystem operations using the Azure Storage REST APIs.",
+	Short:             "Cloudfuse is an open source project developed to provide a virtual filesystem backed by S3 or Azure storage.",
+	Long:              "Cloudfuse is an open source project developed to provide a virtual filesystem backed by S3 or Azure storage.",
 	Version:           common.CloudfuseVersion,
 	FlagErrorHandling: cobra.ExitOnError,
 	SilenceUsage:      true,
