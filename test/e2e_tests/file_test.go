@@ -29,10 +29,10 @@
 package e2e_tests
 
 import (
+	"crypto/rand"
 	"flag"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"runtime"
 	"strconv"
@@ -82,7 +82,6 @@ func initFileFlags() {
 }
 
 func getFileTestDirName(n int) string {
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, n)
 	rand.Read(b)
 	return fmt.Sprintf("%x", b)[:n]

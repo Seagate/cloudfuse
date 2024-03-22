@@ -37,13 +37,13 @@ package block_cache
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	mrand "math/rand"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -74,7 +74,6 @@ type testObj struct {
 }
 
 func randomString(length int) string {
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, length)
 	rand.Read(b)
 	return fmt.Sprintf("%x", b)[:length]
@@ -396,7 +395,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandom() {
 	data = make([]byte, 100)
 	max := int64(100 * _1MB)
 	for i := 0; i < 50; i++ {
-		offset := rand.Int63n(max)
+		offset := mrand.Int63n(max)
 		n, _ := tobj.blockCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: offset, Data: data})
 		suite.assert.LessOrEqual(n, 100)
 	}
@@ -437,7 +436,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 	data = make([]byte, 100)
 	max := int64(100 * _1MB)
 	for i := 0; i < 50; i++ {
-		offset := rand.Int63n(max)
+		offset := mrand.Int63n(max)
 		n, _ := tobj.blockCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: offset, Data: data})
 		suite.assert.Equal(h.Buffers.Cooked.Len(), 1)
 		suite.assert.Equal(h.Buffers.Cooking.Len(), 0)

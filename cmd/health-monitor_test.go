@@ -32,7 +32,6 @@ import (
 	"runtime"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -66,7 +65,6 @@ type hmonTestSuite struct {
 }
 
 func generateRandomPID() string {
-	rand.Seed(time.Now().UnixNano())
 	var randpid int
 	for i := 0; i <= 5; i++ {
 		randpid = rand.Intn(90000) + 10000
