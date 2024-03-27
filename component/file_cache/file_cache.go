@@ -401,7 +401,10 @@ func (fc *FileCache) invalidateDirectory(name string) {
 			if !d.IsDir() {
 				fc.policy.CachePurge(path)
 			} else {
-				_ = deleteFile(path)
+				deleteDirError := deleteFile(path)
+				if deleteDirError != nil {
+					log.Warn("FileCache::invalidateDirectory : %s - failed to delete %s. Here's why: %v", name, path, deleteDirError)
+				}
 			}
 		}
 		return nil
@@ -412,7 +415,10 @@ func (fc *FileCache) invalidateDirectory(name string) {
 		return
 	}
 
-	_ = deleteFile(localPath)
+	deleteErr := deleteFile(localPath)
+	if deleteErr != nil {
+		log.Warn("FileCache::invalidateDirectory : %s - failed to delete %s. Here's why: %v", name, localPath, deleteErr)
+	}
 }
 
 // Note: The primary purpose of the file cache is to keep track of files that are opened by the user.
