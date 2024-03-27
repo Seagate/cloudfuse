@@ -171,7 +171,7 @@ func (s *clientTestSuite) TestCredentialsError() {
 		"WRONGSECRETKEY")
 	// S3 connection creation should fail
 	err := s.setupTestHelper(config, false)
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *clientTestSuite) TestEnvVarCredentials() {
@@ -190,7 +190,7 @@ func (s *clientTestSuite) TestEnvVarCredentials() {
 		storageTestConfigurationParameters.Endpoint)
 	// S3 connection should find credentials from environment variables
 	err := s.setupTestHelper(config, false)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *clientTestSuite) TestCredentialPrecedence() {
@@ -203,14 +203,14 @@ func (s *clientTestSuite) TestCredentialPrecedence() {
 		"WRONGSECRETKEY")
 	// Wrong credentials should take precedence, so S3 connection should fail
 	err := s.setupTestHelper(config, false)
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *clientTestSuite) TestListBuckets() {
 	defer s.cleanupTest()
 	// TODO: generalize this test by creating, listing, then destroying a bucket
 	buckets, err := s.client.ListBuckets()
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Contains(buckets, storageTestConfigurationParameters.BucketName)
 }
 func (s *clientTestSuite) TestSetPrefixPath() {
@@ -220,16 +220,16 @@ func (s *clientTestSuite) TestSetPrefixPath() {
 	fileName := generateFileName()
 
 	err := s.client.SetPrefixPath(prefix)
-	s.assert.Nil(err)                                   //stub
+	s.assert.NoError(err)                               //stub
 	err = s.client.CreateFile(fileName, os.FileMode(0)) // create file uses prefix
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// object should be at prefix
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(path.Join(prefix, fileName)),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 func (s *clientTestSuite) TestCreateFile() {
 	defer s.cleanupTest()
@@ -237,14 +237,14 @@ func (s *clientTestSuite) TestCreateFile() {
 	name := generateFileName()
 
 	err := s.client.CreateFile(name, os.FileMode(0))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// file should be in bucket
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 func (s *clientTestSuite) TestCreateDirectory() {
 	defer s.cleanupTest()
@@ -252,7 +252,7 @@ func (s *clientTestSuite) TestCreateDirectory() {
 	name := generateDirectoryName()
 
 	err := s.client.CreateDirectory(name)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 func (s *clientTestSuite) TestCreateLink() {
 	defer s.cleanupTest()
@@ -264,11 +264,11 @@ func (s *clientTestSuite) TestCreateLink() {
 		Key:    aws.String(target),
 	})
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	source := generateFileName()
 
 	err = s.client.CreateLink(source, target, true)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	source = s.client.getKey(source, true)
 
@@ -276,12 +276,12 @@ func (s *clientTestSuite) TestCreateLink() {
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(source),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// object body should match target file name
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(target, output)
 
 }
@@ -293,7 +293,7 @@ func (s *clientTestSuite) TestReadLink() {
 	source := generateFileName()
 
 	err := s.client.CreateLink(source, target, true)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	source = s.client.getKey(source, true)
 
@@ -301,13 +301,13 @@ func (s *clientTestSuite) TestReadLink() {
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(source),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	defer result.Body.Close()
 
 	// object body should match target file name
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(target, string(output))
 
 }
@@ -320,7 +320,7 @@ func (s *clientTestSuite) TestDeleteLink() {
 	source := generateFileName()
 
 	err := s.client.CreateLink(source, target, true)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	source = s.client.getKey(source, true)
 
@@ -328,13 +328,13 @@ func (s *clientTestSuite) TestDeleteLink() {
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(source),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(source),
 	})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *clientTestSuite) TestDeleteLinks() {
@@ -356,7 +356,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 		targets[i] = generateFileName()
 
 		err := s.client.CreateLink(folder+sources[i], targets[i], true)
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 
 		sources[i] = s.client.getKey(sources[i], true)
 
@@ -365,12 +365,12 @@ func (s *clientTestSuite) TestDeleteLinks() {
 			Bucket: aws.String(s.client.Config.authConfig.BucketName),
 			Key:    aws.String(folder + sources[i]),
 		})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 
 		// object body should match target file name
 		defer result.Body.Close()
 		buffer, err := io.ReadAll(result.Body)
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 
 		s.assert.EqualValues(targets[i], string(buffer))
 	}
@@ -391,7 +391,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 			Quiet:   aws.Bool(true),
 		},
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// make sure the links aren't there
 	for i := range sources {
@@ -399,7 +399,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 			Bucket: aws.String(s.client.Config.authConfig.BucketName),
 			Key:    aws.String(folder + sources[i]),
 		})
-		s.assert.NotNil(err)
+		s.assert.Error(err)
 
 	}
 }
@@ -412,10 +412,10 @@ func (s *clientTestSuite) TestDeleteFile() {
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.client.DeleteFile(name)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// This is similar to the s3 bucket command, use getobject for now
 	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
@@ -425,7 +425,7 @@ func (s *clientTestSuite) TestDeleteFile() {
 		Key:    aws.String(name),
 	})
 
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 func (s *clientTestSuite) TestDeleteDirectory() {
 	defer s.cleanupTest()
@@ -436,17 +436,17 @@ func (s *clientTestSuite) TestDeleteDirectory() {
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(path.Join(dirName, fileName)),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.client.DeleteDirectory(dirName)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// file in directory should no longer be there
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(path.Join(dirName, fileName)),
 	})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 func (s *clientTestSuite) TestRenameFile() {
 	defer s.cleanupTest()
@@ -457,24 +457,24 @@ func (s *clientTestSuite) TestRenameFile() {
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(src),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	dst := generateFileName()
 
 	err = s.client.RenameFile(src, dst, false)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Src should not be in the account
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(src),
 	})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	// Dst should be in the account
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(dst),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 func (s *clientTestSuite) TestRenameFileError() {
 	defer s.cleanupTest()
@@ -491,13 +491,13 @@ func (s *clientTestSuite) TestRenameFileError() {
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(src),
 	})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	// Dst should not be in the account
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(dst),
 	})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 func (s *clientTestSuite) TestRenameDirectory() {
 	defer s.cleanupTest()
@@ -508,24 +508,24 @@ func (s *clientTestSuite) TestRenameDirectory() {
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(path.Join(srcDir, fileName)),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	dstDir := generateDirectoryName()
 	err = s.client.RenameDirectory(srcDir, dstDir)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// file in srcDir should no longer be there
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(path.Join(srcDir, fileName)),
 	})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	// file in dstDir should be there
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(path.Join(dstDir, fileName)),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 func (s *clientTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
@@ -537,10 +537,10 @@ func (s *clientTestSuite) TestGetAttrDir() {
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(filename),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	attr, err := s.client.GetAttr(dirName)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(attr)
 	s.assert.True(attr.IsDir())
 }
@@ -557,12 +557,12 @@ func (s *clientTestSuite) TestGetAttrFile() {
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	before, err := s.client.GetAttr(name)
 
 	// file info
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(before)
 	s.assert.False(before.IsDir())
 	s.assert.False(before.IsSymlink())
@@ -580,10 +580,10 @@ func (s *clientTestSuite) TestGetAttrFile() {
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	after, err := s.client.GetAttr(name)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(after.Mtime)
 
 	s.assert.True(after.Mtime.After(before.Mtime))
@@ -595,7 +595,7 @@ func (s *clientTestSuite) TestGetAttrError() {
 
 	// non existent file should throw error
 	_, err := s.client.GetAttr(name)
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 func (s *clientTestSuite) TestList() {
@@ -609,58 +609,58 @@ func (s *clientTestSuite) TestList() {
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(gc1),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	// a/c2
 	c2 := base + "/c2"
 	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(c2),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	// ab/c1
 	abc1 := base + "b/c1"
 	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(abc1),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	// ac
 	ac := base + "c"
 	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(ac),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// with trailing "/" should return only the directory c1 and the file c2
 	baseTrail := base + "/"
 	objects, _, err := s.client.List(baseTrail, nil, 0)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(objects)
-	s.assert.EqualValues(len(objects), 2)
-	s.assert.EqualValues(objects[0].Name, "c1")
+	s.assert.Len(objects, 2)
+	s.assert.EqualValues("c1", objects[0].Name)
 	s.assert.True(objects[0].IsDir())
-	s.assert.EqualValues(objects[1].Name, "c2")
+	s.assert.EqualValues("c2", objects[1].Name)
 	s.assert.False(objects[1].IsDir())
 
 	// without trailing "/" only get file ac
 	// if not including the trailing "/", List will return any files with the given prefix
 	// but no directories
 	objects, _, err = s.client.List(base, nil, 0)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(objects)
-	s.assert.EqualValues(len(objects), 1)
+	s.assert.Len(objects, 1)
 	s.assert.EqualValues(objects[0].Name, base+"c")
 	s.assert.False(objects[0].IsDir())
 
 	// When listing the root, List should not include the root
 	objects, _, err = s.client.List("", nil, 0)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(objects)
-	s.assert.Greater(len(objects), 0)
-	s.assert.NotEqual(objects[0].Name, "")
-	s.assert.NotEqual(objects[0].Name, "/")
-	s.assert.NotEqual(objects[0].Name, ".")
+	s.assert.NotEmpty(objects)
+	s.assert.NotEqual("", objects[0].Name)
+	s.assert.NotEqual("/", objects[0].Name)
+	s.assert.NotEqual(".", objects[0].Name)
 }
 func (s *clientTestSuite) TestReadToFile() {
 	defer s.cleanupTest()
@@ -675,21 +675,21 @@ func (s *clientTestSuite) TestReadToFile() {
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, err := os.CreateTemp("", name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 
 	err = s.client.ReadToFile(name, 0, 0, f)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// file content should match generated body
 	output := make([]byte, bodyLen)
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	outputLen, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(bodyLen, outputLen)
 	s.assert.EqualValues(body, output)
 	f.Close()
@@ -708,21 +708,21 @@ func (s *clientTestSuite) TestReadToFileRanged() {
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, err := os.CreateTemp("", name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 
 	err = s.client.ReadToFile(name, 0, int64(bodyLen), f)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// file content should match generated body
 	output := make([]byte, bodyLen)
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	outputLen, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(bodyLen, outputLen)
 	s.assert.EqualValues(body, output)
 	f.Close()
@@ -744,21 +744,21 @@ func (s *clientTestSuite) TestReadToFileNoMultipart() {
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, err := os.CreateTemp("", name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 
 	err = s.client.ReadToFile(name, 0, 0, f)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// file content should match generated body
 	output := make([]byte, bodyLen)
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	outputLen, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(bodyLen, outputLen)
 	s.assert.EqualValues(body, output)
 	f.Close()
@@ -777,12 +777,12 @@ func (s *clientTestSuite) TestReadBuffer() {
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	result, err := s.client.ReadBuffer(name, 0, int64(bodyLen), false)
 
 	// result should match generated body
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(body, result)
 }
 func (s *clientTestSuite) TestReadInBuffer() {
@@ -798,14 +798,14 @@ func (s *clientTestSuite) TestReadInBuffer() {
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	outputLen := rand.Intn(bodyLen-1) + 1 // minimum buffer length of 1
 	output := make([]byte, outputLen)
 	err = s.client.ReadInBuffer(name, 0, int64(outputLen), output)
 
 	// read in buffer should match first outputLen characters of generated body
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(body[:outputLen], output)
 }
 func (s *clientTestSuite) TestWriteFromFile() {
@@ -817,15 +817,15 @@ func (s *clientTestSuite) TestWriteFromFile() {
 	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	f, err := os.CreateTemp("", name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	outputLen, err := f.Write(body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(bodyLen, outputLen)
 	var options internal.WriteFileOptions //stub
 
 	err = s.client.WriteFromFile(name, options.Metadata, f)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f.Close()
 
 	//todo: create another test like this one that does getObject here with and without the .rclonelink suffix
@@ -835,12 +835,12 @@ func (s *clientTestSuite) TestWriteFromFile() {
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// object body should match generated body written to file
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(body, output)
 }
 func (s *clientTestSuite) TestWriteFromBuffer() {
@@ -855,18 +855,18 @@ func (s *clientTestSuite) TestWriteFromBuffer() {
 	var options internal.WriteFileOptions //stub
 
 	err := s.client.WriteFromBuffer(name, options.Metadata, body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// object body should match generated body
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(body, output)
 }
 func (s *clientTestSuite) TestTruncateFile() {
@@ -882,22 +882,22 @@ func (s *clientTestSuite) TestTruncateFile() {
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(body),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	size := rand.Intn(bodyLen-1) + 1 // minimum size of 1
 	err = s.client.TruncateFile(name, int64(size))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// object body should match truncated initial body
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(body[:size], output)
 }
 func (s *clientTestSuite) TestWrite() {
@@ -913,24 +913,24 @@ func (s *clientTestSuite) TestWrite() {
 		Key:    aws.String(name),
 		Body:   bytes.NewReader(oldBody),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	offset := rand.Intn(bodyLen-1) + 1 // minimum offset of 1
 	newData := []byte(randomString(bodyLen - offset))
 	h := handlemap.NewHandle(name)
 	err = s.client.Write(internal.WriteFileOptions{Handle: h, Offset: int64(offset), Data: newData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
 		Key:    aws.String(name),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// object body should match generated combo of old and new data
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(oldBody[:offset], output[:offset])
 	s.assert.EqualValues(newData, output[offset:])
 }

@@ -80,7 +80,7 @@ func (suite *streamTestSuite) setupTestHelper(config string, ro bool) {
 	suite.mockCtrl = gomock.NewController(suite.T())
 	suite.mock = internal.NewMockComponent(suite.mockCtrl)
 	suite.stream, err = newTestStream(suite.mock, config, ro)
-	suite.assert.Equal(err, nil)
+	suite.assert.NoError(err)
 	_ = suite.stream.Start(context.Background())
 }
 
@@ -145,25 +145,25 @@ func asyncCloseFile(suite *streamTestSuite, closeFileOptions internal.CloseFileO
 // assert that the block is cached
 func assertBlockCached(suite *streamTestSuite, offset int64, handle *handlemap.Handle) {
 	_, found := handle.CacheObj.Get(offset)
-	suite.assert.Equal(found, true)
+	suite.assert.True(found)
 }
 
 // assert the block is not cached and KeyNotFoundError is thrown
 func assertBlockNotCached(suite *streamTestSuite, offset int64, handle *handlemap.Handle) {
 	_, found := handle.CacheObj.Get(offset)
-	suite.assert.Equal(found, false)
+	suite.assert.False(found)
 }
 
 func assertHandleNotStreamOnly(suite *streamTestSuite, handle *handlemap.Handle) {
-	suite.assert.Equal(handle.CacheObj.StreamOnly, false)
+	suite.assert.False(handle.CacheObj.StreamOnly)
 }
 
 func assertHandleStreamOnly(suite *streamTestSuite, handle *handlemap.Handle) {
-	suite.assert.Equal(handle.CacheObj.StreamOnly, true)
+	suite.assert.True(handle.CacheObj.StreamOnly)
 }
 
 func assertNumberOfCachedFileBlocks(suite *streamTestSuite, numOfBlocks int, handle *handlemap.Handle) {
-	suite.assert.Equal(numOfBlocks, len(handle.CacheObj.Keys()))
+	suite.assert.Len(handle.CacheObj.Keys(), numOfBlocks)
 }
 
 // ====================================== End of helper methods =================================
@@ -171,7 +171,7 @@ func assertNumberOfCachedFileBlocks(suite *streamTestSuite, numOfBlocks int, han
 func (suite *streamTestSuite) TestDefault() {
 	defer suite.cleanupTest()
 	suite.assert.Equal("stream", suite.stream.Name())
-	suite.assert.EqualValues(true, suite.stream.StreamOnly)
+	suite.assert.True(suite.stream.StreamOnly)
 }
 
 func (suite *streamTestSuite) TestConfig() {
@@ -183,14 +183,14 @@ func (suite *streamTestSuite) TestConfig() {
 	suite.assert.Equal("stream", suite.stream.Name())
 	suite.assert.Equal(16*MB, int(suite.stream.BufferSize))
 	suite.assert.Equal(4, int(suite.stream.CachedObjLimit))
-	suite.assert.EqualValues(false, suite.stream.StreamOnly)
+	suite.assert.False(suite.stream.StreamOnly)
 	suite.assert.EqualValues(4*MB, suite.stream.BlockSize)
 
 	// assert streaming is on if any of the values is 0
 	suite.cleanupTest()
 	config = "stream:\n  block-size-mb: 0\n  buffer-size-mb: 16\n  max-buffers: 4\n"
 	suite.setupTestHelper(config, true)
-	suite.assert.EqualValues(true, suite.stream.StreamOnly)
+	suite.assert.True(suite.stream.StreamOnly)
 }
 
 func (suite *streamTestSuite) TestReadWriteFile() {
@@ -258,7 +258,7 @@ func (suite *streamTestSuite) TestFlushFile() {
 	flushFileOptions := internal.FlushFileOptions{Handle: handle1}
 
 	err := suite.stream.FlushFile(flushFileOptions)
-	suite.assert.Equal(nil, err)
+	suite.assert.NoError(err)
 }
 
 func (suite *streamTestSuite) TestSyncFile() {
@@ -270,7 +270,7 @@ func (suite *streamTestSuite) TestSyncFile() {
 	syncFileOptions := internal.SyncFileOptions{Handle: handle1}
 
 	err := suite.stream.SyncFile(syncFileOptions)
-	suite.assert.Equal(nil, err)
+	suite.assert.NoError(err)
 }
 
 func (suite *streamTestSuite) TestReadDeleteDir() {
@@ -321,12 +321,12 @@ func (suite *streamTestSuite) TestStreamOnlyError() {
 	config := "stream:\n  block-size-mb: 0\n  buffer-size-mb: 16\n  max-buffers: 4\n"
 	suite.setupTestHelper(config, true)
 	// assert streaming is on if any of the values is 0
-	suite.assert.EqualValues(true, suite.stream.StreamOnly)
+	suite.assert.True(suite.stream.StreamOnly)
 	handle := &handlemap.Handle{Size: int64(100 * MB), Path: fileNames[0]}
 	_, readInBufferOptions, _ := suite.getRequestOptions(0, handle, true, int64(100*MB), 0, 5)
 	suite.mock.EXPECT().ReadInBuffer(readInBufferOptions).Return(0, syscall.ENOENT)
 	_, err := suite.stream.ReadInBuffer(readInBufferOptions)
-	suite.assert.Equal(err, syscall.ENOENT)
+	suite.assert.Equal(syscall.ENOENT, err)
 }
 
 // Test file key gets cached on open and first block is prefetched
@@ -358,7 +358,7 @@ func (suite *streamTestSuite) TestCacheOnOpenFileError() {
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle, syscall.ENOENT)
 	_, err := suite.stream.OpenFile(openFileOptions)
 
-	suite.assert.Equal(err, syscall.ENOENT)
+	suite.assert.Equal(syscall.ENOENT, err)
 }
 
 // When we evict/remove all blocks of a given file the file should be no longer referenced in the cache
