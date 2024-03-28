@@ -4,8 +4,6 @@ After=network-online.target
 Requires=network-online.target
 
 [Service]
-# Path to where Cloudfuse is currently installed.
-WorkingDirectory=/path/to/cloudfuse/install
 # User service will run as.
 User=CloudfuseUser
 # Path to the location Cloudfuse will mount to. Note this folder must currently exist.
@@ -16,7 +14,7 @@ Environment=ConfigFile=/path/to/config/file/config.yaml
 # Under the hood
 Type=forking
 ExecStart=/usr/bin/cloudfuse mount ${MoutingPoint} --config-file=${ConfigFile}
-ExecStop=/usr/bin/fusermount -u ${MoutingPoint}
+ExecStop=/usr/bin/fusermount -u ${MoutingPoint} -z
 
 [Install]
 WantedBy=multi-user.target
