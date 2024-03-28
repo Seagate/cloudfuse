@@ -82,7 +82,9 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 
 	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
 	if opt.PartSizeMb < 5 || opt.PartSizeMb > MaxPartSizeMb {
-		log.Warn("ParseAndValidateConfig : Part size must be between 5MB and 5GB. Default to default size")
+		if opt.PartSizeMb != 0 {
+			log.Warn("ParseAndValidateConfig : Part size must be between 5MB and 5GB. Defaulting to %dMB.", DefaultPartSize/common.MbToBytes)
+		}
 		s3.stConfig.partSize = DefaultPartSize
 	} else {
 		s3.stConfig.partSize = opt.PartSizeMb * common.MbToBytes

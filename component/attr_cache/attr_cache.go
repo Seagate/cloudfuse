@@ -662,6 +662,29 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	return h, err
 }
 
+// OpenFile: Update cache with Open results from cloud
+func (ac *AttrCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
+	log.Trace("AttrCache::OpenFile : %s", options.Name)
+
+	h, err := ac.NextComponent().OpenFile(options)
+	// sometimes a file is deleted in the cloud concurrently
+	// then this cache needs to be updated
+	if err != nil && os.IsNotExist(err) {
+		currentTime := time.Now()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
+		cacheItem, found := ac.cache.get(options.Name)
+		if found && cacheItem.exists() {
+			cacheItem.markDeleted(currentTime)
+		}
+		if ac.cacheDirs {
+			ac.updateAncestorsInCloud(getParentDir(options.Name), currentTime)
+		}
+	}
+
+	return h, err
+}
+
 // DeleteFile : Mark the file deleted
 func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("AttrCache::DeleteFile : %s", options.Name)
@@ -1007,10 +1030,9 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 
 		value, found := ac.cache.get(options.Name)
 		if !found {
-			log.Err("AttrCache::Chmod : %v", found)
+			log.Err("AttrCache::Chmod : %s not found in cache", options.Name)
 		} else if !value.exists() {
-			log.Err("AttrCache::Chmod : invalidating deleted entry %s", options.Name)
-			value.invalidate()
+			log.Err("AttrCache::Chmod : %s is marked deleted", options.Name)
 		} else {
 			value.setMode(options.Mode)
 		}

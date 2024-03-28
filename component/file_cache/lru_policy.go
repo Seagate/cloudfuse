@@ -243,25 +243,24 @@ func (p *lruPolicy) cacheValidate(name string) {
 
 	node.deleted = false
 
+	// put node at head of linked list
 	if node == p.head {
 		return
 	}
-
+	// remove node from its current position
 	if node.next != nil {
 		node.next.prev = node.prev
 	}
-
 	if node.prev != nil {
 		node.prev.next = node.next
 	}
-
+	// set node as head
 	node.prev = nil
 	node.next = p.head
-
 	p.head.prev = node
 	p.head = node
-	node.usage++
 
+	node.usage++
 }
 
 // For all other timer based activities we check the stuff here
@@ -446,7 +445,13 @@ func (p *lruPolicy) deleteItem(name string) {
 	}
 
 	// There are no open handles for this file so its safe to remove this
-	err := deleteFile(name)
+	// Check if the file exists first, since this is often the second time we're calling deleteFile
+	_, err := os.Stat(name)
+	if err != nil && os.IsNotExist(err) {
+		// file was already deleted - this is normal
+		return
+	}
+	err = deleteFile(name)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("lruPolicy::DeleteItem : failed to delete local file %s [%s]", name, err.Error())
 	}

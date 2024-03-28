@@ -401,7 +401,10 @@ func (fc *FileCache) invalidateDirectory(name string) {
 			if !d.IsDir() {
 				fc.policy.CachePurge(path)
 			} else {
-				_ = deleteFile(path)
+				deleteDirError := deleteFile(path)
+				if deleteDirError != nil {
+					log.Warn("FileCache::invalidateDirectory : %s - failed to delete %s. Here's why: %v", name, path, deleteDirError)
+				}
 			}
 		}
 		return nil
@@ -412,7 +415,10 @@ func (fc *FileCache) invalidateDirectory(name string) {
 		return
 	}
 
-	_ = deleteFile(localPath)
+	deleteErr := deleteFile(localPath)
+	if deleteErr != nil {
+		log.Warn("FileCache::invalidateDirectory : %s - failed to delete %s. Here's why: %v", name, localPath, deleteErr)
+	}
 }
 
 // Note: The primary purpose of the file cache is to keep track of files that are opened by the user.
@@ -456,7 +462,7 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 
 					// This is an overhead for streamdir for now
 					// As list is paginated we have no way to know whether this particular item exists both in local cache
-					// and container or not. So we rely on getAttr to tell if entry was cached then it exists in storage too
+					// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
 					// If entry does not exists on storage then only return a local item here.
 					_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath})
 					if err != nil && (err == syscall.ENOENT || os.IsNotExist(err)) {
@@ -491,7 +497,7 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 			return false
 		}
 
-		// If there are files in local cache then dont allow deletion of directory
+		// If there are files in local cache then don't allow deletion of directory
 		if err != io.EOF {
 			// Local directory is not empty fail the call
 			log.Debug("FileCache::IsDirEmpty : %s was not empty in local cache", options.Name)
@@ -537,8 +543,8 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	// createEmptyFile was added to optionally support immutable containers. If customers do not care about immutability they can set this to true.
 	if fc.createEmptyFile {
 		// We tried moving CreateFile to a separate thread for better perf.
-		// However, before it is created in storage, if GetAttr is called, the call will fail since the file
-		// does not exist in storage yet, failing the whole CreateFile sequence in FUSE.
+		// However, before it is created in cloud storage, if GetAttr is called, the call will fail since the file
+		// does not exist in cloud storage yet, failing the whole CreateFile sequence in FUSE.
 		newF, err := fc.NextComponent().CreateFile(options)
 		if err != nil {
 			log.Err("FileCache::CreateFile : Failed to create file %s", options.Name)
@@ -581,7 +587,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 
 	handle.SetFileObject(f)
 
-	// If an empty file is created in storage then there is no need to upload if FlushFile is called immediately after CreateFile.
+	// If an empty file is created in cloud storage then there is no need to upload if FlushFile is called immediately after CreateFile.
 	if !fc.createEmptyFile {
 		handle.Flags.Set(handlemap.HandleFlagDirty)
 	}
@@ -595,14 +601,14 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 // method: the caller method name
 // recoverable: whether or not case 2 is recoverable on flush/close of the file
 func (fc *FileCache) validateStorageError(path string, err error, method string, recoverable bool) error {
-	// For methods that take in file name, the goal is to update the path in storage and the local cache.
+	// For methods that take in file name, the goal is to update the path in cloud storage and the local cache.
 	// See comments in GetAttr for the different situations we can run into. This specifically handles case 2.
 	if err != nil {
 		if err == syscall.ENOENT || os.IsNotExist(err) {
-			log.Debug("FileCache::%s : %s does not exist in storage", method, path)
+			log.Debug("FileCache::%s : %s does not exist in cloud storage", method, path)
 			if !fc.createEmptyFile {
 				// Check if the file exists in the local cache
-				// (policy might not think the file exists if the file is merely marked for evication and not actually evicted yet)
+				// (policy might not think the file exists if the file is merely marked for eviction and not actually evicted yet)
 				localPath := common.JoinUnixFilepath(fc.tmpPath, path)
 				_, err := os.Stat(localPath)
 				if os.IsNotExist(err) { // If the file is not in the local cache, then the file does not exist.
@@ -672,7 +678,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	}
 
 	if downloadRequired {
-		log.Debug("FileCache::OpenFile : Need to re-download %s", options.Name)
+		log.Debug("FileCache::OpenFile : Need to download %s", options.Name)
 
 		fileSize := int64(0)
 		if attr != nil {
@@ -1061,7 +1067,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 			// When chmod on container was missed, local file was updated with correct mode
 			// Here take the mode from local cache and update the container accordingly
 			localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
-			info, err := os.Lstat(localPath)
+			info, err := os.Stat(localPath)
 			if err == nil {
 				err = fc.Chmod(internal.ChmodOptions{Name: options.Handle.Path, Mode: info.Mode()})
 				if err != nil {
@@ -1081,20 +1087,20 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	log.Trace("FileCache::GetAttr : %s", options.Name)
 
 	// For get attr, there are three different path situations we have to potentially handle.
-	// 1. Path in storage but not in local cache
-	// 2. Path not in storage but in local cache (this could happen if we recently created the file [and are currently writing to it]) (also supports immutable containers)
-	// 3. Path in storage and in local cache (this could result in dirty properties on the service if we recently wrote to the file)
+	// 1. Path in cloud storage but not in local cache
+	// 2. Path not in cloud storage but in local cache (this could happen if we recently created the file [and are currently writing to it]) (also supports immutable containers)
+	// 3. Path in cloud storage and in local cache (this could result in dirty properties on the service if we recently wrote to the file)
 
 	// To cover case 1, get attributes from storage
 	var exists bool
 	attrs, err := fc.NextComponent().GetAttr(options)
 	if err != nil {
 		if err == syscall.ENOENT || os.IsNotExist(err) {
-			log.Debug("FileCache::GetAttr : %s does not exist in storage", options.Name)
+			log.Debug("FileCache::GetAttr : %s does not exist in cloud storage", options.Name)
 			exists = false
 		} else {
 			log.Err("FileCache::GetAttr : Failed to get attr of %s [%s]", options.Name, err.Error())
-			return &internal.ObjAttr{}, err
+			return nil, err
 		}
 	} else {
 		exists = true
@@ -1102,10 +1108,10 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
-	info, err := os.Lstat(localPath)
+	info, err := os.Stat(localPath)
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
-	if (err == nil || os.IsExist(err)) && !info.IsDir() {
-		if exists { // Case 3 (file in storage and in local cache) so update the relevant attributes
+	if err == nil && !info.IsDir() {
+		if exists { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
 			// Return from local cache only if file is not under download or deletion
 			// If file is under download then taking size or mod time from it will be incorrect.
 			if !fc.fileLocks.Locked(options.Name) {
@@ -1128,7 +1134,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	}
 
 	if !exists {
-		return &internal.ObjAttr{}, syscall.ENOENT
+		return nil, syscall.ENOENT
 	}
 
 	return attrs, nil
@@ -1256,7 +1262,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 	log.Trace("FileCache::Chmod : Change mode of path %s", options.Name)
 
-	// Update the file in storage
+	// Update the file in cloud storage
 	err := fc.NextComponent().Chmod(options)
 	err = fc.validateStorageError(options.Name, err, "Chmod", false)
 	if err != nil {
@@ -1271,7 +1277,7 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 	// Update the mode of the file in the local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	info, err := os.Stat(localPath)
-	if err == nil || os.IsExist(err) {
+	if err == nil {
 		fc.policy.CacheValid(localPath)
 
 		if info.Mode() != options.Mode {
@@ -1290,7 +1296,7 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	log.Trace("FileCache::Chown : Change owner of path %s", options.Name)
 
-	// Update the file in storage
+	// Update the file in cloud storage
 	err := fc.NextComponent().Chown(options)
 	err = fc.validateStorageError(options.Name, err, "Chown", false)
 	if err != nil {
@@ -1301,7 +1307,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	// Update the owner and group of the file in the local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	_, err = os.Stat(localPath)
-	if err == nil || os.IsExist(err) {
+	if err == nil {
 		fc.policy.CacheValid(localPath)
 
 		if runtime.GOOS != "windows" {

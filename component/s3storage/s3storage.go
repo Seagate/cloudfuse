@@ -239,7 +239,7 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		// decrement and loop
 		entriesRemaining -= totalEntriesFetched
 		// in one case, the response will be missing one entry (see comment above `count++` in Client::List)
-		if entriesRemaining == 1 && options.Token == "" && options.Count >= maxResultsPerListCall {
+		if entriesRemaining == 1 && options.Token == "" {
 			// don't make a request just for that one leftover entry
 			break
 		}
@@ -456,7 +456,7 @@ func (s3 *S3Storage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 }
 
 func (s3 *S3Storage) Chmod(options internal.ChmodOptions) error {
-	log.Trace("S3Storage::Chmod : Change mod of file %s", options.Name)
+	log.Trace("S3Storage::Chmod : Change mode of file %s", options.Name)
 
 	s3StatsCollector.PushEvents(chmod, options.Name, map[string]interface{}{mode: options.Mode.String()})
 	s3StatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))
