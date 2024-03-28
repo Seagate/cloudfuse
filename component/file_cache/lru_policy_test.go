@@ -75,7 +75,10 @@ func (suite *lruPolicyTestSuite) setupTestHelper(config cachePolicyConfig) {
 func (suite *lruPolicyTestSuite) cleanupTest() {
 	suite.policy.ShutdownPolicy()
 
-	os.RemoveAll(cache_path)
+	err := os.RemoveAll(cache_path)
+	if err != nil {
+		fmt.Printf("lruPolicyTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", cache_path, err)
+	}
 }
 
 func (suite *lruPolicyTestSuite) TestDefault() {

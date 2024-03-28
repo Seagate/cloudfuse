@@ -97,8 +97,14 @@ func (suite *fileCacheTestSuite) SetupTest() {
 	log.Debug(defaultConfig)
 
 	// Delete the temp directories created
-	os.RemoveAll(suite.cache_path)
-	os.RemoveAll(suite.fake_storage_path)
+	err = os.RemoveAll(suite.cache_path)
+	if err != nil {
+		fmt.Printf("fileCacheTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
+	}
+	err = os.RemoveAll(suite.fake_storage_path)
+	if err != nil {
+		fmt.Printf("fileCacheTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
+	}
 	suite.setupTestHelper(defaultConfig)
 }
 
@@ -127,8 +133,14 @@ func (suite *fileCacheTestSuite) cleanupTest() {
 	}
 
 	// Delete the temp directories created
-	os.RemoveAll(suite.cache_path)
-	os.RemoveAll(suite.fake_storage_path)
+	err = os.RemoveAll(suite.cache_path)
+	if err != nil {
+		fmt.Printf("fileCacheTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
+	}
+	err = os.RemoveAll(suite.fake_storage_path)
+	if err != nil {
+		fmt.Printf("fileCacheTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
+	}
 }
 
 // Tests the default configuration of file cache

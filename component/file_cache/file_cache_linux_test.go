@@ -66,8 +66,14 @@ func (suite *fileCacheLinuxTestSuite) SetupTest() {
 	log.Debug(defaultConfig)
 
 	// Delete the temp directories created
-	os.RemoveAll(suite.cache_path)
-	os.RemoveAll(suite.fake_storage_path)
+	err = os.RemoveAll(suite.cache_path)
+	if err != nil {
+		fmt.Printf("fileCacheLinuxTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
+	}
+	err = os.RemoveAll(suite.fake_storage_path)
+	if err != nil {
+		fmt.Printf("fileCacheLinuxTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
+	}
 	suite.setupTestHelper(defaultConfig)
 }
 
@@ -93,8 +99,14 @@ func (suite *fileCacheLinuxTestSuite) cleanupTest() {
 	}
 
 	// Delete the temp directories created
-	os.RemoveAll(suite.cache_path)
-	os.RemoveAll(suite.fake_storage_path)
+	err = os.RemoveAll(suite.cache_path)
+	if err != nil {
+		fmt.Printf("fileCacheLinuxTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
+	}
+	err = os.RemoveAll(suite.fake_storage_path)
+	if err != nil {
+		fmt.Printf("fileCacheLinuxTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
+	}
 }
 
 func (suite *fileCacheLinuxTestSuite) TestChmodNotInCache() {

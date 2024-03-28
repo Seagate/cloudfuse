@@ -201,7 +201,11 @@ func (c *FileCache) TempCacheCleanup() error {
 		}
 
 		for _, entry := range dirents {
-			os.RemoveAll(common.JoinUnixFilepath(c.tmpPath, entry.Name()))
+			localPath := common.JoinUnixFilepath(c.tmpPath, entry.Name())
+			err = os.RemoveAll(localPath)
+			if err != nil {
+				log.Warn("FileCache::TempCacheCleanup : os.RemoveAll(%s) failed [%v]", localPath, err)
+			}
 		}
 	}
 
