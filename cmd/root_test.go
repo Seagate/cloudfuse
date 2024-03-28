@@ -98,28 +98,28 @@ func (suite *rootCmdSuite) TestNoOptions() {
 	defer suite.cleanupTest()
 	out, err := executeCommandC(rootCmd, "")
 	suite.assert.Contains(out, "missing command options")
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 }
 
 func (suite *rootCmdSuite) TestNoOptionsNoVersionCheck() {
 	defer suite.cleanupTest()
 	out, err := executeCommandC(rootCmd, "--disable-version-check")
 	suite.assert.Contains(out, "missing command options")
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 }
 
 func (suite *rootCmdSuite) TestNoMountPath() {
 	defer suite.cleanupTest()
 	out, err := executeCommandC(rootCmd, "mount")
 	suite.assert.Contains(out, "accepts 1 arg(s), received 0")
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 }
 
 func (suite *rootCmdSuite) TestGetRemoteVersionInvalidURL() {
 	defer suite.cleanupTest()
 	out, err := getRemoteVersion("abcd")
 	suite.assert.Empty(out)
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 }
 
 func (suite *rootCmdSuite) TestGetRemoteVersionInvalidRelease() {
@@ -127,7 +127,7 @@ func (suite *rootCmdSuite) TestGetRemoteVersionInvalidRelease() {
 	latestVersionUrl := common.CloudfuseReleaseURL + "/latest1"
 	out, err := getRemoteVersion(latestVersionUrl)
 	suite.assert.Empty(out)
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "unable to get latest version")
 }
 
@@ -140,7 +140,7 @@ func (suite *rootCmdSuite) TestGetRemoteVersionValidURL() {
 	latestVersionUrl := common.CloudfuseReleaseURL + "/latest"
 	out, err := getRemoteVersion(latestVersionUrl)
 	suite.assert.NotEmpty(out)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 }
 
 func (suite *rootCmdSuite) TestGetRemoteVersionCurrentOlder() {
@@ -166,7 +166,7 @@ func (suite *rootCmdSuite) testExecute() {
 	rootCmd.SetArgs([]string{"--version"})
 
 	err := Execute()
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.Contains(buf.String(), "cloudfuse version")
 }
 

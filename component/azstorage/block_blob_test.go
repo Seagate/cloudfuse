@@ -282,7 +282,7 @@ func (s *blockBlobTestSuite) TestInvalidBlockSize() {
 	configuration := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  block-size-mb: 5000\n account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
 		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.BlockKey, s.container)
 	_, err := newTestAzStorage(configuration)
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *blockBlobTestSuite) TestDefault() {
@@ -353,7 +353,7 @@ func (s *blockBlobTestSuite) TestModifyEndpoint() {
 	s.setupTestHelper(config, s.container, true)
 
 	err := s.az.storage.TestPipeline()
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 // func (s *blockBlobTestSuite) TestNoEndpoint() {
@@ -381,9 +381,9 @@ func (s *blockBlobTestSuite) TestListContainers() {
 
 	containers, err := s.az.ListContainers()
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(containers)
-	s.assert.True(len(containers) >= num)
+	s.assert.GreaterOrEqual(len(containers), num)
 	count := 0
 	for _, c := range containers {
 		if strings.HasPrefix(c, prefix) {
@@ -404,11 +404,11 @@ func (s *blockBlobTestSuite) TestCreateDir() {
 		s.Run(path, func() {
 			err := s.az.CreateDir(internal.CreateDirOptions{Name: path})
 
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			// Directory should be in the account
 			dir := s.containerUrl.NewBlobURL(internal.TruncateDirName(path))
 			props, err := dir.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(props)
 			s.assert.NotEmpty(props.NewMetadata())
 			s.assert.Contains(props.NewMetadata(), folderKey)
@@ -428,11 +428,11 @@ func (s *blockBlobTestSuite) TestDeleteDir() {
 
 			err := s.az.DeleteDir(internal.DeleteDirOptions{Name: path})
 
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			// Directory should not be in the account
 			dir := s.containerUrl.NewBlobURL(internal.TruncateDirName(path))
 			_, err = dir.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-			s.assert.NotNil(err)
+			s.assert.Error(err)
 		})
 	}
 }
@@ -497,15 +497,15 @@ func (s *blockBlobTestSuite) setupHierarchy(base string) (*list.List, *list.List
 	// Validate the paths were setup correctly and all paths exist
 	for p := a.Front(); p != nil; p = p.Next() {
 		_, err := s.containerUrl.NewBlobURL(p.Value.(string)).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 	for p := ab.Front(); p != nil; p = p.Next() {
 		_, err := s.containerUrl.NewBlobURL(p.Value.(string)).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 	for p := ac.Front(); p != nil; p = p.Next() {
 		_, err := s.containerUrl.NewBlobURL(p.Value.(string)).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 	return a, ab, ac
 }
@@ -518,17 +518,17 @@ func (s *blockBlobTestSuite) TestDeleteDirHierarchy() {
 
 	err := s.az.DeleteDir(internal.DeleteDirOptions{Name: base})
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	/// a paths should be deleted
 	for p := a.Front(); p != nil; p = p.Next() {
 		_, err = s.containerUrl.NewBlobURL(p.Value.(string)).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.NotNil(err)
+		s.assert.Error(err)
 	}
 	ab.PushBackList(ac) // ab and ac paths should exist
 	for p := ab.Front(); p != nil; p = p.Next() {
 		_, err = s.containerUrl.NewBlobURL(p.Value.(string)).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 }
 
@@ -541,27 +541,27 @@ func (s *blockBlobTestSuite) TestDeleteSubDirPrefixPath() {
 	s.az.storage.SetPrefixPath(base)
 
 	attr, err := s.az.GetAttr(internal.GetAttrOptions{Name: "c1"})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(attr)
 	s.assert.True(attr.IsDir())
 
 	err = s.az.DeleteDir(internal.DeleteDirOptions{Name: "c1"})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// a paths under c1 should be deleted
 	for p := a.Front(); p != nil; p = p.Next() {
 		path := p.Value.(string)
 		_, err = s.containerUrl.NewBlobURL(path).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
 		if strings.HasPrefix(path, base+"/c1") {
-			s.assert.NotNil(err)
+			s.assert.Error(err)
 		} else {
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 		}
 	}
 	ab.PushBackList(ac) // ab and ac paths should exist
 	for p := ab.Front(); p != nil; p = p.Next() {
 		_, err = s.containerUrl.NewBlobURL(p.Value.(string)).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 }
 
@@ -572,12 +572,12 @@ func (s *blockBlobTestSuite) TestDeleteDirError() {
 
 	err := s.az.DeleteDir(internal.DeleteDirOptions{Name: name})
 
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 	// Directory should not be in the account
 	dir := s.containerUrl.NewBlobURL(name)
 	_, err = dir.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *blockBlobTestSuite) TestIsDirEmpty() {
@@ -623,7 +623,7 @@ func (s *blockBlobTestSuite) TestIsDirEmptyError() {
 	// Directory should not be in the account
 	dir := s.containerUrl.NewBlobURL(name)
 	_, err := dir.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *blockBlobTestSuite) TestStreamDirNoVirtualDirectory() {
@@ -640,8 +640,8 @@ func (s *blockBlobTestSuite) TestStreamDirNoVirtualDirectory() {
 		log.Debug(path)
 		s.Run(path, func() {
 			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
-			s.assert.Nil(err)
-			s.assert.EqualValues(1, len(entries))
+			s.assert.NoError(err)
+			s.assert.Len(entries, 1)
 			s.assert.EqualValues(name, entries[0].Path)
 			s.assert.EqualValues(name, entries[0].Name)
 			s.assert.True(entries[0].IsDir())
@@ -659,8 +659,8 @@ func (s *blockBlobTestSuite) TestStreamDirHierarchy() {
 
 	// ReadDir only reads the first level of the hierarchy
 	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: base})
-	s.assert.Nil(err)
-	s.assert.EqualValues(2, len(entries))
+	s.assert.NoError(err)
+	s.assert.Len(entries, 2)
 	// Check the dir
 	s.assert.EqualValues(base+"/c1", entries[0].Path)
 	s.assert.EqualValues("c1", entries[0].Name)
@@ -688,8 +688,8 @@ func (s *blockBlobTestSuite) TestStreamDirRoot() {
 		s.Run(path, func() {
 			// ReadDir only reads the first level of the hierarchy
 			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
-			s.assert.Nil(err)
-			s.assert.EqualValues(3, len(entries))
+			s.assert.NoError(err)
+			s.assert.Len(entries, 3)
 			// Check the base dir
 			s.assert.EqualValues(base, entries[0].Path)
 			s.assert.EqualValues(base, entries[0].Name)
@@ -720,8 +720,8 @@ func (s *blockBlobTestSuite) TestStreamDirSubDir() {
 
 	// ReadDir only reads the first level of the hierarchy
 	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: base + "/c1"})
-	s.assert.Nil(err)
-	s.assert.EqualValues(1, len(entries))
+	s.assert.NoError(err)
+	s.assert.Len(entries, 1)
 	// Check the dir
 	s.assert.EqualValues(base+"/c1"+"/gc1", entries[0].Path)
 	s.assert.EqualValues("gc1", entries[0].Name)
@@ -740,8 +740,8 @@ func (s *blockBlobTestSuite) TestStreamDirSubDirPrefixPath() {
 
 	// ReadDir only reads the first level of the hierarchy
 	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: "/c1"})
-	s.assert.Nil(err)
-	s.assert.EqualValues(1, len(entries))
+	s.assert.NoError(err)
+	s.assert.Len(entries, 1)
 	// Check the dir
 	s.assert.EqualValues("c1"+"/gc1", entries[0].Path)
 	s.assert.EqualValues("gc1", entries[0].Name)
@@ -773,8 +773,8 @@ func (s *blockBlobTestSuite) TestStreamDirWindowsNameConvert() {
 		log.Debug(path)
 		s.Run(path, func() {
 			entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: path})
-			s.assert.Nil(err)
-			s.assert.EqualValues(1, len(entries))
+			s.assert.NoError(err)
+			s.assert.Len(entries, 1)
 			s.assert.Equal(windowsChildName, entries[0].Path)
 		})
 	}
@@ -787,12 +787,12 @@ func (s *blockBlobTestSuite) TestStreamDirError() {
 
 	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: name})
 
-	s.assert.Nil(err) // Note: See comment in BlockBlob.List. BlockBlob behaves differently from Datalake
+	s.assert.NoError(err) // Note: See comment in BlockBlob.List. BlockBlob behaves differently from Datalake
 	s.assert.Empty(entries)
 	// Directory should not be in the account
 	dir := s.containerUrl.NewBlobURL(name)
 	_, err = dir.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *blockBlobTestSuite) TestStreamDirListBlocked() {
@@ -811,8 +811,8 @@ func (s *blockBlobTestSuite) TestStreamDirListBlocked() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: childName})
 
 	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: name})
-	s.assert.Nil(err)
-	s.assert.EqualValues(0, len(entries)) // Since we block the list, it will return an empty list.
+	s.assert.NoError(err)
+	s.assert.Empty(entries) // Since we block the list, it will return an empty list.
 }
 
 func (s *blockBlobTestSuite) TestStreamDirSmallCountNoDuplicates() {
@@ -832,7 +832,7 @@ func (s *blockBlobTestSuite) TestStreamDirSmallCountNoDuplicates() {
 
 	for {
 		new_list, new_marker, err := s.az.StreamDir(internal.StreamDirOptions{Name: "/", Token: marker, Count: 1})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 		blobList = append(blobList, new_list...)
 		marker = new_marker
 		iteration++
@@ -843,7 +843,7 @@ func (s *blockBlobTestSuite) TestStreamDirSmallCountNoDuplicates() {
 		}
 	}
 
-	s.assert.EqualValues(5, len(blobList))
+	s.assert.Len(blobList, 5)
 }
 
 func (s *blockBlobTestSuite) TestRenameDir() {
@@ -865,16 +865,16 @@ func (s *blockBlobTestSuite) TestRenameDir() {
 			s.az.CreateDir(internal.CreateDirOptions{Name: input.src})
 
 			err := s.az.RenameDir(internal.RenameDirOptions{Src: input.src, Dst: input.dst})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			// Src should not be in the account
 			dir := s.containerUrl.NewBlobURL(internal.TruncateDirName(input.src))
 			_, err = dir.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-			s.assert.NotNil(err)
+			s.assert.Error(err)
 
 			// Dst should be in the account
 			dir = s.containerUrl.NewBlobURL(internal.TruncateDirName(input.dst))
 			_, err = dir.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 		})
 	}
 
@@ -889,29 +889,29 @@ func (s *blockBlobTestSuite) TestRenameDirHierarchy() {
 	aDst, abDst, acDst := generateNestedDirectory(baseDst)
 
 	err := s.az.RenameDir(internal.RenameDirOptions{Src: baseSrc, Dst: baseDst})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Source
 	// aSrc paths should be deleted
 	for p := aSrc.Front(); p != nil; p = p.Next() {
 		_, err = s.containerUrl.NewBlobURL(p.Value.(string)).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.NotNil(err)
+		s.assert.Error(err)
 	}
 	abSrc.PushBackList(acSrc) // abSrc and acSrc paths should exist
 	for p := abSrc.Front(); p != nil; p = p.Next() {
 		_, err = s.containerUrl.NewBlobURL(p.Value.(string)).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 	// Destination
 	// aDst paths should exist
 	for p := aDst.Front(); p != nil; p = p.Next() {
 		_, err = s.containerUrl.NewBlobURL(p.Value.(string)).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 	abDst.PushBackList(acDst) // abDst and acDst paths should not exist
 	for p := abDst.Front(); p != nil; p = p.Next() {
 		_, err = s.containerUrl.NewBlobURL(p.Value.(string)).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.NotNil(err)
+		s.assert.Error(err)
 	}
 }
 
@@ -925,7 +925,7 @@ func (s *blockBlobTestSuite) TestRenameDirSubDirPrefixPath() {
 	s.az.storage.SetPrefixPath(baseSrc)
 
 	err := s.az.RenameDir(internal.RenameDirOptions{Src: "c1", Dst: baseDst})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Source
 	// aSrc paths under c1 should be deleted
@@ -933,22 +933,22 @@ func (s *blockBlobTestSuite) TestRenameDirSubDirPrefixPath() {
 		path := p.Value.(string)
 		_, err = s.containerUrl.NewBlobURL(path).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
 		if strings.HasPrefix(path, baseSrc+"/c1") {
-			s.assert.NotNil(err)
+			s.assert.Error(err)
 		} else {
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 		}
 	}
 	abSrc.PushBackList(acSrc) // abSrc and acSrc paths should exist
 	for p := abSrc.Front(); p != nil; p = p.Next() {
 		_, err = s.containerUrl.NewBlobURL(p.Value.(string)).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 	// Destination
 	// aDst paths should exist -> aDst and aDst/gc1
 	_, err = s.containerUrl.NewBlobURL(baseSrc+"/"+baseDst).GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	_, err = s.containerUrl.NewBlobURL(baseSrc+"/"+baseDst+"/gc1").GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *blockBlobTestSuite) TestRenameDirError() {
@@ -959,15 +959,15 @@ func (s *blockBlobTestSuite) TestRenameDirError() {
 
 	err := s.az.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
 
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 	// Neither directory should be in the account
 	dir := s.containerUrl.NewBlobURL(src)
 	_, err = dir.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	dir = s.containerUrl.NewBlobURL(dst)
 	_, err = dir.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *blockBlobTestSuite) TestRenameDirWithoutMarker() {
@@ -981,24 +981,24 @@ func (s *blockBlobTestSuite) TestRenameDirWithoutMarker() {
 		data := []byte(testData)
 		// upload blob
 		_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), int64(len(data)), blockBlobURL, azblob.UploadToBlockBlobOptions{})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 
 		_, err = blockBlobURL.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 
 	err := s.az.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	for i := 0; i < 5; i++ {
 		srcBlobURL := s.containerUrl.NewBlockBlobURL(fmt.Sprintf("%s/blob%v", src, i))
 		dstBlobURL := s.containerUrl.NewBlockBlobURL(fmt.Sprintf("%s/blob%v", dst, i))
 
 		_, err = srcBlobURL.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.NotNil(err)
+		s.assert.Error(err)
 
 		_, err = dstBlobURL.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 
 	// verify that the marker blob does not exist for both source and destination directory
@@ -1006,10 +1006,10 @@ func (s *blockBlobTestSuite) TestRenameDirWithoutMarker() {
 	dstDirURL := s.containerUrl.NewBlockBlobURL(dst)
 
 	_, err = srcDirURL.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 
 	_, err = dstDirURL.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *blockBlobTestSuite) TestCreateFile() {
@@ -1019,7 +1019,7 @@ func (s *blockBlobTestSuite) TestCreateFile() {
 
 	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.EqualValues(name, h.Path)
 	s.assert.EqualValues(0, h.Size)
@@ -1027,7 +1027,7 @@ func (s *blockBlobTestSuite) TestCreateFile() {
 	// File should be in the account
 	file := s.containerUrl.NewBlobURL(name)
 	props, err := file.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.Empty(props.NewMetadata())
 }
@@ -1048,14 +1048,14 @@ func (s *blockBlobTestSuite) TestCreateFileWindowsNameConvert() {
 
 	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: windowsName})
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.EqualValues(windowsName, h.Path)
 	s.assert.EqualValues(0, h.Size)
 	// File should be in the account
 	file := s.containerUrl.NewBlobURL(blobName)
 	props, err := file.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.Empty(props.NewMetadata())
 }
@@ -1067,7 +1067,7 @@ func (s *blockBlobTestSuite) TestOpenFile() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
 	h, err := s.az.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.EqualValues(name, h.Path)
 	s.assert.EqualValues(0, h.Size)
@@ -1079,7 +1079,7 @@ func (s *blockBlobTestSuite) TestOpenFileError() {
 	name := generateFileName()
 
 	h, err := s.az.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 	s.assert.Nil(h)
 }
@@ -1093,7 +1093,7 @@ func (s *blockBlobTestSuite) TestOpenFileSize() {
 	s.az.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(size)})
 
 	h, err := s.az.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.EqualValues(name, h.Path)
 	s.assert.EqualValues(size, h.Size)
@@ -1107,7 +1107,7 @@ func (s *blockBlobTestSuite) TestCloseFile() {
 
 	// This method does nothing.
 	err := s.az.CloseFile(internal.CloseFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *blockBlobTestSuite) TestCloseFileFakeHandle() {
@@ -1118,7 +1118,7 @@ func (s *blockBlobTestSuite) TestCloseFileFakeHandle() {
 
 	// This method does nothing.
 	err := s.az.CloseFile(internal.CloseFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *blockBlobTestSuite) TestDeleteFile() {
@@ -1128,12 +1128,12 @@ func (s *blockBlobTestSuite) TestDeleteFile() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
 	err := s.az.DeleteFile(internal.DeleteFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// File should not be in the account
 	file := s.containerUrl.NewBlobURL(name)
 	_, err = file.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *blockBlobTestSuite) TestDeleteFileWindowsNameConvert() {
@@ -1152,12 +1152,12 @@ func (s *blockBlobTestSuite) TestDeleteFileWindowsNameConvert() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: windowsName})
 
 	err := s.az.DeleteFile(internal.DeleteFileOptions{Name: windowsName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// File should not be in the account
 	file := s.containerUrl.NewBlobURL(blobName)
 	_, err = file.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *blockBlobTestSuite) TestDeleteFileError() {
@@ -1166,13 +1166,13 @@ func (s *blockBlobTestSuite) TestDeleteFileError() {
 	name := generateFileName()
 
 	err := s.az.DeleteFile(internal.DeleteFileOptions{Name: name})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 
 	// File should not be in the account
 	file := s.containerUrl.NewBlobURL(name)
 	_, err = file.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *blockBlobTestSuite) TestRenameFile() {
@@ -1183,16 +1183,16 @@ func (s *blockBlobTestSuite) TestRenameFile() {
 	dst := generateFileName()
 
 	err := s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Src should not be in the account
 	source := s.containerUrl.NewBlobURL(src)
 	_, err = source.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	// Dst should be in the account
 	destination := s.containerUrl.NewBlobURL(dst)
 	_, err = destination.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *blockBlobTestSuite) TestRenameFileWindowsNameConvert() {
@@ -1209,22 +1209,22 @@ func (s *blockBlobTestSuite) TestRenameFileWindowsNameConvert() {
 	srcWindowsName := "＂＊：＜＞？｜" + "/" + src + "＂＊：＜＞？｜"
 	srcBlobName := "\"*:<>?|" + "/" + src + "\"*:<>?|"
 	_, err := s.az.CreateFile(internal.CreateFileOptions{Name: srcWindowsName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	dst := generateFileName()
 	dstWindowsName := "＂＊：＜＞？｜" + "/" + dst + "＂＊：＜＞？｜"
 	dstBlobName := "\"*:<>?|" + "/" + dst + "\"*:<>?|"
 
 	err = s.az.RenameFile(internal.RenameFileOptions{Src: srcWindowsName, Dst: dstWindowsName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Src should not be in the account
 	source := s.containerUrl.NewBlobURL(srcBlobName)
 	_, err = source.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	// Dst should be in the account
 	destination := s.containerUrl.NewBlobURL(dstBlobName)
 	_, err = destination.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *blockBlobTestSuite) TestRenameFileMetadataConservation() {
@@ -1240,15 +1240,15 @@ func (s *blockBlobTestSuite) TestRenameFileMetadataConservation() {
 	dst := generateFileName()
 
 	err := s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Src should not be in the account
 	_, err = source.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	// Dst should be in the account
 	destination := s.containerUrl.NewBlobURL(dst)
 	props, err := destination.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	// Dst should have metadata
 	destMeta := props.NewMetadata()
 	s.assert.Contains(destMeta, "foo")
@@ -1262,16 +1262,16 @@ func (s *blockBlobTestSuite) TestRenameFileError() {
 	dst := generateFileName()
 
 	err := s.az.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 
 	// Src and destination should not be in the account
 	source := s.containerUrl.NewBlobURL(src)
 	_, err = source.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	destination := s.containerUrl.NewBlobURL(dst)
 	_, err = destination.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *blockBlobTestSuite) TestReadFile() {
@@ -1279,14 +1279,14 @@ func (s *blockBlobTestSuite) TestReadFile() {
 	// Setup
 	name := generateFileName()
 	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	h, _ = s.az.OpenFile(internal.OpenFileOptions{Name: name})
 
 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1297,7 +1297,7 @@ func (s *blockBlobTestSuite) TestReadFileError() {
 	h := handlemap.NewHandle(name)
 
 	_, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
@@ -1313,7 +1313,7 @@ func (s *blockBlobTestSuite) TestReadInBuffer() {
 
 	output := make([]byte, 5)
 	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(5, len)
 	s.assert.EqualValues(testData[:5], output)
 }
@@ -1330,7 +1330,7 @@ func (s *blockBlobTestSuite) TestReadInBufferLargeBuffer() {
 
 	output := make([]byte, 1000) // Testing that passing in a super large buffer will still work
 	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(h.Size, len)
 	s.assert.EqualValues(testData, output[:h.Size])
 }
@@ -1343,7 +1343,7 @@ func (s *blockBlobTestSuite) TestReadInBufferEmpty() {
 
 	output := make([]byte, 10)
 	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(0, len)
 }
 
@@ -1355,7 +1355,7 @@ func (s *blockBlobTestSuite) TestReadInBufferBadRange() {
 	h.Size = 10
 
 	_, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 20, Data: make([]byte, 2)})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ERANGE, err)
 }
 
@@ -1367,7 +1367,7 @@ func (s *blockBlobTestSuite) TestReadInBufferError() {
 	h.Size = 10
 
 	_, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: make([]byte, 2)})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
@@ -1380,13 +1380,13 @@ func (s *blockBlobTestSuite) TestWriteFile() {
 	testData := "test data"
 	data := []byte(testData)
 	count, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(len(data), count)
 
 	// Blob should have updated data
 	file := s.containerUrl.NewBlobURL(name)
 	resp, err := file.Download(ctx, 0, int64(len(data)), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
 }
@@ -1409,13 +1409,13 @@ func (s *blockBlobTestSuite) TestWriteFileWindowsNameConvert() {
 	testData := "test data"
 	data := []byte(testData)
 	count, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(len(data), count)
 
 	// Blob should have updated data
 	file := s.containerUrl.NewBlobURL(blobName)
 	resp, err := file.Download(ctx, 0, int64(len(data)), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
 }
@@ -1431,12 +1431,12 @@ func (s *blockBlobTestSuite) TestTruncateSmallFileSmaller() {
 	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 	err := s.az.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Blob should have updated data
 	file := s.containerUrl.NewBlobURL(name)
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData[:truncatedLength], output[:])
@@ -1462,12 +1462,12 @@ func (s *blockBlobTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 	err := s.az.TruncateFile(internal.TruncateFileOptions{Name: windowsName, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Blob should have updated data
 	file := s.containerUrl.NewBlobURL(blobName)
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData[:truncatedLength], output)
@@ -1482,15 +1482,15 @@ func (s *blockBlobTestSuite) TestTruncateEmptyFileToLargeSize() {
 
 	blobSize := int64((1 * common.GbToBytes) + 13)
 	err := s.az.TruncateFile(internal.TruncateFileOptions{Name: name, Size: blobSize})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.EqualValues(blobSize, props.Size)
 
 	err = s.az.DeleteFile(internal.DeleteFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *blockBlobTestSuite) TestTruncateChunkedFileSmaller() {
@@ -1505,15 +1505,15 @@ func (s *blockBlobTestSuite) TestTruncateChunkedFileSmaller() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: 4,
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.az.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Blob should have updated data
 	file := s.containerUrl.NewBlobURL(name)
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData[:truncatedLength], output)
@@ -1530,12 +1530,12 @@ func (s *blockBlobTestSuite) TestTruncateSmallFileEqual() {
 	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 	err := s.az.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Blob should have updated data
 	file := s.containerUrl.NewBlobURL(name)
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
@@ -1553,15 +1553,15 @@ func (s *blockBlobTestSuite) TestTruncateChunkedFileEqual() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: 4,
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.az.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Blob should have updated data
 	file := s.containerUrl.NewBlobURL(name)
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
@@ -1578,12 +1578,12 @@ func (s *blockBlobTestSuite) TestTruncateSmallFileBigger() {
 	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 	err := s.az.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Blob should have updated data
 	file := s.containerUrl.NewBlobURL(name)
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output[:len(data)])
@@ -1601,15 +1601,15 @@ func (s *blockBlobTestSuite) TestTruncateChunkedFileBigger() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: 4,
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.az.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Blob should have updated data
 	file := s.containerUrl.NewBlobURL(name)
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(truncatedLength, resp.ContentLength())
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output[:len(data)])
@@ -1621,7 +1621,7 @@ func (s *blockBlobTestSuite) TestTruncateFileError() {
 	name := generateFileName()
 
 	err := s.az.TruncateFile(internal.TruncateFileOptions{Name: name})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
@@ -1634,17 +1634,17 @@ func (s *blockBlobTestSuite) TestWriteSmallFile() {
 	data := []byte(testData)
 	dataLen := len(data)
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 
 	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output := make([]byte, len(data))
 	f, _ = os.Open(f.Name())
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(testData, output)
 	f.Close()
@@ -1659,22 +1659,22 @@ func (s *blockBlobTestSuite) TestOverwriteSmallFile() {
 	data := []byte(testData)
 	dataLen := len(data)
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("test-newdata-data")
 	output := make([]byte, len(currentData))
 
 	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -1689,23 +1689,23 @@ func (s *blockBlobTestSuite) TestOverwriteAndAppendToSmallFile() {
 	data := []byte(testData)
 
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("test-newdata")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -1720,23 +1720,23 @@ func (s *blockBlobTestSuite) TestAppendToSmallFile() {
 	data := []byte(testData)
 
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("-newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 9, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("test-data-newdata")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -1751,23 +1751,23 @@ func (s *blockBlobTestSuite) TestAppendOffsetLargerThanSmallFile() {
 	data := []byte(testData)
 
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 12, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("test-data\x00\x00\x00newdata")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -1786,23 +1786,23 @@ func (s *blockBlobTestSuite) TestAppendBlocksToSmallFile() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 9, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: 8,
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("-newdata-newdata-newdata")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 9, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("test-data-newdata-newdata-newdata")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -1820,23 +1820,23 @@ func (s *blockBlobTestSuite) TestOverwriteBlocks() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: 4,
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("cake")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 16, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("testdatates1dat1cakedat2tes3dat3tes4dat4")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -1854,19 +1854,19 @@ func (s *blockBlobTestSuite) TestOverwriteAndAppendBlocks() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: 4,
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 32, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("testdatates1dat1tes2dat2tes3dat343211234cake")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
 	len, _ := f.Read(output)
@@ -1887,19 +1887,19 @@ func (s *blockBlobTestSuite) TestAppendBlocks() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: 4,
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("43211234cakedat1tes2dat2tes3dat3tes4dat4")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
 	len, _ := f.Read(output)
@@ -1920,19 +1920,19 @@ func (s *blockBlobTestSuite) TestAppendOffsetLargerThanSize() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: 4,
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 45, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("testdatates1dat1tes2dat2tes3dat3tes4dat4\x00\x00\x00\x00\x0043211234cake")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, _ = os.Open(f.Name())
 	len, _ := f.Read(output)
@@ -1949,7 +1949,7 @@ func (s *blockBlobTestSuite) TestCopyToFileError() {
 	defer os.Remove(f.Name())
 
 	err := s.az.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *blockBlobTestSuite) TestCopyFromFile() {
@@ -1966,12 +1966,12 @@ func (s *blockBlobTestSuite) TestCopyFromFile() {
 
 	err := s.az.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Blob should have updated data
 	file := s.containerUrl.NewBlobURL(name)
 	resp, err := file.Download(ctx, 0, int64(len(data)), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
 }
@@ -1999,12 +1999,12 @@ func (s *blockBlobTestSuite) TestCopyFromFileWindowsNameConvert() {
 
 	err := s.az.CopyFromFile(internal.CopyFromFileOptions{Name: windowsName, File: f})
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Blob should have updated data
 	file := s.containerUrl.NewBlobURL(blobName)
 	resp, err := file.Download(ctx, 0, int64(len(data)), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(testData, output)
 }
@@ -2017,18 +2017,18 @@ func (s *blockBlobTestSuite) TestCreateLink() {
 	name := generateFileName()
 
 	err := s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Link should be in the account
 	link := s.containerUrl.NewBlobURL(name)
 	props, err := link.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.NotEmpty(props.NewMetadata())
 	s.assert.Contains(props.NewMetadata(), symlinkKey)
 	s.assert.EqualValues("true", props.NewMetadata()[symlinkKey])
 	resp, err := link.Download(ctx, 0, props.ContentLength(), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	s.assert.EqualValues(target, data)
 }
@@ -2042,7 +2042,7 @@ func (s *blockBlobTestSuite) TestReadLink() {
 	s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
 
 	read, err := s.az.ReadLink(internal.ReadLinkOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(target, read)
 }
 
@@ -2052,7 +2052,7 @@ func (s *blockBlobTestSuite) TestReadLinkError() {
 	name := generateFileName()
 
 	_, err := s.az.ReadLink(internal.ReadLinkOptions{Name: name})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
@@ -2075,7 +2075,7 @@ func (s *blockBlobTestSuite) TestGetAttrDir() {
 			s.az.CreateDir(internal.CreateDirOptions{Name: name})
 
 			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(props)
 			s.assert.True(props.IsDir())
 			s.assert.NotEmpty(props.Metadata)
@@ -2098,14 +2098,14 @@ func (s *blockBlobTestSuite) TestGetAttrVirtualDir() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
 	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: dirName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.True(props.IsDir())
 	s.assert.False(props.IsSymlink())
 
 	// Check file in dir too
 	props, err = s.az.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.False(props.IsDir())
 	s.assert.False(props.IsSymlink())
@@ -2125,21 +2125,21 @@ func (s *blockBlobTestSuite) TestGetAttrVirtualDirSubDir() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
 	props, err := s.az.GetAttr(internal.GetAttrOptions{Name: dirName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.True(props.IsDir())
 	s.assert.False(props.IsSymlink())
 
 	// Check subdir in dir too
 	props, err = s.az.GetAttr(internal.GetAttrOptions{Name: subDirName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.True(props.IsDir())
 	s.assert.False(props.IsSymlink())
 
 	// Check file in subdir too
 	props, err = s.az.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.False(props.IsDir())
 	s.assert.False(props.IsSymlink())
@@ -2164,7 +2164,7 @@ func (s *blockBlobTestSuite) TestGetAttrFile() {
 			s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
 			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(props)
 			s.assert.False(props.IsDir())
 			s.assert.False(props.IsSymlink())
@@ -2193,7 +2193,7 @@ func (s *blockBlobTestSuite) TestGetAttrLink() {
 			s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
 
 			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(props)
 			s.assert.True(props.IsSymlink())
 			s.assert.NotEmpty(props.Metadata)
@@ -2225,7 +2225,7 @@ func (s *blockBlobTestSuite) TestGetAttrFileSize() {
 			s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 			props, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(props)
 			s.assert.False(props.IsDir())
 			s.assert.False(props.IsSymlink())
@@ -2256,7 +2256,7 @@ func (s *blockBlobTestSuite) TestGetAttrFileTime() {
 			s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 			before, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(before.Mtime)
 
 			time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
@@ -2264,7 +2264,7 @@ func (s *blockBlobTestSuite) TestGetAttrFileTime() {
 			s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 			after, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(after.Mtime)
 
 			s.assert.True(after.Mtime.After(before.Mtime))
@@ -2290,7 +2290,7 @@ func (s *blockBlobTestSuite) TestGetAttrError() {
 			name := generateFileName()
 
 			_, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.NotNil(err)
+			s.assert.Error(err)
 			s.assert.EqualValues(syscall.ENOENT, err)
 		})
 	}
@@ -2304,7 +2304,7 @@ func (s *blockBlobTestSuite) TestChmod() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
 	err := s.az.Chmod(internal.ChmodOptions{Name: name, Mode: 0666})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOTSUP, err)
 }
 
@@ -2320,7 +2320,7 @@ func (s *blockBlobTestSuite) TestChmodIgnore() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
 	err := s.az.Chmod(internal.ChmodOptions{Name: name, Mode: 0666})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *blockBlobTestSuite) TestChown() {
@@ -2330,7 +2330,7 @@ func (s *blockBlobTestSuite) TestChown() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
 	err := s.az.Chown(internal.ChownOptions{Name: name, Owner: 6, Group: 5})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOTSUP, err)
 }
 
@@ -2346,7 +2346,7 @@ func (s *blockBlobTestSuite) TestChownIgnore() {
 	s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
 	err := s.az.Chown(internal.ChownOptions{Name: name, Owner: 6, Group: 5})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *blockBlobTestSuite) TestBlockSize() {
@@ -2358,83 +2358,83 @@ func (s *blockBlobTestSuite) TestBlockSize() {
 
 	// For filesize 0 expected blocksize is 256MB
 	block, err := bb.calculateBlockSize(name, 0)
-	s.assert.Nil(err)
-	s.assert.EqualValues(block, azblob.BlockBlobMaxUploadBlobBytes)
+	s.assert.NoError(err)
+	s.assert.EqualValues(azblob.BlockBlobMaxUploadBlobBytes, block)
 
 	// For filesize 100MB expected blocksize is 256MB
 	block, err = bb.calculateBlockSize(name, (100 * 1024 * 1024))
-	s.assert.Nil(err)
-	s.assert.EqualValues(block, azblob.BlockBlobMaxUploadBlobBytes)
+	s.assert.NoError(err)
+	s.assert.EqualValues(azblob.BlockBlobMaxUploadBlobBytes, block)
 
 	// For filesize 500MB expected blocksize is 4MB
 	block, err = bb.calculateBlockSize(name, (500 * 1024 * 1024))
-	s.assert.Nil(err)
-	s.assert.EqualValues(block, azblob.BlobDefaultDownloadBlockSize)
+	s.assert.NoError(err)
+	s.assert.EqualValues(azblob.BlobDefaultDownloadBlockSize, block)
 
 	// For filesize 1GB expected blocksize is 4MB
 	block, err = bb.calculateBlockSize(name, (1 * 1024 * 1024 * 1024))
-	s.assert.Nil(err)
-	s.assert.EqualValues(block, azblob.BlobDefaultDownloadBlockSize)
+	s.assert.NoError(err)
+	s.assert.EqualValues(azblob.BlobDefaultDownloadBlockSize, block)
 
 	// For filesize 500GB expected blocksize is 10737424
 	block, err = bb.calculateBlockSize(name, (500 * 1024 * 1024 * 1024))
-	s.assert.Nil(err)
-	s.assert.EqualValues(block, int64(10737424))
+	s.assert.NoError(err)
+	s.assert.EqualValues(int64(10737424), block)
 
 	// For filesize 1TB expected blocksize is 21990240  (1TB/50000 ~= rounded off to next multiple of 8)
 	block, err = bb.calculateBlockSize(name, (1 * 1024 * 1024 * 1024 * 1024))
-	s.assert.Nil(err)
-	s.assert.EqualValues(block, int64(21990240))
+	s.assert.NoError(err)
+	s.assert.EqualValues(int64(21990240), block)
 
 	// For filesize 100TB expected blocksize is 2199023256  (100TB/50000 ~= rounded off to next multiple of 8)
 	block, err = bb.calculateBlockSize(name, (100 * 1024 * 1024 * 1024 * 1024))
-	s.assert.Nil(err)
-	s.assert.EqualValues(block, int64(2199023256))
+	s.assert.NoError(err)
+	s.assert.EqualValues(int64(2199023256), block)
 
 	// For filesize 190TB expected blocksize is 4178144192  (190TB/50000 ~= rounded off to next multiple of 8)
 	block, err = bb.calculateBlockSize(name, (190 * 1024 * 1024 * 1024 * 1024))
-	s.assert.Nil(err)
-	s.assert.EqualValues(block, int64(4178144192))
+	s.assert.NoError(err)
+	s.assert.EqualValues(int64(4178144192), block)
 
 	// Boundary condition which is exactly max size supported by sdk
 	block, err = bb.calculateBlockSize(name, (azblob.BlockBlobMaxStageBlockBytes * azblob.BlockBlobMaxBlocks))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(block, int64(azblob.BlockBlobMaxStageBlockBytes)) // 4194304000
 
 	// For Filesize created using dd for 1TB size
 	block, err = bb.calculateBlockSize(name, int64(1099511627776))
-	s.assert.Nil(err)
-	s.assert.EqualValues(block, int64(21990240))
+	s.assert.NoError(err)
+	s.assert.EqualValues(int64(21990240), block)
 
 	// Boundary condition 5 bytes less then max expected file size
 	block, err = bb.calculateBlockSize(name, (azblob.BlockBlobMaxStageBlockBytes*azblob.BlockBlobMaxBlocks)-5)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(block, int64(azblob.BlockBlobMaxStageBlockBytes))
 
 	// Boundary condition 1 bytes more then max expected file size
 	block, err = bb.calculateBlockSize(name, (azblob.BlockBlobMaxStageBlockBytes*azblob.BlockBlobMaxBlocks)+1)
-	s.assert.NotNil(err)
-	s.assert.EqualValues(block, 0)
+	s.assert.Error(err)
+	s.assert.EqualValues(0, block)
 
 	// Boundary condition 5 bytes more then max expected file size
 	block, err = bb.calculateBlockSize(name, (azblob.BlockBlobMaxStageBlockBytes*azblob.BlockBlobMaxBlocks)+5)
-	s.assert.NotNil(err)
-	s.assert.EqualValues(block, 0)
+	s.assert.Error(err)
+	s.assert.EqualValues(0, block)
 
 	// Boundary condition file size one block short of file blocks
 	block, err = bb.calculateBlockSize(name, (azblob.BlockBlobMaxStageBlockBytes*azblob.BlockBlobMaxBlocks)-azblob.BlockBlobMaxStageBlockBytes)
-	s.assert.Nil(err)
-	s.assert.EqualValues(block, 4194220120)
+	s.assert.NoError(err)
+	s.assert.EqualValues(4194220120, block)
 
 	// Boundary condition one byte more then max block size
 	block, err = bb.calculateBlockSize(name, (4194304001 * azblob.BlockBlobMaxBlocks))
-	s.assert.NotNil(err)
-	s.assert.EqualValues(block, 0)
+	s.assert.Error(err)
+	s.assert.EqualValues(0, block)
 
 	// For filesize 200TB, error is expected as max 190TB only supported
 	block, err = bb.calculateBlockSize(name, (200 * 1024 * 1024 * 1024 * 1024))
-	s.assert.NotNil(err)
-	s.assert.EqualValues(block, 0)
+	s.assert.Error(err)
+	s.assert.EqualValues(0, block)
 }
 
 func (s *blockBlobTestSuite) TestGetFileBlockOffsetsSmallFile() {
@@ -2449,8 +2449,8 @@ func (s *blockBlobTestSuite) TestGetFileBlockOffsetsSmallFile() {
 
 	// GetFileBlockOffsets
 	offsetList, err := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
-	s.assert.Nil(err)
-	s.assert.Len(offsetList.BlockList, 0)
+	s.assert.NoError(err)
+	s.assert.Empty(offsetList.BlockList)
 	s.assert.True(offsetList.SmallFile())
 	s.assert.EqualValues(0, offsetList.BlockIdLength)
 }
@@ -2467,11 +2467,11 @@ func (s *blockBlobTestSuite) TestGetFileBlockOffsetsChunkedFile() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: 4,
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// GetFileBlockOffsets
 	offsetList, err := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Len(offsetList.BlockList, 10)
 	s.assert.Zero(offsetList.Flags)
 	s.assert.EqualValues(16, offsetList.BlockIdLength)
@@ -2484,7 +2484,7 @@ func (s *blockBlobTestSuite) TestGetFileBlockOffsetsError() {
 
 	// GetFileBlockOffsets
 	_, err := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *blockBlobTestSuite) TestFlushFileEmptyFile() {
@@ -2499,10 +2499,10 @@ func (s *blockBlobTestSuite) TestFlushFileEmptyFile() {
 	h.CacheObj.BlockOffsetList = bol
 
 	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues("", output)
 }
 
@@ -2519,16 +2519,16 @@ func (s *blockBlobTestSuite) TestFlushFileChunkedFile() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: 4 * MB,
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
 
 	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(data, output)
 }
 
@@ -2546,7 +2546,7 @@ func (s *blockBlobTestSuite) TestFlushFileUpdateChunkedFile() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: int64(blockSize),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
@@ -2559,10 +2559,10 @@ func (s *blockBlobTestSuite) TestFlushFileUpdateChunkedFile() {
 	h.CacheObj.BlockOffsetList.BlockList[1].Flags.Set(common.DirtyBlock)
 
 	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotEqualValues(data, output)
 	s.assert.EqualValues(data[:5*MB], output[:5*MB])
 	s.assert.EqualValues(updatedBlock, output[5*MB:5*MB+2*MB])
@@ -2583,7 +2583,7 @@ func (s *blockBlobTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: int64(blockSize),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
@@ -2598,10 +2598,10 @@ func (s *blockBlobTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	h.CacheObj.BlockOffsetList.BlockList = h.CacheObj.BlockOffsetList.BlockList[:2]
 
 	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotEqualValues(data, output)
 	s.assert.EqualValues(data[:6*MB], output[:6*MB])
 }
@@ -2652,10 +2652,10 @@ func (s *blockBlobTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	bol.Flags.Clear(common.SmallFile)
 
 	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(blk1.Data, output[0:blockSize])
 	s.assert.EqualValues(blk2.Data, output[blockSize:2*blockSize])
 	s.assert.EqualValues(blk3.Data, output[2*blockSize:3*blockSize])
@@ -2676,7 +2676,7 @@ func (s *blockBlobTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: int64(blockSize),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
@@ -2715,10 +2715,10 @@ func (s *blockBlobTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	bol.Flags.Clear(common.SmallFile)
 
 	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(data, output[0:fileSize])
 	s.assert.EqualValues(blk1.Data, output[fileSize:fileSize+blockSize])
 	s.assert.EqualValues(blk2.Data, output[fileSize+blockSize:fileSize+2*blockSize])
@@ -2765,10 +2765,10 @@ func (s *blockBlobTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	bol.Flags.Clear(common.SmallFile)
 
 	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data := make([]byte, 3*blockSize)
 	s.assert.EqualValues(data, output)
 }
@@ -2788,7 +2788,7 @@ func (s *blockBlobTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: int64(blockSize),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
@@ -2821,10 +2821,10 @@ func (s *blockBlobTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	bol.Flags.Clear(common.SmallFile)
 
 	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(data, output[:fileSize])
 	emptyData := make([]byte, 3*blockSize)
 	s.assert.EqualValues(emptyData, output[fileSize:])
@@ -2872,10 +2872,10 @@ func (s *blockBlobTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	bol.Flags.Clear(common.SmallFile)
 
 	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data := make([]byte, blockSize)
 	s.assert.EqualValues(blk1.Data, output[0:blockSize])
 	s.assert.EqualValues(data, output[blockSize:2*blockSize])
@@ -2897,7 +2897,7 @@ func (s *blockBlobTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	_, err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerUrl.NewBlockBlobURL(name), azblob.UploadToBlockBlobOptions{
 		BlockSize: int64(blockSize),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
@@ -2932,11 +2932,11 @@ func (s *blockBlobTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	bol.Flags.Clear(common.SmallFile)
 
 	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// file should be empty
 	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(data, output[:fileSize])
 	emptyData := make([]byte, blockSize)
 	s.assert.EqualValues(blk1.Data, output[fileSize:fileSize+blockSize])
@@ -2983,27 +2983,27 @@ func (s *blockBlobTestSuite) TestMD5SetOnUpload() {
 
 			name := generateFileName()
 			f, err := os.Create(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
 			data := make([]byte, azblob.BlockBlobMaxUploadBlobBytes+1)
 			_, _ = rand.Read(data)
 
 			n, err := f.Write(data)
-			s.assert.Nil(err)
-			s.assert.EqualValues(n, azblob.BlockBlobMaxUploadBlobBytes+1)
+			s.assert.NoError(err)
+			s.assert.EqualValues(azblob.BlockBlobMaxUploadBlobBytes+1, n)
 			_, _ = f.Seek(0, 0)
 
 			err = s.az.storage.WriteFromFile(name, nil, f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 
 			prop, err := s.az.storage.GetAttr(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
 			_, _ = f.Seek(0, 0)
 			localMD5, err := getMD5(f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.EqualValues(localMD5, prop.MD5)
 
 			_ = s.az.storage.DeleteFile(name)
@@ -3036,22 +3036,22 @@ func (s *blockBlobTestSuite) TestMD5NotSetOnUpload() {
 
 			name := generateFileName()
 			f, err := os.Create(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
 			data := make([]byte, azblob.BlockBlobMaxUploadBlobBytes+1)
 			_, _ = rand.Read(data)
 
 			n, err := f.Write(data)
-			s.assert.Nil(err)
-			s.assert.EqualValues(n, azblob.BlockBlobMaxUploadBlobBytes+1)
+			s.assert.NoError(err)
+			s.assert.EqualValues(azblob.BlockBlobMaxUploadBlobBytes+1, n)
 			_, _ = f.Seek(0, 0)
 
 			err = s.az.storage.WriteFromFile(name, nil, f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 
 			prop, err := s.az.storage.GetAttr(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.Empty(prop.MD5)
 
 			_ = s.az.storage.DeleteFile(name)
@@ -3084,27 +3084,27 @@ func (s *blockBlobTestSuite) TestMD5AutoSetOnUpload() {
 
 			name := generateFileName()
 			f, err := os.Create(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
 			data := make([]byte, 100)
 			_, _ = rand.Read(data)
 
 			n, err := f.Write(data)
-			s.assert.Nil(err)
-			s.assert.EqualValues(n, 100)
+			s.assert.NoError(err)
+			s.assert.EqualValues(100, n)
 			_, _ = f.Seek(0, 0)
 
 			err = s.az.storage.WriteFromFile(name, nil, f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 
 			prop, err := s.az.storage.GetAttr(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
 			_, _ = f.Seek(0, 0)
 			localMD5, err := getMD5(f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.EqualValues(localMD5, prop.MD5)
 
 			_ = s.az.storage.DeleteFile(name)
@@ -3137,30 +3137,30 @@ func (s *blockBlobTestSuite) TestInvalidateMD5PostUpload() {
 
 			name := generateFileName()
 			f, err := os.Create(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
 			data := make([]byte, 100)
 			_, _ = rand.Read(data)
 
 			n, err := f.Write(data)
-			s.assert.Nil(err)
-			s.assert.EqualValues(n, 100)
+			s.assert.NoError(err)
+			s.assert.EqualValues(100, n)
 			_, _ = f.Seek(0, 0)
 
 			err = s.az.storage.WriteFromFile(name, nil, f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 
 			blobURL := s.containerUrl.NewBlobURL(name)
 			_, _ = blobURL.SetHTTPHeaders(context.Background(), azblob.BlobHTTPHeaders{ContentMD5: []byte("cloudfuse")}, azblob.BlobAccessConditions{})
 
 			prop, err := s.az.storage.GetAttr(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
 			_, _ = f.Seek(0, 0)
 			localMD5, err := getMD5(f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotEqualValues(localMD5, prop.MD5)
 
 			_ = s.az.storage.DeleteFile(name)
@@ -3193,32 +3193,32 @@ func (s *blockBlobTestSuite) TestValidateAutoMD5OnRead() {
 
 			name := generateFileName()
 			f, err := os.Create(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
 			data := make([]byte, 100)
 			_, _ = rand.Read(data)
 
 			n, err := f.Write(data)
-			s.assert.Nil(err)
-			s.assert.EqualValues(n, 100)
+			s.assert.NoError(err)
+			s.assert.EqualValues(100, n)
 			_, _ = f.Seek(0, 0)
 
 			err = s.az.storage.WriteFromFile(name, nil, f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			_ = f.Close()
 			_ = os.Remove(name)
 
 			prop, err := s.az.storage.GetAttr(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
 			f, err = os.Create(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
 			err = s.az.storage.ReadToFile(name, 0, 100, f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 
 			_ = s.az.storage.DeleteFile(name)
 			_ = os.Remove(name)
@@ -3249,32 +3249,32 @@ func (s *blockBlobTestSuite) TestValidateManualMD5OnRead() {
 
 			name := generateFileName()
 			f, err := os.Create(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
 			data := make([]byte, azblob.BlockBlobMaxUploadBlobBytes+1)
 			_, _ = rand.Read(data)
 
 			n, err := f.Write(data)
-			s.assert.Nil(err)
-			s.assert.EqualValues(n, azblob.BlockBlobMaxUploadBlobBytes+1)
+			s.assert.NoError(err)
+			s.assert.EqualValues(azblob.BlockBlobMaxUploadBlobBytes+1, n)
 			_, _ = f.Seek(0, 0)
 
 			err = s.az.storage.WriteFromFile(name, nil, f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			_ = f.Close()
 			_ = os.Remove(name)
 
 			prop, err := s.az.storage.GetAttr(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
 			f, err = os.Create(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
 			err = s.az.storage.ReadToFile(name, 0, azblob.BlockBlobMaxUploadBlobBytes+1, f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 
 			_ = s.az.storage.DeleteFile(name)
 			_ = os.Remove(name)
@@ -3305,19 +3305,19 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnRead() {
 
 			name := generateFileName()
 			f, err := os.Create(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
 			data := make([]byte, 100)
 			_, _ = rand.Read(data)
 
 			n, err := f.Write(data)
-			s.assert.Nil(err)
-			s.assert.EqualValues(n, 100)
+			s.assert.NoError(err)
+			s.assert.EqualValues(100, n)
 			_, _ = f.Seek(0, 0)
 
 			err = s.az.storage.WriteFromFile(name, nil, f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			_ = f.Close()
 			_ = os.Remove(name)
 
@@ -3325,15 +3325,15 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnRead() {
 			_, _ = blobURL.SetHTTPHeaders(context.Background(), azblob.BlobHTTPHeaders{ContentMD5: []byte("cloudfuse")}, azblob.BlobAccessConditions{})
 
 			prop, err := s.az.storage.GetAttr(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
 			f, err = os.Create(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
 			err = s.az.storage.ReadToFile(name, 0, 100, f)
-			s.assert.NotNil(err)
+			s.assert.Error(err)
 			s.assert.Contains(err.Error(), "md5 sum mismatch on download")
 
 			_ = s.az.storage.DeleteFile(name)
@@ -3365,19 +3365,19 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnReadNoVaildate() {
 
 			name := generateFileName()
 			f, err := os.Create(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
 			data := make([]byte, 100)
 			_, _ = rand.Read(data)
 
 			n, err := f.Write(data)
-			s.assert.Nil(err)
-			s.assert.EqualValues(n, 100)
+			s.assert.NoError(err)
+			s.assert.EqualValues(100, n)
 			_, _ = f.Seek(0, 0)
 
 			err = s.az.storage.WriteFromFile(name, nil, f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			_ = f.Close()
 			_ = os.Remove(name)
 
@@ -3385,15 +3385,15 @@ func (s *blockBlobTestSuite) TestInvalidMD5OnReadNoVaildate() {
 			_, _ = blobURL.SetHTTPHeaders(context.Background(), azblob.BlobHTTPHeaders{ContentMD5: []byte("cloudfuse")}, azblob.BlobAccessConditions{})
 
 			prop, err := s.az.storage.GetAttr(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotEmpty(prop.MD5)
 
 			f, err = os.Create(name)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(f)
 
 			err = s.az.storage.ReadToFile(name, 0, 100, f)
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 
 			_ = s.az.storage.DeleteFile(name)
 			_ = os.Remove(name)
@@ -3568,18 +3568,18 @@ func (suite *blockBlobTestSuite) UtilityFunctionTestTruncateFileToSmaller(size i
 
 	name := generateFileName()
 	h, err := suite.az.CreateFile(internal.CreateFileOptions{Name: name})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	data := make([]byte, size)
 	suite.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 	err = suite.az.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	// Blob should have updated data
 	file := suite.containerUrl.NewBlobURL(name)
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(truncatedLength, resp.ContentLength())
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	suite.assert.EqualValues(data[:truncatedLength], output[:])
@@ -3597,18 +3597,18 @@ func (suite *blockBlobTestSuite) UtilityFunctionTruncateFileToLarger(size int, t
 
 	name := generateFileName()
 	h, err := suite.az.CreateFile(internal.CreateFileOptions{Name: name})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	data := make([]byte, size)
 	suite.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 	err = suite.az.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	// Blob should have updated data
 	file := suite.containerUrl.NewBlobURL(name)
 	resp, err := file.Download(ctx, 0, int64(truncatedLength), azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(truncatedLength, resp.ContentLength())
 	output, _ := io.ReadAll(resp.Body(azblob.RetryReaderOptions{}))
 	suite.assert.EqualValues(data[:], output[:size])

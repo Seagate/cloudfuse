@@ -55,14 +55,14 @@ func (s *utilsTestSuite) TestContentType() {
 		".dum": "dummy/test"
 		}`
 	err := populateContentType(newSet)
-	assert.Nil(err, "Failed to populate new config")
+	assert.NoError(err, "Failed to populate new config")
 
 	val = getContentType("a.tst")
 	assert.EqualValues("application/test", val, "Content-type mismatch")
 
 	// assert mp4 content type would get deserialized correctly
 	val = getContentType("file.mp4")
-	assert.EqualValues(val, "video/mp4")
+	assert.EqualValues("video/mp4", val)
 }
 
 type contentTypeVal struct {
@@ -227,7 +227,7 @@ func (s *utilsTestSuite) TestGetFileMode() {
 		s.Run(i.val, func() {
 			m, err := getFileMode(i.val)
 			if i.str == "" {
-				assert.Nil(err)
+				assert.NoError(err)
 			}
 
 			assert.EqualValues(i.mode, m)
@@ -266,10 +266,10 @@ func (s *utilsTestSuite) TestGetFileModeFromACL() {
 		s.Run(i.acl, func() {
 			m, err := getFileModeFromACL(objid, i.acl, i.owner)
 			if i.errstr == "" {
-				assert.Nil(err)
+				assert.NoError(err)
 				assert.EqualValues(i.mode, m)
 			} else {
-				assert.NotNil(err)
+				assert.Error(err)
 				assert.Contains(err.Error(), i.errstr)
 			}
 		})
@@ -280,18 +280,18 @@ func (s *utilsTestSuite) TestGetMD5() {
 	assert := assert.New(s.T())
 
 	f, err := os.Create("abc.txt")
-	assert.Nil(err)
+	assert.NoError(err)
 
 	_, err = f.Write([]byte(randomString(50)))
-	assert.Nil(err)
+	assert.NoError(err)
 
 	f.Close()
 
 	f, err = os.Open("abc.txt")
-	assert.Nil(err)
+	assert.NoError(err)
 
 	md5Sum, err := getMD5(f)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.NotZero(md5Sum)
 
 	f.Close()
@@ -314,29 +314,29 @@ func (s *utilsTestSuite) TestSanitizeSASKey() {
 func (s *utilsTestSuite) TestBlockNonProxyOptions() {
 	assert := assert.New(s.T())
 	po, ro := getAzBlobPipelineOptions(AzStorageConfig{})
-	assert.EqualValues(ro.MaxTries, int(0))
-	assert.NotEqual(po.RequestLog.SyslogDisabled, true)
+	assert.EqualValues(int(0), ro.MaxTries)
+	assert.False(po.RequestLog.SyslogDisabled)
 }
 
 func (s *utilsTestSuite) TestBlockProxyOptions() {
 	assert := assert.New(s.T())
 	po, ro := getAzBlobPipelineOptions(AzStorageConfig{proxyAddress: "127.0.0.1", maxRetries: 3})
-	assert.EqualValues(ro.MaxTries, 3)
-	assert.NotEqual(po.RequestLog.SyslogDisabled, true)
+	assert.EqualValues(3, ro.MaxTries)
+	assert.False(po.RequestLog.SyslogDisabled)
 }
 
 func (s *utilsTestSuite) TestBfsNonProxyOptions() {
 	assert := assert.New(s.T())
 	po, ro := getAzBfsPipelineOptions(AzStorageConfig{})
-	assert.EqualValues(ro.MaxTries, int(0))
-	assert.NotEqual(po.RequestLog.SyslogDisabled, true)
+	assert.EqualValues(int(0), ro.MaxTries)
+	assert.False(po.RequestLog.SyslogDisabled)
 }
 
 func (s *utilsTestSuite) TestBfsProxyOptions() {
 	assert := assert.New(s.T())
 	po, ro := getAzBfsPipelineOptions(AzStorageConfig{proxyAddress: "127.0.0.1", maxRetries: 3})
-	assert.EqualValues(ro.MaxTries, 3)
-	assert.NotEqual(po.RequestLog.SyslogDisabled, true)
+	assert.EqualValues(3, ro.MaxTries)
+	assert.False(po.RequestLog.SyslogDisabled)
 }
 
 type endpointAccountType struct {
@@ -445,42 +445,42 @@ func (s *utilsTestSuite) TestAutoDetectAuthMode() {
 
 	var authType string
 	authType = autoDetectAuthMode(AzStorageOptions{})
-	assert.Equal(authType, "msi")
+	assert.Equal("msi", authType)
 
 	var authType_ AuthType
 	err := authType_.Parse(authType)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(authType_, EAuthType.MSI())
 
 	authType = autoDetectAuthMode(AzStorageOptions{AccountKey: "abc"})
-	assert.Equal(authType, "key")
+	assert.Equal("key", authType)
 
 	authType = autoDetectAuthMode(AzStorageOptions{SaSKey: "abc"})
-	assert.Equal(authType, "sas")
+	assert.Equal("sas", authType)
 
 	authType = autoDetectAuthMode(AzStorageOptions{ApplicationID: "abc"})
-	assert.Equal(authType, "msi")
+	assert.Equal("msi", authType)
 
 	authType = autoDetectAuthMode(AzStorageOptions{ResourceID: "abc"})
-	assert.Equal(authType, "msi")
+	assert.Equal("msi", authType)
 
 	authType = autoDetectAuthMode(AzStorageOptions{ClientID: "abc"})
-	assert.Equal(authType, "spn")
+	assert.Equal("spn", authType)
 
 	authType = autoDetectAuthMode(AzStorageOptions{ClientSecret: "abc"})
-	assert.Equal(authType, "spn")
+	assert.Equal("spn", authType)
 
 	authType = autoDetectAuthMode(AzStorageOptions{TenantID: "abc"})
-	assert.Equal(authType, "spn")
+	assert.Equal("spn", authType)
 
 	authType = autoDetectAuthMode(AzStorageOptions{ApplicationID: "abc", AccountKey: "abc", SaSKey: "abc", ClientID: "abc"})
-	assert.Equal(authType, "msi")
+	assert.Equal("msi", authType)
 
 	authType = autoDetectAuthMode(AzStorageOptions{AccountKey: "abc", SaSKey: "abc", ClientID: "abc"})
-	assert.Equal(authType, "key")
+	assert.Equal("key", authType)
 
 	authType = autoDetectAuthMode(AzStorageOptions{SaSKey: "abc", ClientID: "abc"})
-	assert.Equal(authType, "sas")
+	assert.Equal("sas", authType)
 }
 
 func (s *utilsTestSuite) TestRemoveLeadingSlashes() {

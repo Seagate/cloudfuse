@@ -146,22 +146,22 @@ func (suite *ConfigTestSuite) TestOverlapShadowConfigReader() {
 	}
 
 	err := os.Setenv("CF_TEST_MATCHLABELS_APP", specOptsTruth.Select.Match.App)
-	assert.Nil(err)
+	assert.NoError(err)
 	BindEnv("selector.matchLabels.app", "CF_TEST_MATCHLABELS_APP")
 
 	templAppFlag := AddStringFlag("template-flag", "defoval", "OJ")
 	err = templAppFlag.Value.Set(specOptsTruth.Templ.Meta.Label.App)
-	assert.Nil(err)
+	assert.NoError(err)
 	templAppFlag.Changed = true
 	BindPFlag("template.metadata.labels.app", templAppFlag)
 	err = os.Setenv("CF_TEST_TEMPLABELS_APP", "somethingthatshouldnotshowup")
 	BindEnv("template.metadata.labels.app", "CF_TEST_TEMPLABELS_APP")
 
 	err = ReadConfigFromReader(strings.NewReader(specconf))
-	assert.Nil(err)
+	assert.NoError(err)
 	specOpts := &Spec{}
 	err = Unmarshal(specOpts)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(specOptsTruth, specOpts)
 
 }
@@ -171,7 +171,7 @@ func (suite *ConfigTestSuite) TestPlainConfig2Reader() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 	err := ReadConfigFromReader(strings.NewReader(config2))
-	assert.Nil(err)
+	assert.NoError(err)
 
 	//Case 1
 	metaDeepOpts2 := &Metadata{}
@@ -181,7 +181,7 @@ func (suite *ConfigTestSuite) TestPlainConfig2Reader() {
 		},
 	}
 	err = UnmarshalKey("spec.template.metadata", metaDeepOpts2)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(metaDeepOpts2Truth, metaDeepOpts2)
 
 	//Case 2
@@ -194,7 +194,7 @@ func (suite *ConfigTestSuite) TestPlainConfig2Reader() {
 		},
 	}
 	err = UnmarshalKey("spec.template", templatOpts2)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(templatOpts2Truth, templatOpts2)
 
 	//Case 3
@@ -215,7 +215,7 @@ func (suite *ConfigTestSuite) TestPlainConfig2Reader() {
 		},
 	}
 	err = UnmarshalKey("spec", specOpts2)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(specOpts2Truth, specOpts2)
 
 	// Case 4
@@ -246,13 +246,13 @@ func (suite *ConfigTestSuite) TestPlainConfig2Reader() {
 		},
 	}
 	err = Unmarshal(opts2)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(opts2Truth, opts2)
 
 	//Case 5
 	apiVersion := 0
 	err = UnmarshalKey("apiVersion", &apiVersion)
-	assert.NotNil(err)
+	assert.Error(err)
 }
 
 // Function to test only config file reader: testcase 1
@@ -260,7 +260,7 @@ func (suite *ConfigTestSuite) TestPlainConfig1Reader() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 	err := ReadConfigFromReader(strings.NewReader(config1))
-	assert.Nil(err)
+	assert.NoError(err)
 
 	//Case1
 	opts1 := &Config1{}
@@ -275,7 +275,7 @@ func (suite *ConfigTestSuite) TestPlainConfig1Reader() {
 		},
 	}
 	err = Unmarshal(opts1)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(opts1Truth, opts1)
 
 	//Case2
@@ -287,7 +287,7 @@ func (suite *ConfigTestSuite) TestPlainConfig1Reader() {
 		},
 	}
 	err = UnmarshalKey("metadata", metaOpts1)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(metaOpts1Truth, metaOpts1)
 
 	//Case 3
@@ -296,7 +296,7 @@ func (suite *ConfigTestSuite) TestPlainConfig1Reader() {
 		App: "web",
 	}
 	err = UnmarshalKey("metadata.labels", labelOpts1)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(labelOpts1Truth, labelOpts1)
 
 	//Case 4:
@@ -320,9 +320,9 @@ func (suite *ConfigTestSuite) TestEnvShadowedConfigReader() {
 		},
 	}
 	err := os.Setenv("CF_TEST_NAME", metaOptsTruth.Name)
-	assert.Nil(err)
+	assert.NoError(err)
 	err = os.Setenv("CF_TEST_APP", metaOptsTruth.Label.App)
-	assert.Nil(err)
+	assert.NoError(err)
 
 	//Case 1
 	BindEnv("name", "CF_TEST_NAME")
@@ -330,19 +330,19 @@ func (suite *ConfigTestSuite) TestEnvShadowedConfigReader() {
 
 	metaOpts := &Metadata{}
 	err = Unmarshal(metaOpts)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(metaOptsTruth, metaOpts)
 
 	ResetConfig()
 
 	//Case 2
 	err = ReadConfigFromReader(strings.NewReader(metaconf))
-	assert.Nil(err)
+	assert.NoError(err)
 	BindEnv("name", "CF_TEST_NAME")
 	BindEnv("labels.app", "CF_TEST_APP")
 	metaOpts = &Metadata{}
 	err = Unmarshal(metaOpts)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(metaOptsTruth, metaOpts)
 
 }
@@ -361,41 +361,41 @@ func (suite *ConfigTestSuite) TestFlagShadowedConfigReader() {
 	//Case 1
 	nameFlag := AddStringFlag("name", "defo", "nahnahnah")
 	err := nameFlag.Value.Set(metaOptsTruth.Name)
-	assert.Nil(err)
+	assert.NoError(err)
 	nameFlag.Changed = true
 	BindPFlag("name", nameFlag)
 
 	appFlag := AddStringFlag("app", "seefood", "jianyang")
 	err = appFlag.Value.Set(metaOptsTruth.Label.App)
-	assert.Nil(err)
+	assert.NoError(err)
 	appFlag.Changed = true
 	BindPFlag("labels.app", appFlag)
 
 	metaOpts := &Metadata{}
 	err = Unmarshal(metaOpts)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(metaOptsTruth, metaOpts)
 
 	ResetConfig()
 
 	//Case 2
 	err = ReadConfigFromReader(strings.NewReader(metaconf))
-	assert.Nil(err)
+	assert.NoError(err)
 	nameFlag = AddStringFlag("name", "defo", "nahnahnah")
 	err = nameFlag.Value.Set(metaOptsTruth.Name)
-	assert.Nil(err)
+	assert.NoError(err)
 	nameFlag.Changed = true
 	BindPFlag("name", nameFlag)
 
 	appFlag = AddStringFlag("app", "seefood", "jianyang")
 	err = appFlag.Value.Set(metaOptsTruth.Label.App)
-	assert.Nil(err)
+	assert.NoError(err)
 	appFlag.Changed = true
 	BindPFlag("labels.app", appFlag)
 
 	metaOpts = &Metadata{}
 	err = Unmarshal(metaOpts)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(metaOptsTruth, metaOpts)
 
 }
@@ -461,16 +461,16 @@ func (suite *ConfigTestSuite) TestConfigFileDescryption() {
 
 	os.WriteFile("test.yaml", []byte(config2), 0644)
 	plaintext, err := os.ReadFile("test.yaml")
-	assert.Nil(err)
-	assert.NotEqual(plaintext, nil)
+	assert.NoError(err)
+	assert.NotNil(plaintext)
 
 	cipherText, err := common.EncryptData(plaintext, []byte("123123123123123123123123"))
-	assert.Nil(err)
+	assert.NoError(err)
 	err = os.WriteFile("test_enc.yaml", cipherText, 0644)
-	assert.Nil(err)
+	assert.NoError(err)
 
 	err = DecryptConfigFile("test_enc.yaml", "123123123123123123123123")
-	assert.Nil(err)
+	assert.NoError(err)
 
 	_ = os.Remove("test.yaml")
 	_ = os.Remove("test_enc.yaml")

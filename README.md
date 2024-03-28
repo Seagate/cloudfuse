@@ -39,6 +39,10 @@ Download the .deb file from our latest release [here](https://github.com/Seagate
 Download the .rpm file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal:  
 `sudo rpm -i ./cloudfuse*.rpm`
 
+#### Enable Running With Systemd
+
+To enable Cloudfuse to run using systemd, see [Setup for systemd instructions](setup/readme.md)
+
 ### From Archive
 
 Download the archive for your platform and architecture from the latest release [here](https://github.com/Seagate/cloudfuse/releases).

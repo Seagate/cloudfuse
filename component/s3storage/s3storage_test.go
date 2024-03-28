@@ -378,7 +378,7 @@ func (s *s3StorageTestSuite) TestListBuckets() {
 	// }
 
 	buckets, err := s.s3Storage.ListBuckets()
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Contains(buckets, storageTestConfigurationParameters.BucketName)
 }
 
@@ -391,7 +391,7 @@ func (s *s3StorageTestSuite) TestCreateDir() {
 		s.Run(path, func() {
 			err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: path})
 			// this does nothing, so just make sure it doesn't return an error
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 		})
 	}
 }
@@ -403,10 +403,10 @@ func (s *s3StorageTestSuite) TestDeleteDir() {
 	// A directory isn't created unless there is a file in that directory, therefore create a file with
 	// 		the directory prefix instead of s.s3Storage.CreateDir(internal.CreateDirOptions{Name: name})
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: path.Join(dirName, generateFileName())})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: dirName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Directory should not be in the account
 	dirEmpty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: dirName})
@@ -454,40 +454,40 @@ func (s *s3StorageTestSuite) setupHierarchy(base string) (*list.List, *list.List
 	//  ab/c1
 	// ac
 	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: base})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	c1 := base + "/c1"
 	err = s.s3Storage.CreateDir(internal.CreateDirOptions{Name: c1})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	gc1 := c1 + "/gc1"
 	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: gc1})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	c2 := base + "/c2"
 	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: c2})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	abPath := base + "b"
 	err = s.s3Storage.CreateDir(internal.CreateDirOptions{Name: abPath})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	abc1 := abPath + "/c1"
 	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: abc1})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	acPath := base + "c"
 	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: acPath})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	a, ab, ac := generateNestedDirectory(base)
 
 	// Validate the paths were setup correctly and all paths exist
 	for p := a.Front(); p != nil; p = p.Next() {
 		_, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 	for p := ab.Front(); p != nil; p = p.Next() {
 		_, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 	for p := ac.Front(); p != nil; p = p.Next() {
 		_, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 	return a, ab, ac
 }
@@ -500,17 +500,17 @@ func (s *s3StorageTestSuite) TestDeleteDirHierarchy() {
 
 	err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: base})
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	/// a paths should be deleted
 	for p := a.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		s.assert.NotNil(err)
+		s.assert.Error(err)
 	}
 	ab.PushBackList(ac) // ab and ac paths should exist
 	for p := ab.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 }
 
@@ -521,31 +521,31 @@ func (s *s3StorageTestSuite) TestDeleteSubDirPrefixPath() {
 	a, ab, ac := s.setupHierarchy(base)
 
 	err := s.s3Storage.storage.SetPrefixPath(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, base))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	attr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: "c1"})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(attr)
 	s.assert.True(attr.IsDir())
 
 	err = s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: "c1"})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.s3Storage.storage.SetPrefixPath(s.s3Storage.stConfig.prefixPath)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	// a paths under c1 should be deleted
 	for p := a.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
 		if strings.HasPrefix(p.Value.(string), base+"/c1") {
-			s.assert.NotNil(err)
+			s.assert.Error(err)
 		} else {
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 		}
 	}
 	ab.PushBackList(ac) // ab and ac paths should exist
 	for p := ab.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 }
 
@@ -558,10 +558,10 @@ func (s *s3StorageTestSuite) TestDeleteDirError() {
 
 	// we have no way of indicating empty folders in the bucket
 	// so deleting a non-existent directory should not cause an error
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	// Directory should not be in the account
 	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *s3StorageTestSuite) TestIsDirEmpty() {
@@ -569,7 +569,7 @@ func (s *s3StorageTestSuite) TestIsDirEmpty() {
 	// Setup
 	name := generateDirectoryName()
 	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
@@ -588,10 +588,10 @@ func (s *s3StorageTestSuite) TestIsDirEmptyFalse() {
 	// Setup
 	name := generateDirectoryName()
 	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	file := name + "/" + generateFileName()
 	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: file})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	empty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 
@@ -615,7 +615,7 @@ func (s *s3StorageTestSuite) TestStreamDirNoVirtualDirectory() {
 	name := generateDirectoryName()
 	childName := name + "/" + generateFileName()
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: childName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Testing dir and dir/
 	var paths = []string{"", "/"}
@@ -624,8 +624,8 @@ func (s *s3StorageTestSuite) TestStreamDirNoVirtualDirectory() {
 		s.Run(path, func() {
 			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: path})
 			// this only works if the test can create an empty test bucket
-			s.assert.Nil(err)
-			s.assert.EqualValues(1, len(entries))
+			s.assert.NoError(err)
+			s.assert.Len(entries, 1)
 			s.assert.EqualValues(name, entries[0].Path)
 			s.assert.EqualValues(name, entries[0].Name)
 			s.assert.True(entries[0].IsDir())
@@ -643,8 +643,8 @@ func (s *s3StorageTestSuite) TestStreamDirHierarchy() {
 
 	// ReadDir only reads the first level of the hierarchy
 	entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: base})
-	s.assert.Nil(err)
-	s.assert.EqualValues(2, len(entries))
+	s.assert.NoError(err)
+	s.assert.Len(entries, 2)
 	// Check the dir
 	s.assert.EqualValues(base+"/c1", entries[0].Path)
 	s.assert.EqualValues("c1", entries[0].Name)
@@ -672,8 +672,8 @@ func (s *s3StorageTestSuite) TestStreamDirRoot() {
 		s.Run(path, func() {
 			// ReadDir only reads the first level of the hierarchy
 			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: path})
-			s.assert.Nil(err)
-			s.assert.EqualValues(3, len(entries))
+			s.assert.NoError(err)
+			s.assert.Len(entries, 3)
 			// Check the base dir
 			s.assert.EqualValues(base, entries[0].Path)
 			s.assert.EqualValues(base, entries[0].Name)
@@ -704,8 +704,8 @@ func (s *s3StorageTestSuite) TestStreamDirSubDir() {
 
 	// ReadDir only reads the first level of the hierarchy
 	entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: base + "/c1"})
-	s.assert.Nil(err)
-	s.assert.EqualValues(1, len(entries))
+	s.assert.NoError(err)
+	s.assert.Len(entries, 1)
 	// Check the dir
 	s.assert.EqualValues(base+"/c1"+"/gc1", entries[0].Path)
 	s.assert.EqualValues("gc1", entries[0].Name)
@@ -721,12 +721,12 @@ func (s *s3StorageTestSuite) TestStreamDirSubDirPrefixPath() {
 	s.setupHierarchy(base)
 
 	err := s.s3Storage.storage.SetPrefixPath(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, base))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// ReadDir only reads the first level of the hierarchy
 	entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: "/c1"})
-	s.assert.Nil(err)
-	s.assert.EqualValues(1, len(entries))
+	s.assert.NoError(err)
+	s.assert.Len(entries, 1)
 	// Check the dir
 	s.assert.EqualValues("c1"+"/gc1", entries[0].Path)
 	s.assert.EqualValues("gc1", entries[0].Name)
@@ -748,11 +748,11 @@ func (s *s3StorageTestSuite) TestStreamDirWindowsNameConvert() {
 	name := generateDirectoryName()
 	windowsDirName := "＂＊：＜＞？｜" + name
 	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: windowsDirName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	childName := generateFileName()
 	windowsChildName := windowsDirName + "/" + childName + "＂＊：＜＞？｜"
 	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: windowsChildName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Testing dir and dir/
 	var paths = []string{windowsDirName, windowsDirName + "/"}
@@ -760,8 +760,8 @@ func (s *s3StorageTestSuite) TestStreamDirWindowsNameConvert() {
 		log.Debug(path)
 		s.Run(path, func() {
 			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: path})
-			s.assert.Nil(err)
-			s.assert.EqualValues(1, len(entries))
+			s.assert.NoError(err)
+			s.assert.Len(entries, 1)
 			s.assert.Equal(windowsChildName, entries[0].Path)
 		})
 	}
@@ -774,11 +774,11 @@ func (s *s3StorageTestSuite) TestStreamDirError() {
 
 	entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: name})
 
-	s.assert.Nil(err) // Note: See comment in BlockBlob.List. BlockBlob behaves differently from Datalake
+	s.assert.NoError(err) // Note: See comment in BlockBlob.List. BlockBlob behaves differently from Datalake
 	s.assert.Empty(entries)
 	// Directory should not be in the account
 	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *s3StorageTestSuite) TestRenameDir() {
@@ -799,18 +799,18 @@ func (s *s3StorageTestSuite) TestRenameDir() {
 			// Setup
 			// We don't keep track of empty directories, so let's create an object with the src prefix
 			_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: common.JoinUnixFilepath(input.src, generateFileName())})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 
 			err = s.s3Storage.RenameDir(internal.RenameDirOptions{Src: input.src, Dst: input.dst})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 
 			// Src should not be in the account
 			_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: input.src})
-			s.assert.NotNil(err)
+			s.assert.Error(err)
 
 			// Dst should be in the account
 			_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: input.dst})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 		})
 	}
 
@@ -825,29 +825,29 @@ func (s *s3StorageTestSuite) TestRenameDirHierarchy() {
 	aDst, abDst, acDst := generateNestedDirectory(baseDst)
 
 	err := s.s3Storage.RenameDir(internal.RenameDirOptions{Src: baseSrc, Dst: baseDst})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Source
 	// aSrc paths should be deleted
 	for p := aSrc.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		s.assert.NotNil(err)
+		s.assert.Error(err)
 	}
 	abSrc.PushBackList(acSrc) // abSrc and acSrc paths should exist
 	for p := abSrc.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 	// Destination
 	// aDst paths should exist
 	for p := aDst.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 	abDst.PushBackList(acDst) // abDst and acDst paths should not exist
 	for p := abDst.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
-		s.assert.NotNil(err)
+		s.assert.Error(err)
 	}
 }
 
@@ -860,35 +860,35 @@ func (s *s3StorageTestSuite) TestRenameDirSubDirPrefixPath() {
 
 	// Test rename directory with prefix set
 	err := s.s3Storage.storage.SetPrefixPath(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, baseSrc))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	err = s.s3Storage.RenameDir(internal.RenameDirOptions{Src: "c1", Dst: baseDst})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// remove extra prefix to check results
 	err = s.s3Storage.storage.SetPrefixPath(s.s3Storage.stConfig.prefixPath)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	// aSrc paths under c1 should be deleted
 	for p := aSrc.Front(); p != nil; p = p.Next() {
 		path := p.Value.(string)
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: path})
 		if strings.HasPrefix(path, baseSrc+"/c1") {
-			s.assert.NotNil(err)
+			s.assert.Error(err)
 		} else {
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 		}
 	}
 	abSrc.PushBackList(acSrc) // abSrc and acSrc paths should exist
 	for p := abSrc.Front(); p != nil; p = p.Next() {
 		path := p.Value.(string)
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: path})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 	}
 	// Destination
 	// aDst paths should exist -> aDst and aDst/gc1
 	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + "/" + baseDst})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + "/" + baseDst + "/gc1"})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *s3StorageTestSuite) TestRenameDirError() {
@@ -901,12 +901,12 @@ func (s *s3StorageTestSuite) TestRenameDirError() {
 
 	// we have no way of indicating empty folders in the bucket
 	// so renaming a non-existent directory should not cause an error
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	// Neither directory should be in the account
 	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: src})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: dst})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *s3StorageTestSuite) TestCreateFile() {
@@ -916,7 +916,7 @@ func (s *s3StorageTestSuite) TestCreateFile() {
 
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.EqualValues(name, h.Path)
 	s.assert.EqualValues(0, h.Size)
@@ -926,7 +926,7 @@ func (s *s3StorageTestSuite) TestCreateFile() {
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(result)
 }
 
@@ -947,7 +947,7 @@ func (s *s3StorageTestSuite) TestCreateFileWindowsNameConvert() {
 
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: windowsName})
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.EqualValues(windowsName, h.Path)
 	s.assert.EqualValues(0, h.Size)
@@ -957,7 +957,7 @@ func (s *s3StorageTestSuite) TestCreateFileWindowsNameConvert() {
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(result)
 }
 
@@ -966,10 +966,10 @@ func (s *s3StorageTestSuite) TestOpenFile() {
 	// Setup
 	name := generateFileName()
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	h, err := s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.EqualValues(name, h.Path)
 	s.assert.EqualValues(0, h.Size)
@@ -981,7 +981,7 @@ func (s *s3StorageTestSuite) TestOpenFileError() {
 	name := generateFileName()
 
 	h, err := s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 	s.assert.Nil(h)
 }
@@ -992,14 +992,14 @@ func (s *s3StorageTestSuite) TestOpenFileSize() {
 	name := generateFileName()
 	size := 10
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(size)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// TODO: There is a sort of bug in S3 where writing zeros to the object causes it to be unreadable.
 	// I think it's related to this link, but this discussion is about the key, whereas this is the value...
 	h, err := s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.EqualValues(name, h.Path)
 	s.assert.EqualValues(size, h.Size)
@@ -1010,11 +1010,11 @@ func (s *s3StorageTestSuite) TestCloseFile() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// This method does nothing.
 	err = s.s3Storage.CloseFile(internal.CloseFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *s3StorageTestSuite) TestCloseFileFakeHandle() {
@@ -1025,7 +1025,7 @@ func (s *s3StorageTestSuite) TestCloseFileFakeHandle() {
 
 	// This method does nothing.
 	err := s.s3Storage.CloseFile(internal.CloseFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *s3StorageTestSuite) TestDeleteFile() {
@@ -1033,10 +1033,10 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 	// Setup
 	name := generateFileName()
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.s3Storage.DeleteFile(internal.DeleteFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// This is similar to the s3 bucket command, use getObject for now
 	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
@@ -1047,7 +1047,7 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 		Key:    aws.String(key),
 	})
 
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *s3StorageTestSuite) TestDeleteFileWindowsNameConvert() {
@@ -1062,10 +1062,10 @@ func (s *s3StorageTestSuite) TestDeleteFileWindowsNameConvert() {
 	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
 	objectName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: windowsName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.s3Storage.DeleteFile(internal.DeleteFileOptions{Name: windowsName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// File should not be in the account
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, objectName)
@@ -1074,7 +1074,7 @@ func (s *s3StorageTestSuite) TestDeleteFileWindowsNameConvert() {
 		Key:    aws.String(key),
 	})
 
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *s3StorageTestSuite) TestDeleteFileError() {
@@ -1083,7 +1083,7 @@ func (s *s3StorageTestSuite) TestDeleteFileError() {
 	name := generateFileName()
 
 	err := s.s3Storage.DeleteFile(internal.DeleteFileOptions{Name: name})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 
 	// File should not be in the account
@@ -1092,7 +1092,7 @@ func (s *s3StorageTestSuite) TestDeleteFileError() {
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *s3StorageTestSuite) TestCopyFromFile() {
@@ -1100,20 +1100,20 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 	// Setup
 	name := generateFileName()
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	homeDir, err := os.UserHomeDir()
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, err := os.CreateTemp(homeDir, name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	_, err = f.Write(data)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.s3Storage.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f})
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Object will be updated with new data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1121,10 +1121,10 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1142,20 +1142,20 @@ func (s *s3StorageTestSuite) TestCopyFromFileWindowsNameConvert() {
 	windowsName := name + "＂＊：＜＞？｜"
 	objectName := name + "\"*:<>?|"
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: windowsName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	homeDir, err := os.UserHomeDir()
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, err := os.CreateTemp(homeDir, windowsName+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	_, err = f.Write(data)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.s3Storage.CopyFromFile(internal.CopyFromFileOptions{Name: windowsName, File: f})
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Object will be updated with new data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, objectName)
@@ -1163,10 +1163,10 @@ func (s *s3StorageTestSuite) TestCopyFromFileWindowsNameConvert() {
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1175,16 +1175,16 @@ func (s *s3StorageTestSuite) TestReadFile() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	h, err = s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1195,7 +1195,7 @@ func (s *s3StorageTestSuite) TestReadFileError() {
 	h := handlemap.NewHandle(name)
 
 	_, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
@@ -1204,17 +1204,17 @@ func (s *s3StorageTestSuite) TestReadInBuffer() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	h, err = s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output := make([]byte, 5)
 	len, err := s.s3Storage.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(5, len)
 	s.assert.EqualValues(testData[:5], output)
 }
@@ -1224,17 +1224,17 @@ func (s *s3StorageTestSuite) TestReadInBufferRange() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data test data "
 	data := []byte(testData)
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	h, err = s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output := make([]byte, 15)
 	len, err := s.s3Storage.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 5, Data: output})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(15, len)
 	s.assert.EqualValues(testData[5:], output)
 }
@@ -1244,17 +1244,17 @@ func (s *s3StorageTestSuite) TestReadInBufferLargeBuffer() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	h, err = s.s3Storage.OpenFile(internal.OpenFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output := make([]byte, 1000) // Testing that passing in a super large buffer will still work
 	len, err := s.s3Storage.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(h.Size, len)
 	s.assert.EqualValues(testData, output[:h.Size])
 }
@@ -1264,11 +1264,11 @@ func (s *s3StorageTestSuite) TestReadInBufferEmpty() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output := make([]byte, 10)
 	len, err := s.s3Storage.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(0, len)
 }
 
@@ -1280,7 +1280,7 @@ func (s *s3StorageTestSuite) TestReadInBufferBadRange() {
 	h.Size = 10
 
 	_, err := s.s3Storage.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 20, Data: make([]byte, 2)})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ERANGE, err)
 }
 
@@ -1292,7 +1292,7 @@ func (s *s3StorageTestSuite) TestReadInBufferError() {
 	h.Size = 10
 
 	_, err := s.s3Storage.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: make([]byte, 2)})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
@@ -1301,12 +1301,12 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	testData := "test data"
 	data := []byte(testData)
 	count, err := s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(len(data), count)
 
 	// Object should have updated data
@@ -1315,10 +1315,10 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1333,12 +1333,12 @@ func (s *s3StorageTestSuite) TestWriteFileMultipartUpload() {
 	name := generateFileName()
 	fileSize := 6 * MB
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data := make([]byte, fileSize)
 	rand.Read(data)
 
 	count, err := s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(len(data), count)
 
 	// Object should have updated data
@@ -1347,10 +1347,10 @@ func (s *s3StorageTestSuite) TestWriteFileMultipartUpload() {
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(data, output)
 
 	// The etag in AWS indicates if it was uploaded as a multipart upload
@@ -1359,10 +1359,10 @@ func (s *s3StorageTestSuite) TestWriteFileMultipartUpload() {
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	etag := strings.Split(*res.ETag, "-")
 	numParts, err := strconv.Atoi(strings.Trim(etag[1], "\""))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Equal(2, numParts)
 }
 
@@ -1381,12 +1381,12 @@ func (s *s3StorageTestSuite) TestWriteFileWindowsNameConvert() {
 	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
 	objectName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: windowsName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	testData := "test data"
 	data := []byte(testData)
 	count, err := s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(len(data), count)
 
 	// Object should have updated data
@@ -1395,10 +1395,10 @@ func (s *s3StorageTestSuite) TestWriteFileWindowsNameConvert() {
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1407,15 +1407,15 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmaller() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 5
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1424,10 +1424,10 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmaller() {
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(testData[:truncatedLength], output[:])
 }
 
@@ -1445,15 +1445,15 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 	windowsName := "＂＊：＜＞？｜" + "/" + name + "＂＊：＜＞？｜"
 	objectName := "\"*:<>?|" + "/" + name + "\"*:<>?|"
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: windowsName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 5
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: windowsName, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, objectName)
@@ -1462,10 +1462,10 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(testData[:truncatedLength], output)
 }
 
@@ -1474,15 +1474,15 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileSmaller() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 5
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1491,10 +1491,10 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileSmaller() {
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(testData[:truncatedLength], output)
 }
 
@@ -1503,15 +1503,15 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileEqual() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 9
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1520,10 +1520,10 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileEqual() {
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1532,15 +1532,15 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileEqual() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 9
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1549,10 +1549,10 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileEqual() {
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(testData, output)
 }
 
@@ -1561,15 +1561,15 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileBigger() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 15
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1578,10 +1578,10 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileBigger() {
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(testData, output[:len(data)])
 }
 
@@ -1590,11 +1590,11 @@ func (s *s3StorageTestSuite) TestTruncateEmptyFileBigger() {
 	// Setup
 	name := generateFileName()
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	truncatedLength := 15
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1602,11 +1602,11 @@ func (s *s3StorageTestSuite) TestTruncateEmptyFileBigger() {
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
-	s.assert.EqualValues(truncatedLength, len(output))
+	s.assert.NoError(err)
+	s.assert.Len(output, truncatedLength)
 	s.assert.EqualValues(make([]byte, truncatedLength), output[:])
 }
 
@@ -1615,15 +1615,15 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileBigger() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	truncatedLength := 15
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1632,10 +1632,10 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileBigger() {
 		Key:    aws.String(key),
 		Range:  aws.String("bytes=0-" + fmt.Sprint(truncatedLength)),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(testData, output[:len(data)])
 }
 
@@ -1645,7 +1645,7 @@ func (s *s3StorageTestSuite) TestTruncateFileError() {
 	name := generateFileName()
 
 	err := s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
@@ -1654,24 +1654,24 @@ func (s *s3StorageTestSuite) TestWriteSmallFile() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
 	dataLen := len(data)
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output := make([]byte, len(data))
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(testData, output)
 	f.Close()
@@ -1682,29 +1682,29 @@ func (s *s3StorageTestSuite) TestOverwriteSmallFile() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test-replace-data"
 	data := []byte(testData)
 	dataLen := len(data)
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("test-newdata-data")
 	output := make([]byte, len(currentData))
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -1715,30 +1715,30 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendToSmallFile() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test-data"
 	data := []byte(testData)
 
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("test-newdata")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -1749,30 +1749,30 @@ func (s *s3StorageTestSuite) TestAppendToSmallFile() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test-data"
 	data := []byte(testData)
 
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("-newdata")
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 9, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("test-data-newdata")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -1783,30 +1783,30 @@ func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSmallFile() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "test-data"
 	data := []byte(testData)
 
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("newdata")
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 12, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("test-data\x00\x00\x00newdata")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -1823,30 +1823,30 @@ func (s *s3StorageTestSuite) TestOverwriteBlocks() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data := make([]byte, 10*MB)
 	rand.Read(data)
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("cake")
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	dataLen := len(data)
 	output := make([]byte, dataLen)
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(data[:5], output[:5])
 	s.assert.EqualValues("cake", output[5:9])
@@ -1865,30 +1865,30 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocks() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data := make([]byte, 5*MB)
 	rand.Read(data)
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5*MB - 4, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := append(data[:len(data)-4], []byte("43211234cake")...)
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -1905,30 +1905,30 @@ func (s *s3StorageTestSuite) TestAppendBlocks() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data := make([]byte, 5*MB)
 	rand.Read(data)
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5 * MB, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := append(data, []byte("43211234cake")...)
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -1945,30 +1945,30 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksLargeFile() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data := make([]byte, 15*MB)
 	rand.Read(data)
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 15*MB - 4, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := append(data[:len(data)-4], []byte("43211234cake")...)
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -1985,18 +1985,18 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksMiddleLargeFile() {
 	// Setup
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data := make([]byte, 15*MB)
 	rand.Read(data)
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5*MB - 4, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := append(data[:5*MB-4], []byte("43211234cake")...)
 	currentData = append(currentData, data[5*MB+8:]...)
@@ -2004,12 +2004,12 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksMiddleLargeFile() {
 	output := make([]byte, dataLen)
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -2021,30 +2021,30 @@ func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSize() {
 	storageTestConfigurationParameters.UploadCutoffMb = 5
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	testData := "testdatates1dat1tes2dat2tes3dat3tes4dat4"
 	data := []byte(testData)
 
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 	newTestData := []byte("43211234cake")
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 45, Data: newTestData})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	currentData := []byte("testdatates1dat1tes2dat2tes3dat3tes4dat4\x00\x00\x00\x00\x0043211234cake")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	f, err = os.Open(f.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	len, err := f.Read(output)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 	f.Close()
@@ -2055,11 +2055,11 @@ func (s *s3StorageTestSuite) TestCopyToFileError() {
 	// Setup
 	name := generateFileName()
 	f, err := os.CreateTemp("", name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(f.Name())
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
@@ -2068,10 +2068,10 @@ func (s *s3StorageTestSuite) TestStreamDir() {
 	// Setup
 	name := generateDirectoryName()
 	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	childName := name + "/" + generateFileName()
 	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: childName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
@@ -2079,8 +2079,8 @@ func (s *s3StorageTestSuite) TestStreamDir() {
 		log.Debug(path)
 		s.Run(path, func() {
 			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: path})
-			s.assert.Nil(err)
-			s.assert.EqualValues(1, len(entries))
+			s.assert.NoError(err)
+			s.assert.Len(entries, 1)
 		})
 	}
 }
@@ -2089,19 +2089,19 @@ func (s *s3StorageTestSuite) TestStreamDirSmallCountNoDuplicates() {
 	defer s.cleanupTest()
 	// Setup
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/object1.txt"})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/object2.txt"})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newObject1.txt"})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/newObject2.txt"})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	err = s.s3Storage.CreateDir(internal.CreateDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/myFolder"})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myFolder/newObjectA.txt"})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: "TestStreamDirSmallCountNoDuplicates/myFolder/newObjectB.txt"})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	var iteration int // = 0
 	var marker string // = ""
@@ -2109,7 +2109,7 @@ func (s *s3StorageTestSuite) TestStreamDirSmallCountNoDuplicates() {
 
 	for {
 		newList, nextMarker, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: "TestStreamDirSmallCountNoDuplicates/", Token: marker, Count: 1})
-		s.assert.Nil(err)
+		s.assert.NoError(err)
 		objectList = append(objectList, newList...)
 		marker = nextMarker
 		iteration++
@@ -2120,7 +2120,7 @@ func (s *s3StorageTestSuite) TestStreamDirSmallCountNoDuplicates() {
 		}
 	}
 
-	s.assert.EqualValues(5, len(objectList))
+	s.assert.Len(objectList, 5)
 }
 
 func (s *s3StorageTestSuite) TestRenameFile() {
@@ -2128,11 +2128,11 @@ func (s *s3StorageTestSuite) TestRenameFile() {
 	// Setup
 	src := generateFileName()
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: src})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	dst := generateFileName()
 
 	err = s.s3Storage.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Src should not be in the account
 	srcKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, src)
@@ -2140,14 +2140,14 @@ func (s *s3StorageTestSuite) TestRenameFile() {
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(srcKey),
 	})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	// Dst should be in the account
 	dstKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, dst)
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(dstKey),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *s3StorageTestSuite) TestRenameFileWindowsNameConvert() {
@@ -2164,14 +2164,14 @@ func (s *s3StorageTestSuite) TestRenameFileWindowsNameConvert() {
 	srcWindowsName := "＂＊：＜＞？｜" + "/" + src + "＂＊：＜＞？｜"
 	srcObjectName := "\"*:<>?|" + "/" + src + "\"*:<>?|"
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: srcWindowsName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	dst := generateFileName()
 	dstWindowsName := "＂＊：＜＞？｜" + "/" + dst + "＂＊：＜＞？｜"
 	dstObjectName := "\"*:<>?|" + "/" + dst + "\"*:<>?|"
 
 	err = s.s3Storage.RenameFile(internal.RenameFileOptions{Src: srcWindowsName, Dst: dstWindowsName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Src should not be in the account
 	srcKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, srcObjectName)
@@ -2179,14 +2179,14 @@ func (s *s3StorageTestSuite) TestRenameFileWindowsNameConvert() {
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(srcKey),
 	})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	// Dst should be in the account
 	dstKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, dstObjectName)
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(dstKey),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *s3StorageTestSuite) TestRenameFileError() {
@@ -2196,7 +2196,7 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 	dst := generateFileName()
 
 	err := s.s3Storage.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 
 	// Src and destination should not be in the account
@@ -2205,13 +2205,13 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(srcKey),
 	})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	dstKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, dst)
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(dstKey),
 	})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *s3StorageTestSuite) TestCreateLink() {
@@ -2222,11 +2222,11 @@ func (s *s3StorageTestSuite) TestCreateLink() {
 	name := generateFileName()
 
 	err := s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// now we check the link exists
 	attr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(attr)
 	s.assert.NotEmpty(attr.Metadata)
 	s.assert.Contains(attr.Metadata, symlinkKey)
@@ -2234,7 +2234,7 @@ func (s *s3StorageTestSuite) TestCreateLink() {
 
 	//download and make sure the data is correct
 	result, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Equal(target, result)
 }
 
@@ -2250,7 +2250,7 @@ func (s *s3StorageTestSuite) TestReadLink() {
 	s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
 
 	read, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(target, read)
 }
 
@@ -2260,7 +2260,7 @@ func (s *s3StorageTestSuite) TestReadLinkError() {
 	name := generateFileName()
 
 	_, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
@@ -2280,18 +2280,18 @@ func (s *s3StorageTestSuite) TestGetAttrDir() {
 			// Setup
 			dirName := generateDirectoryName()
 			err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: dirName})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			// since CreateDir doesn't do anything, let's put an object with that prefix
 			filename := dirName + "/" + generateFileName()
 			_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: filename})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			// Now we should be able to see the directory
 			props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: dirName})
 			deleteError := s.s3Storage.DeleteFile(internal.DeleteFileOptions{Name: filename})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(props)
 			s.assert.True(props.IsDir())
-			s.assert.Nil(deleteError)
+			s.assert.NoError(deleteError)
 		})
 	}
 }
@@ -2306,17 +2306,17 @@ func (s *s3StorageTestSuite) TestGetAttrVirtualDir() {
 	dirName := generateFileName()
 	name := dirName + "/" + generateFileName()
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: dirName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.True(props.IsDir())
 	s.assert.False(props.IsSymlink())
 
 	// Check file in dir too
 	props, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.False(props.IsDir())
 	s.assert.False(props.IsSymlink())
@@ -2333,24 +2333,24 @@ func (s *s3StorageTestSuite) TestGetAttrVirtualDirSubDir() {
 	subDirName := dirName + "/" + generateFileName()
 	name := subDirName + "/" + generateFileName()
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: dirName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.True(props.IsDir())
 	s.assert.False(props.IsSymlink())
 
 	// Check subdir in dir too
 	props, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: subDirName})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.True(props.IsDir())
 	s.assert.False(props.IsSymlink())
 
 	// Check file in subdir too
 	props, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.False(props.IsDir())
 	s.assert.False(props.IsSymlink())
@@ -2372,10 +2372,10 @@ func (s *s3StorageTestSuite) TestGetAttrFile() {
 			// Setup
 			name := generateFileName()
 			_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 
 			props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(props)
 			s.assert.False(props.IsDir())
 			s.assert.False(props.IsSymlink())
@@ -2403,7 +2403,7 @@ func (s *s3StorageTestSuite) TestGetAttrLink() {
 			s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
 
 			props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(props)
 			s.assert.True(props.IsSymlink())
 			s.assert.NotEmpty(props.Metadata)
@@ -2429,14 +2429,14 @@ func (s *s3StorageTestSuite) TestGetAttrFileSize() {
 			// Setup
 			name := generateFileName()
 			h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			testData := "test data"
 			data := []byte(testData)
 			_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 
 			props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(props)
 			s.assert.False(props.IsDir())
 			s.assert.False(props.IsSymlink())
@@ -2461,23 +2461,23 @@ func (s *s3StorageTestSuite) TestGetAttrFileTime() {
 			// Setup
 			name := generateFileName()
 			h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			testData := "test data"
 			data := []byte(testData)
 			_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 
 			before, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(before.Mtime)
 
 			time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
 
 			_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 
 			after, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Nil(err)
+			s.assert.NoError(err)
 			s.assert.NotNil(after.Mtime)
 
 			s.assert.True(after.Mtime.After(before.Mtime))
@@ -2502,7 +2502,7 @@ func (s *s3StorageTestSuite) TestGetAttrError() {
 			name := generateFileName()
 
 			_, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.NotNil(err)
+			s.assert.Error(err)
 			s.assert.EqualValues(syscall.ENOENT, err)
 		})
 	}
@@ -2515,39 +2515,39 @@ func (s *s3StorageTestSuite) TestFullRangedDownload() {
 	//create a temp file containing "test data"
 	name := generateFileName()
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data := []byte("test data")
 	homeDir, err := os.UserHomeDir()
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	uploadFile, err := os.CreateTemp(homeDir, name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(uploadFile.Name())
 	_, err = uploadFile.Write(data)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// upload the temp file
 	err = s.s3Storage.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: uploadFile})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	//create empty file for object download to write into
 	file, err := os.CreateTemp("", generateFileName()+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(file.Name())
 
 	//download to testDownload file
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 0, Count: 0, File: file})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	//create byte array of characters that are identical to what we should have downloaded
 	dataLen := len(data)
 	output := make([]byte, dataLen) //empty byte array of that only holds 5 chars
 	file, err = os.Open(file.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	//downloaded data in file is being read and dumped into the byte array.
 	len, err := file.Read(output)
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(data, output)
 }
@@ -2559,40 +2559,40 @@ func (s *s3StorageTestSuite) TestRangedDownload() {
 	//create a temp file containing "test data"
 	name := generateFileName()
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data := []byte("test data")
 	homeDir, err := os.UserHomeDir()
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	uploadFile, err := os.CreateTemp(homeDir, name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(uploadFile.Name())
 	_, err = uploadFile.Write(data)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// upload the temp file
 	err = s.s3Storage.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: uploadFile})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	//create empty file for object download to write into
 	file, err := os.CreateTemp("", generateFileName()+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(file.Name())
 
 	//download portion of object to file
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 2, Count: 5, File: file})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	//create byte array of characters that are identical to what we should have downloaded
 	currentData := []byte("st da")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen) //empty byte array of that only holds 5 chars
 	file, err = os.Open(file.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	//downloaded data in file is being read and dumped into the byte array.
 	len, err := file.Read(output)
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 
@@ -2605,40 +2605,40 @@ func (s *s3StorageTestSuite) TestOffsetToEndDownload() {
 	//create a temp file containing "test data"
 	name := generateFileName()
 	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data := []byte("test data")
 	homeDir, err := os.UserHomeDir()
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	uploadFile, err := os.CreateTemp(homeDir, name+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(uploadFile.Name())
 	_, err = uploadFile.Write(data)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// upload the temp file
 	err = s.s3Storage.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: uploadFile})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	//create empty file for object download to write into
 	file, err := os.CreateTemp("", generateFileName()+".tmp")
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer os.Remove(file.Name())
 
 	//download to testDownload file
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, Offset: 3, Count: 0, File: file})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	//create byte array of characters that are identical to what we should have downloaded
 	currentData := []byte("t data")
 	dataLen := len(currentData)
 	output := make([]byte, dataLen) //empty byte array of that only holds 5 chars
 	file, err = os.Open(file.Name())
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	//downloaded data in file is being read and dumped into the byte array.
 	len, err := file.Read(output)
 
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(dataLen, len)
 	s.assert.EqualValues(currentData, output)
 
@@ -2661,8 +2661,8 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsSmallFile() {
 
 	// GetFileBlockOffsets
 	offsetList, err := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
-	s.assert.Nil(err)
-	s.assert.Len(offsetList.BlockList, 0)
+	s.assert.NoError(err)
+	s.assert.Empty(offsetList.BlockList)
 	s.assert.True(offsetList.SmallFile())
 	s.assert.EqualValues(0, offsetList.BlockIdLength)
 }
@@ -2685,11 +2685,11 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsChunkedFile() {
 		Key:    aws.String(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)),
 		Body:   bytes.NewReader(data),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// GetFileBlockOffsets
 	offsetList, err := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Len(offsetList.BlockList, 2)
 	s.assert.Zero(offsetList.Flags)
 	s.assert.EqualValues(16, offsetList.BlockIdLength)
@@ -2706,7 +2706,7 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsError() {
 
 	// GetFileBlockOffsets
 	_, err := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *s3StorageTestSuite) TestFlushFileEmptyFile() {
@@ -2725,10 +2725,10 @@ func (s *s3StorageTestSuite) TestFlushFileEmptyFile() {
 	h.CacheObj.BlockOffsetList = bol
 
 	err := s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues("", output)
 }
 
@@ -2747,17 +2747,17 @@ func (s *s3StorageTestSuite) TestFlushFileChunkedFile() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(15*MB), h)
 	h.CacheObj.BlockOffsetList = bol
 	s.assert.Len(bol.BlockList, 3)
 
 	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(data, output)
 }
 
@@ -2777,7 +2777,7 @@ func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(15*MB), h)
 	h.CacheObj.BlockOffsetList = bol
@@ -2790,10 +2790,10 @@ func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
 	h.CacheObj.BlockOffsetList.BlockList[1].Flags.Set(common.DirtyBlock)
 
 	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotEqualValues(data, output)
 	s.assert.EqualValues(data[:6*MB], output[:6*MB])
 	s.assert.EqualValues(updatedBlock, output[6*MB:6*MB+2*MB])
@@ -2816,7 +2816,7 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(15*MB), h)
 	h.CacheObj.BlockOffsetList = bol
@@ -2831,10 +2831,10 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	h.CacheObj.BlockOffsetList.BlockList = h.CacheObj.BlockOffsetList.BlockList[:2]
 
 	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotEqualValues(data, output)
 	s.assert.EqualValues(data[:7.5*MB], output[:7.5*MB])
 }
@@ -2889,10 +2889,10 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	bol.Flags.Clear(common.SmallFile)
 
 	err := s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(blk1.Data, output[0:blockSizeBytes])
 	s.assert.EqualValues(blk2.Data, output[blockSizeBytes:2*blockSizeBytes])
 	s.assert.EqualValues(blk3.Data, output[2*blockSizeBytes:3*blockSizeBytes])
@@ -2915,7 +2915,7 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(30*MB), h)
 	h.CacheObj.BlockOffsetList = bol
@@ -2954,10 +2954,10 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	bol.Flags.Clear(common.SmallFile)
 
 	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(data, output[0:fileSize])
 	s.assert.EqualValues(blk1.Data, output[fileSize:fileSize+blockSizeBytes])
 	s.assert.EqualValues(blk2.Data, output[fileSize+blockSizeBytes:fileSize+2*blockSizeBytes])
@@ -3008,10 +3008,10 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	bol.Flags.Clear(common.SmallFile)
 
 	err := s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data := make([]byte, 3*blockSizeBytes)
 	s.assert.EqualValues(data, output)
 }
@@ -3033,7 +3033,7 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(30*MB), h)
 	h.CacheObj.BlockOffsetList = bol
@@ -3066,10 +3066,10 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	bol.Flags.Clear(common.SmallFile)
 
 	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(data, output[:fileSize])
 	emptyData := make([]byte, 3*blockSizeBytes)
 	s.assert.EqualValues(emptyData, output[fileSize:])
@@ -3121,10 +3121,10 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	bol.Flags.Clear(common.SmallFile)
 
 	err := s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	data := make([]byte, blockSizeBytes)
 	s.assert.EqualValues(blk1.Data, output[0:blockSizeBytes])
 	s.assert.EqualValues(data, output[blockSizeBytes:2*blockSizeBytes])
@@ -3148,7 +3148,7 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err := s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	bol, _ := s.s3Storage.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
@@ -3183,11 +3183,11 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	bol.Flags.Clear(common.SmallFile)
 
 	err = s.s3Storage.FlushFile(internal.FlushFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// file should be empty
 	output, err := s.s3Storage.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.EqualValues(data, output[:fileSize])
 	emptyData := make([]byte, blockSizeBytes)
 	s.assert.EqualValues(blk1.Data, output[fileSize:fileSize+blockSizeBytes])
@@ -3238,13 +3238,13 @@ func (s *s3StorageTestSuite) UtilityFunctionTestTruncateFileToSmaller(size int, 
 
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	data := make([]byte, size)
 	s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -3252,11 +3252,11 @@ func (s *s3StorageTestSuite) UtilityFunctionTestTruncateFileToSmaller(size int, 
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
-	s.assert.EqualValues(truncatedLength, len(output))
+	s.assert.NoError(err)
+	s.assert.Len(output, truncatedLength)
 	s.assert.EqualValues(data[:truncatedLength], output[:])
 }
 
@@ -3271,13 +3271,13 @@ func (s *s3StorageTestSuite) UtilityFunctionTruncateFileToLarger(size int, trunc
 
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	data := make([]byte, size)
 	s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -3285,11 +3285,11 @@ func (s *s3StorageTestSuite) UtilityFunctionTruncateFileToLarger(size int, trunc
 		Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
-	s.assert.Nil(err)
-	s.assert.EqualValues(truncatedLength, len(output))
+	s.assert.NoError(err)
+	s.assert.Len(output, truncatedLength)
 	s.assert.EqualValues(data[:], output[:size])
 }
 

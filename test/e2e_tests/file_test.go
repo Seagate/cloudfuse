@@ -104,7 +104,7 @@ func (suite *fileTestSuite) fileTestCleanup(toRemove []string) {
 func (suite *fileTestSuite) TestFileCreate() {
 	fileName := suite.testPath + "/small_write.txt"
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 
 	suite.fileTestCleanup([]string{fileName})
@@ -113,7 +113,7 @@ func (suite *fileTestSuite) TestFileCreate() {
 func (suite *fileTestSuite) TestFileCreateUtf8Char() {
 	fileName := suite.testPath + "/भारत.txt"
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 
 	suite.fileTestCleanup([]string{fileName})
@@ -131,15 +131,15 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 	fileName := suite.testPath + "/" + speclChar
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 	time.Sleep(time.Second * 2)
 
 	_, err = os.Stat(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	files, err := os.ReadDir(suite.testPath)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	suite.GreaterOrEqual(len(files), 1)
 
 	found := false
@@ -149,7 +149,7 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 		}
 	}
 	// TODO: why did this come back false occasionally in CI (flaky)
-	suite.Equal(true, found)
+	suite.True(found)
 
 	suite.fileTestCleanup([]string{fileName})
 }
@@ -159,15 +159,15 @@ func (suite *fileTestSuite) TestFileCreateEncodeChar() {
 	fileName := suite.testPath + "/" + speclChar
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 	time.Sleep(time.Second * 2)
 
 	_, err = os.Stat(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	files, err := os.ReadDir(suite.testPath)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	suite.GreaterOrEqual(len(files), 1)
 
 	found := false
@@ -176,7 +176,7 @@ func (suite *fileTestSuite) TestFileCreateEncodeChar() {
 			found = true
 		}
 	}
-	suite.Equal(true, found)
+	suite.True(found)
 
 	suite.fileTestCleanup([]string{fileName})
 }
@@ -193,22 +193,22 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 	fileName := speclDirName + "/" + speclChar
 
 	err := os.Mkdir(speclDirName, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	srcFile, err := os.OpenFile(secFile, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 
 	srcFile, err = os.OpenFile(fileName, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 	time.Sleep(time.Second * 2)
 
 	_, err = os.Stat(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	files, err := os.ReadDir(speclDirName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	suite.GreaterOrEqual(len(files), 1)
 
 	found := false
@@ -217,7 +217,7 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 			found = true
 		}
 	}
-	suite.Equal(true, found)
+	suite.True(found)
 
 	suite.fileTestCleanup([]string{speclDirName})
 }
@@ -225,7 +225,7 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 func (suite *fileTestSuite) TestFileCreateLongName() {
 	fileName := suite.testPath + "/Higher Call_ An Incredible True Story of Combat and Chivalry in the War-Torn Skies of World War II, A - Adam Makos & Larry Alexander.epub"
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 
 	suite.fileTestCleanup([]string{fileName})
@@ -241,7 +241,7 @@ func (suite *fileTestSuite) TestFileCreateSlashName() {
 	fileName := suite.testPath + "/abcd\\efg.txt"
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 
 	suite.fileTestCleanup([]string{fileName, suite.testPath + "/abcd"})
@@ -251,7 +251,7 @@ func (suite *fileTestSuite) TestFileCreateLabel() {
 	fileName := suite.testPath + "/chunk_f13c48d4-5c1e-11ea-b41d-000d3afe1867.label"
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 
 	suite.fileTestCleanup([]string{fileName})
@@ -261,11 +261,11 @@ func (suite *fileTestSuite) TestFileCreateLabel() {
 func (suite *fileTestSuite) TestFileWriteSmall() {
 	fileName := suite.testPath + "/small_write.txt"
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 
 	err = os.WriteFile(fileName, suite.minBuff, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	suite.fileTestCleanup([]string{fileName})
 }
@@ -274,14 +274,14 @@ func (suite *fileTestSuite) TestFileWriteSmall() {
 func (suite *fileTestSuite) TestFileReadSmall() {
 	fileName := suite.testPath + "/small_write.txt"
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 
 	err = os.WriteFile(fileName, suite.minBuff, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	data, err := os.ReadFile(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	suite.Equal(len(data), len(suite.minBuff))
 
 	suite.fileTestCleanup([]string{fileName})
@@ -291,11 +291,11 @@ func (suite *fileTestSuite) TestFileReadSmall() {
 func (suite *fileTestSuite) TestFileCreateDuplicate() {
 	fileName := suite.testPath + "/small_write.txt"
 	f, err := os.OpenFile(fileName, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	f.Close()
 
 	f, err = os.Create(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	f.Close()
 
 	suite.fileTestCleanup([]string{fileName})
@@ -305,14 +305,14 @@ func (suite *fileTestSuite) TestFileCreateDuplicate() {
 func (suite *fileTestSuite) TestFileTruncate() {
 	fileName := suite.testPath + "/small_write.txt"
 	f, err := os.Create(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	f.Close()
 
 	err = os.Truncate(fileName, 2)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	data, err := os.ReadFile(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	suite.LessOrEqual(2, len(data))
 
 	suite.fileTestCleanup([]string{fileName})
@@ -324,14 +324,14 @@ func (suite *fileTestSuite) TestFileNameConflict() {
 	fileName := suite.testPath + "/test.txt"
 
 	err := os.Mkdir(dirName, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	f, err := os.Create(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	f.Close()
 
 	err = os.RemoveAll(dirName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 }
 
 // # Copy file from once directory to another
@@ -341,18 +341,18 @@ func (suite *fileTestSuite) TestFileCopy() {
 	dstFileName := dirName + "/test_copy.txt"
 
 	err := os.Mkdir(dirName, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	defer srcFile.Close()
 
 	dstFile, err := os.Create(dstFileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	defer dstFile.Close()
 
 	_, err = io.Copy(srcFile, dstFile)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	dstFile.Close()
 
 	suite.fileTestCleanup([]string{dirName})
@@ -362,15 +362,15 @@ func (suite *fileTestSuite) TestFileCopy() {
 func (suite *fileTestSuite) TestFileGetStat() {
 	fileName := suite.testPath + "/test"
 	f, err := os.Create(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	f.Close()
 	time.Sleep(time.Second * 3)
 
 	stat, err := os.Stat(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	modTineDiff := time.Now().Sub(stat.ModTime())
 
-	suite.Equal(false, stat.IsDir())
+	suite.False(stat.IsDir())
 	suite.Equal("test", stat.Name())
 	suite.LessOrEqual(modTineDiff.Hours(), float64(1))
 
@@ -387,13 +387,13 @@ func (suite *fileTestSuite) TestFileChmod() {
 	if suite.adlsTest {
 		fileName := suite.testPath + "/test"
 		f, err := os.Create(fileName)
-		suite.Equal(nil, err)
+		suite.NoError(err)
 		f.Close()
 
 		err = os.Chmod(fileName, 0744)
-		suite.Equal(nil, err)
+		suite.NoError(err)
 		stat, err := os.Stat(fileName)
-		suite.Equal(nil, err)
+		suite.NoError(err)
 		suite.Equal("-rwxr--r--", stat.Mode().Perm().String())
 
 		suite.fileTestCleanup([]string{fileName})
@@ -408,12 +408,12 @@ func (suite *fileTestSuite) TestFileCreateMulti() {
 	}
 	dirName := suite.testPath + "/multi_dir"
 	err := os.Mkdir(dirName, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	fileName := dirName + "/multi"
 	for i := 0; i < 10; i++ {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.medBuff, 0777)
-		suite.Equal(nil, err)
+		suite.NoError(err)
 	}
 	suite.fileTestCleanup([]string{dirName})
 }
@@ -423,7 +423,7 @@ func (suite *fileTestSuite) TestFileCreateMulti() {
 func (suite *fileTestSuite) TestFileDeleteSingle() {
 	fileName := suite.testPath + "/multi0"
 	f, err := os.Create(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	f.Close()
 	suite.fileTestCleanup([]string{fileName})
 }
@@ -440,17 +440,17 @@ func (suite *fileTestSuite) TestLinkCreate() {
 
 	fileName := suite.testPath + "/small_write1.txt"
 	f, err := os.Create(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	f.Close()
 	symName := suite.testPath + "/small.lnk"
 	err = os.WriteFile(fileName, suite.minBuff, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	err = os.Symlink(fileName, symName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	suite.fileTestCleanup([]string{fileName})
 	err = os.Remove(symName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 }
 
 // # Read a small file using symlink
@@ -463,21 +463,21 @@ func (suite *fileTestSuite) TestLinkRead() {
 
 	fileName := suite.testPath + "/small_write1.txt"
 	f, err := os.Create(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	f.Close()
 
 	symName := suite.testPath + "/small.lnk"
 	err = os.Symlink(fileName, symName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	err = os.WriteFile(fileName, suite.minBuff, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	data, err := os.ReadFile(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	suite.Equal(len(data), len(suite.minBuff))
 	suite.fileTestCleanup([]string{fileName})
 	err = os.Remove(symName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 }
 
 // # Write a small file using symlink
@@ -490,19 +490,19 @@ func (suite *fileTestSuite) TestLinkWrite() {
 
 	targetName := suite.testPath + "/small_write1.txt"
 	f, err := os.Create(targetName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	f.Close()
 	symName := suite.testPath + "/small.lnk"
 	err = os.Symlink(targetName, symName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	stat, err := os.Stat(targetName)
 	modTineDiff := time.Now().Sub(stat.ModTime())
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	suite.LessOrEqual(modTineDiff.Minutes(), float64(1))
 	suite.fileTestCleanup([]string{targetName})
 	err = os.Remove(symName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 }
 
 // # Rename the target file and validate read on symlink fails
@@ -516,26 +516,26 @@ func (suite *fileTestSuite) TestLinkRenameTarget() {
 	fileName := suite.testPath + "/small_write1.txt"
 	symName := suite.testPath + "/small.lnk"
 	f, err := os.Create(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	f.Close()
 	err = os.Symlink(fileName, symName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	fileNameNew := suite.testPath + "/small_write_new.txt"
 	err = os.Rename(fileName, fileNameNew)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	_, err = os.ReadFile(symName)
 	// we expect that to fail
-	suite.NotEqual(nil, err)
+	suite.Error(err)
 
 	// rename back to original name
 	err = os.Rename(fileNameNew, fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	suite.fileTestCleanup([]string{fileName})
 	err = os.Remove(symName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 }
 
 // # Delete the symklink and check target file is still intact
@@ -549,25 +549,25 @@ func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
 	fileName := suite.testPath + "/small_write1.txt"
 	symName := suite.testPath + "/small.lnk"
 	f, err := os.Create(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	f.Close()
 	err = os.Symlink(fileName, symName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	err = os.WriteFile(fileName, suite.minBuff, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	err = os.Remove(symName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	data, err := os.ReadFile(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	suite.Equal(len(data), len(suite.minBuff))
 
 	err = os.Symlink(fileName, symName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	suite.fileTestCleanup([]string{fileName})
 	err = os.Remove(symName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 }
 
 func (suite *fileTestSuite) TestListDirReadLink() {
@@ -583,32 +583,32 @@ func (suite *fileTestSuite) TestListDirReadLink() {
 
 	fileName := suite.testPath + "/small_hns.txt"
 	f, err := os.Create(fileName)
-	suite.Nil(err)
+	suite.NoError(err)
 	f.Close()
 
 	err = os.WriteFile(fileName, suite.minBuff, 0777)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	symName := suite.testPath + "/small_hns.lnk"
 	err = os.Symlink(fileName, symName)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	dl, err := os.ReadDir(suite.testPath)
-	suite.Nil(err)
-	suite.Greater(len(dl), 0)
+	suite.NoError(err)
+	suite.NotEmpty(dl)
 
 	// temp cache cleanup
 	suite.fileTestCleanup([]string{suite.testCachePath + "/small_hns.txt", suite.testCachePath + "/small_hns.lnk"})
 
 	data1, err := os.ReadFile(symName)
-	suite.Nil(err)
+	suite.NoError(err)
 	suite.Equal(len(data1), len(suite.minBuff))
 
 	// temp cache cleanup
 	suite.fileTestCleanup([]string{suite.testCachePath + "/small_hns.txt", suite.testCachePath + "/small_hns.lnk"})
 
 	data2, err := os.ReadFile(fileName)
-	suite.Nil(err)
+	suite.NoError(err)
 	suite.Equal(len(data2), len(suite.minBuff))
 
 	// validating data
@@ -616,7 +616,7 @@ func (suite *fileTestSuite) TestListDirReadLink() {
 
 	suite.fileTestCleanup([]string{fileName})
 	err = os.Remove(symName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 }
 
 /*
@@ -647,9 +647,9 @@ func (suite *fileTestSuite) TestCreateReadOnlyFile() {
 		fileName := suite.testPath + "/createReadOnlyFile.txt"
 		srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0444)
 		srcFile.Close()
-		suite.Equal(nil, err)
+		suite.NoError(err)
 		_, err = os.OpenFile(fileName, os.O_RDONLY, 0444)
-		suite.Equal(nil, err)
+		suite.NoError(err)
 		suite.fileTestCleanup([]string{fileName})
 	}
 }
@@ -668,23 +668,23 @@ func (suite *fileTestSuite) TestRenameSpecial() {
 	newFileName := dirName + "/" + "भारतabcd.txt"
 
 	err := os.Mkdir(dirName, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	f, err := os.Create(fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	f.Close()
 
 	err = os.Rename(fileName, newFileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	err = os.Rename(newFileName, fileName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	err = os.Rename(dirName, newDirName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	err = os.RemoveAll(newDirName)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 }
 
 // -------------- Main Method -------------------
