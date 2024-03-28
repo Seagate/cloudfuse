@@ -26,6 +26,7 @@ from sys import platform
 import os
 import time
 import yaml
+from shutil import which
 
 # Import QT libraries
 from PySide6.QtCore import Qt, QSettings
@@ -50,6 +51,9 @@ if platform == 'win32':
     # on Windows, the mound directory must not exist before mounting,
     # so name a non-existent subdirectory of the user-chosen path
     mountDirSuffix = 'cloudFuse'
+#  if cloudfuse is not in the path, look for it in the current directory
+if which(cloudfuseCli) is None:
+    cloudfuseCli = './' + cloudfuseCli
 
 class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def __init__(self):
