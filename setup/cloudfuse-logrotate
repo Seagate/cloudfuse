@@ -1,5 +1,4 @@
 /var/log/cloudfuse.log 
-/var/log/blobfuse2.log 
 /var/log/cfusemon.log
 /var/log/cloudfuse-rest.log {
     rotate 10
