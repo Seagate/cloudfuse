@@ -74,7 +74,7 @@ func (suite *cachePolicyTestSuite) TestGetUsageSizeOnDisk() {
 	data := make([]byte, 4097)
 	f.Write(data)
 	result, err := common.GetUsage(cache_path)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	// Linux du overestimates the number of sectors used by 1 sometimes
 	// So check that we aren't more or less than 1 sector size off.
@@ -104,7 +104,7 @@ func (suite *cachePolicyTestSuite) TestDeleteFile() {
 	defer suite.cleanupTest()
 	f, _ := os.Create(cache_path + "/test")
 	result := deleteFile(f.Name() + "not_exist")
-	suite.assert.Equal(nil, result)
+	suite.assert.NoError(result)
 	f.Close()
 }
 

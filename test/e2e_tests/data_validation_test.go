@@ -87,7 +87,7 @@ func getDataValidationTestDirName(n int) string {
 func (suite *dataValidationTestSuite) dataValidationTestCleanup(toRemove []string) {
 	for _, path := range toRemove {
 		err := os.RemoveAll(path)
-		suite.Equal(nil, err)
+		suite.NoError(err)
 	}
 }
 
@@ -98,7 +98,7 @@ func (suite *dataValidationTestSuite) copyToMountDir(localFilePath string, remot
 	if len(cliOut) != 0 {
 		fmt.Println(string(cliOut))
 	}
-	suite.Equal(nil, err)
+	suite.NoError(err)
 }
 
 func (suite *dataValidationTestSuite) validateData(localFilePath string, remoteFilePath string) {
@@ -108,8 +108,8 @@ func (suite *dataValidationTestSuite) validateData(localFilePath string, remoteF
 	if len(cliOut) != 0 {
 		fmt.Println(string(cliOut))
 	}
-	suite.Equal(0, len(cliOut))
-	suite.Equal(nil, err)
+	suite.Empty(cliOut)
+	suite.NoError(err)
 }
 
 // -------------- Data Validation Tests -------------------
@@ -127,20 +127,20 @@ func (suite *dataValidationTestSuite) TestFileOverwriteWithEchoCommand() {
 	command := "echo \"" + text + "\" > " + remoteFilePath
 	cmd := exec.Command("/bin/bash", "-c", command)
 	_, err := cmd.Output()
-	suite.Equal(err, nil)
+	suite.NoError(err)
 
 	data, err := os.ReadFile(remoteFilePath)
-	suite.Nil(err)
+	suite.NoError(err)
 	suite.Equal(string(data), text+"\n")
 
 	newtext := "End of test."
 	newcommand := "echo \"" + newtext + "\" > " + remoteFilePath
 	newcmd := exec.Command("/bin/bash", "-c", newcommand)
 	_, err = newcmd.Output()
-	suite.Equal(err, nil)
+	suite.NoError(err)
 
 	data, err = os.ReadFile(remoteFilePath)
-	suite.Nil(err)
+	suite.NoError(err)
 	suite.Equal(string(data), newtext+"\n")
 }
 
@@ -152,12 +152,12 @@ func (suite *dataValidationTestSuite) TestSmallFileData() {
 
 	// create the file in local directory
 	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 
 	// write to file in the local directory
 	err = os.WriteFile(localFilePath, minBuff, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	suite.copyToMountDir(localFilePath, remoteFilePath)
 
@@ -181,12 +181,12 @@ func (suite *dataValidationTestSuite) TestMediumFileData() {
 
 	// create the file in local directory
 	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 
 	// write to file in the local directory
 	err = os.WriteFile(localFilePath, medBuff, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	suite.copyToMountDir(localFilePath, remoteFilePath)
 
@@ -210,12 +210,12 @@ func (suite *dataValidationTestSuite) TestLargeFileData() {
 
 	// create the file in local directory
 	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 
 	// write to file in the local directory
 	err = os.WriteFile(localFilePath, largeBuff, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	suite.copyToMountDir(localFilePath, remoteFilePath)
 
@@ -235,12 +235,12 @@ func (suite *dataValidationTestSuite) TestDataValidationNegative() {
 
 	// create the file in local directory
 	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	srcFile.Close()
 
 	// write to file in the local directory
 	err = os.WriteFile(localFilePath, minBuff, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	// copy local file to mounted directory
 	suite.copyToMountDir(localFilePath, remoteFilePath)
@@ -250,18 +250,18 @@ func (suite *dataValidationTestSuite) TestDataValidationNegative() {
 
 	// update local file
 	srcFile, err = os.OpenFile(localFilePath, os.O_APPEND|os.O_WRONLY, 0777)
-	suite.Equal(nil, err)
+	suite.NoError(err)
 	_, err = srcFile.WriteString("Added text")
 	srcFile.Close()
-	suite.Equal(nil, err)
+	suite.NoError(err)
 
 	// compare local file and mounted files
 	diffCmd := exec.Command("diff", localFilePath, remoteFilePath)
 	cliOut, err := diffCmd.Output()
 	fmt.Println("Negative test case where files should differ")
 	fmt.Println(string(cliOut))
-	suite.NotEqual(0, len(cliOut))
-	suite.NotEqual(nil, err)
+	suite.NotEmpty(cliOut)
+	suite.Error(err)
 
 	suite.dataValidationTestCleanup([]string{localFilePath, remoteFilePath, suite.testCachePath})
 }
@@ -275,7 +275,7 @@ func validateMultipleFilesData(jobs <-chan int, results chan<- string, fileSize 
 
 		// create the file in local directory
 		srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
-		suite.Equal(nil, err)
+		suite.NoError(err)
 		srcFile.Close()
 
 		// write to file in the local directory
@@ -292,7 +292,7 @@ func validateMultipleFilesData(jobs <-chan int, results chan<- string, fileSize 
 		} else {
 			err = os.WriteFile(localFilePath, minBuff, 0777)
 		}
-		suite.Equal(nil, err)
+		suite.NoError(err)
 
 		suite.copyToMountDir(localFilePath, remoteFilePath)
 		suite.dataValidationTestCleanup([]string{suite.testCachePath + "/" + fileName})

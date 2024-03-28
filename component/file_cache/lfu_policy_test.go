@@ -125,10 +125,10 @@ func (suite *lfuPolicyTestSuite) TestClearItemFromCache() {
 	defer suite.cleanupTest()
 	f, err := os.Create(cache_path + "/test")
 	f.Close()
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.policy.clearItemFromCache(f.Name())
 	_, err = os.Stat(f.Name())
-	suite.assert.NotEqual(nil, err)
+	suite.assert.Error(err)
 }
 
 func (suite *lfuPolicyTestSuite) TestCacheValidExisting() {
