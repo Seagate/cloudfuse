@@ -61,6 +61,8 @@ var emptyConfig = ""
 var defaultSize = int64(0)
 var defaultMode = 0777
 
+const MB = 1024 * 1024
+
 func newTestAttrCache(next internal.Component, configuration string) *AttrCache {
 	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
 	attrCache := NewAttrCacheComponent()
@@ -1002,6 +1004,48 @@ func (suite *attrCacheTestSuite) TestCreateFile() {
 	suite.assert.True(found)
 	suite.assert.True(checkItem.exists())
 	suite.assert.EqualValues(0, checkItem.attr.Size)
+}
+
+// Tests Open File
+func (suite *attrCacheTestSuite) TestOpenFile() {
+	defer suite.cleanupTest()
+	path := "a"
+	options := internal.OpenFileOptions{Name: path}
+	handle := &handlemap.Handle{Size: int64(100 * MB), Path: path}
+
+	// If the file is opened successfully, don't change (or create) its attribute entry
+	// If the file does not exist, create or update its attribute entry to be marked as deleted
+
+	// Attribute cache entry does not exist
+
+	// OpenFile succeeds
+	suite.mock.EXPECT().OpenFile(options).Return(handle, nil)
+
+	returnedHandle, err := suite.attrCache.OpenFile(options)
+	// entry should not be cached
+	suite.assert.NoError(err)
+	suite.assert.Equal(handle, returnedHandle)
+	suite.assertNotInCache(path)
+
+	// OpenFile fails
+	suite.mock.EXPECT().OpenFile(options).Return(nil, syscall.ENOENT)
+
+	returnedHandle, err = suite.attrCache.OpenFile(options)
+	// entry should not be cached
+	suite.assert.Error(err)
+	suite.assert.Nil(returnedHandle)
+	suite.assertNotInCache(path)
+
+	// Attribute cache entry does exist
+	suite.addPathToCache(path, true)
+	// OpenFile fails
+	suite.mock.EXPECT().OpenFile(options).Return(nil, syscall.ENOENT)
+
+	returnedHandle, err = suite.attrCache.OpenFile(options)
+	// entry should be marked deleted
+	suite.assert.Error(err)
+	suite.assert.Nil(returnedHandle)
+	suite.assertDeleted(path)
 }
 
 // Tests Delete File

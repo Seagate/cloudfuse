@@ -667,6 +667,8 @@ func (ac *AttrCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	log.Trace("AttrCache::OpenFile : %s", options.Name)
 
 	h, err := ac.NextComponent().OpenFile(options)
+	// sometimes a file is deleted in the cloud concurrently
+	// then this cache needs to be updated
 	if err != nil && os.IsNotExist(err) {
 		currentTime := time.Now()
 		ac.cacheLock.Lock()
