@@ -3,13 +3,14 @@
     "configMode": "AUTO",
     "configExternalURL": "",
     "projectToken": "",
-    "baseBranches": []
+    "enableLicenseViolations": true,
+    "baseBranches": [ "main" ]
   },
   "scanSettingsSAST": {
     "enableScan": false,
     "scanPullRequests": false,
     "incrementalScan": true,
-    "baseBranches": [],
+    "baseBranches": [ "main" ],
     "snippetSize": 10
   },
   "checkRunSettings": {
