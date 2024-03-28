@@ -1409,7 +1409,7 @@ func (suite *fileCacheTestSuite) TestStatFS() {
 
 func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	defer suite.cleanupTest()
-	// Configure to create empty files so we create the file in cloud storagetorage
+	// Configure to create empty files so we create the file in cloud storage
 	createEmptyFile := true
 	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n  timeout-sec: 1000\n  refresh-sec: 10\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, createEmptyFile, suite.fake_storage_path)

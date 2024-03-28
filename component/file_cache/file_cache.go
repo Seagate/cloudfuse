@@ -1067,7 +1067,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 			// When chmod on container was missed, local file was updated with correct mode
 			// Here take the mode from local cache and update the container accordingly
 			localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
-			info, err := os.Lstat(localPath)
+			info, err := os.Stat(localPath)
 			if err == nil {
 				err = fc.Chmod(internal.ChmodOptions{Name: options.Handle.Path, Mode: info.Mode()})
 				if err != nil {
@@ -1108,7 +1108,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
-	info, err := os.Lstat(localPath)
+	info, err := os.Stat(localPath)
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
 	if err == nil && !info.IsDir() {
 		if exists { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
