@@ -122,7 +122,7 @@ This version is based on [blobfuse2 2.1.0](https://github.com/Azure/azure-storag
 ## **0.1.0** ##
 
 October 19th 2023  
-This release includes all features planned for the 1.0.0 release of cloudfuse, which will be released after additional bug fixes.
+This release includes all features planned for the 1.0.0 release of cloudfuse, which will be released after additional bug fixes.  
 This version is based on [blobfuse2 2.1.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.0) (upstream).
 
 ### Features ###
