@@ -7,8 +7,8 @@
     "baseBranches": [ "main" ]
   },
   "scanSettingsSAST": {
-    "enableScan": false,
-    "scanPullRequests": false,
+    "enableScan": true,
+    "scanPullRequests": true,
     "incrementalScan": true,
     "baseBranches": [ "main" ],
     "snippetSize": 10
