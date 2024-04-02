@@ -39,8 +39,8 @@ class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
         self.myWindow = QSettings("CloudFUSE", "s3Window")
         self.initWindowSizePos()
         self.setWindowTitle("S3Cloud Config Settings")
-        self.initSettingsFromConfig()
-        self.populateOptions()
+        config_credentials = self.initSettingsFromConfig()
+        self.populateOptions(config_credentials)
         self.showModeSettings()
 
         # S3 naming conventions:
@@ -103,16 +103,17 @@ class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
 
         # Update S3Storage re-writes everything in the S3Storage dictionary for the same reason update libfuse does.
     def updateS3Storage(self):
+        global config_credentials
         s3Storage = self.settings.value('s3storage')
         s3Storage['bucket-name'] = self.lineEdit_bucketName.text()
-        s3Storage['key-id'] = self.lineEdit_accessKey.text()
-        s3Storage['secret-key'] = self.lineEdit_secretKey.text()
+        config_credentials['s3storage']['key-id'] = self.lineEdit_accessKey.text()
+        config_credentials['s3storage']['secret-key'] = self.lineEdit_secretKey.text()
         s3Storage['endpoint'] = self.lineEdit_endpoint.text()
         s3Storage['region'] = self.lineEdit_region.text()
         self.settings.setValue('s3storage',s3Storage) 
 
     # This widget will not display all the options in settings, only the ones written in the UI file.
-    def populateOptions(self):
+    def populateOptions(self, config_credentials):
         fileCache = self.settings.value('file_cache')
         s3storage = self.settings.value('s3storage')
         libfuse = self.settings.value('libfuse')
@@ -141,11 +142,11 @@ class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
         # There is no sanitizing for lineEdit at the moment, the GUI depends on the user being correct.
         self.lineEdit_bucketName.setText(s3storage['bucket-name'])
         self.lineEdit_endpoint.setText(s3storage['endpoint'])
-        self.lineEdit_secretKey.setText(s3storage['secret-key'])
-        self.lineEdit_accessKey.setText(s3storage['key-id'])
+        self.lineEdit_secretKey.setText(config_credentials['s3storage']['secret-key'])
+        self.lineEdit_accessKey.setText(config_credentials['s3storage']['key-id'])
         self.lineEdit_region.setText(s3storage['region'])
         self.lineEdit_fileCache_path.setText(fileCache['path'])
-        
+
     def resetDefaults(self):
         # Reset these defaults
         checkChoice = self.popupDoubleCheckReset()

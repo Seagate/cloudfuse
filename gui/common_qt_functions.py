@@ -33,6 +33,7 @@ from PySide6.QtGui import QScreen
 
 file_cache_eviction_choices = ['lru','lfu']
 libfusePermissions = [0o777,0o666,0o644,0o444]
+config_credentials = {}
 
 class defaultSettingsManager():
     def __init__(self):
@@ -40,18 +41,16 @@ class defaultSettingsManager():
         self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "settings")
         self.setAllDefaultSettings()
         
-        
     def setAllDefaultSettings(self):
         self.setS3Settings()
         self.setAzureSettings()
         self.setComponentSettings()
-        
+        self.setCredentialSettings()
+
     def setS3Settings(self):
         # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
         self.settings.setValue('s3storage',{
             'bucket-name': '',
-            'key-id': '',
-            'secret-key': '',
             'region': '',
             'endpoint': '',
             'subdirectory': '',
@@ -75,14 +74,6 @@ class defaultSettingsManager():
             'container': '',
             'endpoint': '',
             'mode': 'key',
-            'account-key': '',
-            'sas': '',
-            'appid': '',
-            'resid': '',
-            'objid': '',
-            'tenantid': '',
-            'clientid': '',
-            'clientsecret': '',
             'oauth-token-path': '', # not exposed
             'use-http': False,
             'aadendpoint': '',
@@ -109,7 +100,22 @@ class defaultSettingsManager():
             'telemetry': '',
             'honour-acl': False
         })
-    
+
+    def setCredentialSettings(self):
+       global config_credentials
+       config_credentials['azstorage'] = {'account-key': '',
+                                          'sas': '',
+                                          'appid': '',
+                                          'resid': '',
+                                          'objid': '',
+                                          'tenantid': '',
+                                          'clientid': '',
+                                          'clientsecret': '',
+                                          'cpk-encryption-key': '',             # Not exposed in the GUI
+                                          'cpk-encryption-key-sha256': ''}      # Not exposed in the GUI
+       config_credentials['s3storage'] = {'key-id':'',
+                                          'secret-key':''}
+
     def setComponentSettings(self):
         # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
         
@@ -254,10 +260,18 @@ class widgetCustomFunctions(QWidget):
                 event.ignore()
         
     def constructDictForConfig(self):
+        global config_credentials
         optionKeys = self.settings.allKeys()
         configDict = {}
         for key in optionKeys:
             configDict[key] = self.settings.value(key)
+
+        for key in config_credentials.keys():
+            tempSettings = configDict.get(key)
+            tempCredentials = config_credentials.get(key)
+            tempMerge = {**tempSettings, **tempCredentials}
+            configDict[key] = tempMerge
+
         return configDict
     
     def updateSettingsFromUIChoices(self):
@@ -289,6 +303,7 @@ class widgetCustomFunctions(QWidget):
             msg.exec()
             return False
             
+    # Get the raw (safe) dictionary dump from the config file, nothing removed yet        
     def getConfigs(self,useDefault=False):
         workingDir = self.getWorkingDir()
         if useDefault:
@@ -331,6 +346,7 @@ class widgetCustomFunctions(QWidget):
     #   settings defined in defaultSettingManager.
     def initSettingsFromConfig(self):
         dictForConfigs = self.getConfigs()
+        global config_credentials
         for option in dictForConfigs:
             # check default settings to enforce YAML schema
             invalidOption = not self.settings.contains(option)
@@ -341,10 +357,14 @@ class widgetCustomFunctions(QWidget):
             if type(dictForConfigs[option]) == dict:
                 tempDict = self.settings.value(option)
                 for suboption in dictForConfigs[option]:
+                    if option in config_credentials and suboption in config_credentials[option]:
+                        config_credentials[option][suboption] = dictForConfigs[option][suboption]
+                        continue
                     tempDict[suboption] = dictForConfigs[option][suboption]
                 self.settings.setValue(option,tempDict)
             else:
                 self.settings.setValue(option,dictForConfigs[option])
+        return config_credentials
 
     # Check for a true/false setting and set the checkbox state as appropriate. 
     #   Note, Checked/UnChecked are NOT True/False data types, hence the need to check what the values are.

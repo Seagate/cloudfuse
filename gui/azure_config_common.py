@@ -41,11 +41,11 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         self.setWindowTitle("Azure Config Settings")
         self.myWindow = QSettings("CloudFUSE", "AzcWindow")
         self.initWindowSizePos()
-        self.initSettingsFromConfig()
+        config_credentials = self.initSettingsFromConfig()
         # Hide the pipeline mode groupbox depending on the default select is
         self.showAzureModeSettings()
         self.showModeSettings()
-        self.populateOptions()
+        self.populateOptions(config_credentials)
 
         # Set up signals
         self.dropDown_pipeline.currentIndexChanged.connect(self.showModeSettings)
@@ -79,18 +79,19 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
     # Set up slots
     
     def updateAzStorage(self):
+        global config_credentials
         azStorage = self.settings.value('azstorage')
-        azStorage['account-key'] = self.lineEdit_azure_accountKey.text()
-        azStorage['sas'] = self.lineEdit_azure_sasStorage.text()
+        config_credentials['azstorage']['account-key'] = self.lineEdit_azure_accountKey.text()
+        config_credentials['azstorage']['sas'] = self.lineEdit_azure_sasStorage.text()
         azStorage['account-name'] = self.lineEdit_azure_accountName.text()
         azStorage['container'] = self.lineEdit_azure_container.text()
         azStorage['endpoint'] = self.lineEdit_azure_endpoint.text()
-        azStorage['appid'] = self.lineEdit_azure_msiAppID.text()
-        azStorage['resid'] = self.lineEdit_azure_msiResourceID.text()
-        azStorage['objid'] = self.lineEdit_azure_msiObjectID.text()
-        azStorage['tenantid'] = self.lineEdit_azure_spnTenantID.text()
-        azStorage['clientid'] = self.lineEdit_azure_spnClientID.text()
-        azStorage['clientsecret'] = self.lineEdit_azure_spnClientSecret.text()
+        config_credentials['azstorage']['appid'] = self.lineEdit_azure_msiAppID.text()
+        config_credentials['azstorage']['resid'] = self.lineEdit_azure_msiResourceID.text()
+        config_credentials['azstorage']['objid'] = self.lineEdit_azure_msiObjectID.text()
+        config_credentials['azstorage']['tenantid'] = self.lineEdit_azure_spnTenantID.text()
+        config_credentials['azstorage']['clientid'] = self.lineEdit_azure_spnClientID.text()
+        config_credentials['azstorage']['clientsecret'] = self.lineEdit_azure_spnClientSecret.text()
         azStorage['type'] = azStorageType[self.dropDown_azure_storageType.currentIndex()]
         azStorage['mode'] = bucketModeChoices[self.dropDown_azure_modeSetting.currentIndex()]
         self.settings.setValue('azstorage',azStorage)
@@ -128,7 +129,7 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
             self.groupbox_msi.setVisible(True) 
             
 # This widget will not display all the options in settings, only the ones written in the UI file.
-    def populateOptions(self):
+    def populateOptions(self,config_credentials):
         fileCache = self.settings.value('file_cache')
         azStorage = self.settings.value('azstorage')
         libfuse = self.settings.value('libfuse')
@@ -159,17 +160,17 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         
         # There is no sanitizing for lineEdit at the moment, the GUI depends on the user being correct.
 
-        self.lineEdit_azure_accountKey.setText(azStorage['account-key'])
-        self.lineEdit_azure_sasStorage.setText(azStorage['sas'])
+        self.lineEdit_azure_accountKey.setText(config_credentials['azstorage']['account-key'])
+        self.lineEdit_azure_sasStorage.setText(config_credentials['azstorage']['sas'])
         self.lineEdit_azure_accountName.setText(azStorage['account-name'])
         self.lineEdit_azure_container.setText(azStorage['container'])
         self.lineEdit_azure_endpoint.setText(azStorage['endpoint'])
-        self.lineEdit_azure_msiAppID.setText(azStorage['appid'])
-        self.lineEdit_azure_msiResourceID.setText(azStorage['resid'])
-        self.lineEdit_azure_msiObjectID.setText(azStorage['objid'])
-        self.lineEdit_azure_spnTenantID.setText(azStorage['tenantid'])
-        self.lineEdit_azure_spnClientID.setText(azStorage['clientid'])
-        self.lineEdit_azure_spnClientSecret.setText(azStorage['clientsecret'])
+        self.lineEdit_azure_msiAppID.setText(config_credentials['azstorage']['appid'])
+        self.lineEdit_azure_msiResourceID.setText(config_credentials['azstorage']['resid'])
+        self.lineEdit_azure_msiObjectID.setText(config_credentials['azstorage']['objid'])
+        self.lineEdit_azure_spnTenantID.setText(config_credentials['azstorage']['tenantid'])
+        self.lineEdit_azure_spnClientID.setText(config_credentials['azstorage']['clientid'])
+        self.lineEdit_azure_spnClientSecret.setText(config_credentials['azstorage']['clientsecret'])
         self.lineEdit_fileCache_path.setText(fileCache['path'])
     
     def getFileDirInput(self):
