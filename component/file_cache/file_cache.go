@@ -401,7 +401,7 @@ func (fc *FileCache) invalidateDirectory(name string) {
 	// TODO : wouldn't this cause a race condition? a thread might get the lock before we purge - and the file would be non-existent
 	err = filepath.WalkDir(localPath, func(path string, d fs.DirEntry, err error) error {
 		if err == nil && d != nil {
-			log.Debug("FileCache::invalidateDirectory : %s (%d) getting removed from cache", path, d.IsDir())
+			log.Debug("FileCache::invalidateDirectory : %s (IsDir=%t) getting removed from cache", path, d.IsDir())
 			if !d.IsDir() {
 				fc.policy.CachePurge(path)
 			} else {
