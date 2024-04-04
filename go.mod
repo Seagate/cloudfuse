@@ -1,6 +1,6 @@
 module github.com/Seagate/cloudfuse
 
-go 1.21
+go 1.22
 
 require (
 	github.com/Azure/azure-pipeline-go v0.2.4-0.20220425205405-09e6f201e1e4
