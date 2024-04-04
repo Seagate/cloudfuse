@@ -27,8 +27,8 @@ package file_cache
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
 	"os"
 	"runtime"
 	"strings"
@@ -84,8 +84,6 @@ func randomString(length int) string {
 }
 
 func (suite *fileCacheTestSuite) SetupTest() {
-	// Seed the randomizer when we start the test
-	rand.Seed(time.Now().UnixNano())
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))

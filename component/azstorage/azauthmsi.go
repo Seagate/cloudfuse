@@ -31,7 +31,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"strconv"
@@ -55,7 +55,7 @@ type azAuthMSI struct {
 }
 
 func getNextExpiryTimer(token *adal.Token) time.Duration {
-	delay := time.Duration(5+rand.Intn(120)) * time.Second
+	delay := time.Duration(5+rand.IntN(120)) * time.Second
 	return time.Until(token.Expires()) - delay
 }
 
@@ -204,7 +204,7 @@ func (azmsi *azAuthBlobMSI) getCredential() interface{} {
 				newToken, err := azmsi.fetchTokenFromCLI()
 				if err != nil {
 					log.Err("azAuthBlobMSI::getCredential : Failed to refresh token attempt %d [%s]", failCount, err.Error())
-					time.Sleep(time.Duration(rand.Intn(5)) * time.Second)
+					time.Sleep(time.Duration(rand.IntN(5)) * time.Second)
 					continue
 				}
 
@@ -234,7 +234,7 @@ func (azmsi *azAuthBlobMSI) getCredential() interface{} {
 				newToken, err := token.Refresh(context.Background())
 				if err != nil {
 					log.Err("azAuthBlobMSI::getCredential : Failed to refresh token attempt %d [%s]", failCount, err.Error())
-					time.Sleep(time.Duration(rand.Intn(5)) * time.Second)
+					time.Sleep(time.Duration(rand.IntN(5)) * time.Second)
 					continue
 				}
 
@@ -306,7 +306,7 @@ func (azmsi *azAuthBfsMSI) getCredential() interface{} {
 				newToken, err := azmsi.fetchTokenFromCLI()
 				if err != nil {
 					log.Err("azAuthBfsMSI::getCredential : Failed to refresh token attempt %d [%s]", failCount, err.Error())
-					time.Sleep(time.Duration(rand.Intn(5)) * time.Second)
+					time.Sleep(time.Duration(rand.IntN(5)) * time.Second)
 					continue
 				}
 
@@ -335,7 +335,7 @@ func (azmsi *azAuthBfsMSI) getCredential() interface{} {
 				newToken, err := token.Refresh(context.Background())
 				if err != nil {
 					log.Err("azAuthBfsMSI::getCredential : Failed to refresh token attempt %d [%s]", failCount, err.Error())
-					time.Sleep(time.Duration(rand.Intn(5)) * time.Second)
+					time.Sleep(time.Duration(rand.IntN(5)) * time.Second)
 					continue
 				}
 
