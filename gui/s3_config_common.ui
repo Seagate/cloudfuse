@@ -58,7 +58,7 @@
      <item>
       <widget class="QCheckBox" name="checkBox_daemonForeground">
        <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Run CloudFuse in the foreground of background. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Run Cloudfuse in the foreground of background. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
        <property name="text">
         <string>Run in foreground</string>
@@ -140,7 +140,7 @@
        <item>
         <widget class="QLabel" name="label_2">
          <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Set the pipeline mode for CloudFuse&lt;/p&gt;&lt;p&gt;Choose either File caching or Streaming&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Set the pipeline mode for Cloudfuse&lt;/p&gt;&lt;p&gt;Choose either File caching or Streaming&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="text">
           <string>Mode</string>
