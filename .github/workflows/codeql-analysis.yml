@@ -47,12 +47,15 @@ jobs:
 
     # Install latest version of Go. Codeql runs on an older version of go
     - name: Install Go
+      if: matrix.language == 'go'
       uses: actions/setup-go@v5
       with:
         go-version: '1.22'
         check-latest: true
+    
+    - name: Go Version
       if: matrix.language == 'go'
-    - run: go version
+      run: go version
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
