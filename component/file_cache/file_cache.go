@@ -413,13 +413,16 @@ func (fc *FileCache) invalidateDirectory(name string) {
 				fc.policy.CachePurge(path)
 			}
 			// queue folders for deletion after their children
-			if len(directoryStack) > 0 {
-				lastDirIndex := len(directoryStack) - 1
-				if !strings.HasPrefix(path, directoryStack[lastDirIndex]) {
-					log.Debug("FileCache::invalidateDirectory : %s (directory) getting removed from cache", path)
-					fc.policy.CachePurge(directoryStack[lastDirIndex])
-					directoryStack = directoryStack[:lastDirIndex]
+			for i := len(directoryStack) - 1; i >= 0; i-- {
+				// if we're still working on the children, continue this later
+				if strings.HasPrefix(path, directoryStack[i]) {
+					break
 				}
+				// put this directory in the queue for deletion
+				log.Debug("FileCache::invalidateDirectory : %s (directory) getting removed from cache", path)
+				fc.policy.CachePurge(directoryStack[i])
+				// drop this directory from the list
+				directoryStack = directoryStack[:i]
 			}
 			// remember folders we've come across, to queue up later
 			if d.IsDir() {
@@ -429,12 +432,10 @@ func (fc *FileCache) invalidateDirectory(name string) {
 		return nil
 	})
 	// queue up the remaining folders for deletion
-	for len(directoryStack) > 0 {
-		lastIndex := len(directoryStack) - 1
-		path := directoryStack[lastIndex]
+	for i := len(directoryStack) - 1; i >= 0; i-- {
+		path := directoryStack[i]
 		log.Debug("FileCache::invalidateDirectory : %s (directory) getting removed from cache", path)
 		fc.policy.CachePurge(path)
-		directoryStack = directoryStack[:lastIndex]
 	}
 
 	if err != nil {
