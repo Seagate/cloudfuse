@@ -30,7 +30,9 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -454,15 +456,28 @@ func (suite *fileCacheTestSuite) TestRenameDir() {
 
 	src := "src"
 	dst := "dst"
+	err := suite.fileCache.CreateDir(internal.CreateDirOptions{Name: src, Mode: 0777})
+	suite.assert.NoError(err)
 	path := src + "/file"
-	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: src, Mode: 0777})
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	for i := 0; i < 5; i++ {
+		handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path + strconv.Itoa(i), Mode: 0777})
+		suite.assert.NoError(err)
+		err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+		suite.assert.NoError(err)
+	}
 	// The file (and directory) is in the cache and storage (see TestCreateFileInDirCreateEmptyFile)
 
 	// Delete the directory
-	err := suite.fileCache.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
+	err = suite.fileCache.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
 	suite.assert.NoError(err)
 	suite.assert.False(suite.fileCache.policy.IsCached(src)) // Directory should not be cached
+	// wait for asynchronous deletion
+	time.Sleep(2 * time.Second)
+	// directory should not exist in local filesystem
+	fInfo, err := os.Stat(filepath.Join(suite.cache_path, src))
+	suite.assert.Nil(fInfo)
+	suite.assert.Error(err)
+	suite.assert.True(os.IsNotExist(err))
 }
 
 func (suite *fileCacheTestSuite) TestCreateFile() {
