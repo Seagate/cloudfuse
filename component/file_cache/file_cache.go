@@ -389,7 +389,7 @@ func isLocalDirEmpty(path string) bool {
 func (fc *FileCache) invalidateDirectory(name string) {
 	log.Trace("FileCache::invalidateDirectory : %s", name)
 
-	localPath := fc.tmpPath + "/" + name
+	localPath := filepath.Join(fc.tmpPath, name)
 	_, err := os.Stat(localPath)
 	if os.IsNotExist(err) {
 		log.Info("FileCache::invalidateDirectory : %s does not exist in local cache.", name)
