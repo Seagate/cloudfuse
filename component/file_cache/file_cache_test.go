@@ -458,8 +458,6 @@ func (suite *fileCacheTestSuite) TestRenameDir() {
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: src, Mode: 0777})
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	// The file (and directory) is in the cache and storage (see TestCreateFileInDirCreateEmptyFile)
-	// Delete the file since we can only delete empty directories
-	suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
 
 	// Delete the directory
 	err := suite.fileCache.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
