@@ -399,43 +399,18 @@ func (fc *FileCache) invalidateDirectory(name string) {
 		return
 	}
 	// TODO : wouldn't this cause a race condition? a thread might get the lock before we purge - and the file would be non-existent
-	var directoryStack []string
+	// WalkDir goes through the tree in lexical order so 'dir' always comes before 'dir/file'
+	// Save the paths in lexical order and delete them in reverse order so folders are deleted after their children
+	var pathsToPurge []string
 	err = filepath.WalkDir(localPath, func(path string, d fs.DirEntry, err error) error {
 		if err == nil && d != nil {
-			// WalkDir goes through the tree in lexical order
-			// 	so 'aDir' always comes before 'aDir/file'
-			// 	and 'bDir' always comes after the whole 'aDir' subtree
-			// We can leverage this lexical order to queue folders for deletion after their children
-
-			// queue all files for deletion
-			if !d.IsDir() {
-				log.Debug("FileCache::invalidateDirectory : %s (file) getting removed from cache", path)
-				fc.policy.CachePurge(path)
-			}
-			// queue folders for deletion after their children
-			for i := len(directoryStack) - 1; i >= 0; i-- {
-				// if we're still working on the children, continue this later
-				if strings.HasPrefix(path, directoryStack[i]) {
-					break
-				}
-				// put this directory in the queue for deletion
-				log.Debug("FileCache::invalidateDirectory : %s (directory) getting removed from cache", path)
-				fc.policy.CachePurge(directoryStack[i])
-				// drop this directory from the list
-				directoryStack = directoryStack[:i]
-			}
-			// remember folders we've come across, to queue up later
-			if d.IsDir() {
-				directoryStack = append(directoryStack, path)
-			}
+			pathsToPurge = append(pathsToPurge, path)
 		}
 		return nil
 	})
-	// queue up the remaining folders for deletion
-	for i := len(directoryStack) - 1; i >= 0; i-- {
-		path := directoryStack[i]
-		log.Debug("FileCache::invalidateDirectory : %s (directory) getting removed from cache", path)
-		fc.policy.CachePurge(path)
+	for i := len(pathsToPurge) - 1; i >= 0; i-- {
+		log.Debug("FileCache::invalidateDirectory : %s getting removed from cache", pathsToPurge[i])
+		fc.policy.CachePurge(pathsToPurge[i])
 	}
 
 	if err != nil {

@@ -472,7 +472,7 @@ func (suite *fileCacheTestSuite) TestRenameDir() {
 	suite.assert.NoError(err)
 	suite.assert.False(suite.fileCache.policy.IsCached(src)) // Directory should not be cached
 	// wait for asynchronous deletion
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 	// directory should not exist in local filesystem
 	fInfo, err := os.Stat(filepath.Join(suite.cache_path, src))
 	suite.assert.Nil(fInfo)
