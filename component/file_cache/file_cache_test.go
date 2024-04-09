@@ -30,7 +30,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -394,10 +393,10 @@ func (suite *fileCacheTestSuite) TestStreamDirCase3() {
 	defer suite.cleanupTest()
 	// Setup
 	name := "dir"
-	subdir := filepath.Join(name, "subdir")
-	file1 := filepath.Join(name, "file1")
-	file2 := filepath.Join(name, "file2")
-	file3 := filepath.Join(name, "file3")
+	subdir := name + "/subdir"
+	file1 := name + "/file1"
+	file2 := name + "/file2"
+	file3 := name + "/file3"
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777})
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
 	// By default createEmptyFile is false, so we will not create these files in storage until they are closed.
@@ -439,11 +438,11 @@ func (suite *fileCacheTestSuite) TestReadDirMixed() {
 	defer suite.cleanupTest()
 	// Setup
 	name := "dir"
-	subdir := filepath.Join(name, "subdir")
-	file1 := filepath.Join(name, "file1") // case 1
-	file2 := filepath.Join(name, "file2") // case 2
-	file3 := filepath.Join(name, "file3") // case 3
-	file4 := filepath.Join(name, "file4") // case 4
+	subdir := name + "/subdir"
+	file1 := name + "/file1" // case 1
+	file2 := name + "/file2" // case 2
+	file3 := name + "/file3" // case 3
+	file4 := name + "/file4" // case 4
 
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777})
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
