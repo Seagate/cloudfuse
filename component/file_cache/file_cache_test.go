@@ -434,7 +434,7 @@ func pos(s []*internal.ObjAttr, e string) int {
 	return -1
 }
 
-func (suite *fileCacheTestSuite) TestReadDirMixed() {
+func (suite *fileCacheTestSuite) TestStreamDirMixed() {
 	defer suite.cleanupTest()
 	// Setup
 	name := "dir"
