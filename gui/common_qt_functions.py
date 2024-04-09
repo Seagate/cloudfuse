@@ -28,7 +28,7 @@ from sys import platform
 # Import QT libraries
 from PySide6 import QtWidgets
 from PySide6.QtWidgets import QWidget
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import Qt, QSettings, QEvent
 from PySide6.QtGui import QScreen
 
 file_cache_eviction_choices = ['lru','lfu']
@@ -211,8 +211,9 @@ class widgetCustomFunctions(QWidget):
     def __init__(self):
         super().__init__()
         
-    def exitWindow(self):
-        self.close()
+    def exitWindow(self, saveButton = False):
+        self.closeEvent(QEvent(QEvent.Close),saveButton)
+        #self.close()
         
     def exitWindowCleanup(self):
     # Save this specific window's size and position
@@ -231,7 +232,14 @@ class widgetCustomFunctions(QWidget):
     # Overrides the closeEvent function from parent class to enable this custom behavior
     # TODO: Nice to have - keep track of changes to user makes and only trigger the 'are you sure?' message 
     #   when changes have been made
-    def closeEvent(self, event):
+    def closeEvent(self, event, savebutton):
+        
+
+        if(savebutton):
+            print('save button')
+            event.accept()
+            return
+
         msg = QtWidgets.QMessageBox()
         msg.setWindowTitle("Are you sure?")
         msg.setInformativeText("Do you want to save you changes?")

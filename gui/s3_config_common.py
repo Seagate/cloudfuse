@@ -66,7 +66,7 @@ class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
         # Set up signals for buttons
         self.dropDown_pipeline.currentIndexChanged.connect(self.showModeSettings)
         self.button_browse.clicked.connect(self.getFileDirInput)
-        self.button_okay.clicked.connect(self.exitWindow)
+        self.button_okay.clicked.connect(self.exitWindow(True))
         self.button_advancedSettings.clicked.connect(self.openAdvanced)
         self.button_resetDefaultSettings.clicked.connect(self.resetDefaults)
        
