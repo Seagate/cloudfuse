@@ -41,7 +41,7 @@ body:
       label: Logs
       description: |
         Please share a log file if you can.
-        To generate a log file using the CLI, add these options to the `mount` command: `--log-level LOG_DEBUG --log-type base --log-file-path ~/cloudfuse.log`
+        To generate a log file when using `cloudfuse` on the terminal, add these options to the `mount` command: `--log-level LOG_DEBUG --log-type base --log-file-path ~/cloudfuse.log`
       placeholder: Click here, then click the paperclip to attach your log file.
 
   - type: markdown
@@ -54,7 +54,9 @@ body:
       label: Deployment information
       description: |
         Please tell us about your setup, including operating system, Cloudfuse version, mount command used, config options etc.
-        Copying or uploading your config file here will help a lot, but **data entered here will be publicly viewable**, so please **make sure you remove any private information (such as bucket credentials) before sharing!**
+        Note:
+        Copying or uploading your config file here will help a lot, but **data entered here will be publicly viewable**,
+        so please **make sure you remove any private information (such as bucket credentials) before sharing!**
         When in doubt, **do __not__ share your config file**.
     validations:
       required: true
