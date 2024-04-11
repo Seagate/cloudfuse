@@ -12,6 +12,7 @@ This version is based on [blobfuse2 2.2.1](https://github.com/Azure/azure-storag
 ### Bug Fixes ###
 
 - [#167](https://github.com/Seagate/cloudfuse/pull/167) GUI: Fix bug where GUI can not find Cloudfuse CLI
+- [#181](https://github.com/Seagate/cloudfuse/pull/181) Fix: Renaming a directory leaves behind an empty source directory in file cache
 
 ## **1.1.2** ##
 
