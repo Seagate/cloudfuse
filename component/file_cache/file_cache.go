@@ -201,7 +201,11 @@ func (c *FileCache) TempCacheCleanup() error {
 		}
 
 		for _, entry := range dirents {
-			os.RemoveAll(common.JoinUnixFilepath(c.tmpPath, entry.Name()))
+			localPath := common.JoinUnixFilepath(c.tmpPath, entry.Name())
+			err = os.RemoveAll(localPath)
+			if err != nil {
+				log.Warn("FileCache::TempCacheCleanup : os.RemoveAll(%s) failed [%v]", localPath, err)
+			}
 		}
 	}
 
@@ -385,7 +389,7 @@ func isLocalDirEmpty(path string) bool {
 func (fc *FileCache) invalidateDirectory(name string) {
 	log.Trace("FileCache::invalidateDirectory : %s", name)
 
-	localPath := fc.tmpPath + "/" + name
+	localPath := filepath.Join(fc.tmpPath, name)
 	_, err := os.Stat(localPath)
 	if os.IsNotExist(err) {
 		log.Info("FileCache::invalidateDirectory : %s does not exist in local cache.", name)
@@ -395,29 +399,23 @@ func (fc *FileCache) invalidateDirectory(name string) {
 		return
 	}
 	// TODO : wouldn't this cause a race condition? a thread might get the lock before we purge - and the file would be non-existent
+	// WalkDir goes through the tree in lexical order so 'dir' always comes before 'dir/file'
+	// Save the paths in lexical order and delete them in reverse order so folders are deleted after their children
+	var pathsToPurge []string
 	err = filepath.WalkDir(localPath, func(path string, d fs.DirEntry, err error) error {
 		if err == nil && d != nil {
-			log.Debug("FileCache::invalidateDirectory : %s (%d) getting removed from cache", path, d.IsDir())
-			if !d.IsDir() {
-				fc.policy.CachePurge(path)
-			} else {
-				deleteDirError := deleteFile(path)
-				if deleteDirError != nil {
-					log.Warn("FileCache::invalidateDirectory : %s - failed to delete %s. Here's why: %v", name, path, deleteDirError)
-				}
-			}
+			pathsToPurge = append(pathsToPurge, path)
 		}
 		return nil
 	})
+	for i := len(pathsToPurge) - 1; i >= 0; i-- {
+		log.Debug("FileCache::invalidateDirectory : %s getting removed from cache", pathsToPurge[i])
+		fc.policy.CachePurge(pathsToPurge[i])
+	}
 
 	if err != nil {
 		log.Debug("FileCache::invalidateDirectory : Failed to iterate directory %s [%s].", localPath, err.Error())
 		return
-	}
-
-	deleteErr := deleteFile(localPath)
-	if deleteErr != nil {
-		log.Warn("FileCache::invalidateDirectory : %s - failed to delete %s. Here's why: %v", name, localPath, deleteErr)
 	}
 }
 
