@@ -32,12 +32,12 @@ import (
 	"bytes"
 	"container/list"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"path"
 	"runtime"
@@ -247,7 +247,6 @@ func newTestS3Storage(configuration string) (*S3Storage, error) {
 }
 
 func (s *s3StorageTestSuite) SetupTest() {
-	rand.Seed(time.Now().UnixNano())
 	// Logging config
 	cfg := common.LogConfig{
 		FilePath:    "./logfile.txt",
