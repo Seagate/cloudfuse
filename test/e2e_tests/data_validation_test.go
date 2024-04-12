@@ -29,16 +29,15 @@
 package e2e_tests
 
 import (
+	"crypto/rand"
 	"flag"
 	"fmt"
-	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -80,7 +79,6 @@ func initDataValidationFlags() {
 }
 
 func getDataValidationTestDirName(n int) string {
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, n)
 	rand.Read(b)
 	return fmt.Sprintf("%x", b)[:n]

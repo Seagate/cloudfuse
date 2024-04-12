@@ -27,12 +27,11 @@ package cmd
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"runtime"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -66,10 +65,9 @@ type hmonTestSuite struct {
 }
 
 func generateRandomPID() string {
-	rand.Seed(time.Now().UnixNano())
 	var randpid int
 	for i := 0; i <= 5; i++ {
-		randpid = rand.Intn(90000) + 10000
+		randpid = rand.IntN(90000) + 10000
 		_, err := os.FindProcess(randpid)
 		if err != nil {
 			break

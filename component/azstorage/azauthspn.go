@@ -27,7 +27,7 @@ package azstorage
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"time"
 
@@ -48,7 +48,7 @@ type azAuthSPN struct {
 }
 
 func getNextExpiryTimerSPN(spt *adal.ServicePrincipalToken) time.Duration {
-	delay := time.Duration(5+rand.Intn(120)) * time.Second
+	delay := time.Duration(5+rand.IntN(120)) * time.Second
 	return time.Until(spt.Token().Expires()) - delay
 }
 
@@ -127,7 +127,7 @@ func (azspn *azAuthBlobSPN) getCredential() interface{} {
 			err = spt.Refresh()
 			if err != nil {
 				log.Err("azAuthBfsSPN::getCredential : Failed to refresh token attempt %d [%s]", failCount, err.Error())
-				time.Sleep(time.Duration(rand.Intn(5)) * time.Second)
+				time.Sleep(time.Duration(rand.IntN(5)) * time.Second)
 				continue
 			}
 
@@ -173,7 +173,7 @@ func (azspn *azAuthBfsSPN) getCredential() interface{} {
 			err = spt.Refresh()
 			if err != nil {
 				log.Err("azAuthBfsSPN::getCredential : Failed to refresh token attempt %d [%s]", failCount, err.Error())
-				time.Sleep(time.Duration(rand.Intn(5)) * time.Second)
+				time.Sleep(time.Duration(rand.IntN(5)) * time.Second)
 				continue
 			}
 

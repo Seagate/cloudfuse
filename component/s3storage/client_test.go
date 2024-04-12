@@ -34,7 +34,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"path"
 	"strings"
@@ -550,7 +550,7 @@ func (s *clientTestSuite) TestGetAttrFile() {
 	name := generateFileName()
 	maxBodyLen := 50
 	minBodyLen := 10
-	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -668,7 +668,7 @@ func (s *clientTestSuite) TestReadToFile() {
 	name := generateFileName()
 	maxBodyLen := 50
 	minBodyLen := 10
-	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -701,7 +701,7 @@ func (s *clientTestSuite) TestReadToFileRanged() {
 	name := generateFileName()
 	maxBodyLen := 50
 	minBodyLen := 10
-	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -737,7 +737,7 @@ func (s *clientTestSuite) TestReadToFileNoMultipart() {
 	name := generateFileName()
 	maxBodyLen := 50
 	minBodyLen := 10
-	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -770,7 +770,7 @@ func (s *clientTestSuite) TestReadBuffer() {
 	name := generateFileName()
 	maxBodyLen := 50
 	minBodyLen := 10
-	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -791,7 +791,7 @@ func (s *clientTestSuite) TestReadInBuffer() {
 	name := generateFileName()
 	maxBodyLen := 50
 	minBodyLen := 10
-	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -800,7 +800,7 @@ func (s *clientTestSuite) TestReadInBuffer() {
 	})
 	s.assert.NoError(err)
 
-	outputLen := rand.Intn(bodyLen-1) + 1 // minimum buffer length of 1
+	outputLen := rand.IntN(bodyLen-1) + 1 // minimum buffer length of 1
 	output := make([]byte, outputLen)
 	err = s.client.ReadInBuffer(name, 0, int64(outputLen), output)
 
@@ -814,7 +814,7 @@ func (s *clientTestSuite) TestWriteFromFile() {
 	name := generateFileName()
 	maxBodyLen := 50
 	minBodyLen := 10
-	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
@@ -849,7 +849,7 @@ func (s *clientTestSuite) TestWriteFromBuffer() {
 	name := generateFileName()
 	maxBodyLen := 50
 	minBodyLen := 10
-	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 
 	var options internal.WriteFileOptions //stub
@@ -875,7 +875,7 @@ func (s *clientTestSuite) TestTruncateFile() {
 	name := generateFileName()
 	maxBodyLen := 50
 	minBodyLen := 10
-	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -884,7 +884,7 @@ func (s *clientTestSuite) TestTruncateFile() {
 	})
 	s.assert.NoError(err)
 
-	size := rand.Intn(bodyLen-1) + 1 // minimum size of 1
+	size := rand.IntN(bodyLen-1) + 1 // minimum size of 1
 	err = s.client.TruncateFile(name, int64(size))
 	s.assert.NoError(err)
 
@@ -906,7 +906,7 @@ func (s *clientTestSuite) TestWrite() {
 	name := generateFileName()
 	maxBodyLen := 50
 	minBodyLen := 10
-	bodyLen := rand.Intn(maxBodyLen-minBodyLen) + minBodyLen
+	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	oldBody := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -915,7 +915,7 @@ func (s *clientTestSuite) TestWrite() {
 	})
 	s.assert.NoError(err)
 
-	offset := rand.Intn(bodyLen-1) + 1 // minimum offset of 1
+	offset := rand.IntN(bodyLen-1) + 1 // minimum offset of 1
 	newData := []byte(randomString(bodyLen - offset))
 	h := handlemap.NewHandle(name)
 	err = s.client.Write(internal.WriteFileOptions{Handle: h, Offset: int64(offset), Data: newData})

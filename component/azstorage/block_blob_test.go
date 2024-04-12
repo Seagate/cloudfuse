@@ -32,13 +32,13 @@ import (
 	"bytes"
 	"container/list"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"runtime"
 	"strings"
@@ -207,9 +207,6 @@ func newTestAzStorage(configuration string) (*AzStorage, error) {
 }
 
 func (s *blockBlobTestSuite) SetupTest() {
-	// Seed the randomizer when we start the test
-	rand.Seed(time.Now().UnixNano())
-
 	// Logging config
 	cfg := common.LogConfig{
 		FilePath:    "./logfile.txt",
