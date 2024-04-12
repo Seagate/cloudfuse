@@ -926,7 +926,9 @@ func (ac *AttrCache) SyncDir(options internal.SyncDirOptions) error {
 
 // GetAttr : Try to serve the request from the attribute cache, otherwise cache attributes of the path returned by next component
 func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
-	log.Trace("AttrCache::GetAttr : %s", options.Name)
+	// Don't log these by default, as it noticibly affects performance
+	// log.Trace("AttrCache::GetAttr : %s", options.Name)
+
 	ac.cacheLock.RLock()
 	value, found := ac.cache.get(options.Name)
 	ac.cacheLock.RUnlock()
@@ -942,7 +944,6 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
 		if value.attr.IsMetadataRetrieved() || (ac.noSymlinks && !options.RetrieveMetadata) {
 			// path exists and we have all the metadata required or we do not care about metadata
-			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
 			return value.attr, nil
 		}
 	}

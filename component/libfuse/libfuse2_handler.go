@@ -247,7 +247,9 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 	// TODO: Currently not using filehandle
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
-	log.Trace("Libfuse::Getattr : %s", name)
+
+	// Don't log these by default, as it noticibly affects performance
+	// log.Trace("Libfuse::Getattr : %s", name)
 
 	// Return the default configuration for the root
 	if name == "" {
