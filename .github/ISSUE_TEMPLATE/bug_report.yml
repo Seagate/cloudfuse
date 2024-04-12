@@ -1,5 +1,5 @@
 name: Bug report
-description: Report problems and issues to Cloudfuse. Please first check to make sure this has not yet been reported.
+description: Report problems and issues with Cloudfuse.
 labels: [bug]
 
 body:
@@ -9,6 +9,8 @@ body:
         ## Welcome!
 
         Thanks for taking the time to fill out this bug report!
+
+        If you don't want to use this form, just [email us](mailto:cloudfuse@seagate.com?subject=%5BBug%20Report%5D%20%3CAdd%20Title%20Here%3E&body=Problem%3A%0A%0A%0AExpected%20Behavior%3A%0A%0A%0AHow%20we%20can%20Make%20it%20Repeat%3A%0A%0A%0AMy%20Setup%20%28version%2C%20operating%20system%2C%20config%20options%2C%20etc.%29%3A%0A%0A%0ADetails%3A%0A%0A)!
 
   - type: textarea
     attributes:
@@ -37,8 +39,11 @@ body:
   - type: textarea
     attributes:
       label: Logs
-      description: Please share log files if available.
-      placeholder: Provide log file.
+      description: |
+        Please share a log file if you can.
+        To generate a log file when using `cloudfuse` on the terminal, add these options to the `mount` command:
+        `--log-level LOG_DEBUG --log-type base --log-file-path ~/cloudfuse.log`
+      placeholder: Click here, then click the paperclip to attach your log file.
 
   - type: markdown
     attributes:
@@ -49,8 +54,11 @@ body:
     attributes:
       label: Deployment information
       description: |
-        Provide details about your deployment environment that may be relevant. This could include version, client OS, mount command used, etc.
-
+        Please tell us about your setup, including operating system, Cloudfuse version, mount command used, config options etc.
+        Note:
+        Copying or uploading your config file here will help a lot, but **data entered here will be publicly viewable**,
+        so please **make sure you remove any private information (such as bucket credentials) before sharing!**
+        When in doubt, **do __not__ share your config file**.
     validations:
       required: true
 
