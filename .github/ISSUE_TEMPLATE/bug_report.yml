@@ -41,8 +41,8 @@ body:
       label: Logs
       description: |
         Please share a log file if you can.
-        To generate a log file when using `cloudfuse` on the terminal, add these options to the `mount` command:
-        `--log-level LOG_DEBUG --log-type base --log-file-path ~/cloudfuse.log`
+        To generate a log file, in your config file under `logging`, set:
+        `type: base`, `level: log_debug` and `file-path: /tmp/cloudfuseDebug.log` (or enter your own **full path**)
       placeholder: Click here, then click the paperclip to attach your log file.
 
   - type: markdown
