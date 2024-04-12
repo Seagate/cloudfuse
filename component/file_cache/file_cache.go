@@ -480,16 +480,16 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 
 				if !entry.IsDir() && !fc.fileLocks.Locked(entryPath) {
 					entryCachePath := common.JoinUnixFilepath(fc.tmpPath, entryPath)
-					info, err := os.Stat(entryCachePath) // Grab local cache attributes
-					// If local file is not locked then only use its attributes otherwise rely on container attributes
-					if err == nil {
-						// This is an overhead for streamdir for now
-						// As list is paginated we have no way to know whether this particular item exists both in local cache
-						// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
-						// If entry does not exists on storage then only return a local item here.
-						_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath})
-						if err != nil && (err == syscall.ENOENT || os.IsNotExist(err)) {
-							// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
+					// This is an overhead for streamdir for now
+					// As list is paginated we have no way to know whether this particular item exists both in local cache
+					// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
+					// If entry does not exists on storage then only return a local item here.
+					_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath})
+					if err != nil && (err == syscall.ENOENT || os.IsNotExist(err)) {
+						// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
+						info, err := os.Stat(entryCachePath) // Grab local cache attributes
+						// If local file is not locked then only use its attributes otherwise rely on container attributes
+						if err == nil {
 							log.Debug("FileCache::StreamDir : serving %s from local cache", entryPath)
 							attr := newObjAttr(entryPath, info)
 							attrs = append(attrs, attr)
