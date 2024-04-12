@@ -845,6 +845,20 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 	return err
 }
 
+// Update attribute cache when CopyToFile returns that a file doesn't exist
+func (ac *AttrCache) CopyToFile(options internal.CopyToFileOptions) error {
+	log.Trace("AttrCache::CopyToFile : %s", options.Name)
+
+	err := ac.NextComponent().CopyToFile(options)
+	if err != nil {
+		entry, found := ac.cache.get(options.Name)
+		if found {
+			entry.markDeleted(time.Now())
+		}
+	}
+	return err
+}
+
 // CopyFromFile : Upload file and update cache entry
 func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("AttrCache::CopyFromFile : %s", options.Name)
