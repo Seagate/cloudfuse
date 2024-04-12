@@ -1082,7 +1082,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 
 // GetAttr: Consolidate attributes from storage and local cache
 func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
-	// Don't log these by default, as it noticibly affects performance
+	// Don't log these by default, as it noticeably affects performance
 	// log.Trace("FileCache::GetAttr : %s", options.Name)
 
 	// For get attr, there are three different path situations we have to potentially handle.

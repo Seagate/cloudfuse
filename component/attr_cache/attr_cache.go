@@ -926,7 +926,7 @@ func (ac *AttrCache) SyncDir(options internal.SyncDirOptions) error {
 
 // GetAttr : Try to serve the request from the attribute cache, otherwise cache attributes of the path returned by next component
 func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
-	// Don't log these by default, as it noticibly affects performance
+	// Don't log these by default, as it noticeably affects performance
 	// log.Trace("AttrCache::GetAttr : %s", options.Name)
 
 	ac.cacheLock.RLock()
