@@ -54,7 +54,10 @@ func (suite *cachePolicyTestSuite) SetupTest() {
 }
 
 func (suite *cachePolicyTestSuite) cleanupTest() {
-	os.RemoveAll(cache_path)
+	err := os.RemoveAll(cache_path)
+	if err != nil {
+		fmt.Printf("cachePolicyTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", cache_path, err)
+	}
 }
 
 func (suite *cachePolicyTestSuite) TestGetUsage() {

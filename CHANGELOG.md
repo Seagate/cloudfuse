@@ -1,8 +1,22 @@
 # Cloudfuse Changelog #
 
+## **1.1.3** ##
+
+April 10th 2024
+This version is based on [blobfuse2 2.2.1](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.2.1) (upstream).
+
+### Changes ###
+
+- [#159](https://github.com/Seagate/cloudfuse/pull/159) Add instructions to install Cloudfuse as a service on Linux using systemd
+
+### Bug Fixes ###
+
+- [#167](https://github.com/Seagate/cloudfuse/pull/167) GUI: Fix bug where GUI can not find Cloudfuse CLI
+- [#181](https://github.com/Seagate/cloudfuse/pull/181) Fix: Renaming a directory leaves behind an empty source directory in file cache
+
 ## **1.1.2** ##
 
-March 14th 2024  
+March 14th 2024
 This version is based on [blobfuse2 2.2.1](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.2.1) (upstream).
 
 ### Changes ###
@@ -23,7 +37,7 @@ This version is based on [blobfuse2 2.2.1](https://github.com/Azure/azure-storag
 
 ## **1.1.1** ##
 
-February 13th 2024  
+February 13th 2024
 This version is based on [blobfuse2 2.2.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.2.0) (upstream).
 
 ### Bug Fixes ###
@@ -32,7 +46,7 @@ This version is based on [blobfuse2 2.2.0](https://github.com/Azure/azure-storag
 
 ## **1.1.0** ##
 
-February 12th 2024  
+February 12th 2024
 This version is based on [blobfuse2 2.2.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.2.0) (upstream).
 
 ### Changes ###
@@ -43,7 +57,7 @@ This version is based on [blobfuse2 2.2.0](https://github.com/Azure/azure-storag
 
 ## **1.0.1** ##
 
-January 19th 2024  
+January 19th 2024
 This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
 
 ### Bug Fixes ###
@@ -53,7 +67,7 @@ This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storag
 
 ## **1.0.0** ##
 
-January 18th 2024  
+January 18th 2024
 This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
 
 ### Changes ###
@@ -72,7 +86,7 @@ This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storag
 
 ## **0.3.0** ##
 
-December 20th 2023  
+December 20th 2023
 This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
 
 ### Changes ###
@@ -92,7 +106,7 @@ This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storag
 
 ## **0.2.1** ##
 
-November 30th 2023  
+November 30th 2023
 This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.2) (upstream).
 
 ### Changes ###
@@ -105,7 +119,7 @@ This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storag
 
 ## **0.2.0** ##
 
-November 6th 2023  
+November 6th 2023
 This version is based on [blobfuse2 2.1.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.0) (upstream).
 
 ### Features ###
@@ -121,7 +135,7 @@ This version is based on [blobfuse2 2.1.0](https://github.com/Azure/azure-storag
 
 ## **0.1.0** ##
 
-October 19th 2023  
+October 19th 2023
 This release includes all features planned for the 1.0.0 release of cloudfuse, which will be released after additional bug fixes.
 This version is based on [blobfuse2 2.1.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.1.0) (upstream).
 

@@ -116,7 +116,7 @@ class defaultSettingsManager():
         self.settings.setValue('foreground',False)
         
         # Common
-        self.settings.setValue('allow-other',True)
+        self.settings.setValue('allow-other',False)
         self.settings.setValue('read-only',False)
         self.settings.setValue('nonempty',False)
         self.settings.setValue('restricted-characters-windows',False) # not exposed

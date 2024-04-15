@@ -662,6 +662,29 @@ func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	return h, err
 }
 
+// OpenFile: Update cache with Open results from cloud
+func (ac *AttrCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
+	log.Trace("AttrCache::OpenFile : %s", options.Name)
+
+	h, err := ac.NextComponent().OpenFile(options)
+	// sometimes a file is deleted in the cloud concurrently
+	// then this cache needs to be updated
+	if err != nil && os.IsNotExist(err) {
+		currentTime := time.Now()
+		ac.cacheLock.Lock()
+		defer ac.cacheLock.Unlock()
+		cacheItem, found := ac.cache.get(options.Name)
+		if found && cacheItem.exists() {
+			cacheItem.markDeleted(currentTime)
+		}
+		if ac.cacheDirs {
+			ac.updateAncestorsInCloud(getParentDir(options.Name), currentTime)
+		}
+	}
+
+	return h, err
+}
+
 // DeleteFile : Mark the file deleted
 func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("AttrCache::DeleteFile : %s", options.Name)
@@ -903,7 +926,9 @@ func (ac *AttrCache) SyncDir(options internal.SyncDirOptions) error {
 
 // GetAttr : Try to serve the request from the attribute cache, otherwise cache attributes of the path returned by next component
 func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
-	log.Trace("AttrCache::GetAttr : %s", options.Name)
+	// Don't log these by default, as it noticeably affects performance
+	// log.Trace("AttrCache::GetAttr : %s", options.Name)
+
 	ac.cacheLock.RLock()
 	value, found := ac.cache.get(options.Name)
 	ac.cacheLock.RUnlock()
@@ -919,7 +944,6 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
 		if value.attr.IsMetadataRetrieved() || (ac.noSymlinks && !options.RetrieveMetadata) {
 			// path exists and we have all the metadata required or we do not care about metadata
-			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
 			return value.attr, nil
 		}
 	}
@@ -1007,10 +1031,9 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 
 		value, found := ac.cache.get(options.Name)
 		if !found {
-			log.Err("AttrCache::Chmod : %v", found)
+			log.Err("AttrCache::Chmod : %s not found in cache", options.Name)
 		} else if !value.exists() {
-			log.Err("AttrCache::Chmod : invalidating deleted entry %s", options.Name)
-			value.invalidate()
+			log.Err("AttrCache::Chmod : %s is marked deleted", options.Name)
 		} else {
 			value.setMode(options.Mode)
 		}

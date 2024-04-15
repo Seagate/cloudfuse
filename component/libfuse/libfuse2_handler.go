@@ -247,7 +247,9 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 	// TODO: Currently not using filehandle
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
-	log.Trace("Libfuse::Getattr : %s", name)
+
+	// Don't log these by default, as it noticeably affects performance
+	// log.Trace("Libfuse::Getattr : %s", name)
 
 	// Return the default configuration for the root
 	if name == "" {
@@ -713,11 +715,6 @@ func (cf *CgofuseFS) Flush(path string, fh uint64) int {
 	log.Trace("Libfuse::Flush : %s, handle: %d", handle.Path, handle.ID)
 
 	// If the file handle is not dirty, there is no need to flush
-	// TODO: Fix handling the dirty flag
-	if handle.Dirty() {
-		handle.Flags.Set(handlemap.HandleFlagDirty)
-	}
-
 	if !handle.Dirty() {
 		return 0
 	}
@@ -768,11 +765,6 @@ func (cf *CgofuseFS) Release(path string, fh uint64) int {
 		return -fuse.EBADF
 	}
 	log.Trace("Libfuse::Release : %s, handle: %d", handle.Path, handle.ID)
-
-	// If the file handle is dirty then file-cache needs to flush this file
-	if handle.Dirty() {
-		handle.Flags.Set(handlemap.HandleFlagDirty)
-	}
 
 	err := fuseFS.NextComponent().CloseFile(internal.CloseFileOptions{Handle: handle})
 	if err != nil {
@@ -845,20 +837,20 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 	dstAttr, dstErr := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: dstPath})
 
 	// EISDIR
-	if (dstErr == nil || os.IsExist(dstErr)) && dstAttr.IsDir() && !srcAttr.IsDir() {
+	if dstErr == nil && dstAttr.IsDir() && !srcAttr.IsDir() {
 		log.Err("Libfuse::Rename : dst [%s] is an existing directory but src [%s] is not a directory", dstPath, srcPath)
 		return -fuse.EISDIR
 	}
 
 	// ENOTDIR
-	if (dstErr == nil || os.IsExist(dstErr)) && !dstAttr.IsDir() && srcAttr.IsDir() {
+	if dstErr == nil && !dstAttr.IsDir() && srcAttr.IsDir() {
 		log.Err("Libfuse::Rename : dst [%s] is an existing file but src [%s] is a directory", dstPath, srcPath)
 		return -fuse.ENOTDIR
 	}
 
 	if srcAttr.IsDir() {
 		// ENOTEMPTY
-		if dstErr == nil || os.IsExist(dstErr) {
+		if dstErr == nil {
 			empty := fuseFS.NextComponent().IsDirEmpty(internal.IsDirEmptyOptions{Name: dstPath})
 			if !empty {
 				return -fuse.ENOTEMPTY

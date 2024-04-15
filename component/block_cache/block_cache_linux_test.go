@@ -39,7 +39,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	mrand "math/rand"
+	mrand "math/rand/v2"
 	"os"
 	"path/filepath"
 	"strings"
@@ -395,7 +395,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandom() {
 	data = make([]byte, 100)
 	max := int64(100 * _1MB)
 	for i := 0; i < 50; i++ {
-		offset := mrand.Int63n(max)
+		offset := mrand.Int64N(max)
 		n, _ := tobj.blockCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: offset, Data: data})
 		suite.assert.LessOrEqual(n, 100)
 	}
@@ -436,7 +436,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 	data = make([]byte, 100)
 	max := int64(100 * _1MB)
 	for i := 0; i < 50; i++ {
-		offset := mrand.Int63n(max)
+		offset := mrand.Int64N(max)
 		n, _ := tobj.blockCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: offset, Data: data})
 		suite.assert.Equal(1, h.Buffers.Cooked.Len())
 		suite.assert.Equal(0, h.Buffers.Cooking.Len())

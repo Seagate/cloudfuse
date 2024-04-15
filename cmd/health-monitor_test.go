@@ -27,7 +27,7 @@ package cmd
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"runtime"
 	"strconv"
@@ -67,7 +67,7 @@ type hmonTestSuite struct {
 func generateRandomPID() string {
 	var randpid int
 	for i := 0; i <= 5; i++ {
-		randpid = rand.Intn(90000) + 10000
+		randpid = rand.IntN(90000) + 10000
 		_, err := os.FindProcess(randpid)
 		if err != nil {
 			break
