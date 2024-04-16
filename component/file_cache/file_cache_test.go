@@ -375,7 +375,6 @@ func (suite *fileCacheTestSuite) TestStreamDirCase1() {
 	suite.assert.EqualValues(subdir, dir[3].Path)
 }
 
-// TODO: case3 requires more thought due to the way loopback fs is designed, specifically getAttr and streamDir
 func (suite *fileCacheTestSuite) TestStreamDirCase2() {
 	defer suite.cleanupTest()
 	// Setup
@@ -400,6 +399,97 @@ func (suite *fileCacheTestSuite) TestStreamDirCase2() {
 	suite.assert.EqualValues(file1, dir[1].Path)
 	suite.assert.EqualValues(file2, dir[2].Path)
 	suite.assert.EqualValues(file3, dir[3].Path)
+}
+
+func (suite *fileCacheTestSuite) TestStreamDirCase3() {
+	defer suite.cleanupTest()
+	// Setup
+	name := "dir"
+	subdir := name + "/subdir"
+	file1 := name + "/file1"
+	file2 := name + "/file2"
+	file3 := name + "/file3"
+	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777})
+	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
+	// By default createEmptyFile is false, so we will not create these files in storage until they are closed.
+	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file1, Size: 1024})
+	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file2, Size: 1024})
+	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, Size: 1024})
+	// Create the files in fake_storage and simulate different sizes
+	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
+	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
+	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+
+	// Read the Directory
+	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
+	suite.assert.NoError(err)
+	suite.assert.NotEmpty(dir)
+	suite.assert.Len(dir, 4)
+	suite.assert.EqualValues(file1, dir[0].Path)
+	suite.assert.EqualValues(1024, dir[0].Size)
+	suite.assert.EqualValues(file2, dir[1].Path)
+	suite.assert.EqualValues(1024, dir[1].Size)
+	suite.assert.EqualValues(file3, dir[2].Path)
+	suite.assert.EqualValues(1024, dir[2].Size)
+	suite.assert.EqualValues(subdir, dir[3].Path)
+}
+
+func pos(s []*internal.ObjAttr, e string) int {
+	for i, v := range s {
+		if v.Path == e {
+			return i
+		}
+	}
+	return -1
+}
+
+func (suite *fileCacheTestSuite) TestStreamDirMixed() {
+	defer suite.cleanupTest()
+	// Setup
+	name := "dir"
+	subdir := name + "/subdir"
+	file1 := name + "/file1" // case 1
+	file2 := name + "/file2" // case 2
+	file3 := name + "/file3" // case 3
+	file4 := name + "/file4" // case 4
+
+	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777})
+	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
+
+	// By default createEmptyFile is false, so we will not create these files in storage until they are closed.
+	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file2, Size: 1024})
+	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, Size: 1024})
+
+	// Create the files in fake_storage and simulate different sizes
+	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
+	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+
+	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, Size: 1024})
+	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, Size: 0})
+
+	// Read the Directory
+	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
+	suite.assert.NoError(err)
+	suite.assert.NotEmpty(dir)
+
+	var i int
+	i = pos(dir, file1)
+	suite.assert.EqualValues(0, dir[i].Size)
+
+	i = pos(dir, file3)
+	suite.assert.EqualValues(1024, dir[i].Size)
+
+	i = pos(dir, file2)
+	suite.assert.EqualValues(1024, dir[i].Size)
+
+	i = pos(dir, file4)
+	suite.assert.EqualValues(0, dir[i].Size)
 }
 
 func (suite *fileCacheTestSuite) TestFileUsed() {

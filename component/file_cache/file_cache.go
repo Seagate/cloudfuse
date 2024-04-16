@@ -440,30 +440,66 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 
 // StreamDir : Add local files to the list retrieved from storage container
 func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
+	// For stream directory, there are three different child path situations we have to potentially handle.
+	// 1. Path in storage but not in local cache
+	// 2. Path not in storage but in local cache (this could happen if we recently created the file [and are currently writing to it]) (also supports immutable containers)
+	// 3. Path in storage and in local cache (this could result in dirty properties on the service if we recently wrote to the file)
+
+	// To cover case 1, grab all entries from storage
 	attrs, token, err := fc.NextComponent().StreamDir(options)
+	if err != nil {
+		return attrs, token, err
+	}
 
+	// Get files from local cache
+	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	dirents, err := os.ReadDir(localPath)
+	if err != nil {
+		return attrs, token, nil
+	}
+
+	i := 0 // Index for cloud
+	j := 0 // Index for local cache
+
+	// Iterate through attributes from cloud and local cache, adding the elements in order alphabetically
+	for i < len(attrs) && j < len(dirents) {
+		attr := attrs[i]
+		dirent := dirents[j]
+
+		if attr.Name < dirent.Name() {
+			i++
+		} else if attr.Name > dirent.Name() {
+			j++
+		} else {
+			// Case 3: Item is in both local cache and cloud
+			if !attr.IsDir() && !fc.fileLocks.Locked(attr.Path) {
+				info, err := dirent.Info()
+
+				if err == nil {
+					attr.Mtime = info.ModTime()
+					attr.Size = info.Size()
+				}
+			}
+			i++
+			j++
+		}
+	}
+
+	// Case 2: file is only in local cache
 	if token == "" {
-		// This is the last set of objects retrieved from container so we need to add local files here
-		localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
-		dirents, err := os.ReadDir(localPath)
-
-		if err == nil {
-			// Enumerate over the results from the local cache and add to attrs
-			for _, entry := range dirents {
-				entryPath := common.JoinUnixFilepath(options.Name, entry.Name())
-				entryCachePath := common.JoinUnixFilepath(fc.tmpPath, entryPath)
-
-				info, err := os.Stat(entryCachePath) // Grab local cache attributes
-				// If local file is not locked then only use its attributes otherwise rely on container attributes
-				if err == nil && !info.IsDir() &&
-					!fc.fileLocks.Locked(entryPath) {
-
-					// This is an overhead for streamdir for now
-					// As list is paginated we have no way to know whether this particular item exists both in local cache
-					// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
-					// If entry does not exists on storage then only return a local item here.
-					_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath})
-					if err != nil && (err == syscall.ENOENT || os.IsNotExist(err)) {
+		for _, entry := range dirents {
+			entryPath := common.JoinUnixFilepath(options.Name, entry.Name())
+			if !entry.IsDir() && !fc.fileLocks.Locked(entryPath) {
+				// This is an overhead for streamdir for now
+				// As list is paginated we have no way to know whether this particular item exists both in local cache
+				// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
+				// If entry does not exists on storage then only return a local item here.
+				_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath})
+				if err != nil && (err == syscall.ENOENT || os.IsNotExist(err)) {
+					info, err := entry.Info() // Grab local cache attributes
+					// If local file is not locked then only use its attributes otherwise rely on container attributes
+					if err == nil {
+						// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
 						log.Debug("FileCache::StreamDir : serving %s from local cache", entryPath)
 						attr := newObjAttr(entryPath, info)
 						attrs = append(attrs, attr)
