@@ -271,7 +271,7 @@ func (suite *attrCacheTestSuite) TestDefault() {
 	suite.assert.Equal("attr_cache", suite.attrCache.Name())
 	suite.assert.EqualValues(120, suite.attrCache.cacheTimeout)
 	suite.assert.True(suite.attrCache.cacheOnList)
-	suite.assert.False(suite.attrCache.noSymlinks)
+	suite.assert.True(suite.attrCache.noSymlinks)
 	suite.assert.True(suite.attrCache.cacheDirs)
 }
 
@@ -279,13 +279,13 @@ func (suite *attrCacheTestSuite) TestDefault() {
 func (suite *attrCacheTestSuite) TestConfig() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default attr cache generated
-	config := "attr_cache:\n  timeout-sec: 60\n  no-cache-on-list: true\n  no-symlinks: true\n  no-cache-dirs: true"
+	config := "attr_cache:\n  timeout-sec: 60\n  no-cache-on-list: true\n  no-symlinks: false\n  no-cache-dirs: true"
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal("attr_cache", suite.attrCache.Name())
 	suite.assert.EqualValues(60, suite.attrCache.cacheTimeout)
 	suite.assert.False(suite.attrCache.cacheOnList)
-	suite.assert.True(suite.attrCache.noSymlinks)
+	suite.assert.False(suite.attrCache.noSymlinks)
 	suite.assert.False(suite.attrCache.cacheDirs)
 }
 
@@ -1608,6 +1608,10 @@ func (suite *attrCacheTestSuite) TestCacheTimeout() {
 // Tests CreateLink
 func (suite *attrCacheTestSuite) TestCreateLink() {
 	defer suite.cleanupTest()
+	// enabled symlinks
+	suite.cleanupTest() // clean up the default attr cache generated
+	config := "attr_cache:\n  no-symlinks: false"
+	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
 	link := "a.lnk"
 	path := "a"
 
@@ -1637,6 +1641,22 @@ func (suite *attrCacheTestSuite) TestCreateLink() {
 	suite.assert.NoError(err)
 	suite.assertExists(link)
 	suite.assertUntouched(path)
+}
+
+// Tests CreateLink when no-symlinks is true
+func (suite *attrCacheTestSuite) TestCreateLinkNoSymlinks() {
+	defer suite.cleanupTest()
+	link := "a.lnk"
+	path := "a"
+
+	options := internal.CreateLinkOptions{Name: link, Target: path}
+
+	// symlinks are disabled by default
+	// cloud should not be called
+	suite.mock.EXPECT().CreateLink(options).MaxTimes(0)
+	err := suite.attrCache.CreateLink(options)
+
+	suite.assert.EqualError(err, syscall.ENOTSUP.Error())
 }
 
 // Tests Chmod

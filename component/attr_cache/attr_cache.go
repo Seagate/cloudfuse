@@ -147,7 +147,12 @@ func (ac *AttrCache) Configure(_ bool) error {
 		ac.maxFiles = defaultMaxFiles
 	}
 
-	ac.noSymlinks = conf.NoSymlinks
+	if config.IsSet(compName + ".no-symlinks") {
+		ac.noSymlinks = conf.NoSymlinks
+	} else {
+		ac.noSymlinks = true
+	}
+
 	ac.cacheDirs = !conf.NoCacheDirs
 
 	log.Info("AttrCache::Configure : cache-timeout %d, symlink %t, cache-on-list %t, max-files %d",
@@ -396,14 +401,6 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	if err == nil {
 		log.Debug("AttrCache::StreamDir : %s got %d entries from cloud, token=\"%s\"",
 			options.Name, len(pathList), nextToken)
-		// strip symlink attributes
-		if ac.noSymlinks {
-			for _, attr := range pathList {
-				if attr.IsSymlink() {
-					attr.Flags.Clear(internal.PropFlagSymlink)
-				}
-			}
-		}
 		// cache returned list
 		ac.cacheAttributes(pathList, options.Name)
 		//
@@ -969,10 +966,6 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	defer ac.cacheLock.Unlock()
 
 	if err == nil {
-		if ac.noSymlinks {
-			// strip symlink attribute
-			pathAttr.Flags.Clear(internal.PropFlagSymlink)
-		}
 		// Retrieved attributes so cache them
 		ac.cache.insert(insertOptions{
 			attr:     pathAttr,
@@ -995,6 +988,10 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 // CreateLink : Mark the new link invalid
 func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
+	if ac.noSymlinks {
+		log.Err("AttrCache::CreateLink : %s -> %s - symlinks are disabled", options.Name, options.Target)
+		return syscall.ENOTSUP
+	}
 	log.Trace("AttrCache::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
 
 	err := ac.NextComponent().CreateLink(options)
