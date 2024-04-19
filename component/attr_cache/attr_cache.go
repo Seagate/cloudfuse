@@ -983,10 +983,6 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 // CreateLink : Mark the new link invalid
 func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
-	if !ac.enableSymlinks {
-		log.Err("AttrCache::CreateLink : %s -> %s - symlinks are disabled", options.Name, options.Target)
-		return syscall.ENOTSUP
-	}
 	log.Trace("AttrCache::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
 
 	err := ac.NextComponent().CreateLink(options)

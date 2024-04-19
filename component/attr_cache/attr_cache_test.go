@@ -1641,22 +1641,6 @@ func (suite *attrCacheTestSuite) TestCreateLink() {
 	suite.assertUntouched(path)
 }
 
-// Tests CreateLink when enable-symlinks is false
-func (suite *attrCacheTestSuite) TestCreateLinkNoSymlinks() {
-	defer suite.cleanupTest()
-	link := "a.lnk"
-	path := "a"
-
-	options := internal.CreateLinkOptions{Name: link, Target: path}
-
-	// symlinks are disabled by default
-	// cloud should not be called
-	suite.mock.EXPECT().CreateLink(options).MaxTimes(0)
-	err := suite.attrCache.CreateLink(options)
-
-	suite.assert.EqualError(err, syscall.ENOTSUP.Error())
-}
-
 // Tests Chmod
 func (suite *attrCacheTestSuite) TestChmod() {
 	defer suite.cleanupTest()

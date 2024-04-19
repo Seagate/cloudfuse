@@ -486,6 +486,18 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		az.stConfig.maxRetryDelay = opt.MaxRetryDelay
 	}
 
+	// by default symlink will be disabled
+	enableSymlinks := false
+	// Borrow enable-symlinks flag from attribute cache
+	if config.IsSet("attr_cache.enable-symlinks") {
+		err := config.UnmarshalKey("attr_cache.enable-symlinks", &enableSymlinks)
+		if err != nil {
+			enableSymlinks = false
+			log.Err("ParseAndReadDynamicConfig : Failed to unmarshal attr_cache.enable-symlinks")
+		}
+	}
+	az.stConfig.disableSymlink = !enableSymlinks
+
 	if config.IsSet(compName + ".set-content-type") {
 		log.Warn("unsupported v1 CLI parameter: set-content-type is always true in cloudfuse.")
 	}
