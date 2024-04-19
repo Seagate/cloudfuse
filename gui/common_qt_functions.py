@@ -39,13 +39,13 @@ class defaultSettingsManager():
         super().__init__()
         self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "settings")
         self.setAllDefaultSettings()
-        
-        
+
+
     def setAllDefaultSettings(self):
         self.setS3Settings()
         self.setAzureSettings()
         self.setComponentSettings()
-        
+
     def setS3Settings(self):
         # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
         self.settings.setValue('s3storage',{
@@ -66,7 +66,7 @@ class defaultSettingsManager():
             'checksum-algorithm': 'SHA1',
             'usePathStyle': False,
         })
-    
+
     def setAzureSettings(self):
         # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
         self.settings.setValue('azstorage',{
@@ -109,12 +109,12 @@ class defaultSettingsManager():
             'telemetry': '',
             'honour-acl': False
         })
-    
+
     def setComponentSettings(self):
         # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
-        
+
         self.settings.setValue('foreground',False)
-        
+
         # Common
         self.settings.setValue('allow-other',False)
         self.settings.setValue('read-only',False)
@@ -130,10 +130,10 @@ class defaultSettingsManager():
         self.settings.setValue('libfuse',{
             'default-permission' : 0o777,
             'attribute-expiration-sec': 120,
-            'entry-expiration-sec' : 120,   
+            'entry-expiration-sec' : 120,
             'negative-entry-expiration-sec' : 120,
             'fuse-trace' : False,
-            'extension' : '', 
+            'extension' : '',
             'disable-writeback-cache' : False,
             'ignore-open-flags' : True,
             'max-fuse-threads': 128,
@@ -178,7 +178,7 @@ class defaultSettingsManager():
         self.settings.setValue('attr_cache',{
             'timeout-sec': 120,
             'no-cache-on-list': False,
-            'no-symlinks': True,
+            'enable-symlinks': False,
             # the following attr_cache settings are not exposed in the GUI
             'max-files': 5000000,
             'no-cache-dirs': False
@@ -186,7 +186,7 @@ class defaultSettingsManager():
         self.settings.setValue('loopbackfs',{
             'path': ''
         })
-        
+
         self.settings.setValue('mountall',{
             'container-allowlist': [],
             'container-denylist': []
@@ -200,25 +200,25 @@ class defaultSettingsManager():
         })
         self.settings.setValue('logging',{
             'type' : 'syslog',
-            'level' : 'log_err',        
-            'file-path' : '$HOME/.cloudfuse/cloudfuse.log',         
-            'max-file-size-mb' : 512,                                       
-            'file-count' : 10 ,                                             
-            'track-time' : False                                            
+            'level' : 'log_err',
+            'file-path' : '$HOME/.cloudfuse/cloudfuse.log',
+            'max-file-size-mb' : 512,
+            'file-count' : 10 ,
+            'track-time' : False
             })
-    
+
 class widgetCustomFunctions(QWidget):
     def __init__(self):
         super().__init__()
-        
+
     def exitWindow(self):
         self.close()
-        
+
     def exitWindowCleanup(self):
     # Save this specific window's size and position
         self.myWindow.setValue("window size", self.size())
         self.myWindow.setValue("window position", self.pos())
-            
+
     def popupDoubleCheckReset(self):
         checkMsg = QtWidgets.QMessageBox()
         checkMsg.setWindowTitle("Are you sure?")
@@ -227,9 +227,9 @@ class widgetCustomFunctions(QWidget):
         checkMsg.setDefaultButton(QtWidgets.QMessageBox.Cancel)
         choice = checkMsg.exec()
         return choice
-            
+
     # Overrides the closeEvent function from parent class to enable this custom behavior
-    # TODO: Nice to have - keep track of changes to user makes and only trigger the 'are you sure?' message 
+    # TODO: Nice to have - keep track of changes to user makes and only trigger the 'are you sure?' message
     #   when changes have been made
     def closeEvent(self, event):
         msg = QtWidgets.QMessageBox()
@@ -239,7 +239,7 @@ class widgetCustomFunctions(QWidget):
         msg.setStandardButtons(QtWidgets.QMessageBox.Discard | QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Save)
         msg.setDefaultButton(QtWidgets.QMessageBox.Cancel)
         ret = msg.exec()
-        
+
         if ret == QtWidgets.QMessageBox.Discard:
             self.exitWindowCleanup()
             event.accept()
@@ -252,14 +252,14 @@ class widgetCustomFunctions(QWidget):
                 event.accept()
             else:
                 event.ignore()
-        
+
     def constructDictForConfig(self):
         optionKeys = self.settings.allKeys()
         configDict = {}
         for key in optionKeys:
             configDict[key] = self.settings.value(key)
         return configDict
-    
+
     def updateSettingsFromUIChoices(self):
         # Each individual widget will need to override this function
         pass
@@ -288,7 +288,7 @@ class widgetCustomFunctions(QWidget):
             msg.setInformativeText("Writing the config file failed. Check file permissions and try again.")
             msg.exec()
             return False
-            
+
     def getConfigs(self,useDefault=False):
         workingDir = self.getWorkingDir()
         if useDefault:
@@ -309,13 +309,13 @@ class widgetCustomFunctions(QWidget):
                     configs = yaml.safe_load(file)
                     if configs is None:
                        # The configs file exists, but is empty, use default settings
-                       configs = self.getConfigs(True) 
+                       configs = self.getConfigs(True)
             except:
                 # Could not open or config file does not exist, use default settings
                 configs = self.getConfigs(True)
         return configs
-    
-    
+
+
     def initWindowSizePos(self):
         try:
             self.resize(self.myWindow.value("window size"))
@@ -325,9 +325,9 @@ class widgetCustomFunctions(QWidget):
             myWindowGeometry = self.frameGeometry()
             myWindowGeometry.moveCenter(desktopCenter)
             self.move(myWindowGeometry.topLeft())
-        
+
     # defaultSettingsManager has set the settings to all default, now the code needs to pull in
-    #   all the changes from the config file the user provides. This may not include all the 
+    #   all the changes from the config file the user provides. This may not include all the
     #   settings defined in defaultSettingManager.
     def initSettingsFromConfig(self):
         dictForConfigs = self.getConfigs()
@@ -346,7 +346,7 @@ class widgetCustomFunctions(QWidget):
             else:
                 self.settings.setValue(option,dictForConfigs[option])
 
-    # Check for a true/false setting and set the checkbox state as appropriate. 
+    # Check for a true/false setting and set the checkbox state as appropriate.
     #   Note, Checked/UnChecked are NOT True/False data types, hence the need to check what the values are.
     #   The default values for True/False settings are False, which is why Unchecked is the default state if the value doesn't equate to True.
     #   Explicitly check for True for clarity
@@ -358,18 +358,18 @@ class widgetCustomFunctions(QWidget):
 
     def updateMultiUser(self):
         self.settings.setValue('allow-other',self.checkBox_multiUser.isChecked())
-        
+
     def updateNonEmtpyDir(self):
-        self.settings.setValue('nonempty',self.checkBox_nonEmptyDir.isChecked())        
-    
+        self.settings.setValue('nonempty',self.checkBox_nonEmptyDir.isChecked())
+
     def updateDaemonForeground(self):
         self.settings.setValue('foreground',self.checkBox_daemonForeground.isChecked())
-    
+
     def updateReadOnly(self):
         self.settings.setValue('read-only',self.checkBox_readOnly.isChecked())
-    
-    # Update Libfuse re-writes everything in the Libfuse because of how setting.setValue works - 
-    #   it will not append, so the code makes a copy of the dictionary and updates the sub-keys. 
+
+    # Update Libfuse re-writes everything in the Libfuse because of how setting.setValue works -
+    #   it will not append, so the code makes a copy of the dictionary and updates the sub-keys.
     #   When the user updates the sub-option through the GUI, it will trigger Libfuse to update;
     #   it's written this way to save on lines of code.
     def updateLibfuse(self):
@@ -396,12 +396,12 @@ class widgetCustomFunctions(QWidget):
         stream['buffer-size-mb'] = self.spinBox_streaming_buffSize.value()
         stream['max-buffers'] = self.spinBox_streaming_maxBuff.value()
         self.settings.setValue('stream',stream)
-     
+
     def updateFileCachePath(self):
         filePath = self.settings.value('file_cache')
         filePath['path'] = self.lineEdit_fileCache_path.text()
         self.settings.setValue('file_cache',filePath)
-        
+
     def updateOptionalFileCache(self):
         fileCache = self.settings.value('file_cache')
         fileCache['allow-non-empty-temp'] = self.checkBox_fileCache_allowNonEmptyTmp.isChecked()
@@ -410,13 +410,13 @@ class widgetCustomFunctions(QWidget):
         fileCache['cleanup-on-start'] = self.checkBox_fileCache_cleanupStart.isChecked()
         fileCache['offload-io'] = self.checkBox_fileCache_offloadIO.isChecked()
         fileCache['sync-to-flush'] = self.checkBox_fileCache_syncToFlush.isChecked()
-        
+
         fileCache['timeout-sec'] = self.spinBox_fileCache_evictionTimeout.value()
         fileCache['max-eviction'] = self.spinBox_fileCache_maxEviction.value()
         fileCache['max-size-mb'] = self.spinBox_fileCache_maxCacheSize.value()
         fileCache['high-threshold'] = self.spinBox_fileCache_evictMaxThresh.value()
         fileCache['low-threshold'] = self.spinBox_fileCache_evictMinThresh.value()
         fileCache['refresh-sec'] = self.spinBox_fileCache_refreshSec.value()
-        
+
         fileCache['policy'] = file_cache_eviction_choices[self.dropDown_fileCache_evictionPolicy.currentIndex()]
         self.settings.setValue('file_cache',fileCache)

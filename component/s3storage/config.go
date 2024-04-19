@@ -154,17 +154,17 @@ func ParseAndReadDynamicConfig(s3 *S3Storage, opt Options, reload bool) error {
 	}
 	s3.stConfig.concurrency = opt.Concurrency
 
-	// Borrow no-symlinks flag from attribute cache
-	if config.IsSet("attr_cache.no-symlinks") {
-		err := config.UnmarshalKey("attr_cache.no-symlinks", &s3.stConfig.disableSymlink)
+	// by default symlink will be disabled
+	enableSymlinks := false
+	// Borrow enable-symlinks flag from attribute cache
+	if config.IsSet("attr_cache.enable-symlinks") {
+		err := config.UnmarshalKey("attr_cache.enable-symlinks", &enableSymlinks)
 		if err != nil {
-			s3.stConfig.disableSymlink = true
-			log.Err("ParseAndReadDynamicConfig : Failed to unmarshal attr_cache.no-symlinks")
+			enableSymlinks = false
+			log.Err("ParseAndReadDynamicConfig : Failed to unmarshal attr_cache.enable-symlinks")
 		}
-	} else {
-		// by default symlink will be disabled
-		s3.stConfig.disableSymlink = true
 	}
+	s3.stConfig.disableSymlink = !enableSymlinks
 
 	return nil
 }

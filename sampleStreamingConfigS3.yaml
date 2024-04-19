@@ -22,7 +22,6 @@ stream:
 
 attr_cache:
   timeout-sec: 7200
-  no-symlinks: true
 
 s3storage:
   bucket-name: <ACCOUNT_NAME>

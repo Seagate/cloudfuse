@@ -47,7 +47,7 @@ cloudfuse mount [path] [flags]
       --negative-timeout uint32           The negative entry timeout in seconds.
       --network-share                     Run as a network share. Only supported on Windows.
       --no-cache-dirs                     whether or not empty directories should be cached
-      --no-symlinks                       whether or not symlinks should be supported
+      --enable-symlinks                       whether or not symlinks should be supported
       --passphrase string                 Key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.
                                           Key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.
       --read-only                         Mount the system in read only mode. Default value false.

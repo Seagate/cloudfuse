@@ -184,7 +184,7 @@ type AzStorageOptions struct {
 	CaCertFile     string `config:"ca-cert-file" yaml:"-"`
 }
 
-// RegisterEnvVariables : Register environment varilables
+// RegisterEnvVariables : Register environment variables
 func RegisterEnvVariables() {
 	config.BindEnv("azstorage.account-name", EnvAzStorageAccount)
 	config.BindEnv("azstorage.type", EnvAzStorageAccountType)
@@ -555,16 +555,16 @@ func ParseAndReadDynamicConfig(az *AzStorage, opt AzStorageOptions, reload bool)
 		az.stConfig.honourACL = false
 	}
 
-	if config.IsSet("attr_cache.no-symlinks") {
-		err := config.UnmarshalKey("attr_cache.no-symlinks", &az.stConfig.disableSymlink)
+	// by default symlink will be disabled
+	enableSymlinks := false
+	if config.IsSet("attr_cache.enable-symlinks") {
+		err := config.UnmarshalKey("attr_cache.enable-symlinks", &enableSymlinks)
 		if err != nil {
-			az.stConfig.disableSymlink = true
-			log.Err("ParseAndReadDynamicConfig : Failed to unmarshal attr_cache.no-symlinks")
+			enableSymlinks = false
+			log.Err("ParseAndReadDynamicConfig : Failed to unmarshal attr_cache.enable-symlinks")
 		}
-	} else {
-		// by default symlink will be disabled
-		az.stConfig.disableSymlink = true
 	}
+	az.stConfig.disableSymlink = !enableSymlinks
 
 	// Auth related reconfig
 	switch opt.AuthMode {

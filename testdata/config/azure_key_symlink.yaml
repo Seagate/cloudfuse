@@ -24,8 +24,8 @@ file_cache:
 
 attr_cache:
   timeout-sec: 3600
-  no-symlinks: false
-  
+  enable-symlinks: true
+
 azstorage:
   type: { ACCOUNT_TYPE }
   endpoint: { ACCOUNT_ENDPOINT }

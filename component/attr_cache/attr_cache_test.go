@@ -271,7 +271,7 @@ func (suite *attrCacheTestSuite) TestDefault() {
 	suite.assert.Equal("attr_cache", suite.attrCache.Name())
 	suite.assert.EqualValues(120, suite.attrCache.cacheTimeout)
 	suite.assert.True(suite.attrCache.cacheOnList)
-	suite.assert.True(suite.attrCache.noSymlinks)
+	suite.assert.False(suite.attrCache.enableSymlinks)
 	suite.assert.True(suite.attrCache.cacheDirs)
 }
 
@@ -279,13 +279,13 @@ func (suite *attrCacheTestSuite) TestDefault() {
 func (suite *attrCacheTestSuite) TestConfig() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default attr cache generated
-	config := "attr_cache:\n  timeout-sec: 60\n  no-cache-on-list: true\n  no-symlinks: false\n  no-cache-dirs: true"
+	config := "attr_cache:\n  timeout-sec: 60\n  no-cache-on-list: true\n  enable-symlinks: true\n  no-cache-dirs: true"
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal("attr_cache", suite.attrCache.Name())
 	suite.assert.EqualValues(60, suite.attrCache.cacheTimeout)
 	suite.assert.False(suite.attrCache.cacheOnList)
-	suite.assert.False(suite.attrCache.noSymlinks)
+	suite.assert.True(suite.attrCache.enableSymlinks)
 	suite.assert.False(suite.attrCache.cacheDirs)
 }
 
@@ -303,13 +303,13 @@ func (suite *attrCacheTestSuite) TestConfigMaxFiles() {
 func (suite *attrCacheTestSuite) TestConfigZero() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default attr cache generated
-	config := "attr_cache:\n  timeout-sec: 0\n  no-cache-on-list: true\n  no-symlinks: true\n  no-cache-dirs: true"
+	config := "attr_cache:\n  timeout-sec: 0\n  no-cache-on-list: true\n  enable-symlinks: true\n  no-cache-dirs: true"
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal("attr_cache", suite.attrCache.Name())
 	suite.assert.EqualValues(0, suite.attrCache.cacheTimeout)
 	suite.assert.False(suite.attrCache.cacheOnList)
-	suite.assert.True(suite.attrCache.noSymlinks)
+	suite.assert.True(suite.attrCache.enableSymlinks)
 	suite.assert.False(suite.attrCache.cacheDirs)
 }
 
@@ -1453,24 +1453,17 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithMetadata() {
 	}
 }
 
-func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadataNoSymlinks() {
+func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadata() {
 	defer suite.cleanupTest()
 	var paths = []string{"a", "a/", "a/c1", "a/c1/", "a/c2", "a/c1/gc1", "ab", "ab/", "ab/c1", "ac"}
 
-	noSymlinks := true
-	config := fmt.Sprintf("attr_cache:\n  no-symlinks: %t", noSymlinks)
-
 	for _, path := range paths {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		suite.cleanupTest()
-		suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-		suite.assert.EqualValues(noSymlinks, suite.attrCache.cacheOnList)
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
 			suite.addDirectoryToCache("a", true) // add the paths to the cache with IsMetadataRetrieved=true
 
 			options := internal.GetAttrOptions{Name: path}
-			// no call to mock component since metadata is not needed in noSymlinks mode
+			// no call to mock component since metadata is not needed when symlinks are disabled
 
 			_, err := suite.attrCache.GetAttr(options)
 			suite.assert.NoError(err)
@@ -1479,14 +1472,18 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadataNoSymlinks() {
 	}
 }
 
-func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadata() {
+func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadataWithSymlinks() {
 	defer suite.cleanupTest()
 	var paths = []string{"a", "a/", "a/c1", "a/c1/", "a/c2", "a/c1/gc1", "ab", "ab/", "ab/c1", "ac"}
+
+	enableSymlinks := true
+	config := fmt.Sprintf("attr_cache:\n  enable-symlinks: %t", enableSymlinks)
 
 	for _, path := range paths {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		suite.cleanupTest()
-		suite.SetupTest()
+		suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
+		suite.assert.Equal(enableSymlinks, suite.attrCache.enableSymlinks)
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
 			suite.addDirectoryToCache("a", false) // add the paths to the cache with IsMetadataRetrieved=false
@@ -1610,8 +1607,9 @@ func (suite *attrCacheTestSuite) TestCreateLink() {
 	defer suite.cleanupTest()
 	// enabled symlinks
 	suite.cleanupTest() // clean up the default attr cache generated
-	config := "attr_cache:\n  no-symlinks: false"
+	config := "attr_cache:\n  enable-symlinks: true"
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
+	suite.assert.True(suite.attrCache.enableSymlinks)
 	link := "a.lnk"
 	path := "a"
 
@@ -1643,7 +1641,7 @@ func (suite *attrCacheTestSuite) TestCreateLink() {
 	suite.assertUntouched(path)
 }
 
-// Tests CreateLink when no-symlinks is true
+// Tests CreateLink when enable-symlinks is false
 func (suite *attrCacheTestSuite) TestCreateLinkNoSymlinks() {
 	defer suite.cleanupTest()
 	link := "a.lnk"
