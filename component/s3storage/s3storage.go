@@ -443,7 +443,7 @@ func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 func (s3 *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) {
 	if s3.stConfig.disableSymlink {
 		log.Err("S3Storage::ReadLink : %s - Symlink support not enabled", options.Name)
-		return "", syscall.ENOTSUP
+		return "", syscall.ENOENT
 	}
 	log.Trace("S3Storage::ReadLink : Read symlink %s", options.Name)
 
