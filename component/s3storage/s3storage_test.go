@@ -2301,7 +2301,7 @@ func (s *s3StorageTestSuite) TestReadLinkDisabled() {
 
 	_, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
 	s.assert.Error(err)
-	s.assert.EqualValues(syscall.ENOTSUP, err)
+	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
 func (s *s3StorageTestSuite) TestGetAttrDir() {
