@@ -2391,6 +2391,10 @@ func (s *s3StorageTestSuite) TestGetAttrFile() {
 
 func (s *s3StorageTestSuite) TestGetAttrLink() {
 	defer s.cleanupTest()
+	// enable symlinks in config
+	config := generateConfigYaml(storageTestConfigurationParameters) + "attr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.bucket, true)
+	s.assert.False(s.s3Storage.stConfig.disableSymlink)
 	// Setup
 	target := generateFileName()
 	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
