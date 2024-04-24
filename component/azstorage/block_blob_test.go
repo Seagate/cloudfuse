@@ -2211,9 +2211,11 @@ func (s *blockBlobTestSuite) TestGetAttrFile() {
 
 func (s *blockBlobTestSuite) TestGetAttrLink() {
 	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  virtual-directory: true",
+	// enable symlinks in config
+	config := s.config + "\nattr_cache:\n  enable-symlinks: true"
+	vdConfig := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  virtual-directory: true\nattr_cache:\n  enable-symlinks: true",
 		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.BlockKey, s.container)
-	configs := []string{"", vdConfig}
+	configs := []string{config, vdConfig}
 	for _, c := range configs {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		s.tearDownTestHelper(false)
