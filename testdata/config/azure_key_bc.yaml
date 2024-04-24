@@ -18,9 +18,9 @@ libfuse:
 block_cache:
   block-size-mb: 8
   mem-size-mb: 4192
-  
+
   path: block_cache
-  disk-size-mb: 4192  
+  disk-size-mb: 4192
   disk-timeout-sec: 30
 
   prefetch: 120
@@ -28,7 +28,8 @@ block_cache:
 
 attr_cache:
   timeout-sec: 3600
-  
+  enable-symlinks: true
+
 azstorage:
   type: { ACCOUNT_TYPE }
   endpoint: { ACCOUNT_ENDPOINT }

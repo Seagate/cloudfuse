@@ -24,6 +24,7 @@ file_cache:
 
 attr_cache:
   timeout-sec: 3600
+  enable-symlinks: true
 
 s3storage:
   bucket-name: { S3_BUCKET_NAME }
