@@ -99,7 +99,7 @@ func (suite *dirTestSuite) dirTestCleanup(toRemove []string) {
 
 // # Create Directory with a simple name
 func (suite *dirTestSuite) TestDirCreateSimple() {
-	dirName := suite.testPath + "/test1"
+	dirName := filepath.Join(suite.testPath, "test1")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
@@ -109,7 +109,7 @@ func (suite *dirTestSuite) TestDirCreateSimple() {
 
 // # Create Directory that already exists
 func (suite *dirTestSuite) TestDirCreateDuplicate() {
-	dirName := suite.testPath + "/test1"
+	dirName := filepath.Join(suite.testPath, "test1")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 	// duplicate dir - we expect to throw
@@ -131,7 +131,7 @@ func (suite *dirTestSuite) TestDirCreateSplChar() {
 		fmt.Println("Skipping TestDirCreateSplChar on Windows")
 		return
 	}
-	dirName := suite.testPath + "/" + "@#$^&*()_+=-{}[]|?><.,~"
+	dirName := filepath.Join(suite.testPath, "@#$^&*()_+=-{}[]|?><.,~")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
@@ -145,7 +145,7 @@ func (suite *dirTestSuite) TestDirCreateSlashChar() {
 		fmt.Println("Skipping TestDirCreateSlashChar on Windows")
 		return
 	}
-	dirName := suite.testPath + "/" + "PRQ\\STUV"
+	dirName := filepath.Join(suite.testPath, "PRQ\\STUV")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
@@ -155,11 +155,11 @@ func (suite *dirTestSuite) TestDirCreateSlashChar() {
 
 // # Rename a directory
 func (suite *dirTestSuite) TestDirRename() {
-	dirName := suite.testPath + "/test1"
+	dirName := filepath.Join(suite.testPath, "test1")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
-	newName := suite.testPath + "/test1_new"
+	newName := filepath.Join(suite.testPath, "test1_new")
 	err = os.Rename(dirName, newName)
 	suite.NoError(err)
 
@@ -172,15 +172,15 @@ func (suite *dirTestSuite) TestDirRename() {
 
 // # Move an empty directory
 func (suite *dirTestSuite) TestDirMoveEmpty() {
-	dir2Name := suite.testPath + "/test2"
+	dir2Name := filepath.Join(suite.testPath, "test2")
 	err := os.Mkdir(dir2Name, 0777)
 	suite.NoError(err)
 
-	dir3Name := suite.testPath + "/test3"
+	dir3Name := filepath.Join(suite.testPath, "test3")
 	err = os.Mkdir(dir3Name, 0777)
 	suite.NoError(err)
 
-	err = os.Rename(dir2Name, dir3Name+"/test2")
+	err = os.Rename(dir2Name, filepath.Join(dir3Name, "test2"))
 	time.Sleep(1 * time.Second)
 	suite.NoError(err)
 
@@ -190,23 +190,23 @@ func (suite *dirTestSuite) TestDirMoveEmpty() {
 
 // # Move an non-empty directory
 func (suite *dirTestSuite) TestDirMoveNonEmpty() {
-	dir2Name := suite.testPath + "/test2NE"
+	dir2Name := filepath.Join(suite.testPath, "test2NE")
 	err := os.Mkdir(dir2Name, 0777)
 	suite.NoError(err)
 
-	file1Name := dir2Name + "/test.txt"
+	file1Name := filepath.Join(dir2Name, "test.txt")
 	f, err := os.Create(file1Name)
 	suite.NoError(err)
 	f.Close()
 
-	dir3Name := suite.testPath + "/test3NE"
+	dir3Name := filepath.Join(suite.testPath, "test3NE")
 	err = os.Mkdir(dir3Name, 0777)
 	suite.NoError(err)
 
-	err = os.Mkdir(dir3Name+"/abcdTest", 0777)
+	err = os.Mkdir(filepath.Join(dir3Name, "abcdTest"), 0777)
 	suite.NoError(err)
 
-	err = os.Rename(dir2Name, dir3Name+"/test2")
+	err = os.Rename(dir2Name, filepath.Join(dir3Name, "test2"))
 	time.Sleep(1 * time.Second)
 	suite.NoError(err)
 
@@ -216,7 +216,7 @@ func (suite *dirTestSuite) TestDirMoveNonEmpty() {
 
 // # Delete non-empty directory
 func (suite *dirTestSuite) TestDirDeleteEmpty() {
-	dirName := suite.testPath + "/test1_new"
+	dirName := filepath.Join(suite.testPath, "test1_new")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
@@ -225,11 +225,11 @@ func (suite *dirTestSuite) TestDirDeleteEmpty() {
 
 // # Delete non-empty directory
 func (suite *dirTestSuite) TestDirDeleteNonEmpty() {
-	dir3Name := suite.testPath + "/test3NE"
+	dir3Name := filepath.Join(suite.testPath, "test3NE")
 	err := os.Mkdir(dir3Name, 0777)
 	suite.NoError(err)
 
-	err = os.Mkdir(dir3Name+"/abcdTest", 0777)
+	err = os.Mkdir(filepath.Join(dir3Name, "abcdTest"), 0777)
 	suite.NoError(err)
 
 	err = os.Remove(dir3Name)
@@ -247,21 +247,21 @@ func (suite *dirTestSuite) TestDirDeleteNonEmpty() {
 
 // // # Delete non-empty directory recursively
 // func (suite *dirTestSuite) TestDirDeleteRecursive() {
-// 	dirName := suite.testPath + "/testREC"
+// 	dirName := filepath.Join(suite.testPath, "testREC")
 
 // 	err := os.Mkdir(dirName, 0777)
 // 	suite.Equal(nil, err)
 
-// 	err = os.Mkdir(dirName+"/level1", 0777)
+// 	err = os.Mkdir(filepath.Join(dirName, "level1"), 0777)
 // 	suite.Equal(nil, err)
 
-// 	err = os.Mkdir(dirName+"/level2", 0777)
+// 	err = os.Mkdir(filepath.Join(dirName, "level2"), 0777)
 // 	suite.Equal(nil, err)
 
-// 	err = os.Mkdir(dirName+"/level1/l1", 0777)
+// 	err = os.Mkdir(filepath.Join(dirName, "level1", "l1"), 0777)
 // 	suite.Equal(nil, err)
 
-// 	srcFile, err := os.OpenFile(dirName+"/level2/abc.txt", os.O_CREATE, 0777)
+// 	srcFile, err := os.OpenFile(filepath.Join(dirName, "level2", "abc.txt"), os.O_CREATE, 0777)
 // 	suite.Equal(nil, err)
 // 	srcFile.Close()
 
@@ -270,7 +270,7 @@ func (suite *dirTestSuite) TestDirDeleteNonEmpty() {
 
 // # Get stats of a directory
 func (suite *dirTestSuite) TestDirGetStats() {
-	dirName := suite.testPath + "/test3"
+	dirName := filepath.Join(suite.testPath, "test3")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 	// time.Sleep(2 * time.Second)
@@ -294,7 +294,7 @@ func (suite *dirTestSuite) TestDirGetStats() {
 // TODO: Fix Failing Test with ADLS
 // func (suite *dirTestSuite) TestDirChmod() {
 // 	if suite.adlsTest == true {
-// 		dirName := suite.testPath + "/test3"
+// 		dirName := filepath.Join(suite.testPath, "test3")
 // 		err := os.Mkdir(dirName, 0777)
 // 		suite.Equal(nil, err)
 
@@ -311,21 +311,21 @@ func (suite *dirTestSuite) TestDirGetStats() {
 
 // # List directory
 func (suite *dirTestSuite) TestDirList() {
-	testDir := suite.testPath + "/bigTestDir"
+	testDir := filepath.Join(suite.testPath, "bigTestDir")
 	err := os.Mkdir(testDir, 0777)
 	suite.NoError(err)
 
-	dir := filepath.Join(testDir + "/Dir1")
+	dir := filepath.Join(testDir, "Dir1")
 	err = os.Mkdir(dir, 0777)
 	suite.NoError(err)
-	dir = filepath.Join(testDir + "/Dir2")
+	dir = filepath.Join(testDir, "Dir2")
 	err = os.Mkdir(dir, 0777)
 	suite.NoError(err)
-	dir = filepath.Join(testDir + "/Dir3")
+	dir = filepath.Join(testDir, "Dir3")
 	err = os.Mkdir(dir, 0777)
 	suite.NoError(err)
 
-	srcFile, err := os.OpenFile(testDir+"/abc.txt", os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(filepath.Join(testDir, "abc.txt"), os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
 
@@ -339,23 +339,23 @@ func (suite *dirTestSuite) TestDirList() {
 
 // // # List directory recursively
 // func (suite *dirTestSuite) TestDirListRecursive() {
-// 	testDir := suite.testPath + "/bigTestDir"
+// 	testDir := filepath.Join(suite.testPath, "bigTestDir")
 // 	err := os.Mkdir(testDir, 0777)
 // 	suite.Equal(nil, err)
 
-// 	dir := filepath.Join(testDir + "/Dir1")
+// 	dir := filepath.Join(testDir, "Dir1")
 // 	err = os.Mkdir(dir, 0777)
 // 	suite.Equal(nil, err)
 
-// 	dir = filepath.Join(testDir + "/Dir2")
+// 	dir = filepath.Join(testDir, "Dir2")
 // 	err = os.Mkdir(dir, 0777)
 // 	suite.Equal(nil, err)
 
-// 	dir = filepath.Join(testDir + "/Dir3")
+// 	dir = filepath.Join(testDir, "Dir3")
 // 	err = os.Mkdir(dir, 0777)
 // 	suite.Equal(nil, err)
 
-// 	srcFile, err := os.OpenFile(testDir+"/abc.txt", os.O_CREATE, 0777)
+// 	srcFile, err := os.OpenFile(filepath.Join(testDir, "abc.txt"), os.O_CREATE, 0777)
 // 	suite.Equal(nil, err)
 // 	srcFile.Close()
 
@@ -380,14 +380,14 @@ func (suite *dirTestSuite) TestDirRenameFull() {
 		fmt.Println("Skipping this test case for stream direct")
 		return
 	}
-	dirName := suite.testPath + "/full_dir"
-	newName := suite.testPath + "/full_dir_rename"
-	fileName := dirName + "/test_file_"
+	dirName := filepath.Join(suite.testPath, "full_dir")
+	newName := filepath.Join(suite.testPath, "full_dir_rename")
+	fileName := filepath.Join(dirName, "test_file_")
 
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
-	err = os.Mkdir(dirName+"/tmp", 0777)
+	err = os.Mkdir(filepath.Join(dirName, "tmp"), 0777)
 	suite.NoError(err)
 
 	for i := 0; i < 10; i++ {
@@ -421,8 +421,8 @@ func (suite *dirTestSuite) TestGitStash() {
 		return
 	}
 	if clonePtr == "true" || clonePtr == "True" {
-		dirName := suite.testPath + "/stash"
-		tarName := suite.testPath + "/tardir.tar.gz"
+		dirName := filepath.Join(suite.testPath, "stash")
+		tarName := filepath.Join(suite.testPath, "tardir.tar.gz")
 
 		cmd := exec.Command("git", "clone", "https://github.com/wastore/azure-storage-samples-for-net", dirName)
 		_, err := cmd.Output()
@@ -515,11 +515,11 @@ func (suite *dirTestSuite) TestReadDirLink() {
 		return
 	}
 
-	dirName := suite.testPath + "/test_hns"
+	dirName := filepath.Join(suite.testPath, "test_hns")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
-	fileName := dirName + "/small_file.txt"
+	fileName := filepath.Join(dirName, "small_file.txt")
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
@@ -527,7 +527,7 @@ func (suite *dirTestSuite) TestReadDirLink() {
 	err = os.WriteFile(fileName, suite.minBuff, 0777)
 	suite.NoError(err)
 
-	symName := suite.testPath + "/dirlink.lnk"
+	symName := filepath.Join(suite.testPath, "dirlink.lnk")
 	err = os.Symlink(dirName, symName)
 	suite.NoError(err)
 
@@ -552,14 +552,14 @@ func (suite *dirTestSuite) TestReadDirLink() {
 	}
 
 	// temp cache cleanup
-	suite.dirTestCleanup([]string{suite.testCachePath + "/test_hns/small_file.txt", suite.testCachePath + "/dirlink.lnk"})
+	suite.dirTestCleanup([]string{filepath.Join(suite.testCachePath, "test_hns", "small_file.txt"), filepath.Join(suite.testCachePath, "dirlink.lnk")})
 
-	data1, err := os.ReadFile(symName + "/small_file.txt")
+	data1, err := os.ReadFile(filepath.Join(symName, "small_file.txt"))
 	suite.NoError(err)
 	suite.Equal(len(data1), len(suite.minBuff))
 
 	// temp cache cleanup
-	suite.dirTestCleanup([]string{suite.testCachePath + "/test_hns/small_file.txt", suite.testCachePath + "/dirlink.lnk"})
+	suite.dirTestCleanup([]string{filepath.Join(suite.testCachePath, "test_hns", "small_file.txt"), filepath.Join(suite.testCachePath, "dirlink.lnk")})
 
 	data2, err := os.ReadFile(fileName)
 	suite.NoError(err)
@@ -587,10 +587,10 @@ func TestDirTestSuite(t *testing.T) {
 	fmt.Println(testDirName)
 
 	// Create directory for testing the End to End test on mount path
-	dirTest.testPath = pathPtr + "/" + testDirName
+	dirTest.testPath = filepath.Join(pathPtr, testDirName)
 	fmt.Println(dirTest.testPath)
 
-	dirTest.testCachePath = tempPathPtr + "/" + testDirName
+	dirTest.testCachePath = filepath.Join(tempPathPtr, testDirName)
 	fmt.Println(dirTest.testCachePath)
 
 	if adlsPtr == "true" || adlsPtr == "True" {

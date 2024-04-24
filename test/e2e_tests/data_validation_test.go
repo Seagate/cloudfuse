@@ -147,8 +147,8 @@ func (suite *dataValidationTestSuite) TestFileOverwriteWithEchoCommand() {
 // data validation for small sized files
 func (suite *dataValidationTestSuite) TestSmallFileData() {
 	fileName := "small_data.txt"
-	localFilePath := suite.testLocalPath + "/" + fileName
-	remoteFilePath := suite.testMntPath + "/" + fileName
+	localFilePath := filepath.Join(suite.testLocalPath, fileName)
+	remoteFilePath := filepath.Join(suite.testMntPath, fileName)
 
 	// create the file in local directory
 	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
@@ -176,8 +176,8 @@ func (suite *dataValidationTestSuite) TestMediumFileData() {
 		return
 	}
 	fileName := "medium_data.txt"
-	localFilePath := suite.testLocalPath + "/" + fileName
-	remoteFilePath := suite.testMntPath + "/" + fileName
+	localFilePath := filepath.Join(suite.testLocalPath, fileName)
+	remoteFilePath := filepath.Join(suite.testMntPath, fileName)
 
 	// create the file in local directory
 	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
@@ -205,8 +205,8 @@ func (suite *dataValidationTestSuite) TestLargeFileData() {
 		return
 	}
 	fileName := "large_data.txt"
-	localFilePath := suite.testLocalPath + "/" + fileName
-	remoteFilePath := suite.testMntPath + "/" + fileName
+	localFilePath := filepath.Join(suite.testLocalPath, fileName)
+	remoteFilePath := filepath.Join(suite.testMntPath, fileName)
 
 	// create the file in local directory
 	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
@@ -230,8 +230,8 @@ func (suite *dataValidationTestSuite) TestLargeFileData() {
 // negative test case for data validation where the local file is updated
 func (suite *dataValidationTestSuite) TestDataValidationNegative() {
 	fileName := "updated_data.txt"
-	localFilePath := suite.testLocalPath + "/" + fileName
-	remoteFilePath := suite.testMntPath + "/" + fileName
+	localFilePath := filepath.Join(suite.testLocalPath, fileName)
+	remoteFilePath := filepath.Join(suite.testMntPath, fileName)
 
 	// create the file in local directory
 	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
@@ -269,8 +269,8 @@ func (suite *dataValidationTestSuite) TestDataValidationNegative() {
 func validateMultipleFilesData(jobs <-chan int, results chan<- string, fileSize string, suite *dataValidationTestSuite) {
 	for i := range jobs {
 		fileName := fileSize + strconv.Itoa(i) + ".txt"
-		localFilePath := suite.testLocalPath + "/" + fileName
-		remoteFilePath := suite.testMntPath + "/" + fileName
+		localFilePath := filepath.Join(suite.testLocalPath, fileName)
+		remoteFilePath := filepath.Join(suite.testMntPath, fileName)
 		fmt.Println("Local file path: " + localFilePath)
 
 		// create the file in local directory
@@ -295,10 +295,10 @@ func validateMultipleFilesData(jobs <-chan int, results chan<- string, fileSize 
 		suite.NoError(err)
 
 		suite.copyToMountDir(localFilePath, remoteFilePath)
-		suite.dataValidationTestCleanup([]string{suite.testCachePath + "/" + fileName})
+		suite.dataValidationTestCleanup([]string{filepath.Join(suite.testCachePath, fileName)})
 		suite.validateData(localFilePath, remoteFilePath)
 
-		suite.dataValidationTestCleanup([]string{localFilePath, suite.testCachePath + "/" + fileName})
+		suite.dataValidationTestCleanup([]string{localFilePath, filepath.Join(suite.testCachePath, fileName)})
 
 		results <- remoteFilePath
 	}
@@ -403,13 +403,13 @@ func TestDataValidationTestSuite(t *testing.T) {
 	testDirName := getDataValidationTestDirName(10)
 
 	// Create directory for testing the End to End test on mount path
-	dataValidationTest.testMntPath = dataValidationMntPathPtr + "/" + testDirName
+	dataValidationTest.testMntPath = filepath.Join(dataValidationMntPathPtr, testDirName)
 	fmt.Println(dataValidationTest.testMntPath)
 
 	dataValidationTest.testLocalPath, _ = filepath.Abs(dataValidationMntPathPtr + "/..")
 	fmt.Println(dataValidationTest.testLocalPath)
 
-	dataValidationTest.testCachePath = dataValidationTempPathPtr + "/" + testDirName
+	dataValidationTest.testCachePath = filepath.Join(dataValidationTempPathPtr, testDirName)
 	fmt.Println(dataValidationTest.testCachePath)
 
 	if dataValidationAdlsPtr == "true" || dataValidationAdlsPtr == "True" {
