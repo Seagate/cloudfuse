@@ -329,6 +329,7 @@ func (suite *dirTestSuite) TestDirList() {
 	suite.NoError(err)
 	srcFile.Close()
 
+	time.Sleep(1 * time.Second)
 	files, err := os.ReadDir(testDir)
 	suite.NoError(err)
 	suite.Len(files, 4)
