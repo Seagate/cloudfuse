@@ -740,8 +740,8 @@ func (s *s3StorageTestSuite) TestStreamDirWindowsNameConvert() {
 		return
 	}
 	storageTestConfigurationParameters.RestrictedCharsWin = true
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 	defer s.cleanupTest()
 	// Setup
 	name := generateDirectoryName()
@@ -935,8 +935,8 @@ func (s *s3StorageTestSuite) TestCreateFileWindowsNameConvert() {
 		return
 	}
 	storageTestConfigurationParameters.RestrictedCharsWin = true
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 	defer s.cleanupTest()
 	// Setup
 	// Test with characters in folder and filepath
@@ -1133,8 +1133,8 @@ func (s *s3StorageTestSuite) TestCopyFromFileWindowsNameConvert() {
 		return
 	}
 	storageTestConfigurationParameters.RestrictedCharsWin = true
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -1325,8 +1325,8 @@ func (s *s3StorageTestSuite) TestWriteFileMultipartUpload() {
 	defer s.cleanupTest()
 	storageTestConfigurationParameters.PartSizeMb = 5
 	storageTestConfigurationParameters.UploadCutoffMb = 5
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -1371,8 +1371,8 @@ func (s *s3StorageTestSuite) TestWriteFileWindowsNameConvert() {
 		return
 	}
 	storageTestConfigurationParameters.RestrictedCharsWin = true
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 	defer s.cleanupTest()
 	// Setup
 	// Test with characters in folder and filepath
@@ -1436,8 +1436,8 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 		return
 	}
 	storageTestConfigurationParameters.RestrictedCharsWin = true
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -1816,8 +1816,8 @@ func (s *s3StorageTestSuite) TestOverwriteBlocks() {
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	storageTestConfigurationParameters.UploadCutoffMb = 5
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -1858,8 +1858,8 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocks() {
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	storageTestConfigurationParameters.UploadCutoffMb = 5
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -1898,8 +1898,8 @@ func (s *s3StorageTestSuite) TestAppendBlocks() {
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	storageTestConfigurationParameters.UploadCutoffMb = 5
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -1938,8 +1938,8 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksLargeFile() {
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	storageTestConfigurationParameters.UploadCutoffMb = 5
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -1978,8 +1978,8 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksMiddleLargeFile() {
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
 	storageTestConfigurationParameters.UploadCutoffMb = 5
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -2155,8 +2155,8 @@ func (s *s3StorageTestSuite) TestRenameFileWindowsNameConvert() {
 		return
 	}
 	storageTestConfigurationParameters.RestrictedCharsWin = true
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 	defer s.cleanupTest()
 	// Setup
 	src := generateFileName()
@@ -2215,6 +2215,10 @@ func (s *s3StorageTestSuite) TestRenameFileError() {
 
 func (s *s3StorageTestSuite) TestCreateLink() {
 	defer s.cleanupTest()
+	// enable symlinks in config
+	config := generateConfigYaml(storageTestConfigurationParameters) + "attr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.bucket, true)
+	s.assert.False(s.s3Storage.stConfig.disableSymlink)
 	// Setup
 	target := generateFileName()
 	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
@@ -2237,8 +2241,31 @@ func (s *s3StorageTestSuite) TestCreateLink() {
 	s.assert.Equal(target, result)
 }
 
+func (s *s3StorageTestSuite) TestCreateLinkDisabled() {
+	defer s.cleanupTest()
+	// Setup
+	target := generateFileName()
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
+	name := generateFileName()
+	notSupported := syscall.ENOTSUP
+
+	err := s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+	s.assert.Error(err)
+	s.assert.EqualError(err, notSupported.Error())
+
+	// link should not exist
+	attr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.Nil(attr)
+	s.assert.Error(err)
+	s.assert.True(os.IsNotExist(err))
+}
+
 func (s *s3StorageTestSuite) TestReadLink() {
 	defer s.cleanupTest()
+	// enable symlinks in config
+	config := generateConfigYaml(storageTestConfigurationParameters) + "attr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.bucket, true)
+	s.assert.False(s.s3Storage.stConfig.disableSymlink)
 	// Setup
 	target := generateFileName()
 
@@ -2255,6 +2282,20 @@ func (s *s3StorageTestSuite) TestReadLink() {
 
 func (s *s3StorageTestSuite) TestReadLinkError() {
 	defer s.cleanupTest()
+	// enable symlinks in config
+	config := generateConfigYaml(storageTestConfigurationParameters) + "attr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.bucket, true)
+	s.assert.False(s.s3Storage.stConfig.disableSymlink)
+	// Setup
+	name := generateFileName()
+
+	_, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
+	s.assert.Error(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
+}
+
+func (s *s3StorageTestSuite) TestReadLinkDisabled() {
+	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
 
@@ -2265,42 +2306,25 @@ func (s *s3StorageTestSuite) TestReadLinkError() {
 
 func (s *s3StorageTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	configs := []string{"", vdConfig}
-	for _, c := range configs {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.bucket, true)
-		testName := ""
-		if c != "" {
-			testName = "virtual-directory"
-		}
-		s.Run(testName, func() {
-			// Setup
-			dirName := generateDirectoryName()
-			err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: dirName})
-			s.assert.NoError(err)
-			// since CreateDir doesn't do anything, let's put an object with that prefix
-			filename := dirName + "/" + generateFileName()
-			_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: filename})
-			s.assert.NoError(err)
-			// Now we should be able to see the directory
-			props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: dirName})
-			deleteError := s.s3Storage.DeleteFile(internal.DeleteFileOptions{Name: filename})
-			s.assert.NoError(err)
-			s.assert.NotNil(props)
-			s.assert.True(props.IsDir())
-			s.assert.NoError(deleteError)
-		})
-	}
+	// Setup
+	dirName := generateDirectoryName()
+	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: dirName})
+	s.assert.NoError(err)
+	// since CreateDir doesn't do anything, let's put an object with that prefix
+	filename := dirName + "/" + generateFileName()
+	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: filename})
+	s.assert.NoError(err)
+	// Now we should be able to see the directory
+	props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: dirName})
+	deleteError := s.s3Storage.DeleteFile(internal.DeleteFileOptions{Name: filename})
+	s.assert.NoError(err)
+	s.assert.NotNil(props)
+	s.assert.True(props.IsDir())
+	s.assert.NoError(deleteError)
 }
 
 func (s *s3StorageTestSuite) TestGetAttrVirtualDir() {
 	defer s.cleanupTest()
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-	s.tearDownTestHelper(false)
-	s.setupTestHelper(vdConfig, s.bucket, true)
 	// Setup
 	dirName := generateFileName()
 	name := dirName + "/" + generateFileName()
@@ -2323,10 +2347,6 @@ func (s *s3StorageTestSuite) TestGetAttrVirtualDir() {
 
 func (s *s3StorageTestSuite) TestGetAttrVirtualDirSubDir() {
 	defer s.cleanupTest()
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-	s.tearDownTestHelper(false)
-	s.setupTestHelper(vdConfig, s.bucket, true)
 	// Setup
 	dirName := generateFileName()
 	subDirName := dirName + "/" + generateFileName()
@@ -2357,154 +2377,93 @@ func (s *s3StorageTestSuite) TestGetAttrVirtualDirSubDir() {
 
 func (s *s3StorageTestSuite) TestGetAttrFile() {
 	defer s.cleanupTest()
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	configs := []string{"", vdConfig}
-	for _, c := range configs {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.bucket, true)
-		testName := ""
-		if c != "" {
-			testName = "virtual-directory"
-		}
-		s.Run(testName, func() {
-			// Setup
-			name := generateFileName()
-			_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-			s.assert.NoError(err)
+	// Setup
+	name := generateFileName()
+	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
 
-			props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.NoError(err)
-			s.assert.NotNil(props)
-			s.assert.False(props.IsDir())
-			s.assert.False(props.IsSymlink())
-		})
-	}
+	props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.NoError(err)
+	s.assert.NotNil(props)
+	s.assert.False(props.IsDir())
+	s.assert.False(props.IsSymlink())
 }
 
 func (s *s3StorageTestSuite) TestGetAttrLink() {
 	defer s.cleanupTest()
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	configs := []string{"", vdConfig}
-	for _, c := range configs {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.bucket, true)
-		testName := ""
-		if c != "" {
-			testName = "virtual-directory"
-		}
-		s.Run(testName, func() {
-			// Setup
-			target := generateFileName()
-			s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
-			name := generateFileName()
-			s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+	// enable symlinks in config
+	config := generateConfigYaml(storageTestConfigurationParameters) + "attr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.bucket, true)
+	s.assert.False(s.s3Storage.stConfig.disableSymlink)
+	// Setup
+	target := generateFileName()
+	s.s3Storage.CreateFile(internal.CreateFileOptions{Name: target})
+	name := generateFileName()
+	s.s3Storage.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
 
-			props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.NoError(err)
-			s.assert.NotNil(props)
-			s.assert.True(props.IsSymlink())
-			s.assert.NotEmpty(props.Metadata)
-			s.assert.Contains(props.Metadata, symlinkKey)
-			s.assert.EqualValues("true", props.Metadata[symlinkKey])
-		})
-	}
+	props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.NoError(err)
+	s.assert.NotNil(props)
+	s.assert.True(props.IsSymlink())
+	s.assert.NotEmpty(props.Metadata)
+	s.assert.Contains(props.Metadata, symlinkKey)
+	s.assert.EqualValues("true", props.Metadata[symlinkKey])
 }
 
 func (s *s3StorageTestSuite) TestGetAttrFileSize() {
 	defer s.cleanupTest()
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	configs := []string{"", vdConfig}
-	for _, c := range configs {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.bucket, true)
-		testName := ""
-		if c != "" {
-			testName = "virtual-directory"
-		}
-		s.Run(testName, func() {
-			// Setup
-			name := generateFileName()
-			h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-			s.assert.NoError(err)
-			testData := "test data"
-			data := []byte(testData)
-			_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-			s.assert.NoError(err)
+	// Setup
+	name := generateFileName()
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
+	testData := "test data"
+	data := []byte(testData)
+	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.NoError(err)
 
-			props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.NoError(err)
-			s.assert.NotNil(props)
-			s.assert.False(props.IsDir())
-			s.assert.False(props.IsSymlink())
-			s.assert.EqualValues(len(testData), props.Size)
-		})
-	}
+	props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.NoError(err)
+	s.assert.NotNil(props)
+	s.assert.False(props.IsDir())
+	s.assert.False(props.IsSymlink())
+	s.assert.EqualValues(len(testData), props.Size)
 }
 
 func (s *s3StorageTestSuite) TestGetAttrFileTime() {
 	defer s.cleanupTest()
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	configs := []string{"", vdConfig}
-	for _, c := range configs {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.bucket, true)
-		testName := ""
-		if c != "" {
-			testName = "virtual-directory"
-		}
-		s.Run(testName, func() {
-			// Setup
-			name := generateFileName()
-			h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
-			s.assert.NoError(err)
-			testData := "test data"
-			data := []byte(testData)
-			_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-			s.assert.NoError(err)
+	// Setup
+	name := generateFileName()
+	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})
+	s.assert.NoError(err)
+	testData := "test data"
+	data := []byte(testData)
+	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.NoError(err)
 
-			before, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.NoError(err)
-			s.assert.NotNil(before.Mtime)
+	before, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.NoError(err)
+	s.assert.NotNil(before.Mtime)
 
-			time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
+	time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
 
-			_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-			s.assert.NoError(err)
+	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.NoError(err)
 
-			after, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.NoError(err)
-			s.assert.NotNil(after.Mtime)
+	after, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.NoError(err)
+	s.assert.NotNil(after.Mtime)
 
-			s.assert.True(after.Mtime.After(before.Mtime))
-		})
-	}
+	s.assert.True(after.Mtime.After(before.Mtime))
 }
 
 func (s *s3StorageTestSuite) TestGetAttrError() {
 	defer s.cleanupTest()
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	configs := []string{"", vdConfig}
-	for _, c := range configs {
-		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
-		s.tearDownTestHelper(false)
-		s.setupTestHelper(c, s.bucket, true)
-		testName := ""
-		if c != "" {
-			testName = "virtual-directory"
-		}
-		s.Run(testName, func() {
-			// Setup
-			name := generateFileName()
+	// Setup
+	name := generateFileName()
 
-			_, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
-			s.assert.Error(err)
-			s.assert.EqualValues(syscall.ENOENT, err)
-		})
-	}
+	_, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.Error(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
 }
 
 // uploads data from a temp file and downloads the full object and tests the correct data was received
@@ -2647,8 +2606,8 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsSmallFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -2670,8 +2629,8 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsChunkedFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -2698,8 +2657,8 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsError() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 	// Setup
 	name := generateFileName()
 
@@ -2712,8 +2671,8 @@ func (s *s3StorageTestSuite) TestFlushFileEmptyFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -2735,8 +2694,8 @@ func (s *s3StorageTestSuite) TestFlushFileChunkedFile() {
 	defer s.cleanupTest()
 	blockSizeMB := 5
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -2765,8 +2724,8 @@ func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -2804,8 +2763,8 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -2843,8 +2802,8 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -2902,8 +2861,8 @@ func (s *s3StorageTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -2968,8 +2927,8 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -3020,8 +2979,8 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	blockSizeMB := 5
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -3079,8 +3038,8 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	blockSizeMB := 7
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -3135,8 +3094,8 @@ func (s *s3StorageTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	blockSizeMB := 7
 	blockSizeBytes := blockSizeMB * common.MbToBytes
 	storageTestConfigurationParameters.PartSizeMb = int64(blockSizeMB)
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
 
 	// Setup
 	name := generateFileName()
@@ -3230,9 +3189,9 @@ func (s *s3StorageTestSuite) UtilityFunctionTestTruncateFileToSmaller(size int, 
 	// Setup
 	storageTestConfigurationParameters.PartSizeMb = 5
 	storageTestConfigurationParameters.UploadCutoffMb = 5
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	config := generateConfigYaml(storageTestConfigurationParameters)
 	s.tearDownTestHelper(false)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	s.setupTestHelper(config, s.bucket, true)
 	// // This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 
 	name := generateFileName()
@@ -3264,9 +3223,9 @@ func (s *s3StorageTestSuite) UtilityFunctionTruncateFileToLarger(size int, trunc
 	// Setup
 	storageTestConfigurationParameters.PartSizeMb = 5
 	storageTestConfigurationParameters.UploadCutoffMb = 5
-	vdConfig := generateConfigYaml(storageTestConfigurationParameters)
+	config := generateConfigYaml(storageTestConfigurationParameters)
 	s.tearDownTestHelper(false)
-	s.setupTestHelper(vdConfig, s.bucket, true)
+	s.setupTestHelper(config, s.bucket, true)
 
 	name := generateFileName()
 	h, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: name})

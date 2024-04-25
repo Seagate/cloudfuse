@@ -380,12 +380,12 @@ func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 
 // Get attributes for the given file path.
 // Return ENOENT if there is no corresponding object in the bucket.
-// name should not have a trailing slash (nothing will be found!).
+// name should not have a trailing slash (or nothing will be found!).
 func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getFileAttr : name %s", name)
 	isSymlink := false
 	object, err := cl.headObject(name, isSymlink)
-	if err == syscall.ENOENT {
+	if err == syscall.ENOENT && !cl.Config.disableSymlink {
 		isSymlink = true
 		return cl.headObject(name, isSymlink)
 	}

@@ -457,6 +457,10 @@ func (az *AzStorage) CopyFromFile(options internal.CopyFromFileOptions) error {
 
 // Symlink operations
 func (az *AzStorage) CreateLink(options internal.CreateLinkOptions) error {
+	if az.stConfig.disableSymlink {
+		log.Err("AzStorage::CreateLink : %s -> %s - Symlink support not enabled", options.Name, options.Target)
+		return syscall.ENOTSUP
+	}
 	log.Trace("AzStorage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
 	err := az.storage.CreateLink(options.Name, options.Target)
 
@@ -469,6 +473,10 @@ func (az *AzStorage) CreateLink(options internal.CreateLinkOptions) error {
 }
 
 func (az *AzStorage) ReadLink(options internal.ReadLinkOptions) (string, error) {
+	if az.stConfig.disableSymlink {
+		log.Err("AzStorage::ReadLink : %s - Symlink support not enabled", options.Name)
+		return "", syscall.ENOENT
+	}
 	log.Trace("AzStorage::ReadLink : Read symlink %s", options.Name)
 	data, err := az.storage.ReadBuffer(options.Name, 0, 0)
 

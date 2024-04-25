@@ -30,6 +30,7 @@ import (
 	"fmt"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -129,6 +130,18 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 		s3.stConfig.checksumAlgorithm = opt.ChecksumAlgorithm
 	}
 
+	// by default symlink will be disabled
+	enableSymlinks := false
+	// Borrow enable-symlinks flag from attribute cache
+	if config.IsSet("attr_cache.enable-symlinks") {
+		err := config.UnmarshalKey("attr_cache.enable-symlinks", &enableSymlinks)
+		if err != nil {
+			enableSymlinks = false
+			log.Err("ParseAndReadDynamicConfig : Failed to unmarshal attr_cache.enable-symlinks")
+		}
+	}
+	s3.stConfig.disableSymlink = !enableSymlinks
+
 	// TODO: add more config options to customize AWS SDK behavior and import them here
 
 	return nil
@@ -152,6 +165,18 @@ func ParseAndReadDynamicConfig(s3 *S3Storage, opt Options, reload bool) error {
 		s3.stConfig.uploadCutoff = opt.UploadCutoffMb * common.MbToBytes
 	}
 	s3.stConfig.concurrency = opt.Concurrency
+
+	// by default symlink will be disabled
+	enableSymlinks := false
+	// Borrow enable-symlinks flag from attribute cache
+	if config.IsSet("attr_cache.enable-symlinks") {
+		err := config.UnmarshalKey("attr_cache.enable-symlinks", &enableSymlinks)
+		if err != nil {
+			enableSymlinks = false
+			log.Err("ParseAndReadDynamicConfig : Failed to unmarshal attr_cache.enable-symlinks")
+		}
+	}
+	s3.stConfig.disableSymlink = !enableSymlinks
 
 	return nil
 }

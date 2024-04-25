@@ -1752,6 +1752,10 @@ func (s *datalakeTestSuite) TestCopyFromFileWindowsNameConvert() {
 
 func (s *datalakeTestSuite) TestCreateLink() {
 	defer s.cleanupTest()
+	// enable symlinks in config
+	config := s.config + "\nattr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.container, true)
+	s.assert.False(s.az.stConfig.disableSymlink)
 	// Setup
 	target := generateFileName()
 	s.az.CreateFile(internal.CreateFileOptions{Name: target})
@@ -1775,8 +1779,30 @@ func (s *datalakeTestSuite) TestCreateLink() {
 	s.assert.EqualValues(target, data)
 }
 
+func (s *datalakeTestSuite) TestCreateLinkDisabled() {
+	defer s.cleanupTest()
+	// Setup
+	target := generateFileName()
+	s.az.CreateFile(internal.CreateFileOptions{Name: target})
+	name := generateFileName()
+
+	err := s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+	s.assert.Error(err)
+	s.assert.EqualError(err, syscall.ENOTSUP.Error())
+
+	// Link should not be in the account
+	link := s.containerUrl.NewRootDirectoryURL().NewFileURL(name)
+	props, err := link.GetProperties(ctx)
+	s.assert.Nil(props)
+	s.assert.Error(err)
+}
+
 func (s *datalakeTestSuite) TestReadLink() {
 	defer s.cleanupTest()
+	// enable symlinks in config
+	config := s.config + "\nattr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.container, true)
+	s.assert.False(s.az.stConfig.disableSymlink)
 	// Setup
 	target := generateFileName()
 	s.az.CreateFile(internal.CreateFileOptions{Name: target})
@@ -1789,6 +1815,20 @@ func (s *datalakeTestSuite) TestReadLink() {
 }
 
 func (s *datalakeTestSuite) TestReadLinkError() {
+	defer s.cleanupTest()
+	// enable symlinks in config
+	config := s.config + "\nattr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.container, true)
+	s.assert.False(s.az.stConfig.disableSymlink)
+	// Setup
+	name := generateFileName()
+
+	_, err := s.az.ReadLink(internal.ReadLinkOptions{Name: name})
+	s.assert.Error(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
+}
+
+func (s *datalakeTestSuite) TestReadLinkDisabled() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -1825,6 +1865,10 @@ func (s *datalakeTestSuite) TestGetAttrFile() {
 
 func (s *datalakeTestSuite) TestGetAttrLink() {
 	defer s.cleanupTest()
+	// enable symlinks in config
+	config := s.config + "\nattr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.container, true)
+	s.assert.False(s.az.stConfig.disableSymlink)
 	// Setup
 	target := generateFileName()
 	s.az.CreateFile(internal.CreateFileOptions{Name: target})

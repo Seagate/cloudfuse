@@ -20,7 +20,6 @@ file_cache:
 
 attr_cache:
   timeout-sec: 7200
-  no-symlinks: true
 
 azstorage:
   type: block
@@ -29,4 +28,3 @@ azstorage:
   endpoint: https://<ACCOUNT_NAME>.blob.core.windows.net
   mode: sas
   container: <CONTAINER_NAME>
- 
