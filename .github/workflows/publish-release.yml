@@ -1,6 +1,8 @@
 name: Release binaries
 on:
   push:
+    branches:
+      - fix-rhel-builds
     tags:
       - 'v*'
 
@@ -242,6 +244,6 @@ jobs:
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          args: release --snapshot
+        #env:
+        #  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
