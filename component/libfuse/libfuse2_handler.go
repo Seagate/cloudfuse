@@ -544,26 +544,12 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Open : %s", name)
 
-	//Create an empty file and use a handle with it for now
-	err := os.MkdirAll(path, common.DefaultAllowOtherPermissionBits)
-	if err != nil {
-		log.Err("FileCache::OpenFile : error creating directory structure for file %s [%s]", name, err.Error())
-	}
-	f, err := common.OpenFile(path, os.O_CREATE|os.O_RDWR, common.DefaultAllowOtherPermissionBits)
-	if err != nil {
-		log.Err("FileCache::OpenFile : error creating new file %s [%s]", name, err.Error())
-	}
-
-	handle := handlemap.NewHandle(name)
-	inf, err := f.Stat()
-	if err == nil {
-		handle.Size = inf.Size()
-	}
-	handle.UnixFD = uint64(f.Fd())
-	handle.Flags.Set(handlemap.HandleFlagCached)
-
-	log.Info("FileCache::OpenFile : file=%s, fd=%d", name, f.Fd())
-	handle.SetFileObject(f)
+	handle, err := fuseFS.NextComponent().OpenFile(
+		internal.OpenFileOptions{
+			Name:  name,
+			Flags: flags,
+			Mode:  fs.FileMode(fuseFS.filePermission),
+		})
 
 	if err != nil {
 		log.Err("Libfuse::Open : Failed to open %s [%s]", name, err.Error())
@@ -600,16 +586,6 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 		log.Trace("Libfuse::Read : error getting handle for path %s, handle: %d", path, fh)
 		return -fuse.EBADF
 	}
-
-	name := trimFusePath(path)
-	name = common.NormalizeObjectName(name)
-
-	handle, _ = fuseFS.NextComponent().OpenFile(
-		internal.OpenFileOptions{
-			Name:  name,
-			Flags: 0,
-			Mode:  fs.FileMode(fuseFS.filePermission),
-		})
 
 	offset := uint64(ofst)
 
@@ -649,16 +625,6 @@ func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int 
 		log.Trace("Libfuse::Write : error getting handle for path %s, handle: %d", path, fh)
 		return -fuse.EBADF
 	}
-
-	name := trimFusePath(path)
-	name = common.NormalizeObjectName(name)
-
-	handle, _ = fuseFS.NextComponent().OpenFile(
-		internal.OpenFileOptions{
-			Name:  name,
-			Flags: 0,
-			Mode:  fs.FileMode(fuseFS.filePermission),
-		})
 
 	bytesWritten, err := fuseFS.NextComponent().WriteFile(
 		internal.WriteFileOptions{
