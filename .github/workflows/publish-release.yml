@@ -202,8 +202,6 @@ jobs:
           mkdir -p $HOME/.local/bin
           tar -xf zig.tar.xz -C $HOME/.local/bin
           echo "$HOME/.local/bin/zig-linux-x86_64-${{ env.zig }}" >> $GITHUB_PATH
-          echo $PATH
-          zig version
 
       - name: Install Go
         uses: actions/setup-go@v5
