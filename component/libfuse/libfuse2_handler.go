@@ -607,23 +607,7 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Open : %s", name)
 
-	handle, err := fuseFS.NextComponent().OpenFile(
-		internal.OpenFileOptions{
-			Name:  name,
-			Flags: flags,
-			Mode:  fs.FileMode(fuseFS.filePermission),
-		})
-
-	if err != nil {
-		log.Err("Libfuse::Open : Failed to open %s [%s]", name, err.Error())
-		if os.IsNotExist(err) {
-			return -fuse.ENOENT, 0
-		} else if os.IsPermission(err) {
-			return -fuse.EACCES, 0
-		}
-
-		return -fuse.EIO, 0
-	}
+	handle := handlemap.NewHandle(name)
 
 	fh := handlemap.Add(handle)
 	// Don't think we need this
@@ -644,7 +628,30 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 	log.Debug("Libfuse::Read : reading path %s, handle: %d", path, fh)
 	// Get the filehandle
+
+	name := trimFusePath(path)
+	name = common.NormalizeObjectName(name)
+
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
+	if handle.Size == 0 && handle.GetFileObject().Name() == "" {
+		var err error
+		handle, err = fuseFS.NextComponent().OpenFile(
+			internal.OpenFileOptions{
+				Name:  name,
+				Flags: 0, //TODO: get the proper flag that Open() has
+				Mode:  fs.FileMode(fuseFS.filePermission),
+			})
+		if err != nil {
+			log.Err("Libfuse::Open : Failed to open %s [%s]", name, err.Error())
+			if os.IsNotExist(err) {
+				return -fuse.ENOENT
+			} else if os.IsPermission(err) {
+				return -fuse.EACCES
+			}
+			return -fuse.EIO
+		}
+	}
+
 	if !exists {
 		log.Trace("Libfuse::Read : error getting handle for path %s, handle: %d", path, fh)
 		return -fuse.EBADF
