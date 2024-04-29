@@ -1,0 +1,20 @@
+[Unit]
+Description=Cloudfuse is an open source project developed to provide a virtual filesystem backed by S3 or Azure storage.
+After=network-online.target
+Requires=network-online.target
+
+[Service]
+# User service will run as.
+User=CloudfuseUser
+# Path to the location Cloudfuse will mount to. Note this folder must currently exist.
+Environment=MoutingPoint=/path/to/mounting/point
+# Path to the configuration file.
+Environment=ConfigFile=/path/to/config/file/config.yaml
+
+# Under the hood
+Type=forking
+ExecStart=/usr/bin/cloudfuse mount ${MoutingPoint} --config-file=${ConfigFile}
+ExecStop=/usr/bin/fusermount -u ${MoutingPoint} -z
+
+[Install]
+WantedBy=multi-user.target

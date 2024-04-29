@@ -17,7 +17,7 @@ jobs:
     name: Build and Test on Linux
     runs-on: ubuntu-latest
     env:
-      go: '1.21'
+      go: '1.22'
       cgo: ''
       containerName: 'test-cnt-ubn'
 
@@ -36,14 +36,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go }}
           check-latest: true
       - run: go version
 
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10' 
 
@@ -116,7 +116,7 @@ jobs:
     name: Build and Test on Windows
     runs-on: windows-latest
     env:
-      go: '1.21'
+      go: '1.22'
       cgo: '0'
       containerName: 'test-cnt-win'
 
@@ -125,7 +125,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go }}
           check-latest: true
@@ -141,65 +141,20 @@ jobs:
         run: |
           ./build.sh
 
-      - name: Create Azure Configuration File on Windows
-        run: |-
-          $cnfFile="~\azuretest.json"
-          Write-Host $cnfFile
-          $content = @"
-          {
-            "block-acct": "${{ secrets.AZTEST_BLOCK_ACC_NAME }}",
-            "adls-acct": "${{ secrets.AZTEST_ADLS_ACC_NAME }}",
-            "block-cont": "${{ env.containerName }}",
-            "adls-cont": "${{ env.containerName }}",
-            "block-key": "${{ secrets.AZTEST_BLOCK_KEY }}",
-            "adls-key": "${{ secrets.AZTEST_ADLS_KEY }}",
-            "block-sas": "${{ secrets.AZTEST_BLOCK_SAS }}",
-            "block-cont-sas-ubn-18": "${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_18 }}",
-            "block-cont-sas-ubn-20": "${{ secrets.AZTEST_BLOCK_CONT_SAS_UBN_20 }}",
-            "adls-sas": "${{ secrets.AZTEST_ADLS_SAS }}",
-            "msi-appid": "${{ secrets.AZTEST_APP_ID }}",
-            "msi-resid": "${{ secrets.AZTEST_RES_ID }}",
-            "msi-objid": "${{ secrets.AZTEST_OBJ_ID }}",
-            "spn-client": "${{ secrets.AZTEST_CLIENT }}",
-            "spn-tenant": "${{ secrets.AZTEST_TENANT }}",
-            "spn-secret": "${{ secrets.AZTEST_SECRET }}",
-            "skip-msi": true,
-            "proxy-address": ""
-          }
-          "@
-          $content | Out-File -FilePath $cnfFile -Encoding Ascii
-        shell: powershell
-
-      - name: Create S3 Configuration File on Windows
-        run: |-
-          $cnfFile="~\s3test.json"
-          Write-Host $cnfFile
-          $content = @"
-          {
-            "bucket-name": "${{ secrets.S3TEST_BUCKET_NAME }}",
-            "access-key": "${{ secrets.S3TEST_ACCESS_KEY }}",
-            "secret-key": "${{ secrets.S3TEST_SECRET_KEY }}",
-            "endpoint": "${{ secrets.S3TEST_ENDPOINT }}",
-            "region": "${{ secrets.S3TEST_REGION }}"
-          }
-          "@
-          $content | Out-File -FilePath $cnfFile -Encoding Ascii
-        shell: powershell
-
       - name: Run unit tests
-        run: go test -v -timeout=1h ./... --tags=unittest   
+        run: go test -v -timeout=1h ./... --tags=unittest,authtest
     
   lint:
     name: Lint
     runs-on: ubuntu-latest
     env:
-      go: '1.21'
+      go: '1.22'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go }}
           check-latest: true
@@ -216,7 +171,7 @@ jobs:
           sudo apt-get install libfuse-dev
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v4
         with:
           # Require: The version of golangci-lint to use.
           # When `install-mode` is `binary` (default) the value can be v1.2 or v1.2.3 or `latest` to use the latest version.

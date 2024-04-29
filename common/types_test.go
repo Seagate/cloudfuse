@@ -9,8 +9,8 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
+   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -34,6 +34,7 @@
 package common
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -63,12 +64,12 @@ func (suite *typesTestSuite) TestBinarySearch() {
 		BlockList: blocksList,
 	}
 	found, startingIndex := bol.BinarySearch(5)
-	suite.assert.Equal(found, true)
-	suite.assert.Equal(startingIndex, 1)
+	suite.assert.True(found)
+	suite.assert.Equal(1, startingIndex)
 
 	found, startingIndex = bol.BinarySearch(20)
-	suite.assert.Equal(found, false)
-	suite.assert.Equal(startingIndex, 3)
+	suite.assert.False(found)
+	suite.assert.Equal(3, startingIndex)
 }
 
 func (suite *typesTestSuite) TestFindBlocksToModify() {
@@ -81,17 +82,25 @@ func (suite *typesTestSuite) TestFindBlocksToModify() {
 		BlockList: blocksList,
 	}
 	index, size, largerThanFile, _ := bol.FindBlocksToModify(3, 7)
-	suite.assert.Equal(index, 0)
-	suite.assert.Equal(size, int64(12))
-	suite.assert.Equal(largerThanFile, false)
+	suite.assert.Equal(0, index)
+	suite.assert.Equal(int64(12), size)
+	suite.assert.False(largerThanFile)
 
 	index, size, largerThanFile, _ = bol.FindBlocksToModify(8, 10)
-	suite.assert.Equal(index, 2)
-	suite.assert.Equal(size, int64(5))
-	suite.assert.Equal(largerThanFile, true)
+	suite.assert.Equal(2, index)
+	suite.assert.Equal(int64(5), size)
+	suite.assert.True(largerThanFile)
 
 	index, size, largerThanFile, appendOnly := bol.FindBlocksToModify(20, 20)
-	suite.assert.Equal(size, int64(0))
-	suite.assert.Equal(largerThanFile, true)
-	suite.assert.Equal(appendOnly, true)
+	suite.assert.Equal(int64(0), size)
+	suite.assert.True(largerThanFile)
+	suite.assert.True(appendOnly)
+}
+
+func (suite *typesTestSuite) TestDefaultWorkDir() {
+	val, err := os.UserHomeDir()
+	suite.assert.NoError(err)
+	suite.assert.Equal(DefaultWorkDir, JoinUnixFilepath(val, ".cloudfuse"))
+	suite.assert.Equal(DefaultLogFilePath, JoinUnixFilepath(val, ".cloudfuse/cloudfuse.log"))
+	suite.assert.Equal(StatsConfigFilePath, JoinUnixFilepath(val, ".cloudfuse/stats_monitor.cfg"))
 }

@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -27,12 +27,11 @@ package cmd
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"runtime"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -66,10 +65,9 @@ type hmonTestSuite struct {
 }
 
 func generateRandomPID() string {
-	rand.Seed(time.Now().UnixNano())
 	var randpid int
 	for i := 0; i <= 5; i++ {
-		randpid = rand.Intn(90000) + 10000
+		randpid = rand.IntN(90000) + 10000
 		_, err := os.FindProcess(randpid)
 		if err != nil {
 			break
@@ -99,14 +97,14 @@ func (suite *hmonTestSuite) TestValidateHmonOptions() {
 	configFile = ""
 
 	err := validateHMonOptions()
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "pid of cloudfuse process not given")
 	suite.assert.Contains(err.Error(), "config file not given")
 
 	pid = generateRandomPID()
 	configFile = "config.yaml"
 	err = validateHMonOptions()
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 }
 
 func (suite *hmonTestSuite) TestBuildHmonCliParams() {
@@ -127,14 +125,14 @@ func (suite *hmonTestSuite) TestBuildHmonCliParams() {
 	}
 
 	cliParams := buildCliParamForMonitor()
-	suite.assert.Equal(len(cliParams), 11)
+	suite.assert.Len(cliParams, 11)
 }
 
 func (suite *hmonTestSuite) TestHmonInvalidOptions() {
 	defer suite.cleanupTest()
 
 	op, err := executeCommandC(rootCmd, "health-monitor", "--pid=", "--config-file=")
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(op, "pid of cloudfuse process not given")
 	suite.assert.Contains(op, "config file not given")
 }
@@ -143,7 +141,7 @@ func (suite *hmonTestSuite) TestHmonInvalidConfigFile() {
 	defer suite.cleanupTest()
 
 	op, err := executeCommandC(rootCmd, "health-monitor", fmt.Sprintf("--pid=%s", generateRandomPID()), "--config-file=cfgNotFound.yaml")
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(op, "invalid config file")
 	// The error message is different on Windows, so need to test with cases
 	if runtime.GOOS == "windows" {
@@ -157,40 +155,40 @@ func (suite *hmonTestSuite) TestHmonWithConfigFailure() {
 	defer suite.cleanupTest()
 
 	confFile, err := os.CreateTemp("", "conf*.yaml")
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	cfgFileHmonTest := confFile.Name()
 	defer os.Remove(cfgFileHmonTest)
 
 	_, err = confFile.WriteString(configHmonTest)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	confFile.Close()
 
 	op, err := executeCommandC(rootCmd, "health-monitor", fmt.Sprintf("--pid=%s", generateRandomPID()), fmt.Sprintf("--config-file=%s", cfgFileHmonTest))
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(op, "failed to start health monitor")
 }
 
 func (suite *hmonTestSuite) TestHmonStopAllFailure() {
 	op, err := executeCommandC(rootCmd, "health-monitor", "stop", "all")
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(op, "failed to stop all health monitor binaries")
 }
 
 func (suite *hmonTestSuite) TestHmonStopPidEmpty() {
 	op, err := executeCommandC(rootCmd, "health-monitor", "stop", "--pid=")
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(op, "pid of cloudfuse process not given")
 }
 
 func (suite *hmonTestSuite) TestHmonStopPidInvalid() {
 	op, err := executeCommandC(rootCmd, "health-monitor", "stop", fmt.Sprintf("--pid=%s", generateRandomPID()))
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(op, "failed to get health monitor pid")
 }
 
 func (suite *hmonTestSuite) TestHmonStopPidFailure() {
 	err := stop(generateRandomPID())
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 }
 
 func TestHealthMonitorCommand(t *testing.T) {

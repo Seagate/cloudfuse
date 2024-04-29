@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -29,11 +29,13 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/internal"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -77,7 +79,71 @@ func (suite *lfuPolicyTestSuite) setupTestHelper(config cachePolicyConfig) {
 func (suite *lfuPolicyTestSuite) cleanupTest() {
 	suite.policy.ShutdownPolicy()
 
-	os.RemoveAll(cache_path)
+	err := os.RemoveAll(cache_path)
+	if err != nil {
+		fmt.Printf("lfuPolicyTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", cache_path, err)
+	}
+}
+
+// add named item to local cache filesystem, and cache policy data structure
+func (suite *lfuPolicyTestSuite) createLocalPath(localPath string, isDir bool) {
+	var err error
+	suite.policy.CacheValid(localPath)
+	if isDir {
+		err = os.Mkdir(localPath, os.FileMode(0777))
+		suite.assert.NoError(err)
+	} else {
+		fh, err := os.Create(localPath)
+		suite.assert.NoError(err)
+		err = fh.Close()
+		suite.assert.NoError(err)
+	}
+}
+
+// Generate hierarchy:
+// a/
+//
+//	 a/c1/
+//	  a/c1/gc1
+//		a/c2
+//
+// ab/
+//
+//	ab/c1
+//
+// ac
+func (suite *lfuPolicyTestSuite) generateNestedDirectory(aPath string) ([]string, []string, []string) {
+	localBasePath := filepath.Join(suite.policy.tmpPath, internal.TruncateDirName(aPath))
+	suite.createLocalPath(localBasePath, true)
+	c1 := filepath.Join(localBasePath, "c1")
+	suite.createLocalPath(c1, true)
+	gc1 := filepath.Join(c1, "gc1")
+	suite.createLocalPath(gc1, false)
+	c2 := filepath.Join(localBasePath, "c2")
+	suite.createLocalPath(c2, false)
+	aPaths := []string{localBasePath, c1, gc1, c2}
+
+	abPath := localBasePath + "b"
+	suite.createLocalPath(abPath, true)
+	abc1 := filepath.Join(abPath, "c1")
+	suite.createLocalPath(abc1, false)
+	abPaths := []string{abPath, abc1}
+
+	acPath := localBasePath + "c"
+	suite.createLocalPath(acPath, false)
+	acPaths := []string{acPath}
+
+	var allPaths []string
+	copy(allPaths, aPaths)
+	allPaths = append(allPaths, abPaths...)
+	allPaths = append(allPaths, acPaths...)
+	// Validate the paths were setup correctly and all paths exist
+	for _, path := range allPaths {
+		_, err := os.Stat(path)
+		suite.assert.NoError(err)
+	}
+
+	return aPaths, abPaths, acPaths
 }
 
 func (suite *lfuPolicyTestSuite) TestDefault() {
@@ -125,10 +191,10 @@ func (suite *lfuPolicyTestSuite) TestClearItemFromCache() {
 	defer suite.cleanupTest()
 	f, err := os.Create(cache_path + "/test")
 	f.Close()
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.policy.clearItemFromCache(f.Name())
 	_, err = os.Stat(f.Name())
-	suite.assert.NotEqual(nil, err)
+	suite.assert.Error(err)
 }
 
 func (suite *lfuPolicyTestSuite) TestCacheValidExisting() {
@@ -178,11 +244,37 @@ func (suite *lfuPolicyTestSuite) TestCacheInvalidateTimeout() {
 
 func (suite *lfuPolicyTestSuite) TestCachePurge() {
 	defer suite.cleanupTest()
+	// test policy cache data
 	suite.policy.CacheValid("temp")
 	suite.policy.CachePurge("temp")
 
 	node := suite.policy.list.get("temp")
 	suite.assert.Nil(node)
+
+	// test asynchronous file and folder deletion
+	// purge all aPaths, in reverse order
+	aPaths, abPaths, acPaths := suite.generateNestedDirectory("temp")
+	for i := len(aPaths) - 1; i >= 0; i-- {
+		suite.policy.CachePurge(aPaths[i])
+	}
+
+	// wait for asynchronous deletions
+	// in local testing, 1ms was enough
+	time.Sleep(1 * time.Second)
+	// validate all aPaths were deleted
+	for _, path := range aPaths {
+		_, err := os.Stat(path)
+		suite.assert.Error(err)
+		suite.assert.True(os.IsNotExist(err))
+	}
+	// validate other paths were not touched
+	var otherPaths []string
+	copy(otherPaths, abPaths)
+	otherPaths = append(otherPaths, acPaths...)
+	for _, path := range otherPaths {
+		_, err := os.Stat(path)
+		suite.assert.NoError(err)
+	}
 }
 
 func (suite *lfuPolicyTestSuite) TestIsCached() {

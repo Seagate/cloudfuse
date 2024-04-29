@@ -39,6 +39,10 @@ Download the .deb file from our latest release [here](https://github.com/Seagate
 Download the .rpm file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal:  
 `sudo rpm -i ./cloudfuse*.rpm`
 
+#### Enable Running With Systemd
+
+To enable Cloudfuse to run using systemd, see [Setup for systemd instructions](setup/readme.md)
+
 ### From Archive
 
 Download the archive for your platform and architecture from the latest release [here](https://github.com/Seagate/cloudfuse/releases).
@@ -210,13 +214,18 @@ WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos - [link](ht
 
 ## Support
 
+### Contact Us
+
+We welcome your questions and feedback!  
+Email us: [cloudfuse@seagate.com](mailto:cloudfuse@seagate.com).
+
 ### Frequently Asked Questions
 
 A list of FAQs can be found [here](https://github.com/Seagate/cloudfuse/wiki/Frequently-Asked-Questions).
 
 ### Report Issues and Request Features
 
-We welcome all feedback! Please submit [issues and requests here](https://github.com/Seagate/cloudfuse/issues).
+Please submit [issues and requests here](https://github.com/Seagate/cloudfuse/issues).
 
 ## Contributing
 

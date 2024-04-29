@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +30,7 @@ import (
 	"fmt"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -82,7 +83,9 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 
 	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
 	if opt.PartSizeMb < 5 || opt.PartSizeMb > MaxPartSizeMb {
-		log.Warn("ParseAndValidateConfig : Part size must be between 5MB and 5GB. Default to default size")
+		if opt.PartSizeMb != 0 {
+			log.Warn("ParseAndValidateConfig : Part size must be between 5MB and 5GB. Defaulting to %dMB.", DefaultPartSize/common.MbToBytes)
+		}
 		s3.stConfig.partSize = DefaultPartSize
 	} else {
 		s3.stConfig.partSize = opt.PartSizeMb * common.MbToBytes
@@ -127,6 +130,18 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 		s3.stConfig.checksumAlgorithm = opt.ChecksumAlgorithm
 	}
 
+	// by default symlink will be disabled
+	enableSymlinks := false
+	// Borrow enable-symlinks flag from attribute cache
+	if config.IsSet("attr_cache.enable-symlinks") {
+		err := config.UnmarshalKey("attr_cache.enable-symlinks", &enableSymlinks)
+		if err != nil {
+			enableSymlinks = false
+			log.Err("ParseAndReadDynamicConfig : Failed to unmarshal attr_cache.enable-symlinks")
+		}
+	}
+	s3.stConfig.disableSymlink = !enableSymlinks
+
 	// TODO: add more config options to customize AWS SDK behavior and import them here
 
 	return nil
@@ -150,6 +165,18 @@ func ParseAndReadDynamicConfig(s3 *S3Storage, opt Options, reload bool) error {
 		s3.stConfig.uploadCutoff = opt.UploadCutoffMb * common.MbToBytes
 	}
 	s3.stConfig.concurrency = opt.Concurrency
+
+	// by default symlink will be disabled
+	enableSymlinks := false
+	// Borrow enable-symlinks flag from attribute cache
+	if config.IsSet("attr_cache.enable-symlinks") {
+		err := config.UnmarshalKey("attr_cache.enable-symlinks", &enableSymlinks)
+		if err != nil {
+			enableSymlinks = false
+			log.Err("ParseAndReadDynamicConfig : Failed to unmarshal attr_cache.enable-symlinks")
+		}
+	}
+	s3.stConfig.disableSymlink = !enableSymlinks
 
 	return nil
 }

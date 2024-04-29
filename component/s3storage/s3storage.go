@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -205,32 +205,6 @@ func (s3 *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	return len(list) == 0
 }
 
-func (s3 *S3Storage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
-	log.Trace("S3Storage::ReadDir : %s", options.Name)
-	objectList := make([]*internal.ObjAttr, 0)
-
-	path := formatListDirName(options.Name)
-	var iteration int  // = 0
-	var marker *string // = nil
-	for {
-		newList, newMarker, err := s3.storage.List(path, marker, common.MaxDirListCount)
-		if err != nil {
-			log.Err("S3Storage::ReadDir : Failed to read dir [%s]", err)
-			return objectList, err
-		}
-		objectList = append(objectList, newList...)
-		marker = newMarker
-		iteration++
-
-		log.Debug("S3Storage::ReadDir : So far retrieved %d objects in %d iterations", len(objectList), iteration)
-		if newMarker == nil || *newMarker == "" {
-			break
-		}
-	}
-
-	return objectList, nil
-}
-
 func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
 	log.Trace("S3Storage::StreamDir : %s, offset %d, count %d", options.Name, options.Offset, options.Count)
 	objectList := make([]*internal.ObjAttr, 0)
@@ -239,8 +213,12 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	var iteration int                   // = 0
 	var marker *string = &options.Token // = nil
 	var totalEntriesFetched int32
-	for totalEntriesFetched < options.Count {
-		newList, nextMarker, err := s3.storage.List(path, marker, options.Count-totalEntriesFetched)
+	entriesRemaining := options.Count
+	if options.Count == 0 {
+		entriesRemaining = maxResultsPerListCall
+	}
+	for entriesRemaining > 0 {
+		newList, nextMarker, err := s3.storage.List(path, marker, entriesRemaining)
 		if err != nil {
 			log.Err("S3Storage::StreamDir : %s Failed to read dir [%s]", options.Name, err)
 			return objectList, "", err
@@ -257,6 +235,13 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		} else {
 			log.Debug("S3Storage::StreamDir : %s List iteration %d nextMarker=\"%s\"",
 				options.Name, iteration, *nextMarker)
+		}
+		// decrement and loop
+		entriesRemaining -= totalEntriesFetched
+		// in one case, the response will be missing one entry (see comment above `count++` in Client::List)
+		if entriesRemaining == 1 && options.Token == "" {
+			// don't make a request just for that one leftover entry
+			break
 		}
 	}
 
@@ -440,6 +425,10 @@ func (s3 *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
 
 // Symlink operations
 func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
+	if s3.stConfig.disableSymlink {
+		log.Err("S3Storage::CreateLink : %s -> %s - Symlink support not enabled", options.Name, options.Target)
+		return syscall.ENOTSUP
+	}
 	log.Trace("S3Storage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
 	err := s3.storage.CreateLink(options.Name, options.Target, true)
 
@@ -452,6 +441,10 @@ func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 }
 
 func (s3 *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) {
+	if s3.stConfig.disableSymlink {
+		log.Err("S3Storage::ReadLink : %s - Symlink support not enabled", options.Name)
+		return "", syscall.ENOENT
+	}
 	log.Trace("S3Storage::ReadLink : Read symlink %s", options.Name)
 
 	data, err := s3.storage.ReadBuffer(options.Name, 0, 0, true)
@@ -471,7 +464,7 @@ func (s3 *S3Storage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 }
 
 func (s3 *S3Storage) Chmod(options internal.ChmodOptions) error {
-	log.Trace("S3Storage::Chmod : Change mod of file %s", options.Name)
+	log.Trace("S3Storage::Chmod : Change mode of file %s", options.Name)
 
 	s3StatsCollector.PushEvents(chmod, options.Name, map[string]interface{}{mode: options.Mode.String()})
 	s3StatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))

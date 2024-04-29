@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -76,9 +76,6 @@ type Component interface {
 	IsDirEmpty(IsDirEmptyOptions) bool
 
 	OpenDir(OpenDirOptions) error
-	//ReadDir: implementation expectations
-	//must return ErrNotExist for absence of the requested directory
-	ReadDir(ReadDirOptions) ([]*ObjAttr, error)
 	StreamDir(StreamDirOptions) ([]*ObjAttr, string, error)
 
 	CloseDir(CloseDirOptions) error
@@ -128,4 +125,8 @@ type Component interface {
 
 	FileUsed(name string) error
 	StatFs() (*common.Statfs_t, bool, error)
+
+	GetCommittedBlockList(string) (*CommittedBlockList, error)
+	StageData(StageDataOptions) error
+	CommitData(CommitDataOptions) error
 }

@@ -9,8 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -60,7 +59,7 @@ func (s *utilsTestSuite) TestParseS3errGetObjectNoSuchKey() {
 		Message: &errMessage,
 	})
 	err := parseS3Err(getObjectS3Err, "test")
-	assert.Equal(err, syscall.ENOENT)
+	assert.Equal(syscall.ENOENT, err)
 }
 
 func (s *utilsTestSuite) TestParseS3errHeadObjectNotFound() {
@@ -74,7 +73,7 @@ func (s *utilsTestSuite) TestParseS3errHeadObjectNotFound() {
 		Fault:   smithy.FaultClient,
 	})
 	err := parseS3Err(getObjectS3Err, "test")
-	assert.Equal(err, syscall.ENOENT)
+	assert.Equal(syscall.ENOENT, err)
 }
 
 func (s *utilsTestSuite) TestParseS3errCopyObjectNoSuchKey() {
@@ -88,7 +87,7 @@ func (s *utilsTestSuite) TestParseS3errCopyObjectNoSuchKey() {
 		Fault:   smithy.FaultClient,
 	})
 	err := parseS3Err(getObjectS3Err, "test")
-	assert.Equal(err, syscall.ENOENT)
+	assert.Equal(syscall.ENOENT, err)
 }
 
 func (s *utilsTestSuite) TestParseS3errGetObjectInvalidRange() {
@@ -137,14 +136,14 @@ func (s *utilsTestSuite) TestContentType() {
 		".dum": "dummy/test"
 		}`
 	err := populateContentType(newSet)
-	assert.Nil(err, "Failed to populate new config")
+	assert.NoError(err, "Failed to populate new config")
 
 	val = getContentType("a.tst")
 	assert.EqualValues("application/test", val, "Content-type mismatch")
 
 	// assert mp4 content type would get deserialized correctly
 	val = getContentType("file.mp4")
-	assert.EqualValues(val, "video/mp4")
+	assert.EqualValues("video/mp4", val)
 }
 
 type contentTypeVal struct {

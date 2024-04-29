@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -26,13 +26,12 @@
 package common
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -41,7 +40,6 @@ import (
 var home_dir, _ = os.UserHomeDir()
 
 func randomString(length int) string {
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, length)
 	rand.Read(b)
 	return fmt.Sprintf("%x", b)[:length]
@@ -87,7 +85,7 @@ func (suite *typesTestSuite) TestEncryptBadKey() {
 	rand.Read(data)
 
 	_, err := EncryptData(data, key)
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 }
 
 func (suite *typesTestSuite) TestDecryptBadKey() {
@@ -99,7 +97,7 @@ func (suite *typesTestSuite) TestDecryptBadKey() {
 	rand.Read(data)
 
 	_, err := DecryptData(data, key)
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 }
 
 func (suite *typesTestSuite) TestEncryptDecrypt() {
@@ -111,10 +109,10 @@ func (suite *typesTestSuite) TestEncryptDecrypt() {
 	rand.Read(data)
 
 	cipher, err := EncryptData(data, key)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	d, err := DecryptData(cipher, key)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(data, d)
 }
 
@@ -197,23 +195,23 @@ func (suite *utilTestSuite) TestExpandPathDriveLetter() {
 func (suite *utilTestSuite) TestIsDriveLetter() {
 	path := "D:"
 	match := IsDriveLetter(path)
-	suite.assert.Equal(true, match)
+	suite.assert.True(match)
 
 	path = "x:"
 	match = IsDriveLetter(path)
-	suite.assert.Equal(true, match)
+	suite.assert.True(match)
 
 	path = "D"
 	match = IsDriveLetter(path)
-	suite.assert.Equal(false, match)
+	suite.assert.False(match)
 
 	path = "C/folder"
 	match = IsDriveLetter(path)
-	suite.assert.Equal(false, match)
+	suite.assert.False(match)
 
 	path = "C:\\Users"
 	match = IsDriveLetter(path)
-	suite.assert.Equal(false, match)
+	suite.assert.False(match)
 }
 
 func (suite *utilTestSuite) TestGetUSage() {
@@ -224,17 +222,17 @@ func (suite *utilTestSuite) TestGetUSage() {
 
 	dirName := filepath.Join(pwd, "util_test")
 	err = os.Mkdir(dirName, 0777)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	data := make([]byte, 1024*1024)
 	err = os.WriteFile(dirName+"/1.txt", data, 0777)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	err = os.WriteFile(dirName+"/2.txt", data, 0777)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	usage, err := GetUsage(dirName)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.GreaterOrEqual(int(usage), 2)
 	suite.assert.LessOrEqual(int(usage), 4)
 
@@ -249,12 +247,12 @@ func (suite *utilTestSuite) TestGetDiskUsage() {
 
 	dirName := filepath.Join(pwd, "util_test", "a", "b", "c")
 	err = os.MkdirAll(dirName, 0777)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	usage, usagePercent, err := GetDiskUsageFromStatfs(dirName)
-	suite.assert.Nil(err)
-	suite.assert.NotEqual(usage, 0)
-	suite.assert.NotEqual(usagePercent, 0)
-	suite.assert.NotEqual(usagePercent, 100)
+	suite.assert.NoError(err)
+	suite.assert.NotEqual(0, usage)
+	suite.assert.NotEqual(0, usagePercent)
+	suite.assert.NotEqual(100, usagePercent)
 	_ = os.RemoveAll(filepath.Join(pwd, "util_test"))
 }

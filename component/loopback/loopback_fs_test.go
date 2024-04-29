@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -105,9 +105,9 @@ func (suite *LoopbackFSTestSuite) TestCreateDir() {
 	assert := assert.New(suite.T())
 
 	err := suite.lfs.CreateDir(internal.CreateDirOptions{Name: dirTwo, Mode: os.FileMode(0777)})
-	assert.Nil(err, "CreateDir: Failed")
+	assert.NoError(err, "CreateDir: Failed")
 	info, err := os.Stat(common.JoinUnixFilepath(testPath, dirTwo))
-	assert.Nil(err, "CreateDir: Could not stat created dir")
+	assert.NoError(err, "CreateDir: Could not stat created dir")
 	assert.True(info.IsDir(), "CreateDir: not a dir")
 }
 
@@ -116,25 +116,25 @@ func (suite *LoopbackFSTestSuite) TestDeleteDir() {
 	assert := assert.New(suite.T())
 
 	err := suite.lfs.DeleteDir(internal.DeleteDirOptions{Name: dirEmpty})
-	assert.Nil(err, "DeleteDir: Failed")
+	assert.NoError(err, "DeleteDir: Failed")
 	_, err = os.Stat(common.JoinUnixFilepath(testPath, dirEmpty))
-	assert.NotNil(err, "DeleteDir: Failed to delete")
+	assert.Error(err, "DeleteDir: Failed to delete")
 }
 
-func (suite *LoopbackFSTestSuite) TestReadDir() {
+func (suite *LoopbackFSTestSuite) TestStreamDir() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
 	info, _ := os.Stat(common.JoinUnixFilepath(testPath, fileLorem))
 
-	attrs, err := suite.lfs.ReadDir(internal.ReadDirOptions{Name: dirOne})
-	assert.Nil(err, "ReadDir: Failed")
+	attrs, _, err := suite.lfs.StreamDir(internal.StreamDirOptions{Name: dirOne})
+	assert.NoError(err, "StreamDir: Failed")
 
 	attr := attrs[0]
 
-	assert.Equal(attr.Name, "lorem.txt", "ReadDir: FileName not equal")
-	assert.Equal(attr.Size, info.Size(), "ReadDir: File size not equal")
-	assert.Equal(attr.Mode, info.Mode(), "ReadDir: File Mode not equal")
+	assert.Equal("lorem.txt", attr.Name, "StreamDir: FileName not equal")
+	assert.Equal(attr.Size, info.Size(), "StreamDir: File size not equal")
+	assert.Equal(attr.Mode, info.Mode(), "StreamDir: File Mode not equal")
 }
 
 func (suite *LoopbackFSTestSuite) TestRenameDir() {
@@ -142,12 +142,12 @@ func (suite *LoopbackFSTestSuite) TestRenameDir() {
 	assert := assert.New(suite.T())
 
 	err := suite.lfs.RenameDir(internal.RenameDirOptions{Src: dirEmpty, Dst: "newempty"})
-	assert.Nil(err, "RenameDir: Failed")
+	assert.NoError(err, "RenameDir: Failed")
 
 	info, err := os.Stat(common.JoinUnixFilepath(testPath, "newempty"))
-	assert.Nil(err, "RenameDir: Unable to stat renamed dir")
+	assert.NoError(err, "RenameDir: Unable to stat renamed dir")
 
-	assert.Equal(info.Name(), "newempty", "RenameDir: name does not match")
+	assert.Equal("newempty", info.Name(), "RenameDir: name does not match")
 }
 
 func (suite *LoopbackFSTestSuite) TestCreateFile() {
@@ -155,15 +155,15 @@ func (suite *LoopbackFSTestSuite) TestCreateFile() {
 	assert := assert.New(suite.T())
 
 	handle, err := suite.lfs.CreateFile(internal.CreateFileOptions{Name: fileEmpty, Mode: os.FileMode(0777)})
-	assert.Nil(err, "CreateFile: Failed")
+	assert.NoError(err, "CreateFile: Failed")
 	assert.NotNil(handle)
 
 	info, err := os.Stat(common.JoinUnixFilepath(testPath, fileEmpty))
-	assert.Nil(err, "CreateFile: unable to stat created file")
-	assert.Equal(info.Name(), fileEmpty)
+	assert.NoError(err, "CreateFile: unable to stat created file")
+	assert.Equal(fileEmpty, info.Name())
 
 	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
-	assert.Nil(err, "CreateFile: Failed to close file")
+	assert.NoError(err, "CreateFile: Failed to close file")
 }
 
 func (suite *LoopbackFSTestSuite) TestDeleteFile() {
@@ -171,9 +171,9 @@ func (suite *LoopbackFSTestSuite) TestDeleteFile() {
 	assert := assert.New(suite.T())
 
 	err := suite.lfs.DeleteFile(internal.DeleteFileOptions{Name: fileHello})
-	assert.Nil(err, "DeleteFile: Failed")
+	assert.NoError(err, "DeleteFile: Failed")
 	_, err = os.Stat(common.JoinUnixFilepath(testPath, fileHello))
-	assert.NotNil(err, "DeleteFile: file was not deleted")
+	assert.Error(err, "DeleteFile: file was not deleted")
 }
 
 func (suite *LoopbackFSTestSuite) TestOpenReadCloseFile() {
@@ -181,15 +181,15 @@ func (suite *LoopbackFSTestSuite) TestOpenReadCloseFile() {
 	assert := assert.New(suite.T())
 
 	handle, err := suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileLorem, Flags: os.O_RDONLY, Mode: os.FileMode(0777)})
-	assert.Nil(err, "OpenReadCloseFile: Failed to open file")
+	assert.NoError(err, "OpenReadCloseFile: Failed to open file")
 	assert.NotNil(handle)
 
 	data, err := suite.lfs.ReadFile(internal.ReadFileOptions{Handle: handle})
-	assert.Nil(err, "OpenReadCloseFile: Failed to read file")
+	assert.NoError(err, "OpenReadCloseFile: Failed to read file")
 	assert.Equal(data, []byte(loremText))
 
 	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
-	assert.Nil(err, "OpenReadCloseFile: Failed to close file")
+	assert.NoError(err, "OpenReadCloseFile: Failed to close file")
 }
 
 func (suite *LoopbackFSTestSuite) TestReadInBuffer() {
@@ -197,7 +197,7 @@ func (suite *LoopbackFSTestSuite) TestReadInBuffer() {
 	assert := assert.New(suite.T())
 
 	handle, err := suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileLorem, Flags: os.O_RDONLY, Mode: os.FileMode(0777)})
-	assert.Nil(err, "ReadInBuffer: Failed to open file")
+	assert.NoError(err, "ReadInBuffer: Failed to open file")
 	assert.NotNil(handle)
 	testCases := []struct {
 		offset int64
@@ -218,13 +218,13 @@ func (suite *LoopbackFSTestSuite) TestReadInBuffer() {
 
 	for _, testCase := range testCases {
 		n, err := suite.lfs.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: testCase.offset, Data: testCase.data})
-		assert.Nil(err)
-		assert.Equal(n, len(testCase.truth), "ReadInBuffer: number of bytes returned not equal to input size")
+		assert.NoError(err)
+		assert.Len(testCase.truth, n, "ReadInBuffer: number of bytes returned not equal to input size")
 		assert.Equal(testCase.data, testCase.truth)
 	}
 
 	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
-	assert.Nil(err, "ReadInBuffer: Failed to close file")
+	assert.NoError(err, "ReadInBuffer: Failed to close file")
 }
 
 func (suite *LoopbackFSTestSuite) TestWriteFile() {
@@ -232,19 +232,19 @@ func (suite *LoopbackFSTestSuite) TestWriteFile() {
 	assert := assert.New(suite.T())
 
 	handle, err := suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileQuotes, Flags: os.O_RDWR | os.O_CREATE, Mode: os.FileMode(0777)})
-	assert.Nil(err, "WriteFile: failed to open file")
+	assert.NoError(err, "WriteFile: failed to open file")
 	assert.NotNil(handle)
 
 	n, err := suite.lfs.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: []byte(quotesText)[:5]})
-	assert.Nil(err)
-	assert.Equal(n, 5, "WriteFile: failed to write the specified number of bytes")
+	assert.NoError(err)
+	assert.Equal(5, n, "WriteFile: failed to write the specified number of bytes")
 
 	n, err = suite.lfs.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 5, Data: []byte(quotesText)[5:]})
-	assert.Nil(err)
-	assert.Equal(n, len([]byte(quotesText)[5:]), "WriteFile: failed to write specified number of bytes")
+	assert.NoError(err)
+	assert.Len([]byte(quotesText)[5:], n, "WriteFile: failed to write specified number of bytes")
 
 	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
-	assert.Nil(err, "WriteFile: Failed to close file")
+	assert.NoError(err, "WriteFile: Failed to close file")
 
 }
 
@@ -253,17 +253,17 @@ func (suite *LoopbackFSTestSuite) TestTruncateFile() {
 	assert := assert.New(suite.T())
 
 	handle, err := suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileLorem, Flags: os.O_RDWR, Mode: os.FileMode(0777)})
-	assert.Nil(err, "TruncateFile: failed to open file")
+	assert.NoError(err, "TruncateFile: failed to open file")
 	assert.NotNil(handle)
 
 	err = suite.lfs.TruncateFile(internal.TruncateFileOptions{Name: fileLorem, Size: 0})
-	assert.Nil(err)
+	assert.NoError(err)
 	info, err := os.Stat(common.JoinUnixFilepath(testPath, fileLorem))
-	assert.Nil(err, "TruncateFile: cannot stat file")
-	assert.Equal(info.Size(), int64(0))
+	assert.NoError(err, "TruncateFile: cannot stat file")
+	assert.Equal(int64(0), info.Size())
 
 	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
-	assert.Nil(err, "TruncateFile: Failed to close file")
+	assert.NoError(err, "TruncateFile: Failed to close file")
 }
 
 func (suite *LoopbackFSTestSuite) TestGetAttr() {
@@ -271,14 +271,39 @@ func (suite *LoopbackFSTestSuite) TestGetAttr() {
 	assert := assert.New(suite.T())
 
 	attr, err := suite.lfs.GetAttr(internal.GetAttrOptions{Name: fileLorem})
-	assert.Nil(err)
+	assert.NoError(err)
 	info, err := os.Stat(common.JoinUnixFilepath(testPath, fileLorem))
-	assert.Nil(err)
+	assert.NoError(err)
 
 	assert.Equal(attr.Size, info.Size())
 	assert.Equal(attr.Name, info.Name())
 	assert.Equal(attr.Mode, info.Mode())
 	assert.Equal(attr.IsDir(), info.IsDir())
+}
+
+func (suite *LoopbackFSTestSuite) TestStageAndCommitData() {
+	defer suite.cleanupTest()
+	assert := assert.New(suite.T())
+
+	lfs := &LoopbackFS{}
+
+	lfs.path = common.ExpandPath("~/blocklfstest")
+	err := os.MkdirAll(lfs.path, os.FileMode(0777))
+	assert.NoError(err)
+	defer os.RemoveAll(lfs.path)
+
+	err = lfs.StageData(internal.StageDataOptions{Name: "testBlock", Data: []byte(loremText), Id: "123", Offset: 0})
+	assert.NoError(err)
+
+	err = lfs.StageData(internal.StageDataOptions{Name: "testBlock", Data: []byte(loremText), Id: "456", Offset: 2})
+	assert.NoError(err)
+
+	err = lfs.StageData(internal.StageDataOptions{Name: "testBlock", Data: []byte(loremText), Id: "789", Offset: 1})
+	assert.NoError(err)
+
+	blockList := []string{"123", "789", "456"}
+	err = lfs.CommitData(internal.CommitDataOptions{Name: "testBlock", List: blockList})
+	assert.NoError(err)
 }
 
 func TestLoopbackFSTestSuite(t *testing.T) {

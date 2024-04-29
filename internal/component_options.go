@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -180,6 +180,26 @@ type ChownOptions struct {
 	Owner int
 	Group int
 }
+
+type StageDataOptions struct {
+	Name   string
+	Id     string
+	Offset uint64
+	Data   []byte
+}
+
+type CommitDataOptions struct {
+	Name      string
+	List      []string
+	BlockSize uint64
+}
+
+type CommittedBlock struct {
+	Id     string
+	Offset int64
+	Size   uint64
+}
+type CommittedBlockList []CommittedBlock
 
 func TruncateDirName(name string) string {
 	if len(name) == 0 {

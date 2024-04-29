@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -85,30 +85,30 @@ func (suite *pipelineTestSuite) SetupTest() {
 
 func (s *pipelineTestSuite) TestCreatePipeline() {
 	_, err := NewPipeline([]string{"ComponentA", "ComponentB"}, false)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *pipelineTestSuite) TestCreateInvalidPipeline() {
 	_, err := NewPipeline([]string{"ComponentC", "ComponentA"}, false)
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.Contains(err.Error(), "is out of order")
 
 }
 
 func (s *pipelineTestSuite) TestInvalidComponent() {
 	_, err := NewPipeline([]string{"ComponentD"}, false)
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 }
 
 func (s *pipelineTestSuite) TestStartStopCreateNewPipeline() {
 	p, err := NewPipeline([]string{"ComponentA", "ComponentB"}, false)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = p.Start(nil)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = p.Stop()
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func TestPipelineTestSuite(t *testing.T) {

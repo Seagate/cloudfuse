@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -88,7 +88,7 @@ func (lts *LoggerTestSuite) TestBaseLogger() {
 		Level:       common.ELogLevel.LOG_DEBUG(),
 	}
 	err := SetDefaultLogger("base", cfg)
-	assert.Nil(err, "Failed to set base logger")
+	assert.NoError(err, "Failed to set base logger")
 
 	simpleTest(lts)
 
@@ -99,7 +99,7 @@ func (lts *LoggerTestSuite) TestBaseLogger() {
 	fastTestCrit(lts)
 
 	err = Destroy()
-	assert.Nil(err, "Failed to release base logger")
+	assert.NoError(err, "Failed to release base logger")
 }
 
 func (lts *LoggerTestSuite) TestSilentLogger() {
@@ -108,7 +108,7 @@ func (lts *LoggerTestSuite) TestSilentLogger() {
 	cfg := common.LogConfig{}
 
 	err := SetDefaultLogger("silent", cfg)
-	assert.Nil(err, "Failed to set silent logger")
+	assert.NoError(err, "Failed to set silent logger")
 
 	simpleTest(lts)
 }
@@ -121,7 +121,7 @@ func (lts *LoggerTestSuite) TestSysLogger() {
 	}
 
 	err := SetDefaultLogger("syslog", cfg)
-	assert.Nil(err, "Failed to set silent logger")
+	assert.NoError(err, "Failed to set silent logger")
 
 	simpleTest(lts)
 }
@@ -133,7 +133,7 @@ func (lts *LoggerTestSuite) TestNegative() {
 	}
 
 	err := SetDefaultLogger("negative", cfg)
-	assert.NotNil(err, "Negative : did not get logger object")
+	assert.Error(err, "Negative : did not get logger object")
 }
 
 func TestLoggerTestSuite(t *testing.T) {

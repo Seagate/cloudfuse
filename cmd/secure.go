@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -46,7 +46,7 @@ type secureOptions struct {
 }
 
 const SecureConfigEnvName string = "CLOUDFUSE_SECURE_CONFIG_PASSPHRASE"
-const SecureConfigExtension string = ".azsec"
+const SecureConfigExtension string = ".aes"
 
 var secOpts secureOptions
 
@@ -149,8 +149,7 @@ func encryptConfigFile(saveConfig bool) ([]byte, error) {
 	if saveConfig {
 		outputFileName := ""
 		if secOpts.OutputFile == "" {
-			outputFileName = filepath.Join(common.ExpandPath(common.DefaultWorkDir), filepath.Base(secOpts.ConfigFile))
-			outputFileName += SecureConfigExtension
+			outputFileName = secOpts.ConfigFile + SecureConfigExtension
 		} else {
 			outputFileName = secOpts.OutputFile
 		}
@@ -176,14 +175,14 @@ func decryptConfigFile(saveConfig bool) ([]byte, error) {
 	if saveConfig {
 		outputFileName := ""
 		if secOpts.OutputFile == "" {
-			outputFileName = filepath.Join(os.ExpandEnv(common.DefaultWorkDir), filepath.Base(secOpts.ConfigFile))
+			outputFileName = secOpts.ConfigFile
 			extension := filepath.Ext(outputFileName)
 			outputFileName = outputFileName[0 : len(outputFileName)-len(extension)]
 		} else {
 			outputFileName = secOpts.OutputFile
 		}
 
-		return plainText, saveToFile(outputFileName, plainText, false)
+		return plainText, saveToFile(outputFileName, plainText, true)
 	}
 
 	return plainText, nil

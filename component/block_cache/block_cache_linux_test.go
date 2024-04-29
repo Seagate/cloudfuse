@@ -12,8 +12,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -38,14 +37,13 @@ package block_cache
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"io/ioutil"
-	"math/rand"
+	mrand "math/rand/v2"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -76,7 +74,6 @@ type testObj struct {
 }
 
 func randomString(length int) string {
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, length)
 	rand.Read(b)
 	return fmt.Sprintf("%x", b)[:length]
@@ -159,26 +156,17 @@ func (suite *blockCacheTestSuite) TestEmpty() {
 	tobj, err := setupPipeline(emptyConfig)
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
-	suite.assert.Equal(tobj.blockCache.Name(), "block_cache")
-	suite.assert.EqualValues(tobj.blockCache.blockSize, 16*_1MB)
-	suite.assert.EqualValues(tobj.blockCache.memSize, 4192*_1MB)
-	suite.assert.EqualValues(tobj.blockCache.diskSize, 4192)
-	suite.assert.EqualValues(tobj.blockCache.diskTimeout, defaultTimeout)
-	suite.assert.EqualValues(tobj.blockCache.workers, 128)
-	suite.assert.EqualValues(tobj.blockCache.prefetch, MIN_PREFETCH)
-	suite.assert.EqualValues(tobj.blockCache.noPrefetch, false)
+	suite.assert.NoError(err)
+	suite.assert.Equal("block_cache", tobj.blockCache.Name())
+	suite.assert.EqualValues(16*_1MB, tobj.blockCache.blockSize)
+	suite.assert.EqualValues(4192*_1MB, tobj.blockCache.memSize)
+	suite.assert.EqualValues(4192, tobj.blockCache.diskSize)
+	suite.assert.EqualValues(defaultTimeout, tobj.blockCache.diskTimeout)
+	suite.assert.EqualValues(128, tobj.blockCache.workers)
+	suite.assert.EqualValues(MIN_PREFETCH, tobj.blockCache.prefetch)
+	suite.assert.False(tobj.blockCache.noPrefetch)
 	suite.assert.NotNil(tobj.blockCache.blockPool)
 	suite.assert.NotNil(tobj.blockCache.threadPool)
-}
-
-func (suite *blockCacheTestSuite) TestNonROMount() {
-	emptyConfig := "read-only: false"
-	tobj, err := setupPipeline(emptyConfig)
-
-	suite.assert.NotNil(err)
-	suite.assert.Nil(tobj)
-	suite.assert.Contains(err.Error(), "filesystem is not mounted in read-only mode")
 }
 
 func (suite *blockCacheTestSuite) TestInvalidPrefetchCount() {
@@ -186,7 +174,7 @@ func (suite *blockCacheTestSuite) TestInvalidPrefetchCount() {
 	tobj, err := setupPipeline(cfg)
 	defer tobj.cleanupPipeline()
 
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "invalid prefetch count")
 }
 
@@ -195,7 +183,7 @@ func (suite *blockCacheTestSuite) TestInvalidMemoryLimitPrefetchCount() {
 	tobj, err := setupPipeline(cfg)
 	defer tobj.cleanupPipeline()
 
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "[memory limit too low for configured prefetch")
 }
 
@@ -204,9 +192,9 @@ func (suite *blockCacheTestSuite) TestNoPrefetchConfig() {
 	tobj, err := setupPipeline(cfg)
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
-	suite.assert.Equal(tobj.blockCache.noPrefetch, true)
+	suite.assert.True(tobj.blockCache.noPrefetch)
 }
 
 func (suite *blockCacheTestSuite) TestInvalidDiskPath() {
@@ -214,8 +202,25 @@ func (suite *blockCacheTestSuite) TestInvalidDiskPath() {
 	tobj, err := setupPipeline(cfg)
 	defer tobj.cleanupPipeline()
 
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "permission denied")
+}
+
+func (suite *blockCacheTestSuite) TestSomeInvalidConfigs() {
+	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 8\n  mem-size-mb: 800\n  prefetch: 12\n  parallelism: 0\n"
+	_, err := setupPipeline(cfg)
+	suite.assert.Error(err)
+	suite.assert.Contains(err.Error(), "fail to init thread pool")
+
+	cfg = "read-only: true\n\nblock_cache:\n  block-size-mb: 1024000\n  mem-size-mb: 20240000\n  prefetch: 12\n  parallelism: 1\n"
+	_, err = setupPipeline(cfg)
+	suite.assert.Error(err)
+	suite.assert.Contains(err.Error(), "fail to init block pool")
+
+	cfg = "read-only: true\n\nblock_cache:\n  block-size-mb: 8\n  mem-size-mb: 800\n  prefetch: 12\n  parallelism: 5\n  path: ./\n  disk-size-mb: 100\n  disk-timeout-sec: 0"
+	_, err = setupPipeline(cfg)
+	suite.assert.Error(err)
+	suite.assert.Contains(err.Error(), "timeout can not be zero")
 }
 
 func (suite *blockCacheTestSuite) TestManualConfig() {
@@ -223,15 +228,15 @@ func (suite *blockCacheTestSuite) TestManualConfig() {
 	tobj, err := setupPipeline(cfg)
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
-	suite.assert.Equal(tobj.blockCache.Name(), "block_cache")
-	suite.assert.EqualValues(tobj.blockCache.blockSize, 16*_1MB)
-	suite.assert.EqualValues(tobj.blockCache.memSize, 500*_1MB)
-	suite.assert.EqualValues(tobj.blockCache.workers, 10)
-	suite.assert.EqualValues(tobj.blockCache.diskSize, 100)
-	suite.assert.EqualValues(tobj.blockCache.diskTimeout, 5)
-	suite.assert.EqualValues(tobj.blockCache.prefetch, 12)
-	suite.assert.EqualValues(tobj.blockCache.workers, 10)
+	suite.assert.NoError(err)
+	suite.assert.Equal("block_cache", tobj.blockCache.Name())
+	suite.assert.EqualValues(16*_1MB, tobj.blockCache.blockSize)
+	suite.assert.EqualValues(500*_1MB, tobj.blockCache.memSize)
+	suite.assert.EqualValues(10, tobj.blockCache.workers)
+	suite.assert.EqualValues(100, tobj.blockCache.diskSize)
+	suite.assert.EqualValues(5, tobj.blockCache.diskTimeout)
+	suite.assert.EqualValues(12, tobj.blockCache.prefetch)
+	suite.assert.EqualValues(10, tobj.blockCache.workers)
 
 	suite.assert.NotNil(tobj.blockCache.blockPool)
 }
@@ -240,13 +245,13 @@ func (suite *blockCacheTestSuite) TestOpenFileFail() {
 	tobj, err := setupPipeline("")
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
 
 	path := "a"
 	options := internal.OpenFileOptions{Name: path}
 	h, err := tobj.blockCache.OpenFile(options)
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Nil(h)
 	suite.assert.Contains(err.Error(), "no such file or directory")
 }
@@ -255,18 +260,18 @@ func (suite *blockCacheTestSuite) TestFileOpneClose() {
 	tobj, err := setupPipeline("")
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
 
 	fileName := "bc.tst"
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 5*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
 	suite.assert.Equal(h.Size, int64(5*_1MB))
 	suite.assert.NotNil(h.Buffers.Cooked)
@@ -281,18 +286,18 @@ func (suite *blockCacheTestSuite) TestFileRead() {
 	tobj, err := setupPipeline("")
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
 
 	fileName := "bc.tst"
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 50*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
 	suite.assert.Equal(h.Size, int64(50*_1MB))
 	suite.assert.NotNil(h.Buffers.Cooked)
@@ -302,22 +307,22 @@ func (suite *blockCacheTestSuite) TestFileRead() {
 
 	// Read beyond end of file
 	n, err := tobj.blockCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: int64((50 * _1MB) + 1), Data: data})
-	suite.assert.NotNil(err)
-	suite.assert.Equal(n, 0)
+	suite.assert.Error(err)
+	suite.assert.Equal(0, n)
 	suite.assert.Contains(err.Error(), "EOF")
 
 	// Read exactly at last offset
 	n, err = tobj.blockCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: int64(50 * _1MB), Data: data})
-	suite.assert.NotNil(err)
-	suite.assert.Equal(n, 0)
+	suite.assert.Error(err)
+	suite.assert.Equal(0, n)
 	suite.assert.Contains(err.Error(), "EOF")
 
 	n, err = tobj.blockCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data})
-	suite.assert.Nil(err)
-	suite.assert.Equal(n, 1000)
+	suite.assert.NoError(err)
+	suite.assert.Equal(1000, n)
 
 	cnt := h.Buffers.Cooked.Len() + h.Buffers.Cooking.Len()
-	suite.assert.Equal(cnt, MIN_PREFETCH*2)
+	suite.assert.Equal(MIN_PREFETCH*2, cnt)
 
 	tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.Nil(h.Buffers.Cooked)
@@ -328,18 +333,18 @@ func (suite *blockCacheTestSuite) TestFileReadSerial() {
 	tobj, err := setupPipeline("")
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
 
 	fileName := "bc.tst"
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 50*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
 	suite.assert.Equal(h.Size, int64(50*_1MB))
 	suite.assert.NotNil(h.Buffers.Cooked)
@@ -359,7 +364,7 @@ func (suite *blockCacheTestSuite) TestFileReadSerial() {
 
 	suite.assert.Equal(totaldata, uint64(50*_1MB))
 	cnt := h.Buffers.Cooked.Len() + h.Buffers.Cooking.Len()
-	suite.assert.Equal(cnt, 12)
+	suite.assert.Equal(12, cnt)
 
 	tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.Nil(h.Buffers.Cooked)
@@ -370,18 +375,18 @@ func (suite *blockCacheTestSuite) TestFileReadRandom() {
 	tobj, err := setupPipeline("")
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
 
 	fileName := "bc.tst"
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 100*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
 	suite.assert.Equal(h.Size, int64(100*_1MB))
 	suite.assert.NotNil(h.Buffers.Cooked)
@@ -390,7 +395,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandom() {
 	data = make([]byte, 100)
 	max := int64(100 * _1MB)
 	for i := 0; i < 50; i++ {
-		offset := rand.Int63n(max)
+		offset := mrand.Int64N(max)
 		n, _ := tobj.blockCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: offset, Data: data})
 		suite.assert.LessOrEqual(n, 100)
 	}
@@ -407,7 +412,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 	tobj, err := setupPipeline("")
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
 
 	// Set the no prefetch mode here
@@ -418,11 +423,11 @@ func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 100*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
 	suite.assert.Equal(h.Size, int64(100*_1MB))
 	suite.assert.NotNil(h.Buffers.Cooked)
@@ -431,15 +436,15 @@ func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 	data = make([]byte, 100)
 	max := int64(100 * _1MB)
 	for i := 0; i < 50; i++ {
-		offset := rand.Int63n(max)
+		offset := mrand.Int64N(max)
 		n, _ := tobj.blockCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: offset, Data: data})
-		suite.assert.Equal(h.Buffers.Cooked.Len(), 1)
-		suite.assert.Equal(h.Buffers.Cooking.Len(), 0)
+		suite.assert.Equal(1, h.Buffers.Cooked.Len())
+		suite.assert.Equal(0, h.Buffers.Cooking.Len())
 		suite.assert.LessOrEqual(n, 100)
 	}
 
 	cnt := h.Buffers.Cooked.Len() + h.Buffers.Cooking.Len()
-	suite.assert.Equal(cnt, 1)
+	suite.assert.Equal(1, cnt)
 
 	tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.Nil(h.Buffers.Cooked)
@@ -450,13 +455,13 @@ func (suite *blockCacheTestSuite) TestDiskUsageCheck() {
 	tobj, err := setupPipeline("")
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
 
 	usage, err := common.GetUsage(tobj.disk_cache_path)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.Less(usage, float64(1.0))
-	suite.assert.Equal(tobj.blockCache.checkDiskUsage(), false)
+	suite.assert.False(tobj.blockCache.checkDiskUsage())
 
 	// Default disk size is 50MB
 	data := make([]byte, 5*_1MB)
@@ -475,9 +480,9 @@ func (suite *blockCacheTestSuite) TestDiskUsageCheck() {
 	}
 
 	for i := 0; i < 13; i++ {
-		ioutil.WriteFile(localfiles[i].name, data, 0777)
+		os.WriteFile(localfiles[i].name, data, 0777)
 		usage, err := common.GetUsage(tobj.disk_cache_path)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		fmt.Printf("%d : %v (%v : %v) Usage %v\n", i, localfiles[i].name, localfiles[i].diskflag, tobj.blockCache.checkDiskUsage(), usage)
 		suite.assert.Equal(tobj.blockCache.checkDiskUsage(), localfiles[i].diskflag)
 	}
@@ -489,10 +494,409 @@ func (suite *blockCacheTestSuite) TestDiskUsageCheck() {
 	for i := 0; i < 13; i++ {
 		os.Remove(localfiles[i].name)
 		usage, err := common.GetUsage(tobj.disk_cache_path)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		fmt.Printf("%d : %v (%v : %v) Usage %v\n", i, localfiles[i].name, localfiles[i].diskflag, tobj.blockCache.checkDiskUsage(), usage)
 		suite.assert.Equal(tobj.blockCache.checkDiskUsage(), localfiles[i].diskflag)
 	}
+}
+
+// Block-cache Writer related test cases
+func (suite *blockCacheTestSuite) TestCreateFile() {
+	tobj, err := setupPipeline("")
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.NotNil(tobj.blockCache)
+
+	path := "testCreate"
+	options := internal.CreateFileOptions{Name: path}
+	h, err := tobj.blockCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.False(h.Dirty())
+
+	stroagePath := filepath.Join(tobj.fake_storage_path, path)
+	fs, err := os.Stat(stroagePath)
+	suite.assert.NoError(err)
+	suite.assert.Equal(int64(0), fs.Size())
+
+	path = "FailThis"
+	options = internal.CreateFileOptions{Name: path}
+	h, err = tobj.blockCache.CreateFile(options)
+	suite.assert.Error(err)
+	suite.assert.Nil(h)
+	suite.assert.Contains(err.Error(), "Failed to create file")
+}
+
+func (suite *blockCacheTestSuite) TestOpenWithTruncate() {
+	tobj, err := setupPipeline("")
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.NotNil(tobj.blockCache)
+
+	fileName := "testTruncate.tst"
+	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
+	data := make([]byte, 5*_1MB)
+	_, _ = rand.Read(data)
+	os.WriteFile(stroagePath, data, 0777)
+
+	options := internal.OpenFileOptions{Name: fileName}
+	h, err := tobj.blockCache.OpenFile(options)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.Equal(h.Size, int64(5*_1MB))
+
+	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+
+	options = internal.OpenFileOptions{Name: fileName, Flags: os.O_TRUNC}
+	h, err = tobj.blockCache.OpenFile(options)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.True(h.Dirty())
+
+	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+}
+
+func (suite *blockCacheTestSuite) TestWriteFileSimple() {
+	tobj, err := setupPipeline("")
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.NotNil(tobj.blockCache)
+
+	path := "testWriteSimple"
+	options := internal.CreateFileOptions{Name: path, Mode: 0777}
+	h, err := tobj.blockCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.False(h.Dirty())
+
+	stroagePath := filepath.Join(tobj.fake_storage_path, path)
+	fs, err := os.Stat(stroagePath)
+	suite.assert.NoError(err)
+	suite.assert.Equal(int64(0), fs.Size())
+
+	n, err := tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: []byte("Hello")}) // 5 bytes
+	suite.assert.NoError(err)
+	suite.assert.Equal(5, n)
+	suite.assert.Equal(int64(5), h.Size)
+	suite.assert.True(h.Dirty())
+	suite.assert.Equal(0, h.Buffers.Cooked.Len())
+	suite.assert.Equal(1, h.Buffers.Cooking.Len())
+
+	node, found := h.GetValue("0")
+	suite.assert.True(found)
+	block := node.(*Block)
+	suite.assert.NotNil(block)
+	suite.assert.Equal(int64(0), block.id)
+	suite.assert.Equal(uint64(0), block.offset)
+
+	err = tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+	suite.assert.NoError(err)
+	suite.assert.False(h.Dirty())
+
+	stroagePath = filepath.Join(tobj.fake_storage_path, path)
+	fs, err = os.Stat(stroagePath)
+	suite.assert.NoError(err)
+	suite.assert.Equal(int64(5), fs.Size())
+
+	n, err = tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 5, Data: []byte("Gello")}) // 5 bytes
+	suite.assert.NoError(err)
+	suite.assert.Equal(5, n)
+	suite.assert.Equal(int64(10), h.Size)
+	suite.assert.True(h.Dirty())
+	suite.assert.Equal(0, h.Buffers.Cooked.Len())
+	suite.assert.Equal(1, h.Buffers.Cooking.Len())
+
+	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+
+	stroagePath = filepath.Join(tobj.fake_storage_path, path)
+	fs, err = os.Stat(stroagePath)
+	suite.assert.NoError(err)
+	suite.assert.Equal(int64(10), fs.Size())
+
+	suite.assert.NoError(err)
+}
+
+func (suite *blockCacheTestSuite) TestWriteFileMultiBlock() {
+	tobj, err := setupPipeline("")
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.NotNil(tobj.blockCache)
+
+	path := "testWriteBlock"
+	stroagePath := filepath.Join(tobj.fake_storage_path, path)
+
+	data := make([]byte, 5*_1MB)
+	_, _ = rand.Read(data)
+
+	options := internal.CreateFileOptions{Name: path, Mode: 0777}
+	h, err := tobj.blockCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.False(h.Dirty())
+
+	n, err := tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data}) // 5 bytes
+	suite.assert.NoError(err)
+	suite.assert.Len(data, n)
+	suite.assert.Equal(h.Size, int64(len(data)))
+	suite.assert.True(h.Dirty())
+	suite.assert.Equal(2, h.Buffers.Cooked.Len())
+	suite.assert.Equal(3, h.Buffers.Cooking.Len())
+
+	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+
+	stroagePath = filepath.Join(tobj.fake_storage_path, path)
+	fs, err := os.Stat(stroagePath)
+	suite.assert.NoError(err)
+	suite.assert.Equal(fs.Size(), int64(len(data)))
+
+	suite.assert.NoError(err)
+}
+
+func (suite *blockCacheTestSuite) TestWriteFileMultiBlockWithOverwrite() {
+	tobj, err := setupPipeline("")
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.NotNil(tobj.blockCache)
+
+	path := "testWriteBlock"
+	stroagePath := filepath.Join(tobj.fake_storage_path, path)
+
+	data := make([]byte, 5*_1MB)
+	_, _ = rand.Read(data)
+
+	options := internal.CreateFileOptions{Name: path, Mode: 0777}
+	h, err := tobj.blockCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.False(h.Dirty())
+
+	n, err := tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data}) // 5 bytes
+	suite.assert.NoError(err)
+	suite.assert.Len(data, n)
+	suite.assert.Equal(h.Size, int64(len(data)))
+	suite.assert.True(h.Dirty())
+	suite.assert.Equal(2, h.Buffers.Cooked.Len())
+	suite.assert.Equal(3, h.Buffers.Cooking.Len())
+
+	err = tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+	suite.assert.NoError(err)
+	suite.assert.False(h.Dirty())
+
+	n, err = tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data[:100]}) // 5 bytes
+	suite.assert.NoError(err)
+	suite.assert.Equal(100, n)
+
+	n, err = tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data[:100]}) // 5 bytes
+	suite.assert.NoError(err)
+	suite.assert.Equal(100, n)
+
+	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+
+	stroagePath = filepath.Join(tobj.fake_storage_path, path)
+	fs, err := os.Stat(stroagePath)
+	suite.assert.NoError(err)
+	suite.assert.Equal(fs.Size(), int64(len(data)))
+
+	suite.assert.NoError(err)
+}
+
+func (suite *blockCacheTestSuite) TestWritefileWithAppend() {
+	tobj, err := setupPipeline("")
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.NotNil(tobj.blockCache)
+
+	tobj.blockCache.prefetchOnOpen = true
+
+	path := "testWriteBlockAppend"
+	data := make([]byte, 20*_1MB)
+	_, _ = rand.Read(data)
+
+	options := internal.CreateFileOptions{Name: path, Mode: 0777}
+	h, err := tobj.blockCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.False(h.Dirty())
+
+	n, err := tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data}) // 5 bytes
+	suite.assert.NoError(err)
+	suite.assert.Len(data, n)
+	suite.assert.Equal(h.Size, int64(len(data)))
+	suite.assert.True(h.Dirty())
+
+	err = tobj.blockCache.SyncFile(internal.SyncFileOptions{Handle: h})
+	suite.assert.NoError(err)
+
+	err = tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
+	suite.assert.NoError(err)
+	suite.assert.False(h.Dirty())
+
+	n, err = tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data}) // 5 bytes
+	suite.assert.NoError(err)
+	suite.assert.Len(data, n)
+	suite.assert.Equal(h.Size, int64(len(data)))
+	suite.assert.True(h.Dirty())
+
+	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+
+	h, err = tobj.blockCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: 0777})
+	suite.assert.NoError(err)
+	dataNew := make([]byte, 10*_1MB)
+	_, _ = rand.Read(data)
+
+	n, err = tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: h.Size, Data: dataNew}) // 5 bytes
+	suite.assert.NoError(err)
+	suite.assert.Len(dataNew, n)
+	suite.assert.Equal(h.Size, int64(len(data)+len(dataNew)))
+	suite.assert.True(h.Dirty())
+
+	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+
+	h, err = tobj.blockCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: 0777})
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.Equal(h.Size, int64(len(data)+len(dataNew)))
+
+	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+}
+
+func (suite *blockCacheTestSuite) TestWriteBlockOutOfRange() {
+	tobj, err := setupPipeline("")
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.NotNil(tobj.blockCache)
+
+	tobj.blockCache.prefetchOnOpen = true
+	tobj.blockCache.blockSize = 10
+
+	path := "testInvalidWriteBlock"
+	data := make([]byte, 20*_1MB)
+	_, _ = rand.Read(data)
+
+	options := internal.CreateFileOptions{Name: path, Mode: 0777}
+	h, err := tobj.blockCache.CreateFile(options)
+	suite.assert.NoError(err)
+
+	dataNew := make([]byte, 1*_1MB)
+	_, _ = rand.Read(data)
+
+	n, err := tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 10 * 50001, Data: dataNew}) // 5 bytes
+	suite.assert.Error(err)
+	suite.assert.Contains(err.Error(), "block index out of range")
+	suite.assert.Equal(0, n)
+
+	tobj.blockCache.blockSize = 1048576
+	n, err = tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 10 * 50001, Data: dataNew}) // 5 bytes
+	suite.assert.NoError(err)
+	suite.assert.Len(dataNew, n)
+
+	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+}
+
+func (suite *blockCacheTestSuite) TestDeleteAndRenameDirAndFile() {
+	tobj, err := setupPipeline("")
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.NotNil(tobj.blockCache)
+
+	err = tobj.blockCache.CreateDir(internal.CreateDirOptions{Name: "testCreateDir", Mode: 0777})
+	suite.assert.NoError(err)
+
+	options := internal.CreateFileOptions{Name: "testCreateDir/a.txt", Mode: 0777}
+	h, err := tobj.blockCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.False(h.Dirty())
+
+	n, err := tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: []byte("Hello")}) // 5 bytes
+	suite.assert.NoError(err)
+	suite.assert.Equal(5, n)
+	suite.assert.Equal(int64(5), h.Size)
+	suite.assert.True(h.Dirty())
+	suite.assert.Equal(0, h.Buffers.Cooked.Len())
+	suite.assert.Equal(1, h.Buffers.Cooking.Len())
+
+	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+
+	err = tobj.blockCache.RenameDir(internal.RenameDirOptions{Src: "testCreateDir", Dst: "testCreateDirNew"})
+	suite.assert.NoError(err)
+
+	err = tobj.blockCache.DeleteDir(internal.DeleteDirOptions{Name: "testCreateDirNew"})
+	suite.assert.Error(err)
+
+	err = os.MkdirAll(filepath.Join(filepath.Join(tobj.blockCache.tmpPath, "testCreateDirNew")), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(filepath.Join(tobj.blockCache.tmpPath, "testCreateDirNew/a.txt::0"), []byte("Hello"), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(filepath.Join(tobj.blockCache.tmpPath, "testCreateDirNew/a.txt::1"), []byte("Hello"), 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(filepath.Join(tobj.blockCache.tmpPath, "testCreateDirNew/a.txt::2"), []byte("Hello"), 0777)
+	suite.assert.NoError(err)
+
+	err = tobj.blockCache.RenameFile(internal.RenameFileOptions{Src: "testCreateDirNew/a.txt", Dst: "testCreateDirNew/b.txt"})
+	suite.assert.NoError(err)
+
+	err = tobj.blockCache.DeleteFile(internal.DeleteFileOptions{Name: "testCreateDirNew/b.txt"})
+	suite.assert.NoError(err)
+
+	err = tobj.blockCache.DeleteDir(internal.DeleteDirOptions{Name: "testCreateDirNew"})
+	suite.assert.NoError(err)
+}
+
+func (suite *blockCacheTestSuite) TestTempCacheCleanup() {
+	tobj, _ := setupPipeline("")
+	defer tobj.cleanupPipeline()
+
+	items, _ := os.ReadDir(tobj.disk_cache_path)
+	suite.assert.Empty(items)
+	_ = tobj.blockCache.TempCacheCleanup()
+
+	for i := 0; i < 5; i++ {
+		_ = os.Mkdir(filepath.Join(tobj.disk_cache_path, fmt.Sprintf("temp_%d", i)), 0777)
+		for j := 0; j < 5; j++ {
+			_, _ = os.Create(filepath.Join(tobj.disk_cache_path, fmt.Sprintf("temp_%d", i), fmt.Sprintf("temp_%d", j)))
+		}
+	}
+
+	items, _ = os.ReadDir(tobj.disk_cache_path)
+	suite.assert.Len(items, 5)
+
+	_ = tobj.blockCache.TempCacheCleanup()
+	items, _ = os.ReadDir(tobj.disk_cache_path)
+	suite.assert.Empty(items)
+
+	tobj.blockCache.tmpPath = ""
+	_ = tobj.blockCache.TempCacheCleanup()
+
+	tobj.blockCache.tmpPath = "~/ABCD"
+	err := tobj.blockCache.TempCacheCleanup()
+	suite.assert.Error(err)
+	suite.assert.Contains(err.Error(), "failed to list directory")
 }
 
 // In order for 'go test' to run this suite, we need to create

@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,12 @@
 */
 
 package common
+
+import (
+	"os"
+
+	"github.com/Seagate/cloudfuse/common"
+)
 
 const (
 	CloudfuseStats    = "cloudfuse_stats"
@@ -61,8 +67,8 @@ var (
 
 const CfuseMonitorVersion = "1.0.0-preview.1"
 
-var DefaultWorkDir = "$HOME/.cloudfuse"
-var DefaultLogFile = DefaultWorkDir + "/CfuseMonitor.log"
+var DefaultWorkDir string
+var DefaultLogFile string
 
 type CacheEvent struct {
 	CacheEvent      string            `json:"cacheEvent"`
@@ -78,4 +84,17 @@ type CacheEvent struct {
 type CpuMemStat struct {
 	CpuUsage string
 	MemUsage string
+}
+
+func GetDefaultWorkDir() string {
+	val, err := os.UserHomeDir()
+	if err != nil {
+		return "./"
+	}
+	return val
+}
+
+func init() {
+	DefaultWorkDir = common.JoinUnixFilepath(GetDefaultWorkDir(), ".cloudfuse")
+	DefaultLogFile = common.JoinUnixFilepath(DefaultWorkDir, "CfuseMonitor.log")
 }

@@ -14,18 +14,19 @@ libfuse:
   entry-expiration-sec: 120
   negative-entry-expiration-sec: 120
   ignore-open-flags: true
-  
-  
+
+
 file_cache:
   path: { 1 }
   timeout-sec: 30
   max-size-mb: 2048
   allow-non-empty-temp: true
   cleanup-on-start: true
-  
+
 attr_cache:
   timeout-sec: 3600
   no-cache-on-list: false
+  enable-symlinks: true
 
 azstorage:
   type: { ACCOUNT_TYPE }

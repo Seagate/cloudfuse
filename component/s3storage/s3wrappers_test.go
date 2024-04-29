@@ -103,7 +103,24 @@ func (s *s3wrapperTestSuite) TestGetFileSymlink() {
 	s.assert.Equal(expectedName, newName)
 }
 
+func (s *s3wrapperTestSuite) TestGetFileSymlinkDisabled() {
+	s.client.Config.disableSymlink = true
+	fileName := "test" + symlinkStr
+	newName, isSymLink := s.client.getFile(fileName)
+	s.assert.False(isSymLink)
+	s.assert.Equal(fileName, newName)
+}
+
 func (s *s3wrapperTestSuite) TestGetKeySymlink() {
+	fileName := "test"
+	expectedName := "test" + symlinkStr
+	isSymLink := true
+	newName := s.client.getKey(fileName, isSymLink)
+	s.assert.Equal(expectedName, newName)
+}
+
+func (s *s3wrapperTestSuite) TestGetKeySymlinkDisabled() {
+	s.client.Config.disableSymlink = true
 	fileName := "test"
 	expectedName := "test" + symlinkStr
 	isSymLink := true

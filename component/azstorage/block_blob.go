@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -53,8 +53,9 @@ import (
 )
 
 const (
-	folderKey  = "hdi_isfolder"
-	symlinkKey = "is_symlink"
+	folderKey           = "hdi_isfolder"
+	symlinkKey          = "is_symlink"
+	max_context_timeout = 5
 )
 
 type BlockBlob struct {
@@ -80,11 +81,20 @@ func (bb *BlockBlob) Configure(cfg AzStorageConfig) error {
 	bb.Config = cfg
 
 	bb.blobAccCond = azblob.BlobAccessConditions{}
-	bb.blobCPKOpt = azblob.ClientProvidedKeyOptions{}
+	if bb.Config.cpkEnabled {
+		bb.blobCPKOpt = azblob.ClientProvidedKeyOptions{
+			EncryptionKey:       &bb.Config.cpkEncryptionKey,
+			EncryptionKeySha256: &bb.Config.cpkEncryptionKeySha256,
+			EncryptionAlgorithm: "AES256",
+		}
+	} else {
+		bb.blobCPKOpt = azblob.ClientProvidedKeyOptions{}
+	}
 
 	bb.downloadOptions = azblob.DownloadFromBlobOptions{
-		BlockSize:   bb.Config.blockSize,
-		Parallelism: bb.Config.maxConcurrency,
+		BlockSize:                bb.Config.blockSize,
+		Parallelism:              bb.Config.maxConcurrency,
+		ClientProvidedKeyOptions: bb.blobCPKOpt,
 	}
 
 	bb.listDetails = azblob.BlobListingDetails{
@@ -771,7 +781,11 @@ func (bb *BlockBlob) ReadInBuffer(name string, offset int64, length int64, data 
 	blobURL := bb.getBlobURL(name)
 	opt := bb.downloadOptions
 	opt.BlockSize = length
-	err := azblob.DownloadBlobToBuffer(context.Background(), blobURL, offset, length, data, opt)
+
+	ctx, cancel := context.WithTimeout(context.Background(), max_context_timeout*time.Minute)
+	defer cancel()
+
+	err := azblob.DownloadBlobToBuffer(ctx, blobURL, offset, length, data, opt)
 
 	if err != nil {
 		e := storeBlobErrToErr(err)
@@ -888,6 +902,7 @@ func (bb *BlockBlob) WriteFromFile(name string, metadata map[string]string, fi *
 			ContentType: getContentType(name),
 			ContentMD5:  md5sum,
 		},
+		ClientProvidedKeyOptions: bb.blobCPKOpt,
 	}
 	if common.MonitorCfs() && stat.Size() > 0 {
 		uploadOptions.Progress = func(bytesTransferred int64) {
@@ -935,6 +950,7 @@ func (bb *BlockBlob) WriteFromBuffer(name string, metadata map[string]string, da
 		BlobHTTPHeaders: azblob.BlobHTTPHeaders{
 			ContentType: getContentType(name),
 		},
+		ClientProvidedKeyOptions: bb.blobCPKOpt,
 	})
 
 	if err != nil {
@@ -952,15 +968,18 @@ func (bb *BlockBlob) GetFileBlockOffsets(name string) (*common.BlockOffsetList, 
 	blobURL := bb.getBlockBlobURL(name)
 	storageBlockList, err := blobURL.GetBlockList(
 		context.Background(), azblob.BlockListCommitted, bb.blobAccCond.LeaseAccessConditions)
+
 	if err != nil {
 		log.Err("BlockBlob::GetFileBlockOffsets : Failed to get block list %s ", name, err.Error())
 		return &common.BlockOffsetList{}, err
 	}
+
 	// if block list empty its a small file
 	if len(storageBlockList.CommittedBlocks) == 0 {
 		blockList.Flags.Set(common.SmallFile)
 		return &blockList, nil
 	}
+
 	for _, block := range storageBlockList.CommittedBlocks {
 		blk := &common.Block{
 			Id:         block.Name,
@@ -1052,11 +1071,50 @@ func (bb *BlockBlob) TruncateFile(name string, size int64) error {
 			return err
 		}
 	}
-	//TODO: the resize might be very big - need to allocate in chunks
 	if size == 0 || attr.Size == 0 {
-		err := bb.WriteFromBuffer(name, nil, make([]byte, size))
-		if err != nil {
-			log.Err("BlockBlob::TruncateFile : Failed to set the %s to 0 bytes [%s]", name, err.Error())
+		// If we are resizing to a value > 1GB then we need to upload multiple blocks to resize
+		if size > 1*common.GbToBytes {
+			blkSize := int64(16 * common.MbToBytes)
+			blobName := filepath.Join(bb.Config.prefixPath, name)
+			blobURL := bb.Container.NewBlockBlobURL(blobName)
+
+			blkList := make([]string, 0)
+			id := base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(16))
+
+			for i := 0; size > 0; i++ {
+				if i == 0 || size < blkSize {
+					// Only first and last block we upload and rest all we replicate with the first block itself
+					if size < blkSize {
+						blkSize = size
+						id = base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(16))
+					}
+					data := make([]byte, blkSize)
+
+					_, err = blobURL.StageBlock(context.Background(),
+						id,
+						bytes.NewReader(data),
+						bb.blobAccCond.LeaseAccessConditions,
+						nil,
+						bb.downloadOptions.ClientProvidedKeyOptions)
+					if err != nil {
+						log.Err("BlockBlob::TruncateFile : Failed to stage block for %s [%s]", name, err.Error())
+						return err
+					}
+				}
+				blkList = append(blkList, id)
+				size -= blkSize
+			}
+
+			err = bb.CommitBlocks(blobName, blkList)
+			if err != nil {
+				log.Err("BlockBlob::TruncateFile : Failed to commit blocks for %s [%s]", name, err.Error())
+				return err
+			}
+		} else {
+			err := bb.WriteFromBuffer(name, nil, make([]byte, size))
+			if err != nil {
+				log.Err("BlockBlob::TruncateFile : Failed to set the %s to 0 bytes [%s]", name, err.Error())
+			}
 		}
 		return err
 	}
@@ -1327,6 +1385,88 @@ func (bb *BlockBlob) ChangeOwner(name string, _ int, _ int) error {
 
 	// This is not currently supported for a flat namespace account
 	return syscall.ENOTSUP
+}
+
+// GetCommittedBlockList : Get the list of committed blocks
+func (bb *BlockBlob) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
+	blobURL := bb.Container.NewBlockBlobURL(filepath.Join(bb.Config.prefixPath, name))
+
+	storageBlockList, err := blobURL.GetBlockList(
+		context.Background(), azblob.BlockListCommitted, bb.blobAccCond.LeaseAccessConditions)
+
+	if err != nil {
+		log.Err("BlockBlob::GetFileBlockOffsets : Failed to get block list %s ", name, err.Error())
+		return nil, err
+	}
+
+	// if block list empty its a small file
+	if len(storageBlockList.CommittedBlocks) == 0 {
+		return nil, nil
+	}
+
+	blockList := make(internal.CommittedBlockList, 0)
+	startOffset := int64(0)
+	for _, block := range storageBlockList.CommittedBlocks {
+		blk := internal.CommittedBlock{
+			Id:     block.Name,
+			Offset: startOffset,
+			Size:   uint64(block.Size),
+		}
+		startOffset += block.Size
+		blockList = append(blockList, blk)
+	}
+
+	return &blockList, nil
+}
+
+// StageBlock : stages a block and returns its blockid
+func (bb *BlockBlob) StageBlock(name string, data []byte, id string) error {
+	log.Trace("BlockBlob::StageBlock : name %s", name)
+
+	ctx, cancel := context.WithTimeout(context.Background(), max_context_timeout*time.Minute)
+	defer cancel()
+
+	blobURL := bb.Container.NewBlockBlobURL(filepath.Join(bb.Config.prefixPath, name))
+	_, err := blobURL.StageBlock(ctx,
+		id,
+		bytes.NewReader(data),
+		bb.blobAccCond.LeaseAccessConditions,
+		nil,
+		bb.downloadOptions.ClientProvidedKeyOptions)
+
+	if err != nil {
+		log.Err("BlockBlob::StageBlock : Failed to stage to blob %s with ID %s [%s]", name, id, err.Error())
+		return err
+	}
+
+	return nil
+}
+
+// CommitBlocks : persists the block list
+func (bb *BlockBlob) CommitBlocks(name string, blockList []string) error {
+	log.Trace("BlockBlob::CommitBlocks : name %s", name)
+
+	ctx, cancel := context.WithTimeout(context.Background(), max_context_timeout*time.Minute)
+	defer cancel()
+
+	blobURL := bb.Container.NewBlockBlobURL(filepath.Join(bb.Config.prefixPath, name))
+	_, err := blobURL.CommitBlockList(ctx,
+		blockList,
+		azblob.BlobHTTPHeaders{ContentType: getContentType(name)},
+		nil,
+		bb.blobAccCond,
+		// azblob.BlobAccessConditions{ModifiedAccessConditions: azblob.ModifiedAccessConditions{IfMatch: bol.Etag}},
+		bb.Config.defaultTier,
+		nil, // datalake doesn't support tags here
+		bb.downloadOptions.ClientProvidedKeyOptions,
+		azblob.ImmutabilityPolicyOptions{})
+
+	if err != nil {
+		log.Err("BlockBlob::CommitBlocks : Failed to commit block list to blob %s [%s]", name, err.Error())
+		return err
+	}
+
+	return nil
 }
 
 // getBlobURL returns a new blob url. On Windows this will also convert special characters.

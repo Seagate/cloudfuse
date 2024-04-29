@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -86,7 +86,7 @@ func (s *configTestSuite) TestConfigParse() {
 	err := ParseAndValidateConfig(s.s3, s.opt)
 
 	// Then
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Equal(s.opt.BucketName, s.s3.stConfig.authConfig.BucketName)
 	s.assert.Equal(s.opt.KeyID, s.s3.stConfig.authConfig.KeyID)
 	s.assert.Equal(s.opt.SecretKey, s.s3.stConfig.authConfig.SecretKey)
@@ -103,7 +103,7 @@ func (s *configTestSuite) TestPrefixPath() {
 
 	// Then
 	err := ParseAndValidateConfig(s.s3, s.opt)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Equal("testPrefixPath", s.s3.stConfig.prefixPath)
 }
 
@@ -114,7 +114,7 @@ func (s *configTestSuite) TestValidChecksum() {
 	// Then
 	// Default should be SHA1 if user does not provide checksum algorithm
 	err := ParseAndValidateConfig(s.s3, s.opt)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.True(s.s3.stConfig.enableChecksum)
 	s.assert.Equal(types.ChecksumAlgorithm("SHA1"), s.s3.stConfig.checksumAlgorithm)
 
@@ -124,7 +124,7 @@ func (s *configTestSuite) TestValidChecksum() {
 
 	// Then
 	err = ParseAndValidateConfig(s.s3, s.opt)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.True(s.s3.stConfig.enableChecksum)
 	s.assert.Equal(types.ChecksumAlgorithm("SHA1"), s.s3.stConfig.checksumAlgorithm)
 
@@ -133,7 +133,7 @@ func (s *configTestSuite) TestValidChecksum() {
 
 	// Then
 	err = ParseAndValidateConfig(s.s3, s.opt)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Equal(types.ChecksumAlgorithm("SHA256"), s.s3.stConfig.checksumAlgorithm)
 
 	// When
@@ -141,7 +141,7 @@ func (s *configTestSuite) TestValidChecksum() {
 
 	// Then
 	err = ParseAndValidateConfig(s.s3, s.opt)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Equal(types.ChecksumAlgorithm("CRC32"), s.s3.stConfig.checksumAlgorithm)
 
 	// When
@@ -149,7 +149,7 @@ func (s *configTestSuite) TestValidChecksum() {
 
 	// Then
 	err = ParseAndValidateConfig(s.s3, s.opt)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Equal(types.ChecksumAlgorithm("CRC32C"), s.s3.stConfig.checksumAlgorithm)
 }
 
@@ -160,7 +160,7 @@ func (s *configTestSuite) TestInvalidChecksum() {
 
 	// Then
 	err := ParseAndValidateConfig(s.s3, s.opt)
-	s.assert.NotNil(err)
+	s.assert.Error(err)
 	s.assert.ErrorIs(err, errInvalidConfigField)
 }
 

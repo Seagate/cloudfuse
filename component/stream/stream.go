@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -121,8 +121,8 @@ func (st *Stream) Configure(_ bool) error {
 	}
 	st.cache = NewStreamConnection(conf, st)
 
-	log.Info("Stream::Configure : Buffer size %v, Block size %v, Handle limit %v",
-		conf.BufferSize, conf.BlockSize, conf.CachedObjLimit)
+	log.Info("Stream::Configure : Buffer size %v, Block size %v, Handle limit %v, FileCaching %v, Read-only %v, StreamCacheMb %v, MaxBlocksPerFile %v",
+		conf.BufferSize, conf.BlockSize, conf.CachedObjLimit, conf.FileCaching, conf.readOnly, conf.StreamCacheMb, conf.MaxBlocksPerFile)
 
 	return nil
 }

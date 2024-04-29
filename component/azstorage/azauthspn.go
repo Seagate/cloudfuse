@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -27,7 +27,7 @@ package azstorage
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"time"
 
@@ -48,7 +48,7 @@ type azAuthSPN struct {
 }
 
 func getNextExpiryTimerSPN(spt *adal.ServicePrincipalToken) time.Duration {
-	delay := time.Duration(5+rand.Intn(120)) * time.Second
+	delay := time.Duration(5+rand.IntN(120)) * time.Second
 	return time.Until(spt.Token().Expires()) - delay
 }
 
@@ -127,13 +127,14 @@ func (azspn *azAuthBlobSPN) getCredential() interface{} {
 			err = spt.Refresh()
 			if err != nil {
 				log.Err("azAuthBfsSPN::getCredential : Failed to refresh token attempt %d [%s]", failCount, err.Error())
-				time.Sleep(time.Duration(rand.Intn(5)) * time.Second)
+				time.Sleep(time.Duration(rand.IntN(5)) * time.Second)
 				continue
 			}
 
 			// set the new token value
 			tc.SetToken(spt.Token().AccessToken)
-			log.Debug("azAuthBlobSPN::getCredential : SPN Token retrieved %s (%d)", spt.Token().AccessToken, spt.Token().Expires())
+			log.Info("azAuthBlobSPN::getCredential : SPN Token retrieved")
+			log.Debug("azAuthBlobSPN::getCredential : Token: %s (%s)", spt.Token().AccessToken, spt.Token().Expires())
 
 			// Get the next token slightly before the current one expires
 			return getNextExpiryTimerSPN(spt)
@@ -172,13 +173,14 @@ func (azspn *azAuthBfsSPN) getCredential() interface{} {
 			err = spt.Refresh()
 			if err != nil {
 				log.Err("azAuthBfsSPN::getCredential : Failed to refresh token attempt %d [%s]", failCount, err.Error())
-				time.Sleep(time.Duration(rand.Intn(5)) * time.Second)
+				time.Sleep(time.Duration(rand.IntN(5)) * time.Second)
 				continue
 			}
 
 			// set the new token value
 			tc.SetToken(spt.Token().AccessToken)
-			log.Debug("azAuthBfsSPN::getCredential : SPN Token retrieved %s (%d)", spt.Token().AccessToken, spt.Token().Expires())
+			log.Info("azAuthBfsSPN::getCredential : SPN Token retrieved")
+			log.Debug("azAuthBfsSPN::getCredential : Token: %s (%s)", spt.Token().AccessToken, spt.Token().Expires())
 
 			// Get the next token slightly before the current one expires
 			return getNextExpiryTimerSPN(spt)

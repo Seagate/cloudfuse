@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -68,7 +68,7 @@ type Handle struct {
 	FObj     *os.File // File object being represented by this handle
 	CacheObj *Cache   // Streaming layer cache for this handle
 	Buffers  *Buffers
-	ID       HandleID // Blobfuse assigned unique ID to this handle
+	ID       HandleID // Cloudfuse assigned unique ID to this handle
 	Size     int64    // Size of the file being handled here
 	Mtime    time.Time
 	UnixFD   uint64                 // Unix FD created by create/open syscall

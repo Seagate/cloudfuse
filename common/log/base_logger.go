@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -37,6 +37,10 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 )
+
+// Uses format of Time.UnixDate with addition of milliseconds.
+// See https://pkg.go.dev/time#UnixDate
+const unixDateMilli = "Mon Jan _2 15:04:05.000 MST 2006"
 
 // LogConfig : Configuration to be provided to logging infra
 type LogFileConfig struct {
@@ -212,7 +216,7 @@ func (l *BaseLogger) logEvent(lvl string, format string, args ...interface{}) {
 	_, fn, ln, _ := runtime.Caller(3)
 	msg := fmt.Sprintf(format, args...)
 	msg = fmt.Sprintf("%s : %s[%d] : %s [%s (%d)]: %s",
-		time.Now().Format(time.UnixDate),
+		time.Now().Format(unixDateMilli),
 		l.fileConfig.LogTag,
 		l.procPID,
 		lvl,

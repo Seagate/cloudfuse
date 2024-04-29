@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -64,9 +64,9 @@ func (suite *docTestSuite) TestDocsGeneration() {
 	defer os.RemoveAll(opDir)
 
 	_, err := executeCommandC(rootCmd, "doc", fmt.Sprintf("--output-location=%s", opDir))
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	files, err := os.ReadDir(opDir)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotZero(len(files))
 }
 
@@ -81,7 +81,7 @@ func (suite *docTestSuite) TestOutputDirCreationError() {
 	opDir := "/var/docs_" + randomString(6)
 
 	op, err := executeCommandC(rootCmd, "doc", fmt.Sprintf("--output-location=%s", opDir))
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(op, "failed to create output location")
 }
 
@@ -96,7 +96,7 @@ func (suite *docTestSuite) TestDocsGenerationError() {
 	opDir := "/var"
 
 	op, err := executeCommandC(rootCmd, "doc", fmt.Sprintf("--output-location=%s", opDir))
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(op, "cannot generate command tree")
 }
 
@@ -104,13 +104,13 @@ func (suite *docTestSuite) TestOutputDirIsFileError() {
 	defer suite.cleanupTest()
 
 	opFile, err := os.CreateTemp("", "docfile*")
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	opFileName := opFile.Name()
 	opFile.Close()
 	defer os.Remove(opFileName)
 
 	op, err := executeCommandC(rootCmd, "doc", fmt.Sprintf("--output-location=%s", opFileName))
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(op, "output location is invalid as it is pointing to a file")
 }
 

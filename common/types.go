@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -28,8 +28,10 @@ package common
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"os"
 	"reflect"
+	"runtime"
 	"sync"
 	"time"
 
@@ -38,7 +40,7 @@ import (
 
 // Standard config default values
 const (
-	cloudfuseVersion_ = "1.0.1"
+	cloudfuseVersion_ = "1.1.3"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
@@ -62,6 +64,11 @@ const (
 	FuseAllowedFlags = "invalid FUSE options. Allowed FUSE configurations are: `-o attr_timeout=TIMEOUT`, `-o negative_timeout=TIMEOUT`, `-o entry_timeout=TIMEOUT` `-o allow_other`, `-o allow_root`, `-o umask=PERMISSIONS -o default_permissions`, `-o ro`"
 )
 
+var GitCommit = "**local_build**"
+var CommitDate = "undated"
+var GoVersion = runtime.Version()
+var OsArch = fmt.Sprintf("%s %s", runtime.GOOS, runtime.GOARCH)
+
 func FuseIgnoredFlags() []string {
 	return []string{"default_permissions", "rw", "dev", "nodev", "suid", "nosuid", "delay_connect", "auto", "noauto", "user", "nouser", "exec", "noexec"}
 }
@@ -72,12 +79,20 @@ func CloudfuseVersion_() string {
 	return cloudfuseVersion_
 }
 
-var DefaultWorkDir = "$HOME/.cloudfuse"
-var DefaultLogFilePath = JoinUnixFilepath(DefaultWorkDir, "cloudfuse.log")
-var StatsConfigFilePath = JoinUnixFilepath(DefaultWorkDir, "stats_monitor.cfg")
+var DefaultWorkDir string
+var DefaultLogFilePath string
+var StatsConfigFilePath string
 
 var EnableMonitoring = false
 var CfsDisabled = false
+
+func GetDefaultWorkDir() string {
+	val, err := os.UserHomeDir()
+	if err != nil {
+		return "./"
+	}
+	return val
+}
 
 // LogLevel enum
 type LogLevel int
@@ -309,4 +324,10 @@ func NewUUID() (u uuid) {
 func GetIdLength(id string) int64 {
 	existingBlockId, _ := base64.StdEncoding.DecodeString(id)
 	return int64(len(existingBlockId))
+}
+
+func init() {
+	DefaultWorkDir = JoinUnixFilepath(GetDefaultWorkDir(), ".cloudfuse")
+	DefaultLogFilePath = JoinUnixFilepath(DefaultWorkDir, "cloudfuse.log")
+	StatsConfigFilePath = JoinUnixFilepath(DefaultWorkDir, "stats_monitor.cfg")
 }

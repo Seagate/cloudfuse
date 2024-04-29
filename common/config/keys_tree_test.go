@@ -9,8 +9,8 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
+   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -73,7 +73,7 @@ func (suite *keysTreeTestSuite) TestParseValue() {
 		{val: "65535", toType: reflect.Uint16, result: 65535},
 		{val: "4294967295", toType: reflect.Uint32, result: 4294967295},
 		{val: "18446744073709551615", toType: reflect.Uint64, result: uint64(18446744073709551615)},
-		{val: "6.24321908234", toType: reflect.Float32, result: 6.24321908234},
+		{val: "6.24321908234", toType: reflect.Float32, result: float32(6.24321908234)},
 		{val: "31247921747687123.123871293791263", toType: reflect.Float64, result: 31247921747687123.123871293791263},
 		{val: "6-8i", toType: reflect.Complex64, result: 6 - 8i},
 		{val: "2341241-910284i", toType: reflect.Complex128, result: 2341241 - 910284i},

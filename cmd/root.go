@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -203,7 +203,7 @@ func parseArgs(cmdArgs []string) []string {
 				// Check if ',' exists in arguments or not. If so we assume it might be coming from /etc/fstab
 				opts := strings.Split(cmdArgs[i], ",")
 				for _, o := range opts {
-					// If we got comma separated list then all blobfuse specific options needs to be extracted out
+					// If we got comma separated list then all cloudfuse specific options needs to be extracted out
 					//  as those shall not be part of -o list which for us means libfuse options
 					if strings.HasPrefix(o, "--") {
 						bfuseArgs = append(bfuseArgs, o)
@@ -217,7 +217,7 @@ func parseArgs(cmdArgs []string) []string {
 					args = append(args, "-o", strings.Join(lfuseArgs, ","))
 				}
 
-				// Extract and add blobfuse specific options sepratly
+				// Extract and add cloudfuse specific options sepratly
 				if len(bfuseArgs) > 0 {
 					args = append(args, bfuseArgs...)
 				}

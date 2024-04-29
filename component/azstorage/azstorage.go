@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -242,43 +242,6 @@ func (az *AzStorage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	return false
 }
 
-func (az *AzStorage) ReadDir(options internal.ReadDirOptions) ([]*internal.ObjAttr, error) {
-	log.Trace("AzStorage::ReadDir : %s", options.Name)
-	blobList := make([]*internal.ObjAttr, 0)
-
-	if az.listBlocked {
-		diff := time.Since(az.startTime)
-		if diff.Seconds() > float64(az.stConfig.cancelListForSeconds) {
-			az.listBlocked = false
-			log.Info("AzStorage::ReadDir : Unblocked List API")
-		} else {
-			log.Info("AzStorage::ReadDir : Blocked List API for %d more seconds", int(az.stConfig.cancelListForSeconds)-int(diff.Seconds()))
-			return blobList, nil
-		}
-	}
-
-	path := formatListDirName(options.Name)
-	var iteration int = 0
-	var marker *string = nil
-	for {
-		new_list, new_marker, err := az.storage.List(path, marker, common.MaxDirListCount)
-		if err != nil {
-			log.Err("AzStorage::ReadDir : Failed to read dir [%s]", err)
-			return blobList, err
-		}
-		blobList = append(blobList, new_list...)
-		marker = new_marker
-		iteration++
-
-		log.Debug("AzStorage::ReadDir : So far retrieved %d objects in %d iterations", len(blobList), iteration)
-		if new_marker == nil || *new_marker == "" {
-			break
-		}
-	}
-
-	return blobList, nil
-}
-
 func (az *AzStorage) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
 	log.Trace("AzStorage::StreamDir : Path %s, offset %d, count %d", options.Name, options.Offset, options.Count)
 
@@ -294,6 +257,9 @@ func (az *AzStorage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	}
 
 	path := formatListDirName(options.Name)
+	if options.Count == 0 {
+		options.Count = common.MaxDirListCount
+	}
 
 	new_list, new_marker, err := az.storage.List(path, &options.Token, options.Count)
 	if err != nil {
@@ -491,6 +457,10 @@ func (az *AzStorage) CopyFromFile(options internal.CopyFromFileOptions) error {
 
 // Symlink operations
 func (az *AzStorage) CreateLink(options internal.CreateLinkOptions) error {
+	if az.stConfig.disableSymlink {
+		log.Err("AzStorage::CreateLink : %s -> %s - Symlink support not enabled", options.Name, options.Target)
+		return syscall.ENOTSUP
+	}
 	log.Trace("AzStorage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
 	err := az.storage.CreateLink(options.Name, options.Target)
 
@@ -503,6 +473,10 @@ func (az *AzStorage) CreateLink(options internal.CreateLinkOptions) error {
 }
 
 func (az *AzStorage) ReadLink(options internal.ReadLinkOptions) (string, error) {
+	if az.stConfig.disableSymlink {
+		log.Err("AzStorage::ReadLink : %s - Symlink support not enabled", options.Name)
+		return "", syscall.ENOENT
+	}
 	log.Trace("AzStorage::ReadLink : Read symlink %s", options.Name)
 	data, err := az.storage.ReadBuffer(options.Name, 0, 0)
 
@@ -540,6 +514,18 @@ func (az *AzStorage) Chown(options internal.ChownOptions) error {
 func (az *AzStorage) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("AzStorage::FlushFile : Flush file %s", options.Handle.Path)
 	return az.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
+}
+
+func (az *AzStorage) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
+	return az.storage.GetCommittedBlockList(name)
+}
+
+func (az *AzStorage) StageData(opt internal.StageDataOptions) error {
+	return az.storage.StageBlock(opt.Name, opt.Data, opt.Id)
+}
+
+func (az *AzStorage) CommitData(opt internal.CommitDataOptions) error {
+	return az.storage.CommitBlocks(opt.Name, opt.List)
 }
 
 // TODO : Below methods are pending to be implemented
@@ -586,7 +572,7 @@ func init() {
 	containerNameFlag := config.AddStringFlag("container-name", "", "Configures the name of the container to be mounted")
 	config.BindPFlag(compName+".container", containerNameFlag)
 
-	useAdls := config.AddBoolFlag("use-adls", false, "Enables blobfuse to access Azure DataLake storage account.")
+	useAdls := config.AddBoolFlag("use-adls", false, "Enables cloudfuse to access Azure DataLake storage account.")
 	config.BindPFlag(compName+".use-adls", useAdls)
 	useAdls.Hidden = true
 
@@ -645,6 +631,9 @@ func init() {
 
 	restrictedCharsWin := config.AddBoolFlag("restricted-characters-windows", false, "Enable support for displaying restricted characters on Windows.")
 	config.BindPFlag("restricted-characters-windows", restrictedCharsWin)
+
+	cpkEnabled := config.AddBoolFlag("cpk-enabled", false, "Enable client provided key.")
+	config.BindPFlag(compName+".cpk-enabled", cpkEnabled)
 
 	config.RegisterFlagCompletionFunc("container-name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveNoFileComp

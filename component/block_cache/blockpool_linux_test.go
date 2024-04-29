@@ -13,8 +13,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -69,7 +68,7 @@ func (suite *blockpoolTestSuite) TestAllocate() {
 	suite.assert.NotNil(bp.blocksCh)
 
 	bp.Terminate()
-	suite.assert.Equal(len(bp.blocksCh), 0)
+	suite.assert.Empty(bp.blocksCh)
 }
 
 func (suite *blockpoolTestSuite) TestGetRelease() {
@@ -78,24 +77,24 @@ func (suite *blockpoolTestSuite) TestGetRelease() {
 	bp := NewBlockPool(1, 5)
 	suite.assert.NotNil(bp)
 	suite.assert.NotNil(bp.blocksCh)
-	suite.assert.Equal(len(bp.blocksCh), 5)
+	suite.assert.Len(bp.blocksCh, 5)
 
 	b := bp.MustGet()
 	suite.assert.NotNil(b)
-	suite.assert.Equal(len(bp.blocksCh), 4)
+	suite.assert.Len(bp.blocksCh, 4)
 
 	bp.Release(b)
-	suite.assert.Equal(len(bp.blocksCh), 5)
+	suite.assert.Len(bp.blocksCh, 5)
 
 	b = bp.TryGet()
 	suite.assert.NotNil(b)
-	suite.assert.Equal(len(bp.blocksCh), 4)
+	suite.assert.Len(bp.blocksCh, 4)
 
 	bp.Release(b)
-	suite.assert.Equal(len(bp.blocksCh), 5)
+	suite.assert.Len(bp.blocksCh, 5)
 
 	bp.Terminate()
-	suite.assert.Equal(len(bp.blocksCh), 0)
+	suite.assert.Empty(bp.blocksCh)
 }
 
 func (suite *blockpoolTestSuite) TestUsage() {
@@ -104,7 +103,7 @@ func (suite *blockpoolTestSuite) TestUsage() {
 	bp := NewBlockPool(1, 5)
 	suite.assert.NotNil(bp)
 	suite.assert.NotNil(bp.blocksCh)
-	suite.assert.Equal(len(bp.blocksCh), 5)
+	suite.assert.Len(bp.blocksCh, 5)
 
 	var blocks []*Block
 	b := bp.MustGet()
@@ -112,21 +111,21 @@ func (suite *blockpoolTestSuite) TestUsage() {
 	blocks = append(blocks, b)
 
 	usage := bp.Usage()
-	suite.assert.Equal(usage, uint32(20))
+	suite.assert.Equal(uint32(20), usage)
 
 	b = bp.TryGet()
 	suite.assert.NotNil(b)
 	blocks = append(blocks, b)
 
 	usage = bp.Usage()
-	suite.assert.Equal(usage, uint32(40))
+	suite.assert.Equal(uint32(40), usage)
 
 	for _, blk := range blocks {
 		bp.Release(blk)
 	}
 
 	bp.Terminate()
-	suite.assert.Equal(len(bp.blocksCh), 0)
+	suite.assert.Empty(bp.blocksCh)
 }
 
 func (suite *blockpoolTestSuite) TestBufferExhaution() {
@@ -135,7 +134,7 @@ func (suite *blockpoolTestSuite) TestBufferExhaution() {
 	bp := NewBlockPool(1, 5)
 	suite.assert.NotNil(bp)
 	suite.assert.NotNil(bp.blocksCh)
-	suite.assert.Equal(len(bp.blocksCh), 5)
+	suite.assert.Len(bp.blocksCh, 5)
 
 	var blocks []*Block
 	for i := 0; i < 5; i++ {
@@ -145,7 +144,7 @@ func (suite *blockpoolTestSuite) TestBufferExhaution() {
 	}
 
 	usage := bp.Usage()
-	suite.assert.Equal(usage, uint32(100))
+	suite.assert.Equal(uint32(100), usage)
 
 	b := bp.TryGet()
 	suite.assert.Nil(b)
@@ -159,7 +158,7 @@ func (suite *blockpoolTestSuite) TestBufferExhaution() {
 	}
 
 	bp.Terminate()
-	suite.assert.Equal(len(bp.blocksCh), 0)
+	suite.assert.Empty(bp.blocksCh)
 }
 
 func TestBlockPoolSuite(t *testing.T) {

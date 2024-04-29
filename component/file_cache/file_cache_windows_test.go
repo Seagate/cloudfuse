@@ -4,7 +4,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -65,8 +65,14 @@ func (suite *fileCacheWindowsTestSuite) SetupTest() {
 	log.Debug(defaultConfig)
 
 	// Delete the temp directories created
-	os.RemoveAll(suite.cache_path)
-	os.RemoveAll(suite.fake_storage_path)
+	err = os.RemoveAll(suite.cache_path)
+	if err != nil {
+		fmt.Printf("fileCacheWindowsTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
+	}
+	err = os.RemoveAll(suite.fake_storage_path)
+	if err != nil {
+		fmt.Printf("fileCacheWindowsTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
+	}
 	suite.setupTestHelper(defaultConfig)
 }
 
@@ -92,8 +98,14 @@ func (suite *fileCacheWindowsTestSuite) cleanupTest() {
 	}
 
 	// Delete the temp directories created
-	os.RemoveAll(suite.cache_path)
-	os.RemoveAll(suite.fake_storage_path)
+	err = os.RemoveAll(suite.cache_path)
+	if err != nil {
+		fmt.Printf("fileCacheWindowsTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
+	}
+	err = os.RemoveAll(suite.fake_storage_path)
+	if err != nil {
+		fmt.Printf("fileCacheWindowsTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
+	}
 }
 
 func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {

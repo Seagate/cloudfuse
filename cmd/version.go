@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -40,7 +40,11 @@ var versionCmd = &cobra.Command{
 	Short:             "Command to print the current version along with optional check for latest version",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("cloudfuse version: %s\n", common.CloudfuseVersion)
+		fmt.Println("cloudfuse version:", common.CloudfuseVersion)
+		fmt.Println("git commit:", common.GitCommit)
+		fmt.Println("commit date:", common.CommitDate)
+		fmt.Println("go version:", common.GoVersion)
+		fmt.Println("OS/Arch:", common.OsArch)
 		if check {
 			return VersionCheck()
 		}

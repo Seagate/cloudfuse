@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -77,7 +77,7 @@ func getUsagePercentage(path string, maxSize float64) float64 {
 			log.Err("cachePolicy::getUsagePercentage : failed to get disk usage for %s [%v]", path, err.Error)
 		}
 	} else {
-		// We need to compuate % usage of temp directory against configured limit
+		// We need to compute % usage of temp directory against configured limit
 		currSize, err = common.GetUsage(path)
 		if err != nil {
 			log.Err("cachePolicy::getUsagePercentage : failed to get directory usage for %s [%v]", path, err.Error)

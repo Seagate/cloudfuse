@@ -1,17 +1,27 @@
 name: Feature request
-description: Request a new feature or improvement to Cloudfuse. Please first check to make sure this has not yet been requested.  
+description: Request a new feature or improvement to Cloudfuse.
 labels: [enhancement]
+
 body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Welcome!
+
+        Thanks for taking the time to fill out this feature request!
+
+        If you don't want to use this form, just [email us](mailto:cloudfuse@seagate.com?subject=%5BFeature%20Request%5D%20%3CAdd%20Title%20Here%3E)!
+
   - type: textarea
     id: feature
     attributes:
-      label: Please describe the feature/improvement you would like to see added. 
+      label: Please describe the feature/improvement you would like to see added.
     validations:
       required: true
 
   - type: textarea
     id: rationale
     attributes:
-      label: Please explain why you think adding this feature/improvement is important. 
+      label: Please explain why you think adding this feature/improvement is important.
     validations:
       required: true

@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2023 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -54,7 +54,10 @@ func (suite *cachePolicyTestSuite) SetupTest() {
 }
 
 func (suite *cachePolicyTestSuite) cleanupTest() {
-	os.RemoveAll(cache_path)
+	err := os.RemoveAll(cache_path)
+	if err != nil {
+		fmt.Printf("cachePolicyTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", cache_path, err)
+	}
 }
 
 func (suite *cachePolicyTestSuite) TestGetUsage() {
@@ -74,7 +77,7 @@ func (suite *cachePolicyTestSuite) TestGetUsageSizeOnDisk() {
 	data := make([]byte, 4097)
 	f.Write(data)
 	result, err := common.GetUsage(cache_path)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	// Linux du overestimates the number of sectors used by 1 sometimes
 	// So check that we aren't more or less than 1 sector size off.
@@ -104,7 +107,7 @@ func (suite *cachePolicyTestSuite) TestDeleteFile() {
 	defer suite.cleanupTest()
 	f, _ := os.Create(cache_path + "/test")
 	result := deleteFile(f.Name() + "not_exist")
-	suite.assert.Equal(nil, result)
+	suite.assert.NoError(result)
 	f.Close()
 }
 
