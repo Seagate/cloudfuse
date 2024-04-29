@@ -199,8 +199,9 @@ jobs:
       - name: Install Zig
         run: |
           curl -L https://ziglang.org/download/${{ env.zig }}/zig-linux-x86_64-${{ env.zig }}.tar.xz -o zig.tar.xz
-          tar -xf zig.tar.xz -C /opt
-          echo "/opt/zig-linux-x86_64-${{ env.zig }}" >> $GITHUB_PATH
+          tar -xf zig.tar.xz -C /usr/local
+          echo "/usr/local/zig-linux-x86_64-${{ env.zig }}" >> $GITHUB_PATH
+          echo $PATH
           zig version
 
       - name: Install Go
