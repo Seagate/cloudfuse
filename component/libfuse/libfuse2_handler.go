@@ -633,7 +633,7 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 	name = common.NormalizeObjectName(name)
 
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
-	if handle.Size == 0 && handle.GetFileObject().Name() == "" {
+	if handle.Size == int64(0) && handle.GetFileObject().Name() == "" {
 		var err error
 		handle, err = fuseFS.NextComponent().OpenFile(
 			internal.OpenFileOptions{
