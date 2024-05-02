@@ -100,7 +100,7 @@ func (suite *dirTestSuite) dirTestCleanup(toRemove []string) {
 // # Create Directory with a simple name
 func (suite *dirTestSuite) TestDirCreateSimple() {
 	dirName := filepath.Join(suite.testPath, "test1")
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0755)
 	suite.NoError(err)
 
 	// cleanup
@@ -110,10 +110,10 @@ func (suite *dirTestSuite) TestDirCreateSimple() {
 // # Create Directory that already exists
 func (suite *dirTestSuite) TestDirCreateDuplicate() {
 	dirName := filepath.Join(suite.testPath, "test1")
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0755)
 	suite.NoError(err)
 	// duplicate dir - we expect to throw
-	err = os.Mkdir(dirName, 0777)
+	err = os.Mkdir(dirName, 0755)
 
 	if runtime.GOOS == "windows" {
 		suite.Contains(err.Error(), "file already exists")
@@ -132,7 +132,7 @@ func (suite *dirTestSuite) TestDirCreateSplChar() {
 		return
 	}
 	dirName := filepath.Join(suite.testPath, "@#$^&*()_+=-{}[]|?><.,~")
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0755)
 	suite.NoError(err)
 
 	// cleanup
@@ -146,7 +146,7 @@ func (suite *dirTestSuite) TestDirCreateSlashChar() {
 		return
 	}
 	dirName := filepath.Join(suite.testPath, "PRQ\\STUV")
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0755)
 	suite.NoError(err)
 
 	// cleanup
@@ -156,7 +156,7 @@ func (suite *dirTestSuite) TestDirCreateSlashChar() {
 // # Rename a directory
 func (suite *dirTestSuite) TestDirRename() {
 	dirName := filepath.Join(suite.testPath, "test1")
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0755)
 	suite.NoError(err)
 
 	newName := filepath.Join(suite.testPath, "test1_new")
@@ -173,11 +173,11 @@ func (suite *dirTestSuite) TestDirRename() {
 // # Move an empty directory
 func (suite *dirTestSuite) TestDirMoveEmpty() {
 	dir2Name := filepath.Join(suite.testPath, "test2")
-	err := os.Mkdir(dir2Name, 0777)
+	err := os.Mkdir(dir2Name, 0755)
 	suite.NoError(err)
 
 	dir3Name := filepath.Join(suite.testPath, "test3")
-	err = os.Mkdir(dir3Name, 0777)
+	err = os.Mkdir(dir3Name, 0755)
 	suite.NoError(err)
 
 	err = os.Rename(dir2Name, filepath.Join(dir3Name, "test2"))
@@ -191,7 +191,7 @@ func (suite *dirTestSuite) TestDirMoveEmpty() {
 // # Move an non-empty directory
 func (suite *dirTestSuite) TestDirMoveNonEmpty() {
 	dir2Name := filepath.Join(suite.testPath, "test2NE")
-	err := os.Mkdir(dir2Name, 0777)
+	err := os.Mkdir(dir2Name, 0755)
 	suite.NoError(err)
 
 	file1Name := filepath.Join(dir2Name, "test.txt")
@@ -200,7 +200,7 @@ func (suite *dirTestSuite) TestDirMoveNonEmpty() {
 	f.Close()
 
 	dir3Name := filepath.Join(suite.testPath, "test3NE")
-	err = os.Mkdir(dir3Name, 0777)
+	err = os.Mkdir(dir3Name, 0755)
 	suite.NoError(err)
 
 	err = os.Mkdir(filepath.Join(dir3Name, "abcdTest"), 0777)
@@ -217,7 +217,7 @@ func (suite *dirTestSuite) TestDirMoveNonEmpty() {
 // # Delete non-empty directory
 func (suite *dirTestSuite) TestDirDeleteEmpty() {
 	dirName := filepath.Join(suite.testPath, "test1_new")
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0755)
 	suite.NoError(err)
 
 	suite.dirTestCleanup([]string{dirName})
@@ -226,7 +226,7 @@ func (suite *dirTestSuite) TestDirDeleteEmpty() {
 // # Delete non-empty directory
 func (suite *dirTestSuite) TestDirDeleteNonEmpty() {
 	dir3Name := filepath.Join(suite.testPath, "test3NE")
-	err := os.Mkdir(dir3Name, 0777)
+	err := os.Mkdir(dir3Name, 0755)
 	suite.NoError(err)
 
 	err = os.Mkdir(filepath.Join(dir3Name, "abcdTest"), 0777)
@@ -249,7 +249,7 @@ func (suite *dirTestSuite) TestDirDeleteNonEmpty() {
 // func (suite *dirTestSuite) TestDirDeleteRecursive() {
 // 	dirName := filepath.Join(suite.testPath, "testREC")
 
-// 	err := os.Mkdir(dirName, 0777)
+// 	err := os.Mkdir(dirName, 0755)
 // 	suite.Equal(nil, err)
 
 // 	err = os.Mkdir(filepath.Join(dirName, "level1"), 0777)
@@ -271,7 +271,7 @@ func (suite *dirTestSuite) TestDirDeleteNonEmpty() {
 // # Get stats of a directory
 func (suite *dirTestSuite) TestDirGetStats() {
 	dirName := filepath.Join(suite.testPath, "test3")
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0755)
 	suite.NoError(err)
 	// time.Sleep(2 * time.Second)
 
@@ -295,7 +295,7 @@ func (suite *dirTestSuite) TestDirGetStats() {
 // func (suite *dirTestSuite) TestDirChmod() {
 // 	if suite.adlsTest == true {
 // 		dirName := filepath.Join(suite.testPath, "test3")
-// 		err := os.Mkdir(dirName, 0777)
+// 		err := os.Mkdir(dirName, 0755)
 // 		suite.Equal(nil, err)
 
 // 		err = os.Chmod(dirName, 0744)
@@ -312,17 +312,17 @@ func (suite *dirTestSuite) TestDirGetStats() {
 // # List directory
 func (suite *dirTestSuite) TestDirList() {
 	testDir := filepath.Join(suite.testPath, "bigTestDir")
-	err := os.Mkdir(testDir, 0777)
+	err := os.Mkdir(testDir, 0755)
 	suite.NoError(err)
 
 	dir := filepath.Join(testDir, "Dir1")
-	err = os.Mkdir(dir, 0777)
+	err = os.Mkdir(dir, 0755)
 	suite.NoError(err)
 	dir = filepath.Join(testDir, "Dir2")
-	err = os.Mkdir(dir, 0777)
+	err = os.Mkdir(dir, 0755)
 	suite.NoError(err)
 	dir = filepath.Join(testDir, "Dir3")
-	err = os.Mkdir(dir, 0777)
+	err = os.Mkdir(dir, 0755)
 	suite.NoError(err)
 
 	srcFile, err := os.OpenFile(filepath.Join(testDir, "abc.txt"), os.O_CREATE, 0777)
@@ -341,19 +341,19 @@ func (suite *dirTestSuite) TestDirList() {
 // // # List directory recursively
 // func (suite *dirTestSuite) TestDirListRecursive() {
 // 	testDir := filepath.Join(suite.testPath, "bigTestDir")
-// 	err := os.Mkdir(testDir, 0777)
+// 	err := os.Mkdir(testDir, 0755)
 // 	suite.Equal(nil, err)
 
 // 	dir := filepath.Join(testDir, "Dir1")
-// 	err = os.Mkdir(dir, 0777)
+// 	err = os.Mkdir(dir, 0755)
 // 	suite.Equal(nil, err)
 
 // 	dir = filepath.Join(testDir, "Dir2")
-// 	err = os.Mkdir(dir, 0777)
+// 	err = os.Mkdir(dir, 0755)
 // 	suite.Equal(nil, err)
 
 // 	dir = filepath.Join(testDir, "Dir3")
-// 	err = os.Mkdir(dir, 0777)
+// 	err = os.Mkdir(dir, 0755)
 // 	suite.Equal(nil, err)
 
 // 	srcFile, err := os.OpenFile(filepath.Join(testDir, "abc.txt"), os.O_CREATE, 0777)
@@ -385,7 +385,7 @@ func (suite *dirTestSuite) TestDirRenameFull() {
 	newName := filepath.Join(suite.testPath, "full_dir_rename")
 	fileName := filepath.Join(dirName, "test_file_")
 
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0755)
 	suite.NoError(err)
 
 	err = os.Mkdir(filepath.Join(dirName, "tmp"), 0777)
@@ -517,7 +517,7 @@ func (suite *dirTestSuite) TestReadDirLink() {
 	}
 
 	dirName := filepath.Join(suite.testPath, "test_hns")
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0755)
 	suite.NoError(err)
 
 	fileName := filepath.Join(dirName, "small_file.txt")

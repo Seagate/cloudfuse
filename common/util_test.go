@@ -61,7 +61,7 @@ func TestUtil(t *testing.T) {
 func (suite *typesTestSuite) TestDirectoryExists() {
 	rand := randomString(8)
 	dir := filepath.Join(home_dir, "dir"+rand)
-	os.MkdirAll(dir, 0777)
+	os.MkdirAll(dir, 0755)
 	defer os.RemoveAll(dir)
 
 	exists := DirectoryExists(dir)
@@ -221,14 +221,14 @@ func (suite *utilTestSuite) TestGetUSage() {
 	}
 
 	dirName := filepath.Join(pwd, "util_test")
-	err = os.Mkdir(dirName, 0777)
+	err = os.Mkdir(dirName, 0755)
 	suite.assert.NoError(err)
 
 	data := make([]byte, 1024*1024)
-	err = os.WriteFile(dirName+"/1.txt", data, 0777)
+	err = os.WriteFile(dirName+"/1.txt", data, 0644)
 	suite.assert.NoError(err)
 
-	err = os.WriteFile(dirName+"/2.txt", data, 0777)
+	err = os.WriteFile(dirName+"/2.txt", data, 0644)
 	suite.assert.NoError(err)
 
 	usage, err := GetUsage(dirName)
@@ -246,7 +246,7 @@ func (suite *utilTestSuite) TestGetDiskUsage() {
 	}
 
 	dirName := filepath.Join(pwd, "util_test", "a", "b", "c")
-	err = os.MkdirAll(dirName, 0777)
+	err = os.MkdirAll(dirName, 0755)
 	suite.assert.NoError(err)
 
 	usage, usagePercent, err := GetDiskUsageFromStatfs(dirName)

@@ -101,7 +101,7 @@ func (suite *mountTestSuite) TestForegroundMountDirDoesExist() {
 	mntDir, err := os.MkdirTemp("", "mntdir")
 	suite.assert.Nil(err)
 	tempDir := filepath.Join(mntDir, "tempdir")
-	err = os.MkdirAll(tempDir, 0777)
+	err = os.MkdirAll(tempDir, 0755)
 
 	op, err := executeCommandC(rootCmd, "mount", tempDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "--foreground=true")
 	suite.assert.NotNil(err)
@@ -120,7 +120,7 @@ func (suite *mountTestSuite) TestForegroundMountDirNotEmpty() {
 	suite.assert.Nil(err)
 	tempDir := filepath.Join(mntDir, "tempdir")
 
-	err = os.MkdirAll(tempDir, 0777)
+	err = os.MkdirAll(tempDir, 0755)
 	suite.assert.Nil(err)
 	defer os.RemoveAll(mntDir)
 

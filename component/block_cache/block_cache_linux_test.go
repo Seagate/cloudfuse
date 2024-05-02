@@ -81,7 +81,7 @@ func randomString(length int) string {
 
 func getFakeStoragePath(base string) string {
 	tmp_path := filepath.Join(home_dir, base+randomString(8))
-	_ = os.Mkdir(tmp_path, 0777)
+	_ = os.Mkdir(tmp_path, 0755)
 	return tmp_path
 }
 
@@ -267,7 +267,7 @@ func (suite *blockCacheTestSuite) TestFileOpneClose() {
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 5*_1MB)
 	_, _ = rand.Read(data)
-	os.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0644)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -293,7 +293,7 @@ func (suite *blockCacheTestSuite) TestFileRead() {
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 50*_1MB)
 	_, _ = rand.Read(data)
-	os.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0644)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -340,7 +340,7 @@ func (suite *blockCacheTestSuite) TestFileReadSerial() {
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 50*_1MB)
 	_, _ = rand.Read(data)
-	os.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0644)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -382,7 +382,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandom() {
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 100*_1MB)
 	_, _ = rand.Read(data)
-	os.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0644)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -423,7 +423,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 100*_1MB)
 	_, _ = rand.Read(data)
-	os.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0644)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -540,7 +540,7 @@ func (suite *blockCacheTestSuite) TestOpenWithTruncate() {
 	stroagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 5*_1MB)
 	_, _ = rand.Read(data)
-	os.WriteFile(stroagePath, data, 0777)
+	os.WriteFile(stroagePath, data, 0644)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)

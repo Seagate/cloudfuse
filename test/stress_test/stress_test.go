@@ -354,7 +354,7 @@ func TestMain(m *testing.M) {
 		fmt.Printf("StressTest : Could not cleanup stress dir before testing. Here's why: %v\n", err)
 	}
 
-	err = os.Mkdir(baseDir, 0777)
+	err = os.Mkdir(baseDir, 0755)
 	if err != nil {
 		fmt.Println("Could not create dir before testing")
 	}

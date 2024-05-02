@@ -156,7 +156,7 @@ func (suite *dataValidationTestSuite) TestSmallFileData() {
 	srcFile.Close()
 
 	// write to file in the local directory
-	err = os.WriteFile(localFilePath, minBuff, 0777)
+	err = os.WriteFile(localFilePath, minBuff, 0755)
 	suite.NoError(err)
 
 	suite.copyToMountDir(localFilePath, remoteFilePath)
@@ -185,7 +185,7 @@ func (suite *dataValidationTestSuite) TestMediumFileData() {
 	srcFile.Close()
 
 	// write to file in the local directory
-	err = os.WriteFile(localFilePath, medBuff, 0777)
+	err = os.WriteFile(localFilePath, medBuff, 0755)
 	suite.NoError(err)
 
 	suite.copyToMountDir(localFilePath, remoteFilePath)
@@ -214,7 +214,7 @@ func (suite *dataValidationTestSuite) TestLargeFileData() {
 	srcFile.Close()
 
 	// write to file in the local directory
-	err = os.WriteFile(localFilePath, largeBuff, 0777)
+	err = os.WriteFile(localFilePath, largeBuff, 0755)
 	suite.NoError(err)
 
 	suite.copyToMountDir(localFilePath, remoteFilePath)
@@ -239,7 +239,7 @@ func (suite *dataValidationTestSuite) TestDataValidationNegative() {
 	srcFile.Close()
 
 	// write to file in the local directory
-	err = os.WriteFile(localFilePath, minBuff, 0777)
+	err = os.WriteFile(localFilePath, minBuff, 0755)
 	suite.NoError(err)
 
 	// copy local file to mounted directory
@@ -280,17 +280,17 @@ func validateMultipleFilesData(jobs <-chan int, results chan<- string, fileSize 
 
 		// write to file in the local directory
 		if fileSize == "huge" {
-			err = os.WriteFile(localFilePath, hugeBuff, 0777)
+			err = os.WriteFile(localFilePath, hugeBuff, 0755)
 		} else if fileSize == "large" {
 			if strings.ToLower(dataValidationQuickTest) == "true" {
-				err = os.WriteFile(localFilePath, hugeBuff, 0777)
+				err = os.WriteFile(localFilePath, hugeBuff, 0755)
 			} else {
-				err = os.WriteFile(localFilePath, largeBuff, 0777)
+				err = os.WriteFile(localFilePath, largeBuff, 0755)
 			}
 		} else if fileSize == "medium" {
-			err = os.WriteFile(localFilePath, medBuff, 0777)
+			err = os.WriteFile(localFilePath, medBuff, 0755)
 		} else {
-			err = os.WriteFile(localFilePath, minBuff, 0777)
+			err = os.WriteFile(localFilePath, minBuff, 0755)
 		}
 		suite.NoError(err)
 

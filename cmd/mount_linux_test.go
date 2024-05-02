@@ -138,7 +138,7 @@ func (suite *mountTestSuite) TestMountDirNotEmpty() {
 	suite.assert.NoError(err)
 	tempDir := filepath.Join(mntDir, "tempdir")
 
-	err = os.MkdirAll(tempDir, 0777)
+	err = os.MkdirAll(tempDir, 0755)
 	suite.assert.NoError(err)
 	defer os.RemoveAll(mntDir)
 

@@ -122,7 +122,7 @@ func (suite *mountSuite) TestMountCmd() {
 // or does exist on Windows
 func (suite *mountSuite) TestMountDirNotExists() {
 	if runtime.GOOS == "windows" {
-		os.Mkdir(mntDir, 0777)
+		os.Mkdir(mntDir, 0755)
 		mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--config-file="+configFile)
 		var errb bytes.Buffer
 		mountCmd.Stderr = &errb
@@ -162,7 +162,7 @@ func (suite *mountSuite) TestMountDirNotExists() {
 // mount failure test where the mount directory is not empty
 func (suite *mountSuite) TestMountDirNotEmptyFailure() {
 	tempDir := filepath.Join(mntDir, "tempdir")
-	_ = os.Mkdir(tempDir, 0777)
+	_ = os.Mkdir(tempDir, 0755)
 	mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--config-file="+configFile)
 	var errb bytes.Buffer
 	mountCmd.Stderr = &errb
@@ -195,7 +195,7 @@ func (suite *mountSuite) TestMountDirNotEmptyFailure() {
 // mount non-empty directory using nonempty flag
 func (suite *mountSuite) TestMountDirNotEmptySuccess() {
 	tempDir := filepath.Join(mntDir, "tempdir")
-	_ = os.Mkdir(tempDir, 0777)
+	_ = os.Mkdir(tempDir, 0755)
 
 	mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--config-file="+configFile, "-o", "nonempty")
 	cliOut, err := mountCmd.Output()
@@ -259,7 +259,7 @@ func (suite *mountSuite) TestConfigFileNotProvided() {
 // mount failure test where config file is not provided and environment variables have incorrect credentials
 func (suite *mountSuite) TestEnvVarMountFailure() {
 	tempDir := filepath.Join(mntDir, "..", "tempdir")
-	os.Mkdir(tempDir, 0777)
+	os.Mkdir(tempDir, 0755)
 
 	// create environment variables
 	os.Setenv("AZURE_STORAGE_ACCOUNT", "myAccount")

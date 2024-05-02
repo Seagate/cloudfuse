@@ -192,7 +192,7 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 	secFile := filepath.Join(speclDirName, "abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|.txt")
 	fileName := filepath.Join(speclDirName, speclChar)
 
-	err := os.Mkdir(speclDirName, 0777)
+	err := os.Mkdir(speclDirName, 0755)
 	suite.NoError(err)
 
 	srcFile, err := os.OpenFile(secFile, os.O_CREATE, 0777)
@@ -323,7 +323,7 @@ func (suite *fileTestSuite) TestFileNameConflict() {
 	dirName := filepath.Join(suite.testPath, "test")
 	fileName := filepath.Join(suite.testPath, "test.txt")
 
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0755)
 	suite.NoError(err)
 
 	f, err := os.Create(fileName)
@@ -340,7 +340,7 @@ func (suite *fileTestSuite) TestFileCopy() {
 	fileName := filepath.Join(suite.testPath, "test")
 	dstFileName := filepath.Join(dirName, "test_copy.txt")
 
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0755)
 	suite.NoError(err)
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR, 0777)
@@ -407,7 +407,7 @@ func (suite *fileTestSuite) TestFileCreateMulti() {
 		return
 	}
 	dirName := filepath.Join(suite.testPath, "multi_dir")
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0755)
 	suite.NoError(err)
 	fileName := filepath.Join(dirName, "multi")
 	for i := 0; i < 10; i++ {
@@ -667,7 +667,7 @@ func (suite *fileTestSuite) TestRenameSpecial() {
 	fileName := filepath.Join(dirName, "भारत.txt")
 	newFileName := filepath.Join(dirName, "भारतabcd.txt")
 
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0755)
 	suite.NoError(err)
 
 	f, err := os.Create(fileName)
