@@ -26,7 +26,8 @@ block_cache:
 
 attr_cache:
   timeout-sec: 7200
-  
+  enable-symlinks: true
+
 azstorage:
   type: { ACCOUNT_TYPE }
   endpoint: { ACCOUNT_ENDPOINT }

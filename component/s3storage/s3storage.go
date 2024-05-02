@@ -425,6 +425,10 @@ func (s3 *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
 
 // Symlink operations
 func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
+	if s3.stConfig.disableSymlink {
+		log.Err("S3Storage::CreateLink : %s -> %s - Symlink support not enabled", options.Name, options.Target)
+		return syscall.ENOTSUP
+	}
 	log.Trace("S3Storage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
 	err := s3.storage.CreateLink(options.Name, options.Target, true)
 
@@ -437,6 +441,10 @@ func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 }
 
 func (s3 *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) {
+	if s3.stConfig.disableSymlink {
+		log.Err("S3Storage::ReadLink : %s - Symlink support not enabled", options.Name)
+		return "", syscall.ENOENT
+	}
 	log.Trace("S3Storage::ReadLink : Read symlink %s", options.Name)
 
 	data, err := s3.storage.ReadBuffer(options.Name, 0, 0, true)

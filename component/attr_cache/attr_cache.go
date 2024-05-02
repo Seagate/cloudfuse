@@ -48,21 +48,21 @@ const defaultAttrCacheTimeout uint32 = (120)
 // Common structure for AttrCache Component
 type AttrCache struct {
 	internal.BaseComponent
-	cacheTimeout uint32
-	cacheOnList  bool
-	noSymlinks   bool
-	cacheDirs    bool
-	maxFiles     int
-	cache        *cacheTreeMap
-	cacheLock    sync.RWMutex
+	cacheTimeout   uint32
+	cacheOnList    bool
+	enableSymlinks bool
+	cacheDirs      bool
+	maxFiles       int
+	cache          *cacheTreeMap
+	cacheLock      sync.RWMutex
 }
 
 // Structure defining your config parameters
 type AttrCacheOptions struct {
-	Timeout       uint32 `config:"timeout-sec" yaml:"timeout-sec,omitempty"`
-	NoCacheOnList bool   `config:"no-cache-on-list" yaml:"no-cache-on-list,omitempty"`
-	NoSymlinks    bool   `config:"no-symlinks" yaml:"no-symlinks,omitempty"`
-	NoCacheDirs   bool   `config:"no-cache-dirs" yaml:"no-cache-dirs,omitempty"`
+	Timeout        uint32 `config:"timeout-sec" yaml:"timeout-sec,omitempty"`
+	NoCacheOnList  bool   `config:"no-cache-on-list" yaml:"no-cache-on-list,omitempty"`
+	EnableSymlinks bool   `config:"enable-symlinks" yaml:"enable-symlinks,omitempty"`
+	NoCacheDirs    bool   `config:"no-cache-dirs" yaml:"no-cache-dirs,omitempty"`
 
 	//maximum file attributes overall to be cached
 	MaxFiles int `config:"max-files" yaml:"max-files,omitempty"`
@@ -147,11 +147,11 @@ func (ac *AttrCache) Configure(_ bool) error {
 		ac.maxFiles = defaultMaxFiles
 	}
 
-	ac.noSymlinks = conf.NoSymlinks
+	ac.enableSymlinks = conf.EnableSymlinks
 	ac.cacheDirs = !conf.NoCacheDirs
 
-	log.Info("AttrCache::Configure : cache-timeout %d, symlink %t, cache-on-list %t, max-files %d",
-		ac.cacheTimeout, ac.noSymlinks, ac.cacheOnList, ac.maxFiles)
+	log.Info("AttrCache::Configure : cache-timeout %d, enable-symlinks %t, cache-on-list %t, max-files %d",
+		ac.cacheTimeout, ac.enableSymlinks, ac.cacheOnList, ac.maxFiles)
 
 	return nil
 }
@@ -396,14 +396,6 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	if err == nil {
 		log.Debug("AttrCache::StreamDir : %s got %d entries from cloud, token=\"%s\"",
 			options.Name, len(pathList), nextToken)
-		// strip symlink attributes
-		if ac.noSymlinks {
-			for _, attr := range pathList {
-				if attr.IsSymlink() {
-					attr.Flags.Clear(internal.PropFlagSymlink)
-				}
-			}
-		}
 		// cache returned list
 		ac.cacheAttributes(pathList, options.Name)
 		//
@@ -845,6 +837,20 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 	return err
 }
 
+// Update attribute cache when CopyToFile returns that a file doesn't exist
+func (ac *AttrCache) CopyToFile(options internal.CopyToFileOptions) error {
+	log.Trace("AttrCache::CopyToFile : %s", options.Name)
+
+	err := ac.NextComponent().CopyToFile(options)
+	if err != nil {
+		entry, found := ac.cache.get(options.Name)
+		if found {
+			entry.markDeleted(time.Now())
+		}
+	}
+	return err
+}
+
 // CopyFromFile : Upload file and update cache entry
 func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("AttrCache::CopyFromFile : %s", options.Name)
@@ -942,7 +948,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
 		// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
 		// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
-		if value.attr.IsMetadataRetrieved() || (ac.noSymlinks && !options.RetrieveMetadata) {
+		if value.attr.IsMetadataRetrieved() || (!ac.enableSymlinks && !options.RetrieveMetadata) {
 			// path exists and we have all the metadata required or we do not care about metadata
 			return value.attr, nil
 		}
@@ -955,10 +961,6 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	defer ac.cacheLock.Unlock()
 
 	if err == nil {
-		if ac.noSymlinks {
-			// strip symlink attribute
-			pathAttr.Flags.Clear(internal.PropFlagSymlink)
-		}
 		// Retrieved attributes so cache them
 		ac.cache.insert(insertOptions{
 			attr:     pathAttr,
@@ -1085,8 +1087,8 @@ func init() {
 	attrCacheTimeout := config.AddUint32Flag("attr-cache-timeout", defaultAttrCacheTimeout, "attribute cache timeout")
 	config.BindPFlag(compName+".timeout-sec", attrCacheTimeout)
 
-	noSymlinks := config.AddBoolFlag("no-symlinks", false, "whether or not symlinks should be supported")
-	config.BindPFlag(compName+".no-symlinks", noSymlinks)
+	enableSymlinks := config.AddBoolFlag("enable-symlinks", false, "whether or not symlinks should be supported")
+	config.BindPFlag(compName+".enable-symlinks", enableSymlinks)
 	noCacheDirs := config.AddBoolFlag("no-cache-dirs", false, "whether or not empty directories should be cached")
 	config.BindPFlag(compName+".no-cache-dirs", noCacheDirs)
 

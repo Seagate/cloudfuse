@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -101,7 +102,7 @@ func (suite *fileTestSuite) fileTestCleanup(toRemove []string) {
 
 // # Create file test
 func (suite *fileTestSuite) TestFileCreate() {
-	fileName := suite.testPath + "/small_write.txt"
+	fileName := filepath.Join(suite.testPath, "small_write.txt")
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
@@ -110,7 +111,7 @@ func (suite *fileTestSuite) TestFileCreate() {
 }
 
 func (suite *fileTestSuite) TestFileCreateUtf8Char() {
-	fileName := suite.testPath + "/भारत.txt"
+	fileName := filepath.Join(suite.testPath, "भारत.txt")
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
@@ -127,7 +128,7 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 	fmt.Println("Skipping TestFileCreatSpclChar (flaky)")
 	return
 	speclChar := "abcd%23ABCD%34123-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत.txt"
-	fileName := suite.testPath + "/" + speclChar
+	fileName := filepath.Join(suite.testPath, speclChar)
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
@@ -155,7 +156,7 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 
 func (suite *fileTestSuite) TestFileCreateEncodeChar() {
 	speclChar := "%282%29+class_history_by_item.log"
-	fileName := suite.testPath + "/" + speclChar
+	fileName := filepath.Join(suite.testPath, speclChar)
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
@@ -187,9 +188,9 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 		return
 	}
 	speclChar := "abcd%23ABCD%34123-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत.txt"
-	speclDirName := suite.testPath + "/" + "abc%23%24%25efg-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत"
-	secFile := speclDirName + "/" + "abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|.txt"
-	fileName := speclDirName + "/" + speclChar
+	speclDirName := filepath.Join(suite.testPath, "abc%23%24%25efg-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत")
+	secFile := filepath.Join(speclDirName, "abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|.txt")
+	fileName := filepath.Join(speclDirName, speclChar)
 
 	err := os.Mkdir(speclDirName, 0777)
 	suite.NoError(err)
@@ -222,7 +223,7 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 }
 
 func (suite *fileTestSuite) TestFileCreateLongName() {
-	fileName := suite.testPath + "/Higher Call_ An Incredible True Story of Combat and Chivalry in the War-Torn Skies of World War II, A - Adam Makos & Larry Alexander.epub"
+	fileName := filepath.Join(suite.testPath, "Higher Call_ An Incredible True Story of Combat and Chivalry in the War-Torn Skies of World War II, A - Adam Makos & Larry Alexander.epub")
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
@@ -237,17 +238,17 @@ func (suite *fileTestSuite) TestFileCreateSlashName() {
 		return
 	}
 
-	fileName := suite.testPath + "/abcd\\efg.txt"
+	fileName := filepath.Join(suite.testPath, "abcd\\efg.txt")
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
 
-	suite.fileTestCleanup([]string{fileName, suite.testPath + "/abcd"})
+	suite.fileTestCleanup([]string{fileName, filepath.Join(suite.testPath, "abcd")})
 }
 
 func (suite *fileTestSuite) TestFileCreateLabel() {
-	fileName := suite.testPath + "/chunk_f13c48d4-5c1e-11ea-b41d-000d3afe1867.label"
+	fileName := filepath.Join(suite.testPath, "chunk_f13c48d4-5c1e-11ea-b41d-000d3afe1867.label")
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
@@ -258,7 +259,7 @@ func (suite *fileTestSuite) TestFileCreateLabel() {
 
 // # Write a small file
 func (suite *fileTestSuite) TestFileWriteSmall() {
-	fileName := suite.testPath + "/small_write.txt"
+	fileName := filepath.Join(suite.testPath, "small_write.txt")
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
@@ -271,7 +272,7 @@ func (suite *fileTestSuite) TestFileWriteSmall() {
 
 // # Read a small file
 func (suite *fileTestSuite) TestFileReadSmall() {
-	fileName := suite.testPath + "/small_write.txt"
+	fileName := filepath.Join(suite.testPath, "small_write.txt")
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
@@ -288,7 +289,7 @@ func (suite *fileTestSuite) TestFileReadSmall() {
 
 // # Create duplicate file
 func (suite *fileTestSuite) TestFileCreateDuplicate() {
-	fileName := suite.testPath + "/small_write.txt"
+	fileName := filepath.Join(suite.testPath, "small_write.txt")
 	f, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	f.Close()
@@ -302,7 +303,7 @@ func (suite *fileTestSuite) TestFileCreateDuplicate() {
 
 // # Truncate a file
 func (suite *fileTestSuite) TestFileTruncate() {
-	fileName := suite.testPath + "/small_write.txt"
+	fileName := filepath.Join(suite.testPath, "small_write.txt")
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
@@ -319,8 +320,8 @@ func (suite *fileTestSuite) TestFileTruncate() {
 
 // # Create file matching directory name
 func (suite *fileTestSuite) TestFileNameConflict() {
-	dirName := suite.testPath + "/test"
-	fileName := suite.testPath + "/test.txt"
+	dirName := filepath.Join(suite.testPath, "test")
+	fileName := filepath.Join(suite.testPath, "test.txt")
 
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
@@ -335,9 +336,9 @@ func (suite *fileTestSuite) TestFileNameConflict() {
 
 // # Copy file from once directory to another
 func (suite *fileTestSuite) TestFileCopy() {
-	dirName := suite.testPath + "/test123"
-	fileName := suite.testPath + "/test"
-	dstFileName := dirName + "/test_copy.txt"
+	dirName := filepath.Join(suite.testPath, "test123")
+	fileName := filepath.Join(suite.testPath, "test")
+	dstFileName := filepath.Join(dirName, "test_copy.txt")
 
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
@@ -359,7 +360,7 @@ func (suite *fileTestSuite) TestFileCopy() {
 
 // # Get stats of a file
 func (suite *fileTestSuite) TestFileGetStat() {
-	fileName := suite.testPath + "/test"
+	fileName := filepath.Join(suite.testPath, "test")
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
@@ -384,7 +385,7 @@ func (suite *fileTestSuite) TestFileChmod() {
 		return
 	}
 	if suite.adlsTest {
-		fileName := suite.testPath + "/test"
+		fileName := filepath.Join(suite.testPath, "test")
 		f, err := os.Create(fileName)
 		suite.NoError(err)
 		f.Close()
@@ -405,10 +406,10 @@ func (suite *fileTestSuite) TestFileCreateMulti() {
 		fmt.Println("Skipping this test case for stream direct")
 		return
 	}
-	dirName := suite.testPath + "/multi_dir"
+	dirName := filepath.Join(suite.testPath, "multi_dir")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
-	fileName := dirName + "/multi"
+	fileName := filepath.Join(dirName, "multi")
 	for i := 0; i < 10; i++ {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.medBuff, 0777)
@@ -420,7 +421,7 @@ func (suite *fileTestSuite) TestFileCreateMulti() {
 // TODO: this test would always pass since its dependent on above tests - resources should be created only for it
 // # Delete single files
 func (suite *fileTestSuite) TestFileDeleteSingle() {
-	fileName := suite.testPath + "/multi0"
+	fileName := filepath.Join(suite.testPath, "multi0")
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
@@ -437,11 +438,11 @@ func (suite *fileTestSuite) TestLinkCreate() {
 		return
 	}
 
-	fileName := suite.testPath + "/small_write1.txt"
+	fileName := filepath.Join(suite.testPath, "small_write1.txt")
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
-	symName := suite.testPath + "/small.lnk"
+	symName := filepath.Join(suite.testPath, "small.lnk")
 	err = os.WriteFile(fileName, suite.minBuff, 0777)
 	suite.NoError(err)
 
@@ -460,12 +461,12 @@ func (suite *fileTestSuite) TestLinkRead() {
 		return
 	}
 
-	fileName := suite.testPath + "/small_write1.txt"
+	fileName := filepath.Join(suite.testPath, "small_write1.txt")
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
 
-	symName := suite.testPath + "/small.lnk"
+	symName := filepath.Join(suite.testPath, "small.lnk")
 	err = os.Symlink(fileName, symName)
 	suite.NoError(err)
 
@@ -487,11 +488,11 @@ func (suite *fileTestSuite) TestLinkWrite() {
 		return
 	}
 
-	targetName := suite.testPath + "/small_write1.txt"
+	targetName := filepath.Join(suite.testPath, "small_write1.txt")
 	f, err := os.Create(targetName)
 	suite.NoError(err)
 	f.Close()
-	symName := suite.testPath + "/small.lnk"
+	symName := filepath.Join(suite.testPath, "small.lnk")
 	err = os.Symlink(targetName, symName)
 	suite.NoError(err)
 
@@ -512,15 +513,15 @@ func (suite *fileTestSuite) TestLinkRenameTarget() {
 		return
 	}
 
-	fileName := suite.testPath + "/small_write1.txt"
-	symName := suite.testPath + "/small.lnk"
+	fileName := filepath.Join(suite.testPath, "small_write1.txt")
+	symName := filepath.Join(suite.testPath, "small.lnk")
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
 	err = os.Symlink(fileName, symName)
 	suite.NoError(err)
 
-	fileNameNew := suite.testPath + "/small_write_new.txt"
+	fileNameNew := filepath.Join(suite.testPath, "small_write_new.txt")
 	err = os.Rename(fileName, fileNameNew)
 	suite.NoError(err)
 
@@ -545,8 +546,8 @@ func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
 		return
 	}
 
-	fileName := suite.testPath + "/small_write1.txt"
-	symName := suite.testPath + "/small.lnk"
+	fileName := filepath.Join(suite.testPath, "small_write1.txt")
+	symName := filepath.Join(suite.testPath, "small.lnk")
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
@@ -580,7 +581,7 @@ func (suite *fileTestSuite) TestListDirReadLink() {
 		return
 	}
 
-	fileName := suite.testPath + "/small_hns.txt"
+	fileName := filepath.Join(suite.testPath, "small_hns.txt")
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
@@ -588,7 +589,7 @@ func (suite *fileTestSuite) TestListDirReadLink() {
 	err = os.WriteFile(fileName, suite.minBuff, 0777)
 	suite.NoError(err)
 
-	symName := suite.testPath + "/small_hns.lnk"
+	symName := filepath.Join(suite.testPath, "small_hns.lnk")
 	err = os.Symlink(fileName, symName)
 	suite.NoError(err)
 
@@ -597,14 +598,14 @@ func (suite *fileTestSuite) TestListDirReadLink() {
 	suite.NotEmpty(dl)
 
 	// temp cache cleanup
-	suite.fileTestCleanup([]string{suite.testCachePath + "/small_hns.txt", suite.testCachePath + "/small_hns.lnk"})
+	suite.fileTestCleanup([]string{filepath.Join(suite.testCachePath, "small_hns.txt"), filepath.Join(suite.testCachePath, "small_hns.lnk")})
 
 	data1, err := os.ReadFile(symName)
 	suite.NoError(err)
 	suite.Equal(len(data1), len(suite.minBuff))
 
 	// temp cache cleanup
-	suite.fileTestCleanup([]string{suite.testCachePath + "/small_hns.txt", suite.testCachePath + "/small_hns.lnk"})
+	suite.fileTestCleanup([]string{filepath.Join(suite.testCachePath, "small_hns.txt"), filepath.Join(suite.testCachePath, "small_hns.lnk")})
 
 	data2, err := os.ReadFile(fileName)
 	suite.NoError(err)
@@ -621,7 +622,7 @@ func (suite *fileTestSuite) TestListDirReadLink() {
 /*
 func (suite *fileTestSuite) TestReadOnlyFile() {
 	if suite.adlsTest == true {
-		fileName := suite.testPath + "/readOnlyFile.txt"
+		fileName := filepath.Join(suite.testPath, "readOnlyFile.txt")
 		srcFile, err := os.Create(fileName)
 		suite.Equal(nil, err)
 		srcFile.Close()
@@ -643,7 +644,7 @@ func (suite *fileTestSuite) TestCreateReadOnlyFile() {
 		return
 	}
 	if suite.adlsTest == true {
-		fileName := suite.testPath + "/createReadOnlyFile.txt"
+		fileName := filepath.Join(suite.testPath, "createReadOnlyFile.txt")
 		srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0444)
 		srcFile.Close()
 		suite.NoError(err)
@@ -661,10 +662,10 @@ func (suite *fileTestSuite) TestRenameSpecial() {
 		return
 	}
 
-	dirName := suite.testPath + "/" + "Alcaldía"
-	newDirName := suite.testPath + "/" + "Alδaδcaldía"
-	fileName := dirName + "/" + "भारत.txt"
-	newFileName := dirName + "/" + "भारतabcd.txt"
+	dirName := filepath.Join(suite.testPath, "Alcaldía")
+	newDirName := filepath.Join(suite.testPath, "Alδaδcaldía")
+	fileName := filepath.Join(dirName, "भारत.txt")
+	newFileName := filepath.Join(dirName, "भारतabcd.txt")
 
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
@@ -699,10 +700,10 @@ func TestFileTestSuite(t *testing.T) {
 	testDirName := getFileTestDirName(10)
 
 	// Create directory for testing the End to End test on mount path
-	fileTest.testPath = fileTestPathPtr + "/" + testDirName
+	fileTest.testPath = filepath.Join(fileTestPathPtr, testDirName)
 	fmt.Println(fileTest.testPath)
 
-	fileTest.testCachePath = fileTestTempPathPtr + "/" + testDirName
+	fileTest.testCachePath = filepath.Join(fileTestTempPathPtr, testDirName)
 	fmt.Println(fileTest.testCachePath)
 
 	if fileTestAdlsPtr == "true" || fileTestAdlsPtr == "True" {

@@ -2008,6 +2008,10 @@ func (s *blockBlobTestSuite) TestCopyFromFileWindowsNameConvert() {
 
 func (s *blockBlobTestSuite) TestCreateLink() {
 	defer s.cleanupTest()
+	// enable symlinks in config
+	config := s.config + "\nattr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.container, true)
+	s.assert.False(s.az.stConfig.disableSymlink)
 	// Setup
 	target := generateFileName()
 	s.az.CreateFile(internal.CreateFileOptions{Name: target})
@@ -2030,8 +2034,30 @@ func (s *blockBlobTestSuite) TestCreateLink() {
 	s.assert.EqualValues(target, data)
 }
 
+func (s *blockBlobTestSuite) TestCreateLinkDisabled() {
+	defer s.cleanupTest()
+	// Setup
+	target := generateFileName()
+	s.az.CreateFile(internal.CreateFileOptions{Name: target})
+	name := generateFileName()
+
+	err := s.az.CreateLink(internal.CreateLinkOptions{Name: name, Target: target})
+	s.assert.Error(err)
+	s.assert.EqualError(err, syscall.ENOTSUP.Error())
+
+	// Link should not be in the account
+	link := s.containerUrl.NewBlobURL(name)
+	props, err := link.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
+	s.assert.Nil(props)
+	s.assert.Error(err)
+}
+
 func (s *blockBlobTestSuite) TestReadLink() {
 	defer s.cleanupTest()
+	// enable symlinks in config
+	config := s.config + "\nattr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.container, true)
+	s.assert.False(s.az.stConfig.disableSymlink)
 	// Setup
 	target := generateFileName()
 	s.az.CreateFile(internal.CreateFileOptions{Name: target})
@@ -2044,6 +2070,20 @@ func (s *blockBlobTestSuite) TestReadLink() {
 }
 
 func (s *blockBlobTestSuite) TestReadLinkError() {
+	defer s.cleanupTest()
+	// enable symlinks in config
+	config := s.config + "\nattr_cache:\n  enable-symlinks: true\n"
+	s.setupTestHelper(config, s.container, true)
+	s.assert.False(s.az.stConfig.disableSymlink)
+	// Setup
+	name := generateFileName()
+
+	_, err := s.az.ReadLink(internal.ReadLinkOptions{Name: name})
+	s.assert.Error(err)
+	s.assert.EqualValues(syscall.ENOENT, err)
+}
+
+func (s *blockBlobTestSuite) TestReadLinkDisabled() {
 	defer s.cleanupTest()
 	// Setup
 	name := generateFileName()
@@ -2171,9 +2211,11 @@ func (s *blockBlobTestSuite) TestGetAttrFile() {
 
 func (s *blockBlobTestSuite) TestGetAttrLink() {
 	defer s.cleanupTest()
-	vdConfig := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  virtual-directory: true",
+	// enable symlinks in config
+	config := s.config + "\nattr_cache:\n  enable-symlinks: true"
+	vdConfig := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true\n  virtual-directory: true\nattr_cache:\n  enable-symlinks: true",
 		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.BlockKey, s.container)
-	configs := []string{"", vdConfig}
+	configs := []string{config, vdConfig}
 	for _, c := range configs {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		s.tearDownTestHelper(false)
