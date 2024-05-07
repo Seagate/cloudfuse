@@ -63,6 +63,8 @@ type AttrCacheOptions struct {
 	NoCacheOnList  bool   `config:"no-cache-on-list" yaml:"no-cache-on-list,omitempty"`
 	EnableSymlinks bool   `config:"enable-symlinks" yaml:"enable-symlinks,omitempty"`
 	NoCacheDirs    bool   `config:"no-cache-dirs" yaml:"no-cache-dirs,omitempty"`
+	// hidden option for backward compatibility
+	NoSymlinks bool `config:"no-symlinks" yaml:"no-symlinks,omitempty"`
 
 	//maximum file attributes overall to be cached
 	MaxFiles int `config:"max-files" yaml:"max-files,omitempty"`
@@ -147,7 +149,12 @@ func (ac *AttrCache) Configure(_ bool) error {
 		ac.maxFiles = defaultMaxFiles
 	}
 
-	ac.enableSymlinks = conf.EnableSymlinks
+	if config.IsSet(compName+".no-symlinks") && !config.IsSet(compName+".enable-symlinks") {
+		ac.enableSymlinks = !conf.NoSymlinks
+	} else {
+		ac.enableSymlinks = conf.EnableSymlinks
+	}
+
 	ac.cacheDirs = !conf.NoCacheDirs
 
 	log.Info("AttrCache::Configure : cache-timeout %d, enable-symlinks %t, cache-on-list %t, max-files %d",
