@@ -71,7 +71,7 @@ libfuse:
   ignore-open-flags: true|false <ignore the append and write only flag since O_APPEND and O_WRONLY is not supported with writeback caching. alternatively, you can disable-writeback-cache. Default value is true>
   max-fuse-threads: <number of threads allowed at libfuse layer for highly parallel operations, Default is 128>
   direct-io: true|false <enable to bypass the kernel cache>
-  network-share: true|false <runs as a network share. may improve performance when latency to cloud is high. only supported on Windows.
+  network-share: true|false <runs as a network share. may improve performance when latency to cloud is high. only supported on Windows. Known issue - only one Cloudfuse network share can be mounted at a time>
 
   # Streaming configuration
 stream:
