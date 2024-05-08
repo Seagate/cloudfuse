@@ -1,5 +1,19 @@
 # Cloudfuse Changelog #
 
+## **1.2.0** ##
+
+May 7th 2024
+This version is based on [blobfuse2 2.2.1](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.2.1) (upstream).
+
+### Changes ###
+
+- [#197](https://github.com/Seagate/cloudfuse/pull/197) Disable symlinks by default
+- [#188](https://github.com/Seagate/cloudfuse/pull/188) Update file size when writing to a file
+
+### Bug Fixes ###
+
+- [#199](https://github.com/Seagate/cloudfuse/pull/199) Make Cloudfuse CLI run on other flavors and version of Linux - tested on CentOS
+
 ## **1.1.3** ##
 
 April 10th 2024
