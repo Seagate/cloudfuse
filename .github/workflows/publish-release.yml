@@ -177,6 +177,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       go: '1.22'
+      zig: 0.12.0
 
     steps:
       - # libfuse-dev is required to build our command-line program
@@ -192,8 +193,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      -
-        name: Install Go
+        
+      - name: Install Zig
+        run: |
+          curl -L https://ziglang.org/download/${{ env.zig }}/zig-linux-x86_64-${{ env.zig }}.tar.xz -o zig.tar.xz
+          mkdir -p $HOME/.local/bin
+          tar -xf zig.tar.xz -C $HOME/.local/bin
+          echo "$HOME/.local/bin/zig-linux-x86_64-${{ env.zig }}" >> $GITHUB_PATH
+          rm zig.tar.xz
+
+      - name: Install Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go }}

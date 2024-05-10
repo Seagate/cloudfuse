@@ -62,6 +62,8 @@ builds:
       - amd64
     env:
       - CGO_ENABLED=1
+      - CC=zig cc -target x86_64-linux-gnu
+      - CXX=zig c++ -target x86_64-linux-gnu
     flags:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
@@ -76,7 +78,7 @@ builds:
     goarch:
       - amd64
     env:
-      - CGO_ENABLED=1
+      - CGO_ENABLED=0
     flags:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
@@ -90,8 +92,8 @@ builds:
       - arm64
     env:
       - CGO_ENABLED=1
-      - CC=aarch64-linux-gnu-gcc
-      - CXX=aarch64-linux-gnu-g++
+      - CC=zig cc -target aarch64-linux-gnu
+      - CXX=zig c++ -target aarch64-linux-gnu
     flags:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
@@ -106,9 +108,7 @@ builds:
     goarch:
       - arm64
     env:
-      - CGO_ENABLED=1
-      - CC=aarch64-linux-gnu-gcc
-      - CXX=aarch64-linux-gnu-g++
+      - CGO_ENABLED=0
     flags:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
