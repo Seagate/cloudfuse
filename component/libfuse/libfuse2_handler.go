@@ -650,6 +650,7 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 			}
 			return -fuse.EIO
 		}
+		handlemap.Store(handlemap.HandleID(fh), path, 0)
 	}
 
 	if !exists {
