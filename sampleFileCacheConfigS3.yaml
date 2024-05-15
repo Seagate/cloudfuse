@@ -11,6 +11,7 @@ components:
   - s3storage
 
 libfuse:
+  network-share: true
 
 file_cache:
   path: /<PATH>/<TO>/<CACHE_DIR>
