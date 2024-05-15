@@ -610,6 +610,7 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 	handle := handlemap.NewHandle(name)
 
 	fh := handlemap.Add(handle)
+	fmt.Println("Open:" + fmt.Sprint(fh))
 	// Don't think we need this
 	// ret_val := C.allocate_native_file_object(C.ulong(handle.UnixFD), C.ulong(uintptr(unsafe.Pointer(handle))), C.ulong(handle.Size))
 	// if !handle.Cached() {
@@ -635,7 +636,7 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if handle.Size == int64(0) && handle.GetFileObject() == nil {
 		var err error
-		handle, err = fuseFS.NextComponent().OpenFile(
+		newHandle, err := fuseFS.NextComponent().OpenFile(
 			internal.OpenFileOptions{
 				Name:  name,
 				Flags: 0, //TODO: get the proper flag that Open() has
@@ -650,7 +651,10 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 			}
 			return -fuse.EIO
 		}
-		handlemap.Store(handlemap.HandleID(fh), path, 0)
+
+		handlemap.GetHandles().CompareAndSwap(handlemap.HandleID(fh), handle, newHandle)
+		fmt.Println("Read:" + fmt.Sprint(fh))
+		handle = newHandle
 	}
 
 	if !exists {
@@ -691,7 +695,36 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int {
 	log.Debug("Libfuse::Write : Writing path %s, handle: %d", path, fh)
 	// Get the filehandle
+
+	name := trimFusePath(path)
+	name = common.NormalizeObjectName(name)
+
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
+
+	if handle.Size == int64(0) && handle.GetFileObject() == nil {
+		var err error
+		newHandle, err := fuseFS.NextComponent().OpenFile(
+			internal.OpenFileOptions{
+				Name:  name,
+				Flags: 0, //TODO: get the proper flag that Open() has
+				Mode:  fs.FileMode(fuseFS.filePermission),
+			})
+		if err != nil {
+			log.Err("Libfuse::Open : Failed to open %s [%s]", name, err.Error())
+			if os.IsNotExist(err) {
+				return -fuse.ENOENT
+			} else if os.IsPermission(err) {
+				return -fuse.EACCES
+			}
+			return -fuse.EIO
+		}
+
+		handlemap.GetHandles().CompareAndSwap(handlemap.HandleID(fh), handle, newHandle)
+		fmt.Println("Write:" + fmt.Sprint(fh))
+		handle = newHandle
+	}
+
+	fmt.Println("Write:" + fmt.Sprint(fh))
 	if !exists {
 		log.Trace("Libfuse::Write : error getting handle for path %s, handle: %d", path, fh)
 		return -fuse.EBADF
@@ -717,6 +750,33 @@ func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int 
 func (cf *CgofuseFS) Flush(path string, fh uint64) int {
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
+
+	name := trimFusePath(path)
+	name = common.NormalizeObjectName(name)
+
+	if handle.Size == int64(0) && handle.GetFileObject() == nil {
+		var err error
+		newHandle, err := fuseFS.NextComponent().OpenFile(
+			internal.OpenFileOptions{
+				Name:  name,
+				Flags: 0, //TODO: get the proper flag that Open() has
+				Mode:  fs.FileMode(fuseFS.filePermission),
+			})
+		if err != nil {
+			log.Err("Libfuse::Open : Failed to open %s [%s]", name, err.Error())
+			if os.IsNotExist(err) {
+				return -fuse.ENOENT
+			} else if os.IsPermission(err) {
+				return -fuse.EACCES
+			}
+			return -fuse.EIO
+		}
+
+		handlemap.GetHandles().CompareAndSwap(handlemap.HandleID(fh), handle, newHandle)
+		fmt.Println("Write:" + fmt.Sprint(fh))
+		handle = newHandle
+	}
+
 	if !exists {
 		log.Trace("Libfuse::Flush : error getting handle for path %s, handle: %d", path, fh)
 		return -fuse.EBADF
