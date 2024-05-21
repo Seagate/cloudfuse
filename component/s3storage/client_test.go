@@ -253,8 +253,12 @@ func (s *clientTestSuite) TestDefaultConfig() {
 	config := fmt.Sprintf("s3storage:\n  bucket-name: %s",
 		storageTestConfigurationParameters.BucketName)
 	// Test using default region, and default endpoint
-	err := s.setupTestHelper(config, false)
-	s.assert.NoError(err)
+	// Ignore error because in unit tests this will fail since some unit tests use localstack
+	// so we can't use default endpoint
+	_ = s.setupTestHelper(config, false)
+
+	s.assert.Equal("https://s3.us-east-1.lyvecloud.seagate.com", s.client.Config.authConfig.Endpoint)
+	s.assert.Equal("us-east-1", s.client.Config.authConfig.Region)
 
 	os.Unsetenv("AWS_ACCESS_KEY_ID")
 	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
