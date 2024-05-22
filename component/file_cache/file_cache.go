@@ -1016,6 +1016,10 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	// log.Debug("FileCache::ReadInBuffer : Reading %v bytes from %s", len(options.Data), options.Handle.Path)
 
+	if options.Handle.GetFileObject() == nil {
+		options.Handle = fc.getHandleData(options.Handle)
+	}
+
 	f := options.Handle.GetFileObject()
 	if f == nil {
 		log.Err("FileCache::ReadInBuffer : error [couldn't find fd in handle] %s", options.Handle.Path)
