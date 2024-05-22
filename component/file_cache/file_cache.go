@@ -691,6 +691,188 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	return nil
 }
 
+func (fc *FileCache) getHandleData(handle *handlemap.Handle) *handlemap.Handle {
+	if handle.GetFileObject() == nil {
+		log.Debug("FileCache::getHandleData : Need to download %s", handle.Path)
+
+		//exctract the flags out of handle values
+		flags, _ := handle.GetValue("flag")
+		flagsStruct, ok := flags.(struct{ Number int })
+		if !ok {
+			fmt.Println("Type assertion failed")
+			return nil
+		}
+
+		// Extract the integer as a separate variable
+		flag := flagsStruct.Number
+
+		// extract the filemode out of handle values
+		mode, _ := handle.GetValue("mode")
+		fileModeValue, ok := mode.(os.FileMode)
+		if !ok {
+			fmt.Println("Type assertion failed")
+			return nil
+		}
+
+		handle, err := fc.download(handle.Path, flag, fileModeValue)
+		if err != nil {
+			log.Err("FileCache::getHandleData : error downloading data for file %s [%s]", handle.Path, err.Error())
+		}
+
+	}
+	return handle
+}
+
+func (fc *FileCache) download(name string, flag int, mode os.FileMode) (*handlemap.Handle, error) {
+	log.Trace("FileCache::download : name=%s, flags=%d, mode=%s", name, flag, mode)
+
+	localPath := common.JoinUnixFilepath(fc.tmpPath, name)
+	var f *os.File
+	var err error
+
+	flock := fc.fileLocks.Get(name)
+	flock.Lock()
+	defer flock.Unlock()
+
+	fc.policy.CacheValid(localPath)
+
+	attr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+	if err != nil {
+		log.Err("FileCache::download : Failed to get attr of %s [%s]", name, err.Error())
+	}
+
+	// return err in case of authorization permission mismatch
+	if err != nil && err == syscall.EACCES {
+		return nil, err
+	}
+
+	log.Debug("FileCache::download : Need to download %s", name)
+
+	fileSize := int64(0)
+	if attr != nil {
+		fileSize = int64(attr.Size)
+	}
+	_, err = os.Stat(localPath)
+	var fileExists bool
+	if err == nil {
+		// The file exists in local cache
+		fileExists = true
+	}
+
+	if fileExists {
+		log.Debug("FileCache::download : Delete cached file %s", name)
+
+		err := deleteFile(localPath)
+		if err != nil && !os.IsNotExist(err) {
+			log.Err("FileCache::download : Failed to delete old file %s", name)
+		}
+	} else {
+		// Create the file if if doesn't already exist.
+		err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
+		if err != nil {
+			log.Err("FileCache::download : error creating directory structure for file %s [%s]", name, err.Error())
+			return nil, err
+		}
+	}
+
+	// Open the file in write mode.
+	f, err = common.OpenFile(localPath, os.O_CREATE|os.O_RDWR, mode)
+	if err != nil {
+		log.Err("FileCache::download : error creating new file %s [%s]", name, err.Error())
+		return nil, err
+	}
+
+	if flag&os.O_TRUNC != 0 {
+		fileSize = 0
+	}
+
+	if fileSize > 0 {
+		if fc.diskHighWaterMark != 0 {
+			currSize, err := common.GetUsage(fc.tmpPath)
+			if err != nil {
+				log.Err("FileCache::download : error getting current usage of cache [%s]", err.Error())
+			} else {
+				if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
+					log.Err("FileCache::download : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, name)
+					return nil, syscall.ENOSPC
+				}
+			}
+
+		}
+		// Download/Copy the file from storage to the local file.
+		// We pass a count of 0 to get the entire object
+		err = fc.NextComponent().CopyToFile(
+			internal.CopyToFileOptions{
+				Name:   name,
+				Offset: 0,
+				Count:  0,
+				File:   f,
+			})
+		if err != nil {
+			// File was created locally and now download has failed so we need to delete it back from local cache
+			log.Err("FileCache::download : error downloading file from storage %s [%s]", name, err.Error())
+			_ = f.Close()
+			_ = os.Remove(localPath)
+			return nil, err
+		}
+	}
+
+	// Update the last download time of this file
+	flock.SetDownloadTime()
+
+	log.Debug("FileCache::download : Download of %s is complete", name)
+	f.Close()
+
+	// After downloading the file, update the modified times and mode of the file.
+	fileMode := fc.defaultPermission
+	if attr != nil && !attr.IsModeDefault() {
+		fileMode = attr.Mode
+	}
+
+	// If user has selected some non default mode in config then every local file shall be created with that mode only
+	err = os.Chmod(localPath, fileMode)
+	if err != nil {
+		log.Err("FileCache::download : Failed to change mode of file %s [%s]", name, err.Error())
+	}
+	// TODO: When chown is supported should we update that?
+
+	if attr != nil {
+		// chtimes shall be the last api otherwise calling chmod/chown will update the last change time
+		err = os.Chtimes(localPath, attr.Atime, attr.Mtime)
+		if err != nil {
+			log.Err("FileCache::download : Failed to change times of file %s [%s]", name, err.Error())
+		}
+	}
+
+	fileCacheStatsCollector.UpdateStats(stats_manager.Increment, dlFiles, (int64)(1))
+
+	// Open the file and grab a shared lock to prevent deletion by the cache policy.
+	f, err = common.OpenFile(localPath, flag, mode)
+	if err != nil {
+		log.Err("FileCache::download : error opening cached file %s [%s]", name, err.Error())
+		return nil, err
+	}
+
+	// Increment the handle count in this lock item as there is one handle open for this now
+	flock.Inc()
+
+	handle := handlemap.NewHandle(name)
+	inf, err := f.Stat()
+	if err == nil {
+		handle.Size = inf.Size()
+	}
+
+	handle.UnixFD = uint64(f.Fd())
+	if !fc.offloadIO {
+		handle.Flags.Set(handlemap.HandleFlagCached)
+	}
+
+	log.Info("FileCache::download : file=%s, fd=%d", name, f.Fd())
+	handle.SetFileObject(f)
+
+	return handle, nil
+}
+
 // OpenFile: Makes the file available in the local cache for further file operations.
 func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
 	log.Trace("FileCache::OpenFile : name=%s, flags=%d, mode=%s", options.Name, options.Flags, options.Mode)
@@ -704,7 +886,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	defer flock.Unlock()
 
 	fc.policy.CacheValid(localPath)
-	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, options.Name, flock)
+	downloadRequired, _, _, err := fc.isDownloadRequired(localPath, options.Name, flock)
 
 	// return err in case of authorization permission mismatch
 	if err != nil && err == syscall.EACCES {
@@ -712,99 +894,13 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	}
 
 	if downloadRequired {
-		log.Debug("FileCache::OpenFile : Need to download %s", options.Name)
-
-		fileSize := int64(0)
-		if attr != nil {
-			fileSize = int64(attr.Size)
-		}
-
-		if fileExists {
-			log.Debug("FileCache::OpenFile : Delete cached file %s", options.Name)
-
-			err := deleteFile(localPath)
-			if err != nil && !os.IsNotExist(err) {
-				log.Err("FileCache::OpenFile : Failed to delete old file %s", options.Name)
-			}
-		} else {
-			// Create the file if if doesn't already exist.
-			err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
-			if err != nil {
-				log.Err("FileCache::OpenFile : error creating directory structure for file %s [%s]", options.Name, err.Error())
-				return nil, err
-			}
-		}
-
-		// Open the file in write mode.
-		f, err = common.OpenFile(localPath, os.O_CREATE|os.O_RDWR, options.Mode)
-		if err != nil {
-			log.Err("FileCache::OpenFile : error creating new file %s [%s]", options.Name, err.Error())
-			return nil, err
-		}
-
-		if options.Flags&os.O_TRUNC != 0 {
-			fileSize = 0
-		}
-
-		if fileSize > 0 {
-			if fc.diskHighWaterMark != 0 {
-				currSize, err := common.GetUsage(fc.tmpPath)
-				if err != nil {
-					log.Err("FileCache::OpenFile : error getting current usage of cache [%s]", err.Error())
-				} else {
-					if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
-						log.Err("FileCache::OpenFile : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, options.Name)
-						return nil, syscall.ENOSPC
-					}
-				}
-
-			}
-			// Download/Copy the file from storage to the local file.
-			// We pass a count of 0 to get the entire object
-			err = fc.NextComponent().CopyToFile(
-				internal.CopyToFileOptions{
-					Name:   options.Name,
-					Offset: 0,
-					Count:  0,
-					File:   f,
-				})
-			if err != nil {
-				// File was created locally and now download has failed so we need to delete it back from local cache
-				log.Err("FileCache::OpenFile : error downloading file from storage %s [%s]", options.Name, err.Error())
-				_ = f.Close()
-				_ = os.Remove(localPath)
-				return nil, err
-			}
-		}
-
-		// Update the last download time of this file
-		flock.SetDownloadTime()
-
-		log.Debug("FileCache::OpenFile : Download of %s is complete", options.Name)
-		f.Close()
-
-		// After downloading the file, update the modified times and mode of the file.
-		fileMode := fc.defaultPermission
-		if attr != nil && !attr.IsModeDefault() {
-			fileMode = attr.Mode
-		}
-
-		// If user has selected some non default mode in config then every local file shall be created with that mode only
-		err = os.Chmod(localPath, fileMode)
-		if err != nil {
-			log.Err("FileCache::OpenFile : Failed to change mode of file %s [%s]", options.Name, err.Error())
-		}
-		// TODO: When chown is supported should we update that?
-
-		if attr != nil {
-			// chtimes shall be the last api otherwise calling chmod/chown will update the last change time
-			err = os.Chtimes(localPath, attr.Atime, attr.Mtime)
-			if err != nil {
-				log.Err("FileCache::OpenFile : Failed to change times of file %s [%s]", options.Name, err.Error())
-			}
-		}
-
 		fileCacheStatsCollector.UpdateStats(stats_manager.Increment, dlFiles, (int64)(1))
+		handle := handlemap.NewHandle(options.Name)
+		handle.SetValue("flag", struct{ flags int }{flags: options.Flags})
+		handle.SetValue("mode", options.Mode)
+
+		return handle, nil
+
 	} else {
 		log.Debug("FileCache::OpenFile : %s will be served from cache", options.Name)
 		fileCacheStatsCollector.UpdateStats(stats_manager.Increment, cacheServed, (int64)(1))
