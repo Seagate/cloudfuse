@@ -1050,6 +1050,9 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
 
+	if options.Handle.GetFileObject() == nil {
+		options.Handle = fc.getHandleData(options.Handle)
+	}
 	f := options.Handle.GetFileObject()
 	if f == nil {
 		log.Err("FileCache::WriteFile : error [couldn't find fd in handle] %s", options.Handle.Path)
