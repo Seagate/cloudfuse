@@ -714,7 +714,7 @@ func (fc *FileCache) getHandleData(handle *handlemap.Handle) *handlemap.Handle {
 		return nil
 	}
 
-	handle, err := fc.download(handle.Path, flag, fileModeValue)
+	handle, err := fc.DownloadFile(handle.Path, flag, fileModeValue)
 	if err != nil {
 		log.Err("FileCache::getHandleData : error downloading data for file %s [%s]", handle.Path, err.Error())
 	}
@@ -722,7 +722,7 @@ func (fc *FileCache) getHandleData(handle *handlemap.Handle) *handlemap.Handle {
 	return handle
 }
 
-func (fc *FileCache) download(name string, flag int, mode os.FileMode) (*handlemap.Handle, error) {
+func (fc *FileCache) DownloadFile(name string, flag int, mode os.FileMode) (*handlemap.Handle, error) {
 	log.Trace("FileCache::download : name=%s, flags=%d, mode=%s", name, flag, mode)
 
 	localPath := common.JoinUnixFilepath(fc.tmpPath, name)
@@ -1389,11 +1389,23 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	} else {
 		// If size is not 0 then we need to open the file and then truncate it
 		// Open will force download if file was not present in local system
-		h, err = fc.OpenFile(internal.OpenFileOptions{Name: options.Name, Flags: os.O_RDWR, Mode: fc.defaultPermission})
-		if err != nil {
-			log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
-			return err
+		localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+		flock := fc.fileLocks.Get(options.Name)
+		downloadRequired, _, _, err := fc.isDownloadRequired(localPath, options.Name, flock)
+		if downloadRequired {
+			_, err := fc.DownloadFile(options.Name, os.O_RDWR, fc.defaultPermission)
+			if err != nil {
+				log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
+				return err
+			}
+		} else {
+			h, err = fc.OpenFile(internal.OpenFileOptions{Name: options.Name, Flags: os.O_RDWR, Mode: fc.defaultPermission})
+			if err != nil {
+				log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
+				return err
+			}
 		}
+
 	}
 
 	// Update the size of the file in the local cache
