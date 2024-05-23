@@ -289,6 +289,17 @@ func (suite *attrCacheTestSuite) TestConfig() {
 	suite.assert.False(suite.attrCache.cacheDirs)
 }
 
+// Tests backward compatibility
+func (suite *attrCacheTestSuite) TestOldConfig() {
+	defer suite.cleanupTest()
+	suite.cleanupTest() // clean up the default attr cache generated
+	config := "attr_cache:\n    no-symlinks: false"
+	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
+
+	suite.assert.Equal("attr_cache", suite.attrCache.Name())
+	suite.assert.True(suite.attrCache.enableSymlinks)
+}
+
 // Tests max files config
 func (suite *attrCacheTestSuite) TestConfigMaxFiles() {
 	defer suite.cleanupTest()
