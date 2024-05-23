@@ -692,34 +692,33 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 }
 
 func (fc *FileCache) getHandleData(handle *handlemap.Handle) *handlemap.Handle {
-	if handle.GetFileObject() == nil {
-		log.Debug("FileCache::getHandleData : Need to download %s", handle.Path)
 
-		//exctract the flags out of handle values
-		flags, _ := handle.GetValue("flag")
-		flagsStruct, ok := flags.(struct{ Number int })
-		if !ok {
-			fmt.Println("Type assertion failed")
-			return nil
-		}
+	log.Debug("FileCache::getHandleData : Need to download %s", handle.Path)
 
-		// Extract the integer as a separate variable
-		flag := flagsStruct.Number
-
-		// extract the filemode out of handle values
-		mode, _ := handle.GetValue("mode")
-		fileModeValue, ok := mode.(os.FileMode)
-		if !ok {
-			fmt.Println("Type assertion failed")
-			return nil
-		}
-
-		handle, err := fc.download(handle.Path, flag, fileModeValue)
-		if err != nil {
-			log.Err("FileCache::getHandleData : error downloading data for file %s [%s]", handle.Path, err.Error())
-		}
-
+	//exctract the flags out of handle values
+	flags, _ := handle.GetValue("flag")
+	flagsStruct, ok := flags.(struct{ flags int })
+	if !ok {
+		fmt.Println("Type assertion failed")
+		return nil
 	}
+
+	// Extract the integer as a separate variable
+	flag := flagsStruct.flags
+
+	// extract the filemode out of handle values
+	mode, _ := handle.GetValue("mode")
+	fileModeValue, ok := mode.(os.FileMode)
+	if !ok {
+		fmt.Println("Type assertion failed")
+		return nil
+	}
+
+	handle, err := fc.download(handle.Path, flag, fileModeValue)
+	if err != nil {
+		log.Err("FileCache::getHandleData : error downloading data for file %s [%s]", handle.Path, err.Error())
+	}
+
 	return handle
 }
 
@@ -1016,6 +1015,7 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	// log.Debug("FileCache::ReadInBuffer : Reading %v bytes from %s", len(options.Data), options.Handle.Path)
 
+	//TODO: troubleshoot. Why is options.Handle is still empty?
 	if options.Handle.GetFileObject() == nil {
 		options.Handle = fc.getHandleData(options.Handle)
 	}
