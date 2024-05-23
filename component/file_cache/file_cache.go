@@ -699,7 +699,7 @@ func (fc *FileCache) getHandleData(handle *handlemap.Handle) *handlemap.Handle {
 	flags, _ := handle.GetValue("flag")
 	flagsStruct, ok := flags.(struct{ flags int })
 	if !ok {
-		fmt.Println("Type assertion failed")
+		log.Debug("FileCache::getHandleData : error Type assertion failed on getting flag for %s [%s]", handle.Path)
 		return nil
 	}
 
@@ -710,7 +710,7 @@ func (fc *FileCache) getHandleData(handle *handlemap.Handle) *handlemap.Handle {
 	mode, _ := handle.GetValue("mode")
 	fileModeValue, ok := mode.(os.FileMode)
 	if !ok {
-		fmt.Println("Type assertion failed")
+		log.Debug("FileCache::getHandleData : error Type assertion failed on getting file mode for %s [%s]", handle.Path)
 		return nil
 	}
 
@@ -1016,12 +1016,18 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	// log.Debug("FileCache::ReadInBuffer : Reading %v bytes from %s", len(options.Data), options.Handle.Path)
 
 	var newHandle *handlemap.Handle
-	//TODO: troubleshoot. Why is options.Handle is still empty?
+	var swapped bool
+	//TODO: troubleshoot. on the next offset instance to read the same file, options.Handle is empty after it was previously downloaded.
+	// the file is being downloaded over and over for each next offset to read from.
 	if options.Handle.GetFileObject() == nil {
 		newHandle = fc.getHandleData(options.Handle)
+		swapped = handlemap.GetHandles().CompareAndSwap(options.Handle.ID, options.Handle, newHandle)
+		options.Handle = newHandle
 	}
 
-	options.Handle = newHandle
+	if !swapped {
+		log.Err("FileCache::ReadInBuffer : error [couldn't swap updated handle into handlemap] %s", options.Handle.Path)
+	}
 
 	f := options.Handle.GetFileObject()
 	if f == nil {
@@ -1054,11 +1060,16 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
 
 	var newHandle *handlemap.Handle
+	var swapped bool
 	if options.Handle.GetFileObject() == nil {
 		newHandle = fc.getHandleData(options.Handle)
+		swapped = handlemap.GetHandles().CompareAndSwap(options.Handle.ID, options.Handle, newHandle)
+		options.Handle = newHandle
 	}
 
-	options.Handle = newHandle
+	if !swapped {
+		log.Err("FileCache::WriteFile : error [couldn't swap updated handle into handlemap] %s", options.Handle.Path)
+	}
 
 	f := options.Handle.GetFileObject()
 	if f == nil {
