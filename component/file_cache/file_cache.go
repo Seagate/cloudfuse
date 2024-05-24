@@ -714,7 +714,8 @@ func (fc *FileCache) getHandleData(handle *handlemap.Handle) *handlemap.Handle {
 		return nil
 	}
 
-	handle, err := fc.DownloadFile(handle.Path, flag, fileModeValue)
+	handle, err := fc.DownloadFile(internal.DownloadFileOptions{Name: handle.Path, Flags: flag, Mode: fileModeValue})
+
 	if err != nil {
 		log.Err("FileCache::getHandleData : error downloading data for file %s [%s]", handle.Path, err.Error())
 	}
@@ -722,22 +723,22 @@ func (fc *FileCache) getHandleData(handle *handlemap.Handle) *handlemap.Handle {
 	return handle
 }
 
-func (fc *FileCache) DownloadFile(name string, flag int, mode os.FileMode) (*handlemap.Handle, error) {
-	log.Trace("FileCache::download : name=%s, flags=%d, mode=%s", name, flag, mode)
+func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handlemap.Handle, error) {
+	log.Trace("FileCache::download : name=%s, flags=%d, mode=%s", options.Name, options.Flags, options.Mode)
 
-	localPath := common.JoinUnixFilepath(fc.tmpPath, name)
+	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	var f *os.File
 	var err error
 
-	flock := fc.fileLocks.Get(name)
+	flock := fc.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
 
 	fc.policy.CacheValid(localPath)
 
-	attr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+	attr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 	if err != nil {
-		log.Err("FileCache::download : Failed to get attr of %s [%s]", name, err.Error())
+		log.Err("FileCache::download : Failed to get attr of %s [%s]", options.Name, err.Error())
 	}
 
 	// return err in case of authorization permission mismatch
@@ -745,7 +746,7 @@ func (fc *FileCache) DownloadFile(name string, flag int, mode os.FileMode) (*han
 		return nil, err
 	}
 
-	log.Debug("FileCache::download : Need to download %s", name)
+	log.Debug("FileCache::download : Need to download %s", options.Name)
 
 	fileSize := int64(0)
 	if attr != nil {
@@ -759,29 +760,29 @@ func (fc *FileCache) DownloadFile(name string, flag int, mode os.FileMode) (*han
 	}
 
 	if fileExists {
-		log.Debug("FileCache::download : Delete cached file %s", name)
+		log.Debug("FileCache::download : Delete cached file %s", options.Name)
 
 		err := deleteFile(localPath)
 		if err != nil && !os.IsNotExist(err) {
-			log.Err("FileCache::download : Failed to delete old file %s", name)
+			log.Err("FileCache::download : Failed to delete old file %s", options.Name)
 		}
 	} else {
 		// Create the file if if doesn't already exist.
 		err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
 		if err != nil {
-			log.Err("FileCache::download : error creating directory structure for file %s [%s]", name, err.Error())
+			log.Err("FileCache::download : error creating directory structure for file %s [%s]", options.Name, err.Error())
 			return nil, err
 		}
 	}
 
 	// Open the file in write mode.
-	f, err = common.OpenFile(localPath, os.O_CREATE|os.O_RDWR, mode)
+	f, err = common.OpenFile(localPath, os.O_CREATE|os.O_RDWR, options.Mode)
 	if err != nil {
-		log.Err("FileCache::download : error creating new file %s [%s]", name, err.Error())
+		log.Err("FileCache::download : error creating new file %s [%s]", options.Name, err.Error())
 		return nil, err
 	}
 
-	if flag&os.O_TRUNC != 0 {
+	if options.Flags&os.O_TRUNC != 0 {
 		fileSize = 0
 	}
 
@@ -792,7 +793,7 @@ func (fc *FileCache) DownloadFile(name string, flag int, mode os.FileMode) (*han
 				log.Err("FileCache::download : error getting current usage of cache [%s]", err.Error())
 			} else {
 				if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
-					log.Err("FileCache::download : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, name)
+					log.Err("FileCache::download : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, options.Name)
 					return nil, syscall.ENOSPC
 				}
 			}
@@ -802,14 +803,14 @@ func (fc *FileCache) DownloadFile(name string, flag int, mode os.FileMode) (*han
 		// We pass a count of 0 to get the entire object
 		err = fc.NextComponent().CopyToFile(
 			internal.CopyToFileOptions{
-				Name:   name,
+				Name:   options.Name,
 				Offset: 0,
 				Count:  0,
 				File:   f,
 			})
 		if err != nil {
 			// File was created locally and now download has failed so we need to delete it back from local cache
-			log.Err("FileCache::download : error downloading file from storage %s [%s]", name, err.Error())
+			log.Err("FileCache::download : error downloading file from storage %s [%s]", options.Name, err.Error())
 			_ = f.Close()
 			_ = os.Remove(localPath)
 			return nil, err
@@ -819,7 +820,7 @@ func (fc *FileCache) DownloadFile(name string, flag int, mode os.FileMode) (*han
 	// Update the last download time of this file
 	flock.SetDownloadTime()
 
-	log.Debug("FileCache::download : Download of %s is complete", name)
+	log.Debug("FileCache::download : Download of %s is complete", options.Name)
 	f.Close()
 
 	// After downloading the file, update the modified times and mode of the file.
@@ -831,7 +832,7 @@ func (fc *FileCache) DownloadFile(name string, flag int, mode os.FileMode) (*han
 	// If user has selected some non default mode in config then every local file shall be created with that mode only
 	err = os.Chmod(localPath, fileMode)
 	if err != nil {
-		log.Err("FileCache::download : Failed to change mode of file %s [%s]", name, err.Error())
+		log.Err("FileCache::download : Failed to change mode of file %s [%s]", options.Name, err.Error())
 	}
 	// TODO: When chown is supported should we update that?
 
@@ -839,23 +840,23 @@ func (fc *FileCache) DownloadFile(name string, flag int, mode os.FileMode) (*han
 		// chtimes shall be the last api otherwise calling chmod/chown will update the last change time
 		err = os.Chtimes(localPath, attr.Atime, attr.Mtime)
 		if err != nil {
-			log.Err("FileCache::download : Failed to change times of file %s [%s]", name, err.Error())
+			log.Err("FileCache::download : Failed to change times of file %s [%s]", options.Name, err.Error())
 		}
 	}
 
 	fileCacheStatsCollector.UpdateStats(stats_manager.Increment, dlFiles, (int64)(1))
 
 	// Open the file and grab a shared lock to prevent deletion by the cache policy.
-	f, err = common.OpenFile(localPath, flag, mode)
+	f, err = common.OpenFile(localPath, options.Flags, options.Mode)
 	if err != nil {
-		log.Err("FileCache::download : error opening cached file %s [%s]", name, err.Error())
+		log.Err("FileCache::download : error opening cached file %s [%s]", options.Name, err.Error())
 		return nil, err
 	}
 
 	// Increment the handle count in this lock item as there is one handle open for this now
 	flock.Inc()
 
-	handle := handlemap.NewHandle(name)
+	handle := handlemap.NewHandle(options.Name)
 	inf, err := f.Stat()
 	if err == nil {
 		handle.Size = inf.Size()
@@ -866,7 +867,7 @@ func (fc *FileCache) DownloadFile(name string, flag int, mode os.FileMode) (*han
 		handle.Flags.Set(handlemap.HandleFlagCached)
 	}
 
-	log.Info("FileCache::download : file=%s, fd=%d", name, f.Fd())
+	log.Info("FileCache::download : file=%s, fd=%d", options.Name, f.Fd())
 	handle.SetFileObject(f)
 
 	return handle, nil
@@ -1392,8 +1393,13 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 		localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 		flock := fc.fileLocks.Get(options.Name)
 		downloadRequired, _, _, err := fc.isDownloadRequired(localPath, options.Name, flock)
+		// return err in case of authorization permission mismatch
+		if err != nil && err == syscall.EACCES {
+			return err
+		}
+
 		if downloadRequired {
-			_, err := fc.DownloadFile(options.Name, os.O_RDWR, fc.defaultPermission)
+			_, err := fc.DownloadFile(internal.DownloadFileOptions{Name: options.Name, Flags: os.O_RDWR, Mode: fc.defaultPermission})
 			if err != nil {
 				log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
 				return err

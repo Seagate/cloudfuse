@@ -77,6 +77,12 @@ type DeleteFileOptions struct {
 	Name string
 }
 
+type DownloadFileOptions struct {
+	Name  string
+	Flags int
+	Mode  os.FileMode
+}
+
 type OpenFileOptions struct {
 	Name  string
 	Flags int
