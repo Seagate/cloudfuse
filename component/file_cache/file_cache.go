@@ -1398,7 +1398,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 		}
 
 		if downloadRequired {
-			_, err := fc.DownloadFile(internal.DownloadFileOptions{Name: options.Name, Flags: os.O_RDWR, Mode: fc.defaultPermission})
+			h, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Name, Flags: os.O_RDWR, Mode: fc.defaultPermission})
 			if err != nil {
 				log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
 				return err
