@@ -1020,14 +1020,13 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	var swapped bool
 	//TODO: troubleshoot. on the next offset instance to read the same file, options.Handle is empty after it was previously downloaded.
 	// the file is being downloaded over and over for each next offset to read from.
-	if options.Handle.GetFileObject() == nil {
+	if _, ok := options.Handle.GetValue("flag"); ok {
 		newHandle = fc.getHandleData(options.Handle)
 		swapped = handlemap.GetHandles().CompareAndSwap(options.Handle.ID, options.Handle, newHandle)
 		options.Handle = newHandle
-	}
-
-	if !swapped {
-		log.Err("FileCache::ReadInBuffer : error [couldn't swap updated handle into handlemap] %s", options.Handle.Path)
+		if !swapped {
+			log.Err("FileCache::ReadInBuffer : error [couldn't swap updated handle into handlemap] %s", options.Handle.Path)
+		}
 	}
 
 	f := options.Handle.GetFileObject()
@@ -1062,14 +1061,14 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	var newHandle *handlemap.Handle
 	var swapped bool
-	if options.Handle.GetFileObject() == nil {
+	if _, ok := options.Handle.GetValue("flag"); ok {
 		newHandle = fc.getHandleData(options.Handle)
 		swapped = handlemap.GetHandles().CompareAndSwap(options.Handle.ID, options.Handle, newHandle)
 		options.Handle = newHandle
-	}
+		if !swapped {
+			log.Err("FileCache::WriteFile : error [couldn't swap updated handle into handlemap] %s", options.Handle.Path)
+		}
 
-	if !swapped {
-		log.Err("FileCache::WriteFile : error [couldn't swap updated handle into handlemap] %s", options.Handle.Path)
 	}
 
 	f := options.Handle.GetFileObject()
