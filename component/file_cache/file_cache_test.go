@@ -664,15 +664,19 @@ func (suite *fileCacheTestSuite) TestSyncFile() {
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// On a sync we open, sync, flush and close
-	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: 0777})
+	handlemap.Add(handle)
 	suite.assert.NoError(err)
-	err = suite.fileCache.SyncFile(internal.SyncFileOptions{Handle: handle})
+	err = suite.fileCache.SyncFile(internal.SyncFileOptions{Handle: handle}) //sync flag set here gets wiped in WriteFile
 	suite.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
+
 	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	handle, loaded := handlemap.Load(handle.ID)
+	suite.assert.True(loaded)
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle}) //file isn't getting deleted Handle.Fsynced() is false
 
 	// Path should not be in file cache
 	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))

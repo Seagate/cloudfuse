@@ -1021,7 +1021,9 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	//TODO: troubleshoot. on the next offset instance to read the same file, options.Handle is empty after it was previously downloaded.
 	// the file is being downloaded over and over for each next offset to read from.
 	if _, ok := options.Handle.GetValue("flag"); ok {
+		latestFlag := options.Handle.Flags
 		newHandle = fc.getHandleData(options.Handle)
+		newHandle.Flags = latestFlag
 		swapped = handlemap.GetHandles().CompareAndSwap(options.Handle.ID, options.Handle, newHandle)
 		options.Handle = newHandle
 		if !swapped {
@@ -1062,7 +1064,9 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	var newHandle *handlemap.Handle
 	var swapped bool
 	if _, ok := options.Handle.GetValue("flag"); ok {
+		latestFlag := options.Handle.Flags
 		newHandle = fc.getHandleData(options.Handle)
+		newHandle.Flags = latestFlag
 		swapped = handlemap.GetHandles().CompareAndSwap(options.Handle.ID, options.Handle, newHandle)
 		options.Handle = newHandle
 		if !swapped {
@@ -1099,12 +1103,12 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	// Removing Pwrite as it is not supported on Windows
 	// bytesWritten, err := syscall.Pwrite(options.Handle.FD(), options.Data, options.Offset)
+
 	bytesWritten, err := f.WriteAt(options.Data, options.Offset)
 
 	if err == nil {
 		// Mark the handle dirty so the file is written back to storage on FlushFile.
 		options.Handle.Flags.Set(handlemap.HandleFlagDirty)
-
 	} else {
 		log.Err("FileCache::WriteFile : failed to write %s [%s]", options.Handle.Path, err.Error())
 	}
