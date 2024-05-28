@@ -1537,13 +1537,16 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.assert.NoError(err)
 
 	data := make([]byte, 20)
-	options := internal.OpenFileOptions{Name: path, Mode: 0777}
+	options := internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY, Mode: 0777}
 
 	// Read file once and we shall get the same data
 	f, err := suite.fileCache.OpenFile(options)
+	handlemap.Add(f)
 	suite.assert.NoError(err)
 	suite.assert.False(f.Dirty())
 	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: f, Offset: 0, Data: data})
+	f, loaded := handlemap.Load(f.ID)
+	suite.assert.True(loaded)
 	suite.assert.NoError(err)
 	suite.assert.Equal(9, n)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
@@ -1566,9 +1569,12 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.assert.NoError(err)
 	time.Sleep(12 * time.Second)
 	f, err = suite.fileCache.OpenFile(options)
+	handlemap.Add(f)
 	suite.assert.NoError(err)
 	suite.assert.False(f.Dirty())
 	n, err = suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: f, Offset: 0, Data: data})
+	f, loaded = handlemap.Load(f.ID)
+	suite.assert.True(loaded)
 	suite.assert.NoError(err)
 	suite.assert.Equal(15, n)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
