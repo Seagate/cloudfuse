@@ -570,7 +570,8 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 
 	//seeing if the directory in the cloud is empty I think
 	//If cloud is down and it's empty locally, then just return local res
-	return fc.NextComponent().IsDirEmpty(options)
+	//return fc.NextComponent().IsDirEmpty(options)
+	return true
 }
 
 // RenameDir: Recursively invalidate the source directory and its children
@@ -583,31 +584,16 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	// 	return err
 	// }
 
-	//Create 2 key value pairs for the source and dest. directory
-	srcDirAttr := FileAttributes{}
-	dstDirAttr := FileAttributes{}
-
-	srcDirAttr.operation = "DeleteDir"
-	srcDirAttr.options = options.Src //Not sure if this is ok right now, but either way the options for deleteFile and Rename just store file name
-
-	dstDirAttr.operation = "UploadDir"
-	dstDirAttr.options = options.Dst
-
-	//Check if the source file already has a value
-	_, loaded := fc.fileOps.LoadOrStore(options.Src, srcDirAttr)
-	if loaded {
-
-		fc.fileOps.Delete(options.Src)            //Remove old value for key
-		fc.fileOps.Store(options.Src, srcDirAttr) //Replace with new one
-	}
-
-	//Check if Destination File has a value
-	_, loaded = fc.fileOps.LoadOrStore(options.Dst, dstDirAttr)
+	newAttr := FileAttributes{}
+	newAttr.operation = "RenameDir"
+	newAttr.options = options
+	dKey := options.Src                                //Extract file name to serve as key
+	_, loaded := fc.fileOps.LoadOrStore(dKey, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
 
 	if loaded { //If there is already a value for the given key, we must overwrite it
 
-		fc.fileOps.Delete(options.Dst)            //Remove old value for key
-		fc.fileOps.Store(options.Dst, dstDirAttr) //Replace with new one
+		fc.fileOps.Delete(dKey)         //Remove old value for key
+		fc.fileOps.Store(dKey, newAttr) //Replace with new one
 	}
 
 	go fc.invalidateDirectory(options.Src)
@@ -1334,31 +1320,18 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 		fc.policy.CacheValid(localDstPath)
 	}
 
-	//Create 2 key value pairs for the source and dest. file
-	srcFileAttr := FileAttributes{}
-	dstFileAttr := FileAttributes{}
+	//Rename file into map, just choose src file name as the key
 
-	srcFileAttr.operation = "DeleteFile"
-	srcFileAttr.options = options.Src //Not sure if this is ok right now, but either way the options for deleteFile and Rename just store file name
-
-	dstFileAttr.operation = "UploadFile"
-	dstFileAttr.options = options.Dst
-
-	//Check if the source file already has a value
-	_, loaded := fc.fileOps.LoadOrStore(options.Src, srcFileAttr)
-	if loaded {
-
-		fc.fileOps.Delete(options.Src)             //Remove old value for key
-		fc.fileOps.Store(options.Src, srcFileAttr) //Replace with new one
-	}
-
-	//Check if Destination File has a value
-	_, loaded = fc.fileOps.LoadOrStore(options.Dst, dstFileAttr)
+	newAttr := FileAttributes{}
+	newAttr.operation = "Rename"
+	newAttr.options = options
+	fKey := options.Src                                //Extract file name to serve as key
+	_, loaded := fc.fileOps.LoadOrStore(fKey, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
 
 	if loaded { //If there is already a value for the given key, we must overwrite it
 
-		fc.fileOps.Delete(options.Dst)             //Remove old value for key
-		fc.fileOps.Store(options.Dst, dstFileAttr) //Replace with new one
+		fc.fileOps.Delete(fKey)         //Remove old value for key
+		fc.fileOps.Store(fKey, newAttr) //Replace with new one
 	}
 
 	return nil
