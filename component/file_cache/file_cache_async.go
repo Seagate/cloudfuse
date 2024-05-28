@@ -43,7 +43,40 @@ func (fc *FileCache) async_cloud_handler() {
 	// if up, then go to sync map and service the file ops. reset the timeout
 	// if not, then call sleep() and increase the timeout
 
+	//i := 0
 	fc.fileOps.Range(func(key, value interface{}) bool {
+		val, ok := fc.fileOps.Load(key)
+		attributes := val.(FileAttributes)
+
+		if !ok { //some error has occured, maybe something needs to be done or just try again
+			return false
+		}
+
+		if attributes.operation == "DeleteDir" {
+
+			go fc.asyncDeleteDir(attributes.options.(internal.DeleteDirOptions)) //spawn a new go thread do deleteDir, use type assertion to pass correct parameters
+
+		} else if attributes.operation == "RenameDir" {
+
+			go fc.asyncRenameDir(attributes.options.(internal.RenameDirOptions))
+
+		} else if attributes.operation == "CreateFile" {
+
+			go fc.asyncCreateFile(attributes.options.(internal.CreateFileOptions))
+
+		} else if attributes.operation == "DeleteFile" {
+
+			go fc.asyncDeleteFile(attributes.options.(internal.DeleteFileOptions))
+
+		} else if attributes.operation == "FlushFile" {
+
+			go fc.asyncFlushFile(attributes.options.(internal.FlushFileOptions))
+
+		} else if attributes.operation == "RenameFile" {
+
+			go fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions))
+
+		}
 
 		return true
 	})
@@ -118,4 +151,16 @@ func (fc *FileCache) asyncRenameDir(options internal.RenameDirOptions) error {
 	}
 	return nil
 
+}
+
+func (fc *FileCache) asyncCreateFile(options internal.CreateFileOptions) error {
+
+	newF, err := fc.NextComponent().CreateFile(options)
+	if err != nil {
+		log.Err("FileCache::CreateFile : Failed to create file %s", options.Name)
+		return err
+	}
+	newF.GetFileObject().Close()
+
+	return nil
 }

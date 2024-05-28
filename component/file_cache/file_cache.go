@@ -1160,7 +1160,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 		}
 		*/
 		newAttr := FileAttributes{}
-		newAttr.operation = "UploadFile"
+		newAttr.operation = "FlushFile"
 		newAttr.options = options
 		fName := f.Name()                                   //Extract file name to serve as key
 		_, loaded := fc.fileOps.LoadOrStore(fName, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
@@ -1323,7 +1323,7 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	//Rename file into map, just choose src file name as the key
 
 	newAttr := FileAttributes{}
-	newAttr.operation = "Rename"
+	newAttr.operation = "RenameFile"
 	newAttr.options = options
 	fKey := options.Src                                //Extract file name to serve as key
 	_, loaded := fc.fileOps.LoadOrStore(fKey, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
