@@ -72,10 +72,10 @@ func (fc *FileCache) async_cloud_handler() {
 			go fc.asyncDeleteFile(attributes.options.(internal.DeleteFileOptions), channel)
 
 		case attributes.operation == "FlushFile":
-			go fc.asyncFlushFile(attributes.options.(internal.FlushFileOptions), channel)
+			go fc.asyncFlushFile(attributes.options.(FilePath), channel)
 
 		case attributes.operation == "RenameFile":
-			go fc.asyncFlushFile(attributes.options.(internal.FlushFileOptions), channel)
+			go fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions), channel)
 
 		case attributes.operation == "Chmod":
 			go fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions), channel)
@@ -93,25 +93,25 @@ func (fc *FileCache) async_cloud_handler() {
 }
 
 // File is already flushed locally, we just need to upload it to the cloud
-func (fc *FileCache) asyncFlushFile(options internal.FlushFileOptions, ch chan bool) error {
+func (fc *FileCache) asyncFlushFile(options FilePath, ch chan bool) error {
 
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
+	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	uploadHandle, err := common.Open(localPath)
 	if err != nil {
-		log.Err("FileCache::FlushFile : error [unable to open upload handle] %s [%s]", options.Handle.Path, err.Error())
+		log.Err("FileCache::FlushFile : error [unable to open upload handle] %s [%s]", options.Name, err.Error())
 		ch <- false
 		return err
 	}
 
 	err = fc.NextComponent().CopyFromFile(
 		internal.CopyFromFileOptions{
-			Name: options.Handle.Path,
+			Name: options.Name,
 			File: uploadHandle,
 		})
 
 	uploadHandle.Close()
 	if err != nil {
-		log.Err("FileCache::FlushFile : %s upload failed [%s]", options.Handle.Path, err.Error())
+		log.Err("FileCache::FlushFile : %s upload failed [%s]", options.Name, err.Error())
 		ch <- false
 		return err
 	}
@@ -188,9 +188,12 @@ func (fc *FileCache) asyncCreateFile(options internal.CreateFileOptions, ch chan
 func (fc *FileCache) asyncChmod(options internal.ChmodOptions, ch chan bool) error {
 
 	//need to first flushFile before Chmod to ensure file is in cloud
-	//do we need to search the entire handle map? that doesn't seem efficient
+	//could probably do this as a one liner but figure it out later if needed
+	flushFilePath := FilePath{}
 
-	//fc.asyncFlushFile()
+	flushFilePath.Name = options.Name
+
+	fc.asyncFlushFile(flushFilePath, ch)
 
 	err := fc.NextComponent().Chmod(options)
 	err = fc.validateStorageError(options.Name, err, "Chmod", false)

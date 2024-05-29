@@ -82,6 +82,10 @@ type FileAttributes struct {
 	options   interface{}
 }
 
+type FilePath struct {
+	Name string
+}
+
 // Structure defining your config parameters
 type FileCacheOptions struct {
 	// e.g. var1 uint32 `config:"var1"`
@@ -179,6 +183,8 @@ func (c *FileCache) Start(ctx context.Context) error {
 	// create stats collector for file cache
 	fileCacheStatsCollector = stats_manager.NewStatsCollector(c.Name())
 	log.Debug("Starting file cache stats collector")
+
+	go c.async_cloud_handler() //async cloud thread
 
 	return nil
 }
@@ -1159,9 +1165,13 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 			return err
 		}
 		*/
+		//for async flush file we just need to send the path as the options, because all we need is the file path
+		// we wrap that in a struct so that it's still an interface
 		newAttr := FileAttributes{}
+		fpInst := FilePath{}
+		fpInst.Name = options.Handle.Path
 		newAttr.operation = "FlushFile"
-		newAttr.options = options
+		newAttr.options = fpInst
 		fName := f.Name()                                   //Extract file name to serve as key
 		_, loaded := fc.fileOps.LoadOrStore(fName, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
 
