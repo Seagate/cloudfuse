@@ -73,6 +73,7 @@ type FileCache struct {
 	refreshSec        uint32
 	hardLimit         bool
 	diskHighWaterMark float64
+	mu                sync.Mutex
 }
 
 // Structure defining your config parameters
@@ -695,6 +696,7 @@ func (fc *FileCache) getHandleData(handle *handlemap.Handle) *handlemap.Handle {
 
 	log.Debug("FileCache::getHandleData : Need to download %s", handle.Path)
 
+	fc.mu.Lock()
 	//exctract the flags out of handle values
 	flags, _ := handle.GetValue("flag")
 	flagsStruct, ok := flags.(struct{ flags int })
@@ -718,7 +720,13 @@ func (fc *FileCache) getHandleData(handle *handlemap.Handle) *handlemap.Handle {
 
 	if err != nil {
 		log.Err("FileCache::getHandleData : error downloading data for file %s [%s]", handle.Path, err.Error())
+		return handle
 	}
+
+	handle.RemoveValue("flag")
+	handle.RemoveValue("mode")
+
+	fc.mu.Unlock()
 
 	return handle
 }
