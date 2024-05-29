@@ -993,19 +993,6 @@ func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
 func (fc *FileCache) ReadFile(options internal.ReadFileOptions) ([]byte, error) {
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 
-	var newHandle *handlemap.Handle
-	var swapped bool
-	if _, ok := options.Handle.GetValue("flag"); ok {
-		latestFlag := options.Handle.Flags
-		newHandle = fc.getHandleData(options.Handle)
-		newHandle.Flags = latestFlag
-		swapped = handlemap.GetHandles().CompareAndSwap(options.Handle.ID, options.Handle, newHandle)
-		options.Handle = newHandle
-		if !swapped {
-			log.Err("FileCache::ReadFile : error [couldn't swap updated handle into handlemap] %s", options.Handle.Path)
-		}
-	}
-
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
 	fc.policy.CacheValid(localPath)
 
