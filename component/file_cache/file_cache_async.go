@@ -57,34 +57,28 @@ func (fc *FileCache) async_cloud_handler() {
 			return false
 		}
 
-		if attributes.operation == "DeleteDir" {
+		switch {
 
-			go fc.asyncDeleteDir(attributes.options.(internal.DeleteDirOptions), channel) //spawn a new go thread do deleteDir, use type assertion to pass correct parameters
+		case attributes.operation == "DeleteDir":
+			go fc.asyncDeleteDir(attributes.options.(internal.DeleteDirOptions), channel)
 
-		} else if attributes.operation == "RenameDir" {
-
+		case attributes.operation == "RenameDir":
 			go fc.asyncRenameDir(attributes.options.(internal.RenameDirOptions), channel)
 
-		} else if attributes.operation == "CreateFile" {
-
+		case attributes.operation == "CreateFile":
 			go fc.asyncCreateFile(attributes.options.(internal.CreateFileOptions), channel)
 
-		} else if attributes.operation == "DeleteFile" {
-
+		case attributes.operation == "DeleteFile":
 			go fc.asyncDeleteFile(attributes.options.(internal.DeleteFileOptions), channel)
 
-		} else if attributes.operation == "FlushFile" {
-
+		case attributes.operation == "FlushFile":
 			go fc.asyncFlushFile(attributes.options.(internal.FlushFileOptions), channel)
 
-		} else if attributes.operation == "RenameFile" {
+		case attributes.operation == "RenameFile":
+			go fc.asyncFlushFile(attributes.options.(internal.FlushFileOptions), channel)
 
+		case attributes.operation == "Chmod":
 			go fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions), channel)
-
-		} else if attributes.operation == "Chmod" {
-
-			go fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions), channel)
-
 		}
 
 		isValidOp := <-channel //read return value from go routine
