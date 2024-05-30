@@ -78,9 +78,10 @@ type DeleteFileOptions struct {
 }
 
 type DownloadFileOptions struct {
-	Name  string
-	Flags int
-	Mode  os.FileMode
+	Name   string
+	Flags  int
+	Mode   os.FileMode
+	Handle *handlemap.Handle
 }
 
 type OpenFileOptions struct {

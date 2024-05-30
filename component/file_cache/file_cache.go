@@ -716,7 +716,7 @@ func (fc *FileCache) getHandleData(handle *handlemap.Handle) *handlemap.Handle {
 		return nil
 	}
 
-	handle, err := fc.DownloadFile(internal.DownloadFileOptions{Name: handle.Path, Flags: flag, Mode: fileModeValue})
+	handle, err := fc.DownloadFile(internal.DownloadFileOptions{Name: handle.Path, Flags: flag, Mode: fileModeValue, Handle: handle})
 
 	if err != nil {
 		log.Err("FileCache::getHandleData : error downloading data for file %s [%s]", handle.Path, err.Error())
@@ -864,21 +864,20 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 	// Increment the handle count in this lock item as there is one handle open for this now
 	flock.Inc()
 
-	handle := handlemap.NewHandle(options.Name)
 	inf, err := f.Stat()
 	if err == nil {
-		handle.Size = inf.Size()
+		options.Handle.Size = inf.Size()
 	}
 
-	handle.UnixFD = uint64(f.Fd())
+	options.Handle.UnixFD = uint64(f.Fd())
 	if !fc.offloadIO {
-		handle.Flags.Set(handlemap.HandleFlagCached)
+		options.Handle.Flags.Set(handlemap.HandleFlagCached)
 	}
 
 	log.Info("FileCache::download : file=%s, fd=%d", options.Name, f.Fd())
-	handle.SetFileObject(f)
+	options.Handle.SetFileObject(f)
 
-	return handle, nil
+	return options.Handle, nil
 }
 
 // OpenFile: Makes the file available in the local cache for further file operations.
@@ -1025,17 +1024,8 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	// log.Debug("FileCache::ReadInBuffer : Reading %v bytes from %s", len(options.Data), options.Handle.Path)
 
-	var newHandle *handlemap.Handle
-	var swapped bool
 	if _, ok := options.Handle.GetValue("flag"); ok {
-		latestFlag := options.Handle.Flags
-		newHandle = fc.getHandleData(options.Handle)
-		newHandle.Flags = latestFlag
-		swapped = handlemap.GetHandles().CompareAndSwap(options.Handle.ID, options.Handle, newHandle)
-		options.Handle = newHandle
-		if !swapped {
-			log.Err("FileCache::ReadInBuffer : error [couldn't swap updated handle into handlemap] %s", options.Handle.Path)
-		}
+		fc.getHandleData(options.Handle)
 	}
 
 	f := options.Handle.GetFileObject()
@@ -1068,18 +1058,8 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
 
-	var newHandle *handlemap.Handle
-	var swapped bool
 	if _, ok := options.Handle.GetValue("flag"); ok {
-		latestFlag := options.Handle.Flags
-		newHandle = fc.getHandleData(options.Handle)
-		newHandle.Flags = latestFlag
-		swapped = handlemap.GetHandles().CompareAndSwap(options.Handle.ID, options.Handle, newHandle)
-		options.Handle = newHandle
-		if !swapped {
-			log.Err("FileCache::WriteFile : error [couldn't swap updated handle into handlemap] %s", options.Handle.Path)
-		}
-
+		fc.getHandleData(options.Handle)
 	}
 
 	f := options.Handle.GetFileObject()
@@ -1407,9 +1387,9 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 		if err != nil && err == syscall.EACCES {
 			return err
 		}
-
+		h = handlemap.NewHandle(options.Name)
 		if downloadRequired {
-			h, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Name, Flags: os.O_RDWR, Mode: fc.defaultPermission})
+			_, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Name, Flags: os.O_RDWR, Mode: fc.defaultPermission, Handle: h})
 			if err != nil {
 				log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
 				return err
