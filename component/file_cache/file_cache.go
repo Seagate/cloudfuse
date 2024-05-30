@@ -73,7 +73,6 @@ type FileCache struct {
 	refreshSec        uint32
 	hardLimit         bool
 	diskHighWaterMark float64
-	mu                sync.Mutex
 }
 
 // Structure defining your config parameters
@@ -696,7 +695,6 @@ func (fc *FileCache) getHandleData(handle *handlemap.Handle) *handlemap.Handle {
 
 	log.Debug("FileCache::getHandleData : Need to download %s", handle.Path)
 
-	fc.mu.Lock()
 	//exctract the flags out of handle values
 	flags, _ := handle.GetValue("flag")
 	flagsStruct, ok := flags.(struct{ flags int })
@@ -725,8 +723,6 @@ func (fc *FileCache) getHandleData(handle *handlemap.Handle) *handlemap.Handle {
 
 	handle.RemoveValue("flag")
 	handle.RemoveValue("mode")
-
-	fc.mu.Unlock()
 
 	return handle
 }
@@ -1024,9 +1020,11 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	// log.Debug("FileCache::ReadInBuffer : Reading %v bytes from %s", len(options.Data), options.Handle.Path)
 
+	options.Handle.Lock()
 	if _, ok := options.Handle.GetValue("flag"); ok {
 		fc.getHandleData(options.Handle)
 	}
+	options.Handle.Unlock()
 
 	f := options.Handle.GetFileObject()
 	if f == nil {
@@ -1058,9 +1056,11 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
 
+	options.Handle.Lock()
 	if _, ok := options.Handle.GetValue("flag"); ok {
 		fc.getHandleData(options.Handle)
 	}
+	options.Handle.Unlock()
 
 	f := options.Handle.GetFileObject()
 	if f == nil {
