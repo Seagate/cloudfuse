@@ -1353,7 +1353,6 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 		}
 	}
 
-	var h *handlemap.Handle = nil
 	var err error = nil
 
 	if options.Size == 0 {
@@ -1366,15 +1365,14 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	} else {
 		// If size is not 0 then we need to open the file and then truncate it
 		// Open will force download if file was not present in local system
-		localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
-		flock := fc.fileLocks.Get(options.Name)
-		downloadRequired, _, _, err := fc.isDownloadRequired(localPath, options.Name, flock)
+
 		// return err in case of authorization permission mismatch
 		if err != nil && err == syscall.EACCES {
 			return err
 		}
-		h = handlemap.NewHandle(options.Name)
-		if downloadRequired {
+
+		h, err := fc.OpenFile(internal.OpenFileOptions{Name: options.Name, Flags: 0, Mode: fc.defaultPermission})
+		if _, loaded := h.GetValue("flag"); loaded {
 			_, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Name, Handle: h})
 			if err != nil {
 				log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
