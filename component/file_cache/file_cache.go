@@ -720,104 +720,99 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 
 	flock := fc.fileLocks.Get(options.Name)
 	flock.Lock()
-
-	// TODO: check if file needs downloading again. use the attr from isDownloadRequired()
-
 	defer flock.Unlock()
+
+	downloadRequired, _, attr, err := fc.isDownloadRequired(localPath, options.Name, flock)
+	if err != nil {
+		log.Err("FileCache::DownloadFile : Failed to check if download is required for %s [%s]", options.Name, err.Error())
+	}
 
 	fc.policy.CacheValid(localPath)
 
-	attr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
-	if err != nil {
-		log.Err("FileCache::download : Failed to get attr of %s [%s]", options.Name, err.Error())
-	}
-
-	// return err in case of authorization permission mismatch
-	if err != nil && err == syscall.EACCES {
-		return nil, err
-	}
-
-	log.Debug("FileCache::download : Need to download %s", options.Name)
-
-	fileSize := int64(0)
-	if attr != nil {
-		fileSize = int64(attr.Size)
-	}
-	_, err = os.Stat(localPath)
-	var fileExists bool
-	if err == nil {
-		// The file exists in local cache
-		fileExists = true
-	}
-
-	if fileExists {
-		log.Debug("FileCache::download : Delete cached file %s", options.Name)
-
-		err := deleteFile(localPath)
-		if err != nil && !os.IsNotExist(err) {
-			log.Err("FileCache::download : Failed to delete old file %s", options.Name)
-		}
-	} else {
-		// Create the file if if doesn't already exist.
-		err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
-		if err != nil {
-			log.Err("FileCache::download : error creating directory structure for file %s [%s]", options.Name, err.Error())
-			return nil, err
-		}
-	}
-
-	// Open the file in write mode.
-	f, err = common.OpenFile(localPath, os.O_CREATE|os.O_RDWR, fMode)
-	if err != nil {
-		log.Err("FileCache::download : error creating new file %s [%s]", options.Name, err.Error())
-		return nil, err
-	}
-
-	if flag&os.O_TRUNC != 0 {
-		fileSize = 0
-	}
-
-	if fileSize > 0 {
-		if fc.diskHighWaterMark != 0 {
-			currSize, err := common.GetUsage(fc.tmpPath)
-			if err != nil {
-				log.Err("FileCache::download : error getting current usage of cache [%s]", err.Error())
-			} else {
-				if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
-					log.Err("FileCache::download : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, options.Name)
-					return nil, syscall.ENOSPC
-				}
-			}
-
-		}
-		// Download/Copy the file from storage to the local file.
-		// We pass a count of 0 to get the entire object
-		err = fc.NextComponent().CopyToFile(
-			internal.CopyToFileOptions{
-				Name:   options.Name,
-				Offset: 0,
-				Count:  0,
-				File:   f,
-			})
-		if err != nil {
-			// File was created locally and now download has failed so we need to delete it back from local cache
-			log.Err("FileCache::download : error downloading file from storage %s [%s]", options.Name, err.Error())
-			_ = f.Close()
-			_ = os.Remove(localPath)
-			return nil, err
-		}
-	}
-
-	// Update the last download time of this file
-	flock.SetDownloadTime()
-
-	log.Debug("FileCache::download : Download of %s is complete", options.Name)
-	f.Close()
-
-	// After downloading the file, update the modified times and mode of the file.
+	// redundantly check if file is needs downloading
 	fileMode := fc.defaultPermission
-	if attr != nil && !attr.IsModeDefault() {
-		fileMode = attr.Mode
+	if downloadRequired {
+		log.Debug("FileCache::download : Need to download %s", options.Name)
+
+		fileSize := int64(0)
+		if attr != nil {
+			fileSize = int64(attr.Size)
+		}
+		_, err = os.Stat(localPath)
+		var fileExists bool
+		if err == nil {
+			// The file exists in local cache
+			fileExists = true
+		}
+
+		if fileExists {
+			log.Debug("FileCache::download : Delete cached file %s", options.Name)
+
+			err := deleteFile(localPath)
+			if err != nil && !os.IsNotExist(err) {
+				log.Err("FileCache::download : Failed to delete old file %s", options.Name)
+			}
+		} else {
+			// Create the file if if doesn't already exist.
+			err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
+			if err != nil {
+				log.Err("FileCache::download : error creating directory structure for file %s [%s]", options.Name, err.Error())
+				return nil, err
+			}
+		}
+
+		// Open the file in write mode.
+		f, err = common.OpenFile(localPath, os.O_CREATE|os.O_RDWR, fMode)
+		if err != nil {
+			log.Err("FileCache::download : error creating new file %s [%s]", options.Name, err.Error())
+			return nil, err
+		}
+
+		if flag&os.O_TRUNC != 0 {
+			fileSize = 0
+		}
+
+		if fileSize > 0 {
+			if fc.diskHighWaterMark != 0 {
+				currSize, err := common.GetUsage(fc.tmpPath)
+				if err != nil {
+					log.Err("FileCache::download : error getting current usage of cache [%s]", err.Error())
+				} else {
+					if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
+						log.Err("FileCache::download : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, options.Name)
+						return nil, syscall.ENOSPC
+					}
+				}
+
+			}
+			// Download/Copy the file from storage to the local file.
+			// We pass a count of 0 to get the entire object
+			err = fc.NextComponent().CopyToFile(
+				internal.CopyToFileOptions{
+					Name:   options.Name,
+					Offset: 0,
+					Count:  0,
+					File:   f,
+				})
+			if err != nil {
+				// File was created locally and now download has failed so we need to delete it back from local cache
+				log.Err("FileCache::download : error downloading file from storage %s [%s]", options.Name, err.Error())
+				_ = f.Close()
+				_ = os.Remove(localPath)
+				return nil, err
+			}
+		}
+
+		// Update the last download time of this file
+		flock.SetDownloadTime()
+
+		log.Debug("FileCache::download : Download of %s is complete", options.Name)
+		f.Close()
+
+		// After downloading the file, update the modified times and mode of the file.
+		if attr != nil && !attr.IsModeDefault() {
+			fileMode = attr.Mode
+		}
 	}
 
 	// If user has selected some non default mode in config then every local file shall be created with that mode only
