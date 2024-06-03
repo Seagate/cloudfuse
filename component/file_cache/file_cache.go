@@ -693,15 +693,12 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handlemap.Handle, error) {
 
-	//TODO: use error output properly for flags and mode extraction.
-	var err error
-
 	//extract flag out of the values from handle
 	flags, _ := options.Handle.GetValue("flag")
 	flagsStruct, ok := flags.(struct{ flags int })
 	if !ok {
 		log.Err("FileCache::getHandleData : error Type assertion failed on getting flag for %s [%s]", options.Handle.Path)
-		return nil, err
+		return options.Handle, fmt.Errorf("Type assertion failed on getting flag forfor %s [%s]", options.Handle.Path)
 	}
 	flag := flagsStruct.flags
 
@@ -710,7 +707,7 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 	fMode, ok := mode.(os.FileMode)
 	if !ok {
 		log.Debug("FileCache::getHandleData : error Type assertion failed on getting file mode for %s [%s]", options.Handle.Path)
-		return nil, err
+		return options.Handle, fmt.Errorf("Type assertion failed on getting file mode for %s [%s]", options.Handle.Path)
 	}
 
 	log.Trace("FileCache::DownloadFile : name=%s, flags=%d, mode=%s", options.Name, flags, fMode)
@@ -1355,6 +1352,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 
 	var err error = nil
 
+	var h *handlemap.Handle
 	if options.Size == 0 {
 		// If size is 0 then no need to download any file we can just create an empty file
 		h, err = fc.CreateFile(internal.CreateFileOptions{Name: options.Name, Mode: fc.defaultPermission})
@@ -1371,7 +1369,10 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			return err
 		}
 
-		h, err := fc.OpenFile(internal.OpenFileOptions{Name: options.Name, Flags: 0, Mode: fc.defaultPermission})
+		h, err = fc.OpenFile(internal.OpenFileOptions{Name: options.Name, Flags: 0, Mode: fc.defaultPermission})
+		if err != nil {
+			log.Err("FileCache::TruncateFile : Error calling OpenFile with %s [%s]", options.Name, err.Error())
+		}
 		if _, loaded := h.GetValue("flag"); loaded {
 			_, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Name, Handle: h})
 			if err != nil {
