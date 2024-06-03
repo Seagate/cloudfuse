@@ -693,21 +693,28 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handlemap.Handle, error) {
 
+	flag := 0
 	//extract flag out of the values from handle
-	flags, _ := options.Handle.GetValue("flag")
-	flagsStruct, ok := flags.(struct{ flags int })
-	if !ok {
-		log.Err("FileCache::getHandleData : error Type assertion failed on getting flag for %s [%s]", options.Handle.Path)
-		return options.Handle, fmt.Errorf("Type assertion failed on getting flag forfor %s [%s]", options.Handle.Path)
+	flags, found := options.Handle.GetValue("flag")
+	if found {
+		flagsStruct, ok := flags.(struct{ flags int })
+		if !ok {
+			log.Err("FileCache::getHandleData : error Type assertion failed on getting flag for %s", options.Handle.Path)
+			return options.Handle, fmt.Errorf("type assertion failed on getting flag forfor %s", options.Handle.Path)
+		}
+		flag = flagsStruct.flags
 	}
-	flag := flagsStruct.flags
 
 	// extract the filemode out of handle values
-	mode, _ := options.Handle.GetValue("mode")
-	fMode, ok := mode.(os.FileMode)
-	if !ok {
-		log.Debug("FileCache::getHandleData : error Type assertion failed on getting file mode for %s [%s]", options.Handle.Path)
-		return options.Handle, fmt.Errorf("Type assertion failed on getting file mode for %s [%s]", options.Handle.Path)
+	fMode := fc.defaultPermission
+	var ok bool
+	mode, found := options.Handle.GetValue("mode")
+	if found {
+		fMode, ok = mode.(os.FileMode)
+		if !ok {
+			log.Debug("FileCache::getHandleData : error Type assertion failed on getting file mode for %s [%s]", options.Handle.Path)
+			return options.Handle, fmt.Errorf("type assertion failed on getting file mode for %s", options.Handle.Path)
+		}
 	}
 
 	log.Trace("FileCache::DownloadFile : name=%s, flags=%d, mode=%s", options.Name, flags, fMode)
@@ -1004,8 +1011,12 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	// log.Debug("FileCache::ReadInBuffer : Reading %v bytes from %s", len(options.Data), options.Handle.Path)
 
 	options.Handle.Lock()
+	var err error
 	if _, ok := options.Handle.GetValue("flag"); ok {
-		fc.DownloadFile(internal.DownloadFileOptions{Name: options.Handle.Path, Handle: options.Handle})
+		options.Handle, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Handle.Path, Handle: options.Handle})
+		if err != nil {
+			return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, error.Error(err))
+		}
 	}
 	options.Handle.Unlock()
 
@@ -1363,11 +1374,6 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	} else {
 		// If size is not 0 then we need to open the file and then truncate it
 		// Open will force download if file was not present in local system
-
-		// return err in case of authorization permission mismatch
-		if err != nil && err == syscall.EACCES {
-			return err
-		}
 
 		h, err = fc.OpenFile(internal.OpenFileOptions{Name: options.Name, Flags: 0, Mode: fc.defaultPermission})
 		if err != nil {
