@@ -82,8 +82,10 @@ type FileAttributes struct {
 	options   interface{}
 }
 
-type FilePath struct {
+// we use this struct to avoid passing in the entire handle object, and only pass the data we need to the async thread
+type FlushFileAbstraction struct {
 	Name string
+	//blockList *common.BlockOffsetList //idk if it's actually needed. Just leave it for now
 }
 
 // Structure defining your config parameters
@@ -183,7 +185,6 @@ func (c *FileCache) Start(ctx context.Context) error {
 	// create stats collector for file cache
 	fileCacheStatsCollector = stats_manager.NewStatsCollector(c.Name())
 	log.Debug("Starting file cache stats collector")
-
 	go c.async_cloud_handler() //async cloud thread
 
 	return nil
@@ -480,7 +481,7 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	dirents, err := os.ReadDir(localPath)
 	if err != nil {
-		return attrs, token, nil
+		return attrs, token, err
 	}
 
 	i := 0 // Index for cloud
@@ -566,7 +567,6 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	} else if os.IsNotExist(err) {
 		// Not found in local cache so check with container
 		log.Debug("FileCache::IsDirEmpty : %s not found in local cache", options.Name)
-		return false
 	} else {
 		// Unknown error, check with container
 		log.Err("FileCache::IsDirEmpty : %s failed while checking local cache [%s]", options.Name, err.Error())
@@ -1080,6 +1080,18 @@ func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 		// 	return err
 		// }
 
+		nextAttr := FileAttributes{}
+		nextAttr.operation = "SyncFile"
+		nextAttr.options = options
+
+		_, loaded := fc.fileOps.LoadOrStore(options.Handle.FObj.Name(), nextAttr)
+
+		if loaded {
+
+			fc.fileOps.Delete(options.Handle.FObj.Name())
+			fc.fileOps.Store(options.Handle.FObj.Name(), nextAttr)
+		}
+
 		options.Handle.Flags.Set(handlemap.HandleFlagFSynced)
 	}
 
@@ -1109,6 +1121,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
+	fmt.Printf("in the local thread the localPath is %s\n", localPath)
 	fc.policy.CacheValid(localPath)
 	// if our handle is dirty then that means we wrote to the file
 	if options.Handle.Dirty() {
@@ -1168,17 +1181,19 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 		//for async flush file we just need to send the path as the options, because all we need is the file path
 		// we wrap that in a struct so that it's still an interface
 		newAttr := FileAttributes{}
-		fpInst := FilePath{}
+		fpInst := FlushFileAbstraction{}
 		fpInst.Name = options.Handle.Path
+		//fpInst.blockList = options.Handle.CacheObj.BlockOffsetList
 		newAttr.operation = "FlushFile"
 		newAttr.options = fpInst
-		fName := f.Name()                                   //Extract file name to serve as key
-		_, loaded := fc.fileOps.LoadOrStore(fName, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
+		fName := f.Name()
+		parent := filepath.Base(fName)                       //Extract file name to serve as key
+		_, loaded := fc.fileOps.LoadOrStore(parent, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
 
 		if loaded { //If there is already a value for the given key, we must overwrite it
 
-			fc.fileOps.Delete(fName)         //Remove old value for key
-			fc.fileOps.Store(fName, newAttr) //Replace with new one
+			fc.fileOps.Delete(parent)         //Remove old value for key
+			fc.fileOps.Store(parent, newAttr) //Replace with new one
 		}
 
 		options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
@@ -1186,6 +1201,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 		// If chmod was done on the file before it was uploaded to container then setting up mode would have been missed
 		// Such file names are added to this map and here post upload we try to set the mode correctly
 		_, found := fc.missedChmodList.Load(options.Handle.Path)
+
 		if found {
 			// If file is found in map it means last chmod was missed on this
 			// Delete the entry from map so that any further flush do not try to update the mode again
@@ -1426,7 +1442,6 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 	_, loaded := fc.fileOps.LoadOrStore(options.Name, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
 
 	if loaded { //If there is already a value for the given key, we must overwrite it
-
 		fc.fileOps.Delete(options.Name)         //Remove old value for key
 		fc.fileOps.Store(options.Name, newAttr) //Replace with new one
 	}
@@ -1471,7 +1486,6 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 		fc.fileOps.Delete(options.Name)         //Remove old value for key
 		fc.fileOps.Store(options.Name, newAttr) //Replace with new one
 	}
-
 	// Update the owner and group of the file in the local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	_, err := os.Stat(localPath)

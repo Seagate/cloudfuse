@@ -26,6 +26,7 @@
 package file_cache
 
 import (
+	"fmt"
 	"syscall"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -44,62 +45,66 @@ func (fc *FileCache) async_cloud_handler() {
 	// if up, then go to sync map and service the file ops. reset the timeout
 	// if not, then call sleep() and increase the timeout
 
-	i := 0
 	//not sure if this actually works, may have to look at other methods to iterate through sync map
+	var returnVal error //race condition on returnVal?
 
-	channel := make(chan bool)
+	for {
 
-	fc.fileOps.Range(func(key, value interface{}) bool {
-		val, ok := fc.fileOps.Load(key)
-		attributes := val.(FileAttributes)
+		fc.fileOps.Range(func(key, value interface{}) bool {
 
-		if !ok { //some error has occured, maybe something needs to be done or just try again
-			return false
-		}
+			val, _ := fc.fileOps.Load(key)
+			fmt.Printf("the value is %s for key %s\n", val, key)
+			attributes := val.(FileAttributes)
 
-		switch {
+			switch {
+			case attributes.operation == "DeleteDir":
+				returnVal = fc.asyncDeleteDir(attributes.options.(internal.DeleteDirOptions))
 
-		case attributes.operation == "DeleteDir":
-			go fc.asyncDeleteDir(attributes.options.(internal.DeleteDirOptions), channel)
+			case attributes.operation == "RenameDir":
+				returnVal = fc.asyncRenameDir(attributes.options.(internal.RenameDirOptions))
 
-		case attributes.operation == "RenameDir":
-			go fc.asyncRenameDir(attributes.options.(internal.RenameDirOptions), channel)
+			case attributes.operation == "CreateFile":
+				returnVal = fc.asyncCreateFile(attributes.options.(internal.CreateFileOptions))
 
-		case attributes.operation == "CreateFile":
-			go fc.asyncCreateFile(attributes.options.(internal.CreateFileOptions), channel)
+			case attributes.operation == "DeleteFile":
+				returnVal = fc.asyncDeleteFile(attributes.options.(internal.DeleteFileOptions))
 
-		case attributes.operation == "DeleteFile":
-			go fc.asyncDeleteFile(attributes.options.(internal.DeleteFileOptions), channel)
+			case attributes.operation == "FlushFile":
+				returnVal = fc.asyncFlushFile(attributes.options.(FlushFileAbstraction))
 
-		case attributes.operation == "FlushFile":
-			go fc.asyncFlushFile(attributes.options.(FilePath), channel)
+			case attributes.operation == "RenameFile":
+				returnVal = fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions))
 
-		case attributes.operation == "RenameFile":
-			go fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions), channel)
+			case attributes.operation == "Chmod":
+				returnVal = fc.asyncChmod(attributes.options.(internal.ChmodOptions))
 
-		case attributes.operation == "Chmod":
-			go fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions), channel)
-		}
+			case attributes.operation == "Chown":
+				returnVal = fc.asyncChown(attributes.options.(internal.ChownOptions))
 
-		isValidOp := <-channel //read return value from go routine
+			case attributes.operation == "SyncFile":
+				returnVal = fc.asyncSyncFile(attributes.options.(internal.SyncFileOptions))
+			}
 
-		if isValidOp { //if true, move onto the next file op
-			i++
-		}
+			if returnVal == nil {
+				fmt.Print("returnVal/error not nil\n")
+				_ = fc.fileOps.CompareAndDelete(key, attributes) //file has been serviced, remove it from map only if file op hasn't been updated
+			}
 
-		return true
-	})
+			return true
+		})
+	}
 
 }
 
 // File is already flushed locally, we just need to upload it to the cloud
-func (fc *FileCache) asyncFlushFile(options FilePath, ch chan bool) error {
+func (fc *FileCache) asyncFlushFile(options FlushFileAbstraction) error {
 
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	//fmt.Printf("path in async thread is %s\n", localPath)
 	uploadHandle, err := common.Open(localPath)
+
 	if err != nil {
 		log.Err("FileCache::FlushFile : error [unable to open upload handle] %s [%s]", options.Name, err.Error())
-		ch <- false
 		return err
 	}
 
@@ -112,100 +117,115 @@ func (fc *FileCache) asyncFlushFile(options FilePath, ch chan bool) error {
 	uploadHandle.Close()
 	if err != nil {
 		log.Err("FileCache::FlushFile : %s upload failed [%s]", options.Name, err.Error())
-		ch <- false
 		return err
 	}
-	ch <- true
 
 	return nil
 }
 
-func (fc *FileCache) asyncDeleteFile(options internal.DeleteFileOptions, ch chan bool) error {
+func (fc *FileCache) asyncDeleteFile(options internal.DeleteFileOptions) error {
 
 	err := fc.NextComponent().DeleteFile(options)
 	err = fc.validateStorageError(options.Name, err, "DeleteFile", false)
 	if err != nil {
 		log.Err("FileCache::DeleteFile : error  %s [%s]", options.Name, err.Error())
-		ch <- false
 		return err
 	}
-	ch <- true
 	return nil
 }
 
-func (fc *FileCache) asyncRenameFile(options internal.RenameFileOptions, ch chan bool) error {
+func (fc *FileCache) asyncRenameFile(options internal.RenameFileOptions) error {
 
 	err := fc.NextComponent().RenameFile(options)
 	err = fc.validateStorageError(options.Src, err, "RenameFile", false)
 	if err != nil {
 		log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
-		ch <- false
 		return err
 	}
-	ch <- true
 	return nil
 }
 
-func (fc *FileCache) asyncDeleteDir(options internal.DeleteDirOptions, ch chan bool) error {
+func (fc *FileCache) asyncDeleteDir(options internal.DeleteDirOptions) error {
 	err := fc.NextComponent().DeleteDir(options)
 	if err != nil {
 		log.Err("FileCache::DeleteDir : %s failed", options.Name)
 		// There is a chance that meta file for directory was not created in which case
 		// rest api delete will fail while we still need to cleanup the local cache for the same
-		ch <- false
 		return err
 	}
-	ch <- true
 	return nil
 }
 
-func (fc *FileCache) asyncRenameDir(options internal.RenameDirOptions, ch chan bool) error {
+func (fc *FileCache) asyncRenameDir(options internal.RenameDirOptions) error {
 
 	err := fc.NextComponent().RenameDir(options)
 	if err != nil {
 		log.Err("FileCache::RenameDir : error %s [%s]", options.Src, err.Error())
-		ch <- false
 		return err
 	}
-	ch <- true
 	return nil
-
 }
 
-func (fc *FileCache) asyncCreateFile(options internal.CreateFileOptions, ch chan bool) error {
+func (fc *FileCache) asyncCreateFile(options internal.CreateFileOptions) error {
 
 	newF, err := fc.NextComponent().CreateFile(options)
 	if err != nil {
 		log.Err("FileCache::CreateFile : Failed to create file %s", options.Name)
-		ch <- false
 		return err
 	}
 	newF.GetFileObject().Close()
-	ch <- true
 	return nil
 }
 
-func (fc *FileCache) asyncChmod(options internal.ChmodOptions, ch chan bool) error {
+func (fc *FileCache) asyncChmod(options internal.ChmodOptions) error {
 
 	//need to first flushFile before Chmod to ensure file is in cloud
 	//could probably do this as a one liner but figure it out later if needed
-	flushFilePath := FilePath{}
 
-	flushFilePath.Name = options.Name
+	// flushFilePath := FlushFileAbstraction{}
 
-	fc.asyncFlushFile(flushFilePath, ch)
+	// flushFilePath.Name = options.Name
+
+	// fc.asyncFlushFile(flushFilePath)
 
 	err := fc.NextComponent().Chmod(options)
 	err = fc.validateStorageError(options.Name, err, "Chmod", false)
 	if err != nil {
 		if err != syscall.EIO {
 			log.Err("FileCache::Chmod : %s failed to change mode [%s]", options.Name, err.Error())
-			return err
 		} else {
 			fc.missedChmodList.LoadOrStore(options.Name, true)
 		}
-		ch <- false
+		return err
 	}
-	ch <- true
+	return nil
+}
+
+func (fc *FileCache) asyncChown(options internal.ChownOptions) error {
+
+	//need to first flushFile before Chmod to ensure file is in cloud
+	//could probably do this as a one liner but figure it out later if needed
+	flushFilePath := FlushFileAbstraction{}
+
+	flushFilePath.Name = options.Name
+
+	fc.asyncFlushFile(flushFilePath)
+
+	err := fc.NextComponent().Chown(options)
+	err = fc.validateStorageError(options.Name, err, "Chown", false)
+	if err != nil {
+		log.Err("FileCache::Chown : %s failed to change owner [%s]", options.Name, err.Error())
+		return err
+	}
+	return nil
+}
+
+func (fc *FileCache) asyncSyncFile(options internal.SyncFileOptions) error {
+
+	err := fc.NextComponent().SyncFile(options)
+	if err != nil {
+		log.Err("FileCache::SyncFile : %s failed", options.Handle.Path)
+		return err
+	}
 	return nil
 }

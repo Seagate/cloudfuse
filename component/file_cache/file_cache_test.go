@@ -1031,6 +1031,8 @@ func (suite *fileCacheTestSuite) TestFlushFileEmpty() {
 
 	// Path should be in fake storage
 	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, file))
+	time.Sleep(2 * time.Second)
+	fmt.Printf("error is %s\n", err)
 	suite.assert.True(err == nil || os.IsExist(err))
 }
 
