@@ -699,7 +699,7 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 	if found {
 		flagsStruct, ok := flags.(struct{ flags int })
 		if !ok {
-			log.Err("FileCache::getHandleData : error Type assertion failed on getting flag for %s", options.Handle.Path)
+			log.Err("FileCache::DownloadFile : error Type assertion failed on getting flag for %s", options.Handle.Path)
 			return options.Handle, fmt.Errorf("type assertion failed on getting flag forfor %s", options.Handle.Path)
 		}
 		flag = flagsStruct.flags
@@ -712,8 +712,25 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 	if found {
 		fMode, ok = mode.(os.FileMode)
 		if !ok {
-			log.Debug("FileCache::getHandleData : error Type assertion failed on getting file mode for %s [%s]", options.Handle.Path)
+			log.Debug("FileCache::DownloadFile : error Type assertion failed on getting file mode for %s [%s]", options.Handle.Path)
 			return options.Handle, fmt.Errorf("type assertion failed on getting file mode for %s", options.Handle.Path)
+		}
+	}
+
+	// extract the download bool out of handle values
+	var downloadNeeded bool
+	dwnldIntfce, found := options.Handle.GetValue("isDownloadNeeded")
+	if found {
+		downloadNeedStruct, ok := dwnldIntfce.(struct{ downloadNeeded bool })
+		if !ok {
+			log.Debug("FileCache::DownloadFile : error Type assertion failed on getting file mode for %s [%s]", options.Handle.Path)
+			return options.Handle, fmt.Errorf("type assertion failed on getting file mode for %s", options.Handle.Path)
+		}
+		downloadNeeded = downloadNeedStruct.downloadNeeded
+
+		if !downloadNeeded {
+			log.Debug("FileCache::DownloadFile : isDownloadNeeded value in handle contains false for %s", options.Handle.Path)
+			return options.Handle, nil
 		}
 	}
 
@@ -853,9 +870,9 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 	log.Info("FileCache::download : file=%s, fd=%d", options.Name, f.Fd())
 	options.Handle.SetFileObject(f)
 
-	//remove values as a kind of signal that the file has been downloaded
-	options.Handle.RemoveValue("flag")
-	options.Handle.RemoveValue("mode")
+	//set boolean in isDownloadNeeded value to signal that the file has been downloaded
+	noDownloadNeeded := struct{ downloadNeeded bool }{downloadNeeded: false}
+	options.Handle.SetValue("isDownloadNeeded", noDownloadNeeded)
 
 	return options.Handle, nil
 }
@@ -885,6 +902,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		handle := handlemap.NewHandle(options.Name)
 		handle.SetValue("flag", struct{ flags int }{flags: options.Flags})
 		handle.SetValue("mode", options.Mode)
+		handle.SetValue("isDownloadNeeded", struct{ downloadNeeded bool }{downloadNeeded: downloadRequired})
 
 		return handle, nil
 
@@ -1006,10 +1024,18 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 
 	options.Handle.Lock()
 	var err error
-	if _, ok := options.Handle.GetValue("flag"); ok {
-		options.Handle, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Handle.Path, Handle: options.Handle})
-		if err != nil {
-			return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, error.Error(err))
+	if dwnldIntfce, found := options.Handle.GetValue("isDownloadNeeded"); found {
+		downloadNeededStruct, ok := dwnldIntfce.(struct{ downloadNeeded bool })
+		if !ok {
+			log.Err("FileCache::WriteFile : error type assertion failed on checking if download is needed for %s", options.Handle.Path)
+			return 0, fmt.Errorf("type assertion failed on checking if download is needed for %s", options.Handle.Path)
+		}
+		downloadNeeded := downloadNeededStruct.downloadNeeded
+		if downloadNeeded {
+			_, err := fc.DownloadFile(internal.DownloadFileOptions{Name: options.Handle.Path, Handle: options.Handle})
+			if err != nil {
+				return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
+			}
 		}
 	}
 	options.Handle.Unlock()
@@ -1045,10 +1071,18 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
 
 	options.Handle.Lock()
-	if _, ok := options.Handle.GetValue("flag"); ok {
-		_, err := fc.DownloadFile(internal.DownloadFileOptions{Name: options.Handle.Path, Handle: options.Handle})
-		if err != nil {
-			return 0, fmt.Errorf("error occurred during download for file %s [%s]", options.Handle.Path, err)
+	if dwnldIntfce, found := options.Handle.GetValue("isDownloadNeeded"); found {
+		downloadNeededStruct, ok := dwnldIntfce.(struct{ downloadNeeded bool })
+		if !ok {
+			log.Err("FileCache::WriteFile : error type assertion failed on checking if download is needed for %s", options.Handle.Path)
+			return 0, fmt.Errorf("type assertion failed on checking if download is needed for %s", options.Handle.Path)
+		}
+		downloadNeeded := downloadNeededStruct.downloadNeeded
+		if downloadNeeded {
+			_, err := fc.DownloadFile(internal.DownloadFileOptions{Name: options.Handle.Path, Handle: options.Handle})
+			if err != nil {
+				return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
+			}
 		}
 	}
 	options.Handle.Unlock()
