@@ -1566,6 +1566,7 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.assert.NoError(err)
 	time.Sleep(12 * time.Second)
 	f, err = suite.fileCache.OpenFile(options)
+	time.Sleep(12 * time.Second) //OpenFile() reset the timer for expiration.
 	suite.assert.NoError(err)
 	suite.assert.False(f.Dirty())
 	n, err = suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: f, Offset: 0, Data: data})
