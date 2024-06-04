@@ -1048,7 +1048,7 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	if _, ok := options.Handle.GetValue("flag"); ok {
 		_, err := fc.DownloadFile(internal.DownloadFileOptions{Name: options.Handle.Path, Handle: options.Handle})
 		if err != nil {
-			return 0, fmt.Errorf("Error occured during download for file %s [%s]", options.Handle.Path, err)
+			return 0, fmt.Errorf("error occurred during download for file %s [%s]", options.Handle.Path, err)
 		}
 	}
 	options.Handle.Unlock()
