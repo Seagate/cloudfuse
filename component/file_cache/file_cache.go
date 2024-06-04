@@ -585,6 +585,11 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 			return nil, err
 		}
 		newF.GetFileObject().Close()
+		// update the timestamp when this file was last synchronized
+		flock := fc.fileLocks.Get(options.Name)
+		flock.Lock()
+		defer flock.Unlock()
+		flock.SetDownloadTime()
 	}
 
 	// Create the file in local cache
@@ -1111,6 +1116,12 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 				}
 			}
 		}
+
+		// update the timestamp when this file was last synchronized
+		flock := fc.fileLocks.Get(options.Handle.Path)
+		flock.Lock()
+		defer flock.Unlock()
+		flock.SetDownloadTime()
 	}
 
 	return nil
