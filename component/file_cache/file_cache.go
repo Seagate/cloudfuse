@@ -1375,12 +1375,12 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 		// If size is not 0 then we need to open the file and then truncate it
 		// Open will force download if file was not present in local system
 
-		h, err = fc.OpenFile(internal.OpenFileOptions{Name: options.Name, Flags: 0, Mode: fc.defaultPermission})
+		h, err = fc.OpenFile(internal.OpenFileOptions{Name: options.Name, Flags: os.O_RDWR, Mode: fc.defaultPermission})
 		if err != nil {
 			log.Err("FileCache::TruncateFile : Error calling OpenFile with %s [%s]", options.Name, err.Error())
 		}
 		if _, loaded := h.GetValue("flag"); loaded {
-			_, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Name, Handle: h})
+			h, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Name, Handle: h})
 			if err != nil {
 				log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
 				return err
