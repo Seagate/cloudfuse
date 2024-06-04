@@ -726,7 +726,7 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 	flock.Lock()
 	defer flock.Unlock()
 
-	downloadRequired, _, attr, err := fc.isDownloadRequired(localPath, options.Name, flock)
+	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, options.Name, flock)
 	if err != nil {
 		log.Err("FileCache::DownloadFile : Failed to check if download is required for %s [%s]", options.Name, err.Error())
 	}
@@ -741,12 +741,6 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 		fileSize := int64(0)
 		if attr != nil {
 			fileSize = int64(attr.Size)
-		}
-		_, err = os.Stat(localPath)
-		var fileExists bool
-		if err == nil {
-			// The file exists in local cache
-			fileExists = true
 		}
 
 		if fileExists {
