@@ -693,48 +693,27 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handlemap.Handle, error) {
 
-	flag := 0
-	//extract flag out of the values from handle
-	flags, found := options.Handle.GetValue("flag")
+	//extract flag and mode out of the value from handle
+	var flag int
+	var fMode fs.FileMode
+
+	flagMode, found := options.Handle.GetValue("fileFlagMode")
 	if found {
-		flagsStruct, ok := flags.(struct{ flags int })
+		flagModeStruct, ok := flagMode.(struct {
+			flag  int
+			fMode fs.FileMode
+		})
 		if !ok {
 			log.Err("FileCache::DownloadFile : error Type assertion failed on getting flag for %s", options.Handle.Path)
 			return options.Handle, fmt.Errorf("type assertion failed on getting flag forfor %s", options.Handle.Path)
 		}
-		flag = flagsStruct.flags
+		flag = flagModeStruct.flag
+		fMode = flagModeStruct.fMode
+	} else {
+		return options.Handle, nil
 	}
 
-	// extract the filemode out of handle values
-	fMode := fc.defaultPermission
-	var ok bool
-	mode, found := options.Handle.GetValue("mode")
-	if found {
-		fMode, ok = mode.(os.FileMode)
-		if !ok {
-			log.Debug("FileCache::DownloadFile : error Type assertion failed on getting file mode for %s [%s]", options.Handle.Path)
-			return options.Handle, fmt.Errorf("type assertion failed on getting file mode for %s", options.Handle.Path)
-		}
-	}
-
-	// extract the download bool out of handle values
-	var downloadNeeded bool
-	dwnldIntfce, found := options.Handle.GetValue("isDownloadNeeded")
-	if found {
-		downloadNeedStruct, ok := dwnldIntfce.(struct{ downloadNeeded bool })
-		if !ok {
-			log.Debug("FileCache::DownloadFile : error Type assertion failed on getting file mode for %s [%s]", options.Handle.Path)
-			return options.Handle, fmt.Errorf("type assertion failed on getting file mode for %s", options.Handle.Path)
-		}
-		downloadNeeded = downloadNeedStruct.downloadNeeded
-
-		if !downloadNeeded {
-			log.Debug("FileCache::DownloadFile : isDownloadNeeded value in handle contains false for %s", options.Handle.Path)
-			return options.Handle, nil
-		}
-	}
-
-	log.Trace("FileCache::DownloadFile : name=%s, flags=%d, mode=%s", options.Name, flags, fMode)
+	log.Trace("FileCache::DownloadFile : name=%s, flags=%d, mode=%s", options.Name, flag, fMode)
 
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	var f *os.File
@@ -889,9 +868,10 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 
 	fileCacheStatsCollector.UpdateStats(stats_manager.Increment, dlFiles, (int64)(1))
 	handle := handlemap.NewHandle(options.Name)
-	handle.SetValue("flag", struct{ flags int }{flags: options.Flags})
-	handle.SetValue("mode", options.Mode)
-	handle.SetValue("isDownloadNeeded", struct{ downloadNeeded bool }{downloadNeeded: true})
+	handle.SetValue("fileFlagMode", struct {
+		flag  int
+		fMode fs.FileMode
+	}{flag: options.Flags, fMode: options.Mode})
 
 	return handle, nil
 
@@ -983,19 +963,9 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 
 	options.Handle.Lock()
 	var err error
-	if dwnldIntfce, found := options.Handle.GetValue("isDownloadNeeded"); found {
-		downloadNeededStruct, ok := dwnldIntfce.(struct{ downloadNeeded bool })
-		if !ok {
-			log.Err("FileCache::WriteFile : error type assertion failed on checking if download is needed for %s", options.Handle.Path)
-			return 0, fmt.Errorf("type assertion failed on checking if download is needed for %s", options.Handle.Path)
-		}
-		downloadNeeded := downloadNeededStruct.downloadNeeded
-		if downloadNeeded {
-			_, err := fc.DownloadFile(internal.DownloadFileOptions{Name: options.Handle.Path, Handle: options.Handle})
-			if err != nil {
-				return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
-			}
-		}
+	options.Handle, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Handle.Path, Handle: options.Handle})
+	if err != nil {
+		return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
 	}
 	options.Handle.Unlock()
 
@@ -1030,19 +1000,10 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
 
 	options.Handle.Lock()
-	if dwnldIntfce, found := options.Handle.GetValue("isDownloadNeeded"); found {
-		downloadNeededStruct, ok := dwnldIntfce.(struct{ downloadNeeded bool })
-		if !ok {
-			log.Err("FileCache::WriteFile : error type assertion failed on checking if download is needed for %s", options.Handle.Path)
-			return 0, fmt.Errorf("type assertion failed on checking if download is needed for %s", options.Handle.Path)
-		}
-		downloadNeeded := downloadNeededStruct.downloadNeeded
-		if downloadNeeded {
-			_, err := fc.DownloadFile(internal.DownloadFileOptions{Name: options.Handle.Path, Handle: options.Handle})
-			if err != nil {
-				return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
-			}
-		}
+	var err error
+	options.Handle, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Handle.Path, Handle: options.Handle})
+	if err != nil {
+		return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
 	}
 	options.Handle.Unlock()
 
@@ -1369,18 +1330,11 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 		if err != nil {
 			log.Err("FileCache::TruncateFile : Error calling OpenFile with %s [%s]", options.Name, err.Error())
 		}
-		if _, loaded := h.GetValue("flag"); loaded {
-			h, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Name, Handle: h})
-			if err != nil {
-				log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
-				return err
-			}
-		} else {
-			h, err = fc.OpenFile(internal.OpenFileOptions{Name: options.Name, Flags: os.O_RDWR, Mode: fc.defaultPermission})
-			if err != nil {
-				log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
-				return err
-			}
+
+		h, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Name, Handle: h})
+		if err != nil {
+			log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
+			return err
 		}
 
 	}
