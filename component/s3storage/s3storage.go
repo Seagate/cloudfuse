@@ -508,13 +508,4 @@ func News3storageComponent() internal.Component {
 // On init register this component to pipeline and supply your constructor
 func init() {
 	internal.AddComponent(compName, News3storageComponent)
-
-	endpoint := config.AddStringFlag("endpoint", "", "S3 endpoint url.")
-	config.BindPFlag(compName+".endpoint", endpoint)
-
-	region := config.AddStringFlag("region", "", "S3 region.")
-	config.BindPFlag(compName+".region", region)
-
-	bucketName := config.AddStringFlag("bucket-name", "", "Name of s3 bucket.")
-	config.BindPFlag(compName+".bucket-name", bucketName)
 }
