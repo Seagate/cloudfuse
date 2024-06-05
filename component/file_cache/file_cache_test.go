@@ -895,9 +895,9 @@ func (suite *fileCacheTestSuite) TestReadFile() {
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
 
-	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
+	d, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
+	suite.assert.EqualValues(9, d)
 }
 
 func (suite *fileCacheTestSuite) TestReadFileNoFlush() {
@@ -911,9 +911,9 @@ func (suite *fileCacheTestSuite) TestReadFileNoFlush() {
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
 
-	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
+	d, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
+	suite.assert.EqualValues(9, d)
 }
 
 func (suite *fileCacheTestSuite) TestReadFileErrorBadFd() {
@@ -1477,9 +1477,9 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
 
-	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
+	d, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
+	suite.assert.EqualValues(9, d)
 }
 
 func (suite *fileCacheTestSuite) TestZZOffloadIO() {
@@ -1566,7 +1566,6 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.assert.NoError(err)
 	time.Sleep(12 * time.Second)
 	f, err = suite.fileCache.OpenFile(options)
-	time.Sleep(12 * time.Second) //OpenFile() reset the timer for expiration.
 	suite.assert.NoError(err)
 	suite.assert.False(f.Dirty())
 	n, err = suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: f, Offset: 0, Data: data})
