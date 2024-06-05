@@ -144,10 +144,11 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	// ListBuckets here to test connection
-	_, err = cl.ListBuckets()
-	if err != nil {
-		log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
-	}
+	// Remove check for testing when cloud is down
+	// _, err = cl.ListBuckets()
+	// if err != nil {
+	// 	log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
+	// }
 	return err
 }
 
