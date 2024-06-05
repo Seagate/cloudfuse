@@ -106,7 +106,7 @@ This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storag
 ### Changes ###
 
 - Windows mount no longer requires admin rights
-- Replaced service dedicated to restart mounts on bootup, with a new Windows startup tool that restarts mounts on login.
+- Replaced service dedicated to restart mounts on boot up, with a new Windows startup tool that restarts mounts on login.
 - Persistent mounts are now stored in AppData on Windows rather than the registry.
 - Add --dry-run option
 - Bump golang.org/x/crypto from 0.15.0 to 0.17.0
