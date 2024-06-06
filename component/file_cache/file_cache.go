@@ -696,7 +696,7 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	return nil
 }
 
-func (fc *FileCache) DownloadFile(handle *handlemap.Handle) (*handlemap.Handle, error) {
+func (fc *FileCache) downloadFile(handle *handlemap.Handle) (*handlemap.Handle, error) {
 
 	//extract flags and mode out of the value from handle
 	var flags int
@@ -961,7 +961,7 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 
 	options.Handle.Lock()
 	var err error
-	options.Handle, err = fc.DownloadFile(options.Handle)
+	options.Handle, err = fc.downloadFile(options.Handle)
 	if err != nil {
 		return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
 	}
@@ -999,7 +999,7 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	options.Handle.Lock()
 	var err error
-	options.Handle, err = fc.DownloadFile(options.Handle)
+	options.Handle, err = fc.downloadFile(options.Handle)
 	if err != nil {
 		return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
 	}
@@ -1329,7 +1329,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			log.Err("FileCache::TruncateFile : Error calling OpenFile with %s [%s]", options.Name, err.Error())
 		}
 
-		h, err = fc.DownloadFile(h)
+		h, err = fc.downloadFile(h)
 		if err != nil {
 			log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
 			return err
