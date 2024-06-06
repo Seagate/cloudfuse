@@ -464,12 +464,12 @@ func (suite *ConfigTestSuite) TestConfigFileDescryption() {
 	assert.NoError(err)
 	assert.NotNil(plaintext)
 
-	cipherText, err := common.EncryptData(plaintext, []byte("123123123123123123123123"))
+	cipherText, err := common.EncryptData(plaintext, "12312312312312312312312312312312")
 	assert.NoError(err)
 	err = os.WriteFile("test_enc.yaml", cipherText, 0644)
 	assert.NoError(err)
 
-	err = DecryptConfigFile("test_enc.yaml", "123123123123123123123123")
+	err = DecryptConfigFile("test_enc.yaml", "12312312312312312312312312312312")
 	assert.NoError(err)
 
 	_ = os.Remove("test.yaml")

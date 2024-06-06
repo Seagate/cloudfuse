@@ -142,7 +142,7 @@ var generateConfig = &cobra.Command{
 			}
 		}
 
-		cipherText, err := common.EncryptData([]byte(newConfig), []byte(opts.passphrase))
+		cipherText, err := common.EncryptData([]byte(newConfig), opts.passphrase)
 		if err != nil {
 			return err
 		}
