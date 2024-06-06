@@ -1224,6 +1224,8 @@ func (suite *fileCacheTestSuite) TestRenameFileInCache() {
 	suite.assert.NoError(err)
 	openHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
 	suite.assert.NoError(err)
+	_, err = suite.fileCache.downloadFile(openHandle)
+	suite.assert.NoError(err)
 
 	// Path should be in the file cache
 	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, src))
