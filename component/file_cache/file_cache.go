@@ -705,7 +705,7 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 		})
 		if !ok {
 			log.Err("FileCache::DownloadFile : error Type assertion failed on getting flag for %s", options.Handle.Path)
-			return options.Handle, fmt.Errorf("type assertion failed on getting flag forfor %s", options.Handle.Path)
+			return options.Handle, fmt.Errorf("type assertion failed on getting flag for %s", options.Handle.Path)
 		}
 		flag = flagModeStruct.flag
 		fMode = flagModeStruct.fMode
