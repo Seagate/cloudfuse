@@ -65,7 +65,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 
 	// Validate bucket name
 	if opt.BucketName == "" {
-		return fmt.Errorf("%w: bucket name not provided", errConfigFieldEmpty)
+		log.Warn("ParseAndValidateConfig : bucket name not provided")
 	}
 
 	// Set authentication config
