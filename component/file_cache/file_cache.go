@@ -699,7 +699,7 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 
 	flagMode, found := options.Handle.GetValue("fileFlagMode")
 	if found {
-		flagModeStruct, ok := flagMode.(struct {
+		openFileOptions, ok := flagMode.(struct {
 			flag  int
 			fMode fs.FileMode
 		})
@@ -707,8 +707,8 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 			log.Err("FileCache::DownloadFile : error Type assertion failed on getting flag for %s", options.Handle.Path)
 			return options.Handle, fmt.Errorf("type assertion failed on getting flag for %s", options.Handle.Path)
 		}
-		flag = flagModeStruct.flag
-		fMode = flagModeStruct.fMode
+		flag = openFileOptions.flag
+		fMode = openFileOptions.fMode
 	} else {
 		return options.Handle, nil
 	}
