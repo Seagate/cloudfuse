@@ -868,9 +868,9 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	fileCacheStatsCollector.UpdateStats(stats_manager.Increment, dlFiles, (int64)(1))
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetValue("fileFlagMode", struct {
-		flag  int
+		flags int
 		fMode fs.FileMode
-	}{flag: options.Flags, fMode: options.Mode})
+	}{flags: options.Flags, fMode: options.Mode})
 
 	return handle, nil
 
