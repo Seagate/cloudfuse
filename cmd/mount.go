@@ -482,11 +482,18 @@ var mountCmd = &cobra.Command{
 			pidFile := strings.Replace(options.MountPath, "/", "_", -1) + ".pid"
 			pidFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), pidFile)
 
+			// Delete the pidFile if it already exists which prevents a failed to daemonize error
+			// See https://github.com/sevlyar/go-daemon/issues/37
+			err := os.Remove(pidFileName)
+			if err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return fmt.Errorf("mount: failed to remove pidFile [%v]", err.Error())
+			}
+
 			pid := os.Getpid()
 			fname := fmt.Sprintf("/tmp/cloudfuse.%v", pid)
 
 			ctx, _ := context.WithCancel(context.Background()) //nolint
-			err := createDaemon(pipeline, ctx, pidFileName, 0644, 027, fname)
+			err = createDaemon(pipeline, ctx, pidFileName, 0644, 027, fname)
 			if err != nil {
 				return fmt.Errorf("mount: failed to create daemon [%v]", err.Error())
 			}
