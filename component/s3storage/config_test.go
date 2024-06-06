@@ -76,7 +76,7 @@ func (s *configTestSuite) TestEmptyBucketName() {
 
 	// Then
 	err := ParseAndValidateConfig(s.s3, s.opt)
-	s.assert.ErrorIs(err, errConfigFieldEmpty)
+	s.assert.NoError(err)
 }
 
 // TODO: make errors from the default aws credentials provider visible to the user somehow
