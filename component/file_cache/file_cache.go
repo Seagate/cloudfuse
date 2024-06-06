@@ -700,14 +700,14 @@ func (fc *FileCache) DownloadFile(handle *handlemap.Handle) (*handlemap.Handle, 
 	flagMode, found := handle.GetValue("fileFlagMode")
 	if found {
 		openFileOptions, ok := flagMode.(struct {
-			flag  int
+			flags int
 			fMode fs.FileMode
 		})
 		if !ok {
 			log.Err("FileCache::DownloadFile : error Type assertion failed on getting flag for %s", handle.Path)
 			return handle, fmt.Errorf("type assertion failed on getting flag for %s", handle.Path)
 		}
-		flags = openFileOptions.flag
+		flags = openFileOptions.flags
 		fMode = openFileOptions.fMode
 	} else {
 		return handle, nil
