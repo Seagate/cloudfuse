@@ -1330,10 +1330,11 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanupWithNoTimeout() {
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
-	suite.fileCache.downloadFile(openHandle)
+	_, err := suite.fileCache.downloadFile(openHandle)
+	suite.assert.NoError(err)
 
 	// Path should be in the file cache
-	_, err := os.Stat(suite.cache_path + "/" + src)
+	_, err = os.Stat(suite.cache_path + "/" + src)
 	suite.assert.True(err == nil || os.IsExist(err))
 	// Path should be in fake storage
 	_, err = os.Stat(suite.fake_storage_path + "/" + src)
