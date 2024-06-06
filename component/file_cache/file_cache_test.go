@@ -771,7 +771,7 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
 	// Download is required
-	_, err = suite.fileCache.DownloadFile(internal.DownloadFileOptions{Name: path, Handle: handle})
+	_, err = suite.fileCache.DownloadFile(handle)
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(path, handle.Path)
 	suite.assert.False(handle.Dirty())
@@ -1597,7 +1597,7 @@ func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	smallHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: pathsmall, Flags: os.O_RDONLY, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
 	// try opening small file
-	f, err := suite.fileCache.DownloadFile(internal.DownloadFileOptions{Name: pathsmall, Handle: smallHandle})
+	f, err := suite.fileCache.DownloadFile(smallHandle)
 	suite.assert.NoError(err)
 	suite.assert.False(f.Dirty())
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
@@ -1606,7 +1606,7 @@ func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	bigHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: pathbig, Flags: os.O_RDONLY, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
 	// try opening bigger file which shall fail due to hardlimit
-	f, err = suite.fileCache.DownloadFile(internal.DownloadFileOptions{Name: pathbig, Handle: bigHandle})
+	f, err = suite.fileCache.DownloadFile(bigHandle)
 	suite.assert.Error(err)
 	suite.assert.Nil(f)
 	suite.assert.Equal(syscall.ENOSPC, err)
