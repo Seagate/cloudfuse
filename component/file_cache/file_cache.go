@@ -693,8 +693,8 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handlemap.Handle, error) {
 
-	//extract flag and mode out of the value from handle
-	var flag int
+	//extract flags and mode out of the value from handle
+	var flags int
 	var fMode fs.FileMode
 
 	flagMode, found := options.Handle.GetValue("fileFlagMode")
@@ -707,13 +707,13 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 			log.Err("FileCache::DownloadFile : error Type assertion failed on getting flag for %s", options.Handle.Path)
 			return options.Handle, fmt.Errorf("type assertion failed on getting flag for %s", options.Handle.Path)
 		}
-		flag = openFileOptions.flag
+		flags = openFileOptions.flag
 		fMode = openFileOptions.fMode
 	} else {
 		return options.Handle, nil
 	}
 
-	log.Trace("FileCache::DownloadFile : name=%s, flags=%d, mode=%s", options.Name, flag, fMode)
+	log.Trace("FileCache::DownloadFile : name=%s, flags=%d, mode=%s", options.Name, flags, fMode)
 
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	var f *os.File
@@ -761,7 +761,7 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 			return nil, err
 		}
 
-		if flag&os.O_TRUNC != 0 {
+		if flags&os.O_TRUNC != 0 {
 			fileSize = 0
 		}
 
@@ -826,7 +826,7 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 	fileCacheStatsCollector.UpdateStats(stats_manager.Increment, dlFiles, (int64)(1))
 
 	// Open the file and grab a shared lock to prevent deletion by the cache policy.
-	f, err = common.OpenFile(localPath, flag, fMode)
+	f, err = common.OpenFile(localPath, flags, fMode)
 	if err != nil {
 		log.Err("FileCache::DownloadFile : error opening cached file %s [%s]", options.Name, err.Error())
 		return nil, err
