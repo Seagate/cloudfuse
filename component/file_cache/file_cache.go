@@ -105,6 +105,11 @@ type FileCacheOptions struct {
 	HardLimit  bool   `config:"hard-limit" yaml:"hard-limit,omitempty"`
 }
 
+type openFileOptions struct {
+	flags int
+	fMode fs.FileMode
+}
+
 const (
 	compName                = "file_cache"
 	defaultMaxEviction      = 5000
@@ -699,16 +704,13 @@ func (fc *FileCache) DownloadFile(handle *handlemap.Handle) (*handlemap.Handle, 
 
 	flagMode, found := handle.GetValue("fileFlagMode")
 	if found {
-		openFileOptions, ok := flagMode.(struct {
-			flags int
-			fMode fs.FileMode
-		})
+		fileOptions, ok := flagMode.(openFileOptions)
 		if !ok {
 			log.Err("FileCache::DownloadFile : error Type assertion failed on getting flag for %s", handle.Path)
 			return handle, fmt.Errorf("type assertion failed on getting flag for %s", handle.Path)
 		}
-		flags = openFileOptions.flags
-		fMode = openFileOptions.fMode
+		flags = fileOptions.flags
+		fMode = fileOptions.fMode
 	} else {
 		return handle, nil
 	}
@@ -867,10 +869,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 
 	fileCacheStatsCollector.UpdateStats(stats_manager.Increment, dlFiles, (int64)(1))
 	handle := handlemap.NewHandle(options.Name)
-	handle.SetValue("fileFlagMode", struct {
-		flags int
-		fMode fs.FileMode
-	}{flags: options.Flags, fMode: options.Mode})
+	handle.SetValue("fileFlagMode", openFileOptions{flags: options.Flags, fMode: options.Mode})
 
 	return handle, nil
 
