@@ -1329,7 +1329,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			log.Err("FileCache::TruncateFile : Error calling OpenFile with %s [%s]", options.Name, err.Error())
 		}
 
-		h, err = fc.downloadFile(h)
+		_, err = fc.downloadFile(h)
 		if err != nil {
 			log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
 			return err
