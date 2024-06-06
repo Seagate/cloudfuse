@@ -691,47 +691,47 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	return nil
 }
 
-func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handlemap.Handle, error) {
+func (fc *FileCache) DownloadFile(handle *handlemap.Handle) (*handlemap.Handle, error) {
 
 	//extract flags and mode out of the value from handle
 	var flags int
 	var fMode fs.FileMode
 
-	flagMode, found := options.Handle.GetValue("fileFlagMode")
+	flagMode, found := handle.GetValue("fileFlagMode")
 	if found {
 		openFileOptions, ok := flagMode.(struct {
 			flag  int
 			fMode fs.FileMode
 		})
 		if !ok {
-			log.Err("FileCache::DownloadFile : error Type assertion failed on getting flag for %s", options.Handle.Path)
-			return options.Handle, fmt.Errorf("type assertion failed on getting flag for %s", options.Handle.Path)
+			log.Err("FileCache::DownloadFile : error Type assertion failed on getting flag for %s", handle.Path)
+			return handle, fmt.Errorf("type assertion failed on getting flag for %s", handle.Path)
 		}
 		flags = openFileOptions.flag
 		fMode = openFileOptions.fMode
 	} else {
-		return options.Handle, nil
+		return handle, nil
 	}
 
-	log.Trace("FileCache::DownloadFile : name=%s, flags=%d, mode=%s", options.Name, flags, fMode)
+	log.Trace("FileCache::DownloadFile : name=%s, flags=%d, mode=%s", handle.Path, flags, fMode)
 
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	localPath := common.JoinUnixFilepath(fc.tmpPath, handle.Path)
 	var f *os.File
 
-	flock := fc.fileLocks.Get(options.Name)
+	flock := fc.fileLocks.Get(handle.Path)
 	flock.Lock()
 	defer flock.Unlock()
 
 	fc.policy.CacheValid(localPath)
-	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, options.Name, flock)
+	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, handle.Path, flock)
 	if err != nil {
-		log.Err("FileCache::DownloadFile : Failed to check if download is required for %s [%s]", options.Name, err.Error())
+		log.Err("FileCache::DownloadFile : Failed to check if download is required for %s [%s]", handle.Path, err.Error())
 	}
 
 	// redundantly check if file is needs downloading
 	fileMode := fc.defaultPermission
 	if downloadRequired {
-		log.Debug("FileCache::download : Need to download %s", options.Name)
+		log.Debug("FileCache::download : Need to download %s", handle.Path)
 
 		fileSize := int64(0)
 		if attr != nil {
@@ -739,17 +739,17 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 		}
 
 		if fileExists {
-			log.Debug("FileCache::download : Delete cached file %s", options.Name)
+			log.Debug("FileCache::download : Delete cached file %s", handle.Path)
 
 			err := deleteFile(localPath)
 			if err != nil && !os.IsNotExist(err) {
-				log.Err("FileCache::download : Failed to delete old file %s", options.Name)
+				log.Err("FileCache::download : Failed to delete old file %s", handle.Path)
 			}
 		} else {
 			// Create the file if if doesn't already exist.
 			err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
 			if err != nil {
-				log.Err("FileCache::download : error creating directory structure for file %s [%s]", options.Name, err.Error())
+				log.Err("FileCache::download : error creating directory structure for file %s [%s]", handle.Path, err.Error())
 				return nil, err
 			}
 		}
@@ -757,7 +757,7 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 		// Open the file in write mode.
 		f, err = common.OpenFile(localPath, os.O_CREATE|os.O_RDWR, fMode)
 		if err != nil {
-			log.Err("FileCache::download : error creating new file %s [%s]", options.Name, err.Error())
+			log.Err("FileCache::download : error creating new file %s [%s]", handle.Path, err.Error())
 			return nil, err
 		}
 
@@ -772,7 +772,7 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 					log.Err("FileCache::download : error getting current usage of cache [%s]", err.Error())
 				} else {
 					if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
-						log.Err("FileCache::download : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, options.Name)
+						log.Err("FileCache::download : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, handle.Path)
 						return nil, syscall.ENOSPC
 					}
 				}
@@ -782,14 +782,14 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 			// We pass a count of 0 to get the entire object
 			err = fc.NextComponent().CopyToFile(
 				internal.CopyToFileOptions{
-					Name:   options.Name,
+					Name:   handle.Path,
 					Offset: 0,
 					Count:  0,
 					File:   f,
 				})
 			if err != nil {
 				// File was created locally and now download has failed so we need to delete it back from local cache
-				log.Err("FileCache::download : error downloading file from storage %s [%s]", options.Name, err.Error())
+				log.Err("FileCache::download : error downloading file from storage %s [%s]", handle.Path, err.Error())
 				_ = f.Close()
 				_ = os.Remove(localPath)
 				return nil, err
@@ -799,7 +799,7 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 		// Update the last download time of this file
 		flock.SetDownloadTime()
 
-		log.Debug("FileCache::download : Download of %s is complete", options.Name)
+		log.Debug("FileCache::download : Download of %s is complete", handle.Path)
 		f.Close()
 
 		// After downloading the file, update the modified times and mode of the file.
@@ -811,7 +811,7 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 	// If user has selected some non default mode in config then every local file shall be created with that mode only
 	err = os.Chmod(localPath, fileMode)
 	if err != nil {
-		log.Err("FileCache::DownloadFile : Failed to change mode of file %s [%s]", options.Name, err.Error())
+		log.Err("FileCache::DownloadFile : Failed to change mode of file %s [%s]", handle.Path, err.Error())
 	}
 	// TODO: When chown is supported should we update that?
 
@@ -819,7 +819,7 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 		// chtimes shall be the last api otherwise calling chmod/chown will update the last change time
 		err = os.Chtimes(localPath, attr.Atime, attr.Mtime)
 		if err != nil {
-			log.Err("FileCache::DownloadFile : Failed to change times of file %s [%s]", options.Name, err.Error())
+			log.Err("FileCache::DownloadFile : Failed to change times of file %s [%s]", handle.Path, err.Error())
 		}
 	}
 
@@ -828,7 +828,7 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 	// Open the file and grab a shared lock to prevent deletion by the cache policy.
 	f, err = common.OpenFile(localPath, flags, fMode)
 	if err != nil {
-		log.Err("FileCache::DownloadFile : error opening cached file %s [%s]", options.Name, err.Error())
+		log.Err("FileCache::DownloadFile : error opening cached file %s [%s]", handle.Path, err.Error())
 		return nil, err
 	}
 
@@ -837,22 +837,22 @@ func (fc *FileCache) DownloadFile(options internal.DownloadFileOptions) (*handle
 
 	inf, err := f.Stat()
 	if err == nil {
-		options.Handle.Size = inf.Size()
+		handle.Size = inf.Size()
 	}
 
-	options.Handle.UnixFD = uint64(f.Fd())
+	handle.UnixFD = uint64(f.Fd())
 	if !fc.offloadIO {
-		options.Handle.Flags.Set(handlemap.HandleFlagCached)
+		handle.Flags.Set(handlemap.HandleFlagCached)
 	}
 
-	log.Info("FileCache::DownloadFile : file=%s, fd=%d", options.Name, f.Fd())
-	options.Handle.SetFileObject(f)
+	log.Info("FileCache::DownloadFile : file=%s, fd=%d", handle.Path, f.Fd())
+	handle.SetFileObject(f)
 
 	//set boolean in isDownloadNeeded value to signal that the file has been downloaded
 	noDownloadNeeded := struct{ downloadNeeded bool }{downloadNeeded: false}
-	options.Handle.SetValue("isDownloadNeeded", noDownloadNeeded)
+	handle.SetValue("isDownloadNeeded", noDownloadNeeded)
 
-	return options.Handle, nil
+	return handle, nil
 }
 
 // OpenFile: Makes the file available in the local cache for further file operations.
@@ -963,7 +963,7 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 
 	options.Handle.Lock()
 	var err error
-	options.Handle, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Handle.Path, Handle: options.Handle})
+	options.Handle, err = fc.DownloadFile(options.Handle)
 	if err != nil {
 		return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
 	}
@@ -1001,7 +1001,7 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	options.Handle.Lock()
 	var err error
-	options.Handle, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Handle.Path, Handle: options.Handle})
+	options.Handle, err = fc.DownloadFile(options.Handle)
 	if err != nil {
 		return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
 	}
@@ -1331,7 +1331,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			log.Err("FileCache::TruncateFile : Error calling OpenFile with %s [%s]", options.Name, err.Error())
 		}
 
-		h, err = fc.DownloadFile(internal.DownloadFileOptions{Name: options.Name, Handle: h})
+		h, err = fc.DownloadFile(h)
 		if err != nil {
 			log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
 			return err

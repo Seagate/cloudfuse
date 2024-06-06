@@ -77,11 +77,6 @@ type DeleteFileOptions struct {
 	Name string
 }
 
-type DownloadFileOptions struct {
-	Name   string
-	Handle *handlemap.Handle
-}
-
 type OpenFileOptions struct {
 	Name  string
 	Flags int
