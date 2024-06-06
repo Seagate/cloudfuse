@@ -849,8 +849,7 @@ func (fc *FileCache) DownloadFile(handle *handlemap.Handle) (*handlemap.Handle, 
 	handle.SetFileObject(f)
 
 	//set boolean in isDownloadNeeded value to signal that the file has been downloaded
-	noDownloadNeeded := struct{ downloadNeeded bool }{downloadNeeded: false}
-	handle.SetValue("isDownloadNeeded", noDownloadNeeded)
+	handle.RemoveValue("fileFlagMode")
 
 	return handle, nil
 }
