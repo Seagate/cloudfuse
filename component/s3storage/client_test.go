@@ -223,7 +223,7 @@ func (s *clientTestSuite) TestDefaultBucketName() {
 		storageTestConfigurationParameters.UsePathStyle)
 	err := s.setupTestHelper(config, false)
 	s.assert.NoError(err)
-	buckets, err := s.client.ListBuckets()
+	buckets, _ := s.client.ListBuckets()
 	s.assert.Equal(buckets[0], s.client.Config.authConfig.BucketName)
 }
 

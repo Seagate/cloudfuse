@@ -36,10 +36,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-var (
-	errConfigFieldEmpty   = errors.New("config field empty")
-	errInvalidConfigField = errors.New("config field is invalid")
-)
+var errInvalidConfigField = errors.New("config field is invalid")
 
 type Options struct {
 	BucketName                string                  `config:"bucket-name" yaml:"bucket-name,omitempty"`
