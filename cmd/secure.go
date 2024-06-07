@@ -26,6 +26,7 @@
 package cmd
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -119,6 +120,11 @@ func validateOptions() error {
 		secOpts.PassPhrase = os.Getenv(SecureConfigEnvName)
 	}
 
+	_, err := base64.StdEncoding.DecodeString(secOpts.PassPhrase)
+	if err != nil {
+		return fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
+	}
+
 	if secOpts.ConfigFile == "" {
 		return errors.New("config file not provided, check usage")
 	}
@@ -141,7 +147,7 @@ func encryptConfigFile(saveConfig bool) ([]byte, error) {
 		return nil, err
 	}
 
-	cipherText, err := common.EncryptData(plaintext, []byte(secOpts.PassPhrase))
+	cipherText, err := common.EncryptData(plaintext, secOpts.PassPhrase)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +173,7 @@ func decryptConfigFile(saveConfig bool) ([]byte, error) {
 		return nil, err
 	}
 
-	plainText, err := common.DecryptData(cipherText, []byte(secOpts.PassPhrase))
+	plainText, err := common.DecryptData(cipherText, secOpts.PassPhrase)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +232,7 @@ func init() {
 		"Configuration file to be encrypted / decrypted")
 
 	secureCmd.PersistentFlags().StringVar(&secOpts.PassPhrase, "passphrase", "",
-		"Key to be used for encryption / decryption. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\nKey length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+		"Base64 encoded key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\n Decoded key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 
 	secureCmd.PersistentFlags().StringVar(&secOpts.OutputFile, "output-file", "",
 		"Path and name for the output file")

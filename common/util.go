@@ -29,6 +29,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -172,8 +173,13 @@ func NormalizeObjectName(name string) string {
 }
 
 // Encrypt given data using the key provided
-func EncryptData(plainData []byte, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
+func EncryptData(plainData []byte, key string) ([]byte, error) {
+	binaryKey, err := base64.StdEncoding.DecodeString(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
+	}
+
+	block, err := aes.NewCipher(binaryKey)
 	if err != nil {
 		return nil, err
 	}
@@ -193,8 +199,13 @@ func EncryptData(plainData []byte, key []byte) ([]byte, error) {
 }
 
 // Decrypt given data using the key provided
-func DecryptData(cipherData []byte, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
+func DecryptData(cipherData []byte, key string) ([]byte, error) {
+	binaryKey, err := base64.StdEncoding.DecodeString(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
+	}
+
+	block, err := aes.NewCipher(binaryKey)
 	if err != nil {
 		return nil, err
 	}
