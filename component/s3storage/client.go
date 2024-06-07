@@ -119,7 +119,8 @@ func (cl *Client) Configure(cfg Config) error {
 		})
 	}
 
-	// List objects to test connection
+	// Use list objects to test connection. List objects will correctly validate the region
+	// where list buckets does not do that.
 	_, _, err = cl.List("/", nil, 1)
 	if err != nil {
 		log.Err("Client::Configure : listing objects failed. Here's why: %v", err)
