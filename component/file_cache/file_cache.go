@@ -843,7 +843,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 	handle.SetFileObject(f)
 
 	//set boolean in isDownloadNeeded value to signal that the file has been downloaded
-	handle.RemoveValue("fileFlagMode")
+	handle.RemoveValue("openFileOptions")
 
 	return nil
 }
@@ -861,7 +861,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 
 	fileCacheStatsCollector.UpdateStats(stats_manager.Increment, dlFiles, (int64)(1))
 	handle := handlemap.NewHandle(options.Name)
-	handle.SetValue("fileFlagMode", openFileOptions{flags: options.Flags, fMode: options.Mode})
+	handle.SetValue("openFileOptions", openFileOptions{flags: options.Flags, fMode: options.Mode})
 
 	return handle, nil
 }
