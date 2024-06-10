@@ -292,3 +292,8 @@ func (suite *utilTestSuite) TestGetDiskUsage() {
 	suite.assert.NotEqual(100, usagePercent)
 	_ = os.RemoveAll(filepath.Join(pwd, "util_test"))
 }
+
+func (suite *utilTestSuite) TestGetFuseMinorVersion() {
+	i := GetFuseMinorVersion()
+	suite.assert.GreaterOrEqual(i, 0)
+}

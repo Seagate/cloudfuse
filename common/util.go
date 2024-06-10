@@ -309,3 +309,36 @@ func IsDriveLetter(path string) bool {
 	match, _ := regexp.MatchString(pattern, path)
 	return match
 }
+
+func GetFuseMinorVersion() int {
+	var out bytes.Buffer
+	cmd := exec.Command("fusermount3", "--version")
+	cmd.Stdout = &out
+
+	err := cmd.Run()
+	if err != nil {
+		return 0
+	}
+
+	output := strings.Split(out.String(), ":")
+	if len(output) < 2 {
+		return 0
+	}
+
+	version := strings.Trim(output[1], " ")
+	if version == "" {
+		return 0
+	}
+
+	output = strings.Split(version, ".")
+	if len(output) < 2 {
+		return 0
+	}
+
+	val, err := strconv.Atoi(output[1])
+	if err != nil {
+		return 0
+	}
+
+	return val
+}

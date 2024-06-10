@@ -68,7 +68,6 @@ This version is based on [blobfuse2 2.2.0](https://github.com/Azure/azure-storag
 - improved performance of directory listing
 - merged upstream version 2.2.0
 
-
 ## **1.0.1** ##
 
 January 19th 2024
