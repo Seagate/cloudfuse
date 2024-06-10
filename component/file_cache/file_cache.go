@@ -878,6 +878,12 @@ func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
 		return err
 	}
 
+	// if file has not been interactively read or written to by end user, then there is no cached file to close.
+	_, found := options.Handle.GetValue("openFileOptions")
+	if found {
+		return nil
+	}
+
 	f := options.Handle.GetFileObject()
 	if f == nil {
 		log.Err("FileCache::CloseFile : error [missing fd in handle object] %s", options.Handle.Path)
