@@ -35,7 +35,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"testing"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -771,7 +770,7 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
 	// Download is required
-	_, err = suite.fileCache.downloadFile(handle)
+	err = suite.fileCache.downloadFile(handle)
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(path, handle.Path)
 	suite.assert.False(handle.Dirty())
@@ -1224,7 +1223,7 @@ func (suite *fileCacheTestSuite) TestRenameFileInCache() {
 	suite.assert.NoError(err)
 	openHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
 	suite.assert.NoError(err)
-	_, err = suite.fileCache.downloadFile(openHandle)
+	err = suite.fileCache.downloadFile(openHandle)
 	suite.assert.NoError(err)
 
 	// Path should be in the file cache
@@ -1330,7 +1329,7 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanupWithNoTimeout() {
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
-	_, err := suite.fileCache.downloadFile(openHandle)
+	err := suite.fileCache.downloadFile(openHandle)
 	suite.assert.NoError(err)
 
 	// Path should be in the file cache
@@ -1601,23 +1600,23 @@ func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	smallHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: pathsmall, Flags: os.O_RDONLY, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
 	// try opening small file
-	f, err := suite.fileCache.downloadFile(smallHandle)
+	err = suite.fileCache.downloadFile(smallHandle)
 	suite.assert.NoError(err)
-	suite.assert.False(f.Dirty())
-	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
+	suite.assert.False(smallHandle.Dirty())
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: smallHandle})
 	suite.assert.NoError(err)
 
 	bigHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: pathbig, Flags: os.O_RDONLY, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
 	// try opening bigger file which shall fail due to hardlimit
-	f, err = suite.fileCache.downloadFile(bigHandle)
+	err = suite.fileCache.downloadFile(bigHandle)
 	suite.assert.Error(err)
-	suite.assert.Nil(f)
+	suite.assert.Nil(bigHandle)
 	suite.assert.Equal(syscall.ENOSPC, err)
 
 	// try writing a small file
 	options1 := internal.CreateFileOptions{Name: pathsmall + "_new", Mode: 0777}
-	f, err = suite.fileCache.CreateFile(options1)
+	f, err := suite.fileCache.CreateFile(options1)
 	suite.assert.NoError(err)
 	data = make([]byte, 1*MB)
 	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: f, Offset: 0, Data: data})
@@ -1678,6 +1677,3 @@ func (suite *fileCacheTestSuite) TestHandleDataChange() {
 
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
-func TestFileCacheTestSuite(t *testing.T) {
-	suite.Run(t, new(fileCacheTestSuite))
-}
