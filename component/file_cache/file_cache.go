@@ -859,7 +859,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		return nil, err
 	}
 
-	fileCacheStatsCollector.UpdateStats(stats_manager.Increment, dlFiles, (int64)(1))
+	// create handle and set value
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetValue("openFileOptions", openFileOptions{flags: options.Flags, fMode: options.Mode})
 
