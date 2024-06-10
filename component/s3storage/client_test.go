@@ -367,6 +367,10 @@ func (s *clientTestSuite) TestGetRegionEndpoint() {
 	region, err = getRegionFromEndpoint("http://s3.us-east-2.amazonaws.com")
 	s.assert.NoError(err)
 	s.assert.Equal("us-east-2", region)
+
+	region, err = getRegionFromEndpoint("")
+	s.assert.Error(err)
+	s.assert.Equal("", region)
 }
 
 func (s *clientTestSuite) TestListBuckets() {

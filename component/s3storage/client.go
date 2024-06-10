@@ -167,6 +167,9 @@ func getRegionFromEndpoint(endpoint string) (string, error) {
 	hostParts := strings.Split(u.Hostname(), ".")
 	// Region should be the after the first period
 	// Ex: https://s3.us-east-1.lyvecloud.seagate.com
+	if len(hostParts) < 2 {
+		return "", fmt.Errorf("Unable to parse Endpoint region")
+	}
 	region := hostParts[1]
 	return region, nil
 }
