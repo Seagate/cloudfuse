@@ -730,7 +730,6 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) (*handlemap.Handle, 
 		log.Err("FileCache::DownloadFile : Failed to check if download is required for %s [%s]", handle.Path, err.Error())
 	}
 
-	// redundantly check if file is needs downloading
 	fileMode := fc.defaultPermission
 	if downloadRequired {
 		log.Debug("FileCache::download : Need to download %s", handle.Path)
@@ -872,7 +871,6 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	handle.SetValue("fileFlagMode", openFileOptions{flags: options.Flags, fMode: options.Mode})
 
 	return handle, nil
-
 }
 
 // CloseFile: Flush the file and invalidate it from the cache.
@@ -926,7 +924,6 @@ func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
 // ReadFile: Read the local file
 func (fc *FileCache) ReadFile(options internal.ReadFileOptions) ([]byte, error) {
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
-
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
 	fc.policy.CacheValid(localPath)
 
@@ -1033,7 +1030,6 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	// Removing Pwrite as it is not supported on Windows
 	// bytesWritten, err := syscall.Pwrite(options.Handle.FD(), options.Data, options.Offset)
-
 	bytesWritten, err := f.WriteAt(options.Data, options.Offset)
 
 	if err == nil {
@@ -1310,9 +1306,8 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 		}
 	}
 
-	var err error = nil
-
 	var h *handlemap.Handle
+	var err error
 	if options.Size == 0 {
 		// If size is 0 then no need to download any file we can just create an empty file
 		h, err = fc.CreateFile(internal.CreateFileOptions{Name: options.Name, Mode: fc.defaultPermission})
@@ -1323,7 +1318,6 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	} else {
 		// If size is not 0 then we need to open the file and then truncate it
 		// Open will force download if file was not present in local system
-
 		h, err = fc.OpenFile(internal.OpenFileOptions{Name: options.Name, Flags: os.O_RDWR, Mode: fc.defaultPermission})
 		if err != nil {
 			log.Err("FileCache::TruncateFile : Error calling OpenFile with %s [%s]", options.Name, err.Error())
@@ -1334,7 +1328,6 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			log.Err("FileCache::TruncateFile : Error opening file %s [%s]", options.Name, err.Error())
 			return err
 		}
-
 	}
 
 	// Update the size of the file in the local cache
