@@ -41,7 +41,7 @@ cloudfuse mount [path] [flags]
       --high-disk-threshold uint32        percentage of cache utilization which kicks in early eviction (default 90)
       --ignore-open-flags                 Ignore unsupported open flags (APPEND, WRONLY) by cloudfuse when writeback caching is enabled. (default true)
       --ignore-sync                       Just ignore sync call and do not invalidate locally cached file.
-      --log-file-path string              Configures the path for log files. Default is /$HOME/.cloudfuse/cloudfuse.log (default "$HOME/.cloudfuse/cloudfuse.log")
+      --log-file-path string              Configures the path for log files. Default is $HOME/.cloudfuse/cloudfuse.log (default "$HOME/.cloudfuse/cloudfuse.log")
       --log-level string                  Enables logs written to syslog. Set to LOG_WARNING by default. Allowed values are LOG_OFF|LOG_CRIT|LOG_ERR|LOG_WARNING|LOG_INFO|LOG_DEBUG (default "LOG_WARNING")
       --log-type string                   Type of logger to be used by the system. Set to syslog by default. Allowed values are silent|syslog|base. (default "syslog")
       --low-disk-threshold uint32         percentage of cache utilization which stops early eviction started by high-disk-threshold (default 80)

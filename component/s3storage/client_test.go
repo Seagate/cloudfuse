@@ -334,6 +334,12 @@ func (s *clientTestSuite) TestSetEndpointFromRegion() {
 }
 
 func (s *clientTestSuite) TestSetRegionFromEndpoint() {
+	// This test needs to be skipped for LocalStack as endpoint does not have a region
+	if storageTestConfigurationParameters.BucketName == "test" {
+		fmt.Println("Skipping TestSetRegionFromEndpoint using LocalStack.")
+		return
+	}
+
 	defer s.cleanupTest()
 	// setup
 	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s",

@@ -138,7 +138,7 @@ func (cl *Client) Configure(cfg Config) error {
 	// ListBuckets here to test connection
 	bucketList, err := cl.ListBuckets()
 	if err != nil {
-		log.Err("Client::Configure : listing objects failed. Here's why: %v", err)
+		log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
 		return err
 	}
 
