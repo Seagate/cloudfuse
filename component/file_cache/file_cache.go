@@ -697,25 +697,18 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 }
 
 func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
+	log.Trace("FileCache::downloadFile : name=%s", handle.Path)
 
 	//extract flags and mode out of the value from handle
 	var flags int
 	var fMode fs.FileMode
-
-	flagMode, found := handle.GetValue("fileFlagMode")
-	if found {
-		fileOptions, ok := flagMode.(openFileOptions)
-		if !ok {
-			log.Err("FileCache::downloadFile : error Type assertion failed on getting flag for %s", handle.Path)
-			return fmt.Errorf("type assertion failed on getting flag for %s", handle.Path)
-		}
-		flags = fileOptions.flags
-		fMode = fileOptions.fMode
-	} else {
+	val, found := handle.GetValue("openFileOptions")
+	if !found {
 		return nil
 	}
-
-	log.Trace("FileCache::downloadFile : name=%s, flags=%d, mode=%s", handle.Path, flags, fMode)
+	fileOptions := val.(openFileOptions)
+	flags = fileOptions.flags
+	fMode = fileOptions.fMode
 
 	localPath := common.JoinUnixFilepath(fc.tmpPath, handle.Path)
 	var f *os.File
