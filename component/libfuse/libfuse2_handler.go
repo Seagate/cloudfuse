@@ -312,7 +312,7 @@ func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 		stat.Namemax = attr.Namemax
 	} else {
 		var free, total, avail uint64
-		total = common.PbToBytes
+		total = common.TbToBytes
 		avail = total
 		free = total
 

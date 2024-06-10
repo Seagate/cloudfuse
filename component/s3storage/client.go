@@ -135,13 +135,27 @@ func (cl *Client) Configure(cfg Config) error {
 		})
 	}
 
-	// Use list objects to test connection. List objects will correctly validate the region
-	// where list buckets does not do that.
+	// ListBuckets here to test connection
+	bucketList, err := cl.ListBuckets()
+	if err != nil {
+		log.Err("Client::Configure : listing objects failed. Here's why: %v", err)
+		return err
+	}
+
+	// if no bucket-name was set, default to the first bucket in the list
+	if cl.Config.authConfig.BucketName == "" && len(bucketList) > 0 {
+		cl.Config.authConfig.BucketName = bucketList[0]
+		log.Warn("Client::Configure : Bucket defaulted to first listed bucket: %s", bucketList[0])
+	}
+
+	// Use list objects validate the region and bucket access
 	_, _, err = cl.List("/", nil, 1)
 	if err != nil {
 		log.Err("Client::Configure : listing objects failed. Here's why: %v", err)
+		return err
 	}
-	return err
+
+	return nil
 }
 
 func getRegionFromEndpoint(endpoint string) (string, error) {

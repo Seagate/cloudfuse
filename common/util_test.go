@@ -27,6 +27,7 @@ package common
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -84,7 +85,7 @@ func (suite *typesTestSuite) TestEncryptBadKey() {
 	data := make([]byte, 1024)
 	rand.Read(data)
 
-	_, err := EncryptData(data, key)
+	_, err := EncryptData(data, string(key))
 	suite.assert.Error(err)
 }
 
@@ -96,14 +97,49 @@ func (suite *typesTestSuite) TestDecryptBadKey() {
 	data := make([]byte, 1024)
 	rand.Read(data)
 
-	_, err := DecryptData(data, key)
+	_, err := DecryptData(data, string(key))
 	suite.assert.Error(err)
 }
 
-func (suite *typesTestSuite) TestEncryptDecrypt() {
+func (suite *typesTestSuite) TestEncryptDecrypt16() {
 	// Generate a random key
-	key := make([]byte, 16)
-	rand.Read(key)
+	binaryKey := make([]byte, 16)
+	rand.Read(binaryKey)
+	key := base64.StdEncoding.EncodeToString(binaryKey)
+
+	data := make([]byte, 1024)
+	rand.Read(data)
+
+	cipher, err := EncryptData(data, key)
+	suite.assert.NoError(err)
+
+	d, err := DecryptData(cipher, key)
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(data, d)
+}
+
+func (suite *typesTestSuite) TestEncryptDecrypt24() {
+	// Generate a random key
+	binaryKey := make([]byte, 24)
+	rand.Read(binaryKey)
+	key := base64.StdEncoding.EncodeToString(binaryKey)
+
+	data := make([]byte, 1024)
+	rand.Read(data)
+
+	cipher, err := EncryptData(data, key)
+	suite.assert.NoError(err)
+
+	d, err := DecryptData(cipher, key)
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(data, d)
+}
+
+func (suite *typesTestSuite) TestEncryptDecrypt32() {
+	// Generate a random key
+	binaryKey := make([]byte, 32)
+	rand.Read(binaryKey)
+	key := base64.StdEncoding.EncodeToString(binaryKey)
 
 	data := make([]byte, 1024)
 	rand.Read(data)
