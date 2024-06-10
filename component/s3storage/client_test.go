@@ -269,8 +269,8 @@ func (s *clientTestSuite) TestCredentialPrecedenceEnvOverConfig() {
 	// setup
 	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
-	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  endpoint: %s\n  key-id: %s\n  secret-key: %s",
+		storageTestConfigurationParameters.BucketName, s.client.Config.authConfig.Endpoint, storageTestConfigurationParameters.KeyID,
 		"WRONGSECRETKEY")
 	// Wrong credentials should take precedence, so S3 connection should fail
 	err := s.setupTestHelper(config, false)
@@ -285,8 +285,8 @@ func (s *clientTestSuite) TestCredentialPrecedenceEnvOverProfile() {
 	// setup
 	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
-	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  profile: %s",
-		storageTestConfigurationParameters.BucketName, "NoProfile")
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  endpoint: %s\n  profile: %s",
+		storageTestConfigurationParameters.BucketName, s.client.Config.authConfig.Endpoint, "NoProfile")
 	// Invalid profile, but environment variables should take precedence
 	err := s.setupTestHelper(config, false)
 	s.assert.NoError(err)
@@ -298,9 +298,10 @@ func (s *clientTestSuite) TestCredentialPrecedenceEnvOverProfile() {
 func (s *clientTestSuite) TestCredentialPrecedenceConfigOverProfile() {
 	defer s.cleanupTest()
 	// setup
-	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  profile: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
-		storageTestConfigurationParameters.SecretKey, "NoProfile")
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  endpoint: %s\n  key-id: %s\n  secret-key: %s\n  profile: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.Endpoint,
+		storageTestConfigurationParameters.KeyID, storageTestConfigurationParameters.SecretKey,
+		"NoProfile")
 	// Invalid profile, but config should take precedence
 	err := s.setupTestHelper(config, false)
 	s.assert.NoError(err)
@@ -310,9 +311,10 @@ func (s *clientTestSuite) TestCredentialPrecedenceRegion() {
 	defer s.cleanupTest()
 	// setup
 	os.Setenv("AWS_REGION", storageTestConfigurationParameters.Region)
-	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  region: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
-		storageTestConfigurationParameters.SecretKey, "us-west-1")
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  endpoint: %s\n  key-id: %s\n  secret-key: %s\n  region: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.Endpoint,
+		storageTestConfigurationParameters.KeyID, storageTestConfigurationParameters.SecretKey,
+		"us-west-1")
 	// Wrong region should take precedence, so S3 connection should fail
 	err := s.setupTestHelper(config, false)
 	s.assert.Error(err)
