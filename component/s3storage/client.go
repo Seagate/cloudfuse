@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/url"
 	"os"
 	"strings"
 	"syscall"
@@ -51,7 +52,8 @@ import (
 )
 
 const (
-	symlinkKey = "is_symlink"
+	symlinkKey    = "is_symlink"
+	defaultRegion = "us-east-1"
 )
 
 type Client struct {
@@ -78,15 +80,21 @@ func (cl *Client) Configure(cfg Config) error {
 		)
 	}
 
+	var err error
 	if cl.Config.authConfig.Region == "" {
-		_, exists := os.LookupEnv("AWS_REGION")
+		region, exists := os.LookupEnv("AWS_REGION")
 		if !exists {
-			cl.Config.authConfig.Region = "us-east-1"
+			cl.Config.authConfig.Region, err = getRegionFromEndpoint(cl.Config.authConfig.Endpoint)
+			if err != nil {
+				cl.Config.authConfig.Region = defaultRegion
+			}
+		} else {
+			cl.Config.authConfig.Region = region
 		}
 	}
 
 	if cl.Config.authConfig.Endpoint == "" {
-		cl.Config.authConfig.Endpoint = "https://s3.us-east-1.lyvecloud.seagate.com"
+		cl.Config.authConfig.Endpoint = fmt.Sprintf("https://s3.%s.lyvecloud.seagate.com", cl.Config.authConfig.Region)
 	}
 
 	defaultConfig, err := config.LoadDefaultConfig(
@@ -134,6 +142,19 @@ func (cl *Client) Configure(cfg Config) error {
 		log.Err("Client::Configure : listing objects failed. Here's why: %v", err)
 	}
 	return err
+}
+
+func getRegionFromEndpoint(endpoint string) (string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", err
+	}
+
+	hostParts := strings.Split(u.Hostname(), ".")
+	// Region should be the after the first period
+	// Ex: https://s3.us-east-1.lyvecloud.seagate.com
+	region := hostParts[1]
+	return region, nil
 }
 
 // For dynamic configuration, update the config here.

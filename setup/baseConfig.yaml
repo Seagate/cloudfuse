@@ -181,7 +181,7 @@ s3storage:
   # Optional
   key-id: <S3 access key ID. Default - use credentials from environment variables or shared profile (see README)>
   secret-key: <S3 secret access key. Default - use credentials from environment variables or shared profile (see README)>
-  region: <S3 region. Default - us-east-1>
+  region: <S3 region. If endpoint is provided, will read region from endpoint. Default - us-east-1>
   profile: <AWS shared configuration profile name. Credentials above take precedence over shared profile.>
   endpoint: <S3 endpoint URL. Default - https://s3.[region].lyvecloud.seagate.com>
   subdirectory: <name of subdirectory to be mounted instead of whole bucket>
