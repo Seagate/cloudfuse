@@ -280,6 +280,32 @@ func (s *clientTestSuite) TestCredentialPrecedence() {
 	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
 }
 
+func (s *clientTestSuite) TestCredentialPrecedenceEnvProfile() {
+	defer s.cleanupTest()
+	// setup
+	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
+	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  profile: %s",
+		storageTestConfigurationParameters.BucketName, "NoProfile")
+	// Invalid profile, but environment variables should take precedence
+	err := s.setupTestHelper(config, false)
+	s.assert.NoError(err)
+
+	os.Unsetenv("AWS_ACCESS_KEY_ID")
+	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+}
+
+func (s *clientTestSuite) TestCredentialPrecedenceConfigProfile() {
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  profile: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
+		storageTestConfigurationParameters.SecretKey, "NoProfile")
+	// Invalid profile, but config should take precedence
+	err := s.setupTestHelper(config, false)
+	s.assert.NoError(err)
+}
+
 func (s *clientTestSuite) TestCredentialPrecedenceRegion() {
 	defer s.cleanupTest()
 	// setup

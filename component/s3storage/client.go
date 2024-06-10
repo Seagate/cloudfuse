@@ -89,22 +89,30 @@ func (cl *Client) Configure(cfg Config) error {
 		cl.Config.authConfig.Endpoint = "https://s3.us-east-1.lyvecloud.seagate.com"
 	}
 
-	// Set aws profile so LoadDefaultConfig follows precedence order.
-	// It will use credentials provider is provided, then environment variables
-	// and finally the aws_profile.
-	// See https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/#specifying-profiles
-	os.Setenv("AWS_PROFILE", cl.Config.authConfig.Profile)
-
 	defaultConfig, err := config.LoadDefaultConfig(
 		context.Background(),
+		config.WithSharedConfigProfile(cl.Config.authConfig.Profile),
 		config.WithCredentialsProvider(credentialsProvider),
 		config.WithAppID(UserAgent()),
 		config.WithRegion(cl.Config.authConfig.Region),
 	)
 
 	if err != nil {
-		log.Err("Client::Configure : config.LoadDefaultConfig() failed. Here's why: %v", err)
-		return err
+		var e config.SharedConfigProfileNotExistError
+		if errors.As(err, &e) {
+			// If a config profile is provided the sdk checks that it exists, otherwise it fails and
+			// does not try other credentials. So try the other ones here if the profile does not exist
+			defaultConfig, err = config.LoadDefaultConfig(
+				context.Background(),
+				config.WithCredentialsProvider(credentialsProvider),
+				config.WithAppID(UserAgent()),
+				config.WithRegion(cl.Config.authConfig.Region),
+			)
+		}
+		if err != nil {
+			log.Err("Client::Configure : config.LoadDefaultConfig() failed. Here's why: %v", err)
+			return err
+		}
 	}
 
 	// Create an Amazon S3 service client
