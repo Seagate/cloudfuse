@@ -159,18 +159,32 @@ func (cl *Client) Configure(cfg Config) error {
 }
 
 func getRegionFromEndpoint(endpoint string) (string, error) {
+	if endpoint == "" {
+		return "", fmt.Errorf("Endpoint is empty")
+	}
+
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return "", err
 	}
 
 	hostParts := strings.Split(u.Hostname(), ".")
-	// Region should be the after the first period
-	// Ex: https://s3.us-east-1.lyvecloud.seagate.com
 	if len(hostParts) < 2 {
-		return "", fmt.Errorf("Unable to parse Endpoint region")
+		return "", fmt.Errorf("Invalid Enpoint")
 	}
-	region := hostParts[1]
+
+	// the second host part is usually the region
+	regionPartIndex := 1
+	// but skip "dualstack"
+	if hostParts[1] == "dualstack" {
+		regionPartIndex = 2
+	}
+	// reserve two hostparts after the region for the domain
+	if len(hostParts)-regionPartIndex < 3 {
+		return "", fmt.Errorf("Endpoint does not include a region")
+	}
+
+	region := hostParts[regionPartIndex]
 	return region, nil
 }
 

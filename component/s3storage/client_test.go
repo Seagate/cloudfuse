@@ -381,6 +381,18 @@ func (s *clientTestSuite) TestGetRegionEndpoint() {
 	s.assert.NoError(err)
 	s.assert.Equal("us-east-2", region)
 
+	region, err = getRegionFromEndpoint("https://s3.dualstack.us-east-2.amazonaws.com")
+	s.assert.NoError(err)
+	s.assert.Equal("us-east-2", region)
+
+	region, err = getRegionFromEndpoint("https://s3-fips.us-east-2.amazonaws.com")
+	s.assert.NoError(err)
+	s.assert.Equal("us-east-2", region)
+
+	region, err = getRegionFromEndpoint("https://s3.us-west-1.wasabisys.com")
+	s.assert.NoError(err)
+	s.assert.Equal("us-west-1", region)
+
 	region, err = getRegionFromEndpoint("")
 	s.assert.Error(err)
 	s.assert.Equal("", region)
