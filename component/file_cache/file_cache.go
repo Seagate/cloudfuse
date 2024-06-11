@@ -1316,7 +1316,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 		}
 	} else {
 		// If size is not 0 then we need to open the file and then truncate it
-		// downloadFile will provide download if file was not present in local system
+		// downloadFile will download if file was not present in local system
 		h, err = fc.OpenFile(internal.OpenFileOptions{Name: options.Name, Flags: os.O_RDWR, Mode: fc.defaultPermission})
 		if err != nil {
 			log.Err("FileCache::TruncateFile : Error calling OpenFile with %s [%s]", options.Name, err.Error())
