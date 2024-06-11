@@ -170,7 +170,7 @@ func getRegionFromEndpoint(endpoint string) (string, error) {
 
 	hostParts := strings.Split(u.Hostname(), ".")
 	if len(hostParts) < 2 {
-		return "", fmt.Errorf("Invalid Enpoint")
+		return "", fmt.Errorf("Invalid Endpoint")
 	}
 
 	// the second host part is usually the region
