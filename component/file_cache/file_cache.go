@@ -960,7 +960,7 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 
 	err := fc.downloadFile(options.Handle)
 	if err != nil {
-		return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
+		return 0, fmt.Errorf("error downloading file %s [%s]", options.Handle.Path, err)
 	}
 
 	f := options.Handle.GetFileObject()
