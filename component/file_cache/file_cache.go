@@ -699,6 +699,9 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 	log.Trace("FileCache::downloadFile : name=%s", handle.Path)
 
+	handle.Lock()
+	defer handle.Unlock()
+
 	//extract flags and mode out of the value from handle
 	var flags int
 	var fMode fs.FileMode
@@ -955,13 +958,11 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	// log.Debug("FileCache::ReadInBuffer : Reading %v bytes from %s", len(options.Data), options.Handle.Path)
 
-	options.Handle.Lock()
 	var err error
 	err = fc.downloadFile(options.Handle)
 	if err != nil {
 		return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
 	}
-	options.Handle.Unlock()
 
 	f := options.Handle.GetFileObject()
 	if f == nil {
@@ -993,13 +994,11 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
 
-	options.Handle.Lock()
 	var err error
 	err = fc.downloadFile(options.Handle)
 	if err != nil {
 		return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
 	}
-	options.Handle.Unlock()
 
 	f := options.Handle.GetFileObject()
 	if f == nil {
