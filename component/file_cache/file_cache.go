@@ -728,7 +728,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 
 	fileMode := fc.defaultPermission
 	if downloadRequired {
-		log.Debug("FileCache::download : Need to download %s", handle.Path)
+		log.Debug("FileCache::downloadFile : Need to download %s", handle.Path)
 
 		fileSize := int64(0)
 		if attr != nil {
@@ -736,17 +736,17 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 		}
 
 		if fileExists {
-			log.Debug("FileCache::download : Delete cached file %s", handle.Path)
+			log.Debug("FileCache::downloadFile : Delete cached file %s", handle.Path)
 
 			err := deleteFile(localPath)
 			if err != nil && !os.IsNotExist(err) {
-				log.Err("FileCache::download : Failed to delete old file %s", handle.Path)
+				log.Err("FileCache::downloadFile : Failed to delete old file %s", handle.Path)
 			}
 		} else {
 			// Create the file if if doesn't already exist.
 			err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
 			if err != nil {
-				log.Err("FileCache::download : error creating directory structure for file %s [%s]", handle.Path, err.Error())
+				log.Err("FileCache::downloadFile : error creating directory structure for file %s [%s]", handle.Path, err.Error())
 				return err
 			}
 		}
@@ -754,7 +754,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 		// Open the file in write mode.
 		f, err = common.OpenFile(localPath, os.O_CREATE|os.O_RDWR, fMode)
 		if err != nil {
-			log.Err("FileCache::download : error creating new file %s [%s]", handle.Path, err.Error())
+			log.Err("FileCache::downloadFile : error creating new file %s [%s]", handle.Path, err.Error())
 			return err
 		}
 
@@ -766,10 +766,10 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 			if fc.diskHighWaterMark != 0 {
 				currSize, err := common.GetUsage(fc.tmpPath)
 				if err != nil {
-					log.Err("FileCache::download : error getting current usage of cache [%s]", err.Error())
+					log.Err("FileCache::downloadFile : error getting current usage of cache [%s]", err.Error())
 				} else {
 					if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
-						log.Err("FileCache::download : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, handle.Path)
+						log.Err("FileCache::downloadFile : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, handle.Path)
 						return syscall.ENOSPC
 					}
 				}
@@ -786,7 +786,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 				})
 			if err != nil {
 				// File was created locally and now download has failed so we need to delete it back from local cache
-				log.Err("FileCache::download : error downloading file from storage %s [%s]", handle.Path, err.Error())
+				log.Err("FileCache::downloadFile : error downloading file from storage %s [%s]", handle.Path, err.Error())
 				_ = f.Close()
 				_ = os.Remove(localPath)
 				return err
@@ -796,7 +796,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 		// Update the last download time of this file
 		flock.SetDownloadTime()
 
-		log.Debug("FileCache::download : Download of %s is complete", handle.Path)
+		log.Debug("FileCache::downloadFile : Download of %s is complete", handle.Path)
 		f.Close()
 
 		// After downloading the file, update the modified times and mode of the file.
