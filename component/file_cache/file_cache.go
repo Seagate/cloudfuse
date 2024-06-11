@@ -873,18 +873,18 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
 	log.Trace("FileCache::CloseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
 
+	// if file has not been interactively read or written to by end user, then there is no cached file to close.
+	_, found := options.Handle.GetValue("openFileOptions")
+	if found {
+		return nil
+	}
+
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
 
 	err := fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle}) //nolint
 	if err != nil {
 		log.Err("FileCache::CloseFile : failed to flush file %s", options.Handle.Path)
 		return err
-	}
-
-	// if file has not been interactively read or written to by end user, then there is no cached file to close.
-	_, found := options.Handle.GetValue("openFileOptions")
-	if found {
-		return nil
 	}
 
 	f := options.Handle.GetFileObject()
