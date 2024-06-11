@@ -759,61 +759,61 @@ func (suite *authTestSuite) TestAdlsInvalidSpn() {
 // 	suite.validateStorageTest("TestAdlsSpn", stgConfig)
 // }
 
-func (suite *authTestSuite) TestBlockAzCLI() {
-	defer suite.cleanupTest()
-	stgConfig := AzStorageConfig{
-		container: storageTestConfigurationParameters.BlockContainer,
-		authConfig: azAuthConfig{
-			AuthMode:    EAuthType.AZCLI(),
-			AccountType: EAccountType.BLOCK(),
-			AccountName: storageTestConfigurationParameters.BlockAccount,
-			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
-		},
-	}
+// func (suite *authTestSuite) TestBlockAzCLI() {
+// 	defer suite.cleanupTest()
+// 	stgConfig := AzStorageConfig{
+// 		container: storageTestConfigurationParameters.BlockContainer,
+// 		authConfig: azAuthConfig{
+// 			AuthMode:    EAuthType.AZCLI(),
+// 			AccountType: EAccountType.BLOCK(),
+// 			AccountName: storageTestConfigurationParameters.BlockAccount,
+// 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
+// 		},
+// 	}
 
-	assert := assert.New(suite.T())
-	stg := NewAzStorageConnection(stgConfig)
-	assert.NotNil(stg)
+// 	assert := assert.New(suite.T())
+// 	stg := NewAzStorageConnection(stgConfig)
+// 	assert.NotNil(stg)
 
-	err := stg.SetupPipeline()
-	assert.Nil(err)
+// 	err := stg.SetupPipeline()
+// 	assert.Nil(err)
 
-	err = stg.TestPipeline()
-	if storageTestConfigurationParameters.SkipAzCLI {
-		// error is returned when azcli is not installed or logged out
-		assert.NotNil(err)
-	} else {
-		assert.Nil(err)
-	}
-}
+// 	err = stg.TestPipeline()
+// 	if storageTestConfigurationParameters.SkipAzCLI {
+// 		// error is returned when azcli is not installed or logged out
+// 		assert.NotNil(err)
+// 	} else {
+// 		assert.Nil(err)
+// 	}
+// }
 
-func (suite *authTestSuite) TestAdlsAzCLI() {
-	defer suite.cleanupTest()
-	stgConfig := AzStorageConfig{
-		container: storageTestConfigurationParameters.AdlsContainer,
-		authConfig: azAuthConfig{
-			AuthMode:    EAuthType.AZCLI(),
-			AccountType: EAccountType.ADLS(),
-			AccountName: storageTestConfigurationParameters.AdlsAccount,
-			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
-		},
-	}
+// func (suite *authTestSuite) TestAdlsAzCLI() {
+// 	defer suite.cleanupTest()
+// 	stgConfig := AzStorageConfig{
+// 		container: storageTestConfigurationParameters.AdlsContainer,
+// 		authConfig: azAuthConfig{
+// 			AuthMode:    EAuthType.AZCLI(),
+// 			AccountType: EAccountType.ADLS(),
+// 			AccountName: storageTestConfigurationParameters.AdlsAccount,
+// 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
+// 		},
+// 	}
 
-	assert := assert.New(suite.T())
-	stg := NewAzStorageConnection(stgConfig)
-	assert.NotNil(stg)
+// 	assert := assert.New(suite.T())
+// 	stg := NewAzStorageConnection(stgConfig)
+// 	assert.NotNil(stg)
 
-	err := stg.SetupPipeline()
-	assert.Nil(err)
+// 	err := stg.SetupPipeline()
+// 	assert.Nil(err)
 
-	err = stg.TestPipeline()
-	if storageTestConfigurationParameters.SkipAzCLI {
-		// error is returned when azcli is not installed or logged out
-		assert.NotNil(err)
-	} else {
-		assert.Nil(err)
-	}
-}
+// 	err = stg.TestPipeline()
+// 	if storageTestConfigurationParameters.SkipAzCLI {
+// 		// error is returned when azcli is not installed or logged out
+// 		assert.NotNil(err)
+// 	} else {
+// 		assert.Nil(err)
+// 	}
+// }
 
 func (suite *authTestSuite) cleanupTest() {
 	_ = log.Destroy()

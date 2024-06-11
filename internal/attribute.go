@@ -49,7 +49,7 @@ func CreateObjAttr(objectPath string, size int64, lastModified time.Time) (attr 
 	// set flags
 	attr.Flags.Set(PropFlagMetadataRetrieved)
 	attr.Flags.Set(PropFlagModeDefault)
-	attr.Metadata = make(map[string]string)
+	attr.Metadata = make(map[string]*string)
 
 	return attr
 }
