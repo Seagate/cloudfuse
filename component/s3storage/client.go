@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/url"
 	"os"
 	"strings"
 	"syscall"
@@ -51,7 +52,8 @@ import (
 )
 
 const (
-	symlinkKey = "is_symlink"
+	symlinkKey    = "is_symlink"
+	defaultRegion = "us-east-1"
 )
 
 type Client struct {
@@ -68,50 +70,6 @@ func (cl *Client) Configure(cfg Config) error {
 	log.Trace("Client::Configure : initialize awsS3Client")
 	cl.Config = cfg
 
-	// Set the endpoint supplied in the config file
-	endpointResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-		if service == s3.ServiceID {
-			// resolve region
-			if cl.Config.authConfig.Region == "" && region == "" {
-				region = "us-east-1"
-				// write region back to config struct
-				cl.Config.authConfig.Region = region
-			}
-			// resolve endpoint URL
-			if cl.Config.authConfig.Endpoint == "" {
-				var url string
-				switch region {
-				case "us-east-1":
-					url = "https://s3.us-east-1.lyvecloud.seagate.com"
-				case "us-west-1":
-					url = "https://s3.us-west-1.lyvecloud.seagate.com"
-				case "ap-southeast-1":
-					url = "https://s3.ap-southeast-1.lyvecloud.seagate.com"
-				case "us-central-1":
-					url = "https://s3.us-central-1.lyvecloud.seagate.com"
-				case "eu-west-1":
-					url = "https://s3.eu-west-1.lyvecloud.seagate.com"
-				case "us-central-2":
-					url = "https://s3.us-central-2.lyvecloud.seagate.com"
-				default:
-					errMsg := fmt.Sprintf("unrecognized region \"%s\"", region)
-					log.Err("Client::Configure : %s", errMsg)
-					return aws.Endpoint{}, fmt.Errorf("%s", errMsg)
-				}
-				// on success, write back to config struct
-				cl.Config.authConfig.Region = region
-				cl.Config.authConfig.Endpoint = url
-			}
-			// create the endpoint
-			return aws.Endpoint{
-				PartitionID:   "aws",
-				URL:           cl.Config.authConfig.Endpoint,
-				SigningRegion: cl.Config.authConfig.Region,
-			}, nil
-		}
-		return aws.Endpoint{}, fmt.Errorf("unknown endpoint requested")
-	})
-
 	var credentialsProvider aws.CredentialsProvider
 	credentialsInConfig := cl.Config.authConfig.KeyID != "" && cl.Config.authConfig.SecretKey != ""
 	if credentialsInConfig {
@@ -121,34 +79,113 @@ func (cl *Client) Configure(cfg Config) error {
 			"",
 		)
 	}
+
+	var err error
+	if cl.Config.authConfig.Region == "" {
+		region, exists := os.LookupEnv("AWS_REGION")
+		if !exists {
+			cl.Config.authConfig.Region, err = getRegionFromEndpoint(cl.Config.authConfig.Endpoint)
+			if err != nil {
+				cl.Config.authConfig.Region = defaultRegion
+			}
+		} else {
+			cl.Config.authConfig.Region = region
+		}
+	}
+
+	if cl.Config.authConfig.Endpoint == "" {
+		cl.Config.authConfig.Endpoint = fmt.Sprintf("https://s3.%s.lyvecloud.seagate.com", cl.Config.authConfig.Region)
+	}
+
 	defaultConfig, err := config.LoadDefaultConfig(
 		context.Background(),
 		config.WithSharedConfigProfile(cl.Config.authConfig.Profile),
 		config.WithCredentialsProvider(credentialsProvider),
-		config.WithEndpointResolverWithOptions(endpointResolver),
 		config.WithAppID(UserAgent()),
-		config.WithRegion("auto"),
+		config.WithRegion(cl.Config.authConfig.Region),
 	)
+
 	if err != nil {
-		log.Err("Client::Configure : config.LoadDefaultConfig() failed. Here's why: %v", err)
-		return err
+		var e config.SharedConfigProfileNotExistError
+		if errors.As(err, &e) {
+			// If a config profile is provided the sdk checks that it exists, otherwise it fails and
+			// does not try other credentials. So try the other ones here if the profile does not exist
+			defaultConfig, err = config.LoadDefaultConfig(
+				context.Background(),
+				config.WithCredentialsProvider(credentialsProvider),
+				config.WithAppID(UserAgent()),
+				config.WithRegion(cl.Config.authConfig.Region),
+			)
+		}
+		if err != nil {
+			log.Err("Client::Configure : config.LoadDefaultConfig() failed. Here's why: %v", err)
+			return err
+		}
 	}
 
 	// Create an Amazon S3 service client
 	if cl.Config.usePathStyle {
 		cl.awsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
 			o.UsePathStyle = true
+			o.BaseEndpoint = aws.String(cl.Config.authConfig.Endpoint)
 		})
 	} else {
-		cl.awsS3Client = s3.NewFromConfig(defaultConfig)
+		cl.awsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(cl.Config.authConfig.Endpoint)
+		})
 	}
 
 	// ListBuckets here to test connection
-	_, err = cl.ListBuckets()
+	bucketList, err := cl.ListBuckets()
 	if err != nil {
 		log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
+		return err
 	}
-	return err
+
+	// if no bucket-name was set, default to the first bucket in the list
+	if cl.Config.authConfig.BucketName == "" && len(bucketList) > 0 {
+		cl.Config.authConfig.BucketName = bucketList[0]
+		log.Warn("Client::Configure : Bucket defaulted to first listed bucket: %s", bucketList[0])
+	}
+
+	// Use list objects validate the region and bucket access
+	_, _, err = cl.List("/", nil, 1)
+	if err != nil {
+		log.Err("Client::Configure : listing objects failed. Here's why: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func getRegionFromEndpoint(endpoint string) (string, error) {
+	if endpoint == "" {
+		return "", fmt.Errorf("Endpoint is empty")
+	}
+
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", err
+	}
+
+	hostParts := strings.Split(u.Hostname(), ".")
+	if len(hostParts) < 2 {
+		return "", fmt.Errorf("Invalid Endpoint")
+	}
+
+	// the second host part is usually the region
+	regionPartIndex := 1
+	// but skip "dualstack"
+	if hostParts[1] == "dualstack" {
+		regionPartIndex = 2
+	}
+	// reserve two hostparts after the region for the domain
+	if len(hostParts)-regionPartIndex < 3 {
+		return "", fmt.Errorf("Endpoint does not include a region")
+	}
+
+	region := hostParts[regionPartIndex]
+	return region, nil
 }
 
 // For dynamic configuration, update the config here.

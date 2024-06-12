@@ -133,7 +133,7 @@ func DecryptConfigFile(fileName string, passphrase string) error {
 		return fmt.Errorf("Encrypted config file is empty")
 	}
 
-	plainText, err := common.DecryptData(cipherText, []byte(passphrase))
+	plainText, err := common.DecryptData(cipherText, passphrase)
 	if err != nil {
 		return fmt.Errorf("Failed to decrypt config file [%s]", err.Error())
 	}

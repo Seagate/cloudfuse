@@ -508,6 +508,4 @@ func News3storageComponent() internal.Component {
 // On init register this component to pipeline and supply your constructor
 func init() {
 	internal.AddComponent(compName, News3storageComponent)
-	// TODO: add config flags to customize AWS S3 SDK behavior and register them here
-	// 	(see how this is done in azstorage for reference).
 }
