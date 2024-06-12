@@ -914,9 +914,10 @@ func (suite *fileCacheTestSuite) TestReadFileNoFlush() {
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
 
-	d, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
+	err := suite.fileCache.downloadFile(handle)
+	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(9, d)
+	suite.assert.EqualValues(data, d)
 }
 
 func (suite *fileCacheTestSuite) TestReadFileErrorBadFd() {
@@ -1484,9 +1485,13 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
 
-	d, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
+	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(9, d)
+	suite.assert.EqualValues(9, n)
+
+	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(data, d)
 }
 
 func (suite *fileCacheTestSuite) TestZZOffloadIO() {
@@ -1540,10 +1545,12 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 
 	path := "file42"
-	err := os.WriteFile(suite.fake_storage_path+"/"+path, []byte("test data"), 0777)
+	byteArr := []byte("test data")
+	err := os.WriteFile(suite.fake_storage_path+"/"+path, byteArr, 0777)
 	suite.assert.NoError(err)
 
 	data := make([]byte, 20)
+
 	options := internal.OpenFileOptions{Name: path, Mode: 0777}
 
 	// Read file once and we shall get the same data
@@ -1553,11 +1560,15 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: f, Offset: 0, Data: data})
 	suite.assert.NoError(err)
 	suite.assert.Equal(9, n)
+	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: f})
+	suite.assert.Equal(d, byteArr)
+	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
 	suite.assert.NoError(err)
 
-	// Modify the fil ein background but we shall still get the old data
-	err = os.WriteFile(suite.fake_storage_path+"/"+path, []byte("test data1"), 0777)
+	// Modify the file in background but we shall still get the old data
+	byteArr = []byte("test data1")
+	err = os.WriteFile(suite.fake_storage_path+"/"+path, byteArr, 0777)
 	suite.assert.NoError(err)
 	f, err = suite.fileCache.OpenFile(options)
 	suite.assert.NoError(err)
@@ -1565,10 +1576,14 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	n, err = suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: f, Offset: 0, Data: data})
 	suite.assert.NoError(err)
 	suite.assert.Equal(9, n)
+	d, err = suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: f})
+	suite.assert.NotEqual(d, byteArr)
+	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
 	suite.assert.NoError(err)
 
 	// Now wait for 5 seconds and we shall get the updated content on next read
+	byteArr = []byte("test data123456")
 	err = os.WriteFile(suite.fake_storage_path+"/"+path, []byte("test data123456"), 0777)
 	suite.assert.NoError(err)
 	time.Sleep(12 * time.Second)
@@ -1578,6 +1593,9 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	n, err = suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: f, Offset: 0, Data: data})
 	suite.assert.NoError(err)
 	suite.assert.Equal(15, n)
+	d, err = suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: f})
+	suite.assert.Equal(d, byteArr)
+	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
 	suite.assert.NoError(err)
 }
