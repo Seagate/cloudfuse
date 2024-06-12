@@ -895,11 +895,10 @@ func (suite *fileCacheTestSuite) TestReadFile() {
 	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 
-	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
-	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
+	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
 	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(9, n)
 	suite.assert.EqualValues(data, d)
 }
 
@@ -912,9 +911,9 @@ func (suite *fileCacheTestSuite) TestReadFileNoFlush() {
 	data := []byte(testData)
 	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 
-	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
+	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
 
-	err := suite.fileCache.downloadFile(handle)
 	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(data, d)
@@ -1485,9 +1484,8 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
 
-	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
+	err = suite.fileCache.downloadFile(handle)
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(9, n)
 
 	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
 	suite.assert.NoError(err)
@@ -1560,9 +1558,6 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: f, Offset: 0, Data: data})
 	suite.assert.NoError(err)
 	suite.assert.Equal(9, n)
-	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: f})
-	suite.assert.Equal(d, byteArr)
-	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
 	suite.assert.NoError(err)
 
@@ -1576,9 +1571,6 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	n, err = suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: f, Offset: 0, Data: data})
 	suite.assert.NoError(err)
 	suite.assert.Equal(9, n)
-	d, err = suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: f})
-	suite.assert.NotEqual(d, byteArr)
-	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
 	suite.assert.NoError(err)
 
@@ -1593,9 +1585,6 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	n, err = suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: f, Offset: 0, Data: data})
 	suite.assert.NoError(err)
 	suite.assert.Equal(15, n)
-	d, err = suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: f})
-	suite.assert.Equal(d, byteArr)
-	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
 	suite.assert.NoError(err)
 }

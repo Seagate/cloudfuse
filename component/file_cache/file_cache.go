@@ -936,6 +936,8 @@ func (fc *FileCache) ReadFile(options internal.ReadFileOptions) ([]byte, error) 
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
 	fc.policy.CacheValid(localPath)
 
+	err := fc.downloadFile(options.Handle)
+
 	f := options.Handle.GetFileObject()
 	if f == nil {
 		log.Err("FileCache::ReadFile : error [couldn't find fd in handle] %s", options.Handle.Path)
