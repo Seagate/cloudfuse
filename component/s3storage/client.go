@@ -144,11 +144,17 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	// ListBuckets here to test connection
-	// Remove check for testing when cloud is down
-	// _, err = cl.ListBuckets()
-	// if err != nil {
-	// 	log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
-	// }
+	bucketList, err := cl.ListBuckets()
+	if err != nil {
+		log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
+	}
+
+	// if no bucket-name was set, default to the first bucket in the list
+	if cl.Config.authConfig.BucketName == "" && len(bucketList) > 0 {
+		cl.Config.authConfig.BucketName = bucketList[0]
+		log.Warn("Client::Configure : Bucket defaulted to first listed bucket: %s", bucketList[0])
+	}
+
 	return err
 }
 

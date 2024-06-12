@@ -341,6 +341,11 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 			exists:   true,
 			cachedAt: time.Now(),
 		})
+		if newDirAttrCacheItem != nil {
+
+			log.Debug("Directory got added to the ac")
+			log.Debug("The directory name that got added is %s", newDirAttrCacheItem.attr.Name)
+		}
 		// update flags for tracking directory existence
 		if ac.cacheDirs {
 			newDirAttrCacheItem.markInCloud(false)
@@ -413,14 +418,14 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 				ac.markAncestorsInCloud(options.Name, time.Now())
 				ac.cacheLock.Unlock()
 			}
-			// merge missing directory cache into the last page of results
-			if ac.cacheDirs && nextToken == "" {
-				var numAdded int // prevent shadowing pathList in following line
-				pathList, numAdded = ac.addDirsNotInCloudToListing(options.Name, pathList)
-				log.Info("AttrCache::StreamDir : %s +%d from cache = %d",
-					options.Name, numAdded, len(pathList))
-			}
 		}
+	}
+
+	if ac.cacheDirs && nextToken == "" {
+		var numAdded int // prevent shadowing pathList in following line
+		pathList, numAdded = ac.addDirsNotInCloudToListing(options.Name, pathList)
+		log.Info("AttrCache::StreamDir : %s +%d from cache = %d",
+			options.Name, numAdded, len(pathList))
 	}
 	// add cached items in
 	if len(cachedPathList) > 0 {
@@ -461,6 +466,7 @@ func (ac *AttrCache) fetchCachedDirList(path string, token string) ([]*internal.
 	}
 	// is the requested data cached?
 	if listDirCache.listCache == nil {
+		log.Debug("The requested data is not cached and the name is %s", listDirCache.attr.Name)
 		listDirCache.listCache = make(map[string]listCacheSegment)
 	}
 	cachedListSegment, found := listDirCache.listCache[token]

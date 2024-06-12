@@ -395,7 +395,7 @@ func writeConfigFile(contConfigFile string) error {
 			return fmt.Errorf("failed to marshall yaml content")
 		}
 
-		cipherText, err := common.EncryptData(confStream, []byte(options.PassPhrase))
+		cipherText, err := common.EncryptData(confStream, opts.passphrase)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt yaml content [%s]", err.Error())
 		}

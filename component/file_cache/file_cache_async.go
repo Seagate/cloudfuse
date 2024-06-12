@@ -26,7 +26,6 @@
 package file_cache
 
 import (
-	"fmt"
 	"syscall"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -47,49 +46,51 @@ func (fc *FileCache) async_cloud_handler() {
 
 	//not sure if this actually works, may have to look at other methods to iterate through sync map
 	var returnVal error //race condition on returnVal?
-
 	for {
 
 		fc.fileOps.Range(func(key, value interface{}) bool {
 
 			val, _ := fc.fileOps.Load(key)
-			fmt.Printf("the value is %s for key %s\n", val, key)
 			attributes := val.(FileAttributes)
+			if val != nil {
+				log.Trace("AsyncFileCache:: async_cloud_handler : The key in the function call is %s and the value is %s", key, attributes)
+				switch {
+				case attributes.operation == "DeleteDir":
+					returnVal = fc.asyncDeleteDir(attributes.options.(internal.DeleteDirOptions))
 
-			switch {
-			case attributes.operation == "DeleteDir":
-				returnVal = fc.asyncDeleteDir(attributes.options.(internal.DeleteDirOptions))
+				case attributes.operation == "RenameDir":
+					returnVal = fc.asyncRenameDir(attributes.options.(internal.RenameDirOptions))
 
-			case attributes.operation == "RenameDir":
-				returnVal = fc.asyncRenameDir(attributes.options.(internal.RenameDirOptions))
+				case attributes.operation == "CreateFile":
+					returnVal = fc.asyncCreateFile(attributes.options.(internal.CreateFileOptions))
+					// fc.fileOps.Delete(key)
 
-			case attributes.operation == "CreateFile":
-				returnVal = fc.asyncCreateFile(attributes.options.(internal.CreateFileOptions))
+				case attributes.operation == "DeleteFile":
+					returnVal = fc.asyncDeleteFile(attributes.options.(internal.DeleteFileOptions))
 
-			case attributes.operation == "DeleteFile":
-				returnVal = fc.asyncDeleteFile(attributes.options.(internal.DeleteFileOptions))
+				case attributes.operation == "FlushFile":
+					returnVal = fc.asyncFlushFile(attributes.options.(FlushFileAbstraction))
 
-			case attributes.operation == "FlushFile":
-				returnVal = fc.asyncFlushFile(attributes.options.(FlushFileAbstraction))
+				case attributes.operation == "RenameFile":
+					returnVal = fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions))
 
-			case attributes.operation == "RenameFile":
-				returnVal = fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions))
+				case attributes.operation == "Chmod":
+					returnVal = fc.asyncChmod(attributes.options.(internal.ChmodOptions))
+					returnVal = nil
 
-			case attributes.operation == "Chmod":
-				returnVal = fc.asyncChmod(attributes.options.(internal.ChmodOptions))
+				case attributes.operation == "Chown":
+					returnVal = fc.asyncChown(attributes.options.(internal.ChownOptions))
 
-			case attributes.operation == "Chown":
-				returnVal = fc.asyncChown(attributes.options.(internal.ChownOptions))
+				case attributes.operation == "SyncFile":
+					returnVal = fc.asyncSyncFile(attributes.options.(internal.SyncFileOptions))
+				}
 
-			case attributes.operation == "SyncFile":
-				returnVal = fc.asyncSyncFile(attributes.options.(internal.SyncFileOptions))
+				log.Trace("AsyncFileCache:: async_cloud_handler: The key after the function call is %s and the value is %s", key, attributes)
+				if returnVal == nil {
+					_ = fc.fileOps.CompareAndDelete(key, attributes) //file has been serviced, remove it from map only if file op hasn't been updated
+				}
 			}
-
-			if returnVal == nil {
-				fmt.Print("returnVal/error not nil\n")
-				_ = fc.fileOps.CompareAndDelete(key, attributes) //file has been serviced, remove it from map only if file op hasn't been updated
-			}
-
+			//time.Sleep(5 * time.Second)
 			return true
 		})
 	}
@@ -100,7 +101,6 @@ func (fc *FileCache) async_cloud_handler() {
 func (fc *FileCache) asyncFlushFile(options FlushFileAbstraction) error {
 
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
-	//fmt.Printf("path in async thread is %s\n", localPath)
 	uploadHandle, err := common.Open(localPath)
 
 	if err != nil {
@@ -135,7 +135,6 @@ func (fc *FileCache) asyncDeleteFile(options internal.DeleteFileOptions) error {
 }
 
 func (fc *FileCache) asyncRenameFile(options internal.RenameFileOptions) error {
-
 	err := fc.NextComponent().RenameFile(options)
 	err = fc.validateStorageError(options.Src, err, "RenameFile", false)
 	if err != nil {
@@ -149,6 +148,7 @@ func (fc *FileCache) asyncDeleteDir(options internal.DeleteDirOptions) error {
 	err := fc.NextComponent().DeleteDir(options)
 	if err != nil {
 		log.Err("FileCache::DeleteDir : %s failed", options.Name)
+		log.Err("FileCache::DeleteDir : Error is %s", err.Error())
 		// There is a chance that meta file for directory was not created in which case
 		// rest api delete will fail while we still need to cleanup the local cache for the same
 		return err

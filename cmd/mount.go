@@ -212,7 +212,7 @@ func parseConfig() error {
 			return fmt.Errorf("failed to read encrypted config file %s [%s]", options.ConfigFile, err.Error())
 		}
 
-		plainText, err := common.DecryptData(cipherText, []byte(options.PassPhrase))
+		plainText, err := common.DecryptData(cipherText, options.PassPhrase)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt config file %s [%s]", options.ConfigFile, err.Error())
 		}
@@ -482,11 +482,18 @@ var mountCmd = &cobra.Command{
 			pidFile := strings.Replace(options.MountPath, "/", "_", -1) + ".pid"
 			pidFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), pidFile)
 
+			// Delete the pidFile if it already exists which prevents a failed to daemonize error
+			// See https://github.com/sevlyar/go-daemon/issues/37
+			err := os.Remove(pidFileName)
+			if err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return fmt.Errorf("mount: failed to remove pidFile [%v]", err.Error())
+			}
+
 			pid := os.Getpid()
 			fname := fmt.Sprintf("/tmp/cloudfuse.%v", pid)
 
 			ctx, _ := context.WithCancel(context.Background()) //nolint
-			err := createDaemon(pipeline, ctx, pidFileName, 0644, 027, fname)
+			err = createDaemon(pipeline, ctx, pidFileName, 0644, 027, fname)
 			if err != nil {
 				return fmt.Errorf("mount: failed to create daemon [%v]", err.Error())
 			}
@@ -641,7 +648,7 @@ func init() {
 		"Encrypt auto generated config file for each container")
 
 	mountCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
-		"Key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\nKey length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+		"Base64 encoded key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\n Decoded key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 
 	mountCmd.PersistentFlags().String("log-type", "syslog", "Type of logger to be used by the system. Set to syslog by default. Allowed values are silent|syslog|base.")
 	config.BindPFlag("logging.type", mountCmd.PersistentFlags().Lookup("log-type"))
