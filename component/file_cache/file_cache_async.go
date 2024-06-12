@@ -26,7 +26,9 @@
 package file_cache
 
 import (
+	"math"
 	"syscall"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -45,13 +47,21 @@ func (fc *FileCache) async_cloud_handler() {
 	// if not, then call sleep() and increase the timeout
 
 	//not sure if this actually works, may have to look at other methods to iterate through sync map
+	var maxTries float64 = 20
 	var returnVal error //race condition on returnVal?
+	var tries float64
+	var restTime float64
 	for {
 
 		fc.fileOps.Range(func(key, value interface{}) bool {
 
+			restTime = (math.Pow(2, tries) - 1) * 100 //restTime in ms based on number of failed tries
+			log.Trace("AsyncFileCache:: async_cloud_handler : The timeout value is %f", restTime)
+			time.Sleep(time.Duration(restTime) * (time.Millisecond))
+
 			val, _ := fc.fileOps.Load(key)
 			attributes := val.(FileAttributes)
+
 			if val != nil {
 				log.Trace("AsyncFileCache:: async_cloud_handler : The key in the function call is %s and the value is %s", key, attributes)
 				switch {
@@ -76,7 +86,7 @@ func (fc *FileCache) async_cloud_handler() {
 
 				case attributes.operation == "Chmod":
 					returnVal = fc.asyncChmod(attributes.options.(internal.ChmodOptions))
-					returnVal = nil
+					//returnVal = nil
 
 				case attributes.operation == "Chown":
 					returnVal = fc.asyncChown(attributes.options.(internal.ChownOptions))
@@ -87,10 +97,17 @@ func (fc *FileCache) async_cloud_handler() {
 
 				log.Trace("AsyncFileCache:: async_cloud_handler: The key after the function call is %s and the value is %s", key, attributes)
 				if returnVal == nil {
+					log.Trace("AsyncFileCache:: async_cloud_handler: File name %s has just finished file operation %s", key, attributes.operation)
+					tries = 0                                        //attempt was successful, reset try counter
 					_ = fc.fileOps.CompareAndDelete(key, attributes) //file has been serviced, remove it from map only if file op hasn't been updated
+				} else {
+					if tries < maxTries {
+
+						tries++ //failed op, increase timeout duration
+					}
+
 				}
 			}
-			//time.Sleep(5 * time.Second)
 			return true
 		})
 	}

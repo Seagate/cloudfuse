@@ -27,6 +27,7 @@ package attr_cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -40,6 +41,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 )
 
 // By default attr cache is valid for 120 seconds
@@ -319,7 +321,12 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("AttrCache::CreateDir : %s", options.Name)
 	err := ac.NextComponent().CreateDir(options)
-	if err == nil || err == syscall.EEXIST {
+	var maxAttempts *retry.MaxAttemptsError
+	ok := errors.As(err, &maxAttempts)
+
+	if err != nil && !ok && err != syscall.EEXIST {
+		return err
+	} else {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 		// does the directory already exist?
@@ -360,6 +367,8 @@ func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 
 	deletionTime := time.Now()
 	err := ac.NextComponent().DeleteDir(options)
+	// var maxAttempts *retry.MaxAttemptsError
+	// ok := errors.As(err, &maxAttempts)
 
 	if err == nil {
 		// deleteDirectory may add the parent directory to the cache
@@ -418,14 +427,13 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 				ac.markAncestorsInCloud(options.Name, time.Now())
 				ac.cacheLock.Unlock()
 			}
+			if ac.cacheDirs && nextToken == "" {
+				var numAdded int // prevent shadowing pathList in following line
+				pathList, numAdded = ac.addDirsNotInCloudToListing(options.Name, pathList)
+				log.Info("AttrCache::StreamDir : %s +%d from cache = %d",
+					options.Name, numAdded, len(pathList))
+			}
 		}
-	}
-
-	if ac.cacheDirs && nextToken == "" {
-		var numAdded int // prevent shadowing pathList in following line
-		pathList, numAdded = ac.addDirsNotInCloudToListing(options.Name, pathList)
-		log.Info("AttrCache::StreamDir : %s +%d from cache = %d",
-			options.Name, numAdded, len(pathList))
 	}
 	// add cached items in
 	if len(cachedPathList) > 0 {
@@ -691,11 +699,15 @@ func (ac *AttrCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 }
 
 // DeleteFile : Mark the file deleted
+
 func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("AttrCache::DeleteFile : %s", options.Name)
-
+	var maxAttempts *retry.MaxAttemptsError
 	err := ac.NextComponent().DeleteFile(options)
-	if err == nil {
+	ok := errors.As(err, &maxAttempts)
+	if err != nil && !ok {
+		return err
+	} else {
 		deletionTime := time.Now()
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
@@ -715,7 +727,6 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 			ac.updateAncestorsInCloud(getParentDir(options.Name), deletionTime)
 		}
 	}
-
 	return err
 }
 
@@ -798,7 +809,7 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	}
 
 	size, err := ac.NextComponent().WriteFile(options)
-
+	//start here
 	if err == nil {
 		modifyTime := time.Now()
 		newSize := options.Offset + int64(len(options.Data))
@@ -828,6 +839,7 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("AttrCache::TruncateFile : %s", options.Name)
 
 	err := ac.NextComponent().TruncateFile(options)
+
 	if err == nil {
 		modifyTime := time.Now()
 
@@ -969,7 +981,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	// Get the attributes from next component and cache them
 	pathAttr, err := ac.NextComponent().GetAttr(options)
-
+	//check cloud call here
 	ac.cacheLock.Lock()
 	defer ac.cacheLock.Unlock()
 
@@ -990,7 +1002,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			exists:   false,
 			cachedAt: time.Now(),
 		})
-	}
+	} //check if err is cloud down, entry is valid, and found, repeat if block above
 	return pathAttr, err
 }
 

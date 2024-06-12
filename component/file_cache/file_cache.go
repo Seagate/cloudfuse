@@ -527,7 +527,6 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 				// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
 				// If entry does not exists on storage then only return a local item here.
 				_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath}) //parse the error generated here when cloud is down
-				log.Debug("FileCache::StreamDir : getAttr error is %s", err.Error())
 				// if err != nil && (err == syscall.ENOENT || os.IsNotExist(err)) { //without the cloud, getAttr will return an error
 				// 	info, err := entry.Info() // Grab local cache attributes
 				// 	// If local file is not locked then only use its attributes otherwise rely on container attributes
@@ -539,6 +538,7 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 				// 	}
 				// }
 				if err != nil { //without the cloud, getAttr will return an error
+					log.Debug("FileCache::StreamDir : getAttr error is %s", err.Error())
 					info, err := entry.Info() // Grab local cache attributes
 					// If local file is not locked then only use its attributes otherwise rely on container attributes
 					if err == nil {
