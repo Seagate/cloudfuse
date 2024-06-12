@@ -896,10 +896,11 @@ func (suite *fileCacheTestSuite) TestReadFile() {
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
-
-	d, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
+	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
+	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(9, d)
+	suite.assert.EqualValues(9, n)
+	suite.assert.EqualValues(data, d)
 }
 
 func (suite *fileCacheTestSuite) TestReadFileNoFlush() {
