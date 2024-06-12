@@ -937,6 +937,10 @@ func (fc *FileCache) ReadFile(options internal.ReadFileOptions) ([]byte, error) 
 	fc.policy.CacheValid(localPath)
 
 	err := fc.downloadFile(options.Handle)
+	if err != nil {
+		log.Err("FileCache::ReadFile : error from calling downloadFile for %s", options.Handle.Path)
+		return nil, err
+	}
 
 	f := options.Handle.GetFileObject()
 	if f == nil {
