@@ -763,18 +763,6 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 		}
 
 		if fileSize > 0 {
-			if fc.diskHighWaterMark != 0 {
-				currSize, err := common.GetUsage(fc.tmpPath)
-				if err != nil {
-					log.Err("FileCache::downloadFile : error getting current usage of cache [%s]", err.Error())
-				} else {
-					if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
-						log.Err("FileCache::downloadFile : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, handle.Path)
-						return syscall.ENOSPC
-					}
-				}
-
-			}
 			// Download/Copy the file from storage to the local file.
 			// We pass a count of 0 to get the entire object
 			err = fc.NextComponent().CopyToFile(
@@ -855,11 +843,30 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
 	log.Trace("FileCache::OpenFile : name=%s, flags=%d, mode=%s", options.Name, options.Flags, options.Mode)
 
-	_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+	attr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 
 	// return err in case of authorization permission mismatch
 	if err != nil && err == syscall.EACCES {
 		return nil, err
+	}
+
+	fileSize := int64(0)
+	if attr != nil {
+		fileSize = int64(attr.Size)
+	}
+
+	if fileSize > 0 {
+		if fc.diskHighWaterMark != 0 {
+			currSize, err := common.GetUsage(fc.tmpPath)
+			if err != nil {
+				log.Err("FileCache::OpenFile : error getting current usage of cache [%s]", err.Error())
+			} else {
+				if (currSize + float64(fileSize)) > fc.diskHighWaterMark {
+					log.Err("FileCache::OpenFile : cache size limit reached [%f] failed to open %s", fc.maxCacheSize, options.Name)
+					return nil, syscall.ENOSPC
+				}
+			}
+		}
 	}
 
 	// create handle and set value
