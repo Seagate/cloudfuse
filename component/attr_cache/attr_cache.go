@@ -435,10 +435,17 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			}
 		}
 	}
-	// add cached items in
-	if len(cachedPathList) > 0 {
-		log.Info("AttrCache::StreamDir : %s merging in %d list cache entries...", options.Name, len(cachedPathList))
-		pathList = append(pathList, cachedPathList...)
+	// if cloud is down, use existing cache entries to populate the listing
+	var maxAttempts *retry.MaxAttemptsError
+	cloudIsDown := errors.As(err, &maxAttempts)
+	if err != nil && cloudIsDown {
+		dir, found := ac.cache.get(options.Name)
+		if found {
+			for _, value := range dir.children {
+				pathList = append(pathList, value.attr)
+			}
+		}
+		log.Warn("AttrCache::StreamDir : %s cloud unresponsive - serving %d cached entries...", options.Name, len(pathList))
 	}
 	// values should be returned in ascending order by key, without duplicates
 	// sort
