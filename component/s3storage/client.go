@@ -49,6 +49,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 const (
@@ -64,6 +65,13 @@ type Client struct {
 
 // Verify that Client implements S3Connection interface
 var _ S3Connection = &Client{}
+
+var (
+	ErrInvalidCredential  = errors.New("S3 credentials are invalid. Please check your credentials and endpoint is correct.")
+	ErrInvalidSecretKey   = errors.New("S3 secret key is not valid. Please check that the secret key and endpoint are correct.")
+	ErrBucketDoesNotExist = errors.New("S3 bucket does not exist. Please check your bucket name is correct.")
+	ErrNoBucketInAccount  = errors.New("No bucket exists in S3 account. Please create a bucket in your account.")
+)
 
 // Configure : Initialize the awsS3Client
 func (cl *Client) Configure(cfg Config) error {
@@ -135,20 +143,48 @@ func (cl *Client) Configure(cfg Config) error {
 		})
 	}
 
-	// ListBuckets here to test connection
+	// ListBuckets here to test connection to S3 backend
 	bucketList, err := cl.ListBuckets()
 	if err != nil {
 		log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
+
+		var oe *smithy.OperationError
+		if errors.As(err, &oe) {
+			fmt.Println(oe.Err)
+		}
+
+		var ae smithy.APIError
+		if errors.As(err, &ae) {
+			if ae.ErrorCode() == "Forbidden" {
+				return ErrInvalidCredential
+			}
+			if ae.ErrorCode() == "SignatureDoesNotMatch" {
+				return ErrInvalidSecretKey
+			}
+			fmt.Println(ae.Error())
+		}
 		return err
 	}
 
 	// if no bucket-name was set, default to the first bucket in the list
-	if cl.Config.authConfig.BucketName == "" && len(bucketList) > 0 {
-		cl.Config.authConfig.BucketName = bucketList[0]
-		log.Warn("Client::Configure : Bucket defaulted to first listed bucket: %s", bucketList[0])
+	if cl.Config.authConfig.BucketName == "" {
+		if len(bucketList) > 0 {
+			cl.Config.authConfig.BucketName = bucketList[0]
+			log.Warn("Client::Configure : Bucket defaulted to first listed bucket: %s", bucketList[0])
+		} else {
+			log.Err("Client::Configure : Error no bucket exists in account. Here's why: %v", err)
+			return ErrNoBucketInAccount
+		}
 	}
 
-	// Use list objects validate the region and bucket access
+	// Check that the provided bucket exists and that you have access to bucket
+	exists, err := cl.headBucket()
+	if err != nil || !exists {
+		log.Err("Client::Configure : Error finding bucket. Here's why: %v", err)
+		return ErrBucketDoesNotExist
+	}
+
+	// Use list objects validate the region is correct and user can list objects
 	_, _, err = cl.List("/", nil, 1)
 	if err != nil {
 		log.Err("Client::Configure : listing objects failed. Here's why: %v", err)

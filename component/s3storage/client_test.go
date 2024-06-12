@@ -163,7 +163,19 @@ func (s *clientTestSuite) cleanupTest() {
 	_ = log.Destroy()
 }
 
-func (s *clientTestSuite) TestCredentialsError() {
+func (s *clientTestSuite) TestCredentialsErrorInvalidKeyID() {
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s",
+		storageTestConfigurationParameters.BucketName, "WRONGKEYID",
+		storageTestConfigurationParameters.SecretKey)
+	// S3 connection creation should fail
+	err := s.setupTestHelper(config, false)
+	s.assert.Error(err)
+	s.assert.Equal(ErrInvalidCredential, err)
+}
+
+func (s *clientTestSuite) TestCredentialsErrorInvalidSecretKey() {
 	defer s.cleanupTest()
 	// setup
 	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s",
@@ -172,6 +184,31 @@ func (s *clientTestSuite) TestCredentialsError() {
 	// S3 connection creation should fail
 	err := s.setupTestHelper(config, false)
 	s.assert.Error(err)
+	s.assert.Equal(ErrInvalidSecretKey, err)
+}
+
+func (s *clientTestSuite) TestCredentialsErrorInvalidBucket() {
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s",
+		"WRONGBUCKET", storageTestConfigurationParameters.KeyID,
+		storageTestConfigurationParameters.SecretKey)
+	// S3 connection creation should fail
+	err := s.setupTestHelper(config, false)
+	s.assert.Error(err)
+	s.assert.Equal(ErrBucketDoesNotExist, err)
+}
+
+func (s *clientTestSuite) TestCredentialsErrorIncorrectEndpoint() {
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
+		storageTestConfigurationParameters.SecretKey, "https://s3.us-west-1.lyvecloud.seagate.com")
+	// S3 connection creation should fail
+	err := s.setupTestHelper(config, false)
+	s.assert.Error(err)
+	s.assert.Equal(ErrInvalidCredential, err)
 }
 
 func (s *clientTestSuite) TestEnvVarCredentials() {
@@ -215,6 +252,7 @@ func (s *clientTestSuite) TestEnvVarCredentialsErr() {
 	// S3 connection should find credentials from environment variables
 	err := s.setupTestHelper(config, false)
 	s.assert.Error(err)
+	s.assert.Equal(ErrInvalidCredential, err)
 
 	os.Unsetenv("AWS_ACCESS_KEY_ID")
 	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
