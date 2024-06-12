@@ -1,5 +1,5 @@
 .idea/
-.vscode/
+.vscode/settings.json
 *.out
 config*.yaml
 testcnf.yaml
