@@ -442,7 +442,9 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		dir, found := ac.cache.get(options.Name)
 		if found {
 			for _, value := range dir.children {
-				pathList = append(pathList, value.attr)
+				if value.valid() && value.exists() {
+					pathList = append(pathList, value.attr)
+				}
 			}
 		}
 		log.Warn("AttrCache::StreamDir : %s cloud unresponsive - serving %d cached entries...", options.Name, len(pathList))
