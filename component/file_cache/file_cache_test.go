@@ -874,62 +874,6 @@ func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
 	suite.assert.True(err == nil || os.IsExist(err))
 }
 
-func (suite *fileCacheTestSuite) TestReadFileEmpty() {
-	defer suite.cleanupTest()
-	// Setup
-	file := "file11"
-	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
-
-	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-	suite.assert.Empty(d)
-}
-
-func (suite *fileCacheTestSuite) TestReadFile() {
-	defer suite.cleanupTest()
-	// Setup
-	file := "file12"
-	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
-	testData := "test data"
-	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
-	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
-
-	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
-	suite.assert.NoError(err)
-	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
-}
-
-func (suite *fileCacheTestSuite) TestReadFileNoFlush() {
-	defer suite.cleanupTest()
-	// Setup
-	file := "file13"
-	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
-	testData := "test data"
-	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
-
-	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
-	suite.assert.NoError(err)
-
-	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
-}
-
-func (suite *fileCacheTestSuite) TestReadFileErrorBadFd() {
-	defer suite.cleanupTest()
-	// Setup
-	file := "file14"
-	handle := handlemap.NewHandle(file)
-	data, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
-	suite.assert.Error(err)
-	suite.assert.EqualValues(syscall.EBADF, err)
-	suite.assert.Nil(data)
-}
-
 func (suite *fileCacheTestSuite) TestReadInBufferEmpty() {
 	defer suite.cleanupTest()
 	// Setup
@@ -1487,9 +1431,11 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 	err = suite.fileCache.downloadFile(handle)
 	suite.assert.NoError(err)
 
-	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
+	output := make([]byte, 9)
+	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
+	suite.assert.Equal(9, n)
+	suite.assert.EqualValues(data, output)
 }
 
 func (suite *fileCacheTestSuite) TestZZOffloadIO() {

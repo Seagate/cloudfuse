@@ -437,21 +437,6 @@ func (mr *MockComponentMockRecorder) StreamDir(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StreamDir", reflect.TypeOf((*MockComponent)(nil).StreamDir), arg0)
 }
 
-// ReadFile mocks base method.
-func (m *MockComponent) ReadFile(arg0 ReadFileOptions) ([]byte, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReadFile", arg0)
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ReadFile indicates an expected call of ReadFile.
-func (mr *MockComponentMockRecorder) ReadFile(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadFile", reflect.TypeOf((*MockComponent)(nil).ReadFile), arg0)
-}
-
 // ReadInBuffer mocks base method.
 func (m *MockComponent) ReadInBuffer(arg0 ReadInBufferOptions) (int, error) {
 	m.ctrl.T.Helper()

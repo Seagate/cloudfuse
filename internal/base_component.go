@@ -166,13 +166,6 @@ func (base *BaseComponent) RenameFile(options RenameFileOptions) error {
 	return nil
 }
 
-func (base *BaseComponent) ReadFile(options ReadFileOptions) (b []byte, err error) {
-	if base.next != nil {
-		return base.next.ReadFile(options)
-	}
-	return b, err
-}
-
 func (base *BaseComponent) ReadInBuffer(options ReadInBufferOptions) (int, error) {
 	if base.next != nil {
 		return base.next.ReadInBuffer(options)
