@@ -68,7 +68,7 @@ type Client struct {
 // Verify that Client implements S3Connection interface
 var _ S3Connection = &Client{}
 
-// The test before the : symbol is a magic keyword
+// The text before the : symbol is a magic keyword
 // It cannot change as it is parsed by our plugin for network optix to provide more clear errors to the user
 var (
 	errBucketDoesNotExist = errors.New("Bucket Error: S3 bucket does not exist. Please check your bucket name is correct.")
@@ -181,9 +181,12 @@ func (cl *Client) Configure(cfg Config) error {
 		return err
 	}
 
+	// If endpoint is localhost, then running locally so ignore region check
+	isLocalHost := strings.Contains(cl.Config.authConfig.Endpoint, "localhost")
+
 	// Check that region matches region in endpoint
 	// This check is after endpoint errors so endpoint can be validated first
-	if !strings.Contains(cl.Config.authConfig.Endpoint, cl.Config.authConfig.Region) {
+	if !strings.Contains(cl.Config.authConfig.Endpoint, cl.Config.authConfig.Region) && !isLocalHost {
 		log.Err("Endpoint in region does not match provided endpoint.")
 		return errRegionMismatch
 	}
@@ -199,7 +202,7 @@ func (cl *Client) Configure(cfg Config) error {
 		}
 	}
 
-	// Check that the provided bucket exists and that you have access to bucket
+	// Check that the provided bucket exists and that user has access to bucket
 	exists, err := cl.headBucket()
 	if err != nil || !exists {
 		log.Err("Client::Configure : Error finding bucket. Here's why: %v", err)
