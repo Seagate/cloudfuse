@@ -84,7 +84,7 @@ var setKeyCmd = &cobra.Command{
 			return fmt.Errorf("failed to marshal config [%s]", err.Error())
 		}
 
-		cipherText, err := common.EncryptData(confStream, []byte(secOpts.PassPhrase))
+		cipherText, err := common.EncryptData(confStream, secOpts.PassPhrase)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt config [%s]", err.Error())
 		}

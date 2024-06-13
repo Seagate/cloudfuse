@@ -312,7 +312,7 @@ func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 		stat.Namemax = attr.Namemax
 	} else {
 		var free, total, avail uint64
-		total = common.PbToBytes
+		total = common.TbToBytes
 		avail = total
 		free = total
 
@@ -642,6 +642,8 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 
 // Read reads data from a file into the buffer with the given offset.
 func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
+	//skipping the logging to avoid creating log noise and the performance costs from huge number of calls.
+	//log.Debug("Libfuse::Read : reading path %s, handle: %d", path, fh)
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
@@ -680,6 +682,8 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 
 // Write writes data to a file from the buffer with the given offset.
 func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int {
+	//skipping the logging to avoid creating log noise and the performance costs from huge number of calls
+	//log.Debug("Libfuse::Write : Writing path %s, handle: %d", path, fh)
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
