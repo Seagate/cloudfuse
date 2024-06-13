@@ -47,8 +47,8 @@ func (fc *FileCache) async_cloud_handler() {
 	// if not, then call sleep() and increase the timeout
 
 	//not sure if this actually works, may have to look at other methods to iterate through sync map
-	var maxTries float64 = 20
-	var returnVal error //race condition on returnVal?
+	var maxTries float64 = 12 //max rest time of 6.825 minutes
+	var returnVal error       //race condition on returnVal?
 	var tries float64
 	var restTime float64
 	for {
@@ -101,6 +101,7 @@ func (fc *FileCache) async_cloud_handler() {
 					tries = 0                                        //attempt was successful, reset try counter
 					_ = fc.fileOps.CompareAndDelete(key, attributes) //file has been serviced, remove it from map only if file op hasn't been updated
 				} else {
+
 					if tries < maxTries {
 
 						tries++ //failed op, increase timeout duration

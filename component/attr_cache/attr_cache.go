@@ -322,9 +322,9 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("AttrCache::CreateDir : %s", options.Name)
 	err := ac.NextComponent().CreateDir(options)
 	var maxAttempts *retry.MaxAttemptsError
-	ok := errors.As(err, &maxAttempts)
+	cloudisDown := errors.As(err, &maxAttempts)
 
-	if err != nil && !ok && err != syscall.EEXIST {
+	if err != nil && !cloudisDown && err != syscall.EEXIST {
 		return err
 	} else {
 		ac.cacheLock.Lock()
@@ -367,10 +367,12 @@ func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 
 	deletionTime := time.Now()
 	err := ac.NextComponent().DeleteDir(options)
-	// var maxAttempts *retry.MaxAttemptsError
-	// ok := errors.As(err, &maxAttempts)
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
 
-	if err == nil {
+	if err != nil && !cloudisDown {
+		return err
+	} else {
 		// deleteDirectory may add the parent directory to the cache
 		// so we must lock the cache for writing
 		ac.cacheLock.Lock()
@@ -619,8 +621,12 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 
 	currentTime := time.Now()
 	err := ac.NextComponent().RenameDir(options)
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
 
-	if err == nil {
+	if err != nil && !cloudisDown {
+		return err
+	} else {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 
@@ -659,9 +665,26 @@ func (ac *AttrCache) RenameDir(options internal.RenameDirOptions) error {
 // CreateFile: Cache a new entry for the file
 func (ac *AttrCache) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	log.Trace("AttrCache::CreateFile : %s", options.Name)
+
 	h, err := ac.NextComponent().CreateFile(options)
 
-	if err == nil {
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
+
+	if err != nil && !cloudisDown {
+		return nil, err
+	} else {
+
+		if h == nil {
+
+			h = handlemap.NewHandle(options.Name)
+			if h == nil {
+				log.Err("S3Storage::CreateFile : Failed to create handle for %s", options.Name)
+				return nil, syscall.EFAULT
+			}
+			h.Mtime = time.Now()
+		}
+
 		currentTime := time.Now()
 		// TODO: the cache locks are used incorrectly here
 		// They routinely lock the cache for reading, but then write to it
@@ -713,8 +736,9 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("AttrCache::DeleteFile : %s", options.Name)
 	var maxAttempts *retry.MaxAttemptsError
 	err := ac.NextComponent().DeleteFile(options)
-	ok := errors.As(err, &maxAttempts)
-	if err != nil && !ok {
+	cloudisDown := errors.As(err, &maxAttempts)
+
+	if err != nil && !cloudisDown {
 		return err
 	} else {
 		deletionTime := time.Now()
@@ -778,7 +802,12 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("AttrCache::RenameFile : %s -> %s", options.Src, options.Dst)
 
 	err := ac.NextComponent().RenameFile(options)
-	if err == nil {
+
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
+	if err != nil && !cloudisDown {
+		return err
+	} else {
 		renameTime := time.Now()
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
@@ -818,8 +847,12 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	}
 
 	size, err := ac.NextComponent().WriteFile(options)
-	//start here
-	if err == nil {
+
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
+	if err != nil && !cloudisDown {
+		return 0, err
+	} else {
 		modifyTime := time.Now()
 		newSize := options.Offset + int64(len(options.Data))
 
@@ -848,8 +881,11 @@ func (ac *AttrCache) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("AttrCache::TruncateFile : %s", options.Name)
 
 	err := ac.NextComponent().TruncateFile(options)
-
-	if err == nil {
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
+	if err != nil && !cloudisDown {
+		return err
+	} else {
 		modifyTime := time.Now()
 
 		ac.cacheLock.Lock()
@@ -993,6 +1029,8 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	//check cloud call here
 	ac.cacheLock.Lock()
 	defer ac.cacheLock.Unlock()
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
 
 	if err == nil {
 		// Retrieved attributes so cache them
@@ -1011,7 +1049,20 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			exists:   false,
 			cachedAt: time.Now(),
 		})
-	} //check if err is cloud down, entry is valid, and found, repeat if block above
+	} else if found && cloudisDown && value.valid() { //check if err is cloud down, entry is valid, and found, repeat if block above
+		if !value.exists() {
+			log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
+			return nil, syscall.ENOENT
+		}
+		// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
+		// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
+		// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
+		if value.attr.IsMetadataRetrieved() || (!ac.enableSymlinks && !options.RetrieveMetadata) {
+			// path exists and we have all the metadata required or we do not care about metadata
+			return value.attr, nil
+		}
+	}
+	//check if err is cloud down, entry is valid, and found, repeat if block above
 	return pathAttr, err
 }
 
@@ -1020,8 +1071,11 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 	log.Trace("AttrCache::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
 
 	err := ac.NextComponent().CreateLink(options)
-
-	if err == nil {
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
+	if err != nil && !cloudisDown {
+		return err
+	} else {
 		currentTime := time.Now()
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
@@ -1060,8 +1114,11 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 	log.Trace("AttrCache::Chmod : Change mode of file/directory %s", options.Name)
 
 	err := ac.NextComponent().Chmod(options)
-
-	if err == nil {
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
+	if err != nil && !cloudisDown {
+		return err
+	} else {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 
