@@ -42,8 +42,8 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 }
 
 // Use WinFSP to mount and if successful, add instance to persistent mount list
-func createMountInstance() error {
-	err := winservice.StartMount(options.MountPath, options.ConfigFile)
+func createMountInstance(passphrase string) error {
+	err := winservice.StartMount(options.MountPath, options.ConfigFile, passphrase)
 	if err != nil {
 		return err
 	}
