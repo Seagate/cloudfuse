@@ -329,27 +329,6 @@ func (lfs *LoopbackFS) FlushFile(options internal.FlushFileOptions) error {
 	return nil
 }
 
-func (lfs *LoopbackFS) ReleaseFile(options internal.ReleaseFileOptions) error {
-	log.Trace("LoopbackFS::ReleaseFile : name=%s", options.Handle.Path)
-	f := options.Handle.GetFileObject()
-	if f == nil {
-		log.Err("LoopbackFS::ReleaseFile : error [file not open]")
-		return fmt.Errorf("LoopbackFS::ReleaseFile : %s file not open", options.Handle.Path)
-	}
-	return nil
-}
-
-func (lfs *LoopbackFS) UnlinkFile(options internal.UnlinkFileOptions) error {
-	log.Trace("LoopbackFS::UnlinkFile : name=%s", options.Name)
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
-	_, err := os.Lstat(path)
-	if err != nil {
-		log.Err("LoopbackFS::UnlinkFile : error [%s]", err)
-		return err
-	}
-	return err
-}
-
 func (lfs *LoopbackFS) CopyToFile(options internal.CopyToFileOptions) error {
 	log.Trace("LoopbackFS::CopyToFile : name=%s", options.Name)
 	path := common.JoinUnixFilepath(lfs.path, options.Name)

@@ -484,9 +484,6 @@ func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 
 // TODO: decide if the TODO below is relevant and delete if not
 // TODO : Below methods are pending to be implemented
-// SetAttr(string, internal.ObjAttr) error
-// UnlinkFile(string) error
-// ReleaseFile(*handlemap.Handle) error
 // FlushFile(*handlemap.Handle) error
 
 // ------------------------- Factory methods to create objects -------------------------------------------

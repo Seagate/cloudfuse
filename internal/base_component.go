@@ -229,20 +229,6 @@ func (base *BaseComponent) FlushFile(options FlushFileOptions) error {
 	return nil
 }
 
-func (base *BaseComponent) ReleaseFile(options ReleaseFileOptions) error {
-	if base.next != nil {
-		return base.next.ReleaseFile(options)
-	}
-	return nil
-}
-
-func (base *BaseComponent) UnlinkFile(options UnlinkFileOptions) error {
-	if base.next != nil {
-		return base.next.UnlinkFile(options)
-	}
-	return nil
-}
-
 // Symlink operations
 func (base *BaseComponent) CreateLink(options CreateLinkOptions) error {
 	if base.next != nil {
@@ -271,13 +257,6 @@ func (base *BaseComponent) GetFileBlockOffsets(options GetFileBlockOffsetsOption
 		return base.next.GetFileBlockOffsets(options)
 	}
 	return &common.BlockOffsetList{}, nil
-}
-
-func (base *BaseComponent) SetAttr(options SetAttrOptions) error {
-	if base.next != nil {
-		return base.next.SetAttr(options)
-	}
-	return nil
 }
 
 func (base *BaseComponent) Chmod(options ChmodOptions) error {

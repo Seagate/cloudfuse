@@ -143,14 +143,6 @@ type SyncDirOptions struct {
 	Name string
 }
 
-type ReleaseFileOptions struct {
-	Handle *handlemap.Handle
-}
-
-type UnlinkFileOptions struct {
-	Name string
-}
-
 type CreateLinkOptions struct {
 	Name   string
 	Target string
@@ -163,11 +155,6 @@ type ReadLinkOptions struct {
 type GetAttrOptions struct {
 	Name             string
 	RetrieveMetadata bool
-}
-
-type SetAttrOptions struct {
-	Name string
-	Attr *ObjAttr
 }
 
 type ChmodOptions struct {

@@ -529,9 +529,6 @@ func (az *AzStorage) CommitData(opt internal.CommitDataOptions) error {
 }
 
 // TODO : Below methods are pending to be implemented
-// SetAttr(string, internal.ObjAttr) error
-// UnlinkFile(string) error
-// ReleaseFile(*handlemap.Handle) error
 // FlushFile(*handlemap.Handle) error
 
 // ------------------------- Factory methods to create objects -------------------------------------------
