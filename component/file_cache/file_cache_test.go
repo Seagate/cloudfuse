@@ -1432,7 +1432,7 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 	suite.assert.NoError(err)
 
 	output := make([]byte, 9)
-	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
+	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output})
 	suite.assert.NoError(err)
 	suite.assert.Equal(9, n)
 	suite.assert.EqualValues(data, output)
