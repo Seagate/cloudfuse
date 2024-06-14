@@ -181,23 +181,13 @@ func (cl *Client) Configure(cfg Config) error {
 		return err
 	}
 
-	// If endpoint is localhost, then running locally so ignore region check
-	isLocalHost := strings.Contains(cl.Config.authConfig.Endpoint, "localhost")
-
-	// Check that region matches region in endpoint
-	// This check is after endpoint errors so endpoint can be validated first
-	if !strings.Contains(cl.Config.authConfig.Endpoint, cl.Config.authConfig.Region) && !isLocalHost {
-		log.Err("Endpoint in region does not match provided endpoint.")
-		return errRegionMismatch
-	}
-
 	// if no bucket-name was set, default to the first bucket in the list
 	if cl.Config.authConfig.BucketName == "" {
 		if len(bucketList) > 0 {
 			cl.Config.authConfig.BucketName = bucketList[0]
 			log.Warn("Client::Configure : Bucket defaulted to first listed bucket: %s", bucketList[0])
 		} else {
-			log.Err("Client::Configure : Error no bucket exists in account. Here's why: %v", err)
+			log.Err("Client::Configure : Error no bucket exists in account: %v", err)
 			return errNoBucketInAccount
 		}
 	}
@@ -205,11 +195,18 @@ func (cl *Client) Configure(cfg Config) error {
 	// Check that the provided bucket exists and that user has access to bucket
 	exists, err := cl.headBucket()
 	if err != nil || !exists {
+		var ae smithy.APIError
+		if errors.As(err, &ae) {
+			// If error is a bad request, likely means that the region is incorrect
+			if ae.ErrorCode() == "BadRequest" {
+				return errRegionMismatch
+			}
+		}
 		log.Err("Client::Configure : Error finding bucket. Here's why: %v", err)
 		return errBucketDoesNotExist
 	}
 
-	// Use list objects validate the region is correct and user can list objects
+	// Use list objects validate user can list objects
 	_, _, err = cl.List("/", nil, 1)
 	if err != nil {
 		log.Err("Client::Configure : listing objects failed. Here's why: %v", err)
