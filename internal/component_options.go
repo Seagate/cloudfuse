@@ -92,10 +92,6 @@ type RenameFileOptions struct {
 	Dst string
 }
 
-type ReadFileOptions struct {
-	Handle *handlemap.Handle
-}
-
 type ReadInBufferOptions struct {
 	Handle *handlemap.Handle
 	Offset int64
