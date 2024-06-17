@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -45,10 +46,12 @@ import (
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 const (
@@ -64,6 +67,17 @@ type Client struct {
 
 // Verify that Client implements S3Connection interface
 var _ S3Connection = &Client{}
+
+// The text before the : symbol is a magic keyword
+// It cannot change as it is parsed by our plugin for network optix to provide more clear errors to the user
+var (
+	errBucketDoesNotExist = errors.New("Bucket Error: S3 bucket does not exist. Please check your bucket name is correct.")
+	errInvalidEndpoint    = errors.New("Endpoint Error: Provided S3 endpoint is invalid. Please check endpoint is correct.")
+	errInvalidCredential  = errors.New("Credential or Endpoint Error: S3 credentials or endpoint are invalid. Please check your credentials and endpoint are correct.")
+	errInvalidSecretKey   = errors.New("Secret Error: S3 secret key is not valid. Please check that the secret key and endpoint are correct.")
+	errRegionMismatch     = errors.New("Region Error: Region provided does not match region in endpoint. Please check endpoint has correct region.")
+	errNoBucketInAccount  = errors.New("Bucket Error: No bucket exists in S3 account. Please create a bucket in your account.")
+)
 
 // Configure : Initialize the awsS3Client
 func (cl *Client) Configure(cfg Config) error {
@@ -135,20 +149,64 @@ func (cl *Client) Configure(cfg Config) error {
 		})
 	}
 
-	// ListBuckets here to test connection
+	// ListBuckets here to test connection to S3 backend
 	bucketList, err := cl.ListBuckets()
 	if err != nil {
 		log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
+
+		var oe *smithy.OperationError
+		if errors.As(err, &oe) {
+			var re *awsHttp.ResponseError
+			if errors.As(err, &re) {
+				// Endpoint is invalid or could not connect to endpoint
+				if re.HTTPStatusCode() == http.StatusMovedPermanently || re.HTTPStatusCode() == 0 {
+					log.Err("Client::Configure : Error trying to connect to endpoint. Invalid endpoint. : %v", err)
+					return errInvalidEndpoint
+				}
+			}
+		}
+
+		var ae smithy.APIError
+		if errors.As(err, &ae) {
+			// If error is forbidden, then credentials were incorrect
+			if ae.ErrorCode() == "Forbidden" {
+				return errInvalidCredential
+			}
+			// If error is forbidden, then access key is correct but secret key is incorrect
+			if ae.ErrorCode() == "SignatureDoesNotMatch" {
+				return errInvalidSecretKey
+			}
+			fmt.Println(ae.Error())
+		}
 		return err
 	}
 
 	// if no bucket-name was set, default to the first bucket in the list
-	if cl.Config.authConfig.BucketName == "" && len(bucketList) > 0 {
-		cl.Config.authConfig.BucketName = bucketList[0]
-		log.Warn("Client::Configure : Bucket defaulted to first listed bucket: %s", bucketList[0])
+	if cl.Config.authConfig.BucketName == "" {
+		if len(bucketList) > 0 {
+			cl.Config.authConfig.BucketName = bucketList[0]
+			log.Warn("Client::Configure : Bucket defaulted to first listed bucket: %s", bucketList[0])
+		} else {
+			log.Err("Client::Configure : Error no bucket exists in account: %v", err)
+			return errNoBucketInAccount
+		}
 	}
 
-	// Use list objects validate the region and bucket access
+	// Check that the provided bucket exists and that user has access to bucket
+	exists, err := cl.headBucket()
+	if err != nil || !exists {
+		var ae smithy.APIError
+		if errors.As(err, &ae) {
+			// If error is a bad request, likely means that the region is incorrect
+			if ae.ErrorCode() == "BadRequest" {
+				return errRegionMismatch
+			}
+		}
+		log.Err("Client::Configure : Error finding bucket. Here's why: %v", err)
+		return errBucketDoesNotExist
+	}
+
+	// Use list objects validate user can list objects
 	_, _, err = cl.List("/", nil, 1)
 	if err != nil {
 		log.Err("Client::Configure : listing objects failed. Here's why: %v", err)
@@ -160,7 +218,7 @@ func (cl *Client) Configure(cfg Config) error {
 
 func getRegionFromEndpoint(endpoint string) (string, error) {
 	if endpoint == "" {
-		return "", fmt.Errorf("Endpoint is empty")
+		return "", errors.New("Endpoint is empty")
 	}
 
 	u, err := url.Parse(endpoint)
@@ -170,7 +228,7 @@ func getRegionFromEndpoint(endpoint string) (string, error) {
 
 	hostParts := strings.Split(u.Hostname(), ".")
 	if len(hostParts) < 2 {
-		return "", fmt.Errorf("Invalid Endpoint")
+		return "", errors.New("Invalid Endpoint")
 	}
 
 	// the second host part is usually the region
@@ -181,7 +239,7 @@ func getRegionFromEndpoint(endpoint string) (string, error) {
 	}
 	// reserve two hostparts after the region for the domain
 	if len(hostParts)-regionPartIndex < 3 {
-		return "", fmt.Errorf("Endpoint does not include a region")
+		return "", errors.New("Endpoint does not include a region")
 	}
 
 	region := hostParts[regionPartIndex]
