@@ -1,0 +1,61 @@
+#similar approach as solution 2 with a little less work to sync the fc and ac
+
+# already exist in cloud:
+dira/oldfile.txt
+# then we add a file
+touch dira/newfile.txt
+ls dira
+# now one file is in file_cache, another is not
+cloud goes down
+touch dira/localOnly.txt
+    -touch will wipe out prev attribute cache and not rebuild its listings
+mv dira dirb    - async map RenameDir dira dirb
+file_cache actually moves its cached dira to dirb
+ls dira
+attribute_cache returns stale dira contents:
+    -dira/localOnly.txt
+filecache has async_map rename from dira -> dirb
+so we ignore attr_cache data and return ENOENT instead
+# ls dira correct
+ls dirb
+attribute_cache returns ENOENT
+filecache has async_map rename from dira -> dirb
+so filecache lists dira from attribute cache, and merges that with local dirb listing
+# correct so far
+mkdir dira
+attribute cache responds with EEXIST
+but file cache has async map rename for dira, so it silences the error and returns nil
+ls dira
+we get stale entries for AC
+async map removes the AC listings because that folder was renamed
+FC merges in its local cache, which is an empty dira, and this saves us from return ENOENT
+# host is happy again
+touch dira/newerfile.txt
+ls dira
+stale entries from AC
+async map clears those due to rename
+FC merges local cache: dira/newerfile.txt
+# host is happy
+cloud
+dira/oldfile.txt
+dira/newfile.txt
+AC
+dira/oldfile.txt
+dira/newfile.txt
+FC
+# code changes: rename local directories
+# implement CreateDir to create a local directory and intercept AC responses
+dirb/newfile.txt
+dirb/localOnly.txt
+dira/newerfile.txt
+async
+# code changes: mask listings with map data
+# rename directory affects all its children in the async map
+dira -> dirb
+CreateFile dira/newerfile.txt
+CreateFile dirb/localOnly.txt
+host expects
+dira/newerfile.txt
+dirb/oldfile.txt
+dirb/newfile.txt
+dirb/localOnly.txt

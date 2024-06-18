@@ -474,8 +474,7 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 
 	// To cover case 1, grab all entries from storage
 
-	//If the cloud is down, it'll return an error (attrs is empty, token is empty)
-	//We are accessing data stored in attribute cache, not cloud so this is ok
+	// If the cloud is down, we get stale data back from the attribute cache
 	log.Debug("FileCache::StreamDir : the currFile name is %s", options.Name)
 	attrs, token, err := fc.NextComponent().StreamDir(options)
 	if err != nil {
