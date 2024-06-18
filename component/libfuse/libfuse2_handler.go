@@ -160,7 +160,9 @@ func (lf *Libfuse) initFuse() error {
 	if runtime.GOOS == "windows" && lf.networkShare && common.IsDriveLetter(lf.mountPath) {
 		// TODO: We can support any type of valid network share path so this path could
 		// be configurable for the config file. But this is a good default.
-		opts = append(opts, "--VolumePrefix=\\server\\share")
+
+		volumePrefix := fmt.Sprintf("--VolumePrefix=\\server%d\\share", os.Getpid())
+		opts = append(opts, volumePrefix)
 	}
 
 	// Enabling trace is done by using -d rather than setting an option in fuse
