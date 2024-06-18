@@ -31,7 +31,7 @@ require (
 	github.com/vibhansa-msft/tlru v0.0.0-20230621165448-dbd42234ad22
 	github.com/winfsp/cgofuse v1.5.0
 	go.uber.org/atomic v1.11.0
-	golang.org/x/sys v0.20.0
+	golang.org/x/sys v0.21.0
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 )
