@@ -40,13 +40,6 @@ This function is responsible for going through the fileOps map and servicing eac
 */
 func (fc *FileCache) async_cloud_handler() {
 
-	//we can use the s3/azure sdk to retry cloud ops without having to implement our own timeout
-
-	//check if cloud is up
-	// if up, then go to sync map and service the file ops. reset the timeout
-	// if not, then call sleep() and increase the timeout
-
-	//not sure if this actually works, may have to look at other methods to iterate through sync map
 	var maxTries float64 = 12 //max rest time of 6.825 minutes
 	var returnVal error       //race condition on returnVal?
 	var tries float64
@@ -200,11 +193,11 @@ func (fc *FileCache) asyncChmod(options internal.ChmodOptions) error {
 	//need to first flushFile before Chmod to ensure file is in cloud
 	//could probably do this as a one liner but figure it out later if needed
 
-	// flushFilePath := FlushFileAbstraction{}
+	flushFilePath := FlushFileAbstraction{}
 
-	// flushFilePath.Name = options.Name
+	flushFilePath.Name = options.Name
 
-	// fc.asyncFlushFile(flushFilePath)
+	fc.asyncFlushFile(flushFilePath)
 
 	err := fc.NextComponent().Chmod(options)
 	err = fc.validateStorageError(options.Name, err, "Chmod", false)

@@ -494,16 +494,21 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			attr := attrs[i]
 
 			if attr.Name == key {
-
+				//remove file listing if there is a deleteFile operation
 				if val.operation == "DeleteFile" {
 					attrs = append(attrs[:i], attrs[i+1:]...)
 				}
-				//TODO: Add support for rename file
+				//Change source file name to dst file name
 				if val.operation == "RenameFile" {
 					renameOptions := val.options.(internal.RenameFileOptions)
 					attrs[i].Name = renameOptions.Dst //this just does a rename but we need to make sure file contents are also transferred
 				}
+				//remove directory listing from attrs if there is a deletedir operation
+				if val.operation == "DeleteDir" {
+					attrs = append(attrs[:i], attrs[i+1:]...)
+				}
 				//TODO: Add support for rename directory
+				//
 			}
 
 			return true
@@ -957,6 +962,30 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	handle.SetFileObject(f)
 
 	return handle, nil
+}
+
+func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
+
+	err := fc.NextComponent().CreateDir(options)
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
+	if err != nil && !cloudisDown {
+		log.Err("FileCache::CreateDir : failed to create directory in cloud due to error %s", err.Error())
+		return err
+	}
+
+	// Create the directory locally using itss local path
+	localpath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	err = os.MkdirAll(localpath, options.Mode)
+	if err != nil {
+		log.Err("FileCache::CreateDir : failed to make local directory because %s", err.Error())
+		return err
+	}
+	fc.policy.CacheValid(localpath)
+	log.Trace("FileCache::CreateDir : the directory was created successfully locally with path %s", localpath)
+
+	return nil
+
 }
 
 // CloseFile: Flush the file and invalidate it from the cache.
