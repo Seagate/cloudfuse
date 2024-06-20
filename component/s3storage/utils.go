@@ -37,6 +37,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/smithy-go"
 )
 
@@ -128,6 +129,12 @@ func parseS3Err(err error, attemptedAction string) error {
 			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, errorCode)
 			return syscall.ENOENT
 		}
+	}
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
+
+	if cloudisDown {
+		return errors.New("Failed Cloud Connection")
 	}
 
 	// unrecognized error - parsing failed

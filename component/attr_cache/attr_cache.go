@@ -707,6 +707,13 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("AttrCache::DeleteFile : %s", options.Name)
 
 	err := ac.NextComponent().DeleteFile(options)
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
+
+	if cloudisDown {
+		return errors.New("Failed cloud connection")
+	}
+
 	if err == nil {
 		deletionTime := time.Now()
 		ac.cacheLock.Lock()

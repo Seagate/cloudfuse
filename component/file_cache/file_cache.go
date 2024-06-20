@@ -27,6 +27,7 @@ package file_cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -43,6 +44,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 
 	"github.com/spf13/cobra"
 )
@@ -480,6 +482,35 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	if err != nil {
 		token = ""
 	}
+
+	//after getting the stale cache listing, compare it with async map so that it's correct
+	//this is at a high performance cost, but can be optimized later
+	i := 0
+	for i < len(attrs) {
+
+		fc.fileOps.Range(func(key, value interface{}) bool {
+			val := value.(FileAttributes)
+
+			attr := attrs[i]
+
+			if attr.Name == key {
+
+				if val.operation == "DeleteFile" {
+					attrs = append(attrs[:i], attrs[i+1:]...)
+				}
+				//TODO: Add support for rename file
+				if val.operation == "RenameFile" {
+					renameOptions := val.options.(internal.RenameFileOptions)
+					attrs[i].Name = renameOptions.Dst //this just does a rename but we need to make sure file contents are also transferred
+				}
+				//TODO: Add support for rename directory
+			}
+
+			return true
+		})
+		i++
+	}
+
 	// Get files from local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	dirents, err := os.ReadDir(localPath)
@@ -488,7 +519,7 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		return attrs, token, err
 	}
 
-	i := 0 // Index for cloud
+	i = 0  // Index for cloud
 	j := 0 // Index for local cache
 
 	// Iterate through attributes from cloud and local cache, adding the elements in order alphabetically
@@ -740,13 +771,16 @@ func (fc *FileCache) validateStorageError(path string, err error, method string,
 // DeleteFile: Invalidate the file in local cache.
 func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("FileCache::DeleteFile : name=%s", options.Name)
-
 	flock := fc.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
 
 	_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name, RetrieveMetadata: false})
-	if err != nil {
+	//TODO: Add support for azure errors as well so cloud outage can be detected for both
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
+
+	if err != nil && !cloudisDown {
 		return syscall.ENOENT //no entity if not in cloud error
 	}
 
