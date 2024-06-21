@@ -508,7 +508,11 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 					attrs = append(attrs[:i], attrs[i+1:]...)
 				}
 				//TODO: Add support for rename directory
-				//
+				if val.operation == "RenameDir" {
+					renameOptions := val.options.(internal.RenameDirOptions)
+					attrs[i].Name = renameOptions.Dst //this just does a rename but we need to make sure file contents are also transferred
+
+				}
 			}
 
 			return true
@@ -653,6 +657,18 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 		fc.fileOps.Delete(dKey)         //Remove old value for key
 		fc.fileOps.Store(dKey, newAttr) //Replace with new one
 	}
+
+	localSrcPath := common.JoinUnixFilepath(fc.tmpPath, options.Src)
+	localDstPath := common.JoinUnixFilepath(fc.tmpPath, options.Dst)
+
+	err := os.Rename(localSrcPath, localDstPath)
+
+	if err != nil {
+		log.Err("FileCache::RenameDir : Failed to rename %s to %s due to error %s", localSrcPath, localDstPath, err.Error())
+		return err
+	}
+
+	//fc.policy.CacheValid(localDstPath)
 
 	go fc.invalidateDirectory(options.Src)
 	// TLDR: Dst is guaranteed to be non-existent or empty.
