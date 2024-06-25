@@ -173,7 +173,7 @@ func (lf *Libfuse) initFuse() error {
 			}
 		}
 
-		volumePrefix := fmt.Sprintf("--VolumePrefix=\\bucket: %s\\share", bucketName)
+		volumePrefix := fmt.Sprintf("--VolumePrefix=\\bucket\\%s", bucketName)
 		opts = append(opts, volumePrefix)
 	}
 
