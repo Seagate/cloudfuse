@@ -76,8 +76,8 @@ type FileCache struct {
 	hardLimit         bool
 	diskHighWaterMark float64
 
-	fileOps    sync.Map //we want fileOps to store the operations to preform on the file if the cloud is down. Key is file name, value is operation to do
-	asyncBegin chan bool
+	fileOps     sync.Map //we want fileOps to store the operations to preform on the file if the cloud is down. Key is file name, value is operation to do
+	asyncSignal sync.Mutex
 }
 
 type FileAttributes struct {
@@ -461,7 +461,8 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 		fc.fileOps.Delete(options.Name)         //Remove old value for key
 		fc.fileOps.Store(options.Name, newAttr) //Replace with new one
 	}
-
+	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
+	fc.asyncSignal.Unlock()  // Signal to async thread to do work
 	//Ok because this is invalidating locally
 	go fc.invalidateDirectory(options.Name)
 	return nil
@@ -657,7 +658,8 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 		fc.fileOps.Delete(dKey)         //Remove old value for key
 		fc.fileOps.Store(dKey, newAttr) //Replace with new one
 	}
-
+	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
+	fc.asyncSignal.Unlock()  // Signal to async thread to do work
 	localSrcPath := common.JoinUnixFilepath(fc.tmpPath, options.Src)
 	localDstPath := common.JoinUnixFilepath(fc.tmpPath, options.Dst)
 
@@ -668,7 +670,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 		return err
 	}
 
-	//fc.policy.CacheValid(localDstPath)
+	fc.policy.CacheValid(localDstPath)
 
 	go fc.invalidateDirectory(options.Src)
 	// TLDR: Dst is guaranteed to be non-existent or empty.
@@ -709,6 +711,8 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 			fc.fileOps.Delete(options.Name)         //Remove old value for key
 			fc.fileOps.Store(options.Name, newAttr) //Replace with new one
 		}
+		fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
+		fc.asyncSignal.Unlock()  // Signal to async thread to do work
 	}
 
 	// Create the file in local cache
@@ -816,6 +820,8 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 		fc.fileOps.Delete(options.Name)
 		fc.fileOps.Store(options.Name, nextAttr)
 	}
+	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
+	fc.asyncSignal.Unlock()  // Signal to async thread to do work
 
 	//local delete
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
@@ -1185,7 +1191,8 @@ func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 			fc.fileOps.Delete(options.Handle.FObj.Name())
 			fc.fileOps.Store(options.Handle.FObj.Name(), nextAttr)
 		}
-
+		fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
+		fc.asyncSignal.Unlock()  // Signal to async thread to do work
 		// options.Handle.Flags.Set(handlemap.HandleFlagFSynced)
 	}
 
@@ -1288,7 +1295,8 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 			fc.fileOps.Delete(parent)         //Remove old value for key
 			fc.fileOps.Store(parent, newAttr) //Replace with new one
 		}
-
+		fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
+		fc.asyncSignal.Unlock()  // Signal to async thread to do work
 		options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
 
 		// If chmod was done on the file before it was uploaded to container then setting up mode would have been missed
@@ -1409,7 +1417,8 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 		fc.fileOps.Delete(fKey)         //Remove old value for key
 		fc.fileOps.Store(fKey, newAttr) //Replace with new one
 	}
-
+	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
+	fc.asyncSignal.Unlock()  // Signal to async thread to do work
 	localSrcPath := common.JoinUnixFilepath(fc.tmpPath, options.Src)
 	localDstPath := common.JoinUnixFilepath(fc.tmpPath, options.Dst)
 
@@ -1534,7 +1543,8 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 		fc.fileOps.Delete(options.Name)         //Remove old value for key
 		fc.fileOps.Store(options.Name, newAttr) //Replace with new one
 	}
-
+	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
+	fc.asyncSignal.Unlock()  // Signal to async thread to do work
 	// Update the mode of the file in the local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	info, err := os.Stat(localPath)
@@ -1575,6 +1585,8 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 		fc.fileOps.Delete(options.Name)         //Remove old value for key
 		fc.fileOps.Store(options.Name, newAttr) //Replace with new one
 	}
+	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
+	fc.asyncSignal.Unlock()  // Signal to async thread to do work
 	// Update the owner and group of the file in the local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	_, err := os.Stat(localPath)

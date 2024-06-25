@@ -44,66 +44,77 @@ func (fc *FileCache) async_cloud_handler() {
 	var returnVal error       //race condition on returnVal?
 	var tries float64
 	var restTime float64
-	for {
+	var numFailed int
 
-		fc.fileOps.Range(func(key, value interface{}) bool {
+	for { //infinite loop to keep async thread running
 
-			restTime = (math.Pow(2, tries) - 1) * 100 //restTime in ms based on number of failed tries
-			log.Trace("AsyncFileCache:: async_cloud_handler : The timeout value is %f", restTime)
-			time.Sleep(time.Duration(restTime) * (time.Millisecond))
+		fc.asyncSignal.Lock() //Lock on mutex to sleep until there is an entry in the map
 
-			val, _ := fc.fileOps.Load(key)
-			attributes := val.(FileAttributes)
+		numFailed = 1        //make numFailed non-zero value so it will enter the loop
+		for numFailed != 0 { //Loop to try to service map operations
 
-			if val != nil {
-				log.Trace("AsyncFileCache:: async_cloud_handler : The key in the function call is %s and the value is %s", key, attributes)
-				switch {
-				case attributes.operation == "DeleteDir":
-					returnVal = fc.asyncDeleteDir(attributes.options.(internal.DeleteDirOptions))
+			numFailed = 0
 
-				case attributes.operation == "RenameDir":
-					returnVal = fc.asyncRenameDir(attributes.options.(internal.RenameDirOptions))
+			fc.fileOps.Range(func(key, value interface{}) bool {
 
-				case attributes.operation == "CreateFile":
-					returnVal = fc.asyncCreateFile(attributes.options.(internal.CreateFileOptions))
-					// fc.fileOps.Delete(key)
+				restTime = (math.Pow(2, tries) - 1) * 100 //restTime in ms based on number of failed tries
+				log.Trace("AsyncFileCache:: async_cloud_handler : The timeout value is %f", restTime)
+				time.Sleep(time.Duration(restTime) * (time.Millisecond))
 
-				case attributes.operation == "DeleteFile":
-					returnVal = fc.asyncDeleteFile(attributes.options.(internal.DeleteFileOptions))
+				val, _ := fc.fileOps.Load(key)
+				attributes := val.(FileAttributes)
 
-				case attributes.operation == "FlushFile":
-					returnVal = fc.asyncFlushFile(attributes.options.(FlushFileAbstraction))
+				if val != nil {
+					log.Trace("AsyncFileCache:: async_cloud_handler : The key in the function call is %s and the value is %s", key, attributes)
+					switch {
+					case attributes.operation == "DeleteDir":
+						returnVal = fc.asyncDeleteDir(attributes.options.(internal.DeleteDirOptions))
 
-				case attributes.operation == "RenameFile":
-					returnVal = fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions))
+					case attributes.operation == "RenameDir":
+						returnVal = fc.asyncRenameDir(attributes.options.(internal.RenameDirOptions))
 
-				case attributes.operation == "Chmod":
-					returnVal = fc.asyncChmod(attributes.options.(internal.ChmodOptions))
-					//returnVal = nil
+					case attributes.operation == "CreateFile":
+						returnVal = fc.asyncCreateFile(attributes.options.(internal.CreateFileOptions))
+						// fc.fileOps.Delete(key)
 
-				case attributes.operation == "Chown":
-					returnVal = fc.asyncChown(attributes.options.(internal.ChownOptions))
+					case attributes.operation == "DeleteFile":
+						returnVal = fc.asyncDeleteFile(attributes.options.(internal.DeleteFileOptions))
 
-				case attributes.operation == "SyncFile":
-					returnVal = fc.asyncSyncFile(attributes.options.(internal.SyncFileOptions))
-				}
+					case attributes.operation == "FlushFile":
+						returnVal = fc.asyncFlushFile(attributes.options.(FlushFileAbstraction))
 
-				log.Trace("AsyncFileCache:: async_cloud_handler: The key after the function call is %s and the value is %s", key, attributes)
-				if returnVal == nil {
-					log.Trace("AsyncFileCache:: async_cloud_handler: File name %s has just finished file operation %s", key, attributes.operation)
-					tries = 0                                        //attempt was successful, reset try counter
-					_ = fc.fileOps.CompareAndDelete(key, attributes) //file has been serviced, remove it from map only if file op hasn't been updated
-				} else {
+					case attributes.operation == "RenameFile":
+						returnVal = fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions))
 
-					if tries < maxTries {
+					case attributes.operation == "Chmod":
+						returnVal = fc.asyncChmod(attributes.options.(internal.ChmodOptions))
 
-						tries++ //failed op, increase timeout duration
+					case attributes.operation == "Chown":
+						returnVal = fc.asyncChown(attributes.options.(internal.ChownOptions))
+
+					case attributes.operation == "SyncFile":
+						returnVal = fc.asyncSyncFile(attributes.options.(internal.SyncFileOptions))
 					}
 
+					log.Trace("AsyncFileCache:: async_cloud_handler: The key after the function call is %s and the value is %s", key, attributes)
+					if returnVal == nil {
+						log.Trace("AsyncFileCache:: async_cloud_handler: File name %s has just finished file operation %s", key, attributes.operation)
+						tries = 0                                        //attempt was successful, reset try counter
+						_ = fc.fileOps.CompareAndDelete(key, attributes) //file has been serviced, remove it from map only if file op hasn't been updated
+
+					} else {
+
+						numFailed++
+						if tries < maxTries {
+
+							tries++ //failed op, increase timeout duration
+						}
+
+					}
 				}
-			}
-			return true
-		})
+				return true
+			})
+		}
 	}
 
 }
