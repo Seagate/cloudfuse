@@ -40,8 +40,8 @@ This function is responsible for going through the fileOps map and servicing eac
 */
 func (fc *FileCache) async_cloud_handler() {
 
-	var maxTries float64 = 12 //max rest time of 6.825 minutes
-	var returnVal error       //race condition on returnVal?
+	var maxTries float64 = 9 //max rest time of 51.1 seconds
+	var returnVal error      //race condition on returnVal?
 	var tries float64
 	var restTime float64
 	var numFailed int
@@ -157,6 +157,7 @@ func (fc *FileCache) asyncDeleteFile(options internal.DeleteFileOptions) error {
 }
 
 func (fc *FileCache) asyncRenameFile(options internal.RenameFileOptions) error {
+
 	err := fc.NextComponent().RenameFile(options)
 	err = fc.validateStorageError(options.Src, err, "RenameFile", false)
 	if err != nil {

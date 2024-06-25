@@ -515,7 +515,6 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 
 				}
 			}
-
 			return true
 		})
 		i++
@@ -660,6 +659,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	}
 	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
 	fc.asyncSignal.Unlock()  // Signal to async thread to do work
+
 	localSrcPath := common.JoinUnixFilepath(fc.tmpPath, options.Src)
 	localDstPath := common.JoinUnixFilepath(fc.tmpPath, options.Dst)
 
