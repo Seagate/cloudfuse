@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
@@ -161,7 +162,18 @@ func (lf *Libfuse) initFuse() error {
 		// TODO: We can support any type of valid network share path so this path could
 		// be configurable for the config file. But this is a good default.
 
-		volumePrefix := fmt.Sprintf("--VolumePrefix=\\server%d\\share", os.Getpid())
+		// by default bucketName will be blank
+		bucketName := ""
+		// Borrow bucket-name string from attribute cache
+		if config.IsSet("s3storage.bucket-name") {
+			err := config.UnmarshalKey("s3storage.bucket-name", &bucketName)
+			if err != nil {
+				bucketName = "default"
+				log.Err("ParseAndReadDynamicConfig : Failed to unmarshal s3storage.bucket-name")
+			}
+		}
+
+		volumePrefix := fmt.Sprintf("--VolumePrefix=\\bucket:%s\\share", bucketName)
 		opts = append(opts, volumePrefix)
 	}
 
