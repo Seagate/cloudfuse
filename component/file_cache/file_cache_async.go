@@ -158,13 +158,46 @@ func (fc *FileCache) asyncDeleteFile(options internal.DeleteFileOptions) error {
 
 func (fc *FileCache) asyncRenameFile(options internal.RenameFileOptions) error {
 
-	err := fc.NextComponent().RenameFile(options)
-	err = fc.validateStorageError(options.Src, err, "RenameFile", false)
-	if err != nil {
-		log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
-		return err
+	var getAttrOptions internal.GetAttrOptions
+
+	getAttrOptions.Name = options.Src
+	getAttrOptions.RetrieveMetadata = false //not sure what this is for
+
+	_, err := fc.NextComponent().GetAttr(getAttrOptions)
+
+	if err != nil && err == syscall.ENOENT { //src file does not exist in cloud
+
+		err = fc.asyncDeleteFile(internal.DeleteFileOptions{Name: options.Src})
+		if err != nil {
+			log.Err("FileCache::RenameFile : %s failed to Delete file [%s]", options.Src, err.Error())
+			return err
+		}
+
+		err = fc.asyncFlushFile(FlushFileAbstraction{Name: options.Dst})
+		if err != nil {
+			log.Err("FileCache::RenameFile : %s failed to flush file [%s]", options.Dst, err.Error())
+			return err
+		}
+		return nil
+
+	} else {
+
+		err = fc.NextComponent().RenameFile(options)
+		err = fc.validateStorageError(options.Src, err, "RenameFile", false)
+		if err != nil {
+			log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
+			return err
+		}
+		return nil
+
 	}
-	return nil
+	// err = fc.NextComponent().RenameFile(options)
+	// err = fc.validateStorageError(options.Src, err, "RenameFile", false)
+	// if err != nil {
+	// 	log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
+	// 	return err
+	// }
+	// return nil
 }
 
 func (fc *FileCache) asyncDeleteDir(options internal.DeleteDirOptions) error {
@@ -203,13 +236,8 @@ func (fc *FileCache) asyncCreateFile(options internal.CreateFileOptions) error {
 func (fc *FileCache) asyncChmod(options internal.ChmodOptions) error {
 
 	//need to first flushFile before Chmod to ensure file is in cloud
-	//could probably do this as a one liner but figure it out later if needed
 
-	flushFilePath := FlushFileAbstraction{}
-
-	flushFilePath.Name = options.Name
-
-	fc.asyncFlushFile(flushFilePath)
+	fc.asyncFlushFile(FlushFileAbstraction{Name: options.Name})
 
 	err := fc.NextComponent().Chmod(options)
 	err = fc.validateStorageError(options.Name, err, "Chmod", false)
