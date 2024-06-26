@@ -1033,11 +1033,7 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 	log.Trace("AttrCache::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
 
 	err := ac.NextComponent().CreateLink(options)
-	var maxAttempts *retry.MaxAttemptsError
-	cloudisDown := errors.As(err, &maxAttempts)
-	if err != nil && !cloudisDown {
-		return err
-	} else {
+	if err == nil {
 		currentTime := time.Now()
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
@@ -1076,11 +1072,7 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 	log.Trace("AttrCache::Chmod : Change mode of file/directory %s", options.Name)
 
 	err := ac.NextComponent().Chmod(options)
-	var maxAttempts *retry.MaxAttemptsError
-	cloudisDown := errors.As(err, &maxAttempts)
-	if err != nil && !cloudisDown {
-		return err
-	} else {
+	if err == nil {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 

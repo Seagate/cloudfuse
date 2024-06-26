@@ -491,10 +491,16 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 
 		fc.fileOps.Range(func(key, value interface{}) bool {
 			val := value.(FileAttributes)
-
+			keyString := key.(string)
 			attr := attrs[i]
 
-			if attr.Name == key {
+			if val.operation == "RenameFile" {
+
+				keyString = keyString[:strings.IndexByte(keyString, ',')]
+
+			}
+
+			if attr.Name == keyString {
 				//remove file listing if there is a deleteFile operation
 				if val.operation == "DeleteFile" {
 					attrs = append(attrs[:i], attrs[i+1:]...)
@@ -1409,7 +1415,8 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	newAttr := FileAttributes{}
 	newAttr.operation = "RenameFile"
 	newAttr.options = options
-	fKey := options.Src                                //Extract file name to serve as key
+	fKey := strings.Join([]string{options.Src, options.Dst}, ",") //Extract file name to serve as key
+	log.Trace("FileCache::RenameFile : The key in the async map is %s", fKey)
 	_, loaded := fc.fileOps.LoadOrStore(fKey, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
 
 	if loaded { //If there is already a value for the given key, we must overwrite it

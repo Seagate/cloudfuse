@@ -97,6 +97,7 @@ func (fc *FileCache) async_cloud_handler() {
 					}
 
 					log.Trace("AsyncFileCache:: async_cloud_handler: The key after the function call is %s and the value is %s", key, attributes)
+
 					if returnVal == nil {
 						log.Trace("AsyncFileCache:: async_cloud_handler: File name %s has just finished file operation %s", key, attributes.operation)
 						tries = 0                                        //attempt was successful, reset try counter
@@ -167,12 +168,6 @@ func (fc *FileCache) asyncRenameFile(options internal.RenameFileOptions) error {
 
 	if err != nil && err == syscall.ENOENT { //src file does not exist in cloud
 
-		err = fc.asyncDeleteFile(internal.DeleteFileOptions{Name: options.Src})
-		if err != nil {
-			log.Err("FileCache::RenameFile : %s failed to Delete file [%s]", options.Src, err.Error())
-			return err
-		}
-
 		err = fc.asyncFlushFile(FlushFileAbstraction{Name: options.Dst})
 		if err != nil {
 			log.Err("FileCache::RenameFile : %s failed to flush file [%s]", options.Dst, err.Error())
@@ -237,9 +232,13 @@ func (fc *FileCache) asyncChmod(options internal.ChmodOptions) error {
 
 	//need to first flushFile before Chmod to ensure file is in cloud
 
-	fc.asyncFlushFile(FlushFileAbstraction{Name: options.Name})
+	err := fc.asyncFlushFile(FlushFileAbstraction{Name: options.Name})
+	if err != nil {
+		log.Err("FileCache::Chmod : error [unable to open upload handle] %s [%s]", options.Name, err.Error())
+		return err
+	}
 
-	err := fc.NextComponent().Chmod(options)
+	err = fc.NextComponent().Chmod(options)
 	err = fc.validateStorageError(options.Name, err, "Chmod", false)
 	if err != nil {
 		if err != syscall.EIO {

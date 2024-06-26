@@ -44,6 +44,7 @@ import (
 	"github.com/Seagate/cloudfuse/component/loopback"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -58,6 +59,7 @@ type fileCacheTestSuite struct {
 	loopback          internal.Component
 	cache_path        string
 	fake_storage_path string
+	mock              *internal.MockComponent
 }
 
 func newLoopbackFS() internal.Component {
@@ -339,6 +341,49 @@ func (suite *fileCacheTestSuite) TestDeleteDir() {
 
 	// Delete the directory
 	err = suite.fileCache.DeleteDir(internal.DeleteDirOptions{Name: dir})
+	time.Sleep(time.Second)
+	suite.assert.NoError(err)
+	suite.assert.False(suite.fileCache.policy.IsCached(dir)) // Directory should not be cached
+}
+
+func (suite *fileCacheTestSuite) TestDeleteDirCloudDown() {
+	defer suite.cleanupTest()
+	// Setup
+	// Configure to create empty files so we create the file in cloud storage
+	createEmptyFile := true
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, createEmptyFile, suite.fake_storage_path)
+	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+
+	dir := "dir"
+	path := dir + "/file"
+
+	createDirOptions := internal.CreateDirOptions{Name: dir, Mode: 0777}
+	deleteDirOptions := internal.DeleteDirOptions{Name: dir}
+	createFileOptions := internal.CreateFileOptions{Name: path, Mode: 0777}
+
+	suite.mock.EXPECT().CreateDir(createDirOptions).Return(&retry.MaxAttemptsError{})
+	err := suite.fileCache.CreateDir(createDirOptions)
+	time.Sleep(time.Second)
+	suite.assert.NoError(err)
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(&retry.MaxAttemptsError{})
+	handle, err := suite.fileCache.CreateFile(createFileOptions)
+	time.Sleep(time.Second)
+	suite.assert.NoError(err)
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	time.Sleep(time.Second)
+	suite.assert.NoError(err)
+	// The file (and directory) is in the cache and storage (see TestCreateFileInDirCreateEmptyFile)
+	// Delete the file since we can only delete empty directories
+
+	err = suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
+	time.Sleep(time.Second)
+	suite.assert.NoError(err)
+
+	// Delete the directory
+
+	suite.mock.EXPECT().DeleteDir(deleteDirOptions).Return(&retry.MaxAttemptsError{})
+	err = suite.fileCache.DeleteDir(deleteDirOptions)
 	time.Sleep(time.Second)
 	suite.assert.NoError(err)
 	suite.assert.False(suite.fileCache.policy.IsCached(dir)) // Directory should not be cached
