@@ -930,41 +930,6 @@ func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
 	return nil
 }
 
-// ReadFile: Read the local file
-func (fc *FileCache) ReadFile(options internal.ReadFileOptions) ([]byte, error) {
-	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
-	fc.policy.CacheValid(localPath)
-
-	err := fc.downloadFile(options.Handle)
-	if err != nil {
-		log.Err("FileCache::ReadFile : error from calling downloadFile for %s", options.Handle.Path)
-		return nil, err
-	}
-
-	f := options.Handle.GetFileObject()
-	if f == nil {
-		log.Err("FileCache::ReadFile : error [couldn't find fd in handle] %s", options.Handle.Path)
-		return nil, syscall.EBADF
-	}
-
-	// Get file info so we know the size of data we expect to read.
-	info, err := f.Stat()
-	if err != nil {
-		log.Err("FileCache::ReadFile : error stat %s [%s] ", options.Handle.Path, err.Error())
-		return nil, err
-	}
-	data := make([]byte, info.Size())
-	bytesRead, err := f.Read(data)
-
-	if int64(bytesRead) != info.Size() {
-		log.Err("FileCache::ReadFile : error [couldn't read entire file] %s", options.Handle.Path)
-		return nil, syscall.EIO
-	}
-
-	return data, err
-}
-
 // ReadInBuffer: Read the local file into a buffer
 func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
 	//defer exectime.StatTimeCurrentBlock("FileCache::ReadInBuffer")()

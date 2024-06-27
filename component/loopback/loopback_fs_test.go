@@ -176,22 +176,6 @@ func (suite *LoopbackFSTestSuite) TestDeleteFile() {
 	assert.Error(err, "DeleteFile: file was not deleted")
 }
 
-func (suite *LoopbackFSTestSuite) TestOpenReadCloseFile() {
-	defer suite.cleanupTest()
-	assert := assert.New(suite.T())
-
-	handle, err := suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileLorem, Flags: os.O_RDONLY, Mode: os.FileMode(0777)})
-	assert.NoError(err, "OpenReadCloseFile: Failed to open file")
-	assert.NotNil(handle)
-
-	data, err := suite.lfs.ReadFile(internal.ReadFileOptions{Handle: handle})
-	assert.NoError(err, "OpenReadCloseFile: Failed to read file")
-	assert.Equal(data, []byte(loremText))
-
-	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
-	assert.NoError(err, "OpenReadCloseFile: Failed to close file")
-}
-
 func (suite *LoopbackFSTestSuite) TestReadInBuffer() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())

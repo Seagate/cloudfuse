@@ -394,11 +394,6 @@ func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
 	return err
 }
 
-func (az *AzStorage) ReadFile(options internal.ReadFileOptions) (data []byte, err error) {
-	//log.Trace("AzStorage::ReadFile : Read %s", h.Path)
-	return az.storage.ReadBuffer(options.Handle.Path, 0, 0)
-}
-
 func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length int, err error) {
 	//log.Trace("AzStorage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 

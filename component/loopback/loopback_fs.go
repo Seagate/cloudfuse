@@ -234,32 +234,6 @@ func (lfs *LoopbackFS) RenameFile(options internal.RenameFileOptions) error {
 	return os.Rename(oldPath, newPath)
 }
 
-func (lfs *LoopbackFS) ReadFile(options internal.ReadFileOptions) ([]byte, error) {
-	log.Trace("LoopbackFS::ReadFile : name=%s", options.Handle.Path)
-	f := options.Handle.GetFileObject()
-
-	options.Handle.RLock()
-	defer options.Handle.RUnlock()
-
-	if f == nil {
-		log.Err("LoopbackFS::ReadFile : error [invalid file object]")
-		return nil, os.ErrInvalid
-	}
-
-	info, err := f.Stat()
-	if err != nil {
-		log.Err("LoopbackFS::ReadFile : error [%s]", err)
-		return nil, err
-	}
-	data := make([]byte, info.Size())
-	n, err := f.Read(data)
-	if int64(n) != info.Size() {
-		log.Err("LoopbackFS::ReadFile : error [could not read entire file]")
-		return nil, err
-	}
-	return data, nil
-}
-
 func (lfs *LoopbackFS) ReadLink(options internal.ReadLinkOptions) (string, error) {
 	log.Trace("LoopbackFS::ReadLink : name=%s", options.Name)
 	path := common.JoinUnixFilepath(lfs.path, options.Name)
