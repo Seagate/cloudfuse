@@ -123,6 +123,6 @@ func sigusrHandler(pipeline *internal.Pipeline, ctx context.Context) daemon.Sign
 }
 
 // stub for compilation
-func createMountInstance(passphrase string) error {
+func createMountInstance() error {
 	return nil
 }
