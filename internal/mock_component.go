@@ -467,20 +467,6 @@ func (mr *MockComponentMockRecorder) ReadLink(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadLink", reflect.TypeOf((*MockComponent)(nil).ReadLink), arg0)
 }
 
-// ReleaseFile mocks base method.
-func (m *MockComponent) ReleaseFile(arg0 ReleaseFileOptions) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReleaseFile", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ReleaseFile indicates an expected call of ReleaseFile.
-func (mr *MockComponentMockRecorder) ReleaseFile(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseFile", reflect.TypeOf((*MockComponent)(nil).ReleaseFile), arg0)
-}
-
 // RenameDir mocks base method.
 func (m *MockComponent) RenameDir(arg0 RenameDirOptions) error {
 	m.ctrl.T.Helper()
@@ -507,20 +493,6 @@ func (m *MockComponent) RenameFile(arg0 RenameFileOptions) error {
 func (mr *MockComponentMockRecorder) RenameFile(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenameFile", reflect.TypeOf((*MockComponent)(nil).RenameFile), arg0)
-}
-
-// SetAttr mocks base method.
-func (m *MockComponent) SetAttr(arg0 SetAttrOptions) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetAttr", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetAttr indicates an expected call of SetAttr.
-func (mr *MockComponentMockRecorder) SetAttr(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAttr", reflect.TypeOf((*MockComponent)(nil).SetAttr), arg0)
 }
 
 // SetName mocks base method.
@@ -587,20 +559,6 @@ func (m *MockComponent) TruncateFile(arg0 TruncateFileOptions) error {
 func (mr *MockComponentMockRecorder) TruncateFile(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TruncateFile", reflect.TypeOf((*MockComponent)(nil).TruncateFile), arg0)
-}
-
-// UnlinkFile mocks base method.
-func (m *MockComponent) UnlinkFile(arg0 UnlinkFileOptions) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UnlinkFile", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UnlinkFile indicates an expected call of UnlinkFile.
-func (mr *MockComponentMockRecorder) UnlinkFile(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnlinkFile", reflect.TypeOf((*MockComponent)(nil).UnlinkFile), arg0)
 }
 
 // WriteFile mocks base method.

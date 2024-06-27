@@ -104,8 +104,6 @@ type Component interface {
 	SyncDir(SyncDirOptions) error
 	SyncFile(SyncFileOptions) error
 	FlushFile(FlushFileOptions) error
-	ReleaseFile(ReleaseFileOptions) error
-	UnlinkFile(UnlinkFileOptions) error // TODO: What does this do? Not used anywhere
 
 	// Symlink operations
 	CreateLink(CreateLinkOptions) error
@@ -114,9 +112,8 @@ type Component interface {
 	// Filesystem level operations
 	//GetAttr: Implementation expectations:
 	//1. must return ErrNotExist for absence of a file/directory/symlink
-	//2. must return valid nodeID that was passed with any create/update operations for eg: SetAttr, CreateFile, CreateDir etc
+	//2. must return valid nodeID that was passed with any create/update operations for eg: CreateFile, CreateDir etc
 	GetAttr(GetAttrOptions) (*ObjAttr, error)
-	SetAttr(SetAttrOptions) error
 
 	Chmod(ChmodOptions) error
 	Chown(ChownOptions) error
