@@ -31,7 +31,7 @@ jobs:
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
       -
         name: Install pip dependencies
@@ -241,7 +241,7 @@ jobs:
         continue-on-error: false
       - # Run GoReleaser (see .goreleaser.yaml)
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           args: release --clean
         env:

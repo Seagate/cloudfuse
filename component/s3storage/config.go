@@ -36,10 +36,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-var (
-	errConfigFieldEmpty   = errors.New("config field empty")
-	errInvalidConfigField = errors.New("config field is invalid")
-)
+var errInvalidConfigField = errors.New("config field is invalid")
 
 type Options struct {
 	BucketName                string                  `config:"bucket-name" yaml:"bucket-name,omitempty"`
@@ -65,7 +62,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 
 	// Validate bucket name
 	if opt.BucketName == "" {
-		return fmt.Errorf("%w: bucket name not provided", errConfigFieldEmpty)
+		log.Warn("ParseAndValidateConfig : bucket name not provided")
 	}
 
 	// Set authentication config

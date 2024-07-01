@@ -161,12 +161,10 @@ azstorage:
 
 # S3 storage configuration
 s3storage:
-  # Required
-  bucket-name: <name of the bucket to be mounted>
-  # Optional
+  bucket-name: <name of the bucket to be mounted. Default - first accessible bucket>
   key-id: <S3 access key ID. Default - use credentials from environment variables or shared profile (see README)>
   secret-key: <S3 secret access key. Default - use credentials from environment variables or shared profile (see README)>
-  region: <S3 region. Default - us-east-1>
+  region: <S3 region. Default - us-east-1 or region provided in endpoint>
   profile: <AWS shared configuration profile name. Credentials above take precedence over shared profile.>
   endpoint: <S3 endpoint URL. Default - https://s3.[region].lyvecloud.seagate.com>
   subdirectory: <name of subdirectory to be mounted instead of whole bucket>

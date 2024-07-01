@@ -664,13 +664,17 @@ func (suite *fileCacheTestSuite) TestSyncFile() {
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// On a sync we open, sync, flush and close
-	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: 0777})
+	handlemap.Add(handle)
 	suite.assert.NoError(err)
 	err = suite.fileCache.SyncFile(internal.SyncFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
+
 	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	handle, loaded := handlemap.Load(handle.ID)
+	suite.assert.True(loaded)
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 
@@ -764,8 +768,10 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 		suite.assert.True(os.IsNotExist(err))
 	}
 
+	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: suite.fileCache.defaultPermission})
+	suite.assert.NoError(err)
 	// Download is required
-	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	err = suite.fileCache.downloadFile(handle)
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(path, handle.Path)
 	suite.assert.False(handle.Dirty())
@@ -866,61 +872,6 @@ func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
 	// File should be in cloud storage
 	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
 	suite.assert.True(err == nil || os.IsExist(err))
-}
-
-func (suite *fileCacheTestSuite) TestReadFileEmpty() {
-	defer suite.cleanupTest()
-	// Setup
-	file := "file11"
-	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
-
-	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-	suite.assert.Empty(d)
-}
-
-func (suite *fileCacheTestSuite) TestReadFile() {
-	defer suite.cleanupTest()
-	// Setup
-	file := "file12"
-	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
-	testData := "test data"
-	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
-	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
-
-	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
-
-	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
-}
-
-func (suite *fileCacheTestSuite) TestReadFileNoFlush() {
-	defer suite.cleanupTest()
-	// Setup
-	file := "file13"
-	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
-	testData := "test data"
-	data := []byte(testData)
-	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
-
-	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
-
-	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
-}
-
-func (suite *fileCacheTestSuite) TestReadFileErrorBadFd() {
-	defer suite.cleanupTest()
-	// Setup
-	file := "file14"
-	handle := handlemap.NewHandle(file)
-	data, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
-	suite.assert.Error(err)
-	suite.assert.EqualValues(syscall.EBADF, err)
-	suite.assert.Nil(data)
 }
 
 func (suite *fileCacheTestSuite) TestReadInBufferEmpty() {
@@ -1218,6 +1169,8 @@ func (suite *fileCacheTestSuite) TestRenameFileInCache() {
 	suite.assert.NoError(err)
 	openHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
 	suite.assert.NoError(err)
+	err = suite.fileCache.downloadFile(openHandle)
+	suite.assert.NoError(err)
 
 	// Path should be in the file cache
 	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, src))
@@ -1322,9 +1275,11 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanupWithNoTimeout() {
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
+	err := suite.fileCache.downloadFile(openHandle)
+	suite.assert.NoError(err)
 
 	// Path should be in the file cache
-	_, err := os.Stat(suite.cache_path + "/" + src)
+	_, err = os.Stat(suite.cache_path + "/" + src)
 	suite.assert.True(err == nil || os.IsExist(err))
 	// Path should be in fake storage
 	_, err = os.Stat(suite.fake_storage_path + "/" + src)
@@ -1473,9 +1428,14 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
 
-	d, err := suite.fileCache.ReadFile(internal.ReadFileOptions{Handle: handle})
+	err = suite.fileCache.downloadFile(handle)
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
+
+	output := make([]byte, 9)
+	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output})
+	suite.assert.NoError(err)
+	suite.assert.Equal(9, n)
+	suite.assert.EqualValues(data, output)
 }
 
 func (suite *fileCacheTestSuite) TestZZOffloadIO() {
@@ -1554,10 +1514,12 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 
 	path := "file42"
-	err := os.WriteFile(suite.fake_storage_path+"/"+path, []byte("test data"), 0777)
+	byteArr := []byte("test data")
+	err := os.WriteFile(suite.fake_storage_path+"/"+path, byteArr, 0777)
 	suite.assert.NoError(err)
 
 	data := make([]byte, 20)
+
 	options := internal.OpenFileOptions{Name: path, Mode: 0777}
 
 	// Read file once and we shall get the same data
@@ -1570,8 +1532,9 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
 	suite.assert.NoError(err)
 
-	// Modify the fil ein background but we shall still get the old data
-	err = os.WriteFile(suite.fake_storage_path+"/"+path, []byte("test data1"), 0777)
+	// Modify the file in background but we shall still get the old data
+	byteArr = []byte("test data1")
+	err = os.WriteFile(suite.fake_storage_path+"/"+path, byteArr, 0777)
 	suite.assert.NoError(err)
 	f, err = suite.fileCache.OpenFile(options)
 	suite.assert.NoError(err)
@@ -1583,6 +1546,7 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	suite.assert.NoError(err)
 
 	// Now wait for 5 seconds and we shall get the updated content on next read
+	byteArr = []byte("test data123456")
 	err = os.WriteFile(suite.fake_storage_path+"/"+path, []byte("test data123456"), 0777)
 	suite.assert.NoError(err)
 	time.Sleep(12 * time.Second)
@@ -1613,24 +1577,24 @@ func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	err = os.WriteFile(suite.fake_storage_path+"/"+pathsmall, data, 0777)
 	suite.assert.NoError(err)
 
-	// try opening small file
-	options := internal.OpenFileOptions{Name: pathsmall, Mode: 0777}
-	f, err := suite.fileCache.OpenFile(options)
+	smallHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: pathsmall, Flags: os.O_RDONLY, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
-	suite.assert.False(f.Dirty())
-	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
+	// try opening small file
+	err = suite.fileCache.downloadFile(smallHandle)
+	suite.assert.NoError(err)
+	suite.assert.False(smallHandle.Dirty())
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: smallHandle})
 	suite.assert.NoError(err)
 
 	// try opening bigger file which shall fail due to hardlimit
-	options = internal.OpenFileOptions{Name: pathbig, Mode: 0777}
-	f, err = suite.fileCache.OpenFile(options)
+	bigHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: pathbig, Flags: os.O_RDONLY, Mode: suite.fileCache.defaultPermission})
 	suite.assert.Error(err)
-	suite.assert.Nil(f)
+	suite.assert.Nil(bigHandle)
 	suite.assert.Equal(syscall.ENOSPC, err)
 
 	// try writing a small file
 	options1 := internal.CreateFileOptions{Name: pathsmall + "_new", Mode: 0777}
-	f, err = suite.fileCache.CreateFile(options1)
+	f, err := suite.fileCache.CreateFile(options1)
 	suite.assert.NoError(err)
 	data = make([]byte, 1*MB)
 	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: f, Offset: 0, Data: data})
@@ -1657,6 +1621,36 @@ func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	// try opening small file
 	err = suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: pathsmall, Size: 3 * MB})
 	suite.assert.Error(err)
+}
+
+func (suite *fileCacheTestSuite) TestHandleDataChange() {
+	defer suite.cleanupTest()
+	// Configure to create empty files so we create the file in cloud storage
+	createEmptyFile := true
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n  timeout-sec: 1000\n  refresh-sec: 10\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, createEmptyFile, suite.fake_storage_path)
+	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+
+	path := "file43"
+	err := os.WriteFile(suite.fake_storage_path+"/"+path, []byte("test data"), 0777)
+	suite.assert.NoError(err)
+
+	data := make([]byte, 20)
+	options := internal.OpenFileOptions{Name: path, Flags: os.O_RDONLY, Mode: 0777}
+
+	// Read file once and we shall get the same data
+	f, err := suite.fileCache.OpenFile(options)
+	handlemap.Add(f)
+	suite.assert.NoError(err)
+	suite.assert.False(f.Dirty())
+	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: f, Offset: 0, Data: data})
+	f, loaded := handlemap.Load(f.ID)
+	suite.assert.True(loaded)
+	suite.assert.NoError(err)
+	suite.assert.Equal(9, n)
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
+	suite.assert.NoError(err)
+
 }
 
 // In order for 'go test' to run this suite, we need to create

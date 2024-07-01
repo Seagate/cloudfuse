@@ -398,11 +398,6 @@ func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
 	return err
 }
 
-func (az *AzStorage) ReadFile(options internal.ReadFileOptions) (data []byte, err error) {
-	//log.Trace("AzStorage::ReadFile : Read %s", h.Path)
-	return az.storage.ReadBuffer(options.Handle.Path, 0, 0)
-}
-
 func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length int, err error) {
 	//log.Trace("AzStorage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 
@@ -533,9 +528,6 @@ func (az *AzStorage) CommitData(opt internal.CommitDataOptions) error {
 }
 
 // TODO : Below methods are pending to be implemented
-// SetAttr(string, internal.ObjAttr) error
-// UnlinkFile(string) error
-// ReleaseFile(*handlemap.Handle) error
 // FlushFile(*handlemap.Handle) error
 
 // ------------------------- Factory methods to create objects -------------------------------------------

@@ -1469,32 +1469,6 @@ func (s *datalakeTestSuite) TestRenameFileError() {
 	s.assert.NotNil(err)
 }
 
-func (s *datalakeTestSuite) TestReadFile() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
-	testData := "test data"
-	data := []byte(testData)
-	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	h, _ = s.az.OpenFile(internal.OpenFileOptions{Name: name})
-
-	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.NoError(err)
-	s.assert.EqualValues(testData, output)
-}
-
-func (s *datalakeTestSuite) TestReadFileError() {
-	defer s.cleanupTest()
-	// Setup
-	name := generateFileName()
-	h := handlemap.NewHandle(name)
-
-	_, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
-	s.assert.Error(err)
-	s.assert.EqualValues(syscall.ENOENT, err)
-}
-
 func (s *datalakeTestSuite) TestReadInBuffer() {
 	defer s.cleanupTest()
 	// Setup
@@ -2246,9 +2220,11 @@ func (s *datalakeTestSuite) TestFlushFileEmptyFile() {
 	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
-	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	output := make([]byte, 1)
+	length, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.NoError(err)
-	s.assert.EqualValues("", output)
+	s.assert.EqualValues(0, length)
+	s.assert.EqualValues("", output[:length])
 }
 
 func (s *datalakeTestSuite) TestFlushFileChunkedFile() {
@@ -2269,12 +2245,15 @@ func (s *datalakeTestSuite) TestFlushFileChunkedFile() {
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
+	h.Size = 16 * MB
 
 	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
-	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	output := make([]byte, 16*MB)
+	length, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.NoError(err)
+	s.assert.EqualValues(16*MB, length)
 	s.assert.EqualValues(data, output)
 }
 
@@ -2297,6 +2276,7 @@ func (s *datalakeTestSuite) TestFlushFileUpdateChunkedFile() {
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
+	h.Size = 16 * MB
 
 	updatedBlock := make([]byte, 2*MB)
 	rand.Read(updatedBlock)
@@ -2308,8 +2288,10 @@ func (s *datalakeTestSuite) TestFlushFileUpdateChunkedFile() {
 	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
-	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	output := make([]byte, 16*MB)
+	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.NoError(err)
+	s.assert.EqualValues(16*MB, len)
 	s.assert.NotEqualValues(data, output)
 	s.assert.EqualValues(data[:5*MB], output[:5*MB])
 	s.assert.EqualValues(updatedBlock, output[5*MB:5*MB+2*MB])
@@ -2335,6 +2317,7 @@ func (s *datalakeTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
+	h.Size = 16 * MB
 
 	// truncate block
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize/2)
@@ -2348,8 +2331,10 @@ func (s *datalakeTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
-	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	output := make([]byte, 16*MB)
+	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.NoError(err)
+	s.assert.EqualValues(16*MB, len)
 	s.assert.NotEqualValues(data, output)
 	s.assert.EqualValues(data[:6*MB], output[:6*MB])
 }
@@ -2366,6 +2351,7 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	handlemap.CreateCacheObject(int64(12*MB), h)
 	h.CacheObj.BlockOffsetList = bol
 	h.CacheObj.BlockIdLength = 16
+	h.Size = 12 * MB
 
 	data1 := make([]byte, blockSize)
 	rand.Read(data1)
@@ -2402,8 +2388,10 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
-	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	output := make([]byte, 6*MB)
+	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.NoError(err)
+	s.assert.EqualValues(6*MB, len)
 	s.assert.EqualValues(blk1.Data, output[0:blockSize])
 	s.assert.EqualValues(blk2.Data, output[blockSize:2*blockSize])
 	s.assert.EqualValues(blk3.Data, output[2*blockSize:3*blockSize])
@@ -2430,6 +2418,7 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
 	h.CacheObj.BlockIdLength = 16
+	h.Size = int64(fileSize + 3*blockSize)
 
 	data1 := make([]byte, blockSize)
 	rand.Read(data1)
@@ -2466,8 +2455,10 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
-	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	output := make([]byte, fileSize+3*blockSize)
+	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.NoError(err)
+	s.assert.EqualValues(fileSize+3*blockSize, len)
 	s.assert.EqualValues(data, output[0:fileSize])
 	s.assert.EqualValues(blk1.Data, output[fileSize:fileSize+blockSize])
 	s.assert.EqualValues(blk2.Data, output[fileSize+blockSize:fileSize+2*blockSize])
@@ -2486,6 +2477,7 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	handlemap.CreateCacheObject(int64(12*MB), h)
 	h.CacheObj.BlockOffsetList = bol
 	h.CacheObj.BlockIdLength = 16
+	h.Size = int64(3 * int64(blockSize))
 
 	blk1 := &common.Block{
 		StartIndex: 0,
@@ -2516,8 +2508,10 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
-	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	output := make([]byte, 3*int64(blockSize))
+	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.NoError(err)
+	s.assert.EqualValues(3*int64(blockSize), len)
 	data := make([]byte, 3*blockSize)
 	s.assert.EqualValues(data, output)
 }
@@ -2543,6 +2537,7 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
 	h.CacheObj.BlockIdLength = 16
+	h.Size = int64(fileSize + 3*blockSize)
 
 	blk1 := &common.Block{
 		StartIndex: int64(fileSize),
@@ -2573,8 +2568,10 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
-	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	output := make([]byte, fileSize+3*blockSize)
+	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.NoError(err)
+	s.assert.EqualValues(fileSize+3*blockSize, len)
 	s.assert.EqualValues(data, output[:fileSize])
 	emptyData := make([]byte, 3*blockSize)
 	s.assert.EqualValues(emptyData, output[fileSize:])
@@ -2592,6 +2589,7 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	handlemap.CreateCacheObject(int64(12*MB), h)
 	h.CacheObj.BlockOffsetList = bol
 	h.CacheObj.BlockIdLength = 16
+	h.Size = int64(3 * blockSize)
 
 	data1 := make([]byte, blockSize)
 	rand.Read(data1)
@@ -2624,8 +2622,10 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
-	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	output := make([]byte, 3*blockSize)
+	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.NoError(err)
+	s.assert.EqualValues(3*blockSize, len)
 	data := make([]byte, blockSize)
 	s.assert.EqualValues(blk1.Data, output[0:blockSize])
 	s.assert.EqualValues(data, output[blockSize:2*blockSize])
@@ -2653,6 +2653,7 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	handlemap.CreateCacheObject(int64(16*MB), h)
 	h.CacheObj.BlockOffsetList = bol
 	h.CacheObj.BlockIdLength = 16
+	h.Size = int64(fileSize + 3*blockSize)
 
 	data1 := make([]byte, blockSize)
 	rand.Read(data1)
@@ -2686,8 +2687,10 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	s.assert.NoError(err)
 
 	// file should be empty
-	output, err := s.az.ReadFile(internal.ReadFileOptions{Handle: h})
+	output := make([]byte, fileSize+3*blockSize)
+	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.NoError(err)
+	s.assert.EqualValues(fileSize+3*blockSize, len)
 	s.assert.EqualValues(data, output[:fileSize])
 	emptyData := make([]byte, blockSize)
 	s.assert.EqualValues(blk1.Data, output[fileSize:fileSize+blockSize])
