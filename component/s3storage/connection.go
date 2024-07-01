@@ -28,6 +28,7 @@ package s3storage
 import (
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/internal"
@@ -52,6 +53,7 @@ type Config struct {
 	checksumAlgorithm         types.ChecksumAlgorithm
 	usePathStyle              bool
 	disableSymlink            bool
+	requestTimeout            time.Duration
 }
 
 // TODO: move s3AuthConfig to s3auth.go

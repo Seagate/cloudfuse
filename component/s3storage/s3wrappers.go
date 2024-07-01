@@ -62,7 +62,9 @@ func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
 		u.Concurrency = cl.Config.concurrency
 	})
 
-	_, err := downloader.Download(context.Background(), fi, &s3.GetObjectInput{
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout*5)
+	defer cancelFn()
+	_, err := downloader.Download(ctx, fi, &s3.GetObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -95,7 +97,9 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 		rangeString = "bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)
 	}
 
-	result, err := cl.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout*5)
+	defer cancelFn()
+	result, err := cl.awsS3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
 		Range:  aws.String(rangeString),
@@ -117,7 +121,8 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSymLink bool) error {
 	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::putObject : putting object %s", key)
-	ctx := context.Background()
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout*5)
+	defer cancelFn()
 	var err error
 
 	putObjectInput := &s3.PutObjectInput{
@@ -154,7 +159,9 @@ func (cl *Client) deleteObject(name string, isSymLink bool) error {
 	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::deleteObject : deleting object %s", key)
 
-	_, err := cl.awsS3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelFn()
+	_, err := cl.awsS3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -178,8 +185,11 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 			Key: &key,
 		}
 	}
+	// set context with timeout
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelFn()
 	// send keyList for deletion
-	result, err := cl.awsS3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
+	result, err := cl.awsS3Client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
 		Bucket: &cl.Config.authConfig.BucketName,
 		Delete: &types.Delete{
 			Objects: keyList,
@@ -204,7 +214,9 @@ func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, er
 	key := cl.getKey(name, isSymlink)
 	log.Trace("Client::headObject : object %s", key)
 
-	result, err := cl.awsS3Client.HeadObject(context.Background(), &s3.HeadObjectInput{
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelFn()
+	result, err := cl.awsS3Client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -222,7 +234,9 @@ func (cl *Client) copyObject(source string, target string, isSymLink bool) error
 	// copy the object to its new key
 	sourceKey := cl.getKey(source, isSymLink)
 	targetKey := cl.getKey(target, isSymLink)
-	_, err := cl.awsS3Client.CopyObject(context.Background(), &s3.CopyObjectInput{
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout*3)
+	defer cancelFn()
+	_, err := cl.awsS3Client.CopyObject(ctx, &s3.CopyObjectInput{
 		Bucket:     aws.String(cl.Config.authConfig.BucketName),
 		CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, url.PathEscape(sourceKey))),
 		Key:        aws.String(targetKey),
@@ -238,7 +252,9 @@ func (cl *Client) copyObject(source string, target string, isSymLink bool) error
 
 // abortMultipartUpload stops a multipart upload and verifys that the parts are deleted.
 func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
-	_, abortErr := cl.awsS3Client.AbortMultipartUpload(context.Background(), &s3.AbortMultipartUploadInput{
+	ctx, cancelAbortFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelAbortFn()
+	_, abortErr := cl.awsS3Client.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
 		Bucket:   aws.String(cl.Config.authConfig.BucketName),
 		Key:      aws.String(key),
 		UploadId: &uploadID,
@@ -248,7 +264,9 @@ func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
 	}
 
 	// AWS states you need to call listparts to verify that multipart upload was properly aborted
-	resp, listErr := cl.awsS3Client.ListParts(context.Background(), &s3.ListPartsInput{
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelFn()
+	resp, listErr := cl.awsS3Client.ListParts(ctx, &s3.ListPartsInput{
 		Bucket:   aws.String(cl.Config.authConfig.BucketName),
 		Key:      aws.String(key),
 		UploadId: &uploadID,
@@ -268,7 +286,9 @@ func (cl *Client) ListBuckets() ([]string, error) {
 
 	cntList := make([]string, 0)
 
-	result, err := cl.awsS3Client.ListBuckets(context.Background(), &s3.ListBucketsInput{})
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelFn()
+	result, err := cl.awsS3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
 
 	if err != nil {
 		log.Err("Client::ListBuckets : Failed to list buckets. Here's why: %v", err)
@@ -343,7 +363,9 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// initialize list to be returned
 	objectAttrList := make([]*internal.ObjAttr, 0)
 	// fetch and process a single result page
-	output, err := paginator.NextPage(context.Background())
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelFn()
+	output, err := paginator.NextPage(ctx)
 	if err != nil {
 		log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
 		return objectAttrList, nil, err

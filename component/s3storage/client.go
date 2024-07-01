@@ -147,7 +147,10 @@ func (cl *Client) Configure(cfg Config) error {
 		cl.awsS3Client = s3.NewFromConfig(defaultConfig)
 	}
 
-	// ListBuckets here to test connection
+	// set timeout
+	cl.Config.requestTimeout, _ = time.ParseDuration("1s")
+
+	// ListBuckets here to test connection to S3 backend
 	bucketList, err := cl.ListBuckets()
 	if err != nil {
 		log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
