@@ -107,12 +107,13 @@ To create a private-endpoint for DFS in Azure portal: Go to your storage account
 
 Make sure the configuration file has `azstorage` section in your config file.
 
-The [BlobFuse2 base configuration file](https://github.com/Azure/azure-storage-fuse/blob/main/setup/baseConfig.yaml) contains a list of all settings and a brief explanation of each setting. Use the [sample file cache configuration file](https://github.com/Azure/azure-storage-fuse/blob/main/sampleFileCacheConfig.yaml) or the [sample block cache configuration file](https://github.com/Azure/azure-storage-fuse/blob/main/sampleBlockCacheConfig.yaml) to get started quickly by using some basic settings for each of those scenarios.
+The [Cloudfuse base configuration file](https://github.com/Seagate/cloudfuse/blob/main/setup/baseConfig.yaml) contains a list of all settings and a brief explanation of each setting. Use the [sample file cache configuration file](https://github.com/Seagate/cloudfuse/blob/main/sampleFileCacheConfigAzure.yaml) or the [sample block cache configuration file](https://github.com/Seagate/cloudfuse/blob/main/sampleBlockCacheConfig.yaml) to get started quickly by using some basic settings for each of those scenarios.
 
 # Common Problems after a Successful Mount
 
 **1. Errno 24: Failed to open file /mnt/tmp/root/filex in file cache.  errno = 24 OR Too many files Open error**
 Errno 24 in Linux corresponds to 'Too many files open' error which can occur when an application opens more files than it is allowed on the system. Cloudfuse typically allows 20 files less than the ulimit value set in Linux. Usually the Linux limit is 1024 per process (e.g. Cloudfuse in this case will allow 1004 open file descriptors at a time). Recommended approach is to edit the /etc/security/limits.conf in Ubuntu and add these two lines,
+
 - soft nofile 16384
 - hard nofile 16384
 

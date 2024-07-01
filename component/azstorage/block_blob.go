@@ -1068,7 +1068,7 @@ func (bb *BlockBlob) TruncateFile(name string, size int64) error {
 		// If we are resizing to a value > 1GB then we need to upload multiple blocks to resize
 		if size > 1*common.GbToBytes {
 			blkSize := int64(16 * common.MbToBytes)
-			blobName := filepath.Join(bb.Config.prefixPath, name)
+			blobName := common.JoinUnixFilepath(bb.Config.prefixPath, name)
 			blobClient := bb.Container.NewBlockBlobClient(blobName)
 
 			blkList := make([]string, 0)
@@ -1384,7 +1384,7 @@ func (bb *BlockBlob) ChangeOwner(name string, _ int, _ int) error {
 
 // GetCommittedBlockList : Get the list of committed blocks
 func (bb *BlockBlob) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
-	blobClient := bb.Container.NewBlockBlobClient(filepath.Join(bb.Config.prefixPath, name))
+	blobClient := bb.Container.NewBlockBlobClient(common.JoinUnixFilepath(bb.Config.prefixPath, name))
 
 	storageBlockList, err := blobClient.GetBlockList(context.Background(), blockblob.BlockListTypeCommitted, nil)
 
@@ -1420,7 +1420,7 @@ func (bb *BlockBlob) StageBlock(name string, data []byte, id string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), max_context_timeout*time.Minute)
 	defer cancel()
 
-	blobClient := bb.Container.NewBlockBlobClient(filepath.Join(bb.Config.prefixPath, name))
+	blobClient := bb.Container.NewBlockBlobClient(common.JoinUnixFilepath(bb.Config.prefixPath, name))
 	_, err := blobClient.StageBlock(ctx,
 		id,
 		streaming.NopCloser(bytes.NewReader(data)),
@@ -1443,7 +1443,7 @@ func (bb *BlockBlob) CommitBlocks(name string, blockList []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), max_context_timeout*time.Minute)
 	defer cancel()
 
-	blobClient := bb.Container.NewBlockBlobClient(filepath.Join(bb.Config.prefixPath, name))
+	blobClient := bb.Container.NewBlockBlobClient(common.JoinUnixFilepath(bb.Config.prefixPath, name))
 	_, err := blobClient.CommitBlockList(ctx,
 		blockList,
 		&blockblob.CommitBlockListOptions{

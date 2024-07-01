@@ -403,7 +403,7 @@ func (s *configTestSuite) TestSASRefresh() {
 
 	az.storage = &BlockBlob{Auth: &azAuthBlobSAS{azAuthSAS: azAuthSAS{azAuthBase: azAuthBase{config: azAuthConfig{Endpoint: "abcd:://qreq!@#$%^&*()_)(*&^%$#"}}}}}
 	err := ParseAndReadDynamicConfig(az, opt, true)
-	assert.Nil(err)
+	assert.NoError(err)
 }
 
 func TestConfigTestSuite(t *testing.T) {

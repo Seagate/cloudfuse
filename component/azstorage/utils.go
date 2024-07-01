@@ -90,7 +90,7 @@ func getAzStorageClientOptions(conf *AzStorageConfig) azcore.ClientOptions {
 		telemetryValue += " "
 	}
 	telemetryValue += UserAgent() + " (" + common.GetCurrentDistro() + ")"
-	telemetryPolicy := newBlobfuseTelemetryPolicy(telemetryValue)
+	telemetryPolicy := newCloudfuseTelemetryPolicy(telemetryValue)
 
 	logOptions := getSDKLogOptions()
 
@@ -195,21 +195,21 @@ func getCloudConfiguration(endpoint string) cloud.Configuration {
 	}
 }
 
-// blobfuseTelemetryPolicy is a custom pipeline policy to prepend the blobfuse user agent string to the one coming from SDK.
+// cloudfuseTelemetryPolicy is a custom pipeline policy to prepend the cloudfuse user agent string to the one coming from SDK.
 // This is added in the PerCallPolicies which executes after the SDK's default telemetry policy.
-type blobfuseTelemetryPolicy struct {
+type cloudfuseTelemetryPolicy struct {
 	telemetryValue string
 }
 
-// newBlobfuseTelemetryPolicy creates an object which prepends the blobfuse user agent string to the User-Agent request header
-func newBlobfuseTelemetryPolicy(telemetryValue string) policy.Policy {
-	return &blobfuseTelemetryPolicy{telemetryValue: telemetryValue}
+// newCloudfuseTelemetryPolicy creates an object which prepends the cloudfuse user agent string to the User-Agent request header
+func newCloudfuseTelemetryPolicy(telemetryValue string) policy.Policy {
+	return &cloudfuseTelemetryPolicy{telemetryValue: telemetryValue}
 }
 
-func (p blobfuseTelemetryPolicy) Do(req *policy.Request) (*http.Response, error) {
+func (p cloudfuseTelemetryPolicy) Do(req *policy.Request) (*http.Response, error) {
 	userAgent := p.telemetryValue
 
-	// prepend the blobfuse user agent string
+	// prepend the cloudfuse user agent string
 	if ua := req.Raw().Header.Get(common.UserAgentHeader); ua != "" {
 		userAgent = fmt.Sprintf("%s %s", userAgent, ua)
 	}

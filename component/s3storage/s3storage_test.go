@@ -2204,7 +2204,7 @@ func (s *s3StorageTestSuite) TestCreateLink() {
 	s.assert.NotNil(attr)
 	s.assert.NotEmpty(attr.Metadata)
 	s.assert.Contains(attr.Metadata, symlinkKey)
-	s.assert.Equal("true", attr.Metadata[symlinkKey])
+	s.assert.Equal("true", *attr.Metadata[symlinkKey])
 
 	//download and make sure the data is correct
 	result, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
@@ -2378,7 +2378,7 @@ func (s *s3StorageTestSuite) TestGetAttrLink() {
 	s.assert.True(props.IsSymlink())
 	s.assert.NotEmpty(props.Metadata)
 	s.assert.Contains(props.Metadata, symlinkKey)
-	s.assert.EqualValues("true", props.Metadata[symlinkKey])
+	s.assert.EqualValues("true", *props.Metadata[symlinkKey])
 }
 
 func (s *s3StorageTestSuite) TestGetAttrFileSize() {

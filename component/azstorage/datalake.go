@@ -673,7 +673,7 @@ func (dl *Datalake) getFileClient(name string) *file.Client {
 	return dl.Filesystem.NewFileClient(dl.getFormattedPath(name))
 }
 
-// getFileClientPathEscape  ryURL returns a new root directory url that is properly escaped. On Windows this will also convert
+// getFileClientPathEscape returns a new root directory url that is properly escaped. On Windows this will also convert
 // special characters.
 func (dl *Datalake) getFileClientPathEscape(name string) *file.Client {
 	return dl.Filesystem.NewFileClient(url.PathEscape(dl.getFormattedPath(name)))
