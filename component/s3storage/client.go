@@ -44,6 +44,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -128,6 +129,9 @@ func (cl *Client) Configure(cfg Config) error {
 		config.WithEndpointResolverWithOptions(endpointResolver),
 		config.WithAppID(UserAgent()),
 		config.WithRegion("auto"),
+		config.WithRetryer(func() aws.Retryer {
+			return retry.AddWithMaxAttempts(retry.NewStandard(), 1)
+		}),
 	)
 	if err != nil {
 		log.Err("Client::Configure : config.LoadDefaultConfig() failed. Here's why: %v", err)
