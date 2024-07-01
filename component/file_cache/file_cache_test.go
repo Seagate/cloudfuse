@@ -45,6 +45,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	"github.com/golang/mock/gomock"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -60,6 +61,7 @@ type fileCacheTestSuite struct {
 	cache_path        string
 	fake_storage_path string
 	mock              *internal.MockComponent
+	mockCtrl          *gomock.Controller
 }
 
 func newLoopbackFS() internal.Component {
@@ -112,7 +114,8 @@ func (suite *fileCacheTestSuite) SetupTest() {
 
 func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 	suite.assert = assert.New(suite.T())
-
+	suite.mockCtrl = gomock.NewController(suite.T())
+	suite.mock = internal.NewMockComponent(suite.mockCtrl)
 	config.ReadConfigFromReader(strings.NewReader(configuration))
 	suite.loopback = newLoopbackFS()
 	suite.fileCache = newTestFileCache(suite.loopback)
@@ -124,11 +127,13 @@ func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start file cache [%s]", err.Error()))
 	}
+	suite.fileCache = newTestFileCache(suite.mock)
 
 }
 
 func (suite *fileCacheTestSuite) cleanupTest() {
 	suite.loopback.Stop()
+	suite.mockCtrl.Finish()
 	err := suite.fileCache.Stop()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to stop file cache [%s]", err.Error()))
@@ -366,7 +371,7 @@ func (suite *fileCacheTestSuite) TestDeleteDirCloudDown() {
 	err := suite.fileCache.CreateDir(createDirOptions)
 	time.Sleep(time.Second)
 	suite.assert.NoError(err)
-	suite.mock.EXPECT().CreateFile(createFileOptions).Return(&retry.MaxAttemptsError{})
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(&handlemap.Handle{}, &retry.MaxAttemptsError{})
 	handle, err := suite.fileCache.CreateFile(createFileOptions)
 	time.Sleep(time.Second)
 	suite.assert.NoError(err)

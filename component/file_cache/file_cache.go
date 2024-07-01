@@ -482,6 +482,7 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	attrs, token, err := fc.NextComponent().StreamDir(options)
 	if err != nil {
 		token = ""
+		err = nil
 	}
 
 	//after getting the stale cache listing, compare it with async map so that it's correct
@@ -494,7 +495,7 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			keyString := key.(string)
 			attr := attrs[i]
 
-			if val.operation == "RenameFile" {
+			if val.operation == "RenameFile" || val.operation == "RenameDir" { //for rename operations, only grab the src file/dir to compare
 
 				keyString = keyString[:strings.IndexByte(keyString, ',')]
 
@@ -528,11 +529,11 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 
 	// Get files from local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
-	dirents, err := os.ReadDir(localPath)
-	if err != nil {
-		log.Debug("FileCache::StreamDir Unable to read local cache")
-		return attrs, token, err
-	}
+	dirents, _ := os.ReadDir(localPath)
+	// if err != nil {
+	// 	log.Debug("FileCache::StreamDir Unable to read local cache")
+	// 	return attrs, token, err
+	// }
 
 	i = 0  // Index for cloud
 	j := 0 // Index for local cache
@@ -571,7 +572,7 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 				// As list is paginated we have no way to know whether this particular item exists both in local cache
 				// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
 				// If entry does not exists on storage then only return a local item here.
-				_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath}) //parse the error generated here when cloud is down
+				_, attrErr := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath}) //parse the error generated here when cloud is down
 				// if err != nil && (err == syscall.ENOENT || os.IsNotExist(err)) { //without the cloud, getAttr will return an error
 				// 	info, err := entry.Info() // Grab local cache attributes
 				// 	// If local file is not locked then only use its attributes otherwise rely on container attributes
@@ -582,15 +583,16 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 				// 		attrs = append(attrs, attr)
 				// 	}
 				// }
-				if err != nil { //without the cloud, getAttr will return an error
-					log.Debug("FileCache::StreamDir : getAttr error is %s", err.Error())
-					info, err := entry.Info() // Grab local cache attributes
+				if attrErr != nil { //without the cloud, getAttr will return an error
+					log.Debug("FileCache::StreamDir : getAttr error is %s", attrErr.Error())
+					info, Infoerr := entry.Info() // Grab local cache attributes
 					// If local file is not locked then only use its attributes otherwise rely on container attributes
-					if err == nil {
+					if Infoerr == nil {
 						// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
 						log.Debug("FileCache::StreamDir : serving %s from local cache", entryPath)
 						attr := newObjAttr(entryPath, info)
 						attrs = append(attrs, attr)
+						err = nil
 					}
 				}
 			}
@@ -655,8 +657,8 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	newAttr := FileAttributes{}
 	newAttr.operation = "RenameDir"
 	newAttr.options = options
-	dKey := options.Src                                //Extract file name to serve as key
-	_, loaded := fc.fileOps.LoadOrStore(dKey, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
+	dKey := strings.Join([]string{options.Src, options.Dst}, ",") //Extract file name to serve as key
+	_, loaded := fc.fileOps.LoadOrStore(dKey, newAttr)            //LoadOrStore will add newAttr as the key value if there does not exist a value
 
 	if loaded { //If there is already a value for the given key, we must overwrite it
 
@@ -673,6 +675,13 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 
 	if err != nil {
 		log.Err("FileCache::RenameDir : Failed to rename %s to %s due to error %s", localSrcPath, localDstPath, err.Error())
+		return err
+	}
+
+	obj, err := os.Stat(localDstPath)
+
+	if err != nil && obj == nil {
+		log.Err("FileCache::RenameDir : Destination directory [%s] does not exist due to %s", localDstPath, err.Error())
 		return err
 	}
 
@@ -1344,15 +1353,22 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	// To cover case 1, get attributes from storage
 	var exists bool
+	// var maxAttempts *retry.MaxAttemptsError
 	attrs, err := fc.NextComponent().GetAttr(options) //expect this to return err if cloud is down
+	// cloudisDown := errors.As(err, &maxAttempts)
 	if err != nil {
 		if err == syscall.ENOENT || os.IsNotExist(err) { //file not exist error, not related to cloud being down
 			log.Debug("FileCache::GetAttr : %s does not exist in cloud storage", options.Name)
 			exists = false
 		}
-		// else {
-		// 	log.Err("FileCache::GetAttr : Failed to get attr of %s [%s]", options.Name, err.Error())
-		// 	return nil, err
+		// if cloudisDown {
+		// 	path := filepath.Join(fc.tmpPath, options.Name)
+		// 	_, err = os.Stat(path)
+		// 	if os.IsNotExist(err) {
+		// 		exists = false
+		// 	} else {
+		// 		exists = true
+		// 	}
 		// }
 	} else {
 		exists = true
@@ -1362,7 +1378,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	info, err := os.Stat(localPath)
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
-	if err == nil && !info.IsDir() {
+	if err == nil {
 		if exists { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
 			// Return from local cache only if file is not under download or deletion
 			// If file is under download then taking size or mod time from it will be incorrect.
