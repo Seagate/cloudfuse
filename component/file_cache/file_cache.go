@@ -1003,22 +1003,28 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 
 func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 
-	err := fc.NextComponent().CreateDir(options)
-	var maxAttempts *retry.MaxAttemptsError
-	cloudisDown := errors.As(err, &maxAttempts)
-	if err != nil && !cloudisDown {
-		log.Err("FileCache::CreateDir : failed to create directory in cloud due to error %s", err.Error())
-		return err
+	nextAttr := FileAttributes{}
+	nextAttr.operation = "CreateDir"
+	nextAttr.options = options
+
+	_, loaded := fc.fileOps.LoadOrStore(options.Name, nextAttr)
+
+	if loaded {
+
+		fc.fileOps.Delete(options.Name)
+		fc.fileOps.Store(options.Name, nextAttr)
 	}
+	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
+	fc.asyncSignal.Unlock()  // Signal to async thread to do work
 
 	// Create the directory locally using itss local path
 	localpath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
-	err = os.MkdirAll(localpath, options.Mode)
+	err := os.MkdirAll(localpath, options.Mode)
 	if err != nil {
 		log.Err("FileCache::CreateDir : failed to make local directory because %s", err.Error())
 		return err
 	}
-	fc.policy.CacheValid(localpath)
+	//fc.policy.CacheValid(localpath)
 	log.Trace("FileCache::CreateDir : the directory was created successfully locally with path %s", localpath)
 
 	return nil

@@ -86,6 +86,9 @@ func (fc *FileCache) async_cloud_handler() {
 					case attributes.operation == "RenameFile":
 						returnVal = fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions))
 
+					case attributes.operation == "CreateDir":
+						returnVal = fc.asyncCreateDir(attributes.options.(internal.CreateDirOptions))
+
 					case attributes.operation == "Chmod":
 						returnVal = fc.asyncChmod(attributes.options.(internal.ChmodOptions))
 
@@ -200,6 +203,18 @@ func (fc *FileCache) asyncDeleteDir(options internal.DeleteDirOptions) error {
 	if err != nil {
 		log.Err("FileCache::DeleteDir : %s failed", options.Name)
 		log.Err("FileCache::DeleteDir : Error is %s", err.Error())
+		// There is a chance that meta file for directory was not created in which case
+		// rest api delete will fail while we still need to cleanup the local cache for the same
+		return err
+	}
+	return nil
+}
+
+func (fc *FileCache) asyncCreateDir(options internal.CreateDirOptions) error {
+	err := fc.NextComponent().CreateDir(options)
+	if err != nil {
+		log.Err("FileCache::asyncCreateDir : %s failed", options.Name)
+		log.Err("FileCache::asyncDeleteDir : Error is %s", err.Error())
 		// There is a chance that meta file for directory was not created in which case
 		// rest api delete will fail while we still need to cleanup the local cache for the same
 		return err
