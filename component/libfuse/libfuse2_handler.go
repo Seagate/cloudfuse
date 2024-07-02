@@ -164,21 +164,26 @@ func (lf *Libfuse) initFuse() error {
 
 		// by default bucketName will be blank
 		bucketName := "default"
+		receptacle := "Cloud Storage"
 		// Borrow bucket-name string from attribute cache
 		if config.IsSet("s3storage.bucket-name") {
+
 			err := config.UnmarshalKey("s3storage.bucket-name", &bucketName)
 			if err != nil {
+				bucketName = "default"
 				log.Err("ParseAndReadDynamicConfig : Failed to unmarshal s3storage.bucket-name")
 			}
+			receptacle = "bucket"
 		} else if config.IsSet("azstorage.container") {
 			err := config.UnmarshalKey("azstorage.container", &bucketName)
 			if err != nil {
 				bucketName = "default"
 				log.Err("ParseAndReadDynamicConfig : Failed to unmarshal s3storage.bucket-name")
 			}
+			receptacle = "container"
 		}
 
-		volumePrefix := fmt.Sprintf("--VolumePrefix=\\bucket\\%s", bucketName)
+		volumePrefix := fmt.Sprintf("--VolumePrefix=\\%s\\%s", receptacle, bucketName)
 		opts = append(opts, volumePrefix)
 	}
 
