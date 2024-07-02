@@ -363,7 +363,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// initialize list to be returned
 	objectAttrList := make([]*internal.ObjAttr, 0)
 	// fetch and process a single result page
-	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout*5)
 	defer cancelFn()
 	output, err := paginator.NextPage(ctx)
 	if err != nil {
