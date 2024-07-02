@@ -452,6 +452,8 @@ func (s *s3StorageTestSuite) setupHierarchy(base string) (*list.List, *list.List
 	// ab/
 	//  ab/c1
 	// ac
+	s.T().Helper()
+
 	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: base})
 	s.assert.NoError(err)
 	c1 := base + "/c1"
@@ -3187,6 +3189,8 @@ func (s *s3StorageTestSuite) TestTruncateNoBlockFileToLarger() {
 }
 
 func (s *s3StorageTestSuite) UtilityFunctionTestTruncateFileToSmaller(size int, truncatedLength int) {
+	s.T().Helper()
+
 	defer s.cleanupTest()
 	// Setup
 	storageTestConfigurationParameters.PartSizeMb = 5
@@ -3221,6 +3225,8 @@ func (s *s3StorageTestSuite) UtilityFunctionTestTruncateFileToSmaller(size int, 
 }
 
 func (s *s3StorageTestSuite) UtilityFunctionTruncateFileToLarger(size int, truncatedLength int) {
+	s.T().Helper()
+
 	defer s.cleanupTest()
 	// Setup
 	storageTestConfigurationParameters.PartSizeMb = 5
