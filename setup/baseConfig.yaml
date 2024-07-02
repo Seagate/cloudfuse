@@ -10,7 +10,7 @@
 #         sudo cp setup/11-cloudfuse.conf /etc/rsyslog.d/
 #         sudo cp setup/cloudfuse-logrotate /etc/logrotate.d/
 #         sudo service rsyslog restart
-#   5. For non-HNS (flat namespace) accounts blobfuse expects special directory marker files to
+#   5. For non-HNS (flat namespace) accounts cloudfuse expects special directory marker files to
 #      exists in container to identify a directory.
 #      If these files do not exist in container, then 'virtual-directory: true' in 'azstorage' section is required
 #   6. By default 'writeback-cache' is enabled for libfuse3 and this may result in append/write operations to fail.
@@ -20,7 +20,7 @@
 #   7. If are you using 'allow-other: true' config then make sure user_allow_other is enabled in /etc/fuse.conf file as
 #      well otherwise mount will fail. By default /etc/fuse.conf will have this option disabled we just need to
 #      enable it and save the file.
-#   8. If data in your storage account (non-HNS) is created using Blobfuse or AzCopy then there are marker files present
+#   8. If data in your storage account (non-HNS) is created using cloudfuse or AzCopy then there are marker files present
 #      in your container to mark a directory. In such cases you can optimize your listing by setting 'virtual-directory'
 #      flag to false in mount command.
 #   9. If you are using 'file_cache' component then make sure you have enough disk space available for cache.
@@ -52,6 +52,7 @@ components:
   - block_cache
   - file_cache
   - attr_cache
+  - s3storage
   - azstorage
   - loopbackfs
 
@@ -192,7 +193,7 @@ health_monitor:
   output-path: <Path where health monitor will generate its output file. File name will be monitor_<pid>.json>
   # list of monitors to be disabled
   monitor-disable-list:
-    - blobfuse_stats <Disable cloudfuse stats polling>
+    - cloudfuse_stats <Disable cloudfuse stats polling>
     - file_cache_monitor <Disable file cache directory monitor>
     - cpu_profiler <Disable CPU monitoring on cloudfuse process>
     - memory_profiler <Disable memory monitoring on cloudfuse process>

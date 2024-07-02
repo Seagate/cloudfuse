@@ -1,30 +1,30 @@
-# MUST READ : 
-#   If you are creating a blobfuse2 config file using this kindly take care of below points 
-#   1. All boolean configs (true|false config) (except ignore-open-flags, virtual-directory) are set to 'false' by default. 
+# MUST READ :
+#   If you are creating a cloudfuse config file using this kindly take care of below points
+#   1. All boolean configs (true|false config) (except ignore-open-flags, virtual-directory, sync-to-flush) are set to 'false' by default.
 #      No need to mention them in your config file unless you are setting them to true.
 #   2. 'loopbackfs' is purely for testing and shall not be used in production configuration.
 #   3. 'stream' and 'file_cache' can not co-exist and config file shall have only one of them based on your use case.
-#   4. By default log level is set to 'log_warning' level and are redirected to syslog. 
+#   4. By default log level is set to 'log_warning' level and are redirected to syslog.
 #      Either use 'base' logging or syslog filters to redirect logs to separate file.
-#      To install syslog filter follow below steps:        
-#         sudo cp setup/11-blobfuse2.conf /etc/rsyslog.d/
-#         sudo cp setup/blobfuse2-logrotate /etc/logrotate.d/
+#      To install syslog filter follow below steps:
+#         sudo cp setup/11-cloudfuse.conf /etc/rsyslog.d/
+#         sudo cp setup/cloudfuse-logrotate /etc/logrotate.d/
 #         sudo service rsyslog restart
-#   5. For non-HNS (flat namespace) accounts blobfuse expects special directory marker files to 
-#      exists in container to identify a directory. 
+#   5. For non-HNS (flat namespace) accounts cloudfuse expects special directory marker files to
+#      exists in container to identify a directory.
 #      If these files do not exist in container, then 'virtual-directory: true' in 'azstorage' section is required
 #   6. By default 'writeback-cache' is enabled for libfuse3 and this may result in append/write operations to fail.
 #      Either you can disable 'writeback-cache', which might hurt the performance
-#      or you can configure blobfuse2 to ignore open flags given by user and make it work with ''writeback-cache'.
-#      'libfuse' sectoin below has both the configurations.
-#   7. If are you using 'allow-other: true' config then make sure user_allow_other is enabled in /etc/fuse.conf file as 
-#      well otherwise mount will fail. By default /etc/fuse.conf will have this option disabled we just need to 
+#      or you can configure cloudfuse to ignore open flags given by user and make it work with ''writeback-cache'.
+#      'libfuse' section below has both the configurations.
+#   7. If are you using 'allow-other: true' config then make sure user_allow_other is enabled in /etc/fuse.conf file as
+#      well otherwise mount will fail. By default /etc/fuse.conf will have this option disabled we just need to
 #      enable it and save the file.
-#   8. If data in your storage account (non-HNS) is created using Blobfuse or AzCopy then there are marker files present
+#   8. If data in your storage account (non-HNS) is created using cloudfuse or AzCopy then there are marker files present
 #      in your container to mark a directory. In such cases you can optimize your listing by setting 'virtual-directory'
 #      flag to false in mount command.
 #   9. If you are using 'file_cache' component then make sure you have enough disk space available for cache.
-#  10. 'sdk-trace' has been removed with v2.3.0 release and setting log level to log_debug will auto enable these logs.
+#  10. 'sdk-trace' has been removed and setting log level to log_debug will auto enable these logs.
 # -----------------------------------------------------------------------------------------------------------------------
 
 
@@ -34,6 +34,7 @@ foreground: true|false <run blobfuse2 in foreground or background>
 # Common configurations
 allow-other: true|false <allow other users to access the mounted directory - used for FUSE and File Cache>
 nonempty: true|false <allow mounting on non-empty directory>
+restricted-characters-windows: true|false <allows filenames with restricted characters to appear on Windows - used for AzStorage and S3Storage>
 
 # Dynamic profiler related configuration. This helps to root-cause high memory/cpu usage related issues.
 dynamic-profile: true|false <allows to turn on dynamic profiler for cpu/memory usage monitoring. Only for debugging, shall not be used in production>
@@ -47,6 +48,7 @@ logging:
   file-path: <path where log files shall be stored. Default - '$HOME/.blobfuse2/blobfuse2.log'>
   max-file-size-mb: <maximum allowed size for each log file (in MB). Default - 512 MB>
   file-count: <maximum number of files to be rotated to preserve old logs. Default - 10>
+  track-time: true|false <track time taken by important operations>
 
 # Pipeline configuration. Choose components to be engaged. The order below is the priority order that needs to be followed.
 components:
@@ -54,6 +56,7 @@ components:
   - block_cache
   - file_cache
   - attr_cache
+  - s3storage
   - azstorage
   - loopbackfs
 
@@ -65,7 +68,11 @@ libfuse:
   negative-entry-expiration-sec: <time kernel can cache attributes of non existent paths (in sec). Default - 120 sec>
   fuse-trace: true|false <enable libfuse api trace logs for debugging>
   extension: <physical path to extension library>
+  disable-writeback-cache: true|false <disallow libfuse to buffer write requests if you must strictly open files in O_WRONLY or O_APPEND mode. alternatively, you can set ignore-open-flags.>
+  ignore-open-flags: true|false <ignore the append and write only flag since O_APPEND and O_WRONLY is not supported with writeback caching. alternatively, you can disable-writeback-cache. Default value is true>
+  max-fuse-threads: <number of threads allowed at libfuse layer for highly parallel operations, Default is 128>
   direct-io: true|false <enable to bypass the kernel cache>
+  network-share: true|false <runs as a network share. may improve performance when latency to cloud is high. only supported on Windows. Known issue - only one Cloudfuse network share can be mounted at a time>
 
 # Streaming configuration – remove and redirect to block-cache
 stream:
@@ -75,7 +82,7 @@ stream:
   buffer-size-mb: <size for each buffer. Default - 0 MB>
   file-caching: <read/write mode file level caching or handle level caching. Default - false (handle level caching ON)>
 
-# Block cache related configuration
+# Block cache related configuration. Block cache is only supported on Linux.
 block_cache:
   block-size-mb: <size of each block to be cached in memory (in MB). Default - 16 MB>
   mem-size-mb: <total amount of memory to be preallocated for block cache (in MB). Default - 4192 MB>
@@ -83,28 +90,39 @@ block_cache:
   disk-size-mb: <maximum disk cache size allowed. Default - 4192 MB>
   disk-timeout-sec: <default disk cache eviction timeout (in sec). Default - 120 sec>
   prefetch: <number of blocks to be prefetched in serial read case. Min - 11>
-  parallelism: <number of parallel threads downloading the data and writing to disk cache. Default - 128> 
+  parallelism: <number of parallel threads downloading the data and writing to disk cache. Default - 128>
+  prefetch-on-open: true|false <prefetch blocks on open. This shall be used only when user application is going to read file from offset 0>
 
 # Disk cache related configuration
 file_cache:
   # Required
   path: <path to local disk cache>
 
-  # Optional 
+  # Optional
+  policy: lru|lfu <eviction policy to be engaged for cache eviction. lru = least recently used file to be deleted, lfu = least frequently used file to be deleted. Default - lru>
   timeout-sec: <default cache eviction timeout (in sec). Default - 120 sec>
+  max-eviction: <number of files that can be evicted at once. Default - 5000>
   max-size-mb: <maximum cache size allowed. Default - 0 (unlimited)>
-  allow-non-empty-temp: true|false <allow non empty temp directory at startup>
-  cleanup-on-start: true|false <cleanup the temp directory on startup, if its not empty>
-  sync-to-flush: true|false <sync call to a file will force upload of the contents to storage account>
+  high-threshold: <% disk space consumed which triggers eviction. This parameter overrides 'timeout-sec' parameter and cached files will be removed even if they have not expired. Default - 80>
+  low-threshold: <% disk space consumed which triggers eviction to stop when previously triggered by the high-threshold. Default - 60>
+  create-empty-file: true|false <create an empty file on container when create call is received from kernel>
+  allow-non-empty-temp: true|false <allow non empty temp directory at startup. Set true to persist local cache across reboots.>
+  cleanup-on-start: true|false <cleanup the temp directory on startup, if it's not empty>
+  policy-trace: true|false <generate eviction policy logs showing which files will expire soon>
+  offload-io: true|false <by default libfuse will service reads/writes to files for better perf. Set to true to make file-cache component service read/write calls.>
+  sync-to-flush: true|false <sync call to a file will force upload of the contents to storage account. Default - true>
   refresh-sec: <number of seconds after which compare lmt of file in local cache and container and refresh file if container has the latest copy>
   ignore-sync: true|false <sync call will be ignored and locally cached file will not be deleted>
   hard-limit: true|false <if set to true, file-cache will not allow read/writes to file which exceed the configured limits>
   
 # Attribute cache related configuration
 attr_cache:
-  timeout-sec: <time attributes can be cached (in sec). Default - 120 sec>
-  no-symlinks: true|false <to improve performance disable symlink support. symlinks will be treated like regular files.>
-  
+  timeout-sec: <time attributes and directory contents can be cached (in sec). Default - 120 sec>
+  no-cache-on-list: true|false <do not cache attributes or directory contents during listing. Enabling may cause performance problems.>
+  enable-symlinks: true|false <enable symlink support. When false, symlinks will be treated like regular files. Enabling may cause performance problems.>
+  max-files: <maximum number of files in the attribute cache at a time. Default - 5000000>
+  no-cache-dirs: true|false <to prevent double-listing directories and to make timestamps accurate, disable caching directories. Breaks s3storage.>
+
 # Loopback configuration
 loopbackfs:
   path: <path to local directory>
@@ -154,6 +172,25 @@ azstorage:
   cpk-encryption-key: <customer provided base64-encoded AES-256 encryption key value>
   cpk-encryption-key-sha256:  <customer provided base64-encoded sha256 of the encryption key>
 
+# S3 storage configuration
+s3storage:
+  # Required
+  bucket-name: <name of the bucket to be mounted>
+  # Optional
+  key-id: <S3 access key ID. Default - use credentials from environment variables or shared profile (see README)>
+  secret-key: <S3 secret access key. Default - use credentials from environment variables or shared profile (see README)>
+  region: <S3 region. Default - us-east-1>
+  profile: <AWS shared configuration profile name. Credentials above take precedence over shared profile.>
+  endpoint: <S3 endpoint URL. Default - https://s3.[region].lyvecloud.seagate.com>
+  subdirectory: <name of subdirectory to be mounted instead of whole bucket>
+  part-size-mb: <size of each part for multipart uploads (in MB). Valid range is 5MB to 5120MB. Default - 8 MB>
+  upload-cutoff-mb: <files exceeding this size will use be uploaded in parts (in MB). Default - 100 MB>
+  concurrency: <number of parallel upload/download threads. Default - 5>
+  disable-concurrent-download: true|false <disables concurrent downloads. Can improve performance with small files at the cost of slow downloads for large objects>
+  enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
+  checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - SHA1>
+  usePathStyle: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
+
 # Mount all configuration
 mountall:
   # allowlist takes precedence over denylist in case of conflicts
@@ -170,7 +207,7 @@ health_monitor:
   output-path: <Path where health monitor will generate its output file. File name will be monitor_<pid>.json>
   # list of monitors to be disabled
   monitor-disable-list:
-    - blobfuse_stats <Disable blobfuse2 stats polling>
+    - cloudfuse_stats <Disable blobfuse2 stats polling>
     - file_cache_monitor <Disable file cache directory monitor>
     - cpu_profiler <Disable CPU monitoring on blobfuse2 process>
     - memory_profiler <Disable memory monitoring on blobfuse2 process>
