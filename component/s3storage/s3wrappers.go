@@ -363,7 +363,9 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// initialize list to be returned
 	objectAttrList := make([]*internal.ObjAttr, 0)
 	// fetch and process a single result page
-	output, err := paginator.NextPage(context.Background())
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelFn()
+	output, err := paginator.NextPage(ctx)
 	if err != nil {
 		log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
 		return objectAttrList, nil, err
