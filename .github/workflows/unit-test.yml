@@ -180,7 +180,7 @@ jobs:
           version: latest
 
           # Optional: golangci-lint command line arguments.
-          args: --tests=false --timeout=5m --exclude-dirs test,common/stats_collector,common/stats_monitor --skip-files component/libfuse/libfuse2_handler_test_wrapper.go --out-format=github-actions
+          args: --tests=false --timeout=5m --exclude-dirs test,common/stats_collector,common/stats_monitor --exclude-files component/libfuse/libfuse2_handler_test_wrapper.go --out-format=github-actions
 
       - name: Notice file check
         run: |
