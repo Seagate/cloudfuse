@@ -163,10 +163,15 @@ func (lf *Libfuse) initFuse() error {
 		// be configurable for the config file. But this is a good default.
 
 		// by default bucketName will be blank
-		bucketName := ""
+		bucketName := "default"
 		// Borrow bucket-name string from attribute cache
 		if config.IsSet("s3storage.bucket-name") {
 			err := config.UnmarshalKey("s3storage.bucket-name", &bucketName)
+			if err != nil {
+				log.Err("ParseAndReadDynamicConfig : Failed to unmarshal s3storage.bucket-name")
+			}
+		} else if config.IsSet("azstorage.container") {
+			err := config.UnmarshalKey("azstorage.container", &bucketName)
 			if err != nil {
 				bucketName = "default"
 				log.Err("ParseAndReadDynamicConfig : Failed to unmarshal s3storage.bucket-name")
