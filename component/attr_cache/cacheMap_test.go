@@ -368,6 +368,8 @@ func generateFSTree(path string) (*list.List, *list.List) {
 
 func (suite *cacheMapTestSuite) confirmMarkedDeleted(item *attrCacheItem) {
 	// check the item
+	suite.T().Helper()
+
 	suite.assert.NotNil(item)
 	suite.assert.False(item.exists())
 	// recurse over its children
@@ -380,6 +382,8 @@ func (suite *cacheMapTestSuite) confirmMarkedDeleted(item *attrCacheItem) {
 
 func (suite *cacheMapTestSuite) confirmInvalid(item *attrCacheItem) {
 	// check item
+	suite.T().Helper()
+
 	suite.assert.NotNil(item)
 	suite.assert.False(item.attrFlag.IsSet(AttrFlagValid))
 	// recurse over its children

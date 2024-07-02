@@ -26,19 +26,17 @@
 package azstorage
 
 import (
-	"net/url"
 	"os"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 
-	"github.com/Azure/azure-pipeline-go/pipeline"
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 )
 
-// Example for azblob usage : https://godoc.org/github.com/Azure/azure-storage-blob-go/azblob#pkg-examples
-// For methods help refer : https://godoc.org/github.com/Azure/azure-storage-blob-go/azblob#ContainerURL
+// Example for azblob usage : https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/storage/azblob#pkg-examples
+// For methods help refer : https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/storage/azblob#Client
 type AzStorageConfig struct {
 	authConfig azAuthConfig
 
@@ -48,7 +46,7 @@ type AzStorageConfig struct {
 	maxConcurrency uint16
 
 	// tier to be set on every upload
-	defaultTier azblob.AccessTierType
+	defaultTier *blob.AccessTier
 
 	// Return back readDir on mount for given amount of time
 	cancelListForSeconds uint16
@@ -59,7 +57,6 @@ type AzStorageConfig struct {
 	backoffTime           int32
 	maxRetryDelay         int32
 	proxyAddress          string
-	sdkTrace              bool
 	ignoreAccessModifiers bool
 	mountAllContainers    bool
 
@@ -82,10 +79,6 @@ type AzStorageConfig struct {
 
 type AzStorageConnection struct {
 	Config AzStorageConfig
-
-	Pipeline pipeline.Pipeline
-
-	Endpoint *url.URL
 }
 
 type AzConnection interface {
@@ -119,8 +112,8 @@ type AzConnection interface {
 	ReadBuffer(name string, offset int64, length int64) ([]byte, error)
 	ReadInBuffer(name string, offset int64, length int64, data []byte) error
 
-	WriteFromFile(name string, metadata map[string]string, fi *os.File) error
-	WriteFromBuffer(name string, metadata map[string]string, data []byte) error
+	WriteFromFile(name string, metadata map[string]*string, fi *os.File) error
+	WriteFromBuffer(name string, metadata map[string]*string, data []byte) error
 	Write(options internal.WriteFileOptions) error
 	GetFileBlockOffsets(name string) (*common.BlockOffsetList, error)
 
@@ -133,7 +126,7 @@ type AzConnection interface {
 	StageBlock(string, []byte, string) error
 	CommitBlocks(string, []string) error
 
-	NewCredentialKey(_, _ string) error
+	UpdateServiceClient(_, _ string) error
 }
 
 // NewAzStorageConnection : Based on account type create respective AzConnection Object

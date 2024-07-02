@@ -452,6 +452,8 @@ func (s *s3StorageTestSuite) setupHierarchy(base string) (*list.List, *list.List
 	// ab/
 	//  ab/c1
 	// ac
+	s.T().Helper()
+
 	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: base})
 	s.assert.NoError(err)
 	c1 := base + "/c1"
@@ -2204,7 +2206,7 @@ func (s *s3StorageTestSuite) TestCreateLink() {
 	s.assert.NotNil(attr)
 	s.assert.NotEmpty(attr.Metadata)
 	s.assert.Contains(attr.Metadata, symlinkKey)
-	s.assert.Equal("true", attr.Metadata[symlinkKey])
+	s.assert.Equal("true", *attr.Metadata[symlinkKey])
 
 	//download and make sure the data is correct
 	result, err := s.s3Storage.ReadLink(internal.ReadLinkOptions{Name: name})
@@ -2378,7 +2380,7 @@ func (s *s3StorageTestSuite) TestGetAttrLink() {
 	s.assert.True(props.IsSymlink())
 	s.assert.NotEmpty(props.Metadata)
 	s.assert.Contains(props.Metadata, symlinkKey)
-	s.assert.EqualValues("true", props.Metadata[symlinkKey])
+	s.assert.EqualValues("true", *props.Metadata[symlinkKey])
 }
 
 func (s *s3StorageTestSuite) TestGetAttrFileSize() {
@@ -3187,6 +3189,8 @@ func (s *s3StorageTestSuite) TestTruncateNoBlockFileToLarger() {
 }
 
 func (s *s3StorageTestSuite) UtilityFunctionTestTruncateFileToSmaller(size int, truncatedLength int) {
+	s.T().Helper()
+
 	defer s.cleanupTest()
 	// Setup
 	storageTestConfigurationParameters.PartSizeMb = 5
@@ -3221,6 +3225,8 @@ func (s *s3StorageTestSuite) UtilityFunctionTestTruncateFileToSmaller(size int, 
 }
 
 func (s *s3StorageTestSuite) UtilityFunctionTruncateFileToLarger(size int, truncatedLength int) {
+	s.T().Helper()
+
 	defer s.cleanupTest()
 	// Setup
 	storageTestConfigurationParameters.PartSizeMb = 5

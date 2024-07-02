@@ -40,6 +40,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -78,6 +79,16 @@ var (
 	errRegionMismatch     = errors.New("Region Error: Region provided does not match region in endpoint. Please check endpoint has correct region.")
 	errNoBucketInAccount  = errors.New("Bucket Error: No bucket exists in S3 account. Please create a bucket in your account.")
 )
+
+// getSymlinkBool returns true if the symlink flag is set in the metadata map, false otherwise.
+func getSymlinkBool(metadata map[string]*string) bool {
+	isSymlink := false
+	sym, ok := metadata[symlinkKey]
+	if ok && sym != nil {
+		isSymlink = (*sym == "true")
+	}
+	return isSymlink
+}
 
 // Configure : Initialize the awsS3Client
 func (cl *Client) Configure(cfg Config) error {
@@ -295,9 +306,9 @@ func (cl *Client) CreateLink(source string, target string, isSymlink bool) error
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
 
-	symlinkMap := map[string]string{symlinkKey: "false"}
+	symlinkMap := map[string]*string{symlinkKey: to.Ptr("false")}
 	if isSymlink {
-		symlinkMap[symlinkKey] = "true"
+		symlinkMap[symlinkKey] = to.Ptr("true")
 	}
 	return cl.WriteFromBuffer(source, symlinkMap, data)
 }
@@ -593,8 +604,9 @@ func (cl *Client) ReadInBuffer(name string, offset int64, length int64, data []b
 
 // Upload from a file handle to an object.
 // The metadata parameter is not used.
-func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.File) error {
-	isSymlink := metadata[symlinkKey] == "true"
+func (cl *Client) WriteFromFile(name string, metadata map[string]*string, fi *os.File) error {
+	isSymlink := getSymlinkBool(metadata)
+
 	log.Trace("Client::WriteFromFile : file %s -> name %s", fi.Name(), name)
 	// track time for performance testing
 	defer log.TimeTrack(time.Now(), "Client::WriteFromFile", name)
@@ -638,9 +650,9 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 
 // WriteFromBuffer : Upload from a buffer to an object.
 // name is the file path.
-func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) error {
+func (cl *Client) WriteFromBuffer(name string, metadata map[string]*string, data []byte) error {
 	log.Trace("Client::WriteFromBuffer : name %s", name)
-	isSymlink := metadata[symlinkKey] == "true"
+	isSymlink := getSymlinkBool(metadata)
 
 	// convert byte array to io.Reader
 	dataReader := bytes.NewReader(data)
@@ -762,7 +774,8 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		// case 1: file consists of no parts (small file)
 
 		// get the existing object data
-		isSymlink := options.Metadata[symlinkKey] == "true"
+		isSymlink := getSymlinkBool(options.Metadata)
+
 		oldData, _ := cl.ReadBuffer(name, 0, 0, isSymlink)
 		// update the data with the new data
 		// if we're only overwriting existing data

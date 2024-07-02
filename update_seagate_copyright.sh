@@ -2,7 +2,7 @@
 
 # URL of blobfuse2 repo
 blobfuse2_repo="https://github.com/Azure/azure-storage-fuse.git"
-tags="tags/blobfuse2-2.2.0"
+tags="tags/blobfuse2-2.3.0"
 year="2024"
 
 # Create temporary directory to clone into

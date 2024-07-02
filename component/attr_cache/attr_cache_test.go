@@ -104,6 +104,8 @@ func (suite *attrCacheTestSuite) assertCacheEmpty() bool {
 }
 
 func (suite *attrCacheTestSuite) assertNotInCache(path string) {
+	suite.T().Helper()
+
 	_, found := suite.attrCache.cache.get(path)
 	suite.assert.False(found)
 }
@@ -123,6 +125,8 @@ func (suite *attrCacheTestSuite) addPathToCache(path string, metadata bool) {
 }
 
 func (suite *attrCacheTestSuite) assertDeleted(path string) {
+	suite.T().Helper()
+
 	cacheItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
 	suite.assert.True(cacheItem.valid())
@@ -130,12 +134,16 @@ func (suite *attrCacheTestSuite) assertDeleted(path string) {
 }
 
 func (suite *attrCacheTestSuite) assertInvalid(path string) {
+	suite.T().Helper()
+
 	cacheItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
 	suite.assert.False(cacheItem.valid())
 }
 
 func (suite *attrCacheTestSuite) assertUntouched(path string) {
+	suite.T().Helper()
+
 	cacheItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
 	suite.assert.EqualValues(defaultSize, cacheItem.attr.Size)
@@ -145,6 +153,8 @@ func (suite *attrCacheTestSuite) assertUntouched(path string) {
 }
 
 func (suite *attrCacheTestSuite) assertExists(path string) {
+	suite.T().Helper()
+
 	checkItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
 	suite.assert.True(checkItem.valid())
@@ -152,6 +162,8 @@ func (suite *attrCacheTestSuite) assertExists(path string) {
 }
 
 func (suite *attrCacheTestSuite) assertInCloud(path string) {
+	suite.T().Helper()
+
 	checkItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
 	suite.assert.True(checkItem.valid())
@@ -160,6 +172,8 @@ func (suite *attrCacheTestSuite) assertInCloud(path string) {
 }
 
 func (suite *attrCacheTestSuite) assertNotInCloud(path string) {
+	suite.T().Helper()
+
 	checkItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
 	suite.assert.True(checkItem.valid())

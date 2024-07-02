@@ -35,4 +35,3 @@ azstorage:
   mode: sas
   container: { 0 }
   tier: hot
-  sdk-trace: { VERBOSE_LOG }

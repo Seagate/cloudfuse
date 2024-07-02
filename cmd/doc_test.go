@@ -67,7 +67,7 @@ func (suite *docTestSuite) TestDocsGeneration() {
 	suite.assert.NoError(err)
 	files, err := os.ReadDir(opDir)
 	suite.assert.NoError(err)
-	suite.assert.NotZero(len(files))
+	suite.assert.NotEmpty(files)
 }
 
 func (suite *docTestSuite) TestOutputDirCreationError() {
