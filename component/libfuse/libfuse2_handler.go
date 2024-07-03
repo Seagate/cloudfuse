@@ -183,9 +183,7 @@ func (lf *Libfuse) initFuse() error {
 				kindStorage = "cloud"
 				log.Err("initFuse : Failed to unmarshal s3storage.bucket-name")
 			}
-		} else {
-			nameStorage = "default"
-			kindStorage = "cloud"
+
 		}
 
 		volumePrefix := fmt.Sprintf("--VolumePrefix=\\%s\\%s", kindStorage, nameStorage)
