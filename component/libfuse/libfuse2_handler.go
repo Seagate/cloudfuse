@@ -162,31 +162,31 @@ func (lf *Libfuse) initFuse() error {
 		// TODO: We can support any type of valid network share path so this path could
 		// be configurable for the config file. But this is a good default.
 
-		// by default storageName will be blank
-		var storageName string
-		var cloudStorageKind string
+		// by default nameStorage will be blank
+		var nameStorage string
+		var kindStorage string
 		// Borrow bucket-name string from attribute cache
 		if config.IsSet("s3storage.bucket-name") {
 
-			err := config.UnmarshalKey("s3storage.bucket-name", &storageName)
-			cloudStorageKind = "bucket"
+			err := config.UnmarshalKey("s3storage.bucket-name", &nameStorage)
+			kindStorage = "bucket"
 			if err != nil {
-				storageName = "default"
-				cloudStorageKind = "Cloud Storage"
+				nameStorage = "default"
+				kindStorage = "Cloud Storage"
 				log.Err("ParseAndReadDynamicConfig : Failed to unmarshal s3storage.bucket-name")
 			}
 		} else if config.IsSet("azstorage.container") {
-			err := config.UnmarshalKey("azstorage.container", &storageName)
-			cloudStorageKind = "container"
+			err := config.UnmarshalKey("azstorage.container", &nameStorage)
+			kindStorage = "container"
 			if err != nil {
-				storageName = "default"
-				cloudStorageKind = "Cloud Storage"
+				nameStorage = "default"
+				kindStorage = "Cloud Storage"
 				log.Err("ParseAndReadDynamicConfig : Failed to unmarshal s3storage.bucket-name")
 			}
 
 		}
 
-		volumePrefix := fmt.Sprintf("--VolumePrefix=\\%s\\%s", cloudStorageKind, storageName)
+		volumePrefix := fmt.Sprintf("--VolumePrefix=\\%s\\%s", kindStorage, nameStorage)
 		opts = append(opts, volumePrefix)
 	}
 
