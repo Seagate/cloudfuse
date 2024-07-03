@@ -163,27 +163,30 @@ func (lf *Libfuse) initFuse() error {
 		// be configurable for the config file. But this is a good default.
 
 		// by default nameStorage will be blank
-		var nameStorage string
-		var kindStorage string
+		nameStorage := "default"
+		kindStorage := "cloud"
 		// Borrow bucket-name string from attribute cache
 		if config.IsSet("s3storage.bucket-name") {
 
 			err := config.UnmarshalKey("s3storage.bucket-name", &nameStorage)
-			kindStorage = "bucket"
 			if err != nil {
 				nameStorage = "default"
-				kindStorage = "cloud"
 				log.Err("initFuse : Failed to unmarshal s3storage.bucket-name")
+			} else {
+				kindStorage = "bucket"
 			}
 		} else if config.IsSet("azstorage.container") {
 			err := config.UnmarshalKey("azstorage.container", &nameStorage)
-			kindStorage = "container"
 			if err != nil {
 				nameStorage = "default"
-				kindStorage = "cloud"
 				log.Err("initFuse : Failed to unmarshal s3storage.bucket-name")
+			} else {
+				kindStorage = "container"
 			}
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 		}
 
 		volumePrefix := fmt.Sprintf("--VolumePrefix=\\%s\\%s", kindStorage, nameStorage)
