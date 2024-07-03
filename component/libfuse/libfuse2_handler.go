@@ -173,7 +173,7 @@ func (lf *Libfuse) initFuse() error {
 			if err != nil {
 				nameStorage = "default"
 				kindStorage = "cloud"
-				log.Err("ParseAndReadDynamicConfig : Failed to unmarshal s3storage.bucket-name")
+				log.Err("initFuse : Failed to unmarshal s3storage.bucket-name")
 			}
 		} else if config.IsSet("azstorage.container") {
 			err := config.UnmarshalKey("azstorage.container", &nameStorage)
@@ -181,7 +181,7 @@ func (lf *Libfuse) initFuse() error {
 			if err != nil {
 				nameStorage = "default"
 				kindStorage = "cloud"
-				log.Err("ParseAndReadDynamicConfig : Failed to unmarshal s3storage.bucket-name")
+				log.Err("initFuse : Failed to unmarshal s3storage.bucket-name")
 			}
 
 		}
