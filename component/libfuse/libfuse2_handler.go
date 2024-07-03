@@ -183,10 +183,6 @@ func (lf *Libfuse) initFuse() error {
 			} else {
 				kindStorage = "container"
 			}
-<<<<<<< Updated upstream
-
-=======
->>>>>>> Stashed changes
 		}
 
 		volumePrefix := fmt.Sprintf("--VolumePrefix=\\%s\\%s", kindStorage, nameStorage)
