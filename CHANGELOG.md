@@ -1,5 +1,17 @@
 # Cloudfuse Changelog #
 
+## **1.3.0** ##
+
+July 3rd 2024
+This version is based on [blobfuse2 2.3.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.0) (upstream).
+
+### Changes ###
+
+- [#219](https://github.com/Seagate/cloudfuse/pull/219) Improve performance with Windows Explorer
+- [#212](https://github.com/Seagate/cloudfuse/pull/212) Detect region from endpoint by default
+- [#237](https://github.com/Seagate/cloudfuse/pull/237) Allow empty bucket-name and default to the first accessible s3 bucket
+- [#238](https://github.com/Seagate/cloudfuse/pull/238) Use base64 encoding for config passphrase
+
 ## **1.2.0** ##
 
 May 7th 2024
