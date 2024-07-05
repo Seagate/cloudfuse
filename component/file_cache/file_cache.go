@@ -1024,7 +1024,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 		log.Err("FileCache::CreateDir : failed to make local directory because %s", err.Error())
 		return err
 	}
-	//fc.policy.CacheValid(localpath)
+
 	log.Trace("FileCache::CreateDir : the directory was created successfully locally with path %s", localpath)
 
 	return nil

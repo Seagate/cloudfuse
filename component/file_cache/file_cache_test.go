@@ -112,10 +112,21 @@ func (suite *fileCacheTestSuite) SetupTest() {
 	suite.setupTestHelper(defaultConfig)
 }
 
-func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
+func (suite *fileCacheTestSuite) setupTestHelperMock(configuration string) {
 	suite.assert = assert.New(suite.T())
 	suite.mockCtrl = gomock.NewController(suite.T())
 	suite.mock = internal.NewMockComponent(suite.mockCtrl)
+	config.ReadConfigFromReader(strings.NewReader(configuration))
+	suite.fileCache = newTestFileCache(suite.mock)
+	err := suite.fileCache.Start(context.Background())
+	if err != nil {
+		panic(fmt.Sprintf("Unable to start file cache [%s]", err.Error()))
+	}
+
+}
+
+func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
+	suite.assert = assert.New(suite.T())
 	config.ReadConfigFromReader(strings.NewReader(configuration))
 	suite.loopback = newLoopbackFS()
 	suite.fileCache = newTestFileCache(suite.loopback)
@@ -127,12 +138,29 @@ func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start file cache [%s]", err.Error()))
 	}
-	suite.fileCache = newTestFileCache(suite.mock)
 
 }
 
 func (suite *fileCacheTestSuite) cleanupTest() {
 	suite.loopback.Stop()
+	//suite.mockCtrl.Finish()
+	err := suite.fileCache.Stop()
+	if err != nil {
+		panic(fmt.Sprintf("Unable to stop file cache [%s]", err.Error()))
+	}
+
+	// Delete the temp directories created
+	err = os.RemoveAll(suite.cache_path)
+	if err != nil {
+		fmt.Printf("fileCacheTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
+	}
+	err = os.RemoveAll(suite.fake_storage_path)
+	if err != nil {
+		fmt.Printf("fileCacheTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
+	}
+}
+
+func (suite *fileCacheTestSuite) cleanupTestMock() {
 	suite.mockCtrl.Finish()
 	err := suite.fileCache.Stop()
 	if err != nil {
@@ -308,14 +336,37 @@ func (suite *fileCacheTestSuite) TestCreateDir() {
 	path := "a"
 	options := internal.CreateDirOptions{Name: path}
 	err := suite.fileCache.CreateDir(options)
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 
-	// Path should not be added to the file cache
+	// Path should  be added to the file cache
 	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoError(err)
 	// Path should be in fake storage
 	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
 	suite.assert.True(err == nil || os.IsExist(err))
+}
+
+func (suite *fileCacheTestSuite) TestCreateDirCloudDown() {
+	defer suite.cleanupTestMock()
+	createEmptyFile := true
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, createEmptyFile, suite.fake_storage_path)
+	suite.setupTestHelperMock(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+
+	path := "a"
+	options := internal.CreateDirOptions{Name: path}
+	suite.mock.EXPECT().CreateDir(options).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	err := suite.fileCache.CreateDir(options)
+	time.Sleep(time.Millisecond)
+	suite.assert.NoError(err)
+
+	// Path should  be added to the file cache
+	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
+	suite.assert.NoError(err)
+	// Path should not be in fake storage
+	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
+	suite.assert.False(err == nil || os.IsExist(err))
 }
 
 func (suite *fileCacheTestSuite) TestDeleteDir() {
@@ -330,35 +381,35 @@ func (suite *fileCacheTestSuite) TestDeleteDir() {
 	dir := "dir"
 	path := dir + "/file"
 	err := suite.fileCache.CreateDir(internal.CreateDirOptions{Name: dir, Mode: 0777})
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 	// The file (and directory) is in the cache and storage (see TestCreateFileInDirCreateEmptyFile)
 	// Delete the file since we can only delete empty directories
 	err = suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 
 	// Delete the directory
 	err = suite.fileCache.DeleteDir(internal.DeleteDirOptions{Name: dir})
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 	suite.assert.False(suite.fileCache.policy.IsCached(dir)) // Directory should not be cached
 }
 
 func (suite *fileCacheTestSuite) TestDeleteDirCloudDown() {
-	defer suite.cleanupTest()
+	defer suite.cleanupTestMock()
 	// Setup
 	// Configure to create empty files so we create the file in cloud storage
 	createEmptyFile := true
 	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, createEmptyFile, suite.fake_storage_path)
-	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+	suite.setupTestHelperMock(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 
 	dir := "dir"
 	path := dir + "/file"
@@ -367,29 +418,32 @@ func (suite *fileCacheTestSuite) TestDeleteDirCloudDown() {
 	deleteDirOptions := internal.DeleteDirOptions{Name: dir}
 	createFileOptions := internal.CreateFileOptions{Name: path, Mode: 0777}
 
-	suite.mock.EXPECT().CreateDir(createDirOptions).Return(&retry.MaxAttemptsError{})
+	suite.mock.EXPECT().CreateDir(createDirOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
 	err := suite.fileCache.CreateDir(createDirOptions)
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
-	suite.mock.EXPECT().CreateFile(createFileOptions).Return(&handlemap.Handle{}, &retry.MaxAttemptsError{})
-	handle, err := suite.fileCache.CreateFile(createFileOptions)
-	time.Sleep(time.Second)
+
+	handle := handlemap.NewHandle(path)
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(handle, &retry.MaxAttemptsError{}).AnyTimes()
+	handle, err = suite.fileCache.CreateFile(createFileOptions)
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
+
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 	// The file (and directory) is in the cache and storage (see TestCreateFileInDirCreateEmptyFile)
 	// Delete the file since we can only delete empty directories
-
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: false}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().DeleteFile(internal.DeleteFileOptions{Name: path}).Return(&retry.MaxAttemptsError{}).AnyTimes()
 	err = suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 
 	// Delete the directory
-
-	suite.mock.EXPECT().DeleteDir(deleteDirOptions).Return(&retry.MaxAttemptsError{})
+	suite.mock.EXPECT().DeleteDir(deleteDirOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
 	err = suite.fileCache.DeleteDir(deleteDirOptions)
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 	suite.assert.False(suite.fileCache.policy.IsCached(dir)) // Directory should not be cached
 }
@@ -563,6 +617,7 @@ func (suite *fileCacheTestSuite) TestIsDirEmpty() {
 	suite.assert.True(empty)
 }
 
+// Reworked isDirEmpty to always return true so that local operations can continue
 func (suite *fileCacheTestSuite) TestIsDirEmptyFalse() {
 	defer suite.cleanupTest()
 	// Setup
@@ -614,7 +669,51 @@ func (suite *fileCacheTestSuite) TestRenameDir() {
 	suite.assert.NoError(err)
 	suite.assert.False(suite.fileCache.policy.IsCached(src)) // Directory should not be cached
 	// wait for asynchronous deletion
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Millisecond)
+	// directory should not exist in local filesystem
+	fInfo, err := os.Stat(filepath.Join(suite.cache_path, src))
+	suite.assert.Nil(fInfo)
+	suite.assert.Error(err)
+	suite.assert.True(os.IsNotExist(err))
+}
+
+func (suite *fileCacheTestSuite) TestRenameDirCloudDown() {
+	defer suite.cleanupTestMock()
+	// Setup
+	// Configure to create empty files so we create the file in cloud storage
+	createEmptyFile := true
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, createEmptyFile, suite.fake_storage_path)
+	suite.setupTestHelperMock(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+
+	src := "src"
+	dst := "dst"
+	createDirOptions := internal.CreateDirOptions{Name: src, Mode: 0777}
+	suite.mock.EXPECT().CreateDir(createDirOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	err := suite.fileCache.CreateDir(createDirOptions)
+	time.Sleep(time.Millisecond)
+	suite.assert.NoError(err)
+	path := src + "/file"
+	for i := 0; i < 5; i++ {
+		handle := handlemap.NewHandle(path + strconv.Itoa(i))
+		suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: path + strconv.Itoa(i), Mode: 0777}).Return(handle, &retry.MaxAttemptsError{}).AnyTimes()
+		handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path + strconv.Itoa(i), Mode: 0777})
+		time.Sleep(time.Millisecond)
+		suite.assert.NoError(err)
+		err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+		suite.assert.NoError(err)
+	}
+	// The file (and directory) is in the cache and storage (see TestCreateFileInDirCreateEmptyFile)
+
+	// Delete the directory
+	renameDirOptions := internal.RenameDirOptions{Src: src, Dst: dst}
+	suite.mock.EXPECT().RenameDir(renameDirOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	err = suite.fileCache.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
+	time.Sleep(time.Millisecond)
+	suite.assert.NoError(err)
+	suite.assert.False(suite.fileCache.policy.IsCached(src)) // Directory should not be cached
+	// wait for asynchronous deletion
+	time.Sleep(time.Millisecond)
 	// directory should not exist in local filesystem
 	fInfo, err := os.Stat(filepath.Join(suite.cache_path, src))
 	suite.assert.Nil(fInfo)
@@ -628,6 +727,30 @@ func (suite *fileCacheTestSuite) TestCreateFile() {
 	path := "file1"
 	options := internal.CreateFileOptions{Name: path}
 	f, err := suite.fileCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
+
+	// Path should be added to the file cache
+	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
+	suite.assert.True(err == nil || os.IsExist(err))
+	// Path should not be in fake storage
+	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
+	suite.assert.True(os.IsNotExist(err))
+}
+
+func (suite *fileCacheTestSuite) TestCreateFileCloudDown() {
+	defer suite.cleanupTestMock()
+	createEmptyFile := false
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, createEmptyFile, suite.fake_storage_path)
+	suite.setupTestHelperMock(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+	// Default is to not create empty files on create file to support immutable storage.
+	path := "file1"
+	options := internal.CreateFileOptions{Name: path}
+	handle := handlemap.NewHandle(path)
+	suite.mock.EXPECT().CreateFile(options).Return(handle, &retry.MaxAttemptsError{}).AnyTimes()
+	f, err := suite.fileCache.CreateFile(options)
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 	suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
 
@@ -659,6 +782,32 @@ func (suite *fileCacheTestSuite) TestCreateFileInDir() {
 	suite.assert.True(os.IsNotExist(err))
 }
 
+func (suite *fileCacheTestSuite) TestCreateFileInDirCloudDown() {
+	defer suite.cleanupTestMock()
+	createEmptyFile := false
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, createEmptyFile, suite.fake_storage_path)
+	suite.setupTestHelperMock(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+	// Default is to not create empty files on create file to support immutable storage.
+	dir := "dir"
+	path := dir + "/file"
+	handle := handlemap.NewHandle(path)
+	options := internal.CreateFileOptions{Name: path}
+	suite.mock.EXPECT().CreateFile(options).Return(handle, &retry.MaxAttemptsError{}).AnyTimes()
+	f, err := suite.fileCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
+
+	// Path should be added to the file cache, including directory
+	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, dir))
+	suite.assert.True(err == nil || os.IsExist(err))
+	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
+	suite.assert.True(err == nil || os.IsExist(err))
+	// Path should not be in fake storage
+	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
+	suite.assert.True(os.IsNotExist(err))
+}
+
 func (suite *fileCacheTestSuite) TestCreateFileCreateEmptyFile() {
 	defer suite.cleanupTest()
 	// Configure to create empty files so we create the file in cloud storage
@@ -672,7 +821,7 @@ func (suite *fileCacheTestSuite) TestCreateFileCreateEmptyFile() {
 	f, err := suite.fileCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.False(f.Dirty()) // Handle should not be dirty since it was written to storage
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Millisecond)
 	// Path should be added to the file cache
 	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
 	suite.assert.True(err == nil || os.IsExist(err))
@@ -681,7 +830,59 @@ func (suite *fileCacheTestSuite) TestCreateFileCreateEmptyFile() {
 	suite.assert.True(err == nil || os.IsExist(err))
 }
 
+func (suite *fileCacheTestSuite) TestCreateFileCreateEmptyFileCloudDown() {
+	defer suite.cleanupTestMock()
+
+	// Configure to create empty files so we create the file in cloud storage
+	createEmptyFile := true
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, createEmptyFile, suite.fake_storage_path)
+	suite.setupTestHelperMock(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+
+	path := "file2"
+	handle := handlemap.NewHandle(path)
+	options := internal.CreateFileOptions{Name: path}
+	suite.mock.EXPECT().CreateFile(options).Return(handle, &retry.MaxAttemptsError{}).AnyTimes()
+	f, err := suite.fileCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.False(f.Dirty()) // Handle should not be dirty since it was written to storage
+	time.Sleep(time.Millisecond)
+	// Path should be added to the file cache
+	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
+	suite.assert.True(err == nil || os.IsExist(err))
+	// Path should be in fake storage
+	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
+	suite.assert.False(err == nil || os.IsExist(err))
+}
+
 func (suite *fileCacheTestSuite) TestCreateFileInDirCreateEmptyFile() {
+	defer suite.cleanupTest()
+	// Configure to create empty files so we create the file in cloud storage
+	createEmptyFile := true
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, createEmptyFile, suite.fake_storage_path)
+	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+
+	dir := "dir"
+	path := dir + "/file"
+	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: dir, Mode: 0777})
+	f, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.assert.NoError(err)
+	suite.assert.False(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
+	time.Sleep(time.Millisecond)
+	// Path should be added to the file cache, including directory
+	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, dir))
+	suite.assert.True(err == nil || os.IsExist(err))
+	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
+	suite.assert.True(err == nil || os.IsExist(err))
+	// Path should be in fake storage, including directory
+	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, dir))
+	suite.assert.True(err == nil || os.IsExist(err))
+	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
+	suite.assert.True(err == nil || os.IsExist(err))
+}
+
+func (suite *fileCacheTestSuite) TestCreateFileInDirCreateEmptyFileCloudDown() {
 	defer suite.cleanupTest()
 	// Configure to create empty files so we create the file in cloud storage
 	createEmptyFile := true
