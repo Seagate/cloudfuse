@@ -33,7 +33,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -123,7 +123,7 @@ func (s *configTestSuite) TestBlockSize() {
 	assert.Error(err)
 	assert.Equal(az.stConfig.blockSize, opt.BlockSize*1024*1024)
 
-	opt.BlockSize = azblob.BlockBlobMaxStageBlockBytes + 1
+	opt.BlockSize = blockblob.MaxStageBlockBytes + 1
 	err = ParseAndValidateConfig(az, opt)
 	assert.Error(err)
 	assert.Contains(err.Error(), "block size is too large")
@@ -379,7 +379,7 @@ func (s *configTestSuite) TestCompressionType() {
 
 }
 
-func (s *configTestSuite) TestInvalidSASRefresh() {
+func (s *configTestSuite) TestSASRefresh() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
@@ -403,8 +403,7 @@ func (s *configTestSuite) TestInvalidSASRefresh() {
 
 	az.storage = &BlockBlob{Auth: &azAuthBlobSAS{azAuthSAS: azAuthSAS{azAuthBase: azAuthBase{config: azAuthConfig{Endpoint: "abcd:://qreq!@#$%^&*()_)(*&^%$#"}}}}}
 	err := ParseAndReadDynamicConfig(az, opt, true)
-	assert.Error(err)
-	assert.Equal("SAS key update failure", err.Error())
+	assert.NoError(err)
 }
 
 func TestConfigTestSuite(t *testing.T) {

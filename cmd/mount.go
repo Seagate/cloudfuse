@@ -79,6 +79,7 @@ type mountOptions struct {
 	ProfilerIP        string         `config:"profiler-ip"`
 	MonitorOpt        monitorOptions `config:"health_monitor"`
 	WaitForMount      time.Duration  `config:"wait-for-mount"`
+	LazyWrite         bool           `config:"lazy-write"`
 
 	// v1 support
 	Streaming      bool     `config:"streaming"`
@@ -246,6 +247,8 @@ var mountCmd = &cobra.Command{
 	RunE: func(_ *cobra.Command, args []string) error {
 		options.MountPath = common.ExpandPath(args[0])
 		configFileProvided := options.ConfigFile != ""
+		common.MountPath = options.MountPath
+
 		configFileExists := true
 
 		if options.ConfigFile == "" {
@@ -446,6 +449,7 @@ var mountCmd = &cobra.Command{
 		var pipeline *internal.Pipeline
 
 		log.Crit("Starting Cloudfuse Mount : %s on [%s]", common.CloudfuseVersion, common.GetCurrentDistro())
+		log.Info("Mount Command: %s", os.Args)
 		log.Crit("Logging level set to : %s", logLevel.String())
 		log.Debug("Mount allowed on nonempty path : %v", options.NonEmpty)
 
@@ -677,6 +681,9 @@ func init() {
 	mountCmd.Flags().BoolVar(&options.DryRun, "dry-run", false,
 		"Test mount configuration, credentials, etc., but don't make any changes to the container or the local file system. Implies foreground.")
 	config.BindPFlag("dry-run", mountCmd.Flags().Lookup("dry-run"))
+
+	mountCmd.PersistentFlags().Bool("lazy-write", false, "Async write to storage container after file handle is closed.")
+	config.BindPFlag("lazy-write", mountCmd.PersistentFlags().Lookup("lazy-write"))
 
 	mountCmd.PersistentFlags().String("default-working-dir", "", "Default working directory for storing log files and other cloudfuse information")
 	mountCmd.PersistentFlags().Lookup("default-working-dir").Hidden = true

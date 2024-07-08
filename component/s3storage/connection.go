@@ -103,8 +103,8 @@ type S3Connection interface {
 	ReadBuffer(name string, offset int64, length int64, isSymlink bool) ([]byte, error)
 	ReadInBuffer(name string, offset int64, length int64, data []byte) error
 
-	WriteFromFile(name string, metadata map[string]string, fi *os.File) error
-	WriteFromBuffer(name string, metadata map[string]string, data []byte) error
+	WriteFromFile(name string, metadata map[string]*string, fi *os.File) error
+	WriteFromBuffer(name string, metadata map[string]*string, data []byte) error
 	Write(options internal.WriteFileOptions) error
 	GetFileBlockOffsets(name string) (*common.BlockOffsetList, error)
 

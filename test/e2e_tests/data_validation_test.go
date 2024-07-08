@@ -93,6 +93,8 @@ func (suite *dataValidationTestSuite) dataValidationTestCleanup(toRemove []strin
 
 func (suite *dataValidationTestSuite) copyToMountDir(localFilePath string, remoteFilePath string) {
 	// copy to mounted directory
+	suite.T().Helper()
+
 	cpCmd := exec.Command("cp", localFilePath, remoteFilePath)
 	cliOut, err := cpCmd.Output()
 	if len(cliOut) != 0 {
@@ -103,6 +105,8 @@ func (suite *dataValidationTestSuite) copyToMountDir(localFilePath string, remot
 
 func (suite *dataValidationTestSuite) validateData(localFilePath string, remoteFilePath string) {
 	// compare the local and mounted files
+	suite.T().Helper()
+
 	diffCmd := exec.Command("diff", localFilePath, remoteFilePath)
 	cliOut, err := diffCmd.Output()
 	if len(cliOut) != 0 {

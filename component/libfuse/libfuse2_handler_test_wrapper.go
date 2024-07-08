@@ -148,14 +148,14 @@ func testStatFsNotPopulated(suite *libfuseTestSuite) {
 
 	// By default these are all 0, so they should be populated by the system
 	// and thus each larger than 0
-	suite.assert.Greater(int(buf.Frsize), 0)
-	suite.assert.Greater(int(buf.Blocks), 0)
-	suite.assert.Greater(int(buf.Bavail), 0)
-	suite.assert.Greater(int(buf.Bfree), 0)
-	suite.assert.Greater(int(buf.Bsize), 0)
-	suite.assert.Greater(int(buf.Files), 0)
-	suite.assert.Greater(int(buf.Ffree), 0)
-	suite.assert.Greater(int(buf.Namemax), 0)
+	suite.assert.Positive(buf.Frsize)
+	suite.assert.Positive(buf.Blocks)
+	suite.assert.Positive(buf.Bavail)
+	suite.assert.Positive(buf.Bfree)
+	suite.assert.Positive(buf.Bsize)
+	suite.assert.Positive(buf.Files)
+	suite.assert.Positive(buf.Ffree)
+	suite.assert.Positive(buf.Namemax)
 }
 
 func testStatFsError(suite *libfuseTestSuite) {

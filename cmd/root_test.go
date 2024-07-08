@@ -159,6 +159,8 @@ func (suite *rootCmdSuite) TestGetRemoteVersionCurrentSame() {
 }
 
 func (suite *rootCmdSuite) testExecute() {
+	suite.T().Helper()
+
 	defer suite.cleanupTest()
 	buf := new(bytes.Buffer)
 	rootCmd.SetOut(buf)
