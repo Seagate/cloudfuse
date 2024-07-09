@@ -327,7 +327,7 @@ var mountCmd = &cobra.Command{
 				pipeline = append(pipeline, "attr_cache")
 			}
 
-			pipeline = append(pipeline, "azstorage")
+			pipeline = append(pipeline, "s3storage")
 			options.Components = pipeline
 		}
 
