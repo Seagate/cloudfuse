@@ -1367,15 +1367,6 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			log.Debug("FileCache::GetAttr : %s does not exist in cloud storage", options.Name)
 			exists = false
 		}
-		// if cloudisDown {
-		// 	path := filepath.Join(fc.tmpPath, options.Name)
-		// 	_, err = os.Stat(path)
-		// 	if os.IsNotExist(err) {
-		// 		exists = false
-		// 	} else {
-		// 		exists = true
-		// 	}
-		// }
 	} else {
 		exists = true
 	}
