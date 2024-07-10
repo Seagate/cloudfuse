@@ -482,7 +482,11 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	attrs, token, err := fc.NextComponent().StreamDir(options)
 	if err != nil {
 		token = ""
-		err = nil
+		var maxAttempts *retry.MaxAttemptsError
+		cloudIsDown := errors.As(err, &maxAttempts)
+		if cloudIsDown {
+			err = nil
+		}
 	}
 
 	//after getting the stale cache listing, compare it with async map so that it's correct
@@ -1024,7 +1028,6 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 		log.Err("FileCache::CreateDir : failed to make local directory because %s", err.Error())
 		return err
 	}
-
 	log.Trace("FileCache::CreateDir : the directory was created successfully locally with path %s", localpath)
 
 	return nil
