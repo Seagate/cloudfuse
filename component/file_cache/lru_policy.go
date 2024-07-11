@@ -155,6 +155,7 @@ func (p *lruPolicy) UpdateConfig(c cachePolicyConfig) error {
 	p.lowThreshold = c.lowThreshold
 	p.maxEviction = c.maxEviction
 	p.policyTrace = c.policyTrace
+	p.fileOps = c.fileOps
 	return nil
 }
 
@@ -416,7 +417,7 @@ func (p *lruPolicy) deleteExpiredNodes() {
 
 func (p *lruPolicy) deleteItem(name string) {
 	log.Trace("lruPolicy::deleteItem : Deleting %s", name)
-
+	//var shouldDelete bool = true
 	azPath := strings.TrimPrefix(name, p.tmpPath)
 	if azPath == "" {
 		log.Err("lruPolicy::DeleteItem : Empty file name formed name : %s, tmpPath : %s", name, p.tmpPath)
@@ -451,10 +452,27 @@ func (p *lruPolicy) deleteItem(name string) {
 		// file was already deleted - this is normal
 		return
 	}
+
+	// p.fileOps.Range(func(key, value interface{}) bool {
+
+	// 	keyString := key.(string)
+
+	// 	fileName := filepath.Base(name)
+	// 	//if the file is found in the async map, don't remove it from the cache so it can be uploaded when the cloud is back
+	// 	if keyString == fileName {
+
+	// 		shouldDelete = false
+	// 	}
+
+	// 	return true
+	// })
+
+	//if shouldDelete {
 	err = deleteFile(name)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("lruPolicy::DeleteItem : failed to delete local file %s [%s]", name, err.Error())
 	}
+	//}
 
 	// File was deleted so try clearing its parent directory
 	// TODO: Delete directories up the path recursively that are "safe to delete". Ensure there is no race between this code and code that creates directories (like OpenFile)

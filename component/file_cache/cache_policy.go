@@ -28,6 +28,7 @@ package file_cache
 import (
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -44,8 +45,8 @@ type cachePolicyConfig struct {
 	maxSizeMB     float64
 	highThreshold float64
 	lowThreshold  float64
-
-	fileLocks *common.LockMap
+	fileOps       *sync.Map
+	fileLocks     *common.LockMap
 
 	policyTrace bool
 }
@@ -97,6 +98,8 @@ func getUsagePercentage(path string, maxSize float64) float64 {
 // Delete a given file
 func deleteFile(name string) error {
 	log.Debug("cachePolicy::deleteFile : attempting to delete %s", name)
+	//name is grabbing the whole local path, but the sync map only stores the file/dir name not the whole path
+	//rework name to only store the file name rather than full path
 
 	err := os.Remove(name)
 	if err != nil && os.IsPermission(err) {

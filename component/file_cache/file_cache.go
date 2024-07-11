@@ -388,6 +388,7 @@ func (c *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 		maxSizeMB:     conf.MaxSizeMB,
 		fileLocks:     c.fileLocks,
 		policyTrace:   conf.EnablePolicyTrace,
+		fileOps:       &c.fileOps,
 	}
 
 	return cacheConfig
@@ -927,21 +928,21 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 
 			//find a way to check for errors later
 			//open file doesnt have to do anything in the async cloud thread if the cloud is down, we'd only have local copies of the file
-			// err = fc.NextComponent().CopyToFile(
-			// 	internal.CopyToFileOptions{
-			// 		Name:   options.Name,
-			// 		Offset: 0,
-			// 		Count:  0,
-			// 		File:   f,
-			// 	})
+			err = fc.NextComponent().CopyToFile(
+				internal.CopyToFileOptions{
+					Name:   options.Name,
+					Offset: 0,
+					Count:  0,
+					File:   f,
+				})
 
-			// if err != nil {
-			// 	// File was created locally and now download has failed so we need to delete it back from local cache
-			// 	log.Err("FileCache::OpenFile : error downloading file from storage %s [%s]", options.Name, err.Error())
-			// 	_ = f.Close()
-			// 	_ = os.Remove(localPath)
-			// 	return nil, err
-			// }
+			if err != nil {
+				// File was created locally and now download has failed so we need to delete it back from local cache
+				log.Err("FileCache::OpenFile : error downloading file from storage %s [%s]", options.Name, err.Error())
+				_ = f.Close()
+				_ = os.Remove(localPath)
+				return nil, err
+			}
 
 		}
 
