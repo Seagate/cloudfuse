@@ -96,13 +96,19 @@ func (cl *Client) Configure(cfg Config) error {
 	cl.Config = cfg
 
 	var credentialsProvider aws.CredentialsProvider
-	credentialsInConfig := cl.Config.authConfig.KeyID != "" && cl.Config.authConfig.SecretKey != ""
-	if credentialsInConfig {
-		credentialsProvider = credentials.NewStaticCredentialsProvider(
-			cl.Config.authConfig.KeyID,
-			cl.Config.authConfig.SecretKey,
-			"",
-		)
+	if cl.Config.authConfig.KeyID != nil && cl.Config.authConfig.SecretKey != nil {
+		keyID, _ := cl.Config.authConfig.KeyID.Open()
+		defer keyID.Destroy()
+		secretKey, _ := cl.Config.authConfig.SecretKey.Open()
+		defer secretKey.Destroy()
+		credentialsInConfig := keyID.String() != "" && secretKey.String() != ""
+		if credentialsInConfig {
+			credentialsProvider = credentials.NewStaticCredentialsProvider(
+				strings.Clone(keyID.String()),
+				strings.Clone(secretKey.String()),
+				"",
+			)
+		}
 	}
 
 	var err error

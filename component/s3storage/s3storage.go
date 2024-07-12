@@ -38,6 +38,8 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
+	"github.com/awnumar/memguard"
+	"github.com/spf13/viper"
 )
 
 // S3Storage Wrapper type around aws-sdk-go-v2/service/s3
@@ -79,11 +81,35 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 
 	err = config.UnmarshalKey("restricted-characters-windows", &conf.RestrictedCharsWin)
 	if err != nil {
-		log.Err("AzStorage::Configure : config error [unable to obtain restricted-characters-windows]")
+		log.Err("S3Storage::Configure : config error [unable to obtain restricted-characters-windows]")
 		return err
 	}
 
-	err = ParseAndValidateConfig(s3, conf)
+	secrets := ConfigSecrets{}
+	// Securely store key-id and secret-key in enclave
+	if viper.GetString("s3storage.key-id") != "" {
+		dataBuf := memguard.NewBufferFromBytes([]byte(viper.GetString("s3storage.key-id")))
+		memguard.ScrambleBytes([]byte(viper.GetString("s3storage.key-id")))
+
+		encryptedKeyID := dataBuf.Seal()
+		if encryptedKeyID == nil {
+			return fmt.Errorf("S3Storage::Configure : unable to store key-id securely")
+		}
+		secrets.KeyID = encryptedKeyID
+	}
+
+	if viper.GetString("s3storage.secret-key") != "" {
+		dataBuf := memguard.NewBufferFromBytes([]byte(viper.GetString("s3storage.secret-key")))
+		memguard.ScrambleBytes([]byte(viper.GetString("s3storage.secret-key")))
+
+		encryptedSecretKey := dataBuf.Seal()
+		if encryptedSecretKey == nil {
+			return fmt.Errorf("S3Storage::Configure : unable to store secret-key securely")
+		}
+		secrets.SecretKey = encryptedSecretKey
+	}
+
+	err = ParseAndValidateConfig(s3, conf, secrets)
 	if err != nil {
 		log.Err("S3Storage::Configure : Config validation failed [%s]", err.Error())
 		return fmt.Errorf("config error in %s [%s]", s3.Name(), err.Error())
