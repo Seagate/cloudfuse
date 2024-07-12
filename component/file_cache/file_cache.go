@@ -883,14 +883,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 			fileSize = int64(attr.Size)
 		}
 
-		if fileExists {
-			log.Debug("FileCache::OpenFile : Delete cached file %s", options.Name)
-
-			err := deleteFile(localPath)
-			if err != nil && !os.IsNotExist(err) {
-				log.Err("FileCache::OpenFile : Failed to delete old file %s", options.Name)
-			}
-		} else {
+		if !fileExists {
 			// Create the file if if doesn't already exist.
 			err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
 			if err != nil {
@@ -921,7 +914,6 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 						return nil, syscall.ENOSPC
 					}
 				}
-
 			}
 			// Download/Copy the file from storage to the local file.
 			// We pass a count of 0 to get the entire object
@@ -937,9 +929,11 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 				})
 
 			if err != nil {
+
 				// File was created locally and now download has failed so we need to delete it back from local cache
 				log.Err("FileCache::OpenFile : error downloading file from storage %s [%s]", options.Name, err.Error())
 				_ = f.Close()
+				//if file exists and cloud is down, don't remove because local data is as good as cloud data
 				_ = os.Remove(localPath)
 				return nil, err
 			}

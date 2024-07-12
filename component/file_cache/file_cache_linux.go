@@ -75,6 +75,25 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 		log.Debug("FileCache::isDownloadRequired : %s not present in local cache policy", localPath)
 		downloadRequired = true
 	}
+	//check async map and automatically set downloadRequired false if entry is matched
+	//When cloud is down, local data will always be most up to date compared to cloud, download is not required
+	//Async map stores file entries that have been changed when cloud is down
+	
+	//case is no record of file in cloud
+	//does not exist locally
+	//this does not matter because isDownloadRequired is called by OpenFile, which means file already exists somewhere
+	fc.fileOps.Range(func(key, value interface{}) bool {
+
+		// keyString := key.(string)
+		// val := value.(FileAttributes).operation
+		// fileName := filepath.Base(name)
+		//if the file is found in the async map, don't remove it from the cache so it can be uploaded when the cloud is back
+		// if keyString == fileName {
+
+		// }
+
+		return true
+	})
 
 	finfo, err := os.Stat(localPath)
 	if err == nil {
@@ -120,6 +139,7 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 		attr, err = fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: blobPath})
 		if err != nil {
 			log.Err("FileCache::isDownloadRequired : Failed to get attr of %s [%s]", blobPath, err.Error())
+			//TODO:handle ENOENT error
 		}
 	}
 

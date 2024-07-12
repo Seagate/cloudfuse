@@ -62,49 +62,51 @@ func (fc *FileCache) async_cloud_handler() {
 				time.Sleep(time.Duration(restTime) * (time.Millisecond))
 
 				val, _ := fc.fileOps.Load(key)
-				attributes := val.(FileAttributes)
+
+				fileOperation := val.(FileAttributes).operation
+				fileOptions := val.(FileAttributes).options
 
 				if val != nil {
-					log.Trace("AsyncFileCache:: async_cloud_handler : The key in the function call is %s and the value is %s", key, attributes)
+					log.Trace("AsyncFileCache:: async_cloud_handler : The key in the function call is %s and the value is %s", key, fileOptions)
 					switch {
-					case attributes.operation == "DeleteDir":
-						returnVal = fc.asyncDeleteDir(attributes.options.(internal.DeleteDirOptions))
+					case fileOperation == "DeleteDir":
+						returnVal = fc.asyncDeleteDir(fileOptions.(internal.DeleteDirOptions))
 
-					case attributes.operation == "RenameDir":
-						returnVal = fc.asyncRenameDir(attributes.options.(internal.RenameDirOptions))
+					case fileOperation == "RenameDir":
+						returnVal = fc.asyncRenameDir(fileOptions.(internal.RenameDirOptions))
 
-					case attributes.operation == "CreateFile":
-						returnVal = fc.asyncCreateFile(attributes.options.(internal.CreateFileOptions))
+					case fileOperation == "CreateFile":
+						returnVal = fc.asyncCreateFile(fileOptions.(internal.CreateFileOptions))
 						// fc.fileOps.Delete(key)
 
-					case attributes.operation == "DeleteFile":
-						returnVal = fc.asyncDeleteFile(attributes.options.(internal.DeleteFileOptions))
+					case fileOperation == "DeleteFile":
+						returnVal = fc.asyncDeleteFile(fileOptions.(internal.DeleteFileOptions))
 
-					case attributes.operation == "FlushFile":
-						returnVal = fc.asyncFlushFile(attributes.options.(FlushFileAbstraction))
+					case fileOperation == "FlushFile":
+						returnVal = fc.asyncFlushFile(fileOptions.(FlushFileAbstraction))
 
-					case attributes.operation == "RenameFile":
-						returnVal = fc.asyncRenameFile(attributes.options.(internal.RenameFileOptions))
+					case fileOperation == "RenameFile":
+						returnVal = fc.asyncRenameFile(fileOptions.(internal.RenameFileOptions))
 
-					case attributes.operation == "CreateDir":
-						returnVal = fc.asyncCreateDir(attributes.options.(internal.CreateDirOptions))
+					case fileOperation == "CreateDir":
+						returnVal = fc.asyncCreateDir(fileOptions.(internal.CreateDirOptions))
 
-					case attributes.operation == "Chmod":
-						returnVal = fc.asyncChmod(attributes.options.(internal.ChmodOptions))
+					case fileOperation == "Chmod":
+						returnVal = fc.asyncChmod(fileOptions.(internal.ChmodOptions))
 
-					case attributes.operation == "Chown":
-						returnVal = fc.asyncChown(attributes.options.(internal.ChownOptions))
+					case fileOperation == "Chown":
+						returnVal = fc.asyncChown(fileOptions.(internal.ChownOptions))
 
-					case attributes.operation == "SyncFile":
-						returnVal = fc.asyncSyncFile(attributes.options.(internal.SyncFileOptions))
+					case fileOperation == "SyncFile":
+						returnVal = fc.asyncSyncFile(fileOptions.(internal.SyncFileOptions))
 					}
 
-					log.Trace("AsyncFileCache:: async_cloud_handler: The key after the function call is %s and the value is %s", key, attributes)
+					log.Trace("AsyncFileCache:: async_cloud_handler: The key after the function call is %s and the value is %s", key, fileOptions)
 
 					if returnVal == nil {
-						log.Trace("AsyncFileCache:: async_cloud_handler: File name %s has just finished file operation %s", key, attributes.operation)
-						tries = 0                                        //attempt was successful, reset try counter
-						_ = fc.fileOps.CompareAndDelete(key, attributes) //file has been serviced, remove it from map only if file op hasn't been updated
+						log.Trace("AsyncFileCache:: async_cloud_handler: File name %s has just finished file operation %s", key, fileOperation)
+						tries = 0                                 //attempt was successful, reset try counter
+						_ = fc.fileOps.CompareAndDelete(key, val) //file has been serviced, remove it from map only if file op hasn't been updated
 
 					} else {
 

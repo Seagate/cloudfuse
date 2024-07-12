@@ -1268,9 +1268,11 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	suite.setupTestHelper(config)
 	path := "file7"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	time.Sleep(time.Second)
 	testData := "test data"
 	data := []byte(testData)
 	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	time.Sleep(time.Second)
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	time.Sleep(time.Second)
 	// loop until file does not exist - done due to async nature of eviction
