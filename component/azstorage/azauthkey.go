@@ -50,12 +50,18 @@ type azAuthBlobKey struct {
 
 // getServiceClient : returns shared key based service client for blob
 func (azkey *azAuthBlobKey) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
-	if azkey.config.AccountKey == "" {
+	if azkey.config.AccountKey == nil {
 		log.Err("azAuthBlobKey::getServiceClient : Shared key for account is empty, cannot authenticate user")
 		return nil, errors.New("shared key for account is empty, cannot authenticate user")
 	}
 
-	cred, err := azblob.NewSharedKeyCredential(azkey.config.AccountName, azkey.config.AccountKey)
+	buff, err := azkey.config.AccountKey.Open()
+	if err != nil || buff == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	//defer buff.Destroy()
+
+	cred, err := azblob.NewSharedKeyCredential(azkey.config.AccountName, buff.String())
 	if err != nil {
 		log.Err("azAuthBlobKey::getServiceClient : Failed to create shared key credential [%s]", err.Error())
 		return nil, err
@@ -75,12 +81,18 @@ type azAuthDatalakeKey struct {
 
 // getServiceClient : returns shared key based service client for datalake
 func (azkey *azAuthDatalakeKey) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
-	if azkey.config.AccountKey == "" {
+	if azkey.config.AccountKey == nil {
 		log.Err("azAuthDatalakeKey::getServiceClient : Shared key for account is empty, cannot authenticate user")
 		return nil, errors.New("shared key for account is empty, cannot authenticate user")
 	}
 
-	cred, err := azdatalake.NewSharedKeyCredential(azkey.config.AccountName, azkey.config.AccountKey)
+	buff, err := azkey.config.AccountKey.Open()
+	if err != nil || buff == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	// defer buff.Destroy()
+
+	cred, err := azdatalake.NewSharedKeyCredential(azkey.config.AccountName, buff.String())
 	if err != nil {
 		log.Err("azAuthDatalakeKey::getServiceClient : Failed to create shared key credential [%s]", err.Error())
 		return nil, err
