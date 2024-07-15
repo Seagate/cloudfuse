@@ -92,6 +92,7 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 		memguard.ScrambleBytes([]byte(viper.GetString("s3storage.key-id")))
 
 		encryptedKeyID := dataBuf.Seal()
+		dataBuf.Destroy()
 		if encryptedKeyID == nil {
 			return fmt.Errorf("S3Storage::Configure : unable to store key-id securely")
 		}
@@ -103,6 +104,7 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 		memguard.ScrambleBytes([]byte(viper.GetString("s3storage.secret-key")))
 
 		encryptedSecretKey := dataBuf.Seal()
+		dataBuf.Destroy()
 		if encryptedSecretKey == nil {
 			return fmt.Errorf("S3Storage::Configure : unable to store secret-key securely")
 		}

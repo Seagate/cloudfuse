@@ -43,6 +43,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/awnumar/memguard"
 	"gopkg.in/ini.v1"
 )
 
@@ -173,8 +174,10 @@ func NormalizeObjectName(name string) string {
 }
 
 // Encrypt given data using the key provided
-func EncryptData(plainData []byte, key string) ([]byte, error) {
-	binaryKey, err := base64.StdEncoding.DecodeString(key)
+func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
+	secretKey, _ := key.Open()
+	defer secretKey.Destroy()
+	binaryKey, err := base64.StdEncoding.DecodeString(secretKey.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
 	}
@@ -199,8 +202,10 @@ func EncryptData(plainData []byte, key string) ([]byte, error) {
 }
 
 // Decrypt given data using the key provided
-func DecryptData(cipherData []byte, key string) ([]byte, error) {
-	binaryKey, err := base64.StdEncoding.DecodeString(key)
+func DecryptData(cipherData []byte, key *memguard.Enclave) ([]byte, error) {
+	secretKey, _ := key.Open()
+	defer secretKey.Destroy()
+	binaryKey, err := base64.StdEncoding.DecodeString(secretKey.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
 	}

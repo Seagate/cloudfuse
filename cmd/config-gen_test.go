@@ -27,6 +27,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -124,6 +125,7 @@ func (suite *genConfigTestSuite) TestGenConfig() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile := "config_encrypted.aes"
+	passphrase := base64.StdEncoding.EncodeToString([]byte("12312312312312312312312312312312"))
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile)
@@ -133,7 +135,7 @@ func (suite *genConfigTestSuite) TestGenConfig() {
 
 	confFile.Close()
 
-	_, err = executeCommandGen(rootCmd, "gen-config", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=12312312312312312312312312312312", fmt.Sprintf("--output-file=%s", outFile), "--temp-path=/tmp")
+	_, err = executeCommandGen(rootCmd, "gen-config", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile), "--temp-path=/tmp")
 	suite.assert.NoError(err)
 
 	// Out file should exist
@@ -145,6 +147,7 @@ func (suite *genConfigTestSuite) TestGenConfigGet() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile := "config_encrypted.aes"
+	passphrase := base64.StdEncoding.EncodeToString([]byte("12312312312312312312312312312312"))
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile)
@@ -154,7 +157,7 @@ func (suite *genConfigTestSuite) TestGenConfigGet() {
 
 	confFile.Close()
 
-	_, err = executeCommandGen(rootCmd, "gen-config", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=12312312312312312312312312312312", fmt.Sprintf("--output-file=%s", outFile), "--temp-path=/tmp")
+	_, err = executeCommandGen(rootCmd, "gen-config", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile), "--temp-path=/tmp")
 	suite.assert.NoError(err)
 
 	// Out file should exist
@@ -162,7 +165,7 @@ func (suite *genConfigTestSuite) TestGenConfigGet() {
 	suite.assert.NoError(err)
 
 	// Gen-config should correctly set the temp path for the file_cache
-	path, err := executeCommandGen(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile), "--passphrase=12312312312312312312312312312312", "--key=file_cache.path")
+	path, err := executeCommandGen(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile), fmt.Sprintf("--passphrase=%s", passphrase), "--key=file_cache.path")
 	suite.assert.NoError(err)
 	suite.assert.Equal("Fetching scalar configuration\nfile_cache.path = /tmp\n", path)
 }

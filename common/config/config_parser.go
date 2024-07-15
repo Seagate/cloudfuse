@@ -34,6 +34,7 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"github.com/spf13/cobra"
 
@@ -73,12 +74,12 @@ type options struct {
 	envTree           *Tree
 	completionFuncMap map[string]func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)
 	secureConfig      bool
-	passphrase        string
+	passphrase        *memguard.Enclave
 }
 
 var userOptions options
 
-func SetSecureConfigOptions(passphrase string) {
+func SetSecureConfigOptions(passphrase *memguard.Enclave) {
 	userOptions.secureConfig = true
 	userOptions.passphrase = passphrase
 }
@@ -123,7 +124,7 @@ func ReadFromConfigBuffer(configData []byte) error {
 	return nil
 }
 
-func DecryptConfigFile(fileName string, passphrase string) error {
+func DecryptConfigFile(fileName string, passphrase *memguard.Enclave) error {
 	cipherText, err := os.ReadFile(fileName)
 	if err != nil {
 		return fmt.Errorf("Failed to read encrypted config file [%s]", err.Error())

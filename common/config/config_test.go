@@ -31,6 +31,7 @@ import (
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/awnumar/memguard"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -464,12 +465,15 @@ func (suite *ConfigTestSuite) TestConfigFileDescryption() {
 	assert.NoError(err)
 	assert.NotNil(plaintext)
 
-	cipherText, err := common.EncryptData(plaintext, "12312312312312312312312312312312")
+	passphrase := memguard.NewBufferFromBytes([]byte("12312312312312312312312312312312"))
+	encryptedPassphrase := passphrase.Seal()
+
+	cipherText, err := common.EncryptData(plaintext, encryptedPassphrase)
 	assert.NoError(err)
 	err = os.WriteFile("test_enc.yaml", cipherText, 0644)
 	assert.NoError(err)
 
-	err = DecryptConfigFile("test_enc.yaml", "12312312312312312312312312312312")
+	err = DecryptConfigFile("test_enc.yaml", encryptedPassphrase)
 	assert.NoError(err)
 
 	_ = os.Remove("test.yaml")

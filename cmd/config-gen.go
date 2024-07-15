@@ -40,6 +40,7 @@ import (
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/awnumar/memguard"
 	"github.com/spf13/cobra"
 )
 
@@ -48,7 +49,7 @@ type configGenOptions struct {
 	outputConfigPath string
 	containerName    string
 	tempDirPath      string
-	passphrase       string
+	passphrase       []byte
 }
 
 var opts configGenOptions
@@ -120,6 +121,11 @@ var generateConfig = &cobra.Command{
 		var templateConfig []byte
 		var err error
 
+		passphrase := memguard.NewBufferFromBytes([]byte(options.PassPhrase))
+		memguard.ScrambleBytes(options.PassPhrase)
+		encryptedPassphrase = passphrase.Seal()
+		passphrase.Destroy()
+
 		templateConfig, err = os.ReadFile(opts.configFilePath)
 		if err != nil {
 			return fmt.Errorf("failed to read file [%s]", err.Error())
@@ -142,7 +148,7 @@ var generateConfig = &cobra.Command{
 			}
 		}
 
-		cipherText, err := common.EncryptData([]byte(newConfig), opts.passphrase)
+		cipherText, err := common.EncryptData([]byte(newConfig), encryptedPassphrase)
 		if err != nil {
 			return err
 		}
@@ -168,6 +174,6 @@ func init() {
 	generateConfig.Flags().StringVar(&opts.configFilePath, "config-file", "", "Input config file.")
 	generateConfig.Flags().StringVar(&opts.outputConfigPath, "output-file", "", "Output config file path.")
 	generateConfig.Flags().StringVar(&opts.tempDirPath, "temp-path", "", "Temporary file path.")
-	generateConfig.Flags().StringVar(&opts.passphrase, "passphrase", "",
+	generateConfig.Flags().BytesBase64Var(&opts.passphrase, "passphrase", nil,
 		"Key to be used for encryption / decryption. Key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 }

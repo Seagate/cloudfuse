@@ -28,6 +28,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -46,6 +47,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
+	"github.com/awnumar/memguard"
 
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"
@@ -72,7 +74,7 @@ type mountOptions struct {
 	DefaultWorkingDir string         `config:"default-working-dir"`
 	CPUProfile        string         `config:"cpu-profile"`
 	MemProfile        string         `config:"mem-profile"`
-	PassPhrase        string         `config:"passphrase"`
+	PassPhrase        []byte         `config:"passphrase"`
 	SecureConfig      bool           `config:"secure-config"`
 	DynamicProfiler   bool           `config:"dynamic-profile"`
 	ProfilerPort      int            `config:"profiler-port"`
@@ -200,26 +202,35 @@ func parseConfig() error {
 		filepath.Ext(options.ConfigFile) == SecureConfigExtension {
 
 		// Validate config is to be secured on write or not
-		if options.PassPhrase == "" {
-			options.PassPhrase = os.Getenv(SecureConfigEnvName)
+		if options.PassPhrase == nil || string(options.PassPhrase) == "" {
+			options.PassPhrase = []byte(os.Getenv(SecureConfigEnvName))
+			if options.PassPhrase == nil || string(options.PassPhrase) == "" {
+				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+			}
+
+			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
+			if err != nil {
+				return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
+			}
 		}
 
-		if options.PassPhrase == "" {
-			return fmt.Errorf("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
-		}
+		passphrase := memguard.NewBufferFromBytes([]byte(options.PassPhrase))
+		memguard.ScrambleBytes(options.PassPhrase)
+		encryptedPassphrase = passphrase.Seal()
+		passphrase.Destroy()
 
 		cipherText, err := os.ReadFile(options.ConfigFile)
 		if err != nil {
 			return fmt.Errorf("failed to read encrypted config file %s [%s]", options.ConfigFile, err.Error())
 		}
 
-		plainText, err := common.DecryptData(cipherText, options.PassPhrase)
+		plainText, err := common.DecryptData(cipherText, encryptedPassphrase)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt config file %s [%s]", options.ConfigFile, err.Error())
 		}
 
 		config.SetConfigFile(options.ConfigFile)
-		config.SetSecureConfigOptions(options.PassPhrase)
+		config.SetSecureConfigOptions(encryptedPassphrase)
 		err = config.ReadFromConfigBuffer(plainText)
 		if err != nil {
 			return fmt.Errorf("invalid decrypted config file [%s]", err.Error())
@@ -651,7 +662,7 @@ func init() {
 	mountCmd.PersistentFlags().BoolVar(&options.SecureConfig, "secure-config", false,
 		"Encrypt auto generated config file for each container")
 
-	mountCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
+	mountCmd.PersistentFlags().BytesBase64Var(&options.PassPhrase, "passphrase", []byte(""),
 		"Base64 encoded key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\n Decoded key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 
 	mountCmd.PersistentFlags().String("log-type", "syslog", "Type of logger to be used by the system. Set to syslog by default. Allowed values are silent|syslog|base.")
