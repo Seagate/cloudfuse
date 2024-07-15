@@ -97,9 +97,15 @@ func (cl *Client) Configure(cfg Config) error {
 
 	var credentialsProvider aws.CredentialsProvider
 	if cl.Config.authConfig.KeyID != nil && cl.Config.authConfig.SecretKey != nil {
-		keyID, _ := cl.Config.authConfig.KeyID.Open()
+		keyID, err := cl.Config.authConfig.KeyID.Open()
+		if err != nil || keyID == nil {
+			return errors.New("unable to decrypt key id")
+		}
 		defer keyID.Destroy()
-		secretKey, _ := cl.Config.authConfig.SecretKey.Open()
+		secretKey, err := cl.Config.authConfig.SecretKey.Open()
+		if err != nil || secretKey == nil {
+			return errors.New("unable to decrypt secret key")
+		}
 		defer secretKey.Destroy()
 		credentialsInConfig := keyID.String() != "" && secretKey.String() != ""
 		if credentialsInConfig {

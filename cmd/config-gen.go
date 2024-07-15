@@ -121,10 +121,7 @@ var generateConfig = &cobra.Command{
 		var templateConfig []byte
 		var err error
 
-		passphrase := memguard.NewBufferFromBytes([]byte(options.PassPhrase))
-		memguard.ScrambleBytes(options.PassPhrase)
-		encryptedPassphrase = passphrase.Seal()
-		passphrase.Destroy()
+		encryptedPassphrase = memguard.NewEnclave([]byte(opts.passphrase))
 
 		templateConfig, err = os.ReadFile(opts.configFilePath)
 		if err != nil {

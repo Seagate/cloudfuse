@@ -130,10 +130,7 @@ func validateOptions() error {
 		return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
 	}
 
-	passphrase := memguard.NewBufferFromBytes([]byte(secOpts.PassPhrase))
-	memguard.ScrambleBytes(secOpts.PassPhrase)
-	encryptedPassphrase = passphrase.Seal()
-	passphrase.Destroy()
+	encryptedPassphrase = memguard.NewEnclave([]byte(secOpts.PassPhrase))
 
 	if secOpts.ConfigFile == "" {
 		return errors.New("config file not provided, check usage")

@@ -30,6 +30,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -175,9 +176,17 @@ func NormalizeObjectName(name string) string {
 
 // Encrypt given data using the key provided
 func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
-	secretKey, _ := key.Open()
+	if key == nil {
+		return nil, errors.New("provided passphrase key is empty")
+	}
+
+	secretKey, err := key.Open()
+	if err != nil || secretKey == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	defer secretKey.Destroy()
+
 	binaryKey, err := base64.StdEncoding.DecodeString(secretKey.String())
-	secretKey.Destroy()
 	if err != nil {
 		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
 	}
@@ -203,9 +212,17 @@ func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
 
 // Decrypt given data using the key provided
 func DecryptData(cipherData []byte, key *memguard.Enclave) ([]byte, error) {
-	secretKey, _ := key.Open()
+	if key == nil {
+		return nil, errors.New("provided passphrase key is empty")
+	}
+
+	secretKey, err := key.Open()
+	if err != nil || secretKey == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	defer secretKey.Destroy()
+
 	binaryKey, err := base64.StdEncoding.DecodeString(secretKey.String())
-	secretKey.Destroy()
 	if err != nil {
 		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
 	}

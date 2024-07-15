@@ -174,10 +174,7 @@ func processCommand() error {
 			}
 		}
 
-		passphrase := memguard.NewBufferFromBytes([]byte(options.PassPhrase))
-		memguard.ScrambleBytes(options.PassPhrase)
-		encryptedPassphrase = passphrase.Seal()
-		passphrase.Destroy()
+		encryptedPassphrase = memguard.NewEnclave([]byte(options.PassPhrase))
 	}
 
 	var containerList []string
