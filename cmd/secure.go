@@ -133,7 +133,7 @@ func validateOptions() error {
 	passphrase := memguard.NewBufferFromBytes([]byte(secOpts.PassPhrase))
 	memguard.ScrambleBytes(secOpts.PassPhrase)
 	encryptedPassphrase = passphrase.Seal()
-	defer passphrase.Destroy()
+	passphrase.Destroy()
 
 	if secOpts.ConfigFile == "" {
 		return errors.New("config file not provided, check usage")
