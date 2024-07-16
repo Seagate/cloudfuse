@@ -115,8 +115,7 @@ func generateEndpoint(useHttp bool, accountName string, accountType AccountType)
 
 func (suite *authTestSuite) TestBlockInvalidAuth() {
 	defer suite.cleanupTest()
-	dataBuf := memguard.NewBufferFromBytes([]byte(storageTestConfigurationParameters.BlockKey))
-	encryptedKey := dataBuf.Seal()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.BlockKey))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.BlockContainer,
 		authConfig: azAuthConfig{
@@ -139,8 +138,7 @@ func (suite *authTestSuite) TestBlockInvalidAuth() {
 
 func (suite *authTestSuite) TestAdlsInvalidAuth() {
 	defer suite.cleanupTest()
-	dataBuf := memguard.NewBufferFromBytes([]byte(storageTestConfigurationParameters.BlockKey))
-	encryptedKey := dataBuf.Seal()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.BlockKey))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.AdlsContainer,
 		authConfig: azAuthConfig{
@@ -163,8 +161,7 @@ func (suite *authTestSuite) TestAdlsInvalidAuth() {
 
 func (suite *authTestSuite) TestInvalidAccountType() {
 	defer suite.cleanupTest()
-	dataBuf := memguard.NewBufferFromBytes([]byte(storageTestConfigurationParameters.BlockKey))
-	encryptedKey := dataBuf.Seal()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.BlockKey))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.AdlsContainer,
 		authConfig: azAuthConfig{
@@ -206,8 +203,7 @@ func (suite *authTestSuite) TestBlockInvalidSharedKey() {
 
 func (suite *authTestSuite) TestBlockInvalidSharedKey2() {
 	defer suite.cleanupTest()
-	dataBuf := memguard.NewBufferFromBytes([]byte("abcd>="))
-	encryptedKey := dataBuf.Seal()
+	encryptedKey := memguard.NewEnclave([]byte("abcd>="))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.BlockContainer,
 		authConfig: azAuthConfig{
@@ -230,8 +226,7 @@ func (suite *authTestSuite) TestBlockInvalidSharedKey2() {
 
 func (suite *authTestSuite) TestBlockSharedKey() {
 	defer suite.cleanupTest()
-	dataBuf := memguard.NewBufferFromBytes([]byte(storageTestConfigurationParameters.BlockKey))
-	encryptedKey := dataBuf.Seal()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.BlockKey))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.BlockContainer,
 		authConfig: azAuthConfig{
@@ -285,8 +280,7 @@ func (suite *authTestSuite) TestAdlsInvalidSharedKey() {
 
 func (suite *authTestSuite) TestAdlsSharedKey() {
 	defer suite.cleanupTest()
-	dataBuf := memguard.NewBufferFromBytes([]byte(storageTestConfigurationParameters.AdlsKey))
-	encryptedKey := dataBuf.Seal()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.AdlsKey))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.AdlsContainer,
 		authConfig: azAuthConfig{

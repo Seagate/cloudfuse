@@ -32,7 +32,6 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/awnumar/memguard"
-	"github.com/spf13/viper"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
@@ -67,13 +66,8 @@ func (s *configTestSuite) SetupTest() {
 		PrefixPath:         "testPrefixPath",
 	}
 
-	dataBuf := memguard.NewBufferFromBytes([]byte("testKeyId"))
-	memguard.ScrambleBytes([]byte(viper.GetString("testKeyId")))
-	encryptedKeyID := dataBuf.Seal()
-
-	dataBuf = memguard.NewBufferFromBytes([]byte("testSecretKey"))
-	memguard.ScrambleBytes([]byte(viper.GetString("testSecretKey")))
-	encryptedSecretKey := dataBuf.Seal()
+	encryptedKeyID := memguard.NewEnclave([]byte("testKeyId"))
+	encryptedSecretKey := memguard.NewEnclave([]byte("testKeyId"))
 
 	s.secrets = ConfigSecrets{
 		KeyID:     encryptedKeyID,

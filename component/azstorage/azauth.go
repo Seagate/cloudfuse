@@ -93,9 +93,6 @@ func getAzAuth(config azAuthConfig) azAuth {
 
 func getAzBlobAuth(config azAuthConfig) azAuth {
 	base := azAuthBase{config: config}
-	base.config.AccountKey = config.AccountKey
-	base.config.SASKey = config.SASKey
-	base.config.ClientSecret = config.ClientSecret
 	if config.AuthMode == EAuthType.KEY() {
 		return &azAuthBlobKey{
 			azAuthKey{
@@ -134,9 +131,6 @@ func getAzBlobAuth(config azAuthConfig) azAuth {
 
 func getAzDatalakeAuth(config azAuthConfig) azAuth {
 	base := azAuthBase{config: config}
-	base.config.AccountKey = config.AccountKey
-	base.config.SASKey = config.SASKey
-	base.config.ClientSecret = config.ClientSecret
 	if config.AuthMode == EAuthType.KEY() {
 		return &azAuthDatalakeKey{
 			azAuthKey{

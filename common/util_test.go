@@ -83,8 +83,7 @@ func (suite *typesTestSuite) TestEncryptBadKey() {
 	key := make([]byte, 20)
 	rand.Read(key)
 
-	passphrase := memguard.NewBufferFromBytes(key)
-	encryptedPassphrase := passphrase.Seal()
+	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
 	rand.Read(data)
@@ -98,8 +97,7 @@ func (suite *typesTestSuite) TestDecryptBadKey() {
 	key := make([]byte, 20)
 	rand.Read(key)
 
-	passphrase := memguard.NewBufferFromBytes(key)
-	encryptedPassphrase := passphrase.Seal()
+	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
 	rand.Read(data)
@@ -114,8 +112,7 @@ func (suite *typesTestSuite) TestEncryptDecrypt16() {
 	rand.Read(binaryKey)
 	key := base64.StdEncoding.EncodeToString(binaryKey)
 
-	passphrase := memguard.NewBufferFromBytes([]byte(key))
-	encryptedPassphrase := passphrase.Seal()
+	encryptedPassphrase := memguard.NewEnclave([]byte(key))
 
 	data := make([]byte, 1024)
 	rand.Read(data)
@@ -134,8 +131,7 @@ func (suite *typesTestSuite) TestEncryptDecrypt24() {
 	rand.Read(binaryKey)
 	key := base64.StdEncoding.EncodeToString(binaryKey)
 
-	passphrase := memguard.NewBufferFromBytes([]byte(key))
-	encryptedPassphrase := passphrase.Seal()
+	encryptedPassphrase := memguard.NewEnclave([]byte(key))
 
 	data := make([]byte, 1024)
 	rand.Read(data)
@@ -154,8 +150,7 @@ func (suite *typesTestSuite) TestEncryptDecrypt32() {
 	rand.Read(binaryKey)
 	key := base64.StdEncoding.EncodeToString(binaryKey)
 
-	passphrase := memguard.NewBufferFromBytes([]byte(key))
-	encryptedPassphrase := passphrase.Seal()
+	encryptedPassphrase := memguard.NewEnclave([]byte(key))
 
 	data := make([]byte, 1024)
 	rand.Read(data)

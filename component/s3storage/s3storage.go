@@ -27,6 +27,7 @@ package s3storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"syscall"
@@ -91,7 +92,9 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 		encryptedKeyID := memguard.NewEnclave([]byte(viper.GetString("s3storage.key-id")))
 
 		if encryptedKeyID == nil {
-			return fmt.Errorf("S3Storage::Configure : unable to store key-id securely")
+			err := errors.New("unable to store key-id securely")
+			log.Err("S3Storage::Configure : ", err.Error())
+			return err
 		}
 		secrets.KeyID = encryptedKeyID
 	}
@@ -100,7 +103,9 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 		encryptedSecretKey := memguard.NewEnclave([]byte(viper.GetString("s3storage.secret-key")))
 
 		if encryptedSecretKey == nil {
-			return fmt.Errorf("S3Storage::Configure : unable to store secret-key securely")
+			err := errors.New("unable to store secret-key securely")
+			log.Err("S3Storage::Configure : ", err.Error())
+			return err
 		}
 		secrets.SecretKey = encryptedSecretKey
 	}

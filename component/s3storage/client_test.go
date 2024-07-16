@@ -79,10 +79,7 @@ func newTestClient(configuration string) (*Client, error) {
 	// Secure keyID in enclave
 	var encryptedKeyID *memguard.Enclave
 	if viper.GetString("s3storage.key-id") != "" {
-		dataBuf := memguard.NewBufferFromBytes([]byte(viper.GetString("s3storage.key-id")))
-		memguard.ScrambleBytes([]byte(viper.GetString("s3storage.key-id")))
-
-		encryptedKeyID = dataBuf.Seal()
+		encryptedKeyID = memguard.NewEnclave([]byte(viper.GetString("s3storage.key-id")))
 		if encryptedKeyID == nil {
 			return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, "Error storing key ID securely")
 		}
@@ -91,10 +88,7 @@ func newTestClient(configuration string) (*Client, error) {
 	// Secure secretKey in enclave
 	var encryptedSecretKey *memguard.Enclave
 	if viper.GetString("s3storage.secret-key") != "" {
-		dataBuf := memguard.NewBufferFromBytes([]byte(viper.GetString("s3storage.secret-key")))
-		memguard.ScrambleBytes([]byte(viper.GetString("s3storage.secret-key")))
-
-		encryptedSecretKey = dataBuf.Seal()
+		encryptedSecretKey = memguard.NewEnclave([]byte(viper.GetString("s3storage.secret-key")))
 		if encryptedSecretKey == nil {
 			return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, "Error storing secret key securely")
 		}

@@ -465,8 +465,7 @@ func (suite *ConfigTestSuite) TestConfigFileDescryption() {
 	assert.NoError(err)
 	assert.NotNil(plaintext)
 
-	passphrase := memguard.NewBufferFromBytes([]byte("12312312312312312312312312312312"))
-	encryptedPassphrase := passphrase.Seal()
+	encryptedPassphrase := memguard.NewEnclave([]byte("12312312312312312312312312312312"))
 
 	cipherText, err := common.EncryptData(plaintext, encryptedPassphrase)
 	assert.NoError(err)
