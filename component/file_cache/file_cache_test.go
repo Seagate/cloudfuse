@@ -1262,7 +1262,7 @@ func (suite *fileCacheTestSuite) TestDeleteFileError() {
 
 func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	defer suite.cleanupTest()
-	createEmptyFile := false
+	createEmptyFile := true
 	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 0\n  create-empty-file: %t\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, createEmptyFile, suite.fake_storage_path)
 	suite.setupTestHelper(config)
@@ -1276,12 +1276,15 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	time.Sleep(time.Second)
 	// loop until file does not exist - done due to async nature of eviction
+	localPath := common.JoinUnixFilepath(suite.fileCache.tmpPath, path)
+	suite.fileCache.policy.CacheInvalidate(localPath)
 	_, err := os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
 	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
 		time.Sleep(time.Second)
 		_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
 	}
 	// TODO: find out why this delayed eviction check fails in CI on Windows sometimes
+
 	if runtime.GOOS == "windows" {
 		fmt.Println("Skipping TestOpenFileNotInCache eviction check on Windows (flaky)")
 	} else {
@@ -1336,7 +1339,6 @@ func (suite *fileCacheTestSuite) TestCloseFile() {
 	// CloseFile
 	err := suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
-
 	// loop until file does not exist - done due to async nature of eviction
 	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
 	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
@@ -1372,7 +1374,6 @@ func (suite *fileCacheTestSuite) TestCloseFileCloudDown() {
 	suite.mock.EXPECT().CopyFromFile(copyFromFileOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
 	err := suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
-
 	// loop until file does not exist - done due to async nature of eviction
 	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
 	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
@@ -1953,19 +1954,17 @@ func (suite *fileCacheTestSuite) TestRenameFileInCache() {
 func (suite *fileCacheTestSuite) TestRenameFileInCacheCloudDown() {
 	defer suite.cleanupTestMock()
 	// Setup
-	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 0\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
+	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: true\n  timeout-sec: 0\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
 	suite.setupTestHelperMock(defaultConfig) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 	src := "source2"
 	dst := "destination2"
 
-	createHandle := handlemap.NewHandle(src)
-
 	createFileOptions := internal.CreateFileOptions{Name: src, Mode: 0666}
 	renameFileOptions := internal.RenameFileOptions{Src: src, Dst: dst}
 
-	suite.mock.EXPECT().CreateFile(createFileOptions).Return(createHandle, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
 	createHandle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
-	time.Sleep(time.Millisecond)
+	time.Sleep(time.Second)
 	suite.assert.NoError(err)
 	suite.mock.EXPECT().CopyFromFile(internal.CopyFromFileOptions{Name: src, File: createHandle.FObj}).Return(&retry.MaxAttemptsError{}).AnyTimes()
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})

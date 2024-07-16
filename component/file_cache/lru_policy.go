@@ -185,10 +185,29 @@ func (p *lruPolicy) CacheInvalidate(name string) {
 }
 
 func (p *lruPolicy) CachePurge(name string) {
-	log.Trace("lruPolicy::CachePurge : %s", name)
+	log.Trace("lruPolicy::CachePurge :  Attempting %s", name)
+	//look through async map to see if we should actually purge the
+	shouldDelete := true
+	p.fileOps.Range(func(key, value interface{}) bool {
 
-	p.removeNode(name)
-	p.deleteEvent <- name
+		keyString := key.(string)
+		val := value.(FileAttributes).operation
+		fileName := filepath.Base(name)
+		//if the file is found in the async map, don't remove it from the cache so it can be uploaded when the cloud is back
+		if keyString == fileName && val != "DeleteFile" && val != "DeleteDir" {
+
+			shouldDelete = false
+		}
+
+		return true
+	})
+
+	if shouldDelete {
+		log.Trace("lruPolicy::CachePurge :  Purging %s", name)
+		p.removeNode(name)
+		p.deleteEvent <- name
+	}
+
 }
 
 func (p *lruPolicy) IsCached(name string) bool {
@@ -390,20 +409,21 @@ func (p *lruPolicy) deleteExpiredNodes() {
 
 	for ; node != nil && count < p.maxEviction; node = node.next {
 		p.fileOps.Range(func(key, value interface{}) bool {
-
+			log.Debug("lruPolicy::deleteExpiredNodes : Checking File %s", key.(string))
 			keyString := key.(string)
 			val := value.(FileAttributes).operation
 			fileName := filepath.Base(node.name)
 			//if the file is found in the async map, don't remove it from the cache so it can be uploaded when the cloud is back
 			if keyString == fileName && val != "DeleteFile" && val != "DeleteDir" {
-
+				log.Debug("lruPolicy::deleteExpiredNodes : Will not remove %s from cache", key.(string))
 				shouldDelete = false
 			}
 
 			return true
 		})
-		if shouldDelete {
 
+		if shouldDelete {
+			log.Debug("lruPolicy::deleteExpiredNodes : Added %s to delete list", node.name)
 			delItems = append(delItems, node)
 			node.deleted = true
 			count++
@@ -436,7 +456,6 @@ func (p *lruPolicy) deleteExpiredNodes() {
 
 func (p *lruPolicy) deleteItem(name string) {
 	log.Trace("lruPolicy::deleteItem : Deleting %s", name)
-	var shouldDelete bool = true
 	azPath := strings.TrimPrefix(name, p.tmpPath)
 	if azPath == "" {
 		log.Err("lruPolicy::DeleteItem : Empty file name formed name : %s, tmpPath : %s", name, p.tmpPath)
@@ -472,25 +491,9 @@ func (p *lruPolicy) deleteItem(name string) {
 		return
 	}
 
-	p.fileOps.Range(func(key, value interface{}) bool {
-
-		keyString := key.(string)
-		val := value.(FileAttributes).operation
-		fileName := filepath.Base(name)
-		//if the file is found in the async map, don't remove it from the cache so it can be uploaded when the cloud is back
-		if keyString == fileName && val != "DeleteFile" && val != "DeleteDir" {
-
-			shouldDelete = false
-		}
-
-		return true
-	})
-
-	if shouldDelete {
-		err = deleteFile(name)
-		if err != nil && !os.IsNotExist(err) {
-			log.Err("lruPolicy::DeleteItem : failed to delete local file %s [%s]", name, err.Error())
-		}
+	err = deleteFile(name)
+	if err != nil && !os.IsNotExist(err) {
+		log.Err("lruPolicy::DeleteItem : failed to delete local file %s [%s]", name, err.Error())
 	}
 
 	// File was deleted so try clearing its parent directory

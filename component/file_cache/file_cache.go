@@ -869,7 +869,8 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 
 	fc.policy.CacheValid(localPath)
 	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, options.Name, flock)
-
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
 	// return err in case of authorization permission mismatch
 	if err != nil && err == syscall.EACCES {
 		return nil, err
@@ -934,7 +935,10 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 				log.Err("FileCache::OpenFile : error downloading file from storage %s [%s]", options.Name, err.Error())
 				_ = f.Close()
 				//if file exists and cloud is down, don't remove because local data is as good as cloud data
-				_ = os.Remove(localPath)
+				if !fileExists && !cloudisDown {
+					_ = os.Remove(localPath)
+				}
+
 				return nil, err
 			}
 

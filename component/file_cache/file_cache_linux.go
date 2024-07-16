@@ -31,6 +31,7 @@ import (
 	"io/fs"
 	"math"
 	"os"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -66,6 +67,7 @@ func newObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
 // isDownloadRequired: Whether or not the file needs to be downloaded to local cache.
 func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock *common.LockMapItem) (bool, bool, *internal.ObjAttr, error) {
 	fileExists := false
+	inMap := false
 	downloadRequired := false
 	lmt := time.Time{}
 	var stat *syscall.Stat_t = nil
@@ -78,19 +80,19 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 	//check async map and automatically set downloadRequired false if entry is matched
 	//When cloud is down, local data will always be most up to date compared to cloud, download is not required
 	//Async map stores file entries that have been changed when cloud is down
-	
+
 	//case is no record of file in cloud
 	//does not exist locally
 	//this does not matter because isDownloadRequired is called by OpenFile, which means file already exists somewhere
 	fc.fileOps.Range(func(key, value interface{}) bool {
 
-		// keyString := key.(string)
-		// val := value.(FileAttributes).operation
-		// fileName := filepath.Base(name)
-		//if the file is found in the async map, don't remove it from the cache so it can be uploaded when the cloud is back
-		// if keyString == fileName {
+		keyString := key.(string)
+		fileName := filepath.Base(localPath)
 
-		// }
+		if fileName == keyString {
+
+			inMap = true
+		}
 
 		return true
 	})
@@ -159,6 +161,11 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 		} else {
 			log.Info("FileCache::isDownloadRequired : File in container is not latest, skip redownload %s [A-%v : L-%v]", blobPath, attr.Mtime, lmt)
 		}
+	}
+
+	if inMap == true {
+		downloadRequired = false
+		return downloadRequired, fileExists, attr, err
 	}
 
 	return downloadRequired, fileExists, attr, err
