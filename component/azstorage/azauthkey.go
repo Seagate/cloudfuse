@@ -59,7 +59,7 @@ func (azkey *azAuthBlobKey) getServiceClient(stConfig *AzStorageConfig) (interfa
 	if err != nil || buff == nil {
 		return nil, errors.New("unable to decrypt passphrase key")
 	}
-	// TODO: Defering the destruction of the buffer causes a segfault later in the code in some cases.
+	// TODO: Deferring the destruction of the buffer causes a segfault later in the code in some cases.
 	// defer buff.Destroy()
 
 	cred, err := azblob.NewSharedKeyCredential(azkey.config.AccountName, buff.String())
@@ -91,7 +91,7 @@ func (azkey *azAuthDatalakeKey) getServiceClient(stConfig *AzStorageConfig) (int
 	if err != nil || buff == nil {
 		return nil, errors.New("unable to decrypt passphrase key")
 	}
-	// TODO: Defering the destruction of the buffer causes a segfault later in the code in some cases.
+	// TODO: Deferring the destruction of the buffer causes a segfault later in the code in some cases.
 	// defer buff.Destroy()
 
 	cred, err := azdatalake.NewSharedKeyCredential(azkey.config.AccountName, buff.String())
