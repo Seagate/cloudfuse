@@ -92,10 +92,6 @@ type RenameFileOptions struct {
 	Dst string
 }
 
-type ReadFileOptions struct {
-	Handle *handlemap.Handle
-}
-
 type ReadInBufferOptions struct {
 	Handle *handlemap.Handle
 	Offset int64
@@ -106,7 +102,7 @@ type WriteFileOptions struct {
 	Handle   *handlemap.Handle
 	Offset   int64
 	Data     []byte
-	Metadata map[string]string
+	Metadata map[string]*string
 }
 
 type GetFileBlockOffsetsOptions struct {
@@ -128,11 +124,12 @@ type CopyToFileOptions struct {
 type CopyFromFileOptions struct {
 	Name     string
 	File     *os.File
-	Metadata map[string]string
+	Metadata map[string]*string
 }
 
 type FlushFileOptions struct {
-	Handle *handlemap.Handle
+	Handle          *handlemap.Handle
+	CloseInProgress bool
 }
 
 type SyncFileOptions struct {
@@ -140,14 +137,6 @@ type SyncFileOptions struct {
 }
 
 type SyncDirOptions struct {
-	Name string
-}
-
-type ReleaseFileOptions struct {
-	Handle *handlemap.Handle
-}
-
-type UnlinkFileOptions struct {
 	Name string
 }
 
@@ -163,11 +152,6 @@ type ReadLinkOptions struct {
 type GetAttrOptions struct {
 	Name             string
 	RetrieveMetadata bool
-}
-
-type SetAttrOptions struct {
-	Name string
-	Attr *ObjAttr
 }
 
 type ChmodOptions struct {

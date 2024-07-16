@@ -29,19 +29,23 @@
 
 
 # Daemon configuration
-foreground: true|false <run cloudfuse in foreground or background>
+foreground: true|false <run blobfuse2 in foreground or background>
 
 # Common configurations
-read-only: true|false <mount in read only mode - used for Streaming and FUSE>
 allow-other: true|false <allow other users to access the mounted directory - used for FUSE and File Cache>
 nonempty: true|false <allow mounting on non-empty directory>
 restricted-characters-windows: true|false <allows filenames with restricted characters to appear on Windows - used for AzStorage and S3Storage>
 
+# Dynamic profiler related configuration. This helps to root-cause high memory/cpu usage related issues.
+dynamic-profile: true|false <allows to turn on dynamic profiler for cpu/memory usage monitoring. Only for debugging, shall not be used in production>
+profiler-port: <port number for dynamic-profiler to listen for REST calls. Default - 6060>
+profiler-ip: <IP address for dynamic-profiler to listen for REST calls. Default - localhost>
+
 # Logger configuration
 logging:
   type: syslog|silent|base <type of logger to be used by the system. silent = no logger, base = file based logger. Default - syslog>
-  level: log_off|log_crit|log_err|log_warning|log_info|log_trace|log_debug <log level. Default - log_warning>
-  file-path: <path where log files shall be stored. Default - '$HOME/.cloudfuse/cloudfuse.log'>
+  level: log_off|log_crit|log_err|log_warning|log_info|log_trace|log_debug <log level. Default - log_warning> <log_debug will also enable sdk-trace logs>
+  file-path: <path where log files shall be stored. Default - '$HOME/.blobfuse2/blobfuse2.log'>
   max-file-size-mb: <maximum allowed size for each log file (in MB). Default - 512 MB>
   file-count: <maximum number of files to be rotated to preserve old logs. Default - 10>
   track-time: true|false <track time taken by important operations>
@@ -49,7 +53,6 @@ logging:
 # Pipeline configuration. Choose components to be engaged. The order below is the priority order that needs to be followed.
 components:
   - libfuse
-  - stream
   - block_cache
   - file_cache
   - attr_cache
@@ -71,9 +74,9 @@ libfuse:
   direct-io: true|false <enable to bypass the kernel cache>
   network-share: true|false <runs as a network share. may improve performance when latency to cloud is high. only supported on Windows. Known issue - only one Cloudfuse network share can be mounted at a time>
 
-  # Streaming configuration
+# Streaming configuration – remove and redirect to block-cache
 stream:
-  # If block-size-mb, max-buffers or buffer-size-mb are 0, the stream component will not cache blocks.
+  # If block-size-mb, max-buffers or buffer-size-mb are 0, the stream component will not cache blocks. 
   block-size-mb: <for read only mode size of each block to be cached in memory while streaming (in MB). For read/write size of newly created blocks. Default - 0 MB>
   max-buffers: <total number of buffers to store blocks in. Default - 0>
   buffer-size-mb: <size for each buffer. Default - 0 MB>
@@ -111,7 +114,7 @@ file_cache:
   refresh-sec: <number of seconds after which compare lmt of file in local cache and container and refresh file if container has the latest copy>
   ignore-sync: true|false <sync call will be ignored and locally cached file will not be deleted>
   hard-limit: true|false <if set to true, file-cache will not allow read/writes to file which exceed the configured limits>
-
+  
 # Attribute cache related configuration
 attr_cache:
   timeout-sec: <time attributes and directory contents can be cached (in sec). Default - 120 sec>
@@ -173,10 +176,10 @@ azstorage:
 
 # S3 storage configuration
 s3storage:
-  bucket-name: <name of the bucket to be mounted. Default - first accessible bucket>
+  bucket-name: <name of the bucket to be mounted>
   key-id: <S3 access key ID. Default - use credentials from environment variables or shared profile (see README)>
   secret-key: <S3 secret access key. Default - use credentials from environment variables or shared profile (see README)>
-  region: <S3 region. Default - us-east-1 or region provided in endpoint>
+  region: <S3 region. Default - us-east-1>
   profile: <AWS shared configuration profile name. Credentials above take precedence over shared profile.>
   endpoint: <S3 endpoint URL. Default - https://s3.[region].lyvecloud.seagate.com>
   subdirectory: <name of subdirectory to be mounted instead of whole bucket>
@@ -199,13 +202,13 @@ mountall:
 # Health Monitor configuration
 health_monitor:
   enable-monitoring: true|false <enable health monitor>
-  stats-poll-interval-sec: <Cloudfuse stats polling interval (in sec). Default - 10 sec>
+  stats-poll-interval-sec: <Blobfuse2 stats polling interval (in sec). Default - 10 sec>
   process-monitor-interval-sec: <CPU, memory and network usage polling interval (in sec). Default - 30 sec>
   output-path: <Path where health monitor will generate its output file. File name will be monitor_<pid>.json>
   # list of monitors to be disabled
   monitor-disable-list:
-    - cloudfuse_stats <Disable cloudfuse stats polling>
+    - cloudfuse_stats <Disable blobfuse2 stats polling>
     - file_cache_monitor <Disable file cache directory monitor>
-    - cpu_profiler <Disable CPU monitoring on cloudfuse process>
-    - memory_profiler <Disable memory monitoring on cloudfuse process>
-    - network_profiler <Disable network monitoring on cloudfuse process>
+    - cpu_profiler <Disable CPU monitoring on blobfuse2 process>
+    - memory_profiler <Disable memory monitoring on blobfuse2 process>
+    - network_profiler <Disable network monitoring on blobfuse2 process>

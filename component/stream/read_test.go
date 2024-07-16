@@ -75,6 +75,8 @@ func newTestStream(next internal.Component, configuration string, ro bool) (*Str
 }
 
 func (suite *streamTestSuite) setupTestHelper(config string, ro bool) {
+	suite.T().Helper()
+
 	var err error
 	suite.assert = assert.New(suite.T())
 	suite.mockCtrl = gomock.NewController(suite.T())

@@ -38,6 +38,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -47,6 +48,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 const symlinkStr = ".rclonelink"
@@ -227,6 +229,28 @@ func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, er
 
 	object := createObjAttr(name, *result.ContentLength, *result.LastModified, isSymlink)
 	return object, nil
+}
+
+// Wrapper for awsS3Client.HeadBucket
+func (cl *Client) headBucket() (bool, error) {
+	_, err := cl.awsS3Client.HeadBucket(context.Background(), &s3.HeadBucketInput{
+		Bucket: aws.String(cl.Config.authConfig.BucketName),
+	})
+	exists := true
+	if err != nil {
+		var apiError smithy.APIError
+		if errors.As(err, &apiError) {
+			switch apiError.(type) {
+			case *types.NotFound:
+				log.Err("Client::headBucket : Bucket %s does not exist: ", err.Error())
+				exists = false
+			default:
+				log.Err("Client::headBucket : Bucket %s exists but you do not have access to bucket or other error occurred : ", err.Error())
+			}
+		}
+	}
+
+	return exists, err
 }
 
 // Wrapper for awsS3Client.CopyObject
@@ -465,11 +489,11 @@ func createObjAttr(path string, size int64, lastModified time.Time, isSymLink bo
 	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
-	attr.Metadata = make(map[string]string)
+	attr.Metadata = make(map[string]*string)
 
 	if isSymLink {
 		attr.Flags.Set(internal.PropFlagSymlink)
-		attr.Metadata[symlinkKey] = "true"
+		attr.Metadata[symlinkKey] = to.Ptr("true")
 	}
 
 	return attr

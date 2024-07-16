@@ -358,12 +358,6 @@ func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 	return err
 }
 
-// Read and return file data as a buffer.
-func (s3 *S3Storage) ReadFile(options internal.ReadFileOptions) ([]byte, error) {
-	//log.Trace("S3Storage::ReadFile : Read %s", h.Path)
-	return s3.storage.ReadBuffer(options.Handle.Path, 0, 0, false)
-}
-
 // Read file data into the buffer given in options.Data.
 func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
 	//log.Trace("S3Storage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
@@ -482,9 +476,6 @@ func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 
 // TODO: decide if the TODO below is relevant and delete if not
 // TODO : Below methods are pending to be implemented
-// SetAttr(string, internal.ObjAttr) error
-// UnlinkFile(string) error
-// ReleaseFile(*handlemap.Handle) error
 // FlushFile(*handlemap.Handle) error
 
 // ------------------------- Factory methods to create objects -------------------------------------------
@@ -506,6 +497,4 @@ func News3storageComponent() internal.Component {
 // On init register this component to pipeline and supply your constructor
 func init() {
 	internal.AddComponent(compName, News3storageComponent)
-	// TODO: add config flags to customize AWS S3 SDK behavior and register them here
-	// 	(see how this is done in azstorage for reference).
 }
