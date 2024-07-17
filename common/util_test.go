@@ -27,7 +27,6 @@ package common
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -108,11 +107,10 @@ func (suite *typesTestSuite) TestDecryptBadKey() {
 
 func (suite *typesTestSuite) TestEncryptDecrypt16() {
 	// Generate a random key
-	binaryKey := make([]byte, 16)
-	rand.Read(binaryKey)
-	key := base64.StdEncoding.EncodeToString(binaryKey)
+	key := make([]byte, 16)
+	rand.Read(key)
 
-	encryptedPassphrase := memguard.NewEnclave([]byte(key))
+	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
 	rand.Read(data)
@@ -127,11 +125,10 @@ func (suite *typesTestSuite) TestEncryptDecrypt16() {
 
 func (suite *typesTestSuite) TestEncryptDecrypt24() {
 	// Generate a random key
-	binaryKey := make([]byte, 24)
-	rand.Read(binaryKey)
-	key := base64.StdEncoding.EncodeToString(binaryKey)
+	key := make([]byte, 24)
+	rand.Read(key)
 
-	encryptedPassphrase := memguard.NewEnclave([]byte(key))
+	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
 	rand.Read(data)
@@ -146,11 +143,10 @@ func (suite *typesTestSuite) TestEncryptDecrypt24() {
 
 func (suite *typesTestSuite) TestEncryptDecrypt32() {
 	// Generate a random key
-	binaryKey := make([]byte, 32)
-	rand.Read(binaryKey)
-	key := base64.StdEncoding.EncodeToString(binaryKey)
+	key := make([]byte, 32)
+	rand.Read(key)
 
-	encryptedPassphrase := memguard.NewEnclave([]byte(key))
+	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
 	rand.Read(data)
