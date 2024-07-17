@@ -361,10 +361,10 @@ func (cl *Client) DeleteDirectory(name string) error {
 	for !done {
 
 		// list all objects with the prefix
-		objects, marker, err := cl.List(name, marker, 0)
-		if err != nil {
-			log.Warn("Client::DeleteDirectory : Failed to list object with prefix %s. Here's why: %v", name, err)
-			return err
+		objects, marker, listErr := cl.List(name, marker, 0)
+		if listErr != nil {
+			log.Warn("Client::DeleteDirectory : Failed to list object with prefix %s. Here's why: %v", name, listErr)
+			return listErr
 		}
 
 		// we have no way of indicating empty folders in the bucket
