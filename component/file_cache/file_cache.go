@@ -1225,12 +1225,12 @@ func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 		nextAttr.operation = "SyncFile"
 		nextAttr.options = options
 
-		_, loaded := fc.fileOps.LoadOrStore(options.Handle.FObj.Name(), nextAttr)
+		_, loaded := fc.fileOps.LoadOrStore(options.Handle.Path, nextAttr)
 
 		if loaded {
 
-			fc.fileOps.Delete(options.Handle.FObj.Name())
-			fc.fileOps.Store(options.Handle.FObj.Name(), nextAttr)
+			fc.fileOps.Delete(options.Handle.Path)
+			fc.fileOps.Store(options.Handle.Path, nextAttr)
 		}
 		fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
 		fc.asyncSignal.Unlock()  // Signal to async thread to do work
