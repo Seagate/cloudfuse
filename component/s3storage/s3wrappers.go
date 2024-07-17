@@ -64,9 +64,7 @@ func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
 		u.Concurrency = cl.Config.concurrency
 	})
 
-	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout*5)
-	defer cancelFn()
-	_, err := downloader.Download(ctx, fi, &s3.GetObjectInput{
+	_, err := downloader.Download(context.Background(), fi, &s3.GetObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -99,9 +97,7 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 		rangeString = "bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)
 	}
 
-	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout*5)
-	defer cancelFn()
-	result, err := cl.awsS3Client.GetObject(ctx, &s3.GetObjectInput{
+	result, err := cl.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
 		Range:  aws.String(rangeString),
@@ -123,8 +119,6 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSymLink bool) error {
 	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::putObject : putting object %s", key)
-	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout*5)
-	defer cancelFn()
 	var err error
 
 	putObjectInput := &s3.PutObjectInput{
@@ -141,14 +135,14 @@ func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSym
 	// If the object is small, just do a normal put object.
 	// If not, then use a multipart upload
 	if size < cl.Config.uploadCutoff {
-		_, err = cl.awsS3Client.PutObject(ctx, putObjectInput)
+		_, err = cl.awsS3Client.PutObject(context.Background(), putObjectInput)
 	} else {
 		uploader := manager.NewUploader(cl.awsS3Client, func(u *manager.Uploader) {
 			u.PartSize = cl.Config.partSize
 			u.Concurrency = cl.Config.concurrency
 		})
 
-		_, err = uploader.Upload(ctx, putObjectInput)
+		_, err = uploader.Upload(context.Background(), putObjectInput)
 	}
 
 	attemptedAction := fmt.Sprintf("upload object %s", key)
@@ -258,9 +252,7 @@ func (cl *Client) copyObject(source string, target string, isSymLink bool) error
 	// copy the object to its new key
 	sourceKey := cl.getKey(source, isSymLink)
 	targetKey := cl.getKey(target, isSymLink)
-	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout*3)
-	defer cancelFn()
-	_, err := cl.awsS3Client.CopyObject(ctx, &s3.CopyObjectInput{
+	_, err := cl.awsS3Client.CopyObject(context.Background(), &s3.CopyObjectInput{
 		Bucket:     aws.String(cl.Config.authConfig.BucketName),
 		CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, url.PathEscape(sourceKey))),
 		Key:        aws.String(targetKey),
