@@ -163,7 +163,7 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 		}
 	}
 
-	if inMap == true {
+	if inMap {
 		downloadRequired = false
 		return downloadRequired, fileExists, attr, err
 	}

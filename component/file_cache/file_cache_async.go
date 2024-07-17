@@ -276,9 +276,14 @@ func (fc *FileCache) asyncChown(options internal.ChownOptions) error {
 
 	flushFilePath.Name = options.Name
 
-	fc.asyncFlushFile(flushFilePath)
+	err := fc.asyncFlushFile(flushFilePath)
 
-	err := fc.NextComponent().Chown(options)
+	if err != nil {
+		log.Err("FileCache::Chown : %s failed to flush before changing owners [%s]", options.Name, err.Error())
+		return err
+	}
+
+	err = fc.NextComponent().Chown(options)
 	err = fc.validateStorageError(options.Name, err, "Chown", false)
 	if err != nil {
 		log.Err("FileCache::Chown : %s failed to change owner [%s]", options.Name, err.Error())
