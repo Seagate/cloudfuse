@@ -29,7 +29,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -186,12 +185,7 @@ func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
 	}
 	defer secretKey.Destroy()
 
-	binaryKey, err := base64.StdEncoding.DecodeString(secretKey.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
-	}
-
-	block, err := aes.NewCipher(binaryKey)
+	block, err := aes.NewCipher(secretKey.Data())
 	if err != nil {
 		return nil, err
 	}
@@ -222,12 +216,7 @@ func DecryptData(cipherData []byte, key *memguard.Enclave) ([]byte, error) {
 	}
 	defer secretKey.Destroy()
 
-	binaryKey, err := base64.StdEncoding.DecodeString(secretKey.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
-	}
-
-	block, err := aes.NewCipher(binaryKey)
+	block, err := aes.NewCipher(secretKey.Data())
 	if err != nil {
 		return nil, err
 	}

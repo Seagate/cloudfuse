@@ -174,7 +174,7 @@ func processCommand() error {
 			}
 		}
 
-		encryptedPassphrase = memguard.NewEnclave([]byte(options.PassPhrase))
+		encryptedPassphrase = memguard.NewEnclave(options.PassPhrase)
 	}
 
 	var containerList []string

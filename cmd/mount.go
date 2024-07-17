@@ -214,7 +214,7 @@ func parseConfig() error {
 			}
 		}
 
-		encryptedPassphrase = memguard.NewEnclave([]byte(options.PassPhrase))
+		encryptedPassphrase = memguard.NewEnclave(options.PassPhrase)
 
 		cipherText, err := os.ReadFile(options.ConfigFile)
 		if err != nil {
