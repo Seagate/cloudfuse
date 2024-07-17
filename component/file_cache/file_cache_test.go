@@ -1221,7 +1221,7 @@ func (suite *fileCacheTestSuite) TestDeleteFileCase2() {
 
 	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
 	suite.assert.Error(err)
-	//suite.assert.Equal(syscall.EIO, err) not fully sure what this specfic error code should be indicating,
+	//suite.assert.Equal(syscall.EIO, err) not fully sure what this specific error code should be indicating,
 
 	// Path should not be in local cache (since we failed the operation)
 	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
@@ -1250,7 +1250,7 @@ func (suite *fileCacheTestSuite) TestDeleteFileCase2CloudDown() {
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: false}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
 	time.Sleep(time.Millisecond)
 	err := suite.fileCache.DeleteFile(deleteFileOptions)
-	//suite.assert.Equal(syscall.EIO, err) not fully sure what this specfic error code should be indicating,
+	//suite.assert.Equal(syscall.EIO, err) not fully sure what this specific error code should be indicating,
 	time.Sleep(time.Millisecond)
 	// Path should not be in local cache (since we failed the operation)
 	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))

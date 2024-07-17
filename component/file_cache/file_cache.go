@@ -78,7 +78,7 @@ type FileCache struct {
 	lazyWrite         bool
 	fileCloseOpt      sync.WaitGroup
 
-	fileOps     sync.Map //we want fileOps to store the operations to preform on the file if the cloud is down. Key is file name, value is operation to do
+	fileOps     sync.Map //we want fileOps to store the operations to perform on the file if the cloud is down. Key is file name, value is operation to do
 	asyncSignal sync.Mutex
 }
 
@@ -905,7 +905,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 			// We pass a count of 0 to get the entire object
 
 			//find a way to check for errors later
-			//open file doesnt have to do anything in the async cloud thread if the cloud is down, we'd only have local copies of the file
+			//open file doesn't have to do anything in the async cloud thread if the cloud is down, we'd only have local copies of the file
 			err = fc.NextComponent().CopyToFile(
 				internal.CopyToFileOptions{
 					Name:   handle.Path,
