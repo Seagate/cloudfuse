@@ -119,6 +119,7 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSymLink bool) error {
 	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::putObject : putting object %s", key)
+	ctx := context.Background()
 	var err error
 
 	putObjectInput := &s3.PutObjectInput{
@@ -135,14 +136,14 @@ func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSym
 	// If the object is small, just do a normal put object.
 	// If not, then use a multipart upload
 	if size < cl.Config.uploadCutoff {
-		_, err = cl.awsS3Client.PutObject(context.Background(), putObjectInput)
+		_, err = cl.awsS3Client.PutObject(ctx, putObjectInput)
 	} else {
 		uploader := manager.NewUploader(cl.awsS3Client, func(u *manager.Uploader) {
 			u.PartSize = cl.Config.partSize
 			u.Concurrency = cl.Config.concurrency
 		})
 
-		_, err = uploader.Upload(context.Background(), putObjectInput)
+		_, err = uploader.Upload(ctx, putObjectInput)
 	}
 
 	attemptedAction := fmt.Sprintf("upload object %s", key)
