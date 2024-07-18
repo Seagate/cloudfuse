@@ -80,6 +80,7 @@ type FileCache struct {
 
 	fileOps     sync.Map //we want fileOps to store the operations to perform on the file if the cloud is down. Key is file name, value is operation to do
 	asyncSignal sync.Mutex
+	//closeSignal chan int
 }
 
 type FileAttributes struct {
@@ -174,6 +175,7 @@ func (c *FileCache) Priority() internal.ComponentPriority {
 //	this shall not block the call otherwise pipeline will not start
 func (c *FileCache) Start(ctx context.Context) error {
 	log.Trace("Starting component : %s", c.Name())
+	//c.closeSignal = make(chan int)
 
 	if c.cleanupOnStart {
 		err := c.TempCacheCleanup()
@@ -213,7 +215,7 @@ func (c *FileCache) Stop() error {
 	if !c.allowNonEmpty {
 		_ = c.TempCacheCleanup()
 	}
-
+	//c.closeSignal <- 1
 	fileCacheStatsCollector.Destroy()
 
 	return nil
