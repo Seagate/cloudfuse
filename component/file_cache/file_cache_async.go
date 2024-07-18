@@ -27,6 +27,7 @@ package file_cache
 
 import (
 	"math"
+	"os"
 	"syscall"
 	"time"
 
@@ -60,7 +61,6 @@ func (fc *FileCache) async_cloud_handler() {
 				restTime = (math.Pow(2, tries) - 1) * 100 //restTime in ms based on number of failed tries
 				log.Trace("AsyncFileCache:: async_cloud_handler : The timeout value is %f", restTime)
 				time.Sleep(time.Duration(restTime) * (time.Millisecond))
-
 				val, _ := fc.fileOps.Load(key)
 
 				fileOperation := val.(FileAttributes).operation
@@ -147,6 +147,8 @@ func (fc *FileCache) asyncFlushFile(options FlushFileAbstraction) error {
 		log.Err("FileCache::FlushFile : %s upload failed [%s]", options.Name, err.Error())
 		return err
 	}
+
+	//use miss list to update mode, take it out of flush file
 
 	return nil
 }
@@ -249,19 +251,29 @@ func (fc *FileCache) asyncChmod(options internal.ChmodOptions) error {
 
 	//need to first flushFile before Chmod to ensure file is in cloud
 
-	err := fc.asyncFlushFile(FlushFileAbstraction{Name: options.Name})
-	if err != nil {
-		log.Err("FileCache::Chmod : error [unable to open upload handle] %s [%s]", options.Name, err.Error())
-		return err
-	}
+	flushFilePath := FlushFileAbstraction{}
+	flushFilePath.Name = options.Name
 
-	err = fc.NextComponent().Chmod(options)
+	if !fc.createEmptyFile {
+		localPath := common.JoinUnixFilepath(fc.tmpPath, flushFilePath.Name)
+		info, err := os.Stat(localPath)
+
+		if err != nil && info != nil {
+			// We can allow for empty files to be flushed here because this only gets called by flushFile, meaning the user wants to close the file
+			_ = fc.asyncFlushFile(flushFilePath)
+
+		}
+	}
+	_ = fc.asyncFlushFile(flushFilePath)
+
+	err := fc.NextComponent().Chmod(options)
 	err = fc.validateStorageError(options.Name, err, "Chmod", false)
 	if err != nil {
 		if err != syscall.EIO {
 			log.Err("FileCache::Chmod : %s failed to change mode [%s]", options.Name, err.Error())
 		} else {
 			fc.missedChmodList.LoadOrStore(options.Name, true)
+			return nil
 		}
 		return err
 	}
@@ -270,20 +282,20 @@ func (fc *FileCache) asyncChmod(options internal.ChmodOptions) error {
 
 func (fc *FileCache) asyncChown(options internal.ChownOptions) error {
 
-	//need to first flushFile before Chmod to ensure file is in cloud
-	//could probably do this as a one liner but figure it out later if needed
 	flushFilePath := FlushFileAbstraction{}
-
 	flushFilePath.Name = options.Name
 
-	err := fc.asyncFlushFile(flushFilePath)
+	if !fc.createEmptyFile {
+		localPath := common.JoinUnixFilepath(fc.tmpPath, flushFilePath.Name)
+		info, err := os.Stat(localPath)
 
-	if err != nil {
-		log.Err("FileCache::Chown : %s failed to flush before changing owners [%s]", options.Name, err.Error())
-		return err
+		if err != nil && info != nil {
+			// We can allow for empty files to be flushed here because this only gets called by flushFile, meaning the user wants to close the file
+			_ = fc.asyncFlushFile(flushFilePath)
+		}
 	}
 
-	err = fc.NextComponent().Chown(options)
+	err := fc.NextComponent().Chown(options)
 	err = fc.validateStorageError(options.Name, err, "Chown", false)
 	if err != nil {
 		log.Err("FileCache::Chown : %s failed to change owner [%s]", options.Name, err.Error())

@@ -1545,17 +1545,42 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 	log.Trace("FileCache::Chmod : Change mode of path %s", options.Name)
 
+	//try chmod in local thread first
+	// err := fc.NextComponent().Chmod(options)
+	// err = fc.validateStorageError(options.Name, err, "Chmod", false)
+	// if err != nil {
+	// 	if err != syscall.EIO {
+	// 		log.Err("FileCache::Chmod : %s failed to change mode [%s]", options.Name, err.Error())
+	// 	} else {
+	// 		fc.missedChmodList.LoadOrStore(options.Name, true)
+	// 	}
+	// 	//if chmod failed, add it to sync map
+	// 	newAttr := FileAttributes{}
+	// 	newAttr.operation = "Chmod"
+	// 	newAttr.options = options
+	// 	_, loaded := fc.fileOps.LoadOrStore(options.Name, newAttr)
+
+	// 	if loaded {
+	// 		fc.fileOps.Delete(options.Name)
+	// 		fc.fileOps.Store(options.Name, newAttr)
+	// 	}
+	// 	fc.asyncSignal.TryLock()
+	// 	fc.asyncSignal.Unlock()
+
+	// }
+
 	newAttr := FileAttributes{}
 	newAttr.operation = "Chmod"
-	newAttr.options = options                                  //Extract file name to serve as key
-	_, loaded := fc.fileOps.LoadOrStore(options.Name, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
+	newAttr.options = options
+	_, loaded := fc.fileOps.LoadOrStore(options.Name, newAttr)
 
-	if loaded { //If there is already a value for the given key, we must overwrite it
-		fc.fileOps.Delete(options.Name)         //Remove old value for key
-		fc.fileOps.Store(options.Name, newAttr) //Replace with new one
+	if loaded {
+		fc.fileOps.Delete(options.Name)
+		fc.fileOps.Store(options.Name, newAttr)
 	}
-	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
-	fc.asyncSignal.Unlock()  // Signal to async thread to do work
+	fc.asyncSignal.TryLock()
+	fc.asyncSignal.Unlock()
+
 	// Update the mode of the file in the local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	info, err := os.Stat(localPath)
@@ -1590,6 +1615,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	}
 	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
 	fc.asyncSignal.Unlock()  // Signal to async thread to do work
+
 	// Update the owner and group of the file in the local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	_, err := os.Stat(localPath)
