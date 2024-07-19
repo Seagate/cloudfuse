@@ -2008,7 +2008,7 @@ func (suite *fileCacheTestSuite) TestRenameFileCase2CloudDown() {
 	time.Sleep(time.Millisecond)
 
 	renameFileOptions := internal.RenameFileOptions{Src: src, Dst: dst}
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: src, RetrieveMetadata: false}).Return(nil, &retry.MaxAttemptsError{})
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: src, RetrieveMetadata: false}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
 	suite.mock.EXPECT().RenameFile(renameFileOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
 	err := suite.fileCache.RenameFile(renameFileOptions)
 	time.Sleep(time.Millisecond)

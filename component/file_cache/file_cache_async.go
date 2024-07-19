@@ -27,7 +27,6 @@ package file_cache
 
 import (
 	"math"
-	"os"
 	"syscall"
 	"time"
 
@@ -99,6 +98,9 @@ func (fc *FileCache) async_cloud_handler() {
 
 					case fileOperation == "SyncFile":
 						returnVal = fc.asyncSyncFile(fileOptions.(internal.SyncFileOptions))
+
+					case fileOperation == "ChmodAndFlush":
+						returnVal = fc.asyncChmodAndFlush(fileOptions.(internal.ChmodOptions))
 					}
 
 					log.Trace("AsyncFileCache:: async_cloud_handler: The key after the function call is %s and the value is %s", key, fileOptions)
@@ -254,22 +256,6 @@ func (fc *FileCache) asyncCreateFile(options internal.CreateFileOptions) error {
 
 func (fc *FileCache) asyncChmod(options internal.ChmodOptions) error {
 
-	//need to first flushFile before Chmod to ensure file is in cloud
-
-	flushFilePath := FlushFileAbstraction{}
-	flushFilePath.Name = options.Name
-
-	if !fc.createEmptyFile {
-		localPath := common.JoinUnixFilepath(fc.tmpPath, flushFilePath.Name)
-		info, err := os.Stat(localPath)
-
-		if err == nil && info != nil {
-			// We can allow for empty files to be flushed here because this only gets called by flushFile, meaning the user wants to close the file
-			_ = fc.asyncFlushFile(flushFilePath)
-
-		}
-	}
-
 	err := fc.NextComponent().Chmod(options)
 	err = fc.validateStorageError(options.Name, err, "Chmod", false)
 	if err != nil {
@@ -277,7 +263,33 @@ func (fc *FileCache) asyncChmod(options internal.ChmodOptions) error {
 			log.Err("FileCache::Chmod : %s failed to change mode [%s]", options.Name, err.Error())
 		} else {
 			fc.missedChmodList.LoadOrStore(options.Name, true)
-			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+func (fc *FileCache) asyncChmodAndFlush(options internal.ChmodOptions) error {
+
+	//need to first flushFile before Chmod to ensure file is in cloud
+
+	flushFilePath := FlushFileAbstraction{}
+	flushFilePath.Name = options.Name
+
+	// We can allow for empty files to be flushed here because this only gets called by flushFile, meaning the user wants to close the file
+	err := fc.asyncFlushFile(flushFilePath)
+	if err != nil {
+		log.Err("FileCache::Chmod : %s failed to flushFile [%s]", options.Name, err.Error())
+		return err
+	}
+
+	err = fc.NextComponent().Chmod(options)
+	err = fc.validateStorageError(options.Name, err, "Chmod", false)
+	if err != nil {
+		if err != syscall.EIO {
+			log.Err("FileCache::Chmod : %s failed to change mode [%s]", options.Name, err.Error())
+		} else {
+			fc.missedChmodList.LoadOrStore(options.Name, true)
 		}
 		return err
 	}
@@ -286,18 +298,18 @@ func (fc *FileCache) asyncChmod(options internal.ChmodOptions) error {
 
 func (fc *FileCache) asyncChown(options internal.ChownOptions) error {
 
-	flushFilePath := FlushFileAbstraction{}
-	flushFilePath.Name = options.Name
+	// flushFilePath := FlushFileAbstraction{}
+	// flushFilePath.Name = options.Name
 
-	if !fc.createEmptyFile {
-		localPath := common.JoinUnixFilepath(fc.tmpPath, flushFilePath.Name)
-		info, err := os.Stat(localPath)
+	// if !fc.createEmptyFile {
+	// 	localPath := common.JoinUnixFilepath(fc.tmpPath, flushFilePath.Name)
+	// 	info, err := os.Stat(localPath)
 
-		if err == nil && info != nil {
-			// We can allow for empty files to be flushed here because this only gets called by flushFile, meaning the user wants to close the file
-			_ = fc.asyncFlushFile(flushFilePath)
-		}
-	}
+	// 	if err == nil && info != nil {
+	// 		// We can allow for empty files to be flushed here because this only gets called by flushFile, meaning the user wants to close the file
+	// 		_ = fc.asyncFlushFile(flushFilePath)
+	// 	}
+	// }
 
 	err := fc.NextComponent().Chown(options)
 	err = fc.validateStorageError(options.Name, err, "Chown", false)

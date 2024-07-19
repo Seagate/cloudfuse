@@ -1342,7 +1342,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 			localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
 			info, err := os.Stat(localPath)
 			if err == nil {
-				err = fc.Chmod(internal.ChmodOptions{Name: options.Handle.Path, Mode: info.Mode()})
+				err = fc.flushAndChmod(internal.ChmodOptions{Name: options.Handle.Path, Mode: info.Mode()})
 				if err != nil {
 					// chmod was missed earlier for this file and doing it now also
 					// resulted in error so ignore this one and proceed for flush handling
@@ -1543,33 +1543,66 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	return fc.CloseFile(internal.CloseFileOptions{Handle: h})
 }
 
+func (fc *FileCache) flushAndChmod(options internal.ChmodOptions) error {
+	log.Trace("FileCache::Chmod : Change mode of path %s", options.Name)
+
+	newAttr := FileAttributes{}
+	newAttr.operation = "ChmodAndFlush"
+	newAttr.options = options
+	_, loaded := fc.fileOps.LoadOrStore(options.Name, newAttr)
+
+	if loaded {
+		fc.fileOps.Delete(options.Name)
+		fc.fileOps.Store(options.Name, newAttr)
+	}
+	fc.asyncSignal.TryLock()
+	fc.asyncSignal.Unlock()
+
+	// Update the mode of the file in the local cache
+	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	info, err := os.Stat(localPath)
+	if err == nil {
+		fc.policy.CacheValid(localPath)
+
+		if info.Mode() != options.Mode {
+			err = os.Chmod(localPath, options.Mode)
+			if err != nil {
+				log.Err("FileCache::Chmod : error changing mode on the cached path %s [%s]", localPath, err.Error())
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // Chmod : Update the file with its new permissions
 func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 	log.Trace("FileCache::Chmod : Change mode of path %s", options.Name)
 
 	//try chmod in local thread first
-	// err := fc.NextComponent().Chmod(options)
-	// err = fc.validateStorageError(options.Name, err, "Chmod", false)
-	// if err != nil {
-	// 	if err != syscall.EIO {
-	// 		log.Err("FileCache::Chmod : %s failed to change mode [%s]", options.Name, err.Error())
-	// 	} else {
-	// 		fc.missedChmodList.LoadOrStore(options.Name, true)
-	// 	}
-	// 	//if chmod failed, add it to sync map
-	// 	newAttr := FileAttributes{}
-	// 	newAttr.operation = "Chmod"
-	// 	newAttr.options = options
-	// 	_, loaded := fc.fileOps.LoadOrStore(options.Name, newAttr)
+	err := fc.NextComponent().Chmod(options)
+	err = fc.validateStorageError(options.Name, err, "Chmod", false)
+	if err != nil {
+		if err != syscall.EIO {
+			log.Err("FileCache::Chmod : %s failed to change mode [%s]", options.Name, err.Error())
+		} else {
+			fc.missedChmodList.LoadOrStore(options.Name, true)
+		}
+		//if chmod failed, add it to sync map
+		newAttr := FileAttributes{}
+		newAttr.operation = "Chmod"
+		newAttr.options = options
+		_, loaded := fc.fileOps.LoadOrStore(options.Name, newAttr)
 
-	// 	if loaded {
-	// 		fc.fileOps.Delete(options.Name)
-	// 		fc.fileOps.Store(options.Name, newAttr)
-	// 	}
-	// 	fc.asyncSignal.TryLock()
-	// 	fc.asyncSignal.Unlock()
+		if loaded {
+			fc.fileOps.Delete(options.Name)
+			fc.fileOps.Store(options.Name, newAttr)
+		}
+		fc.asyncSignal.TryLock()
+		fc.asyncSignal.Unlock()
 
-	// }
+	}
 
 	newAttr := FileAttributes{}
 	newAttr.operation = "Chmod"
