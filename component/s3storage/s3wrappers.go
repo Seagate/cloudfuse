@@ -194,7 +194,7 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 		},
 	})
 	if err != nil {
-		log.Err("Client::DeleteDirectory : Failed to delete %d files. Here's why: %v", len(objects), err)
+		err = parseS3Err(err, fmt.Sprintf("delete %d files", len(objects)))
 		for i := 0; i < len(result.Errors); i++ {
 			log.Err("Client::DeleteDirectory : Failed to delete key %s. Here's why: %s", result.Errors[i].Key, result.Errors[i].Message)
 		}
@@ -309,7 +309,7 @@ func (cl *Client) ListBuckets() ([]string, error) {
 
 	if err != nil {
 		log.Err("Client::ListBuckets : Failed to list buckets. Here's why: %v", err)
-		return cntList, err
+		return cntList, parseS3Err(err, "list buckets")
 	}
 
 	for _, bucket := range result.Buckets {
@@ -384,8 +384,8 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	defer cancelFn()
 	output, err := paginator.NextPage(ctx)
 	if err != nil {
-		log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
-		return objectAttrList, nil, err
+		attemptedAction := fmt.Sprintf("list objects in bucket %v with prefix %v", bucketName, prefix)
+		return objectAttrList, nil, parseS3Err(err, attemptedAction)
 	}
 
 	if output.IsTruncated != nil && *output.IsTruncated {
