@@ -369,24 +369,42 @@ func (p *lruPolicy) removeNode(name string) {
 func (p *lruPolicy) updateMarker() {
 	log.Trace("lruPolicy::updateMarker")
 
-	p.Lock()
-	node := p.lastMarker
-	if node.next != nil {
-		node.next.prev = node.prev
+	shouldDelete := true
+	p.fileOps.Range(func(key, value interface{}) bool {
+		log.Debug("lruPolicy::updateMarker : Checking File %s", key.(string))
+		keyString := key.(string)
+		val := value.(FileAttributes).operation
+		fileName := filepath.Base(p.head.name)
+		//if the file is found in the async map, don't remove it from the cache so it can be uploaded when the cloud is back
+		if keyString == fileName && val != "DeleteFile" && val != "DeleteDir" {
+			log.Debug("lruPolicy::updateMarker : %s is found in the async map. Not updating marker", key.(string))
+			shouldDelete = false
+		}
+
+		return true
+	})
+
+	if shouldDelete {
+
+		p.Lock()
+		node := p.lastMarker
+		if node.next != nil {
+			node.next.prev = node.prev
+		}
+
+		if node.prev != nil {
+			node.prev.next = node.next
+		}
+		node.prev = nil
+		node.next = p.head
+		p.head.prev = node
+		p.head = node
+
+		p.lastMarker = p.currMarker
+		p.currMarker = node
+
+		p.Unlock()
 	}
-
-	if node.prev != nil {
-		node.prev.next = node.next
-	}
-	node.prev = nil
-	node.next = p.head
-	p.head.prev = node
-	p.head = node
-
-	p.lastMarker = p.currMarker
-	p.currMarker = node
-
-	p.Unlock()
 }
 
 func (p *lruPolicy) deleteExpiredNodes() {
