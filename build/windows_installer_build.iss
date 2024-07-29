@@ -106,11 +106,11 @@ begin
     // Install WinFSP if it is not already installed
     if not RegKeyExists(HKLM, 'SOFTWARE\WOW6432Node\WinFsp\Services') then
     begin
-      if MsgBox('WinFSP is required for Cloudfuse. Do you want to install it now?', mbConfirmation, MB_YESNO) = idYes then
+      if SuppressibleMsgBox('WinFSP is required for Cloudfuse. Do you want to install it now?', mbConfirmation, MB_YESNO, IDYES) = IDYES then
       begin
-        if not Exec('msiexec.exe', '/i "' + ExpandConstant('{app}\{#WinFSPInstaller}') + '"', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+        if not Exec('msiexec.exe', '/qn /i "' + ExpandConstant('{app}\{#WinFSPInstaller}') + '"', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
         begin
-          MsgBox('Failed to run the WinFSP installer. You might need to install it manually.', mbError, MB_OK);
+          SuppressibleMsgBox('Failed to run the WinFSP installer. You might need to install it manually.', mbError, MB_OK, IDOK);
         end;
       end;
     end;
@@ -118,7 +118,7 @@ begin
     // Install the Cloudfuse Startup Tool
     if not Exec(ExpandConstant('{app}\{#MyAppExeCLIName}'), 'service install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
-      MsgBox('Failed to install cloudfuse as a service. You may need to do this manually from the command line.', mbError, MB_OK);
+      SuppressibleMsgBox('Failed to install cloudfuse as a service. You may need to do this manually from the command line.', mbError, MB_OK, IDOK);
     end;
   end;
 end;
