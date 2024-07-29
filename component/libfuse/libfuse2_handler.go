@@ -121,6 +121,8 @@ func (lf *Libfuse) initFuse() error {
 			lf.entryExpiration,
 			lf.attributeExpiration,
 			lf.negativeTimeout)
+
+		options += fmt.Sprintf(",FileSecurity=D:P(A;;FA;;;WD)")
 	}
 
 	// While reading a file let kernel do readahead for better perf
@@ -669,7 +671,7 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 // Read reads data from a file into the buffer with the given offset.
 func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 	//skipping the logging to avoid creating log noise and the performance costs from huge number of calls.
-	//log.Debug("Libfuse::Read : reading path %s, handle: %d", path, fh)
+	log.Debug("Libfuse::Read : reading path %s, handle: %d", path, fh)
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
@@ -709,7 +711,7 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 // Write writes data to a file from the buffer with the given offset.
 func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int {
 	//skipping the logging to avoid creating log noise and the performance costs from huge number of calls
-	//log.Debug("Libfuse::Write : Writing path %s, handle: %d", path, fh)
+	log.Debug("Libfuse::Write : Writing path %s, handle: %d", path, fh)
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {

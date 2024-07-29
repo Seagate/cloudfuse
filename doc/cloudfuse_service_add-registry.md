@@ -1,25 +1,25 @@
-## cloudfuse service uninstall
+## cloudfuse service add-registry
 
-Uninstall the startup process for Cloudfuse. Requires running as admin.
+Add registry information for WinFSP to launch cloudfuse. Requires running as admin.
 
 ### Synopsis
 
-Uninstall the startup process for Cloudfuse. Requires running as admin.
+Add registry information for WinFSP to launch cloudfuse. Requires running as admin.
 
 ```
-cloudfuse service uninstall [flags]
+cloudfuse service add-registry [flags]
 ```
 
 ### Examples
 
 ```
-cloudfuse service uninstall
+cloudfuse service add-registry
 ```
 
 ### Options
 
 ```
-  -h, --help   help for uninstall
+  -h, --help   help for add-registry
 ```
 
 ### Options inherited from parent commands
