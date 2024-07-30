@@ -3,8 +3,6 @@ on:
   push:
     tags:
       - 'v*'
-    branches:
-      - 'Add-installation-without-gui'
 
 jobs:
   compile-gui:
@@ -259,7 +257,7 @@ jobs:
         id: get_version_no_gui
         run: echo "::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )"
       - # Get cached intermediate build products
-        name: Restore cached Windows installer
+        name: Restore cached Windows installer No Gui
         uses: actions/cache/restore@v4
         with:
           enableCrossOsArchive: true
