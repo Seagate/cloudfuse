@@ -121,8 +121,6 @@ func (lf *Libfuse) initFuse() error {
 			lf.entryExpiration,
 			lf.attributeExpiration,
 			lf.negativeTimeout)
-
-		options += fmt.Sprintf(",FileSecurity=D:P(A;;FA;;;WD)")
 	}
 
 	// While reading a file let kernel do readahead for better perf
