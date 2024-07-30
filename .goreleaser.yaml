@@ -243,6 +243,7 @@ archives:
 release:
   extra_files: 
     - glob: ./build/Output/cloudfuse_{{.Version}}_windows_amd64.exe
+    - glob: ./build/Output/cloudfuse_no_gui_{{.Version}}_windows_amd64.exe
 
 nfpms:
   - id: linux

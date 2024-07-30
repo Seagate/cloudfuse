@@ -167,7 +167,6 @@ jobs:
         working-directory: ./build
         run: |
           .\run-iscc.bat
-          .\run-iscc_no_gui.bat
       -
         name: Set Version
         id: get_version
@@ -176,7 +175,19 @@ jobs:
         name: Rename installer
         run: |
           mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
-          mv build/Output/cloudfuse_no_gui.exe build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
+      -
+        name: Run Inno Setup No Gui
+        working-directory: ./build
+        run: |
+          .\run-iscc_no_gui.bat
+      -
+        name: Set Version No Gui
+        id: get_version_no_gui
+        run: echo "::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )"
+      -
+        name: Rename installer No Gui
+        run: |
+          mv build/Output/cloudfuse.exe build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
       -
         name: Cache windows installer
         uses: actions/cache/save@v4
@@ -185,12 +196,12 @@ jobs:
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
       -
-        name: Cache windows installer
+        name: Cache windows installer No GUi
         uses: actions/cache/save@v4
         with:
           enableCrossOsArchive: true
-          path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
-          key: windows-cloudfuse-installer-${{ github.sha }}
+          path: build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
+          key: windows-cloudfuse-no-gui-installer-${{ github.sha }}
 
   release:
     # Use GoReleaser to package and publish Linux releases along with the Windows installer
@@ -240,6 +251,18 @@ jobs:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
+          fail-on-cache-miss: true
+      -
+        name: Set Version No GUi
+        id: get_version_no_gui
+        run: echo "::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )"
+      - # Get cached intermediate build products
+        name: Restore cached Windows installer
+        uses: actions/cache/restore@v4
+        with:
+          enableCrossOsArchive: true
+          path: build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
+          key: windows-cloudfuse-no-gui-installer-${{ github.sha }}
           fail-on-cache-miss: true
       -
         name: Restore Linux compiled GUI
