@@ -1,5 +1,24 @@
 # Cloudfuse Changelog #
 
+## **1.3.2** ##
+
+July 23th 2024
+This version is based on [blobfuse2 2.3.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.0) (upstream).
+
+### Bug Fixes ###
+
+- [#294](https://github.com/Seagate/cloudfuse/pull/294) Fix setting system path on Windows install
+
+## **1.3.1** ##
+
+July 11th 2024
+This version is based on [blobfuse2 2.3.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.0) (upstream).
+
+### Changes ###
+
+- [#263](https://github.com/Seagate/cloudfuse/pull/263) When mounting to a Windows drive letter with network-share true, set volume name to container name
+- [#273](https://github.com/Seagate/cloudfuse/pull/273) Default cloud component to s3storage when config has no components section
+
 ## **1.3.0** ##
 
 July 3rd 2024

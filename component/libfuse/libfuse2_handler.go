@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
@@ -160,7 +161,32 @@ func (lf *Libfuse) initFuse() error {
 	if runtime.GOOS == "windows" && lf.networkShare && common.IsDriveLetter(lf.mountPath) {
 		// TODO: We can support any type of valid network share path so this path could
 		// be configurable for the config file. But this is a good default.
-		opts = append(opts, "--VolumePrefix=\\server\\share")
+
+		// by default nameStorage will be blank
+		nameStorage := "default"
+		kindStorage := "cloud"
+		// Borrow bucket-name string from attribute cache
+		if config.IsSet("s3storage.bucket-name") {
+
+			err := config.UnmarshalKey("s3storage.bucket-name", &nameStorage)
+			if err != nil {
+				nameStorage = "default"
+				log.Err("initFuse : Failed to unmarshal s3storage.bucket-name")
+			} else {
+				kindStorage = "bucket"
+			}
+		} else if config.IsSet("azstorage.container") {
+			err := config.UnmarshalKey("azstorage.container", &nameStorage)
+			if err != nil {
+				nameStorage = "default"
+				log.Err("initFuse : Failed to unmarshal s3storage.bucket-name")
+			} else {
+				kindStorage = "container"
+			}
+		}
+
+		volumePrefix := fmt.Sprintf("--VolumePrefix=\\%s\\%s", kindStorage, nameStorage)
+		opts = append(opts, volumePrefix)
 	}
 
 	// Enabling trace is done by using -d rather than setting an option in fuse
