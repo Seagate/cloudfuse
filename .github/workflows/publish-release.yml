@@ -210,7 +210,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       go: '1.22'
-      zig: 0.12.0
+      zig: 0.13.0
 
     steps:
       - # libfuse-dev is required to build our command-line program
