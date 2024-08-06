@@ -78,24 +78,28 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 		downloadRequired = true
 	}
 	//check async map and automatically set downloadRequired false if entry is matched
-	//When cloud is down, local data will always be most up to date compared to cloud, download is not required
+	//When cloud is down, local data will always be most up to date compared to cloud, and download is not required
 	//Async map stores file entries that have been changed when cloud is down
 
-	//case is no record of file in cloud
-	//does not exist locally
-	//this does not matter because isDownloadRequired is called by OpenFile, which means file already exists somewhere
-	fc.fileOps.Range(func(key, value interface{}) bool {
+	fileName := filepath.Base(localPath)
+	_, found := fc.fileOps.Load(fileName)
 
-		keyString := key.(string)
-		fileName := filepath.Base(localPath)
+	if found {
+		inMap = true
+	}
 
-		if fileName == keyString {
+	// fc.fileOps.Range(func(key, value interface{}) bool {
 
-			inMap = true
-		}
+	// 	keyString := key.(string)
+	// 	fileName := filepath.Base(localPath)
 
-		return true
-	})
+	// 	if fileName == keyString {
+
+	// 		inMap = true
+	// 	}
+
+	// 	return true
+	// })
 
 	finfo, err := os.Stat(localPath)
 	if err == nil {

@@ -315,6 +315,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownCase2() {
 	owner := os.Getuid()
 	group := os.Getgid()
 	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	suite.assert.NoError(err)
 	time.Sleep(time.Millisecond)
 
 	// Path should be in the file cache with old group and owner (since we failed the operation)

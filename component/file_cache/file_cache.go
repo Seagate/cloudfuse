@@ -80,7 +80,6 @@ type FileCache struct {
 
 	fileOps     sync.Map //we want fileOps to store the operations to perform on the file if the cloud is down. Key is file name, value is operation to do
 	asyncSignal sync.Mutex
-	//closeSignal chan int
 }
 
 type FileAttributes struct {
@@ -175,7 +174,6 @@ func (c *FileCache) Priority() internal.ComponentPriority {
 //	this shall not block the call otherwise pipeline will not start
 func (c *FileCache) Start(ctx context.Context) error {
 	log.Trace("Starting component : %s", c.Name())
-	//c.closeSignal = make(chan int)
 
 	if c.cleanupOnStart {
 		err := c.TempCacheCleanup()
@@ -215,7 +213,6 @@ func (c *FileCache) Stop() error {
 	if !c.allowNonEmpty {
 		_ = c.TempCacheCleanup()
 	}
-	//c.closeSignal <- 1
 	fileCacheStatsCollector.Destroy()
 
 	return nil
@@ -508,6 +505,7 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	i := 0
 	for i < len(attrs) {
 
+		//Using Load() would be better performance, but the key for rename operations doesn't match attrs listings
 		fc.fileOps.Range(func(key, value interface{}) bool {
 			val := value.(FileAttributes)
 			keyString := key.(string)
@@ -520,25 +518,23 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			}
 
 			if attr.Name == keyString {
+
+				switch val.operation {
 				//remove file listing if there is a deleteFile operation
-				if val.operation == "DeleteFile" {
+				case "DeleteFile":
 					attrs = append(attrs[:i], attrs[i+1:]...)
-				}
 				//Change source file name to dst file name
-				if val.operation == "RenameFile" {
+				case "RenameFile":
 					renameOptions := val.options.(internal.RenameFileOptions)
 					attrs[i].Name = renameOptions.Dst //this just does a rename but we need to make sure file contents are also transferred
-				}
 				//remove directory listing from attrs if there is a deletedir operation
-				if val.operation == "DeleteDir" {
+				case "DeleteDir":
 					attrs = append(attrs[:i], attrs[i+1:]...)
-				}
-				//TODO: Add support for rename directory
-				if val.operation == "RenameDir" {
+				case "RenameDir":
 					renameOptions := val.options.(internal.RenameDirOptions)
 					attrs[i].Name = renameOptions.Dst //this just does a rename but we need to make sure file contents are also transferred
-
 				}
+
 			}
 			return true
 		})
@@ -548,10 +544,6 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	// Get files from local cache
 	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	dirents, _ := os.ReadDir(localPath)
-	// if err != nil {
-	// 	log.Debug("FileCache::StreamDir Unable to read local cache")
-	// 	return attrs, token, err
-	// }
 
 	i = 0  // Index for cloud
 	j := 0 // Index for local cache
@@ -598,6 +590,7 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 					if Infoerr == nil {
 						// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
 						log.Debug("FileCache::StreamDir : serving %s from local cache", entryPath)
+
 						attr := newObjAttr(entryPath, info)
 						attrs = append(attrs, attr)
 						err = nil
@@ -687,6 +680,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	fc.policy.CacheValid(localDstPath)
 
 	go fc.invalidateDirectory(options.Src)
+
 	// TLDR: Dst is guaranteed to be non-existent or empty.
 	// Note: We do not need to invalidate Dst due to the logic in our FUSE connector, see comments there.
 	return nil
@@ -874,6 +868,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 	}
 
 	fileMode := fc.defaultPermission
+
 	if downloadRequired {
 		log.Debug("FileCache::downloadFile : Need to download %s", handle.Path)
 
@@ -1042,7 +1037,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
 	fc.asyncSignal.Unlock()  // Signal to async thread to do work
 
-	// Create the directory locally using itss local path
+	// Create the directory locally using its local path
 	localpath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
 	err := os.MkdirAll(localpath, options.Mode)
 	if err != nil {
@@ -1377,6 +1372,34 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		}
 	} else {
 		exists = true
+	}
+
+	entryShouldBeGone := false
+
+	fc.fileOps.Range(func(key, value interface{}) bool {
+		val := value.(FileAttributes)
+		keyString := key.(string)
+
+		if val.operation == "RenameFile" || val.operation == "RenameDir" { //for rename operations, only grab the src file/dir to compare
+
+			keyString = keyString[:strings.IndexByte(keyString, ',')]
+
+		}
+
+		if options.Name == keyString {
+			//remove file listing if there is a deleteFile operation
+			if val.operation == "DeleteFile" || val.operation == "RenameFile" || val.operation == "DeleteDir" || val.operation == "RenameDir" {
+
+				entryShouldBeGone = true
+				return false
+			}
+		}
+		return true
+	})
+
+	if entryShouldBeGone {
+
+		return nil, syscall.ENOENT
 	}
 
 	// To cover cases 2 and 3, grab the attributes from the local cache

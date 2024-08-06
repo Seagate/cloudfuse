@@ -35,4 +35,3 @@ dist/
 **/Output/
 /gui/build/**
 /build/winfsp-*
-start.sh

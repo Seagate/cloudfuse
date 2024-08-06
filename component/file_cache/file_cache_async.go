@@ -124,10 +124,8 @@ func (fc *FileCache) async_cloud_handler() {
 			})
 		}
 
-		//check channel to end thread here
-		// if <-fc.closeSignal == 1 {
-		// 	return
-		// }
+		//TODO: Implement mechanism to end async thread
+
 	}
 
 }
@@ -297,19 +295,6 @@ func (fc *FileCache) asyncChmodAndFlush(options internal.ChmodOptions) error {
 }
 
 func (fc *FileCache) asyncChown(options internal.ChownOptions) error {
-
-	// flushFilePath := FlushFileAbstraction{}
-	// flushFilePath.Name = options.Name
-
-	// if !fc.createEmptyFile {
-	// 	localPath := common.JoinUnixFilepath(fc.tmpPath, flushFilePath.Name)
-	// 	info, err := os.Stat(localPath)
-
-	// 	if err == nil && info != nil {
-	// 		// We can allow for empty files to be flushed here because this only gets called by flushFile, meaning the user wants to close the file
-	// 		_ = fc.asyncFlushFile(flushFilePath)
-	// 	}
-	// }
 
 	err := fc.NextComponent().Chown(options)
 	err = fc.validateStorageError(options.Name, err, "Chown", false)

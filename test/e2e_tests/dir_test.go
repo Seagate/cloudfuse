@@ -73,8 +73,10 @@ func getDirTestFlag(name string) string {
 
 func initDirFlags() {
 	pathPtr = getDirTestFlag("mnt-path")
+	//pathPtr = "/home/user/mycontainer"
 	adlsPtr = getDirTestFlag("adls")
 	tempPathPtr = getDirTestFlag("tmp-path")
+	//tempPathPtr = "/home/user/e2e-temp"
 	clonePtr = getDirTestFlag("clone")
 	streamDirectPtr = getDirTestFlag("stream-direct-test")
 	enableSymlinkADLS = getDirTestFlag("enable-symlink-adls")
@@ -89,6 +91,7 @@ func getTestDirName(n int) string {
 func (suite *dirTestSuite) dirTestCleanup(toRemove []string) {
 	for _, path := range toRemove {
 		err := os.RemoveAll(path)
+		time.Sleep(time.Second)
 		if err != nil {
 			fmt.Printf("dirTestCleanup : %s failed [%v]\n", path, err)
 		}
@@ -157,10 +160,12 @@ func (suite *dirTestSuite) TestDirCreateSlashChar() {
 func (suite *dirTestSuite) TestDirRename() {
 	dirName := filepath.Join(suite.testPath, "test1")
 	err := os.Mkdir(dirName, 0777)
+	time.Sleep(time.Second)
 	suite.NoError(err)
 
 	newName := filepath.Join(suite.testPath, "test1_new")
 	err = os.Rename(dirName, newName)
+	time.Sleep(time.Second)
 	suite.NoError(err)
 
 	_, err = os.Stat(dirName)
@@ -199,7 +204,7 @@ func (suite *dirTestSuite) TestDirMoveNonEmpty() {
 	suite.NoError(err)
 	f.Close()
 
-	dir3Name := filepath.Join(suite.testPath, "test3NE")
+	dir3Name := filepath.Join(suite.testPath, "test4NE")
 	err = os.Mkdir(dir3Name, 0777)
 	suite.NoError(err)
 
@@ -329,7 +334,7 @@ func (suite *dirTestSuite) TestDirList() {
 	suite.NoError(err)
 	srcFile.Close()
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 	files, err := os.ReadDir(testDir)
 	suite.NoError(err)
 	suite.Len(files, 4)

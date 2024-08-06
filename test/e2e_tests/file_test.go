@@ -73,9 +73,11 @@ func getFileTestFlag(name string) string {
 }
 
 func initFileFlags() {
-	fileTestPathPtr = getFileTestFlag("mnt-path")
+	//fileTestPathPtr = getFileTestFlag("mnt-path")
+	fileTestPathPtr = "/home/user/mycontainer"
 	fileTestAdlsPtr = getFileTestFlag("adls")
-	fileTestTempPathPtr = getFileTestFlag("tmp-path")
+	//fileTestTempPathPtr = getFileTestFlag("tmp-path")
+	fileTestTempPathPtr = "/home/user/e2e-temp"
 	fileTestGitClonePtr = getFileTestFlag("clone")
 	fileTestStreamDirectPtr = getFileTestFlag("stream-direct-test")
 	fileTestDistroName = getFileTestFlag("distro-name")
@@ -92,6 +94,7 @@ func (suite *fileTestSuite) fileTestCleanup(toRemove []string) {
 	for _, path := range toRemove {
 		// don't assert.Nil(err) here, since it's flaky
 		err := os.RemoveAll(path)
+		time.Sleep(time.Second)
 		if err != nil {
 			fmt.Printf("FileTestSuite::fileTestCleanup : Cleanup failed with error %v\n", err)
 		}
@@ -463,6 +466,7 @@ func (suite *fileTestSuite) TestLinkRead() {
 
 	fileName := filepath.Join(suite.testPath, "small_write1.txt")
 	f, err := os.Create(fileName)
+	time.Sleep(5 * time.Second)
 	suite.NoError(err)
 	f.Close()
 
@@ -549,9 +553,11 @@ func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
 	fileName := filepath.Join(suite.testPath, "small_write1.txt")
 	symName := filepath.Join(suite.testPath, "small.lnk")
 	f, err := os.Create(fileName)
+	time.Sleep(time.Second)
 	suite.NoError(err)
 	f.Close()
 	err = os.Symlink(fileName, symName)
+	time.Sleep(time.Second)
 	suite.NoError(err)
 	err = os.WriteFile(fileName, suite.minBuff, 0777)
 	suite.NoError(err)
