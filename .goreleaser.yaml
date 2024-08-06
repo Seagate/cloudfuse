@@ -122,12 +122,11 @@ checksum:
   algorithm: sha256
 
 archives:
-  - id: linux-amd64_gui
+  - id: linux-amd64
     builds:
       - linux-amd64
       - linux-amd64-health-monitor
     format: tar.gz
-    name_template: "{{ .ProjectName }}_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md
@@ -147,12 +146,12 @@ archives:
       - src: "sampleStreamingConfigAzure.yaml"
         dst: "./samples/sampleStreamingConfigAzure.yaml"
 
-  - id: linux-amd64
+  - id: linux-amd64_no_gui
     builds:
       - linux-amd64
       - linux-amd64-health-monitor
     format: tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md
@@ -170,12 +169,12 @@ archives:
       - src: "sampleStreamingConfigAzure.yaml"
         dst: "./samples/sampleStreamingConfigAzure.yaml"
 
-  - id: linux-arm64
+  - id: linux-arm64_no_gui
     builds:
       - linux-arm64
       - linux-arm64-health-monitor
     format: tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md
@@ -193,13 +192,12 @@ archives:
       - src: "sampleStreamingConfigAzure.yaml"
         dst: "./samples/sampleStreamingConfigAzure.yaml"
 
-  - id: windows_gui
+  - id: windows
     builds:
       - windows
       - windows-startup
       - windows-health-monitor
     format: zip
-    name_template: "{{ .ProjectName }}_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md
@@ -219,12 +217,12 @@ archives:
       - src: "sampleStreamingConfigAzure.yaml"
         dst: "./samples/sampleStreamingConfigAzure.yaml"
 
-  - id: windows
+  - id: windows_no_gui
     builds:
       - windows
       - windows-health-monitor
     format: zip
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md
@@ -244,11 +242,11 @@ archives:
 
 release:
   extra_files: 
-    - glob: ./build/Output/cloudfuse_gui_{{.Version}}_windows_amd64.exe
     - glob: ./build/Output/cloudfuse_{{.Version}}_windows_amd64.exe
+    - glob: ./build/Output/cloudfuse_no_gui_{{.Version}}_windows_amd64.exe
 
 nfpms:
-  - id: linux_gui
+  - id: linux
 
     # Name of the package.
     package_name: cloudfuse
@@ -257,7 +255,6 @@ nfpms:
     # Defaults empty, which means no filtering.
     builds:
       - linux-amd64
-    file_name_template: "{{ .ProjectName }}_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
     vendor: Seagate Technology
     homepage: https://github.com/Seagate/cloudfuse
@@ -314,7 +311,7 @@ nfpms:
         dependencies:
           - fuse-devel
 
-  - id: linux
+  - id: linux_no_gui
 
     # Name of the package.
     package_name: cloudfuse
@@ -324,7 +321,7 @@ nfpms:
     builds:
       - linux-amd64
       - linux-arm64
-    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    file_name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
     vendor: Seagate Technology
     homepage: https://github.com/Seagate/cloudfuse
