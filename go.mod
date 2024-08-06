@@ -11,8 +11,8 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.30.3
 	github.com/aws/aws-sdk-go-v2/config v1.27.27
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.27
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.9
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.58.2
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.10
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.58.3
 	github.com/aws/smithy-go v1.20.3
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-ole/go-ole v1.3.0
@@ -30,7 +30,7 @@ require (
 	github.com/vibhansa-msft/tlru v0.0.0-20240410102558-9e708419e21f
 	github.com/winfsp/cgofuse v1.5.0
 	go.uber.org/atomic v1.11.0
-	golang.org/x/sys v0.22.0
+	golang.org/x/sys v0.23.0
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 )
