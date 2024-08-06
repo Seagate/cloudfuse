@@ -23,6 +23,8 @@ Cloudfuse supports clouds with an S3 or Azure interface.
 
 ## Installation
 
+Cloudfuse includes two types of installers. The default "cloudfuse" and the "cloudfuse_no_gui" option. The "no_gui" option includes only the cloudfuse CLI tool and will not install the GUI and on Windows it will additionally not install the startup tool which automatically restarts existing mounts on reboot. The "no_gui" installer is significantly smaller and suitable for those who only want the CLI tool. Most users should pick the default "cloudfuse" installer.
+
 ### Windows
 
 Download and run the .exe installer from our latest release [here](https://github.com/Seagate/cloudfuse/releases). Uncheck the "Launch Cloudfuse" upon finishing the installation. Run the GUI separately as admin after the install completes.
