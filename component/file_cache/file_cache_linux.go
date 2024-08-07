@@ -31,6 +31,7 @@ import (
 	"io/fs"
 	"math"
 	"os"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -66,6 +67,7 @@ func newObjAttr(path string, info fs.FileInfo) *internal.ObjAttr {
 // isDownloadRequired: Whether or not the file needs to be downloaded to local cache.
 func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock *common.LockMapItem) (bool, bool, *internal.ObjAttr, error) {
 	fileExists := false
+	inMap := false
 	downloadRequired := false
 	lmt := time.Time{}
 	var stat *syscall.Stat_t = nil
@@ -75,6 +77,29 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 		log.Debug("FileCache::isDownloadRequired : %s not present in local cache policy", localPath)
 		downloadRequired = true
 	}
+	//check async map and automatically set downloadRequired false if entry is matched
+	//When cloud is down, local data will always be most up to date compared to cloud, and download is not required
+	//Async map stores file entries that have been changed when cloud is down
+
+	fileName := filepath.Base(localPath)
+	_, found := fc.fileOps.Load(fileName)
+
+	if found {
+		inMap = true
+	}
+
+	// fc.fileOps.Range(func(key, value interface{}) bool {
+
+	// 	keyString := key.(string)
+	// 	fileName := filepath.Base(localPath)
+
+	// 	if fileName == keyString {
+
+	// 		inMap = true
+	// 	}
+
+	// 	return true
+	// })
 
 	finfo, err := os.Stat(localPath)
 	if err == nil {
@@ -120,6 +145,7 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 		attr, err = fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: blobPath})
 		if err != nil {
 			log.Err("FileCache::isDownloadRequired : Failed to get attr of %s [%s]", blobPath, err.Error())
+			//TODO:handle ENOENT error
 		}
 	}
 
@@ -139,6 +165,11 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 		} else {
 			log.Info("FileCache::isDownloadRequired : File in container is not latest, skip redownload %s [A-%v : L-%v]", blobPath, attr.Mtime, lmt)
 		}
+	}
+
+	if inMap {
+		downloadRequired = false
+		return downloadRequired, fileExists, attr, err
 	}
 
 	return downloadRequired, fileExists, attr, err

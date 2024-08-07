@@ -280,6 +280,10 @@ func (s3 *S3Storage) RenameDir(options internal.RenameDirOptions) error {
 func (s3 *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	log.Trace("S3Storage::CreateFile : %s", options.Name)
 
+	err := s3.storage.CreateFile(options.Name, options.Mode)
+	if err != nil {
+		return nil, err
+	}
 	// Create a handle object for the file being created
 	// This handle will be added to handlemap by the first component in pipeline
 	handle := handlemap.NewHandle(options.Name)
@@ -287,13 +291,7 @@ func (s3 *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		log.Err("S3Storage::CreateFile : Failed to create handle for %s", options.Name)
 		return nil, syscall.EFAULT
 	}
-
-	err := s3.storage.CreateFile(options.Name, options.Mode)
-	if err != nil {
-		return nil, err
-	}
 	handle.Mtime = time.Now()
-
 	s3StatsCollector.PushEvents(createFile, options.Name, map[string]interface{}{mode: options.Mode.String()})
 
 	// increment open file handles count

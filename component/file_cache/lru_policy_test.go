@@ -30,6 +30,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -63,6 +64,7 @@ func (suite *lruPolicyTestSuite) SetupTest() {
 		highThreshold: defaultMaxThreshold,
 		lowThreshold:  defaultMinThreshold,
 		fileLocks:     &common.LockMap{},
+		fileOps:       &sync.Map{},
 	}
 
 	suite.setupTestHelper(config)
@@ -192,7 +194,8 @@ func (suite *lruPolicyTestSuite) TestCacheInvalidate() {
 	f, _ := os.Create(cache_path + "/temp")
 	f.Close()
 	suite.policy.CacheValid("temp")
-	suite.policy.CacheInvalidate("temp") // this is equivalent to purge since timeout=0
+	time.Sleep(time.Second)
+	suite.policy.CacheInvalidate("temp")
 
 	n, ok := suite.policy.nodeMap.Load("temp")
 	suite.assert.False(ok)
@@ -286,6 +289,7 @@ func (suite *lruPolicyTestSuite) TestTimeout() {
 		highThreshold: defaultMaxThreshold,
 		lowThreshold:  defaultMinThreshold,
 		fileLocks:     &common.LockMap{},
+		fileOps:       &sync.Map{},
 	}
 
 	suite.setupTestHelper(config)
@@ -309,6 +313,7 @@ func (suite *lruPolicyTestSuite) TestMaxEvictionDefault() {
 		highThreshold: defaultMaxThreshold,
 		lowThreshold:  defaultMinThreshold,
 		fileLocks:     &common.LockMap{},
+		fileOps:       &sync.Map{},
 	}
 
 	suite.setupTestHelper(config)
@@ -336,6 +341,7 @@ func (suite *lruPolicyTestSuite) TestMaxEviction() {
 		highThreshold: defaultMaxThreshold,
 		lowThreshold:  defaultMinThreshold,
 		fileLocks:     &common.LockMap{},
+		fileOps:       &sync.Map{},
 	}
 
 	suite.setupTestHelper(config)

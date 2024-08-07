@@ -72,6 +72,7 @@ func (l *lfuPolicy) UpdateConfig(config cachePolicyConfig) error {
 	l.list.cacheTimeout = config.cacheTimeout
 
 	l.policyTrace = config.policyTrace
+	l.fileOps = config.fileOps
 	return nil
 }
 

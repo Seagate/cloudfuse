@@ -27,6 +27,7 @@ package attr_cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -40,6 +41,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 )
 
 // By default attr cache is valid for 120 seconds
@@ -319,6 +321,7 @@ func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
 func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("AttrCache::CreateDir : %s", options.Name)
 	err := ac.NextComponent().CreateDir(options)
+
 	if err == nil || err == syscall.EEXIST {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
@@ -341,6 +344,11 @@ func (ac *AttrCache) CreateDir(options internal.CreateDirOptions) error {
 			exists:   true,
 			cachedAt: time.Now(),
 		})
+		if newDirAttrCacheItem != nil {
+
+			log.Debug("Directory got added to the ac")
+			log.Debug("The directory name that got added is %s", newDirAttrCacheItem.attr.Name)
+		}
 		// update flags for tracking directory existence
 		if ac.cacheDirs {
 			newDirAttrCacheItem.markInCloud(false)
@@ -357,6 +365,7 @@ func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 	err := ac.NextComponent().DeleteDir(options)
 
 	if err == nil {
+
 		// deleteDirectory may add the parent directory to the cache
 		// so we must lock the cache for writing
 		ac.cacheLock.Lock()
@@ -413,7 +422,6 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 				ac.markAncestorsInCloud(options.Name, time.Now())
 				ac.cacheLock.Unlock()
 			}
-			// merge missing directory cache into the last page of results
 			if ac.cacheDirs && nextToken == "" {
 				var numAdded int // prevent shadowing pathList in following line
 				pathList, numAdded = ac.addDirsNotInCloudToListing(options.Name, pathList)
@@ -422,10 +430,19 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			}
 		}
 	}
-	// add cached items in
-	if len(cachedPathList) > 0 {
-		log.Info("AttrCache::StreamDir : %s merging in %d list cache entries...", options.Name, len(cachedPathList))
-		pathList = append(pathList, cachedPathList...)
+	// if cloud is down, use existing cache entries to populate the listing
+	var maxAttempts *retry.MaxAttemptsError
+	cloudIsDown := errors.As(err, &maxAttempts)
+	if err != nil && cloudIsDown {
+		dir, found := ac.cache.get(options.Name)
+		if found {
+			for _, value := range dir.children {
+				if value.valid() && value.exists() {
+					pathList = append(pathList, value.attr)
+				}
+			}
+		}
+		log.Warn("AttrCache::StreamDir : %s cloud unresponsive - serving %d cached entries...", options.Name, len(pathList))
 	}
 	// values should be returned in ascending order by key, without duplicates
 	// sort
@@ -461,6 +478,7 @@ func (ac *AttrCache) fetchCachedDirList(path string, token string) ([]*internal.
 	}
 	// is the requested data cached?
 	if listDirCache.listCache == nil {
+		log.Debug("The requested data is not cached and the name is %s", listDirCache.attr.Name)
 		listDirCache.listCache = make(map[string]listCacheSegment)
 	}
 	cachedListSegment, found := listDirCache.listCache[token]
@@ -689,6 +707,13 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("AttrCache::DeleteFile : %s", options.Name)
 
 	err := ac.NextComponent().DeleteFile(options)
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
+
+	if cloudisDown {
+		return errors.New("Failed cloud connection")
+	}
+
 	if err == nil {
 		deletionTime := time.Now()
 		ac.cacheLock.Lock()
@@ -963,9 +988,11 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	// Get the attributes from next component and cache them
 	pathAttr, err := ac.NextComponent().GetAttr(options)
-
+	//check cloud call here
 	ac.cacheLock.Lock()
 	defer ac.cacheLock.Unlock()
+	var maxAttempts *retry.MaxAttemptsError
+	cloudisDown := errors.As(err, &maxAttempts)
 
 	if err == nil {
 		// Retrieved attributes so cache them
@@ -984,7 +1011,20 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			exists:   false,
 			cachedAt: time.Now(),
 		})
+	} else if found && cloudisDown && value.valid() { //check if err is cloud down, entry is valid, and found, repeat if block above
+		if !value.exists() {
+			log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
+			return nil, syscall.ENOENT
+		}
+		// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
+		// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
+		// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
+		if value.attr.IsMetadataRetrieved() || (!ac.enableSymlinks && !options.RetrieveMetadata) {
+			// path exists and we have all the metadata required or we do not care about metadata
+			return value.attr, nil
+		}
 	}
+	//check if err is cloud down, entry is valid, and found, repeat if block above
 	return pathAttr, err
 }
 
@@ -993,7 +1033,6 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 	log.Trace("AttrCache::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
 
 	err := ac.NextComponent().CreateLink(options)
-
 	if err == nil {
 		currentTime := time.Now()
 		ac.cacheLock.Lock()
@@ -1033,7 +1072,6 @@ func (ac *AttrCache) Chmod(options internal.ChmodOptions) error {
 	log.Trace("AttrCache::Chmod : Change mode of file/directory %s", options.Name)
 
 	err := ac.NextComponent().Chmod(options)
-
 	if err == nil {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
