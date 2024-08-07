@@ -91,10 +91,11 @@ func getTestDirName(n int) string {
 func (suite *dirTestSuite) dirTestCleanup(toRemove []string) {
 	for _, path := range toRemove {
 		err := os.RemoveAll(path)
-		time.Sleep(time.Second)
+
 		if err != nil {
 			fmt.Printf("dirTestCleanup : %s failed [%v]\n", path, err)
 		}
+
 	}
 }
 
@@ -318,23 +319,25 @@ func (suite *dirTestSuite) TestDirGetStats() {
 func (suite *dirTestSuite) TestDirList() {
 	testDir := filepath.Join(suite.testPath, "bigTestDir")
 	err := os.Mkdir(testDir, 0777)
+	time.Sleep(time.Second)
 	suite.NoError(err)
 
 	dir := filepath.Join(testDir, "Dir1")
 	err = os.Mkdir(dir, 0777)
+	time.Sleep(time.Second)
 	suite.NoError(err)
 	dir = filepath.Join(testDir, "Dir2")
 	err = os.Mkdir(dir, 0777)
+	time.Sleep(time.Second)
 	suite.NoError(err)
 	dir = filepath.Join(testDir, "Dir3")
 	err = os.Mkdir(dir, 0777)
 	suite.NoError(err)
-
+	time.Sleep(time.Second)
 	srcFile, err := os.OpenFile(filepath.Join(testDir, "abc.txt"), os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
-
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 	files, err := os.ReadDir(testDir)
 	suite.NoError(err)
 	suite.Len(files, 4)

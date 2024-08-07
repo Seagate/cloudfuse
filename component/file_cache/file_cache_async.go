@@ -153,8 +153,6 @@ func (fc *FileCache) asyncFlushFile(options FlushFileAbstraction) error {
 		return err
 	}
 
-	//use miss list to update mode, take it out of flush file
-
 	return nil
 }
 
@@ -198,13 +196,6 @@ func (fc *FileCache) asyncRenameFile(options internal.RenameFileOptions) error {
 		return nil
 
 	}
-	// err = fc.NextComponent().RenameFile(options)
-	// err = fc.validateStorageError(options.Src, err, "RenameFile", false)
-	// if err != nil {
-	// 	log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
-	// 	return err
-	// }
-	// return nil
 }
 
 func (fc *FileCache) asyncDeleteDir(options internal.DeleteDirOptions) error {

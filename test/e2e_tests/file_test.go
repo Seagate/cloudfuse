@@ -323,7 +323,7 @@ func (suite *fileTestSuite) TestFileTruncate() {
 
 // # Create file matching directory name
 func (suite *fileTestSuite) TestFileNameConflict() {
-	dirName := filepath.Join(suite.testPath, "test")
+	dirName := filepath.Join(suite.testPath, "test90") // changed this file name
 	fileName := filepath.Join(suite.testPath, "test.txt")
 
 	err := os.Mkdir(dirName, 0777)
@@ -464,13 +464,13 @@ func (suite *fileTestSuite) TestLinkRead() {
 		return
 	}
 
-	fileName := filepath.Join(suite.testPath, "small_write1.txt")
+	fileName := filepath.Join(suite.testPath, "small_write2.txt")
 	f, err := os.Create(fileName)
 	time.Sleep(5 * time.Second)
 	suite.NoError(err)
 	f.Close()
 
-	symName := filepath.Join(suite.testPath, "small.lnk")
+	symName := filepath.Join(suite.testPath, "small1.lnk")
 	err = os.Symlink(fileName, symName)
 	suite.NoError(err)
 
@@ -492,11 +492,11 @@ func (suite *fileTestSuite) TestLinkWrite() {
 		return
 	}
 
-	targetName := filepath.Join(suite.testPath, "small_write1.txt")
+	targetName := filepath.Join(suite.testPath, "small_write3.txt")
 	f, err := os.Create(targetName)
 	suite.NoError(err)
 	f.Close()
-	symName := filepath.Join(suite.testPath, "small.lnk")
+	symName := filepath.Join(suite.testPath, "small3.lnk")
 	err = os.Symlink(targetName, symName)
 	suite.NoError(err)
 
@@ -517,8 +517,8 @@ func (suite *fileTestSuite) TestLinkRenameTarget() {
 		return
 	}
 
-	fileName := filepath.Join(suite.testPath, "small_write1.txt")
-	symName := filepath.Join(suite.testPath, "small.lnk")
+	fileName := filepath.Join(suite.testPath, "small_write4.txt")
+	symName := filepath.Join(suite.testPath, "small4.lnk")
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
@@ -550,8 +550,8 @@ func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
 		return
 	}
 
-	fileName := filepath.Join(suite.testPath, "small_write1.txt")
-	symName := filepath.Join(suite.testPath, "small.lnk")
+	fileName := filepath.Join(suite.testPath, "small_write5.txt")
+	symName := filepath.Join(suite.testPath, "small5.lnk")
 	f, err := os.Create(fileName)
 	time.Sleep(time.Second)
 	suite.NoError(err)
@@ -568,7 +568,7 @@ func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
 	data, err := os.ReadFile(fileName)
 	suite.NoError(err)
 	suite.Equal(len(data), len(suite.minBuff))
-
+	symName = filepath.Join(suite.testPath, "small50.lnk")
 	err = os.Symlink(fileName, symName)
 	suite.NoError(err)
 	suite.fileTestCleanup([]string{fileName})
@@ -688,9 +688,9 @@ func (suite *fileTestSuite) TestRenameSpecial() {
 
 	err = os.Rename(dirName, newDirName)
 	suite.NoError(err)
-
-	err = os.RemoveAll(newDirName)
-	suite.NoError(err)
+	suite.fileTestCleanup([]string{newDirName})
+	// err = os.RemoveAll(newDirName)
+	// suite.NoError(err)
 }
 
 // -------------- Main Method -------------------

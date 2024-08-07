@@ -465,15 +465,9 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	newAttr := FileAttributes{}
 	newAttr.operation = "DeleteDir"
 	newAttr.options = options
-	_, loaded := fc.fileOps.LoadOrStore(options.Name, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
-
-	if loaded { //If there is already a value for the given key, we must overwrite it
-
-		fc.fileOps.Delete(options.Name)         //Remove old value for key
-		fc.fileOps.Store(options.Name, newAttr) //Replace with new one
-	}
-	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
-	fc.asyncSignal.Unlock()  // Signal to async thread to do work
+	fc.fileOps.Store(options.Name, newAttr) //Replace with new one
+	fc.asyncSignal.TryLock()                // Make sure we don't unlock a mutex that is not locked
+	fc.asyncSignal.Unlock()                 // Signal to async thread to do work
 	//Ok because this is invalidating locally
 	go fc.invalidateDirectory(options.Name)
 	return nil
@@ -812,14 +806,7 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	nextAttr := FileAttributes{}
 	nextAttr.operation = "DeleteFile"
 	nextAttr.options = options
-
-	_, loaded := fc.fileOps.LoadOrStore(options.Name, nextAttr)
-
-	if loaded {
-
-		fc.fileOps.Delete(options.Name)
-		fc.fileOps.Store(options.Name, nextAttr)
-	}
+	fc.fileOps.Store(options.Name, nextAttr)
 	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
 	fc.asyncSignal.Unlock()  // Signal to async thread to do work
 
