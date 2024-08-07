@@ -1,5 +1,14 @@
 # Cloudfuse Changelog #
 
+## **1.4.0** ##
+
+August 7th 2024
+This version is based on [blobfuse2 2.3.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.0) (upstream).
+
+### Changes ###
+
+- [#297](https://github.com/Seagate/cloudfuse/pull/297) Add installation without GUI front-end
+
 ## **1.3.2** ##
 
 July 23th 2024
