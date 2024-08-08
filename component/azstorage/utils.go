@@ -42,6 +42,7 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
+	"github.com/awnumar/memguard"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
@@ -541,16 +542,17 @@ func split(prefixPath string, path string) string {
 	return common.JoinUnixFilepath(paths...)
 }
 
-func sanitizeSASKey(key string) string {
+func sanitizeSASKey(key string) *memguard.Enclave {
+	encryptedKey := memguard.NewEnclave([]byte(key))
 	if key == "" {
-		return key
+		return encryptedKey
 	}
 
 	if key[0] != '?' {
-		return ("?" + key)
+		return memguard.NewEnclave([]byte("?" + key))
 	}
 
-	return key
+	return memguard.NewEnclave([]byte(key))
 }
 
 func getMD5(fi *os.File) ([]byte, error) {
