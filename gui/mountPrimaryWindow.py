@@ -39,7 +39,7 @@ from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
 from aboutPage import aboutPage
 from under_Construction import underConstruction
-from common_qt_functions import widgetCustomFunctions as widgetFuncs
+from common_qt_functions import widgetCustomFunctions as widgetFuncs, defaultSettingsManager as settingsManager
 
 bucketOptions = ['s3storage', 'azstorage']
 mountTargetComponent = 3
@@ -60,11 +60,10 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("Cloud FUSE")
-        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "primaryWindow")
         self.initMountPoint()
         self.checkConfigDirectory()
         self.textEdit_output.setReadOnly(True)
-
+        self.settings = settingsManager()
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
@@ -125,11 +124,11 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def showSettingsWidget(self):
         targetIndex = self.dropDown_bucketSelect.currentIndex()
         if bucketOptions[targetIndex] == 's3storage':
-            self.settings = s3SettingsWidget()
+            self.setConfigs = s3SettingsWidget(self.settings.allMountSettings)
         else:
-            self.settings = azureSettingsWidget()
-        self.settings.setWindowModality(Qt.ApplicationModal)
-        self.settings.show()
+            self.setConfigs = azureSettingsWidget(self.settings.allMountSettings)
+        self.setConfigs.setWindowModality(Qt.ApplicationModal)
+        self.setConfigs.show()
 
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())

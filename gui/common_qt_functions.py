@@ -37,18 +37,18 @@ libfusePermissions = [0o777,0o666,0o644,0o444]
 class defaultSettingsManager():
     def __init__(self):
         super().__init__()
-        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "settings")
-        self.setAllDefaultSettings()
+        self.allMountSettings = {}
+        self.setAllDefaultSettings(self.allMountSettings)
 
+    def setAllDefaultSettings(self, allMountSettings):
+        self.setS3Settings(allMountSettings)
+        self.setAzureSettings(allMountSettings)
+        self.setComponentSettings(allMountSettings)
 
-    def setAllDefaultSettings(self):
-        self.setS3Settings()
-        self.setAzureSettings()
-        self.setComponentSettings()
-
-    def setS3Settings(self):
+    def setS3Settings(self, allMountSettings):
         # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
-        self.settings.setValue('s3storage',{
+        
+        allMountSettings['s3storage'] = {
             'bucket-name': '',
             'key-id': '',
             'secret-key': '',
@@ -64,12 +64,12 @@ class defaultSettingsManager():
             'disable-concurrent-download': False,
             'enable-checksum': False,
             'checksum-algorithm': 'SHA1',
-            'usePathStyle': False,
-        })
+            'usePathStyle': False
+            }
 
-    def setAzureSettings(self):
+    def setAzureSettings(self,allMountSettings):
         # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
-        self.settings.setValue('azstorage',{
+        allMountSettings['azstorage'] = {
             'type': 'block',
             'account-name': '',
             'container': '',
@@ -108,26 +108,25 @@ class defaultSettingsManager():
             'max-results-for-list': 2,
             'telemetry': '',
             'honour-acl': False
-        })
+            }
 
-    def setComponentSettings(self):
+    def setComponentSettings(self, allMountSettings):
         # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
 
-        self.settings.setValue('foreground',False)
-
+        allMountSettings['foreground'] = False
         # Common
-        self.settings.setValue('allow-other',False)
-        self.settings.setValue('read-only',False)
-        self.settings.setValue('nonempty',False)
-        self.settings.setValue('restricted-characters-windows',False) # not exposed
+        allMountSettings['allow-other'] = False
+        allMountSettings['read-only'] = False
+        allMountSettings['nonempty'] = False
+        allMountSettings['restricted-characters-windows'] = False
         # Profiler
-        self.settings.setValue('dynamic-profile',False)
-        self.settings.setValue('profiler-port',6060)
-        self.settings.setValue('profiler-ip','localhost')
+        allMountSettings['dynamic-profile'] = False
+        allMountSettings['profiler-port'] = 6060
+        allMountSettings['profiler-ip'] = 'localhost'
         # Pipeline components
-        self.settings.setValue('components',['libfuse','file_cache','attr_cache','s3storage'])
+        allMountSettings['components'] = ['libfuse','file_cache','attr_cache','s3storage']
         # Sub-sections
-        self.settings.setValue('libfuse',{
+        allMountSettings['libfuse'] = {
             'default-permission' : 0o777,
             'attribute-expiration-sec': 120,
             'entry-expiration-sec' : 120,
@@ -139,15 +138,17 @@ class defaultSettingsManager():
             'max-fuse-threads': 128,
             'direct-io': False, # not exposed
             'network-share': False
-        })
-        self.settings.setValue('stream',{
+            }
+
+        allMountSettings['stream'] = {
             'block-size-mb': 0,
             'max-buffers': 0,
             'buffer-size-mb': 0,
             'file-caching': False # false = handle level caching ON
-        })
+            }
+        
         # the block cache component and its settings are not exposed in the GUI
-        self.settings.setValue('block_cache',{
+        allMountSettings['block_cache'] = {
             'block-size-mb': 16,
             'mem-size-mb': 4192,
             'path': '',
@@ -155,9 +156,10 @@ class defaultSettingsManager():
             'disk-timeout-sec': 120,
             'prefetch': 11,
             'parallelism': 128,
-            'prefetch-on-open': False,
-        })
-        self.settings.setValue('file_cache',{
+            'prefetch-on-open': False
+            }
+
+        allMountSettings['file_cache'] = {
             'path': '',
             'policy': 'lru',
             'timeout-sec' : 64000000,
@@ -174,39 +176,43 @@ class defaultSettingsManager():
             'refresh-sec': 60,
             'ignore-sync': True,
             'hard-limit': False # not exposed
-        })
-        self.settings.setValue('attr_cache',{
+            }
+
+        allMountSettings['attr_cache'] = {
             'timeout-sec': 120,
             'no-cache-on-list': False,
             'enable-symlinks': False,
             # the following attr_cache settings are not exposed in the GUI
             'max-files': 5000000,
             'no-cache-dirs': False
-        })
-        self.settings.setValue('loopbackfs',{
+            }
+        
+        allMountSettings['loopbackfs'] = {
             'path': ''
-        })
+            }
 
-        self.settings.setValue('mountall',{
+        allMountSettings['mountall'] = {
             'container-allowlist': [],
             'container-denylist': []
-        })
-        self.settings.setValue('health_monitor',{
+            }
+        
+        allMountSettings['health_monitor'] = {
             'enable-monitoring': False,
             'stats-poll-interval-sec': 10,
             'process-monitor-interval-sec': 30,
             'output-path':'',
             'monitor-disable-list': []
-        })
-        self.settings.setValue('logging',{
+            }
+        
+        allMountSettings['logging'] = {
             'type' : 'syslog',
             'level' : 'log_err',
             'file-path' : '$HOME/.cloudfuse/cloudfuse.log',
             'max-file-size-mb' : 512,
             'file-count' : 10 ,
             'track-time' : False
-            })
-
+            }
+        
 class widgetCustomFunctions(QWidget):
     def __init__(self):
         super().__init__()
@@ -333,18 +339,18 @@ class widgetCustomFunctions(QWidget):
         dictForConfigs = self.getConfigs()
         for option in dictForConfigs:
             # check default settings to enforce YAML schema
-            invalidOption = not self.settings.contains(option)
-            invalidType = type(self.settings.value(option)) != type(dictForConfigs[option])
+            invalidOption = not (option in self.settings)
+            invalidType = type(self.settings.get(option, None)) != type(dictForConfigs[option])
             if invalidOption or invalidType:
                 print(f"WARNING: Ignoring invalid config option: {option} (type mismatch)")
                 continue
             if type(dictForConfigs[option]) == dict:
-                tempDict = self.settings.value(option)
+                tempDict = self.settings[option]
                 for suboption in dictForConfigs[option]:
                     tempDict[suboption] = dictForConfigs[option][suboption]
-                self.settings.setValue(option,tempDict)
+                self.settings[option]=tempDict
             else:
-                self.settings.setValue(option,dictForConfigs[option])
+                self.settings[option] = dictForConfigs[option]
 
     # Check for a true/false setting and set the checkbox state as appropriate.
     #   Note, Checked/UnChecked are NOT True/False data types, hence the need to check what the values are.
