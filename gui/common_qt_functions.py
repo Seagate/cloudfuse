@@ -259,13 +259,6 @@ class widgetCustomFunctions(QWidget):
             else:
                 event.ignore()
 
-    def constructDictForConfig(self):
-        optionKeys = self.settings.allKeys()
-        configDict = {}
-        for key in optionKeys:
-            configDict[key] = self.settings.value(key)
-        return configDict
-
     def updateSettingsFromUIChoices(self):
         # Each individual widget will need to override this function
         pass
@@ -282,7 +275,7 @@ class widgetCustomFunctions(QWidget):
 
     def writeConfigFile(self):
         self.updateSettingsFromUIChoices()
-        dictForConfigs = self.constructDictForConfig()
+        dictForConfigs = self.settings
         workingDir = self.getWorkingDir()
         try:
             with open(workingDir+'/config.yaml','w') as file:
@@ -363,53 +356,53 @@ class widgetCustomFunctions(QWidget):
             checkbox.setCheckState(Qt.Unchecked)
 
     def updateMultiUser(self):
-        self.settings.setValue('allow-other',self.checkBox_multiUser.isChecked())
+        self.settings['allow-other'] = self.checkBox_multiUser.isChecked()
 
     def updateNonEmtpyDir(self):
-        self.settings.setValue('nonempty',self.checkBox_nonEmptyDir.isChecked())
+        self.settings['nonempty'] = self.checkBox_nonEmptyDir.isChecked()
 
     def updateDaemonForeground(self):
-        self.settings.setValue('foreground',self.checkBox_daemonForeground.isChecked())
+        self.settings['foreground'] = self.checkBox_daemonForeground.isChecked()
 
     def updateReadOnly(self):
-        self.settings.setValue('read-only',self.checkBox_readOnly.isChecked())
+        self.settings['read-only'] = self.checkBox_readOnly.isChecked()
 
     # Update Libfuse re-writes everything in the Libfuse because of how setting.setValue works -
     #   it will not append, so the code makes a copy of the dictionary and updates the sub-keys.
     #   When the user updates the sub-option through the GUI, it will trigger Libfuse to update;
     #   it's written this way to save on lines of code.
     def updateLibfuse(self):
-        libfuse = self.settings.value('libfuse')
+        libfuse = self.settings['libfuse']
         libfuse['default-permission'] = libfusePermissions[self.dropDown_libfuse_permissions.currentIndex()]
         libfuse['ignore-open-flags'] = self.checkBox_libfuse_ignoreAppend.isChecked()
         libfuse['attribute-expiration-sec'] = self.spinBox_libfuse_attExp.value()
         libfuse['entry-expiration-sec'] = self.spinBox_libfuse_entExp.value()
         libfuse['negative-entry-expiration-sec'] = self.spinBox_libfuse_negEntryExp.value()
-        self.settings.setValue('libfuse',libfuse)
+        self.settings['libfuse'] = libfuse
 
     def updateOptionalLibfuse(self):
-        libfuse = self.settings.value('libfuse')
+        libfuse = self.settings['libfuse']
         libfuse['disable-writeback-cache'] = self.checkBox_libfuse_disableWriteback.isChecked()
         libfuse['network-share'] = self.checkBox_libfuse_networkshare.isChecked()
         libfuse['max-fuse-threads'] = self.spinBox_libfuse_maxFuseThreads.value()
-        self.settings.setValue('libfuse',libfuse)
+        self.settings['libfuse'] = libfuse
 
     # Update stream re-writes everything in the stream dictionary for the same reason update libfuse does.
     def updateStream(self):
-        stream = self.settings.value('stream')
+        stream = self.settings['stream']
         stream['file-caching'] = self.checkBox_streaming_fileCachingLevel.isChecked()
         stream['block-size-mb'] = self.spinBox_streaming_blockSize.value()
         stream['buffer-size-mb'] = self.spinBox_streaming_buffSize.value()
         stream['max-buffers'] = self.spinBox_streaming_maxBuff.value()
-        self.settings.setValue('stream',stream)
+        self.settings['stream'] = stream
 
     def updateFileCachePath(self):
-        filePath = self.settings.value('file_cache')
+        filePath = self.settings['file_cache']
         filePath['path'] = self.lineEdit_fileCache_path.text()
-        self.settings.setValue('file_cache',filePath)
+        self.settings['file_cache'] = filePath
 
     def updateOptionalFileCache(self):
-        fileCache = self.settings.value('file_cache')
+        fileCache = self.settings['file_cache']
         fileCache['allow-non-empty-temp'] = self.checkBox_fileCache_allowNonEmptyTmp.isChecked()
         fileCache['policy-trace'] = self.checkBox_fileCache_policyLogs.isChecked()
         fileCache['create-empty-file'] = self.checkBox_fileCache_createEmptyFile.isChecked()
@@ -425,4 +418,4 @@ class widgetCustomFunctions(QWidget):
         fileCache['refresh-sec'] = self.spinBox_fileCache_refreshSec.value()
 
         fileCache['policy'] = file_cache_eviction_choices[self.dropDown_fileCache_evictionPolicy.currentIndex()]
-        self.settings.setValue('file_cache',fileCache)
+        self.settings['file_cache'] = fileCache

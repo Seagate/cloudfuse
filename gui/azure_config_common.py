@@ -194,8 +194,8 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         # Reset these defaults
         checkChoice = self.popupDoubleCheckReset()
         if checkChoice == QtWidgets.QMessageBox.Yes:
-            self.setAzureSettings()
-            self.setComponentSettings()
+            defaultSettingsManager.setAzureSettings(self, self.settings)
+            defaultSettingsManager.setComponentSettings(self, self.settings)
             self.populateOptions()
     
     def updateSettingsFromUIChoices(self):

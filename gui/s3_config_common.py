@@ -27,7 +27,7 @@ from PySide6 import QtWidgets, QtGui
 # import the custom class made from QtDesigner
 from ui_s3_config_common import Ui_Form
 from s3_config_advanced import s3AdvancedSettingsWidget
-from common_qt_functions import widgetCustomFunctions
+from common_qt_functions import widgetCustomFunctions, defaultSettingsManager
 
 pipelineChoices = ['file_cache','stream','block_cache']
 libfusePermissions = [0o777,0o666,0o644,0o444]
@@ -106,13 +106,13 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
 
         # Update S3Storage re-writes everything in the S3Storage dictionary for the same reason update libfuse does.
     def updateS3Storage(self):
-        s3Storage = self.settings.value('s3storage')
+        s3Storage = self.settings['s3storage']
         s3Storage['bucket-name'] = self.lineEdit_bucketName.text()
         s3Storage['key-id'] = self.lineEdit_accessKey.text()
         s3Storage['secret-key'] = self.lineEdit_secretKey.text()
         s3Storage['endpoint'] = self.lineEdit_endpoint.text()
         s3Storage['region'] = self.lineEdit_region.text()
-        self.settings.setValue('s3storage',s3Storage) 
+        self.settings['s3storage'] = s3Storage
 
     # This widget will not display all the options in settings, only the ones written in the UI file.
     def populateOptions(self):
@@ -153,8 +153,8 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
         # Reset these defaults
         checkChoice = self.popupDoubleCheckReset()
         if checkChoice == QtWidgets.QMessageBox.Yes:
-            self.setS3Settings()
-            self.setComponentSettings()
+            defaultSettingsManager.setS3Settings(self, self.settings)
+            defaultSettingsManager.setComponentSettings(self, self.settings)
             self.populateOptions()
     
     def updateSettingsFromUIChoices(self):
