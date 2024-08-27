@@ -727,5 +727,5 @@ func init() {
 
 func Destroy(message string) error {
 	_ = log.Destroy()
-	return fmt.Errorf(message)
+	return errors.New(message)
 }
