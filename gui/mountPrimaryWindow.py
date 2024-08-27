@@ -60,10 +60,12 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("Cloud FUSE")
+        self.myWindow = QSettings("CloudFUSE", "Mainwindow")
         self.initMountPoint()
         self.checkConfigDirectory()
         self.textEdit_output.setReadOnly(True)
         self.settings = settingsManager().allMountSettings
+        #widgetFuncs.initSettingsFromConfig(self)
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
@@ -103,7 +105,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
     def initMountPoint(self):
         try:
-            directory = self.settings.value("mountPoint")
+            directory = self.myWindow.value("mountPoint")
             self.lineEdit_mountPoint.setText(directory)
         except:
             # Nothing in the settings for mountDir, leave mountPoint blank
@@ -112,7 +114,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def updateMountPointInSettings(self):
         try:
             directory = str(self.lineEdit_mountPoint.text())
-            self.settings["mountPoint"] =  directory
+            self.myWindow.setValue("mountPoint",directory)
         except:
             # Couldn't update the settings
             return
