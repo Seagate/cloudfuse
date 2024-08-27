@@ -476,6 +476,31 @@ func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 	return s3.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
 }
 
+const blockSize = 4096
+
+func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
+	// cache_size = f_blocks * f_frsize/1024
+	// cache_size - used = f_frsize * f_bavail/1024
+	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
+	// if cache size is set to 0 then we have the root mount usage
+	sizeUsed := s3.storage.GetUsedSize()
+
+	var total uint64 = 3 * common.TbToBytes
+
+	stat := common.Statfs_t{
+		Blocks:  total / blockSize,
+		Bavail:  (total - sizeUsed) / blockSize,
+		Bfree:   (total - sizeUsed) / blockSize,
+		Bsize:   blockSize,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  blockSize,
+		Namemax: 255,
+	}
+
+	return &stat, true, nil
+}
+
 // TODO: decide if the TODO below is relevant and delete if not
 // TODO : Below methods are pending to be implemented
 // FlushFile(*handlemap.Handle) error
