@@ -63,7 +63,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.initMountPoint()
         self.checkConfigDirectory()
         self.textEdit_output.setReadOnly(True)
-        self.settings = settingsManager()
+        self.settings = settingsManager().allMountSettings
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
@@ -112,7 +112,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def updateMountPointInSettings(self):
         try:
             directory = str(self.lineEdit_mountPoint.text())
-            self.settings.setValue("mountPoint", directory)
+            self.settings["mountPoint"] =  directory
         except:
             # Couldn't update the settings
             return
@@ -124,9 +124,9 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def showSettingsWidget(self):
         targetIndex = self.dropDown_bucketSelect.currentIndex()
         if bucketOptions[targetIndex] == 's3storage':
-            self.setConfigs = s3SettingsWidget(self.settings.allMountSettings)
+            self.setConfigs = s3SettingsWidget(self.settings)
         else:
-            self.setConfigs = azureSettingsWidget(self.settings.allMountSettings)
+            self.setConfigs = azureSettingsWidget(self.settings)
         self.setConfigs.setWindowModality(Qt.ApplicationModal)
         self.setConfigs.show()
 
