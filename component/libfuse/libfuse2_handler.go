@@ -1,4 +1,4 @@
-package libfuse
+//go:build fuse2
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -24,6 +24,8 @@ package libfuse
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE
 */
+
+package libfuse
 
 import (
 	"errors"
@@ -576,10 +578,10 @@ func (cf *CgofuseFS) Rmdir(path string) int {
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Rmdir : %s", name)
 
-	empty := fuseFS.NextComponent().IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
-	if !empty {
-		return -fuse.ENOTEMPTY
-	}
+	// empty := fuseFS.NextComponent().IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
+	// if !empty {
+	// 	return -fuse.ENOTEMPTY
+	// }
 
 	err := fuseFS.NextComponent().DeleteDir(internal.DeleteDirOptions{Name: name})
 	if err != nil {
