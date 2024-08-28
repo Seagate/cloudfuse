@@ -212,8 +212,84 @@ class defaultSettingsManager():
             'file-count' : 10 ,
             'track-time' : False
             }
-        
-class widgetCustomFunctions(QWidget):
+
+class customConfigFunctions():
+    def __init__(self):
+        super().__init__()
+
+    # defaultSettingsManager has set the settings to all default, now the code needs to pull in
+    #   all the changes from the config file the user provides. This may not include all the
+    #   settings defined in defaultSettingManager.
+    def initSettingsFromConfig(self):
+        dictForConfigs = self.getConfigs()
+        for option in dictForConfigs:
+            # check default settings to enforce YAML schema
+            invalidOption = not (option in self.settings)
+            invalidType = type(self.settings.get(option, None)) != type(dictForConfigs[option])
+            if invalidOption or invalidType:
+                print(f"WARNING: Ignoring invalid config option: {option} (type mismatch)")
+                continue
+            if type(dictForConfigs[option]) == dict:
+                tempDict = self.settings[option]
+                for suboption in dictForConfigs[option]:
+                    tempDict[suboption] = dictForConfigs[option][suboption]
+                self.settings[option]=tempDict
+            else:
+                self.settings[option] = dictForConfigs[option]
+
+    def getConfigs(self,useDefault=False):
+        workingDir = self.getWorkingDir()
+        if useDefault:
+            try:
+                with open(workingDir+'/default_config.yaml','r') as file:
+                    configs = yaml.safe_load(file)
+                    if configs is None:
+                        # The default file is empty, use programmed defaults
+                        defaultSettingsManager.setAllDefaultSettings(self)
+                        configs = self.constructDictForConfig()
+            except:
+                # There is no default config file, use programmed defaults
+                defaultSettingsManager.setAllDefaultSettings(self)
+                configs = self.constructDictForConfig()
+        else:
+            try:
+                with open(workingDir+'/config.yaml', 'r') as file:
+                    configs = yaml.safe_load(file)
+                    if configs is None:
+                       # The configs file exists, but is empty, use default settings
+                       configs = self.getConfigs(True)
+            except:
+                # Could not open or config file does not exist, use default settings
+                configs = self.getConfigs(True)
+        return configs
+    
+
+    def getWorkingDir(self):
+        if platform == "win32":
+            defaultFuseDir = 'Cloudfuse'
+            userDir = os.getenv('APPDATA')
+        else:
+            defaultFuseDir = '.Cloudfuse'
+            userDir = os.getenv('HOME')
+        workingDir = os.path.join(userDir, defaultFuseDir)
+        return workingDir
+
+    def writeConfigFile(self):
+        self.updateSettingsFromUIChoices()
+        dictForConfigs = self.settings
+        workingDir = self.getWorkingDir()
+        try:
+            with open(workingDir+'/config.yaml','w') as file:
+                yaml.safe_dump(dictForConfigs,file)
+                return True
+        except:
+            msg = QtWidgets.QMessageBox()
+            msg.setWindowTitle("Write Failed")
+            msg.setInformativeText("Writing the config file failed. Check file permissions and try again.")
+            msg.exec()
+            return False
+
+class widgetCustomFunctions(customConfigFunctions,QWidget):
     def __init__(self):
         super().__init__()
 
@@ -263,58 +339,6 @@ class widgetCustomFunctions(QWidget):
         # Each individual widget will need to override this function
         pass
 
-    def getWorkingDir(self):
-        if platform == "win32":
-            defaultFuseDir = 'Cloudfuse'
-            userDir = os.getenv('APPDATA')
-        else:
-            defaultFuseDir = '.Cloudfuse'
-            userDir = os.getenv('HOME')
-        workingDir = os.path.join(userDir, defaultFuseDir)
-        return workingDir
-
-    def writeConfigFile(self):
-        self.updateSettingsFromUIChoices()
-        dictForConfigs = self.settings
-        workingDir = self.getWorkingDir()
-        try:
-            with open(workingDir+'/config.yaml','w') as file:
-                yaml.safe_dump(dictForConfigs,file)
-                return True
-        except:
-            msg = QtWidgets.QMessageBox()
-            msg.setWindowTitle("Write Failed")
-            msg.setInformativeText("Writing the config file failed. Check file permissions and try again.")
-            msg.exec()
-            return False
-
-    def getConfigs(self,useDefault=False):
-        workingDir = self.getWorkingDir()
-        if useDefault:
-            try:
-                with open(workingDir+'/default_config.yaml','r') as file:
-                    configs = yaml.safe_load(file)
-                    if configs is None:
-                        # The default file is empty, use programmed defaults
-                        defaultSettingsManager.setAllDefaultSettings(self)
-                        configs = self.constructDictForConfig()
-            except:
-                # There is no default config file, use programmed defaults
-                defaultSettingsManager.setAllDefaultSettings(self)
-                configs = self.constructDictForConfig()
-        else:
-            try:
-                with open(workingDir+'/config.yaml', 'r') as file:
-                    configs = yaml.safe_load(file)
-                    if configs is None:
-                       # The configs file exists, but is empty, use default settings
-                       configs = self.getConfigs(True)
-            except:
-                # Could not open or config file does not exist, use default settings
-                configs = self.getConfigs(True)
-        return configs
-
-
     def initWindowSizePos(self):
         try:
             self.resize(self.myWindow.value("window size"))
@@ -324,26 +348,6 @@ class widgetCustomFunctions(QWidget):
             myWindowGeometry = self.frameGeometry()
             myWindowGeometry.moveCenter(desktopCenter)
             self.move(myWindowGeometry.topLeft())
-
-    # defaultSettingsManager has set the settings to all default, now the code needs to pull in
-    #   all the changes from the config file the user provides. This may not include all the
-    #   settings defined in defaultSettingManager.
-    def initSettingsFromConfig(self):
-        dictForConfigs = self.getConfigs()
-        for option in dictForConfigs:
-            # check default settings to enforce YAML schema
-            invalidOption = not (option in self.settings)
-            invalidType = type(self.settings.get(option, None)) != type(dictForConfigs[option])
-            if invalidOption or invalidType:
-                print(f"WARNING: Ignoring invalid config option: {option} (type mismatch)")
-                continue
-            if type(dictForConfigs[option]) == dict:
-                tempDict = self.settings[option]
-                for suboption in dictForConfigs[option]:
-                    tempDict[suboption] = dictForConfigs[option][suboption]
-                self.settings[option]=tempDict
-            else:
-                self.settings[option] = dictForConfigs[option]
 
     # Check for a true/false setting and set the checkbox state as appropriate.
     #   Note, Checked/UnChecked are NOT True/False data types, hence the need to check what the values are.

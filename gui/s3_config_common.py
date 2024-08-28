@@ -40,7 +40,6 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
         self.initWindowSizePos()
         self.setWindowTitle("S3Cloud Config Settings")
         self.settings = configSettings
-        self.initSettingsFromConfig()
         self.populateOptions()
         self.showModeSettings()
         

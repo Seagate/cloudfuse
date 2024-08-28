@@ -24,8 +24,6 @@
 import subprocess
 from sys import platform
 import os
-import time
-import yaml
 from shutil import which
 
 # Import QT libraries
@@ -39,7 +37,7 @@ from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
 from aboutPage import aboutPage
 from under_Construction import underConstruction
-from common_qt_functions import widgetCustomFunctions as widgetFuncs, defaultSettingsManager as settingsManager
+from common_qt_functions import defaultSettingsManager as settingsManager, customConfigFunctions as configFuncs
 
 bucketOptions = ['s3storage', 'azstorage']
 mountTargetComponent = 3
@@ -55,7 +53,7 @@ if platform == 'win32':
 if which(cloudfuseCli) is None:
     cloudfuseCli = './' + cloudfuseCli
 
-class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
+class FUSEWindow(configFuncs, QMainWindow, Ui_primaryFUSEwindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
@@ -65,7 +63,8 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.checkConfigDirectory()
         self.textEdit_output.setReadOnly(True)
         self.settings = settingsManager().allMountSettings
-        #widgetFuncs.initSettingsFromConfig(self)
+        self.initSettingsFromConfig()
+
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
@@ -96,7 +95,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             self.button_browse.setToolTip("Browse to a pre-existing directory")
 
     def checkConfigDirectory(self):
-        workingDir = widgetFuncs.getWorkingDir(self)
+        workingDir = self.getWorkingDir()
         if not os.path.isdir(workingDir):
             try:
                 os.mkdir(workingDir)
@@ -173,7 +172,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             return
         directory = os.path.join(directory, mountDirSuffix)
         # get config path
-        configPath = os.path.join(widgetFuncs.getWorkingDir(self), 'config.yaml')
+        configPath = os.path.join(self.getWorkingDir(), 'config.yaml')
 
         # on Windows, the mount directory should not exist (yet)
         if platform == "win32":
@@ -252,43 +251,22 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
     # This function reads in the config file, modifies the components section, then writes the config file back
     def modifyPipeline(self):
-
         self.addOutputText("Validating configuration...")
         # Update the pipeline/components before mounting the target
+        self.writeConfigFile()
 
-        targetBucket = bucketOptions[self.dropDown_bucketSelect.currentIndex()]
-        workingDir = widgetFuncs.getWorkingDir(self)
-
-        # Read in the configs as a dictionary. Notify user if failed
-        try:
-            with open(workingDir+'/config.yaml', 'r') as file:
-                configs = yaml.safe_load(file)
-        except:
-            self.errorMessageBox(
-                f"Could not read the config file in {workingDir}. Consider going through the settings for selected target.",
-                "Could not read config file")
-            return
-
-        # Modify the components (pipeline) in the config file.
-        #   If the components are not present, there's a chance the configs are wrong. Notify user.
-
-        components = configs.get('components')
-        if components != None:
-            components[mountTargetComponent] = targetBucket
-            configs['components'] = components
-        else:
-            self.errorMessageBox(
-                f"The components is missing in {workingDir}/config.yaml. Consider Going through the settings to create one.",
-                "Components in config missing")
-            return
-
-        # Write the config file with the modified components
-        try:
-            with open(workingDir+'/config.yaml','w') as file:
-                yaml.safe_dump(configs,file)
-        except:
-            self.errorMessageBox(f"Could not modify {workingDir}/config.yaml.", "Could not modify config file")
-            return
+    def updateSettingsFromUIChoices(self):
+            targetBucket = bucketOptions[self.dropDown_bucketSelect.currentIndex()]
+            components = self.settings.get('components')
+            if components != None:
+                components[mountTargetComponent] = targetBucket
+                self.settings['components'] = components
+            else:
+                workingDir = self.getWorkingDir()
+                self.errorMessageBox(
+                    f"The components is missing in {workingDir}/config.yaml. Consider Going through the settings to create one.",
+                    "Components in config missing")
+                return
 
     # run command and return tuple:
     # (stdOut, stdErr, exitCode, executableFound)

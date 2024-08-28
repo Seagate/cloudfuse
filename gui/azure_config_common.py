@@ -42,7 +42,6 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.myWindow = QSettings("CloudFUSE", "AzcWindow")
         self.settings = configSettings
         self.initWindowSizePos()
-        self.initSettingsFromConfig()
         # Hide the pipeline mode groupbox depending on the default select is
         self.showAzureModeSettings()
         self.showModeSettings()
