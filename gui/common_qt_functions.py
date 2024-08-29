@@ -275,7 +275,6 @@ class customConfigFunctions():
         return workingDir
 
     def writeConfigFile(self):
-        self.updateSettingsFromUIChoices()
         dictForConfigs = self.settings
         workingDir = self.getWorkingDir()
         try:
@@ -321,7 +320,6 @@ class widgetCustomFunctions(customConfigFunctions,QWidget):
         msg.setStandardButtons(QtWidgets.QMessageBox.Discard | QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Save)
         msg.setDefaultButton(QtWidgets.QMessageBox.Cancel)
         ret = msg.exec()
-
         if ret == QtWidgets.QMessageBox.Discard:
             self.exitWindowCleanup()
             event.accept()
@@ -330,6 +328,7 @@ class widgetCustomFunctions(customConfigFunctions,QWidget):
         elif ret == QtWidgets.QMessageBox.Save:
             # Insert all settings to yaml file
             self.exitWindowCleanup()
+            self.updateSettingsFromUIChoices()
             if self.writeConfigFile():
                 event.accept()
             else:

@@ -253,20 +253,18 @@ class FUSEWindow(configFuncs, QMainWindow, Ui_primaryFUSEwindow):
     def modifyPipeline(self):
         self.addOutputText("Validating configuration...")
         # Update the pipeline/components before mounting the target
+        targetBucket = bucketOptions[self.dropDown_bucketSelect.currentIndex()]
+        components = self.settings.get('components')
+        if components != None:
+            components[mountTargetComponent] = targetBucket
+            self.settings['components'] = components
+        else:
+            workingDir = self.getWorkingDir()
+            self.errorMessageBox(
+                f"The components is missing in {workingDir}/config.yaml. Consider Going through the settings to create one.",
+                "Components in config missing")
+            return
         self.writeConfigFile()
-
-    def updateSettingsFromUIChoices(self):
-            targetBucket = bucketOptions[self.dropDown_bucketSelect.currentIndex()]
-            components = self.settings.get('components')
-            if components != None:
-                components[mountTargetComponent] = targetBucket
-                self.settings['components'] = components
-            else:
-                workingDir = self.getWorkingDir()
-                self.errorMessageBox(
-                    f"The components is missing in {workingDir}/config.yaml. Consider Going through the settings to create one.",
-                    "Components in config missing")
-                return
 
     # run command and return tuple:
     # (stdOut, stdErr, exitCode, executableFound)
