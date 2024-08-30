@@ -253,7 +253,7 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 	if config.IsSet(compName + ".display-capacity-mb") {
 		lf.displayCapacityMb = opt.DisplayCapacityMb
 	} else {
-		lf.displayCapacityMb = common.DefaultCapacity / common.MbToBytes
+		lf.displayCapacityMb = common.DefaultCapacityMb
 	}
 
 	log.Info("Libfuse::Validate : UID %v, GID %v", lf.ownerUID, lf.ownerGID)
@@ -363,6 +363,6 @@ func init() {
 	networkShareFlags := config.AddBoolFlag("network-share", false, "Run as a network share. Only supported on Windows.")
 	config.BindPFlag(compName+".network-share", networkShareFlags)
 
-	displayCapacityFlag := config.AddUint64Flag("display-capacity-mb", common.DefaultCapacity/common.MbToBytes, "Storage capacity to display.")
+	displayCapacityFlag := config.AddUint64Flag("display-capacity-mb", common.DefaultCapacityMb, "Storage capacity to display.")
 	config.BindPFlag(compName+".display-capacity-mb", displayCapacityFlag)
 }
