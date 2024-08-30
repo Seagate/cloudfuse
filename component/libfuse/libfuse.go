@@ -72,6 +72,7 @@ type Libfuse struct {
 	maxFuseThreads        uint32
 	directIO              bool
 	umask                 uint32
+	displayCapacityMb     uint64
 }
 
 // To support pagination in readdir calls this structure holds a block of items for a given directory
@@ -105,6 +106,7 @@ type LibfuseOptions struct {
 	MaxFuseThreads          uint32 `config:"max-fuse-threads" yaml:"max-fuse-threads,omitempty"`
 	DirectIO                bool   `config:"direct-io" yaml:"direct-io,omitempty"`
 	Umask                   uint32 `config:"umask" yaml:"umask,omitempty"`
+	DisplayCapacityMb       uint64 `config:"display-capacity-mb" yaml:"display-capacity-mb,omitempty"`
 }
 
 const compName = "libfuse"
@@ -248,6 +250,12 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 		lf.maxFuseThreads = defaultMaxFuseThreads
 	}
 
+	if config.IsSet(compName + ".display-capacity-mb") {
+		lf.displayCapacityMb = opt.DisplayCapacityMb
+	} else {
+		lf.displayCapacityMb = common.DefaultCapacity / common.MbToBytes
+	}
+
 	log.Info("Libfuse::Validate : UID %v, GID %v", lf.ownerUID, lf.ownerGID)
 
 	return nil
@@ -309,9 +317,9 @@ func (lf *Libfuse) Configure(_ bool) error {
 	}
 
 	log.Info("Libfuse::Configure : read-only %t, allow-other %t, allow-root %t, default-perm %d, entry-timeout %d, attr-time %d, negative-timeout %d, "+
-		"ignore-open-flags: %t, nonempty %t, network-share %t, direct_io %t, max-fuse-threads %d, fuse-trace %t, extension %s, disable-writeback-cache %t, dirPermission %v, mountPath %v, umask %v",
+		"ignore-open-flags: %t, nonempty %t, network-share %t, direct_io %t, max-fuse-threads %d, fuse-trace %t, extension %s, disable-writeback-cache %t, dirPermission %v, mountPath %v, umask %v, displayCapacityMb %v",
 		lf.readOnly, lf.allowOther, lf.allowRoot, lf.filePermission, lf.entryExpiration, lf.attributeExpiration, lf.negativeTimeout,
-		lf.ignoreOpenFlags, lf.nonEmptyMount, lf.networkShare, lf.directIO, lf.maxFuseThreads, lf.traceEnable, lf.extensionPath, lf.disableWritebackCache, lf.dirPermission, lf.mountPath, lf.umask)
+		lf.ignoreOpenFlags, lf.nonEmptyMount, lf.networkShare, lf.directIO, lf.maxFuseThreads, lf.traceEnable, lf.extensionPath, lf.disableWritebackCache, lf.dirPermission, lf.mountPath, lf.umask, lf.displayCapacityMb)
 
 	return nil
 }
@@ -354,4 +362,7 @@ func init() {
 
 	networkShareFlags := config.AddBoolFlag("network-share", false, "Run as a network share. Only supported on Windows.")
 	config.BindPFlag(compName+".network-share", networkShareFlags)
+
+	displayCapacityFlag := config.AddUint64Flag("display-capacity-mb", common.DefaultCapacity/common.MbToBytes, "Storage capacity to display.")
+	config.BindPFlag(compName+".display-capacity-mb", displayCapacityFlag)
 }
