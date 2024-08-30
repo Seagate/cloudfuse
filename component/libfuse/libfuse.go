@@ -250,7 +250,7 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 		lf.maxFuseThreads = defaultMaxFuseThreads
 	}
 
-	if config.IsSet(compName + ".display-capacity-mb") {
+	if config.IsSet(compName+".display-capacity-mb") && opt.DisplayCapacityMb > 0 {
 		lf.displayCapacityMb = opt.DisplayCapacityMb
 	} else {
 		lf.displayCapacityMb = common.DefaultCapacityMb

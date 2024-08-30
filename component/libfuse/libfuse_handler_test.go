@@ -97,7 +97,7 @@ func (suite *libfuseTestSuite) TestConfigZero() {
 	suite.assert.Equal(uint32(0), suite.libfuse.entryExpiration)
 	suite.assert.Equal(uint32(0), suite.libfuse.attributeExpiration)
 	suite.assert.Equal(uint32(0), suite.libfuse.negativeTimeout)
-	suite.assert.Equal(uint64(0), suite.libfuse.displayCapacityMb)
+	suite.assert.Equal(uint64(1024*1024), suite.libfuse.displayCapacityMb)
 	suite.assert.False(suite.libfuse.directIO)
 }
 
