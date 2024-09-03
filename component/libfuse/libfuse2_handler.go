@@ -1,4 +1,4 @@
-//go:build fuse2
+//go:build fuse2 || windows
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -68,6 +68,33 @@ type CgofuseFS struct {
 
 	// group identifier on linux
 	gid uint32
+}
+
+// Libfuse holds the settings and information for the FUSE component.
+type Libfuse struct {
+	internal.BaseComponent
+	host                  *fuse.FileSystemHost
+	mountPath             string
+	dirPermission         uint
+	filePermission        uint
+	readOnly              bool
+	attributeExpiration   uint32
+	entryExpiration       uint32
+	negativeTimeout       uint32
+	allowOther            bool
+	allowRoot             bool
+	ownerUID              uint32
+	ownerGID              uint32
+	traceEnable           bool
+	extensionPath         string
+	disableWritebackCache bool
+	ignoreOpenFlags       bool
+	nonEmptyMount         bool
+	networkShare          bool // Run as a network file share on Windows
+	lsFlags               common.BitMap16
+	maxFuseThreads        uint32
+	directIO              bool
+	umask                 uint32
 }
 
 // Note: libfuse prepends "/" to the path.

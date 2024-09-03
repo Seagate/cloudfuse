@@ -1,4 +1,4 @@
-//go:build !fuse2
+//go:build !fuse2 && linux
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
