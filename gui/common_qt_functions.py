@@ -240,17 +240,9 @@ class customConfigFunctions():
     def getConfigs(self,useDefault=False):
         workingDir = self.getWorkingDir()
         if useDefault:
-            try:
-                with open(workingDir+'/default_config.yaml','r') as file:
-                    configs = yaml.safe_load(file)
-                    if configs is None:
-                        # The default file is empty, use programmed defaults
-                        defaultSettingsManager.setAllDefaultSettings(self)
-                        configs = self.constructDictForConfig()
-            except:
-                # There is no default config file, use programmed defaults
-                defaultSettingsManager.setAllDefaultSettings(self)
-                configs = self.constructDictForConfig()
+            # Use programmed defaults
+            defaultSettingsManager.setAllDefaultSettings(self,self.settings)
+            configs = self.settings
         else:
             try:
                 with open(workingDir+'/config.yaml', 'r') as file:

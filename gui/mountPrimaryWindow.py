@@ -53,7 +53,7 @@ if platform == 'win32':
 if which(cloudfuseCli) is None:
     cloudfuseCli = './' + cloudfuseCli
 
-class FUSEWindow(configFuncs, QMainWindow, Ui_primaryFUSEwindow):
+class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
@@ -62,7 +62,7 @@ class FUSEWindow(configFuncs, QMainWindow, Ui_primaryFUSEwindow):
         self.initMountPoint()
         self.checkConfigDirectory()
         self.textEdit_output.setReadOnly(True)
-        self.settings = settingsManager().allMountSettings
+        self.settings = self.allMountSettings
         self.initSettingsFromConfig()
 
         if platform == 'win32':
