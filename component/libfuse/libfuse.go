@@ -234,16 +234,6 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 		lf.negativeTimeout = defaultNegativeEntryExpiration
 	}
 
-	if !(config.IsSet(compName+".uid") || config.IsSet(compName+".gid") ||
-		config.IsSet("lfuse.uid") || config.IsSet("lfuse.gid")) {
-		var err error
-		lf.ownerUID, lf.ownerGID, err = common.GetCurrentUser()
-		if err != nil {
-			log.Err("Libfuse::Validate : config error [unable to obtain current user info]")
-			return nil
-		}
-	}
-
 	if config.IsSet(compName + ".max-fuse-threads") {
 		lf.maxFuseThreads = opt.MaxFuseThreads
 	} else {
@@ -256,6 +246,16 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 		lf.displayCapacityMb = opt.DisplayCapacityMb
 	} else {
 		lf.displayCapacityMb = common.DefaultCapacityMb
+	}
+
+	if !(config.IsSet(compName+".uid") || config.IsSet(compName+".gid") ||
+		config.IsSet("lfuse.uid") || config.IsSet("lfuse.gid")) {
+		var err error
+		lf.ownerUID, lf.ownerGID, err = common.GetCurrentUser()
+		if err != nil {
+			log.Err("Libfuse::Validate : config error [unable to obtain current user info]")
+			return nil
+		}
 	}
 
 	log.Info("Libfuse::Validate : UID %v, GID %v", lf.ownerUID, lf.ownerGID)
