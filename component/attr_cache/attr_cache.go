@@ -37,11 +37,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
-	"github.com/aws/aws-sdk-go-v2/aws/retry"
 )
 
 // By default attr cache is valid for 120 seconds
@@ -431,8 +431,8 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		}
 	}
 	// if cloud is down, use existing cache entries to populate the listing
-	var maxAttempts *retry.MaxAttemptsError
-	cloudIsDown := errors.As(err, &maxAttempts)
+	var cloudUnreachable *common.CloudUnreachableError
+	cloudIsDown := errors.As(err, &cloudUnreachable)
 	if err != nil && cloudIsDown {
 		dir, found := ac.cache.get(options.Name)
 		if found {
@@ -707,8 +707,8 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("AttrCache::DeleteFile : %s", options.Name)
 
 	err := ac.NextComponent().DeleteFile(options)
-	var maxAttempts *retry.MaxAttemptsError
-	cloudisDown := errors.As(err, &maxAttempts)
+	var cloudUnreachable *common.CloudUnreachableError
+	cloudisDown := errors.As(err, &cloudUnreachable)
 
 	if cloudisDown {
 		return errors.New("Failed cloud connection")
@@ -991,8 +991,8 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	//check cloud call here
 	ac.cacheLock.Lock()
 	defer ac.cacheLock.Unlock()
-	var maxAttempts *retry.MaxAttemptsError
-	cloudisDown := errors.As(err, &maxAttempts)
+	var cloudUnreachable *common.CloudUnreachableError
+	cloudisDown := errors.As(err, &cloudUnreachable)
 
 	if err == nil {
 		// Retrieved attributes so cache them
