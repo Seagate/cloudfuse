@@ -37,7 +37,6 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 
-	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/smithy-go"
 )
 
@@ -130,8 +129,8 @@ func parseS3Err(err error, attemptedAction string) error {
 			return syscall.ENOENT
 		}
 	}
-	var maxAttempts *retry.MaxAttemptsError
-	cloudisDown := errors.As(err, &maxAttempts)
+	var Cloudunreachable *common.CloudUnreachableError
+	cloudisDown := errors.As(err, &Cloudunreachable)
 	if cloudisDown {
 		log.Err("%s : Failed to %s because cloud storage is unreachable", functionName, attemptedAction)
 		return common.NewCloudUnreachableError(err)

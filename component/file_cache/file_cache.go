@@ -1348,7 +1348,6 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	// To cover case 1, get attributes from storage
 	var exists bool
-	// var maxAttempts *retry.MaxAttemptsError
 	attrs, err := fc.NextComponent().GetAttr(options) //expect this to return err if cloud is down
 	if err != nil {
 		if err == syscall.ENOENT || os.IsNotExist(err) { //file not exist error, not related to cloud being down
