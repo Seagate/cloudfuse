@@ -900,11 +900,6 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 
 			if err != nil {
 
-				var e common.CloudUnreachableError
-				if errors.As(err, &e) {
-					return err
-				}
-
 				// File was created locally and now download has failed so we need to delete it back from local cache
 				log.Err("FileCache::downloadFile : error downloading file from storage %s [%s]", handle.Path, err.Error())
 				_ = f.Close()
