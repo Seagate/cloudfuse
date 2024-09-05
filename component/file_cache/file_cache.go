@@ -44,7 +44,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
-	"github.com/aws/aws-sdk-go-v2/aws/retry"
 
 	"github.com/spf13/cobra"
 )
@@ -487,8 +486,8 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	attrs, token, err := fc.NextComponent().StreamDir(options)
 	if err != nil {
 		token = ""
-		var maxAttempts *retry.MaxAttemptsError
-		cloudIsDown := errors.As(err, &maxAttempts)
+		var cloudUnreachable *common.CloudUnreachableError
+		cloudIsDown := errors.As(err, &cloudUnreachable)
 		if cloudIsDown {
 			err = nil
 		}
@@ -796,8 +795,8 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 	_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name, RetrieveMetadata: false})
 	//TODO: Add support for azure errors as well so cloud outage can be detected for both
-	var maxAttempts *retry.MaxAttemptsError
-	cloudisDown := errors.As(err, &maxAttempts)
+	var cloudUnreachable *common.CloudUnreachableError
+	cloudisDown := errors.As(err, &cloudUnreachable)
 
 	if err != nil && !cloudisDown {
 		return syscall.ENOENT //no entity if not in cloud error
@@ -848,8 +847,8 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 
 	fc.policy.CacheValid(localPath)
 	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, handle.Path, flock)
-	var maxAttempts *retry.MaxAttemptsError
-	cloudisDown := errors.As(err, &maxAttempts)
+	var cloudUnreachable *common.CloudUnreachableError
+	cloudisDown := errors.As(err, &cloudUnreachable)
 	if err != nil {
 		log.Err("FileCache::downloadFile : Failed to check if download is required for %s [%s]", handle.Path, err.Error())
 	}
@@ -1351,7 +1350,6 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	var exists bool
 	// var maxAttempts *retry.MaxAttemptsError
 	attrs, err := fc.NextComponent().GetAttr(options) //expect this to return err if cloud is down
-	// cloudisDown := errors.As(err, &maxAttempts)
 	if err != nil {
 		if err == syscall.ENOENT || os.IsNotExist(err) { //file not exist error, not related to cloud being down
 			log.Debug("FileCache::GetAttr : %s does not exist in cloud storage", options.Name)
