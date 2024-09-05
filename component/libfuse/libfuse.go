@@ -250,6 +250,8 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 		lf.maxFuseThreads = defaultMaxFuseThreads
 	}
 
+	fmt.Printf("Libfuse::Validate - IsSet(%s): %v\n", compName+".display-capacity-mb", config.IsSet(compName+".display-capacity-mb"))
+	fmt.Printf("Libfuse::Validate - opt.DisplayCapacityMb = %v\n", opt.DisplayCapacityMb)
 	if config.IsSet(compName+".display-capacity-mb") && opt.DisplayCapacityMb > 0 {
 		lf.displayCapacityMb = opt.DisplayCapacityMb
 	} else {
@@ -316,6 +318,7 @@ func (lf *Libfuse) Configure(_ bool) error {
 		return fmt.Errorf("%s config error %s", lf.Name(), err.Error())
 	}
 
+	fmt.Printf("Libfuse::Configure - displayCapacityMb: %v\n", lf.displayCapacityMb)
 	log.Info("Libfuse::Configure : read-only %t, allow-other %t, allow-root %t, default-perm %d, entry-timeout %d, attr-time %d, negative-timeout %d, "+
 		"ignore-open-flags: %t, nonempty %t, network-share %t, direct_io %t, max-fuse-threads %d, fuse-trace %t, extension %s, disable-writeback-cache %t, dirPermission %v, mountPath %v, umask %v, displayCapacityMb %v",
 		lf.readOnly, lf.allowOther, lf.allowRoot, lf.filePermission, lf.entryExpiration, lf.attributeExpiration, lf.negativeTimeout,
