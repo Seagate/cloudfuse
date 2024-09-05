@@ -246,13 +246,13 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 		lf.displayCapacityMb = common.DefaultCapacityMb
 	}
 
+	// NOTE/TODO: this always fails in GitHub Actions on Windows
 	if !(config.IsSet(compName+".uid") || config.IsSet(compName+".gid") ||
 		config.IsSet("lfuse.uid") || config.IsSet("lfuse.gid")) {
 		var err error
 		lf.ownerUID, lf.ownerGID, err = common.GetCurrentUser()
 		if err != nil {
 			log.Err("Libfuse::Validate : config error [unable to obtain current user info]")
-			return nil
 		}
 	}
 
