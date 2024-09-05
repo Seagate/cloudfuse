@@ -44,7 +44,6 @@ import (
 	"github.com/Seagate/cloudfuse/component/loopback"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
-	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/golang/mock/gomock"
 
 	"github.com/stretchr/testify/assert"
@@ -355,7 +354,7 @@ func (suite *fileCacheTestSuite) TestCreateDirCloudDown() {
 
 	path := "a"
 	options := internal.CreateDirOptions{Name: path}
-	suite.mock.EXPECT().CreateDir(options).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateDir(options).Return(&common.CloudUnreachableError{}).AnyTimes()
 	err := suite.fileCache.CreateDir(options)
 	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
@@ -417,13 +416,13 @@ func (suite *fileCacheTestSuite) TestDeleteDirCloudDown() {
 	deleteDirOptions := internal.DeleteDirOptions{Name: dir}
 	createFileOptions := internal.CreateFileOptions{Name: path, Mode: 0777}
 
-	suite.mock.EXPECT().CreateDir(createDirOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateDir(createDirOptions).Return(&common.CloudUnreachableError{}).AnyTimes()
 	err := suite.fileCache.CreateDir(createDirOptions)
 	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 
 	handle := handlemap.NewHandle(path)
-	suite.mock.EXPECT().CreateFile(createFileOptions).Return(handle, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(handle, &common.CloudUnreachableError{}).AnyTimes()
 	handle, err = suite.fileCache.CreateFile(createFileOptions)
 	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
@@ -433,14 +432,14 @@ func (suite *fileCacheTestSuite) TestDeleteDirCloudDown() {
 	suite.assert.NoError(err)
 	// The file (and directory) is in the cache and storage (see TestCreateFileInDirCreateEmptyFile)
 	// Delete the file since we can only delete empty directories
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: false}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().DeleteFile(internal.DeleteFileOptions{Name: path}).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: false}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().DeleteFile(internal.DeleteFileOptions{Name: path}).Return(&common.CloudUnreachableError{}).AnyTimes()
 	err = suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
 	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 
 	// Delete the directory
-	suite.mock.EXPECT().DeleteDir(deleteDirOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().DeleteDir(deleteDirOptions).Return(&common.CloudUnreachableError{}).AnyTimes()
 	err = suite.fileCache.DeleteDir(deleteDirOptions)
 	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
@@ -503,10 +502,10 @@ func (suite *fileCacheTestSuite) TestStreamDirCase1CloudDown() {
 	objectList = append(objectList, object3)
 	objectList = append(objectList, object4)
 	// Read the Directory
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().StreamDir(internal.StreamDirOptions{Name: name}).Return(objectList, "", &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().StreamDir(internal.StreamDirOptions{Name: name}).Return(objectList, "", &common.CloudUnreachableError{}).AnyTimes()
 	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
 	suite.assert.NoError(err)
 	suite.assert.NotEmpty(dir)
@@ -558,14 +557,14 @@ func (suite *fileCacheTestSuite) TestStreamDirCase2CloudDown() {
 	file2 := name + "/file2"
 	file3 := name + "/file3"
 
-	suite.mock.EXPECT().CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777}).Return(&retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777}).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777}).Return(&common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777}).Return(&common.CloudUnreachableError{}).AnyTimes()
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777})
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
 	// By default createEmptyFile is false, so we will not create these files in cloud storage until they are closed.
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
@@ -574,10 +573,10 @@ func (suite *fileCacheTestSuite) TestStreamDirCase2CloudDown() {
 	objectList := make([]*internal.ObjAttr, 0)
 	attr := internal.CreateObjAttrDir(subdir)
 	objectList = append(objectList, attr)
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file1}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file2}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file3}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().StreamDir(internal.StreamDirOptions{Name: name}).Return(objectList, "", &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file1}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file2}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file3}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().StreamDir(internal.StreamDirOptions{Name: name}).Return(objectList, "", &common.CloudUnreachableError{}).AnyTimes()
 	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
 	suite.assert.NoError(err)
 	suite.assert.NotEmpty(dir)
@@ -635,22 +634,22 @@ func (suite *fileCacheTestSuite) TestStreamDirCase3CloudDown() {
 	file2 := name + "/file2"
 	file3 := name + "/file3"
 
-	suite.mock.EXPECT().CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777}).Return(&retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777}).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777}).Return(&common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777}).Return(&common.CloudUnreachableError{}).AnyTimes()
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777})
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
 	// By default createEmptyFile is false, so we will not create these files in storage until they are closed.
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file1}).Return(nil, &retry.MaxAttemptsError{})
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file2}).Return(nil, &retry.MaxAttemptsError{})
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file3}).Return(nil, &retry.MaxAttemptsError{})
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file1}).Return(nil, &common.CloudUnreachableError{})
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file2}).Return(nil, &common.CloudUnreachableError{})
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file3}).Return(nil, &common.CloudUnreachableError{})
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file1, Size: 1024})
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file2, Size: 1024})
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, Size: 1024})
 
@@ -668,7 +667,7 @@ func (suite *fileCacheTestSuite) TestStreamDirCase3CloudDown() {
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file1}).Return(nil, nil).AnyTimes() //entries will be found in attribute cache so nil error is returned
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file2}).Return(nil, nil).AnyTimes()
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file3}).Return(nil, nil).AnyTimes()
-	suite.mock.EXPECT().StreamDir(internal.StreamDirOptions{Name: name}).Return(objectList, "test", &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().StreamDir(internal.StreamDirOptions{Name: name}).Return(objectList, "test", &common.CloudUnreachableError{}).AnyTimes()
 	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
 	suite.assert.NoError(err)
 	suite.assert.NotEmpty(dir)
@@ -749,18 +748,18 @@ func (suite *fileCacheTestSuite) TestStreamDirMixedCloudDown() {
 	file3 := name + "/file3" // case 3
 	file4 := name + "/file4" // case 4
 
-	suite.mock.EXPECT().CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777}).Return(&retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777}).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777}).Return(&common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777}).Return(&common.CloudUnreachableError{}).AnyTimes()
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777})
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
 
 	// By default createEmptyFile is false, so we will not create these files in storage until they are closed.
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file2}).Return(nil, syscall.ENOENT).AnyTimes()
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777}) //File 2 is local cache only
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file2, Size: 1024})
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file3}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file3}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777}) //file 3 is local cache and cloud
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, Size: 1024})
 
@@ -775,7 +774,7 @@ func (suite *fileCacheTestSuite) TestStreamDirMixedCloudDown() {
 	objectList = append(objectList, object2)
 	objectList = append(objectList, object4)
 	objectList = append(objectList, object5)
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file4, RetrieveMetadata: false}).Return(nil, syscall.ENOENT).AnyTimes()
 	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, Size: 1024})
@@ -785,7 +784,7 @@ func (suite *fileCacheTestSuite) TestStreamDirMixedCloudDown() {
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file1}).Return(nil, nil).AnyTimes() //entries will be found in attribute cache so nil error is returned
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file2}).Return(nil, syscall.ENOENT).AnyTimes()
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file3}).Return(nil, nil).AnyTimes()
-	suite.mock.EXPECT().StreamDir(internal.StreamDirOptions{Name: name}).Return(objectList, "", &retry.MaxAttemptsError{})
+	suite.mock.EXPECT().StreamDir(internal.StreamDirOptions{Name: name}).Return(objectList, "", &common.CloudUnreachableError{})
 	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
 	suite.assert.NoError(err)
 	suite.assert.NotEmpty(dir)
@@ -890,14 +889,14 @@ func (suite *fileCacheTestSuite) TestRenameDirCloudDown() {
 	src := "src"
 	dst := "dst"
 	createDirOptions := internal.CreateDirOptions{Name: src, Mode: 0777}
-	suite.mock.EXPECT().CreateDir(createDirOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateDir(createDirOptions).Return(&common.CloudUnreachableError{}).AnyTimes()
 	err := suite.fileCache.CreateDir(createDirOptions)
 	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 	path := src + "/file"
 	for i := 0; i < 5; i++ {
 		handle := handlemap.NewHandle(path + strconv.Itoa(i))
-		suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: path + strconv.Itoa(i), Mode: 0777}).Return(handle, &retry.MaxAttemptsError{}).AnyTimes()
+		suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: path + strconv.Itoa(i), Mode: 0777}).Return(handle, &common.CloudUnreachableError{}).AnyTimes()
 		handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path + strconv.Itoa(i), Mode: 0777})
 		time.Sleep(time.Millisecond)
 		suite.assert.NoError(err)
@@ -908,7 +907,7 @@ func (suite *fileCacheTestSuite) TestRenameDirCloudDown() {
 
 	// Delete the directory
 	renameDirOptions := internal.RenameDirOptions{Src: src, Dst: dst}
-	suite.mock.EXPECT().RenameDir(renameDirOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().RenameDir(renameDirOptions).Return(&common.CloudUnreachableError{}).AnyTimes()
 	err = suite.fileCache.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
 	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
@@ -947,7 +946,7 @@ func (suite *fileCacheTestSuite) TestCreateFileCloudDown() {
 	path := "file1"
 	options := internal.CreateFileOptions{Name: path}
 
-	suite.mock.EXPECT().CreateFile(options).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(options).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	f, err := suite.fileCache.CreateFile(options)
 	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
@@ -990,7 +989,7 @@ func (suite *fileCacheTestSuite) TestCreateFileInDirCloudDown() {
 	path := dir + "/file"
 
 	options := internal.CreateFileOptions{Name: path}
-	suite.mock.EXPECT().CreateFile(options).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(options).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	f, err := suite.fileCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
@@ -1037,7 +1036,7 @@ func (suite *fileCacheTestSuite) TestCreateFileCreateEmptyFileCloudDown() {
 	path := "file2"
 
 	options := internal.CreateFileOptions{Name: path}
-	suite.mock.EXPECT().CreateFile(options).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(options).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	_, err := suite.fileCache.CreateFile(options)
 	suite.assert.NoError(err)
 	time.Sleep(time.Millisecond)
@@ -1089,9 +1088,9 @@ func (suite *fileCacheTestSuite) TestCreateFileInDirCreateEmptyFileCloudDown() {
 	createDirOptions := internal.CreateDirOptions{Name: dir, Mode: 0777}
 	createFileOptions := internal.CreateFileOptions{Name: path, Mode: 0777}
 
-	suite.mock.EXPECT().CreateDir(createDirOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateDir(createDirOptions).Return(&common.CloudUnreachableError{}).AnyTimes()
 	suite.fileCache.CreateDir(createDirOptions)
-	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	_, err := suite.fileCache.CreateFile(createFileOptions)
 	suite.assert.NoError(err)
 	time.Sleep(time.Millisecond)
@@ -1187,19 +1186,19 @@ func (suite *fileCacheTestSuite) TestDeleteFileCloudDown() {
 	path := "file4"
 	createFileOptions := internal.CreateFileOptions{Name: path, Mode: 0777}
 
-	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 
-	suite.mock.EXPECT().CopyFromFile(internal.CopyFromFileOptions{Name: path, File: handle.FObj}).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CopyFromFile(internal.CopyFromFileOptions{Name: path, File: handle.FObj}).Return(&common.CloudUnreachableError{}).AnyTimes()
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 	time.Sleep(time.Millisecond)
 
 	deleteFileOptions := internal.DeleteFileOptions{Name: path}
-	suite.mock.EXPECT().DeleteFile(deleteFileOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: false}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().DeleteFile(deleteFileOptions).Return(&common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: false}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	err = suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
 	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
@@ -1240,14 +1239,14 @@ func (suite *fileCacheTestSuite) TestDeleteFileCase2CloudDown() {
 	path := "file5"
 
 	createFileOptions := internal.CreateFileOptions{Name: path, Mode: 0777}
-	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 
 	time.Sleep(time.Millisecond)
 
 	deleteFileOptions := internal.DeleteFileOptions{Name: path}
-	suite.mock.EXPECT().DeleteFile(deleteFileOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: false}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().DeleteFile(deleteFileOptions).Return(&common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path, RetrieveMetadata: false}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	time.Sleep(time.Millisecond)
 	err := suite.fileCache.DeleteFile(deleteFileOptions)
 	//suite.assert.Equal(syscall.EIO, err) not fully sure what this specific error code should be indicating,
@@ -1378,12 +1377,12 @@ func (suite *fileCacheTestSuite) TestCloseFileCloudDown() {
 	path := "file9"
 	createFileOptions := internal.CreateFileOptions{Name: path, Mode: 0777}
 
-	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	handle, _ := suite.fileCache.CreateFile(createFileOptions)
 	// The file is in the cache but not in cloud storage (see TestCreateFileInDirCreateEmptyFile)
 	// CloseFile
 	copyFromFileOptions := internal.CopyFromFileOptions{Name: path, File: handle.FObj}
-	suite.mock.EXPECT().CopyFromFile(copyFromFileOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CopyFromFile(copyFromFileOptions).Return(&common.CloudUnreachableError{}).AnyTimes()
 	err := suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 	// loop to test timeout eviction prevention
@@ -1529,7 +1528,7 @@ func (suite *fileCacheTestSuite) TestWriteFileCloudDown() {
 	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 0\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
 	suite.setupTestHelperMock(defaultConfig) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 	file := "file19"
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 
 	handle.Flags.Clear(handlemap.HandleFlagDirty) // Technically create file will mark it as dirty, we just want to check write file updates the dirty flag, so temporarily set this to false
@@ -1588,7 +1587,7 @@ func (suite *fileCacheTestSuite) TestFlushFileEmptyCloudDown() { //only works wh
 
 	createFileOptions := internal.CreateFileOptions{Name: file, Mode: 0777}
 
-	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	handle, _ := suite.fileCache.CreateFile(createFileOptions)
 
 	// Path should not be in fake storage
@@ -1597,7 +1596,7 @@ func (suite *fileCacheTestSuite) TestFlushFileEmptyCloudDown() { //only works wh
 
 	// Flush the Empty File
 	copyFromFileOptions := internal.CopyFromFileOptions{Name: file, File: handle.FObj}
-	suite.mock.EXPECT().CopyFromFile(copyFromFileOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CopyFromFile(copyFromFileOptions).Return(&common.CloudUnreachableError{}).AnyTimes()
 	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
@@ -1647,7 +1646,7 @@ func (suite *fileCacheTestSuite) TestAFlushFileCloudDown() { //only works when c
 
 	createFileOptions := internal.CreateFileOptions{Name: file, Mode: 0777}
 
-	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	myHandle, _ := suite.fileCache.CreateFile(createFileOptions)
 	time.Sleep(time.Millisecond)
 
@@ -1662,8 +1661,8 @@ func (suite *fileCacheTestSuite) TestAFlushFileCloudDown() { //only works when c
 	// Flush the Empty File
 	mode := os.FileMode(0000)
 	copyFromFileOptions := internal.CopyFromFileOptions{Name: file}
-	suite.mock.EXPECT().CopyFromFile(copyFromFileOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().Chmod(internal.ChmodOptions{Name: file, Mode: mode}).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CopyFromFile(copyFromFileOptions).Return(&common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().Chmod(internal.ChmodOptions{Name: file, Mode: mode}).Return(&common.CloudUnreachableError{}).AnyTimes()
 	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: myHandle})
 	suite.assert.NoError(err)
 	suite.assert.False(myHandle.Dirty())
@@ -1745,12 +1744,12 @@ func (suite *fileCacheTestSuite) TestGetAttrCase2CloudDown() {
 	handle := handlemap.NewHandle(file)
 	// By default createEmptyFile is false, so we will not create these files in cloud storage until they are closed.
 	createFileOptions := internal.CreateFileOptions{Name: file, Mode: 0777}
-	suite.mock.EXPECT().CreateFile(createFileOptions).Return(handle, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(handle, &common.CloudUnreachableError{}).AnyTimes()
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 
 	// Read the Directory
 	getAttrOptions := internal.GetAttrOptions{Name: file}
-	suite.mock.EXPECT().GetAttr(getAttrOptions).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().GetAttr(getAttrOptions).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	attr, err := suite.fileCache.GetAttr(getAttrOptions)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(attr)
@@ -1927,15 +1926,15 @@ func (suite *fileCacheTestSuite) TestRenameFileInCacheCloudDown() {
 	createFileOptions := internal.CreateFileOptions{Name: src, Mode: 0666}
 	renameFileOptions := internal.RenameFileOptions{Src: src, Dst: dst}
 
-	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	createHandle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
 	time.Sleep(time.Second)
 	suite.assert.NoError(err)
-	suite.mock.EXPECT().CopyFromFile(internal.CopyFromFileOptions{Name: src, File: createHandle.FObj}).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CopyFromFile(internal.CopyFromFileOptions{Name: src, File: createHandle.FObj}).Return(&common.CloudUnreachableError{}).AnyTimes()
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: src, RetrieveMetadata: false}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: src, RetrieveMetadata: false}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
 	openHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
 	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
@@ -1947,7 +1946,7 @@ func (suite *fileCacheTestSuite) TestRenameFileInCacheCloudDown() {
 	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, src))
 	suite.assert.True(err == nil || os.IsNotExist(err))
 	// RenameFile
-	suite.mock.EXPECT().RenameFile(renameFileOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().RenameFile(renameFileOptions).Return(&common.CloudUnreachableError{}).AnyTimes()
 	err = suite.fileCache.RenameFile(renameFileOptions)
 	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
@@ -2003,13 +2002,13 @@ func (suite *fileCacheTestSuite) TestRenameFileCase2CloudDown() {
 	createFileOptions := internal.CreateFileOptions{Name: src, Mode: 0777}
 	handle := handlemap.NewHandle(src)
 
-	suite.mock.EXPECT().CreateFile(createFileOptions).Return(handle, &retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().CreateFile(createFileOptions).Return(handle, &common.CloudUnreachableError{}).AnyTimes()
 	handle, _ = suite.fileCache.CreateFile(createFileOptions)
 	time.Sleep(time.Millisecond)
 
 	renameFileOptions := internal.RenameFileOptions{Src: src, Dst: dst}
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: src, RetrieveMetadata: false}).Return(nil, &retry.MaxAttemptsError{}).AnyTimes()
-	suite.mock.EXPECT().RenameFile(renameFileOptions).Return(&retry.MaxAttemptsError{}).AnyTimes()
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: src, RetrieveMetadata: false}).Return(nil, &common.CloudUnreachableError{}).AnyTimes()
+	suite.mock.EXPECT().RenameFile(renameFileOptions).Return(&common.CloudUnreachableError{}).AnyTimes()
 	err := suite.fileCache.RenameFile(renameFileOptions)
 	time.Sleep(time.Millisecond)
 	suite.assert.True(err == nil)
