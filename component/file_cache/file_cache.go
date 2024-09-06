@@ -579,6 +579,9 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 		return err
 	}
 
+	// move cached files
+	// update cache policy
+
 	go fc.invalidateDirectory(options.Src)
 	// TLDR: Dst is guaranteed to be non-existent or empty.
 	// Note: We do not need to invalidate Dst due to the logic in our FUSE connector, see comments there.
