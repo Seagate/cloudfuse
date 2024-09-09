@@ -644,13 +644,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	newAttr.operation = "RenameDir"
 	newAttr.options = options
 	dKey := strings.Join([]string{options.Src, options.Dst}, ",") //Extract file name to serve as key
-	_, loaded := fc.fileOps.LoadOrStore(dKey, newAttr)            //LoadOrStore will add newAttr as the key value if there does not exist a value
-
-	if loaded { //If there is already a value for the given key, we must overwrite it
-
-		fc.fileOps.Delete(dKey)         //Remove old value for key
-		fc.fileOps.Store(dKey, newAttr) //Replace with new one
-	}
+	fc.fileOps.Store(dKey, newAttr)
 	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
 	fc.asyncSignal.Unlock()  // Signal to async thread to do work
 
@@ -698,13 +692,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		newAttr := FileAttributes{}
 		newAttr.operation = "CreateFile"
 		newAttr.options = options
-		_, loaded := fc.fileOps.LoadOrStore(options.Name, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
-
-		if loaded { //If there is already a value for the given key, we must overwrite it
-
-			fc.fileOps.Delete(options.Name)         //Remove old value for key
-			fc.fileOps.Store(options.Name, newAttr) //Replace with new one
-		}
+		fc.fileOps.Store(options.Name, newAttr)
 		fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
 		fc.asyncSignal.Unlock()  // Signal to async thread to do work
 	}
@@ -1013,14 +1001,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 	nextAttr := FileAttributes{}
 	nextAttr.operation = "CreateDir"
 	nextAttr.options = options
-
-	_, loaded := fc.fileOps.LoadOrStore(options.Name, nextAttr)
-
-	if loaded {
-
-		fc.fileOps.Delete(options.Name)
-		fc.fileOps.Store(options.Name, nextAttr)
-	}
+	fc.fileOps.Store(options.Name, nextAttr)
 	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
 	fc.asyncSignal.Unlock()  // Signal to async thread to do work
 
@@ -1208,14 +1189,7 @@ func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 		nextAttr := FileAttributes{}
 		nextAttr.operation = "SyncFile"
 		nextAttr.options = options
-
-		_, loaded := fc.fileOps.LoadOrStore(options.Handle.Path, nextAttr)
-
-		if loaded {
-
-			fc.fileOps.Delete(options.Handle.Path)
-			fc.fileOps.Store(options.Handle.Path, nextAttr)
-		}
+		fc.fileOps.Store(options.Handle.Path, nextAttr)
 		fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
 		fc.asyncSignal.Unlock()  // Signal to async thread to do work
 		// options.Handle.Flags.Set(handlemap.HandleFlagFSynced)
@@ -1298,14 +1272,8 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 		newAttr.operation = "FlushFile"
 		newAttr.options = fpInst
 		fName := f.Name()
-		parent := filepath.Base(fName)                       //Extract file name to serve as key
-		_, loaded := fc.fileOps.LoadOrStore(parent, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
-
-		if loaded { //If there is already a value for the given key, we must overwrite it
-
-			fc.fileOps.Delete(parent)         //Remove old value for key
-			fc.fileOps.Store(parent, newAttr) //Replace with new one
-		}
+		parent := filepath.Base(fName)
+		fc.fileOps.Store(parent, newAttr)
 		fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
 		fc.asyncSignal.Unlock()  // Signal to async thread to do work
 		options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
@@ -1441,15 +1409,10 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	newAttr.options = options
 	fKey := strings.Join([]string{options.Src, options.Dst}, ",") //Extract file name to serve as key
 	log.Trace("FileCache::RenameFile : The key in the async map is %s", fKey)
-	_, loaded := fc.fileOps.LoadOrStore(fKey, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
-
-	if loaded { //If there is already a value for the given key, we must overwrite it
-
-		fc.fileOps.Delete(fKey)         //Remove old value for key
-		fc.fileOps.Store(fKey, newAttr) //Replace with new one
-	}
+	fc.fileOps.Store(fKey, newAttr)
 	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
 	fc.asyncSignal.Unlock()  // Signal to async thread to do work
+
 	localSrcPath := common.JoinUnixFilepath(fc.tmpPath, options.Src)
 	localDstPath := common.JoinUnixFilepath(fc.tmpPath, options.Dst)
 
@@ -1559,12 +1522,7 @@ func (fc *FileCache) flushAndChmod(options internal.ChmodOptions) error {
 	newAttr := FileAttributes{}
 	newAttr.operation = "ChmodAndFlush"
 	newAttr.options = options
-	_, loaded := fc.fileOps.LoadOrStore(options.Name, newAttr)
-
-	if loaded {
-		fc.fileOps.Delete(options.Name)
-		fc.fileOps.Store(options.Name, newAttr)
-	}
+	fc.fileOps.Store(options.Name, newAttr)
 	fc.asyncSignal.TryLock()
 	fc.asyncSignal.Unlock()
 
@@ -1603,12 +1561,7 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 		newAttr := FileAttributes{}
 		newAttr.operation = "Chmod"
 		newAttr.options = options
-		_, loaded := fc.fileOps.LoadOrStore(options.Name, newAttr)
-
-		if loaded {
-			fc.fileOps.Delete(options.Name)
-			fc.fileOps.Store(options.Name, newAttr)
-		}
+		fc.fileOps.Store(options.Name, newAttr)
 		fc.asyncSignal.TryLock()
 		fc.asyncSignal.Unlock()
 
@@ -1617,12 +1570,7 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 	newAttr := FileAttributes{}
 	newAttr.operation = "Chmod"
 	newAttr.options = options
-	_, loaded := fc.fileOps.LoadOrStore(options.Name, newAttr)
-
-	if loaded {
-		fc.fileOps.Delete(options.Name)
-		fc.fileOps.Store(options.Name, newAttr)
-	}
+	fc.fileOps.Store(options.Name, newAttr)
 	fc.asyncSignal.TryLock()
 	fc.asyncSignal.Unlock()
 
@@ -1650,14 +1598,8 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 
 	newAttr := FileAttributes{}
 	newAttr.operation = "Chown"
-	newAttr.options = options                                  //Extract file name to serve as key
-	_, loaded := fc.fileOps.LoadOrStore(options.Name, newAttr) //LoadOrStore will add newAttr as the key value if there does not exist a value
-
-	if loaded { //If there is already a value for the given key, we must overwrite it
-
-		fc.fileOps.Delete(options.Name)         //Remove old value for key
-		fc.fileOps.Store(options.Name, newAttr) //Replace with new one
-	}
+	newAttr.options = options
+	fc.fileOps.Store(options.Name, newAttr)
 	fc.asyncSignal.TryLock() // Make sure we don't unlock a mutex that is not locked
 	fc.asyncSignal.Unlock()  // Signal to async thread to do work
 
