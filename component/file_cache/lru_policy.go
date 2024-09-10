@@ -223,7 +223,8 @@ func (p *lruPolicy) asyncCacheValid() {
 
 func (p *lruPolicy) cacheValidate(name string) {
 
-	// write new, or get existing entry
+	// get existing entry, or if it doesn't exist then
+	//  write a new one and return it
 	val, _ := p.nodeMap.LoadOrStore(name, &lruNode{
 		name:    name,
 		next:    nil,
