@@ -222,21 +222,18 @@ func (p *lruPolicy) asyncCacheValid() {
 }
 
 func (p *lruPolicy) cacheValidate(name string) {
-	var node *lruNode = nil
 
-	val, found := p.nodeMap.Load(name)
-	if !found {
-		node = &lruNode{
-			name:    name,
-			next:    nil,
-			prev:    nil,
-			usage:   0,
-			deleted: false,
-		}
-		p.nodeMap.Store(name, node)
-	} else {
-		node = val.(*lruNode)
+	// create a new node (in case the entry doesn't exist)
+	node := &lruNode{
+		name:    name,
+		next:    nil,
+		prev:    nil,
+		usage:   0,
+		deleted: false,
 	}
+	// write new, or get existing entry
+	val, _ := p.nodeMap.LoadOrStore(name, node)
+	node = val.(*lruNode)
 
 	p.Lock()
 	defer p.Unlock()
