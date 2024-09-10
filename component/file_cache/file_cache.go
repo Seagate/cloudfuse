@@ -580,6 +580,43 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	}
 
 	// move cached files
+	localSrcPath := common.JoinUnixFilepath(fc.tmpPath, options.Src)
+	localDstPath := common.JoinUnixFilepath(fc.tmpPath, options.Dst)
+	// in case of git clone multiple rename requests come for which destination files already exists in system
+	// if we do not perform rename operation locally and those destination files are cached then next time they are read
+	// we will be serving the wrong content (as we did not rename locally, we still be having older destination files with
+	// stale content). We either need to remove dest file as well from cache or just run rename to replace the content.
+	err = os.Rename(localSrcPath, localDstPath)
+	if err != nil && !os.IsNotExist(err) {
+		log.Err("FileCache::RenameFile : %s failed to rename local file %s [%s]", localSrcPath, err.Error())
+	}
+
+	if err != nil {
+		// If there was a problem in local rename then delete the destination file
+		// it might happen that dest file was already there and local rename failed
+		// so deleting local dest file ensures next open of that will get the updated file from container
+		err = deleteFile(localDstPath)
+		if err != nil && !os.IsNotExist(err) {
+			log.Err("FileCache::RenameFile : %s failed to delete local file %s [%s]", localDstPath, err.Error())
+		}
+
+		fc.policy.CachePurge(localDstPath)
+	}
+
+	err = deleteFile(localSrcPath)
+	if err != nil && !os.IsNotExist(err) {
+		log.Err("FileCache::RenameFile : %s failed to delete local file %s [%s]", localSrcPath, err.Error())
+	}
+
+	fc.policy.CachePurge(localSrcPath)
+	//TODO: remove cacheTimeout = 0 functionality. Doesn't work well with cloudfuses' intent
+	if fc.cacheTimeout == 0 {
+		// Destination file needs to be deleted immediately
+		fc.policy.CachePurge(localDstPath)
+	} else {
+		// Add destination file to cache, it will be removed on timeout
+		fc.policy.CacheValid(localDstPath)
+	}
 	// update cache policy
 
 	go fc.invalidateDirectory(options.Src)
