@@ -109,7 +109,7 @@ func deleteFile(name string) error {
 			return err
 		}
 
-		err = os.Remove(name)
+		return deleteFile(name)
 	} else if err != nil && os.IsNotExist(err) {
 		log.Debug("cachePolicy::deleteFile : %s does not exist in local cache", name)
 		return nil
