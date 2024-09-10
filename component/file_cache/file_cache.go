@@ -1305,7 +1305,13 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	// if we do not perform rename operation locally and those destination files are cached then next time they are read
 	// we will be serving the wrong content (as we did not rename locally, we still be having older destination files with
 	// stale content). We either need to remove dest file as well from cache or just run rename to replace the content.
-	err = os.Rename(localSrcPath, localDstPath)
+	fc.renameCachedFile(localSrcPath, localDstPath)
+
+	return nil
+}
+
+func (fc *FileCache) renameCachedFile(localSrcPath string, localDstPath string) {
+	err := os.Rename(localSrcPath, localDstPath)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("FileCache::RenameFile : %s failed to rename local file %s [%s]", localSrcPath, err.Error())
 	}
@@ -1336,8 +1342,6 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 		// Add destination file to cache, it will be removed on timeout
 		fc.policy.CacheValid(localDstPath)
 	}
-
-	return nil
 }
 
 // TruncateFile: Update the file with its new size.
