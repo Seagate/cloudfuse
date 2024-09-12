@@ -433,7 +433,7 @@ func (fc *FileCache) invalidateDirectory(name string) {
 	})
 
 	// clean up leftover source directories in reverse order
-	for i := len(directoriesToPurge); i >= 0; i-- {
+	for i := len(directoriesToPurge) - 1; i >= 0; i-- {
 		fc.policy.CachePurge(directoriesToPurge[i])
 	}
 
@@ -627,7 +627,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	})
 
 	// clean up leftover source directories in reverse order
-	for i := len(directoriesToPurge); i >= 0; i-- {
+	for i := len(directoriesToPurge) - 1; i >= 0; i-- {
 		fc.policy.CachePurge(directoriesToPurge[i])
 	}
 
