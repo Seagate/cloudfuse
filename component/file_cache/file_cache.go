@@ -567,7 +567,7 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	return fc.NextComponent().IsDirEmpty(options)
 }
 
-// RenameDir: Recursively invalidate the source directory and its children
+// RenameDir: Recursively move the source directory
 func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("FileCache::RenameDir : src=%s, dst=%s", options.Src, options.Dst)
 
@@ -577,49 +577,46 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 		return err
 	}
 
-	// move cached files
+	// updated local storage
 	localSrcPath := common.JoinUnixFilepath(fc.tmpPath, options.Src)
+	// move the files
 	localDstPath := common.JoinUnixFilepath(fc.tmpPath, options.Dst)
-	// in case of git clone multiple rename requests come for which destination files already exists in system
-	// if we do not perform rename operation locally and those destination files are cached then next time they are read
-	// we will be serving the wrong content (as we did not rename locally, we still be having older destination files with
-	// stale content). We either need to remove dest file as well from cache or just run rename to replace the content.
-	err = os.Rename(localSrcPath, localDstPath)
-	if err != nil && !os.IsNotExist(err) {
-		log.Err("FileCache::RenameFile : %s failed to rename local file %s [%s]", localSrcPath, err.Error())
-	}
-
-	if err != nil {
-		// If there was a problem in local rename then delete the destination file
-		// it might happen that dest file was already there and local rename failed
-		// so deleting local dest file ensures next open of that will get the updated file from container
-		err = deleteFile(localDstPath)
-		if err != nil && !os.IsNotExist(err) {
-			log.Err("FileCache::RenameFile : %s failed to delete local file %s [%s]", localDstPath, err.Error())
+	// WalkDir goes through the tree in lexical order so 'dir' always comes before 'dir/file'
+	_ = filepath.WalkDir(localSrcPath, func(path string, d fs.DirEntry, err error) error {
+		if err == nil && d != nil {
+			newPath := strings.Replace(path, localSrcPath, localDstPath, 1)
+			if !d.IsDir() {
+				renameErr := os.Rename(path, newPath)
+				if renameErr != nil {
+					// if rename fails, we just delete the source file anyway
+					log.Warn("FileCache::RenameDir : Failed to rename local file %s -> %s. Here's why: %v", path, newPath, renameErr)
+				} else {
+					fc.policy.CacheValid(newPath)
+				}
+				// delete the source from our cache policy
+				// this will also delete the source file from local storage (if rename failed)
+				fc.policy.CachePurge(path)
+			} else {
+				// create the new directory
+				mkdirErr := os.MkdirAll(newPath, fc.defaultPermission)
+				if mkdirErr != nil {
+					// log any error but do nothing about it
+					log.Warn("FileCache::RenameDir : Failed to created directory %s. Here's why: %v", newPath, mkdirErr)
+				}
+				// defer deleting the src directory (until after its contents are deleted)
+				defer fc.policy.CachePurge(path)
+			}
+		} else {
+			// none of the files that were moved actually exist in local storage
+			if os.IsNotExist(err) {
+				log.Info("FileCache::RenameDir : %s does not exist in local cache.", options.Src)
+			} else if err != nil {
+				log.Warn("FileCache::RenameDir : %s stat err [%v].", options.Src, err)
+			}
 		}
+		return nil
+	})
 
-		fc.policy.CachePurge(localDstPath)
-	}
-
-	err = deleteFile(localSrcPath)
-	if err != nil && !os.IsNotExist(err) {
-		log.Err("FileCache::RenameFile : %s failed to delete local file %s [%s]", localSrcPath, err.Error())
-	}
-
-	fc.policy.CachePurge(localSrcPath)
-	//TODO: remove cacheTimeout = 0 functionality. Doesn't work well with cloudfuses' intent
-	if fc.cacheTimeout == 0 {
-		// Destination file needs to be deleted immediately
-		fc.policy.CachePurge(localDstPath)
-	} else {
-		// Add destination file to cache, it will be removed on timeout
-		fc.policy.CacheValid(localDstPath)
-	}
-	// update cache policy
-
-	go fc.invalidateDirectory(options.Src)
-	// TLDR: Dst is guaranteed to be non-existent or empty.
-	// Note: We do not need to invalidate Dst due to the logic in our FUSE connector, see comments there.
 	return nil
 }
 
