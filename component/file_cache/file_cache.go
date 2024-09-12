@@ -452,7 +452,7 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 		// rest api delete will fail while we still need to cleanup the local cache for the same
 	}
 
-	go fc.invalidateDirectory(options.Name)
+	fc.invalidateDirectory(options.Name)
 	return err
 }
 
