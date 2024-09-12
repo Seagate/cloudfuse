@@ -412,14 +412,15 @@ func (fc *FileCache) invalidateDirectory(name string) {
 	localPath := filepath.Join(fc.tmpPath, name)
 	// TODO : wouldn't this cause a race condition? a thread might get the lock before we purge - and the file would be non-existent
 	// WalkDir goes through the tree in lexical order so 'dir' always comes before 'dir/file'
+	var directoriesToPurge []string
 	err := filepath.WalkDir(localPath, func(path string, d fs.DirEntry, err error) error {
 		if err == nil && d != nil {
 			log.Debug("FileCache::invalidateDirectory : %s getting removed from cache", path)
 			if !d.IsDir() {
 				fc.policy.CachePurge(path)
 			} else {
-				// defer directory deletion (after its children are gone)
-				defer fc.policy.CachePurge(path)
+				// remember to delete the directory later (after its children)
+				directoriesToPurge = append(directoriesToPurge, path)
 			}
 		} else {
 			if os.IsNotExist(err) {
@@ -430,6 +431,11 @@ func (fc *FileCache) invalidateDirectory(name string) {
 		}
 		return nil
 	})
+
+	// clean up leftover source directories in reverse order
+	for i := len(directoriesToPurge); i >= 0; i-- {
+		fc.policy.CachePurge(directoriesToPurge[i])
+	}
 
 	if err != nil {
 		log.Debug("FileCache::invalidateDirectory : Failed to walk directory %s. Here's why: %v", localPath, err)
@@ -582,10 +588,12 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	// move the files
 	localDstPath := common.JoinUnixFilepath(fc.tmpPath, options.Dst)
 	// WalkDir goes through the tree in lexical order so 'dir' always comes before 'dir/file'
+	var directoriesToPurge []string
 	_ = filepath.WalkDir(localSrcPath, func(path string, d fs.DirEntry, err error) error {
 		if err == nil && d != nil {
 			newPath := strings.Replace(path, localSrcPath, localDstPath, 1)
 			if !d.IsDir() {
+				log.Debug("FileCache::RenameDir : Renaming local file %s -> %s...", path, newPath)
 				renameErr := os.Rename(path, newPath)
 				if renameErr != nil {
 					// if rename fails, we just delete the source file anyway
@@ -597,14 +605,15 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				// this will also delete the source file from local storage (if rename failed)
 				fc.policy.CachePurge(path)
 			} else {
+				log.Debug("FileCache::RenameDir : Renaming local directory %s -> %s...", path, newPath)
 				// create the new directory
 				mkdirErr := os.MkdirAll(newPath, fc.defaultPermission)
 				if mkdirErr != nil {
 					// log any error but do nothing about it
 					log.Warn("FileCache::RenameDir : Failed to created directory %s. Here's why: %v", newPath, mkdirErr)
 				}
-				// defer deleting the src directory (until after its contents are deleted)
-				defer fc.policy.CachePurge(path)
+				// remember to delete the src directory later (after its contents are deleted)
+				directoriesToPurge = append(directoriesToPurge, path)
 			}
 		} else {
 			// none of the files that were moved actually exist in local storage
@@ -616,6 +625,11 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 		}
 		return nil
 	})
+
+	// clean up leftover source directories in reverse order
+	for i := len(directoriesToPurge); i >= 0; i-- {
+		fc.policy.CachePurge(directoriesToPurge[i])
+	}
 
 	return nil
 }
