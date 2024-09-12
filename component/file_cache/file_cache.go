@@ -410,31 +410,29 @@ func (fc *FileCache) invalidateDirectory(name string) {
 	log.Trace("FileCache::invalidateDirectory : %s", name)
 
 	localPath := filepath.Join(fc.tmpPath, name)
-	_, err := os.Stat(localPath)
-	if os.IsNotExist(err) {
-		log.Info("FileCache::invalidateDirectory : %s does not exist in local cache.", name)
-		return
-	} else if err != nil {
-		log.Debug("FileCache::invalidateDirectory : %s stat err [%s].", name, err.Error())
-		return
-	}
 	// TODO : wouldn't this cause a race condition? a thread might get the lock before we purge - and the file would be non-existent
 	// WalkDir goes through the tree in lexical order so 'dir' always comes before 'dir/file'
-	// Save the paths in lexical order and delete them in reverse order so folders are deleted after their children
-	var pathsToPurge []string
-	err = filepath.WalkDir(localPath, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(localPath, func(path string, d fs.DirEntry, err error) error {
 		if err == nil && d != nil {
-			pathsToPurge = append(pathsToPurge, path)
+			log.Debug("FileCache::invalidateDirectory : %s getting removed from cache", path)
+			if !d.IsDir() {
+				fc.policy.CachePurge(path)
+			} else {
+				// defer directory deletion (after its children are gone)
+				defer fc.policy.CachePurge(path)
+			}
+		} else {
+			if os.IsNotExist(err) {
+				log.Info("FileCache::invalidateDirectory : %s does not exist in local cache.", name)
+			} else if err != nil {
+				log.Warn("FileCache::invalidateDirectory : %s stat err [%s].", name, err.Error())
+			}
 		}
 		return nil
 	})
-	for i := len(pathsToPurge) - 1; i >= 0; i-- {
-		log.Debug("FileCache::invalidateDirectory : %s getting removed from cache", pathsToPurge[i])
-		fc.policy.CachePurge(pathsToPurge[i])
-	}
 
 	if err != nil {
-		log.Debug("FileCache::invalidateDirectory : Failed to iterate directory %s [%s].", localPath, err.Error())
+		log.Debug("FileCache::invalidateDirectory : Failed to walk directory %s. Here's why: %v", localPath, err)
 		return
 	}
 }
