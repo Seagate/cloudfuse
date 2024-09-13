@@ -162,7 +162,7 @@ func (c *FileCache) Start(ctx context.Context) error {
 	log.Trace("Starting component : %s", c.Name())
 
 	if c.cleanupOnStart {
-		err := c.TempCacheCleanup()
+		err := common.TempCacheCleanup(c.tmpPath)
 		if err != nil {
 			return fmt.Errorf("error in %s error [fail to cleanup temp cache]", c.Name())
 		}
@@ -196,32 +196,10 @@ func (c *FileCache) Stop() error {
 
 	_ = c.policy.ShutdownPolicy()
 	if !c.allowNonEmpty {
-		_ = c.TempCacheCleanup()
+		_ = common.TempCacheCleanup(c.tmpPath)
 	}
 
 	fileCacheStatsCollector.Destroy()
-
-	return nil
-}
-
-func (c *FileCache) TempCacheCleanup() error {
-	// TODO : Cleanup temp cache dir before exit
-	if !isLocalDirEmpty(c.tmpPath) {
-		log.Err("FileCache::TempCacheCleanup : Cleaning up temp directory %s", c.tmpPath)
-
-		dirents, err := os.ReadDir(c.tmpPath)
-		if err != nil {
-			return nil
-		}
-
-		for _, entry := range dirents {
-			localPath := common.JoinUnixFilepath(c.tmpPath, entry.Name())
-			err = os.RemoveAll(localPath)
-			if err != nil {
-				log.Warn("FileCache::TempCacheCleanup : os.RemoveAll(%s) failed [%v]", localPath, err)
-			}
-		}
-	}
 
 	return nil
 }
@@ -256,7 +234,6 @@ func (c *FileCache) Configure(_ bool) error {
 	c.cleanupOnStart = conf.CleanupOnStart
 	c.policyTrace = conf.EnablePolicyTrace
 	c.offloadIO = conf.OffloadIO
-	c.maxCacheSize = conf.MaxSizeMB
 	c.syncToFlush = conf.SyncToFlush
 	c.syncToDelete = !conf.SyncNoOp
 	c.refreshSec = conf.RefreshSec
@@ -291,6 +268,19 @@ func (c *FileCache) Configure(_ bool) error {
 		}
 	}
 
+	var stat syscall.Statfs_t
+	err = syscall.Statfs(c.tmpPath, &stat)
+	if err != nil {
+		log.Err("FileCache::Configure : config error %s [%s]. Assigning a default value of 4GB or if any value is assigned to .disk-size-mb in config.", c.Name(), err.Error())
+		c.maxCacheSize = 4192 * MB
+	} else {
+		c.maxCacheSize = 0.8 * float64(stat.Bavail) * float64(stat.Bsize)
+	}
+
+	if config.IsSet(compName+".max-size-mb") && conf.MaxSizeMB != 0 {
+		c.maxCacheSize = conf.MaxSizeMB
+	}
+
 	if !isLocalDirEmpty(c.tmpPath) && !c.allowNonEmpty {
 		log.Err("FileCache: config error %s directory is not empty", c.tmpPath)
 		return fmt.Errorf("config error in %s [%s]", c.Name(), "temp directory not empty")
@@ -309,16 +299,7 @@ func (c *FileCache) Configure(_ bool) error {
 	}
 
 	cacheConfig := c.GetPolicyConfig(conf)
-
-	switch strings.ToLower(conf.Policy) {
-	case "lru":
-		c.policy = NewLRUPolicy(cacheConfig)
-	case "lfu":
-		c.policy = NewLFUPolicy(cacheConfig)
-	default:
-		log.Info("FileCache::Configure : Using default eviction policy")
-		c.policy = NewLRUPolicy(cacheConfig)
-	}
+	c.policy = NewLRUPolicy(cacheConfig)
 
 	if c.policy == nil {
 		log.Err("FileCache::Configure : failed to create cache eviction policy")
@@ -1134,12 +1115,28 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 		// Write to storage
 		// Create a new handle for the SDK to use to upload (read local file)
 		// The local handle can still be used for read and write.
+		var orgMode fs.FileMode
+		modeChanged := false
+
 		uploadHandle, err := common.Open(localPath)
 		if err != nil {
-			log.Err("FileCache::FlushFile : error [unable to open upload handle] %s [%s]", options.Handle.Path, err.Error())
-			return nil
-		}
+			if os.IsPermission(err) {
+				info, _ := os.Stat(localPath)
+				orgMode = info.Mode()
+				newMode := orgMode | 0444
+				err = os.Chmod(localPath, newMode)
+				if err == nil {
+					modeChanged = true
+					uploadHandle, err = common.Open(localPath)
+					log.Info("FileCache::FlushFile : read mode added to file %s", options.Handle.Path)
+				}
+			}
 
+			if err != nil {
+				log.Err("FileCache::FlushFile : error [unable to open upload handle] %s [%s]", options.Handle.Path, err.Error())
+				return err
+			}
+		}
 		err = fc.NextComponent().CopyFromFile(
 			internal.CopyFromFileOptions{
 				Name: options.Handle.Path,
@@ -1147,6 +1144,14 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 			})
 
 		uploadHandle.Close()
+
+		if modeChanged {
+			err1 := os.Chmod(localPath, orgMode)
+			if err1 != nil {
+				log.Err("FileCache::FlushFile : Failed to remove read mode from file %s [%s]", options.Handle.Path, err1.Error())
+			}
+		}
+
 		if err != nil {
 			log.Err("FileCache::FlushFile : %s upload failed [%s]", options.Handle.Path, err.Error())
 			return err

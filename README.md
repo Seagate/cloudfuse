@@ -1,3 +1,4 @@
+
 # Cloudfuse - An S3 and Azure Storage FUSE driver
 
 Cloudfuse provides the ability to mount a cloud bucket in your local filesystem on Linux and Windows with a GUI for easy configuration.
@@ -235,4 +236,4 @@ This project welcomes contributions and suggestions.
 
 This project is governed by the [code of conduct](CODE_OF_CONDUCT.md).  
 You are expected to follow this as you contribute to the project.  
-Please report all unacceptable behavior to [opensource@seagate.com](mailto:opensource@seagate.com).
+Please report all unacceptable behavior to [opensource@seagate.com](mailto:opensource@seagate.com)
