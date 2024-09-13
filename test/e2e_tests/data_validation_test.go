@@ -135,6 +135,26 @@ func (suite *dataValidationTestSuite) computeMD5(filePath string) []byte {
 	return hash.Sum(nil)
 }
 
+// Computes MD5 and returns the 32byte slice which represents the hash value
+func (suite *dataValidationTestSuite) computeMD5(filePath string) []byte {
+	fh, err := os.Open(filePath)
+	suite.Nil(err)
+
+	fi, err := fh.Stat()
+	suite.Nil(err)
+	size := fi.Size()
+
+	hash := md5.New()
+	bytesCopied, err := io.Copy(hash, fh)
+	suite.Nil(err)
+	suite.Equal(size, bytesCopied)
+
+	err = fh.Close()
+	suite.Nil(err)
+
+	return hash.Sum(nil)
+}
+
 func (suite *dataValidationTestSuite) validateData(localFilePath string, remoteFilePath string) {
 	localMD5sum := suite.computeMD5(localFilePath)
 	remoteMD5sum := suite.computeMD5(remoteFilePath)
