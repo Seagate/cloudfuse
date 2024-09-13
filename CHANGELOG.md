@@ -1,5 +1,15 @@
 # Cloudfuse Changelog #
 
+## **1.5.0** ##
+
+August 28th 2024
+This version is based on [blobfuse2 2.3.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.0) (upstream).
+
+### Changes ###
+
+- [#307](https://github.com/Seagate/cloudfuse/pull/307) Allow all users to write to the mount by default (Windows only)
+- [#309](https://github.com/Seagate/cloudfuse/pull/309) Uninstaller now removes WinFSP (Windows only)
+
 ## **1.4.0** ##
 
 August 7th 2024

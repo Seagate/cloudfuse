@@ -370,7 +370,8 @@ func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 		stat.Namemax = attr.Namemax
 	} else {
 		var free, total, avail uint64
-		total = common.TbToBytes
+		// TODO: if display capacity is specified, should it overwrite populated Bavail?
+		total = fuseFS.displayCapacityMb * common.MbToBytes
 		avail = total
 		free = total
 
