@@ -31,6 +31,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 )
 
@@ -123,7 +124,7 @@ func (l *lfuPolicy) Name() string {
 }
 
 func (l *lfuPolicy) clearItemFromCache(path string) {
-	azPath := strings.TrimPrefix(path, l.tmpPath)
+	azPath := common.NormalizeObjectName(strings.TrimPrefix(path, l.tmpPath))
 	if azPath[0] == '/' {
 		azPath = azPath[1:]
 	}
