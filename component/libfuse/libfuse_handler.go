@@ -94,6 +94,7 @@ type Libfuse struct {
 	maxFuseThreads        uint32
 	directIO              bool
 	umask                 uint32
+	displayCapacityMb     uint64
 }
 
 // Note: libfuse prepends "/" to the path.
