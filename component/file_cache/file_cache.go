@@ -423,6 +423,8 @@ func (fc *FileCache) invalidateDirectory(name string) {
 				directoriesToPurge = append(directoriesToPurge, path)
 			}
 		} else {
+			// stat(localPath) failed. err is the one returned by stat
+			// documentation: https://pkg.go.dev/io/fs#WalkDirFunc
 			if os.IsNotExist(err) {
 				log.Info("FileCache::invalidateDirectory : %s does not exist in local cache.", name)
 			} else if err != nil {
@@ -583,9 +585,8 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 		return err
 	}
 
-	// updated local storage
+	// move the files in local storage
 	localSrcPath := common.JoinUnixFilepath(fc.tmpPath, options.Src)
-	// move the files
 	localDstPath := common.JoinUnixFilepath(fc.tmpPath, options.Dst)
 	// WalkDir goes through the tree in lexical order so 'dir' always comes before 'dir/file'
 	var directoriesToPurge []string
@@ -594,16 +595,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 			newPath := strings.Replace(path, localSrcPath, localDstPath, 1)
 			if !d.IsDir() {
 				log.Debug("FileCache::RenameDir : Renaming local file %s -> %s...", path, newPath)
-				renameErr := os.Rename(path, newPath)
-				if renameErr != nil {
-					// if rename fails, we just delete the source file anyway
-					log.Warn("FileCache::RenameDir : Failed to rename local file %s -> %s. Here's why: %v", path, newPath, renameErr)
-				} else {
-					fc.policy.CacheValid(newPath)
-				}
-				// delete the source from our cache policy
-				// this will also delete the source file from local storage (if rename failed)
-				fc.policy.CachePurge(path)
+				fc.renameCachedFile(path, newPath)
 			} else {
 				log.Debug("FileCache::RenameDir : Renaming local directory %s -> %s...", path, newPath)
 				// create the new directory
@@ -616,8 +608,10 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				directoriesToPurge = append(directoriesToPurge, path)
 			}
 		} else {
-			// none of the files that were moved actually exist in local storage
+			// stat(localPath) failed. err is the one returned by stat
+			// documentation: https://pkg.go.dev/io/fs#WalkDirFunc
 			if os.IsNotExist(err) {
+				// none of the files that were moved actually exist in local storage
 				log.Info("FileCache::RenameDir : %s does not exist in local cache.", options.Src)
 			} else if err != nil {
 				log.Warn("FileCache::RenameDir : %s stat err [%v].", options.Src, err)
@@ -629,6 +623,11 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	// clean up leftover source directories in reverse order
 	for i := len(directoriesToPurge) - 1; i >= 0; i-- {
 		fc.policy.CachePurge(directoriesToPurge[i])
+	}
+
+	if fc.cacheTimeout == 0 {
+		// delete destination path immediately
+		fc.invalidateDirectory(options.Dst)
 	}
 
 	return nil
@@ -1321,35 +1320,19 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 
 func (fc *FileCache) renameCachedFile(localSrcPath string, localDstPath string) {
 	err := os.Rename(localSrcPath, localDstPath)
-	if err != nil && !os.IsNotExist(err) {
-		log.Err("FileCache::RenameFile : %s failed to rename local file %s [%s]", localSrcPath, err.Error())
-	}
-
 	if err != nil {
-		// If there was a problem in local rename then delete the destination file
-		// it might happen that dest file was already there and local rename failed
-		// so deleting local dest file ensures next open of that will get the updated file from container
-		err = deleteFile(localDstPath)
-		if err != nil && !os.IsNotExist(err) {
-			log.Err("FileCache::RenameFile : %s failed to delete local file %s [%s]", localDstPath, err.Error())
-		}
-
-		fc.policy.CachePurge(localDstPath)
+		// if rename fails, we just delete the source file anyway
+		log.Warn("FileCache::RenameDir : Failed to rename local file %s -> %s. Here's why: %v", localSrcPath, localDstPath, err)
+	} else {
+		fc.policy.CacheValid(localDstPath)
 	}
-
-	err = deleteFile(localSrcPath)
-	if err != nil && !os.IsNotExist(err) {
-		log.Err("FileCache::RenameFile : %s failed to delete local file %s [%s]", localSrcPath, err.Error())
-	}
-
+	// delete the source from our cache policy
+	// this will also delete the source file from local storage (if rename failed)
 	fc.policy.CachePurge(localSrcPath)
 
 	if fc.cacheTimeout == 0 {
 		// Destination file needs to be deleted immediately
 		fc.policy.CachePurge(localDstPath)
-	} else {
-		// Add destination file to cache, it will be removed on timeout
-		fc.policy.CacheValid(localDstPath)
 	}
 }
 
