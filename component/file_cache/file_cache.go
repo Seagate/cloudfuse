@@ -415,8 +415,8 @@ func (fc *FileCache) invalidateDirectory(name string) {
 	var directoriesToPurge []string
 	err := filepath.WalkDir(localPath, func(path string, d fs.DirEntry, err error) error {
 		if err == nil && d != nil {
-			log.Debug("FileCache::invalidateDirectory : %s getting removed from cache", path)
 			if !d.IsDir() {
+				log.Debug("FileCache::invalidateDirectory : removing file %s from cache", path)
 				fc.policy.CachePurge(path)
 			} else {
 				// remember to delete the directory later (after its children)
@@ -436,6 +436,7 @@ func (fc *FileCache) invalidateDirectory(name string) {
 
 	// clean up leftover source directories in reverse order
 	for i := len(directoriesToPurge) - 1; i >= 0; i-- {
+		log.Debug("FileCache::invalidateDirectory : removing dir %s from cache", directoriesToPurge[i])
 		fc.policy.CachePurge(directoriesToPurge[i])
 	}
 
@@ -594,10 +595,10 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 		if err == nil && d != nil {
 			newPath := strings.Replace(path, localSrcPath, localDstPath, 1)
 			if !d.IsDir() {
-				log.Debug("FileCache::RenameDir : Renaming local file %s -> %s...", path, newPath)
+				log.Debug("FileCache::RenameDir : Renaming local file %s -> %s", path, newPath)
 				fc.renameCachedFile(path, newPath)
 			} else {
-				log.Debug("FileCache::RenameDir : Renaming local directory %s -> %s...", path, newPath)
+				log.Debug("FileCache::RenameDir : Creating local destination directory %s", newPath)
 				// create the new directory
 				mkdirErr := os.MkdirAll(newPath, fc.defaultPermission)
 				if mkdirErr != nil {
@@ -622,11 +623,13 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 
 	// clean up leftover source directories in reverse order
 	for i := len(directoriesToPurge) - 1; i >= 0; i-- {
+		log.Debug("FileCache::RenameDir : Removing local directory %s", directoriesToPurge[i])
 		fc.policy.CachePurge(directoriesToPurge[i])
 	}
 
 	if fc.cacheTimeout == 0 {
 		// delete destination path immediately
+		log.Info("FileCache::RenameDir : Timeout is zero, so removing local destination %s", options.Dst)
 		go fc.invalidateDirectory(options.Dst)
 	}
 
