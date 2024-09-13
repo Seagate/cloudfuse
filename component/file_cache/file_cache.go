@@ -587,8 +587,8 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	}
 
 	// move the files in local storage
-	localSrcPath := common.JoinUnixFilepath(fc.tmpPath, options.Src)
-	localDstPath := common.JoinUnixFilepath(fc.tmpPath, options.Dst)
+	localSrcPath := filepath.Join(fc.tmpPath, options.Src)
+	localDstPath := filepath.Join(fc.tmpPath, options.Dst)
 	// WalkDir goes through the tree in lexical order so 'dir' always comes before 'dir/file'
 	var directoriesToPurge []string
 	_ = filepath.WalkDir(localSrcPath, func(path string, d fs.DirEntry, err error) error {
