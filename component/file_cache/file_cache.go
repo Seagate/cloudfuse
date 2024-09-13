@@ -627,7 +627,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 
 	if fc.cacheTimeout == 0 {
 		// delete destination path immediately
-		fc.invalidateDirectory(options.Dst)
+		go fc.invalidateDirectory(options.Dst)
 	}
 
 	return nil
@@ -1332,7 +1332,7 @@ func (fc *FileCache) renameCachedFile(localSrcPath string, localDstPath string) 
 
 	if fc.cacheTimeout == 0 {
 		// Destination file needs to be deleted immediately
-		fc.policy.CachePurge(localDstPath)
+		go fc.policy.CachePurge(localDstPath)
 	}
 }
 
