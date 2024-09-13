@@ -298,7 +298,7 @@ func ExpandPath(path string) string {
 
 	path = os.ExpandEnv(path)
 	path, _ = filepath.Abs(path)
-	path = filepath.Join(path)
+	path = JoinUnixFilepath(path)
 	return path
 }
 

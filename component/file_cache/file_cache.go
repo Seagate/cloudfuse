@@ -268,7 +268,7 @@ func (c *FileCache) Configure(_ bool) error {
 		return fmt.Errorf("config error in %s [%s]", c.Name(), err.Error())
 	}
 
-	c.tmpPath = common.ExpandPath(conf.TmpPath)
+	c.tmpPath = filepath.Clean(common.ExpandPath(conf.TmpPath))
 	if c.tmpPath == "" {
 		log.Err("FileCache: config error [tmp-path not set]")
 		return fmt.Errorf("config error in %s error [tmp-path not set]", c.Name())
