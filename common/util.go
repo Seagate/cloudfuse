@@ -276,19 +276,19 @@ func ExpandPath(path string) string {
 		if err != nil {
 			return path
 		}
-		path = filepath.Join(homeDir, path[2:])
+		path = JoinUnixFilepath(homeDir, path[2:])
 	} else if strings.HasPrefix(path, "$HOME/") {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			return path
 		}
-		path = filepath.Join(homeDir, path[6:])
+		path = JoinUnixFilepath(homeDir, path[6:])
 	} else if strings.HasPrefix(path, "/$HOME/") {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			return path
 		}
-		path = filepath.Join(homeDir, path[7:])
+		path = JoinUnixFilepath(homeDir, path[7:])
 	}
 
 	// If it is a drive letter don't add a trailing slash
