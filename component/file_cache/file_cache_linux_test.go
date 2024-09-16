@@ -142,7 +142,10 @@ func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 	path := "file34"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	// Open and read data from the file to keep it in file cache
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
+	var buff []byte
+	suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: openHandle, Data: buff})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
