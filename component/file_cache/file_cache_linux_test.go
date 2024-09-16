@@ -145,19 +145,19 @@ func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
 
 	// Path should be in the file cache
-	_, err := os.Stat(suite.cache_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.cache_path + "/" + path)
 	// Path should be in fake storage
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	// Chmod
-	err = suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0755)})
+	err := suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0755)})
 	suite.assert.NoError(err)
 	// Path in fake storage and file cache should be updated
-	info, _ := os.Stat(suite.cache_path + "/" + path)
+	info, err := os.Stat(suite.cache_path + "/" + path)
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(0755, info.Mode())
-	info, _ = os.Stat(suite.fake_storage_path + "/" + path)
+	info, err = os.Stat(suite.fake_storage_path + "/" + path)
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(0755, info.Mode())
 
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
