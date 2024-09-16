@@ -236,16 +236,13 @@ func (lfs *LoopbackFS) RenameFile(options internal.RenameFileOptions) error {
 
 func (lfs *LoopbackFS) ReadLink(options internal.ReadLinkOptions) (string, error) {
 	log.Trace("LoopbackFS::ReadLink : name=%s", options.Name)
-	path := filepath.Join(lfs.path, options.Name)
+	path := common.JoinUnixFilepath(lfs.path, options.Name)
 	targetPath, err := os.Readlink(path)
 	if err != nil {
 		log.Err("LoopbackFS::ReadLink : error [%s]", err)
 		return "", err
 	}
-	// this is emulating cloud storage - it should use the unix path style
-	targetPath = common.NormalizeObjectName(targetPath)
-	prefix := common.NormalizeObjectName(lfs.path)
-	return strings.TrimPrefix(targetPath, prefix), nil
+	return strings.TrimPrefix(targetPath, lfs.path), nil
 }
 
 func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
