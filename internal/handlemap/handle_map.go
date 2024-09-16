@@ -74,7 +74,7 @@ type Handle struct {
 	UnixFD   uint64                 // Unix FD created by create/open syscall
 	OptCnt   uint64                 // Number of operations done on this file
 	Flags    common.BitMap16        // Various states of the file
-	Path     string                 // Always holds path relative to mount dir
+	Path     string                 // Always holds path relative to mount dir, same as object name (uses common.JoinUnixFilepath)
 	values   map[string]interface{} // Map to hold other info if application wants to store
 }
 

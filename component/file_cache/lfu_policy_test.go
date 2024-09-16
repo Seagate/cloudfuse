@@ -47,7 +47,7 @@ type lfuPolicyTestSuite struct {
 	policy *lfuPolicy
 }
 
-var cache_path = common.JoinUnixFilepath(home_dir, "file_cache")
+var cache_path = filepath.Join(home_dir, "file_cache")
 
 func (suite *lfuPolicyTestSuite) SetupTest() {
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
