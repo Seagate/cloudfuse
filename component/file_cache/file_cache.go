@@ -51,8 +51,8 @@ import (
 type FileCache struct {
 	internal.BaseComponent
 
-	tmpPath   string
-	fileLocks *common.LockMap
+	tmpPath   string          // uses os.Separator (filepath.Join)
+	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
 	policy    cachePolicy
 
 	createEmptyFile bool
@@ -60,8 +60,8 @@ type FileCache struct {
 	cacheTimeout    float64
 	cleanupOnStart  bool
 	policyTrace     bool
-	missedChmodList sync.Map
-	mountPath       string
+	missedChmodList sync.Map // uses object name (common.JoinUnixFilepath)
+	mountPath       string   // uses os.Separator (filepath.Join)
 	allowOther      bool
 	offloadIO       bool
 	syncToFlush     bool
@@ -245,14 +245,14 @@ func (c *FileCache) Configure(_ bool) error {
 		return fmt.Errorf("config error in %s [%s]", c.Name(), err.Error())
 	}
 
-	c.tmpPath = common.ExpandPath(conf.TmpPath)
+	c.tmpPath = filepath.Clean(common.ExpandPath(conf.TmpPath))
 	if c.tmpPath == "" {
 		log.Err("FileCache: config error [tmp-path not set]")
 		return fmt.Errorf("config error in %s error [tmp-path not set]", c.Name())
 	}
 
 	err = config.UnmarshalKey("mount-path", &c.mountPath)
-	if err == nil && c.mountPath == c.tmpPath {
+	if err == nil && filepath.Clean(c.mountPath) == filepath.Clean(c.tmpPath) {
 		log.Err("FileCache: config error [tmp-path is same as mount path]")
 		return fmt.Errorf("config error in %s error [tmp-path is same as mount path]", c.Name())
 	}
@@ -453,7 +453,7 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	}
 
 	// Get files from local cache
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	localPath := filepath.Join(fc.tmpPath, options.Name)
 	dirents, err := os.ReadDir(localPath)
 	if err != nil {
 		return attrs, token, nil
@@ -518,7 +518,7 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	log.Trace("FileCache::IsDirEmpty : %s", options.Name)
 
 	// If the directory does not exist locally then call the next component
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	localPath := filepath.Join(fc.tmpPath, options.Name)
 	f, err := common.Open(localPath)
 	if err == nil {
 		log.Debug("FileCache::IsDirEmpty : %s found in local cache", options.Name)
@@ -589,7 +589,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	}
 
 	// Create the file in local cache
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	localPath := filepath.Join(fc.tmpPath, options.Name)
 	fc.policy.CacheValid(localPath)
 
 	err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
@@ -644,7 +644,7 @@ func (fc *FileCache) validateStorageError(path string, err error, method string,
 			if !fc.createEmptyFile {
 				// Check if the file exists in the local cache
 				// (policy might not think the file exists if the file is merely marked for eviction and not actually evicted yet)
-				localPath := common.JoinUnixFilepath(fc.tmpPath, path)
+				localPath := filepath.Join(fc.tmpPath, path)
 				_, err := os.Stat(localPath)
 				if os.IsNotExist(err) { // If the file is not in the local cache, then the file does not exist.
 					log.Err("FileCache::%s : %s does not exist in local cache", method, path)
@@ -681,7 +681,7 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 		return err
 	}
 
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	localPath := filepath.Join(fc.tmpPath, options.Name)
 	err = deleteFile(localPath)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("FileCache::DeleteFile : failed to delete local file %s [%s]", localPath, err.Error())
@@ -709,7 +709,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 	flags = fileOptions.flags
 	fMode = fileOptions.fMode
 
-	localPath := common.JoinUnixFilepath(fc.tmpPath, handle.Path)
+	localPath := filepath.Join(fc.tmpPath, handle.Path)
 	var f *os.File
 
 	flock := fc.fileLocks.Get(handle.Path)
@@ -905,7 +905,7 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 		return nil
 	}
 
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
+	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 
 	err := fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true}) //nolint
 	if err != nil {
@@ -929,7 +929,7 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 	// If it is an fsync op then purge the file
 	if options.Handle.Fsynced() {
 		log.Trace("FileCache::closeFileInternal : fsync/sync op, purging %s", options.Handle.Path)
-		localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
+		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 
 		err = deleteFile(localPath)
 		if err != nil && !os.IsNotExist(err) {
@@ -965,7 +965,7 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	// Update cache policy every 1K operations (includes both read and write) instead
 	options.Handle.OptCnt++
 	if (options.Handle.OptCnt % defaultCacheUpdateCount) == 0 {
-		localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
+		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 		fc.policy.CacheValid(localPath)
 	}
 
@@ -1012,7 +1012,7 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	// Update cache policy every 1K operations (includes both read and write) instead
 	options.Handle.OptCnt++
 	if (options.Handle.OptCnt % defaultCacheUpdateCount) == 0 {
-		localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
+		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 		fc.policy.CacheValid(localPath)
 	}
 
@@ -1073,7 +1073,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
+	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 	fc.policy.CacheValid(localPath)
 	// if our handle is dirty then that means we wrote to the file
 	if options.Handle.Dirty() {
@@ -1169,7 +1169,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 
 			// When chmod on container was missed, local file was updated with correct mode
 			// Here take the mode from local cache and update the container accordingly
-			localPath := common.JoinUnixFilepath(fc.tmpPath, options.Handle.Path)
+			localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 			info, err := os.Stat(localPath)
 			if err == nil {
 				err = fc.Chmod(internal.ChmodOptions{Name: options.Handle.Path, Mode: info.Mode()})
@@ -1211,7 +1211,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	}
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	localPath := filepath.Join(fc.tmpPath, options.Name)
 	info, err := os.Stat(localPath)
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
 	if err == nil && !info.IsDir() {
@@ -1263,8 +1263,8 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 		return err
 	}
 
-	localSrcPath := common.JoinUnixFilepath(fc.tmpPath, options.Src)
-	localDstPath := common.JoinUnixFilepath(fc.tmpPath, options.Dst)
+	localSrcPath := filepath.Join(fc.tmpPath, options.Src)
+	localDstPath := filepath.Join(fc.tmpPath, options.Dst)
 
 	// in case of git clone multiple rename requests come for which destination files already exists in system
 	// if we do not perform rename operation locally and those destination files are cached then next time they are read
@@ -1349,7 +1349,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	}
 
 	// Update the size of the file in the local cache
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	localPath := filepath.Join(fc.tmpPath, options.Name)
 	fc.policy.CacheValid(localPath)
 
 	// Truncate the file created in local system
@@ -1383,7 +1383,7 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 	}
 
 	// Update the mode of the file in the local cache
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	localPath := filepath.Join(fc.tmpPath, options.Name)
 	info, err := os.Stat(localPath)
 	if err == nil {
 		fc.policy.CacheValid(localPath)
@@ -1413,7 +1413,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	}
 
 	// Update the owner and group of the file in the local cache
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	localPath := filepath.Join(fc.tmpPath, options.Name)
 	_, err = os.Stat(localPath)
 	if err == nil {
 		fc.policy.CacheValid(localPath)
@@ -1432,7 +1432,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 
 func (fc *FileCache) FileUsed(name string) error {
 	// Update the owner and group of the file in the local cache
-	localPath := common.JoinUnixFilepath(fc.tmpPath, name)
+	localPath := filepath.Join(fc.tmpPath, name)
 	fc.policy.CacheValid(localPath)
 	return nil
 }
