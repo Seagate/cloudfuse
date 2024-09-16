@@ -99,7 +99,6 @@ file_cache:
   path: <path to local disk cache>
 
   # Optional
-  policy: lru|lfu <eviction policy to be engaged for cache eviction. lru = least recently used file to be deleted, lfu = least frequently used file to be deleted. Default - lru>
   timeout-sec: <default cache eviction timeout (in sec). Default - 120 sec>
   max-eviction: <number of files that can be evicted at once. Default - 5000>
   max-size-mb: <maximum cache size allowed. Default - 80% of free disk space>

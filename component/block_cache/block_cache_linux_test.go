@@ -468,8 +468,8 @@ func (suite *blockCacheTestSuite) TestFileReadTotalBytes() {
 
 	n, err := tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data}) // Write data to file
 	suite.assert.Nil(err)
-	suite.assert.Equal(n, int64(size))
-	suite.assert.Equal(h.Size, int64(size))
+	suite.assert.Equal(int64(n), size)
+	suite.assert.Equal(h.Size, size)
 
 	data = make([]byte, 1000)
 
