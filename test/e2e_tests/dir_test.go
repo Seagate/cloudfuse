@@ -292,6 +292,10 @@ func (suite *dirTestSuite) TestDirGetStats() {
 
 // # Change mod of directory
 func (suite *dirTestSuite) TestDirChmod() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping TestDirChmod on Windows")
+		return
+	}
 	if suite.adlsTest == true {
 		dirName := filepath.Join(suite.testPath, "testchmod")
 		err := os.Mkdir(dirName, 0777)
