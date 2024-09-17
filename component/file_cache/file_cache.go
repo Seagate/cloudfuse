@@ -268,12 +268,12 @@ func (c *FileCache) Configure(_ bool) error {
 		}
 	}
 
-	stat, _, err := c.StatFs()
+	avail, err := c.getAvailableSize()
 	if err != nil {
 		log.Err("FileCache::Configure : config error %s [%s]. Assigning a default value of 4GB or if any value is assigned to .disk-size-mb in config.", c.Name(), err.Error())
 		c.maxCacheSize = 4192 * MB
 	} else {
-		c.maxCacheSize = 0.8 * float64(stat.Bavail) * float64(stat.Bsize)
+		c.maxCacheSize = 0.8 * float64(avail)
 	}
 
 	if config.IsSet(compName+".max-size-mb") && conf.MaxSizeMB != 0 {
