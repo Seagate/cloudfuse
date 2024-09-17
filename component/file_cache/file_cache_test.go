@@ -216,7 +216,7 @@ func (suite *fileCacheTestSuite) TestDefaultCacheSize() {
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		err := cmd.Run()
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 
 		output := out.String()
 		re := regexp.MustCompile(`Total free bytes\s+:\s+([\d,]+)`)
@@ -224,16 +224,16 @@ func (suite *fileCacheTestSuite) TestDefaultCacheSize() {
 		suite.assert.GreaterOrEqual(len(matches), 2)
 		totalFreeBytesStr := strings.ReplaceAll(matches[1], ",", "")
 		freeDisk, err = strconv.Atoi(totalFreeBytesStr)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 	} else {
 		cmd := exec.Command("bash", "-c", fmt.Sprintf("df -B1 %s | awk 'NR==2{print $4}'", suite.cache_path))
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		err := cmd.Run()
 		fmt.Println(err)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		freeDisk, err = strconv.Atoi(strings.TrimSpace(out.String()))
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 	}
 	expected := uint64(0.8 * float64(freeDisk))
 	actual := suite.fileCache.maxCacheSize
@@ -634,7 +634,7 @@ func (suite *fileCacheTestSuite) TestCreateFileWithNoPerm() {
 		path := "file1"
 		options := internal.CreateFileOptions{Name: path, Mode: 0444}
 		f, err := suite.fileCache.CreateFile(options)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in storage
 
 		// Path should be added to the file cache
@@ -644,7 +644,7 @@ func (suite *fileCacheTestSuite) TestCreateFileWithNoPerm() {
 		_, err = os.Stat(suite.fake_storage_path + "/" + path)
 		suite.assert.True(os.IsNotExist(err))
 		err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		info, _ := os.Stat(suite.cache_path + "/" + path)
 		suite.assert.Equal(info.Mode(), os.FileMode(0444))
 	} else {
@@ -653,7 +653,7 @@ func (suite *fileCacheTestSuite) TestCreateFileWithNoPerm() {
 		path := "file1"
 		options := internal.CreateFileOptions{Name: path, Mode: 0000}
 		f, err := suite.fileCache.CreateFile(options)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in storage
 
 		// Path should be added to the file cache
@@ -663,7 +663,7 @@ func (suite *fileCacheTestSuite) TestCreateFileWithNoPerm() {
 		_, err = os.Stat(suite.fake_storage_path + "/" + path)
 		suite.assert.True(os.IsNotExist(err))
 		err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		info, _ := os.Stat(suite.cache_path + "/" + path)
 		suite.assert.Equal(info.Mode(), os.FileMode(0000))
 	}
@@ -676,7 +676,7 @@ func (suite *fileCacheTestSuite) TestCreateFileWithWritePerm() {
 		path := "file1"
 		options := internal.CreateFileOptions{Name: path, Mode: 0444}
 		f, err := suite.fileCache.CreateFile(options)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in storage
 
 		os.Chmod(suite.cache_path+"/"+path, 0666)
@@ -688,7 +688,7 @@ func (suite *fileCacheTestSuite) TestCreateFileWithWritePerm() {
 		_, err = os.Stat(suite.fake_storage_path + "/" + path)
 		suite.assert.True(os.IsNotExist(err))
 		err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		info, _ := os.Stat(suite.cache_path + "/" + path)
 		suite.assert.Equal(info.Mode(), fs.FileMode(0666))
 	} else {
@@ -697,7 +697,7 @@ func (suite *fileCacheTestSuite) TestCreateFileWithWritePerm() {
 		path := "file1"
 		options := internal.CreateFileOptions{Name: path, Mode: 0222}
 		f, err := suite.fileCache.CreateFile(options)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in storage
 
 		os.Chmod(suite.cache_path+"/"+path, 0331)
@@ -709,7 +709,7 @@ func (suite *fileCacheTestSuite) TestCreateFileWithWritePerm() {
 		_, err = os.Stat(suite.fake_storage_path + "/" + path)
 		suite.assert.True(os.IsNotExist(err))
 		err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		info, _ := os.Stat(suite.cache_path + "/" + path)
 		suite.assert.Equal(info.Mode(), fs.FileMode(0331))
 	}

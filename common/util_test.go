@@ -301,7 +301,7 @@ func (suite *utilTestSuite) TestDirectoryCleanup() {
 	suite.assert.False(exists)
 
 	err := TempCacheCleanup(dirName)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	// Directory exists but is empty
 	_ = os.MkdirAll(dirName, 0777)
@@ -312,7 +312,7 @@ func (suite *utilTestSuite) TestDirectoryCleanup() {
 	suite.assert.True(empty)
 
 	err = TempCacheCleanup(dirName)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	// Directory exists and is not empty
 	_ = os.MkdirAll(dirName+"/A", 0777)
@@ -323,5 +323,5 @@ func (suite *utilTestSuite) TestDirectoryCleanup() {
 	suite.assert.False(empty)
 
 	err = TempCacheCleanup(dirName)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 }

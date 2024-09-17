@@ -168,7 +168,7 @@ func (suite *blockTestSuite) TestUnBlock() {
 	suite.assert.Nil(b.node)
 
 	b.Ready(BlockStatusDownloaded)
-	suite.assert.Equal(len(b.state), 1)
+	suite.assert.Len(b.state, 1)
 
 	<-b.state
 	suite.assert.Empty(b.state)
@@ -202,7 +202,7 @@ func (suite *blockTestSuite) TestWriter() {
 	suite.assert.False(b.IsDirty())
 
 	b.Ready(BlockStatusDownloaded)
-	suite.assert.Equal(len(b.state), 1)
+	suite.assert.Len(b.state, 1)
 
 	<-b.state
 	suite.assert.Empty(b.state)
@@ -224,7 +224,7 @@ func (suite *blockTestSuite) TestWriter() {
 	suite.assert.False(b.IsDirty())
 
 	b.Ready(BlockStatusUploaded)
-	suite.assert.Equal(len(b.state), 1)
+	suite.assert.Len(b.state, 1)
 
 	<-b.state
 	suite.assert.Empty(b.state)

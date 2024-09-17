@@ -118,19 +118,19 @@ func (suite *dataValidationTestSuite) copyToMountDir(localFilePath string, remot
 // Computes MD5 and returns the 32byte slice which represents the hash value
 func (suite *dataValidationTestSuite) computeMD5(filePath string) []byte {
 	fh, err := os.Open(filePath)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	fi, err := fh.Stat()
-	suite.Nil(err)
+	suite.NoError(err)
 	size := fi.Size()
 
 	hash := md5.New()
 	bytesCopied, err := io.Copy(hash, fh)
-	suite.Nil(err)
+	suite.NoError(err)
 	suite.Equal(size, bytesCopied)
 
 	err = fh.Close()
-	suite.Nil(err)
+	suite.NoError(err)
 
 	return hash.Sum(nil)
 }
@@ -153,10 +153,10 @@ func convertFileNameToFilePath(fileName string) (localFilePath string, remoteFil
 // creates File in Local and Mounted Directories and returns there file handles the associated fd has O_RDWR mode
 func createFileHandleInLocalAndRemote(suite *dataValidationTestSuite, localFilePath, remoteFilePath string) (lfh *os.File, rfh *os.File) {
 	lfh, err := os.Create(localFilePath)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	rfh, err = os.Create(remoteFilePath)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	return lfh, rfh
 }
@@ -165,7 +165,7 @@ func createFileHandleInLocalAndRemote(suite *dataValidationTestSuite, localFileP
 func closeFileHandles(suite *dataValidationTestSuite, handles ...*os.File) {
 	for _, h := range handles {
 		err := h.Close()
-		suite.Nil(err)
+		suite.NoError(err)
 	}
 }
 
@@ -175,7 +175,7 @@ func writeSparseData(suite *dataValidationTestSuite, fh *os.File, offsets []int6
 	for _, o := range offsets {
 		// write 1MB data at offset o
 		n, err := fh.WriteAt(medBuff[ind*_1MB:(ind+1)*_1MB], o)
-		suite.Nil(err)
+		suite.NoError(err)
 		suite.Equal(n, int(_1MB))
 
 		ind = (ind + 1) % 10
@@ -192,7 +192,7 @@ func min(x, y int) int {
 // Creates the file with filePath and puts random data of size bytes
 func generateFileWithRandomData(suite *dataValidationTestSuite, filePath string, size int) {
 	fh, err := os.Create(filePath)
-	suite.Nil(err)
+	suite.NoError(err)
 	bufferSize := 4 * 1024
 	buffer := make([]byte, 4*1024)
 	rand.Read(buffer)
@@ -200,7 +200,7 @@ func generateFileWithRandomData(suite *dataValidationTestSuite, filePath string,
 	for i := 0; i < blocks; i++ {
 		bytesToWrite := min(bufferSize, size)
 		bytesWritten, err := fh.Write(buffer[0:bytesToWrite])
-		suite.Nil(err)
+		suite.NoError(err)
 		suite.Equal(bytesToWrite, bytesWritten)
 		size -= bytesWritten
 	}
@@ -472,8 +472,8 @@ func (suite *dataValidationTestSuite) TestSparseFileRandomWrite() {
 	closeFileHandles(suite, lfh, rfh)
 	// check size of blob uploaded
 	fi, err := os.Stat(remoteFilePath)
-	suite.Nil(err)
-	suite.Equal(fi.Size(), 165*int64(_1MB))
+	suite.NoError(err)
+	suite.Equal(165*int64(_1MB), fi.Size())
 
 	suite.validateData(localFilePath, remoteFilePath)
 
@@ -495,8 +495,8 @@ func (suite *dataValidationTestSuite) TestSparseFileRandomWriteBlockOverlap() {
 
 	// check size of blob uploaded
 	fi, err := os.Stat(remoteFilePath)
-	suite.Nil(err)
-	suite.Equal(fi.Size(), 171*int64(_1MB))
+	suite.NoError(err)
+	suite.Equal(171*int64(_1MB), fi.Size())
 
 	suite.validateData(localFilePath, remoteFilePath)
 
@@ -510,34 +510,34 @@ func (suite *dataValidationTestSuite) TestFileReadBytesMultipleBlocks() {
 
 	// write 65MB data
 	n, err := lfh.WriteAt(largeBuff[0:65*_1MB], 0)
-	suite.Nil(err)
+	suite.NoError(err)
 	suite.Equal(n, int(65*_1MB))
 
 	// write 7 bytes at offset 65MB
 	n, err = lfh.WriteAt(largeBuff[0:7], int64(65*_1MB))
-	suite.Nil(err)
-	suite.Equal(n, 7)
+	suite.NoError(err)
+	suite.Equal(7, n)
 
 	// write 65MB data
 	n, err = rfh.WriteAt(largeBuff[0:65*_1MB], 0)
-	suite.Nil(err)
+	suite.NoError(err)
 	suite.Equal(n, int(65*_1MB))
 
 	// write 7 bytes at offset 65MB
 	n, err = rfh.WriteAt(largeBuff[0:7], int64(65*_1MB))
-	suite.Nil(err)
-	suite.Equal(n, 7)
+	suite.NoError(err)
+	suite.Equal(7, n)
 
 	closeFileHandles(suite, lfh, rfh)
 
 	// check size of blob uploaded using os.Stat()
 	fi, err := os.Stat(remoteFilePath)
-	suite.Nil(err)
-	suite.Equal(fi.Size(), 65*int64(_1MB)+7)
+	suite.NoError(err)
+	suite.Equal(65*int64(_1MB)+7, fi.Size())
 
 	// count the total bytes uploaded
 	fh, err := os.Open(remoteFilePath)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	totalBytesread := int64(0)
 	dataBuff := make([]byte, int(_1MB))
@@ -549,7 +549,7 @@ func (suite *dataValidationTestSuite) TestFileReadBytesMultipleBlocks() {
 			break
 		}
 	}
-	suite.Equal(totalBytesread, 65*int64(_1MB)+7)
+	suite.Equal(65*int64(_1MB)+7, totalBytesread)
 
 	closeFileHandles(suite, fh)
 
@@ -565,24 +565,24 @@ func (suite *dataValidationTestSuite) TestFileReadBytesOneBlock() {
 
 	// write 13 bytes data to local file
 	n, err := lfh.WriteAt(largeBuff[0:13], 0)
-	suite.Nil(err)
-	suite.Equal(n, 13)
+	suite.NoError(err)
+	suite.Equal(13, n)
 
 	// write 13 bytes data to remote file
 	n, err = rfh.WriteAt(largeBuff[0:13], 0)
-	suite.Nil(err)
-	suite.Equal(n, 13)
+	suite.NoError(err)
+	suite.Equal(13, n)
 
 	closeFileHandles(suite, lfh, rfh)
 
 	// check size of blob uploaded using os.Stat()
 	fi, err := os.Stat(remoteFilePath)
-	suite.Nil(err)
-	suite.Equal(fi.Size(), int64(13))
+	suite.NoError(err)
+	suite.Equal(int64(13), fi.Size())
 
 	// count the total bytes uploaded
 	fh, err := os.Open(remoteFilePath)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	totalBytesread := int64(0)
 	dataBuff := make([]byte, 1000)
@@ -594,7 +594,7 @@ func (suite *dataValidationTestSuite) TestFileReadBytesOneBlock() {
 			break
 		}
 	}
-	suite.Equal(totalBytesread, int64(13))
+	suite.Equal(int64(13), totalBytesread)
 
 	closeFileHandles(suite, fh)
 
@@ -625,8 +625,8 @@ func (suite *dataValidationTestSuite) TestRandomWriteRaceCondition() {
 
 	// check size of blob uploaded
 	fi, err := os.Stat(remoteFilePath)
-	suite.Nil(err)
-	suite.Equal(fi.Size(), 145*int64(_1MB))
+	suite.NoError(err)
+	suite.Equal(145*int64(_1MB), fi.Size())
 
 	suite.validateData(localFilePath, remoteFilePath)
 
@@ -641,17 +641,17 @@ func (suite *dataValidationTestSuite) TestPanicOnClosingFile() {
 	generateFileWithRandomData(suite, remoteFilePath, blockSizeBytes*10)
 
 	rfh, err := os.OpenFile(remoteFilePath, syscall.O_RDWR, 0666)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	//Read 1st block
 	bytes_read, err := rfh.Read(buffer)
-	suite.Nil(err)
+	suite.NoError(err)
 	suite.Equal(bytes_read, blockSizeBytes)
 
 	//Write to 2nd block
 	bytes_written, err := rfh.Write(buffer)
 	suite.Equal(bytes_written, blockSizeBytes)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	closeFileHandles(suite, rfh)
 }
@@ -665,20 +665,20 @@ func (suite *dataValidationTestSuite) TestPanicOnWritingToFile() {
 	generateFileWithRandomData(suite, remoteFilePath, blockSizeBytes*20)
 
 	rfh, err := os.OpenFile(remoteFilePath, syscall.O_RDWR, 0666)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	//Make the cooking+cooked=prefetchCount
 	for i := 0; i < 3; i++ {
 		offset := 4 * int64(i) * int64(_1MB)
 		bytes_read, err := rfh.ReadAt(buffer, offset)
-		suite.Nil(err)
+		suite.NoError(err)
 		suite.Equal(bytes_read, blockSizeBytes)
 	}
 
 	for i := 18; i < 20; i++ {
 		bytes_written, err := rfh.WriteAt(buffer, 18*int64(blockSizeBytes))
 		suite.Equal(bytes_written, blockSizeBytes)
-		suite.Nil(err)
+		suite.NoError(err)
 	}
 
 	closeFileHandles(suite, rfh)
@@ -693,18 +693,18 @@ func (suite *dataValidationTestSuite) TestPanicOnReadingFileInRandReadMode() {
 	generateFileWithRandomData(suite, remoteFilePath, blockSizeBytes*84)
 
 	rfh, err := os.OpenFile(remoteFilePath, syscall.O_RDWR, 0666)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	//Write at some offset
 	bytes_written, err := rfh.WriteAt(buffer, 0)
 	suite.Equal(bytes_written, blockSizeBytes)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	//Make the file handle goto random read mode in block cache(This is causing panic)
 	for i := 0; i < 14; i++ {
 		offset := int64(_1MB) * 6 * int64(i)
 		bytes_read, err := rfh.ReadAt(buffer, offset)
-		suite.Nil(err)
+		suite.NoError(err)
 		suite.Equal(bytes_read, blockSizeBytes)
 	}
 

@@ -165,27 +165,27 @@ func (s *configTestSuite) TestProxyConfig() {
 
 	opt.HttpsProxyAddress = "127.0.0.1"
 	err := ParseAndValidateConfig(az, opt)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
 
 	opt.HttpsProxyAddress = "https://128.0.0.1:8080/"
 	err = ParseAndValidateConfig(az, opt)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
 
 	opt.HttpsProxyAddress = "http://129.0.0.1:8080/"
 	err = ParseAndValidateConfig(az, opt)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
 
 	opt.HttpProxyAddress = "130.0.0.1"
 	err = ParseAndValidateConfig(az, opt)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpProxyAddress, !opt.UseHTTPS))
 
 	opt.HttpProxyAddress = "http://131.0.0.1:8080/"
 	err = ParseAndValidateConfig(az, opt)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpProxyAddress, !opt.UseHTTPS))
 
 	config.SetBool(compName+".use-https", true)
@@ -199,17 +199,17 @@ func (s *configTestSuite) TestProxyConfig() {
 
 	opt.HttpsProxyAddress = "133.0.0.1"
 	err = ParseAndValidateConfig(az, opt)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
 
 	opt.HttpsProxyAddress = "http://134.0.0.1:8080/"
 	err = ParseAndValidateConfig(az, opt)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
 
 	opt.HttpsProxyAddress = "https://135.0.0.1:8080/"
 	err = ParseAndValidateConfig(az, opt)
-	assert.Nil(err)
+	assert.NoError(err)
 	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
 }
 
