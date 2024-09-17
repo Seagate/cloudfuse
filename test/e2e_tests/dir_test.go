@@ -295,13 +295,13 @@ func (suite *dirTestSuite) TestDirChmod() {
 	if suite.adlsTest == true {
 		dirName := filepath.Join(suite.testPath, "testchmod")
 		err := os.Mkdir(dirName, 0777)
-		suite.Equal(nil, err)
+		suite.NoError(err)
 
 		err = os.Chmod(dirName, 0744)
-		suite.Equal(nil, err)
+		suite.NoError(err)
 
 		stat, err := os.Stat(dirName)
-		suite.Equal(nil, err)
+		suite.NoError(err)
 		suite.Equal("-rwxr--r--", stat.Mode().Perm().String())
 
 		suite.dirTestCleanup([]string{dirName})

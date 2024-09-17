@@ -83,9 +83,9 @@ func (suite *blockpoolTestSuite) TestAllocate() {
 	suite.assert.True(validateNullData(bp.zeroBlock))
 
 	bp.Terminate()
-	suite.assert.Equal(len(bp.blocksCh), 0)
-	suite.assert.Equal(len(bp.resetBlockCh), 0)
-	suite.assert.Equal(len(bp.zeroBlock.data), 0)
+	suite.assert.Empty(bp.blocksCh)
+	suite.assert.Empty(bp.resetBlockCh)
+	suite.assert.Empty(bp.zeroBlock.data)
 }
 
 func (suite *blockpoolTestSuite) TestGetRelease() {
@@ -96,30 +96,30 @@ func (suite *blockpoolTestSuite) TestGetRelease() {
 	suite.assert.NotNil(bp.blocksCh)
 	suite.assert.NotNil(bp.resetBlockCh)
 	suite.assert.NotNil(bp.zeroBlock)
-	suite.assert.Equal(len(bp.blocksCh), 4)
-	suite.assert.Equal(len(bp.resetBlockCh), 0)
+	suite.assert.Len(bp.blocksCh, 4)
+	suite.assert.Empty(bp.resetBlockCh)
 	suite.assert.True(validateNullData(bp.zeroBlock))
 
 	b := bp.MustGet()
 	suite.assert.NotNil(b)
-	suite.assert.Equal(len(bp.blocksCh), 3)
+	suite.assert.Len(bp.blocksCh, 3)
 
 	bp.Release(b)
 	time.Sleep(1 * time.Second)
-	suite.assert.Equal(len(bp.blocksCh), 4)
+	suite.assert.Len(bp.blocksCh, 4)
 
 	b = bp.TryGet()
 	suite.assert.NotNil(b)
-	suite.assert.Equal(len(bp.blocksCh), 3)
+	suite.assert.Len(bp.blocksCh, 3)
 
 	bp.Release(b)
 	time.Sleep(1 * time.Second)
-	suite.assert.Equal(len(bp.blocksCh), 4)
+	suite.assert.Len(bp.blocksCh, 4)
 
 	bp.Terminate()
-	suite.assert.Equal(len(bp.blocksCh), 0)
-	suite.assert.Equal(len(bp.resetBlockCh), 0)
-	suite.assert.Equal(len(bp.zeroBlock.data), 0)
+	suite.assert.Empty(bp.blocksCh)
+	suite.assert.Empty(bp.resetBlockCh)
+	suite.assert.Empty(bp.zeroBlock.data)
 }
 
 func (suite *blockpoolTestSuite) TestUsage() {
@@ -130,8 +130,8 @@ func (suite *blockpoolTestSuite) TestUsage() {
 	suite.assert.NotNil(bp.blocksCh)
 	suite.assert.NotNil(bp.resetBlockCh)
 	suite.assert.NotNil(bp.zeroBlock)
-	suite.assert.Equal(len(bp.blocksCh), 4)
-	suite.assert.Equal(len(bp.resetBlockCh), 0)
+	suite.assert.Len(bp.blocksCh, 4)
+	suite.assert.Empty(bp.resetBlockCh)
 	suite.assert.True(validateNullData(bp.zeroBlock))
 
 	var blocks []*Block
@@ -140,14 +140,14 @@ func (suite *blockpoolTestSuite) TestUsage() {
 	blocks = append(blocks, b)
 
 	usage := bp.Usage()
-	suite.assert.Equal(usage, uint32(40))
+	suite.assert.Equal(uint32(40), usage)
 
 	b = bp.TryGet()
 	suite.assert.NotNil(b)
 	blocks = append(blocks, b)
 
 	usage = bp.Usage()
-	suite.assert.Equal(usage, uint32(60))
+	suite.assert.Equal(uint32(60), usage)
 
 	for _, blk := range blocks {
 		bp.Release(blk)
@@ -157,12 +157,12 @@ func (suite *blockpoolTestSuite) TestUsage() {
 	time.Sleep(2 * time.Second)
 
 	usage = bp.Usage()
-	suite.assert.Equal(usage, uint32(20)) // because of zeroBlock
+	suite.assert.Equal(uint32(20), usage) // because of zeroBlock
 
 	bp.Terminate()
-	suite.assert.Equal(len(bp.blocksCh), 0)
-	suite.assert.Equal(len(bp.resetBlockCh), 0)
-	suite.assert.Equal(len(bp.zeroBlock.data), 0)
+	suite.assert.Empty(bp.blocksCh)
+	suite.assert.Empty(bp.resetBlockCh)
+	suite.assert.Empty(bp.zeroBlock.data)
 }
 
 func (suite *blockpoolTestSuite) TestBufferExhaution() {
@@ -173,8 +173,8 @@ func (suite *blockpoolTestSuite) TestBufferExhaution() {
 	suite.assert.NotNil(bp.blocksCh)
 	suite.assert.NotNil(bp.resetBlockCh)
 	suite.assert.NotNil(bp.zeroBlock)
-	suite.assert.Equal(len(bp.blocksCh), 4)
-	suite.assert.Equal(len(bp.resetBlockCh), 0)
+	suite.assert.Len(bp.blocksCh, 4)
+	suite.assert.Empty(bp.resetBlockCh)
 	suite.assert.True(validateNullData(bp.zeroBlock))
 
 	var blocks []*Block
@@ -199,9 +199,9 @@ func (suite *blockpoolTestSuite) TestBufferExhaution() {
 	}
 
 	bp.Terminate()
-	suite.assert.Equal(len(bp.blocksCh), 0)
-	suite.assert.Equal(len(bp.resetBlockCh), 0)
-	suite.assert.Equal(len(bp.zeroBlock.data), 0)
+	suite.assert.Empty(bp.blocksCh)
+	suite.assert.Empty(bp.resetBlockCh)
+	suite.assert.Empty(bp.zeroBlock.data)
 }
 
 // get n blocks
@@ -237,8 +237,8 @@ func (suite *blockpoolTestSuite) TestBlockReset() {
 	suite.assert.NotNil(bp.blocksCh)
 	suite.assert.NotNil(bp.resetBlockCh)
 	suite.assert.NotNil(bp.zeroBlock)
-	suite.assert.Equal(len(bp.blocksCh), 4)
-	suite.assert.Equal(len(bp.resetBlockCh), 0)
+	suite.assert.Len(bp.blocksCh, 4)
+	suite.assert.Empty(bp.resetBlockCh)
 	suite.assert.True(validateNullData(bp.zeroBlock))
 
 	blocks := getBlocks(suite, bp, 4)
@@ -253,9 +253,9 @@ func (suite *blockpoolTestSuite) TestBlockReset() {
 	releaseBlocks(suite, bp, blocks)
 
 	bp.Terminate()
-	suite.assert.Equal(len(bp.blocksCh), 0)
-	suite.assert.Equal(len(bp.resetBlockCh), 0)
-	suite.assert.Equal(len(bp.zeroBlock.data), 0)
+	suite.assert.Empty(bp.blocksCh)
+	suite.assert.Empty(bp.resetBlockCh)
+	suite.assert.Empty(bp.zeroBlock.data)
 }
 
 func TestBlockPoolSuite(t *testing.T) {
