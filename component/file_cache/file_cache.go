@@ -268,8 +268,7 @@ func (c *FileCache) Configure(_ bool) error {
 		}
 	}
 
-	var stat syscall.Statfs_t
-	err = syscall.Statfs(c.tmpPath, &stat)
+	stat, _, err := c.StatFs()
 	if err != nil {
 		log.Err("FileCache::Configure : config error %s [%s]. Assigning a default value of 4GB or if any value is assigned to .disk-size-mb in config.", c.Name(), err.Error())
 		c.maxCacheSize = 4192 * MB
