@@ -832,9 +832,6 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 		return err
 	}
 
-	// Increment the handle count in this lock item as there is one handle open for this now
-	flock.Inc()
-
 	inf, err := f.Stat()
 	if err == nil {
 		handle.Size = inf.Size()
@@ -857,6 +854,11 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 // OpenFile: Makes the file available in the local cache for further file operations.
 func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
 	log.Trace("FileCache::OpenFile : name=%s, flags=%d, mode=%s", options.Name, options.Flags, options.Mode)
+
+	// get the file lock
+	flock := fc.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
 
 	attr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 
@@ -884,9 +886,11 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		}
 	}
 
-	// create handle and set value
+	// create handle and record openFileOptions for later
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetValue("openFileOptions", openFileOptions{flags: options.Flags, fMode: options.Mode})
+	// Increment the handle count in this lock item as there is one handle open for this now
+	flock.Inc()
 
 	return handle, nil
 }
@@ -919,10 +923,7 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 	defer fc.fileCloseOpt.Done()
 
 	// if file has not been interactively read or written to by end user, then there is no cached file to close.
-	_, found := options.Handle.GetValue("openFileOptions")
-	if found {
-		return nil
-	}
+	_, noCachedHandle := options.Handle.GetValue("openFileOptions")
 
 	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 
@@ -932,17 +933,20 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 		return err
 	}
 
-	f := options.Handle.GetFileObject()
-	if f == nil {
-		log.Err("FileCache::closeFileInternal : error [missing fd in handle object] %s", options.Handle.Path)
-		return syscall.EBADF
+	if !noCachedHandle {
+		f := options.Handle.GetFileObject()
+		if f == nil {
+			log.Err("FileCache::closeFileInternal : error [missing fd in handle object] %s", options.Handle.Path)
+			return syscall.EBADF
+		}
+
+		err = f.Close()
+		if err != nil {
+			log.Err("FileCache::closeFileInternal : error closing file %s(%d) [%s]", options.Handle.Path, int(f.Fd()), err.Error())
+			return err
+		}
 	}
 
-	err = f.Close()
-	if err != nil {
-		log.Err("FileCache::closeFileInternal : error closing file %s(%d) [%s]", options.Handle.Path, int(f.Fd()), err.Error())
-		return err
-	}
 	flock.Dec()
 
 	// If it is an fsync op then purge the file
@@ -959,7 +963,7 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 		return nil
 	}
 
-	fc.policy.CacheInvalidate(localPath) // Invalidate the file from the local cache.
+	fc.policy.CacheInvalidate(localPath) // Invalidate the file from the local cache if the timeout is zero.
 	return nil
 }
 
