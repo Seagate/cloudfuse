@@ -336,7 +336,10 @@ func (suite *fileCacheTestSuite) TestDeleteDir() {
 	// Delete the directory
 	err = suite.fileCache.DeleteDir(internal.DeleteDirOptions{Name: dir})
 	suite.assert.NoError(err)
-	suite.assert.False(suite.fileCache.policy.IsCached(dir)) // Directory should not be cached
+	// wait for asynchronous deletion
+	time.Sleep(time.Second)
+	// Directory should not be cached
+	suite.assert.NoDirExists(filepath.Join(suite.cache_path, dir))
 }
 
 func (suite *fileCacheTestSuite) TestStreamDirError() {
@@ -494,8 +497,9 @@ func (suite *fileCacheTestSuite) TestStreamDirMixed() {
 
 func (suite *fileCacheTestSuite) TestFileUsed() {
 	defer suite.cleanupTest()
-	suite.fileCache.FileUsed("temp")
-	suite.fileCache.policy.IsCached("temp")
+	err := suite.fileCache.FileUsed("temp")
+	suite.assert.NoError(err)
+	suite.assert.True(suite.fileCache.policy.IsCached(filepath.Join(suite.cache_path, "temp")))
 }
 
 // File cache does not have CreateDir Method implemented hence results are undefined here
@@ -555,17 +559,13 @@ func (suite *fileCacheTestSuite) TestRenameDir() {
 	}
 	// The file (and directory) is in the cache and storage (see TestCreateFileInDirCreateEmptyFile)
 
-	// Delete the directory
+	// Rename the directory
 	err = suite.fileCache.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
 	suite.assert.NoError(err)
-	suite.assert.False(suite.fileCache.policy.IsCached(src)) // Directory should not be cached
 	// wait for asynchronous deletion
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Second)
 	// src directory should not exist in local filesystem
-	fInfo, err := os.Stat(filepath.Join(suite.cache_path, src))
-	suite.assert.Nil(fInfo)
-	suite.assert.Error(err)
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoDirExists(filepath.Join(suite.cache_path, src))
 	// dst directory should exist and have contents from src
 	dstEntries, err := os.ReadDir(filepath.Join(suite.cache_path, dst))
 	suite.assert.NoError(err)
@@ -829,15 +829,10 @@ func (suite *fileCacheTestSuite) TestCloseFile() {
 		time.Sleep(time.Second)
 		_, err = os.Stat(filepath.Join(suite.cache_path, path))
 	}
-	suite.assert.True(os.IsNotExist(err))
-
-	suite.assert.False(suite.fileCache.policy.IsCached(path)) // File should be invalidated
 	// File should not be in cache
-	_, err = os.Stat(filepath.Join(suite.cache_path, path))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
 	// File should be in cloud storage
-	_, err = os.Stat(filepath.Join(suite.fake_storage_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
 func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
@@ -856,14 +851,11 @@ func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
 	// CloseFile
 	err := suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
-	suite.assert.False(suite.fileCache.policy.IsCached(path)) // File should be invalidated
 
 	// File should be in cache
-	_, err = os.Stat(filepath.Join(suite.cache_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 	// File should be in cloud storage
-	_, err = os.Stat(filepath.Join(suite.fake_storage_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
 
 	// loop until file does not exist - done due to async nature of eviction
 	_, err = os.Stat(filepath.Join(suite.cache_path, path))
@@ -873,9 +865,9 @@ func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
 	}
 
 	// File should not be in cache
-	_, err = os.Stat(filepath.Join(suite.cache_path, path))
-	suite.assert.True(os.IsNotExist(err))
-
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
+	// File should be invalidated
+	suite.assert.False(suite.fileCache.policy.IsCached(filepath.Join(suite.cache_path, path)))
 	// File should be in cloud storage
 	_, err = os.Stat(filepath.Join(suite.fake_storage_path, path))
 	suite.assert.True(err == nil || os.IsExist(err))
