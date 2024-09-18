@@ -222,21 +222,17 @@ func (p *lruPolicy) asyncCacheValid() {
 }
 
 func (p *lruPolicy) cacheValidate(name string) {
-	var node *lruNode = nil
 
-	val, found := p.nodeMap.Load(name)
-	if !found {
-		node = &lruNode{
-			name:    name,
-			next:    nil,
-			prev:    nil,
-			usage:   0,
-			deleted: false,
-		}
-		p.nodeMap.Store(name, node)
-	} else {
-		node = val.(*lruNode)
-	}
+	// get existing entry, or if it doesn't exist then
+	//  write a new one and return it
+	val, _ := p.nodeMap.LoadOrStore(name, &lruNode{
+		name:    name,
+		next:    nil,
+		prev:    nil,
+		usage:   0,
+		deleted: false,
+	})
+	node := val.(*lruNode)
 
 	p.Lock()
 	defer p.Unlock()
@@ -444,7 +440,7 @@ func (p *lruPolicy) deleteItem(name string) {
 		return
 	}
 
-	// There are no open handles for this file so its safe to remove this
+	// There are no open handles for this file so it's safe to remove this
 	// Check if the file exists first, since this is often the second time we're calling deleteFile
 	_, err := os.Stat(name)
 	if err != nil && os.IsNotExist(err) {
