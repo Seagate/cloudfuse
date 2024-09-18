@@ -108,8 +108,7 @@ func deleteFile(name string) error {
 			log.Err("cachePolicy::deleteFile : %s failed to reset permissions", name)
 			return err
 		}
-		// recurse so any further errors can be handled or returned
-		return deleteFile(name)
+		err = os.Remove(name)
 	} else if err != nil && os.IsNotExist(err) {
 		log.Debug("cachePolicy::deleteFile : %s does not exist in local cache", name)
 		return nil
