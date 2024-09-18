@@ -253,7 +253,7 @@ func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, 
 	f := options.Handle.GetFileObject()
 
 	if f == nil {
-		f1, err := os.OpenFile(filepath.Join(lfs.path, options.Handle.Path), os.O_RDONLY, 0777)
+		f1, err := os.OpenFile(filepath.Join(lfs.path, options.Handle.Path), os.O_RDONLY, 0666)
 		if err != nil {
 			return 0, nil
 		}
