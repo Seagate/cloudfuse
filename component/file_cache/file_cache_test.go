@@ -563,9 +563,12 @@ func (suite *fileCacheTestSuite) TestRenameDir() {
 	err = suite.fileCache.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
 	suite.assert.NoError(err)
 	// wait for asynchronous deletion
-	time.Sleep(time.Second)
+	time.Sleep(1 * time.Second)
 	// src directory should not exist in local filesystem
-	suite.assert.NoDirExists(filepath.Join(suite.cache_path, src))
+	fInfo, err := os.Stat(filepath.Join(suite.cache_path, src))
+	suite.assert.Nil(fInfo)
+	suite.assert.Error(err)
+	suite.assert.True(os.IsNotExist(err))
 	// dst directory should exist and have contents from src
 	dstEntries, err := os.ReadDir(filepath.Join(suite.cache_path, dst))
 	suite.assert.NoError(err)
@@ -829,10 +832,14 @@ func (suite *fileCacheTestSuite) TestCloseFile() {
 		time.Sleep(time.Second)
 		_, err = os.Stat(filepath.Join(suite.cache_path, path))
 	}
+	suite.assert.True(os.IsNotExist(err))
+
 	// File should not be in cache
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
+	_, err = os.Stat(filepath.Join(suite.cache_path, path))
+	suite.assert.True(os.IsNotExist(err))
 	// File should be in cloud storage
-	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
+	_, err = os.Stat(filepath.Join(suite.fake_storage_path, path))
+	suite.assert.True(err == nil || os.IsExist(err))
 }
 
 func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
@@ -853,9 +860,11 @@ func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
 	suite.assert.NoError(err)
 
 	// File should be in cache
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	_, err = os.Stat(filepath.Join(suite.cache_path, path))
+	suite.assert.True(err == nil || os.IsExist(err))
 	// File should be in cloud storage
-	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
+	_, err = os.Stat(filepath.Join(suite.fake_storage_path, path))
+	suite.assert.True(err == nil || os.IsExist(err))
 
 	// loop until file does not exist - done due to async nature of eviction
 	_, err = os.Stat(filepath.Join(suite.cache_path, path))
@@ -865,7 +874,8 @@ func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
 	}
 
 	// File should not be in cache
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
+	_, err = os.Stat(filepath.Join(suite.cache_path, path))
+	suite.assert.True(os.IsNotExist(err))
 	// File should be invalidated
 	suite.assert.False(suite.fileCache.policy.IsCached(filepath.Join(suite.cache_path, path)))
 	// File should be in cloud storage
