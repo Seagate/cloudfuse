@@ -877,7 +877,7 @@ func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
 func (suite *fileCacheTestSuite) TestOpenCloseHandleCount() {
 	defer suite.cleanupTest()
 	// Setup
-	file := "file14"
+	file := "file11"
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
@@ -902,7 +902,7 @@ func (suite *fileCacheTestSuite) TestOpenPreventsEviction() {
 		suite.cache_path, cacheTimeout, suite.fake_storage_path)
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 
-	path := "file14"
+	path := "file12"
 
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	suite.assert.NoError(err)
