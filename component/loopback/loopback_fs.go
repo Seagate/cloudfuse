@@ -53,7 +53,7 @@ const compName = "loopbackfs"
 type LoopbackFS struct {
 	internal.BaseComponent
 
-	path string
+	path string // uses os.Separator (filepath.Join)
 }
 
 var _ internal.Component = &LoopbackFS{}
@@ -97,19 +97,19 @@ func (lfs *LoopbackFS) Priority() internal.ComponentPriority {
 
 func (lfs *LoopbackFS) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("LoopbackFS::CreateDir : name=%s", options.Name)
-	dirPath := common.JoinUnixFilepath(lfs.path, options.Name)
+	dirPath := filepath.Join(lfs.path, options.Name)
 	return os.Mkdir(dirPath, options.Mode)
 }
 
 func (lfs *LoopbackFS) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("LoopbackFS::DeleteDir : name=%s", options.Name)
-	dirPath := common.JoinUnixFilepath(lfs.path, options.Name)
+	dirPath := filepath.Join(lfs.path, options.Name)
 	return os.Remove(dirPath)
 }
 
 func (lfs *LoopbackFS) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	log.Trace("LoopbackFS::IsDirEmpty : name=%s", options.Name)
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
+	path := filepath.Join(lfs.path, options.Name)
 	f, err := os.Open(path)
 	if err != nil {
 		log.Err("LoopbackFS::IsDirEmpty : error opening path [%s]", err)
@@ -127,7 +127,7 @@ func (lfs *LoopbackFS) StreamDir(options internal.StreamDirOptions) ([]*internal
 	}
 	log.Trace("LoopbackFS::StreamDir : name=%s", options.Name)
 	attrList := make([]*internal.ObjAttr, 0)
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
+	path := filepath.Join(lfs.path, options.Name)
 
 	log.Debug("LoopbackFS::StreamDir : requested for %s", path)
 	files, err := os.ReadDir(path)
@@ -160,8 +160,8 @@ func (lfs *LoopbackFS) StreamDir(options internal.StreamDirOptions) ([]*internal
 
 func (lfs *LoopbackFS) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("LoopbackFS::RenameDir : %s -> %s", options.Src, options.Dst)
-	oldPath := common.JoinUnixFilepath(lfs.path, options.Src)
-	newPath := common.JoinUnixFilepath(lfs.path, options.Dst)
+	oldPath := filepath.Join(lfs.path, options.Src)
+	newPath := filepath.Join(lfs.path, options.Dst)
 
 	return os.Rename(oldPath, newPath)
 }
@@ -173,7 +173,7 @@ func (lfs *LoopbackFS) CreateFile(options internal.CreateFileOptions) (*handlema
 		return nil, fmt.Errorf("LoopbackFS::CreateFile : Failed to create file %s", options.Name)
 	}
 
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
+	path := filepath.Join(lfs.path, options.Name)
 
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, options.Mode)
 	if err != nil {
@@ -188,7 +188,7 @@ func (lfs *LoopbackFS) CreateFile(options internal.CreateFileOptions) (*handlema
 
 func (lfs *LoopbackFS) CreateLink(options internal.CreateLinkOptions) error {
 	log.Trace("LoopbackFS::CreateLink : name=%s", options.Name)
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
+	path := filepath.Join(lfs.path, options.Name)
 
 	err := os.Symlink(options.Target, path)
 
@@ -197,13 +197,13 @@ func (lfs *LoopbackFS) CreateLink(options internal.CreateLinkOptions) error {
 
 func (lfs *LoopbackFS) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("LoopbackFS::DeleteFile : name=%s", options.Name)
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
+	path := filepath.Join(lfs.path, options.Name)
 	return os.Remove(path)
 }
 
 func (lfs *LoopbackFS) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
 	log.Trace("LoopbackFS::OpenFile : name=%s", options.Name)
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
+	path := filepath.Join(lfs.path, options.Name)
 	log.Debug("LoopbackFS::OpenFile : requested for %s", options.Name)
 	f, err := os.OpenFile(path, options.Flags, options.Mode)
 	if err != nil {
@@ -229,20 +229,23 @@ func (lfs *LoopbackFS) CloseFile(options internal.CloseFileOptions) error {
 
 func (lfs *LoopbackFS) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("LoopbackFS::RenameFile : %s -> %s", options.Src, options.Dst)
-	oldPath := common.JoinUnixFilepath(lfs.path, options.Src)
-	newPath := common.JoinUnixFilepath(lfs.path, options.Dst)
+	oldPath := filepath.Join(lfs.path, options.Src)
+	newPath := filepath.Join(lfs.path, options.Dst)
 	return os.Rename(oldPath, newPath)
 }
 
 func (lfs *LoopbackFS) ReadLink(options internal.ReadLinkOptions) (string, error) {
 	log.Trace("LoopbackFS::ReadLink : name=%s", options.Name)
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
+	path := filepath.Join(lfs.path, options.Name)
 	targetPath, err := os.Readlink(path)
 	if err != nil {
 		log.Err("LoopbackFS::ReadLink : error [%s]", err)
 		return "", err
 	}
-	return strings.TrimPrefix(targetPath, lfs.path), nil
+	// this is emulating cloud storage - it should use the unix path style
+	targetPath = common.NormalizeObjectName(targetPath)
+	prefix := common.NormalizeObjectName(lfs.path)
+	return strings.TrimPrefix(targetPath, prefix), nil
 }
 
 func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
@@ -250,7 +253,7 @@ func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, 
 	f := options.Handle.GetFileObject()
 
 	if f == nil {
-		f1, err := os.OpenFile(common.JoinUnixFilepath(lfs.path, options.Handle.Path), os.O_RDONLY, 0777)
+		f1, err := os.OpenFile(filepath.Join(lfs.path, options.Handle.Path), os.O_RDONLY, 0666)
 		if err != nil {
 			return 0, nil
 		}
@@ -287,7 +290,7 @@ func (lfs *LoopbackFS) WriteFile(options internal.WriteFileOptions) (int, error)
 
 func (lfs *LoopbackFS) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("LoopbackFS::TruncateFile : name=%s", options.Name)
-	fsPath := common.JoinUnixFilepath(lfs.path, options.Name)
+	fsPath := filepath.Join(lfs.path, options.Name)
 
 	return os.Truncate(fsPath, options.Size)
 }
@@ -305,7 +308,7 @@ func (lfs *LoopbackFS) FlushFile(options internal.FlushFileOptions) error {
 
 func (lfs *LoopbackFS) CopyToFile(options internal.CopyToFileOptions) error {
 	log.Trace("LoopbackFS::CopyToFile : name=%s", options.Name)
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
+	path := filepath.Join(lfs.path, options.Name)
 	fsrc, err := os.Open(path)
 	if err != nil {
 		log.Err("LoopbackFS::CopyToFile : error opening [%s]", err)
@@ -326,7 +329,7 @@ func (lfs *LoopbackFS) CopyToFile(options internal.CopyToFileOptions) error {
 
 func (lfs *LoopbackFS) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("LoopbackFS::CopyFromFile : name=%s", options.Name)
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
+	path := filepath.Join(lfs.path, options.Name)
 	fdst, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, os.FileMode(0666))
 	if err != nil {
 		log.Err("LoopbackFS::CopyFromFile : error opening [%s]", err)
@@ -347,7 +350,7 @@ func (lfs *LoopbackFS) CopyFromFile(options internal.CopyFromFileOptions) error 
 
 func (lfs *LoopbackFS) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
 	log.Trace("LoopbackFS::GetAttr : name=%s", options.Name)
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
+	path := filepath.Join(lfs.path, options.Name)
 	info, err := os.Lstat(path)
 	if err != nil {
 		log.Err("LoopbackFS::GetAttr : error [%s]", err)
@@ -378,13 +381,13 @@ func (lfs *LoopbackFS) GetAttr(options internal.GetAttrOptions) (*internal.ObjAt
 
 func (lfs *LoopbackFS) Chmod(options internal.ChmodOptions) error {
 	log.Trace("LoopbackFS::Chmod : name=%s", options.Name)
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
+	path := filepath.Join(lfs.path, options.Name)
 	return os.Chmod(path, options.Mode)
 }
 
 func (lfs *LoopbackFS) Chown(options internal.ChownOptions) error {
 	log.Trace("LoopbackFS::Chown : name=%s", options.Name)
-	path := common.JoinUnixFilepath(lfs.path, options.Name)
+	path := filepath.Join(lfs.path, options.Name)
 	if runtime.GOOS == "windows" {
 		return nil
 	}
