@@ -55,7 +55,7 @@ jobs:
       - name: Install libfuse on Linux
         shell: bash
         run: |
-          sudo apt-get install fuse3 libfuse-dev rpm pkg-config
+          sudo apt-get install fuse3 libfuse3-dev rpm pkg-config
 
       - name: Build
         run: |
@@ -169,7 +169,7 @@ jobs:
       - name: Install libfuse on Linux
         shell: bash
         run: |
-          sudo apt-get install libfuse-dev
+          sudo apt-get install libfuse3-dev
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6

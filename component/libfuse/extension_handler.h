@@ -35,12 +35,7 @@
 #include <errno.h>
 #include <dlfcn.h>
 
-// Decide whether to add fuse2 or fuse3
-#ifdef __FUSE2__
-#include <fuse.h>
-#else
 #include <fuse3/fuse.h>
-#endif
 
 // -------------------------------------------------------------------------------------------------------------
 // Extension loading and registration methods

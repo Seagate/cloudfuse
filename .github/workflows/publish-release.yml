@@ -218,14 +218,14 @@ jobs:
           echo -e "deb [arch=arm64] http://ports.ubuntu.com/ jammy main restricted\n" "deb [arch=arm64] http://ports.ubuntu.com/ jammy-updates main restricted\n" "deb [arch=arm64] http://ports.ubuntu.com/ jammy universe\n" "deb [arch=arm64] http://ports.ubuntu.com/ jammy-updates universe\n" "deb [arch=arm64] http://ports.ubuntu.com/ jammy multiverse\n" "deb [arch=arm64] http://ports.ubuntu.com/ jammy-updates multiverse\n" "deb [arch=arm64] http://ports.ubuntu.com/ jammy-backports main restricted universe multiverse" | sudo tee /etc/apt/sources.list.d/arm-cross-compile-sources.list
           sudo dpkg --add-architecture arm64
           sudo apt-get update
-      - # libfuse-dev is required to build our command-line program
+      - # libfuse3-dev is required to build our command-line program
         name: Install Libfuse
         run: |
-          sudo apt-get install -y libfuse-dev libfuse3-dev
+          sudo apt-get install -y libfuse3-dev
       - # enable GoReleaser to build for ARM64
         name: Install ARM64 compilers
         run: |
-          sudo apt-get install -y gcc-aarch64-linux-gnu libfuse3-dev:arm64 libfuse-dev:arm64
+          sudo apt-get install -y gcc-aarch64-linux-gnu libfuse3-dev:arm64
       - # Get code and Go ready
         name: Checkout code
         uses: actions/checkout@v4

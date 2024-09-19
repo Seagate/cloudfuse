@@ -37,18 +37,6 @@
         6. import "C" and code that uses it has to be in same Go file
 */
 
-// There are structs defined in fuse3 only so giving a placeholder for fuse2
-#ifdef __FUSE2__
-enum fuse_readdir_flags
-{
-    FUSE_READDIR_PLUS = (1 << 0)
-};
-enum fuse_fill_dir_flags
-{
-    FUSE_FILL_DIR_PLUS = (1 << 1)
-};
-#endif
-
 typedef struct fuse_operations fuse_operations_t;
 typedef struct fuse_conn_info fuse_conn_info_t;
 typedef struct fuse_config fuse_config_t;
@@ -60,11 +48,7 @@ typedef struct timespec timespec_t;
 typedef enum fuse_readdir_flags fuse_readdir_flags_t;
 typedef enum fuse_fill_dir_flags fuse_fill_dir_flags_t;
 
-#ifdef __FUSE2__
-static int fill_dir_plus = 0;
-#else
 static int fill_dir_plus = FUSE_FILL_DIR_PLUS;
-#endif
 
 // Structure to hold config for libfuse
 typedef struct fuse_options

@@ -38,12 +38,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-// Decide whether to add fuse2 or fuse3
-#ifdef __FUSE2__
-#include <fuse.h>
-#else
 #include <fuse3/fuse.h>
-#endif
 
 #include "libfuse_defs.h"
 #include "native_file_io.h"
@@ -51,61 +46,60 @@
 // Method to populate the fuse structure with our callback methods
 static int populate_callbacks(fuse_operations_t *opt)
 {
-    opt->destroy    = (void (*)(void *))libfuse_destroy;
+    opt->destroy = (void (*)(void *))libfuse_destroy;
 
-    opt->statfs     = (int (*)(const char *path, statvfs_t *stbuf))libfuse_statfs;
+    opt->statfs = (int (*)(const char *path, statvfs_t *stbuf))libfuse_statfs;
 
-    opt->mkdir      = (int (*)(const char *path, mode_t mode))libfuse_mkdir;
-    opt->rmdir      = (int (*)(const char *path))libfuse_rmdir;
+    opt->mkdir = (int (*)(const char *path, mode_t mode))libfuse_mkdir;
+    opt->rmdir = (int (*)(const char *path))libfuse_rmdir;
 
-    opt->opendir    = (int (*)(const char *path, fuse_file_info_t *fi))libfuse_opendir;
+    opt->opendir = (int (*)(const char *path, fuse_file_info_t *fi))libfuse_opendir;
     opt->releasedir = (int (*)(const char *path, fuse_file_info_t *fi))libfuse_releasedir;
 
-    opt->create     = (int (*)(const char *path, mode_t mode, fuse_file_info_t *fi))libfuse_create;
-    opt->open       = (int (*)(const char *path, fuse_file_info_t *fi))libfuse_open;
+    opt->create = (int (*)(const char *path, mode_t mode, fuse_file_info_t *fi))libfuse_create;
+    opt->open = (int (*)(const char *path, fuse_file_info_t *fi))libfuse_open;
 
-    // These are methods declared in C to do read/write operation directly on file for better performance
-    #if 1
-    opt->read       = (int (*)(const char *path, char *buf, size_t, off_t, fuse_file_info_t *))native_read_file;
-    opt->write      = (int (*)(const char *path, const char *buf, size_t, off_t, fuse_file_info_t *))native_write_file;
-    opt->flush      = (int (*)(const char *path, fuse_file_info_t *fi))native_flush_file;
-    #else
-    opt->read       = (int (*)(const char *path, char *buf, size_t, off_t, fuse_file_info_t *))libfuse_read;
-    opt->write      = (int (*)(const char *path, const char *buf, size_t, off_t, fuse_file_info_t *))libfuse_write;
-    opt->flush      = (int (*)(const char *path, fuse_file_info_t *fi))libfuse_flush;
-    #endif
-    
-    opt->release    = (int (*)(const char *path, fuse_file_info_t *fi))libfuse_release;
+// These are methods declared in C to do read/write operation directly on file for better performance
+#if 1
+    opt->read = (int (*)(const char *path, char *buf, size_t, off_t, fuse_file_info_t *))native_read_file;
+    opt->write = (int (*)(const char *path, const char *buf, size_t, off_t, fuse_file_info_t *))native_write_file;
+    opt->flush = (int (*)(const char *path, fuse_file_info_t *fi))native_flush_file;
+#else
+    opt->read = (int (*)(const char *path, char *buf, size_t, off_t, fuse_file_info_t *))libfuse_read;
+    opt->write = (int (*)(const char *path, const char *buf, size_t, off_t, fuse_file_info_t *))libfuse_write;
+    opt->flush = (int (*)(const char *path, fuse_file_info_t *fi))libfuse_flush;
+#endif
 
-    opt->unlink     = (int (*)(const char *path))libfuse_unlink;
+    opt->release = (int (*)(const char *path, fuse_file_info_t *fi))libfuse_release;
 
-    opt->symlink    = (int (*)(const char *from, const char *to))libfuse_symlink;
-    opt->readlink   = (int (*)(const char *path, char *buf, size_t size))libfuse_readlink;
+    opt->unlink = (int (*)(const char *path))libfuse_unlink;
 
-    opt->fsync      = (int (*)(const char *path, int, fuse_file_info_t *fi))libfuse_fsync;
-    opt->fsyncdir   = (int (*)(const char *path, int, fuse_file_info_t *))libfuse_fsyncdir;
+    opt->symlink = (int (*)(const char *from, const char *to))libfuse_symlink;
+    opt->readlink = (int (*)(const char *path, char *buf, size_t size))libfuse_readlink;
 
+    opt->fsync = (int (*)(const char *path, int, fuse_file_info_t *fi))libfuse_fsync;
+    opt->fsyncdir = (int (*)(const char *path, int, fuse_file_info_t *))libfuse_fsyncdir;
 
-    #ifdef __FUSE2__
-    opt->init       = (void *(*)(fuse_conn_info_t *))libfuse2_init;
-    opt->getattr    = (int (*)(const char *, stat_t *))libfuse2_getattr;
-    opt->readdir    = (int (*)(const char *path, void *buf, fuse_fill_dir_t filler, off_t, fuse_file_info_t *))libfuse2_readdir;
-    opt->truncate   = (int (*)(const char *path, off_t off))libfuse2_truncate;
-    opt->rename     = (int (*)(const char *src, const char *dst))libfuse2_rename;
-    opt->chmod      = (int (*)(const char *path, mode_t mode))libfuse2_chmod;
-    opt->chown      = (int (*)(const char *path, uid_t uid, gid_t gid))libfuse2_chown;
-    opt->utimens    = (int (*)(const char *path, const timespec_t tv[2]))libfuse2_utimens;
-    #else
-    opt->init       = (void *(*)(fuse_conn_info_t *, fuse_config_t *))libfuse_init;
-    opt->getattr    = (int (*)(const char *, stat_t *, fuse_file_info_t *))libfuse_getattr;
-    opt->readdir    = (int (*)(const char *path, void *buf, fuse_fill_dir_t filler, off_t, fuse_file_info_t *, 
-                               fuse_readdir_flags_t))libfuse_readdir;
-    opt->truncate   = (int (*)(const char *path, off_t off, fuse_file_info_t *fi))libfuse_truncate;
-    opt->rename     = (int (*)(const char *src, const char *dst, unsigned int flags))libfuse_rename;
-    opt->chmod      = (int (*)(const char *path, mode_t mode, fuse_file_info_t *fi))libfuse_chmod;
-    opt->chown      = (int (*)(const char *path, uid_t uid, gid_t gid, fuse_file_info_t *fi))libfuse_chown;
-    opt->utimens    = (int (*)(const char *path, const timespec_t tv[2], fuse_file_info_t *fi))libfuse_utimens;
-    #endif
+#ifdef __FUSE2__
+    opt->init = (void *(*)(fuse_conn_info_t *))libfuse2_init;
+    opt->getattr = (int (*)(const char *, stat_t *))libfuse2_getattr;
+    opt->readdir = (int (*)(const char *path, void *buf, fuse_fill_dir_t filler, off_t, fuse_file_info_t *))libfuse2_readdir;
+    opt->truncate = (int (*)(const char *path, off_t off))libfuse2_truncate;
+    opt->rename = (int (*)(const char *src, const char *dst))libfuse2_rename;
+    opt->chmod = (int (*)(const char *path, mode_t mode))libfuse2_chmod;
+    opt->chown = (int (*)(const char *path, uid_t uid, gid_t gid))libfuse2_chown;
+    opt->utimens = (int (*)(const char *path, const timespec_t tv[2]))libfuse2_utimens;
+#else
+    opt->init = (void *(*)(fuse_conn_info_t *, fuse_config_t *))libfuse_init;
+    opt->getattr = (int (*)(const char *, stat_t *, fuse_file_info_t *))libfuse_getattr;
+    opt->readdir = (int (*)(const char *path, void *buf, fuse_fill_dir_t filler, off_t, fuse_file_info_t *,
+                            fuse_readdir_flags_t))libfuse_readdir;
+    opt->truncate = (int (*)(const char *path, off_t off, fuse_file_info_t *fi))libfuse_truncate;
+    opt->rename = (int (*)(const char *src, const char *dst, unsigned int flags))libfuse_rename;
+    opt->chmod = (int (*)(const char *path, mode_t mode, fuse_file_info_t *fi))libfuse_chmod;
+    opt->chown = (int (*)(const char *path, uid_t uid, gid_t gid, fuse_file_info_t *fi))libfuse_chown;
+    opt->utimens = (int (*)(const char *path, const timespec_t tv[2], fuse_file_info_t *fi))libfuse_utimens;
+#endif
 
     return 0;
 }
@@ -161,9 +155,10 @@ static int get_root_properties(stat_t *stbuf)
 static int fill_dir_entry(fuse_fill_dir_t filler, void *buf, char *name, stat_t *stbuf, off_t off)
 {
     return filler(buf, name, stbuf, off
-    #ifndef __FUSE2__
-        ,(fuse_fill_dir_flags_t) fill_dir_plus
-    #endif
+#ifndef __FUSE2__
+                  ,
+                  (fuse_fill_dir_flags_t)fill_dir_plus
+#endif
     );
 }
 

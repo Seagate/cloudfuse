@@ -1,4 +1,4 @@
-//go:build fuse2 || windows
+//go:build windows
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
