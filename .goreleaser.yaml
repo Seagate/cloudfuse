@@ -123,6 +123,126 @@ checksum:
   name_template: "checksums_sha256.txt"
   algorithm: sha256
 
+archives:
+  - id: linux-amd64
+    builds:
+      - linux-amd64
+      - linux-amd64-health-monitor
+    format: tar.gz
+    files:
+      - LICENSE
+      - README.md
+      - NOTICE
+      - src: "./gui/dist/cloudfuseGUI_Linux/*"
+        dst: "./"
+      - src: "setup/baseConfig.yaml"
+        dst: "./samples/baseConfig.yaml"
+      - src: "sampleFileCacheConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheConfigAzure.yaml"
+      - src: "sampleFileCacheWithSASConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheWithSASConfigAzure.yaml"
+      - src: "sampleFileCacheConfigS3.yaml"
+        dst: "./samples/sampleFileCacheConfigS3.yaml"
+      - src: "sampleStreamingConfigS3.yaml"
+        dst: "./samples/sampleStreamingConfigS3.yaml"
+      - src: "sampleStreamingConfigAzure.yaml"
+        dst: "./samples/sampleStreamingConfigAzure.yaml"
+  
+  - id: linux-amd64_no_gui
+    builds:
+      - linux-amd64
+      - linux-amd64-health-monitor
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - NOTICE
+      - src: "setup/baseConfig.yaml"
+        dst: "./samples/baseConfig.yaml"
+      - src: "sampleFileCacheConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheConfigAzure.yaml"
+      - src: "sampleFileCacheWithSASConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheWithSASConfigAzure.yaml"
+      - src: "sampleFileCacheConfigS3.yaml"
+        dst: "./samples/sampleFileCacheConfigS3.yaml"
+      - src: "sampleStreamingConfigS3.yaml"
+        dst: "./samples/sampleStreamingConfigS3.yaml"
+      - src: "sampleStreamingConfigAzure.yaml"
+        dst: "./samples/sampleStreamingConfigAzure.yaml"
+  
+  - id: linux-arm64_no_gui
+    builds:
+      - linux-arm64
+      - linux-arm64-health-monitor
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - NOTICE
+      - src: "setup/baseConfig.yaml"
+        dst: "./samples/baseConfig.yaml"
+      - src: "sampleFileCacheConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheConfigAzure.yaml"
+      - src: "sampleFileCacheWithSASConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheWithSASConfigAzure.yaml"
+      - src: "sampleFileCacheConfigS3.yaml"
+        dst: "./samples/sampleFileCacheConfigS3.yaml"
+      - src: "sampleStreamingConfigS3.yaml"
+        dst: "./samples/sampleStreamingConfigS3.yaml"
+      - src: "sampleStreamingConfigAzure.yaml"
+        dst: "./samples/sampleStreamingConfigAzure.yaml"
+  
+  - id: windows
+    builds:
+      - windows
+      - windows-startup
+      - windows-health-monitor
+    format: zip
+    files:
+      - LICENSE
+      - README.md
+      - NOTICE
+      - src: "./gui/dist/cloudfuseGUI_Windows/*"
+        dst: "./"
+      - src: "setup/baseConfig.yaml"
+        dst: "./samples/baseConfig.yaml"
+      - src: "sampleFileCacheConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheConfigAzure.yaml"
+      - src: "sampleFileCacheWithSASConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheWithSASConfigAzure.yaml"
+      - src: "sampleFileCacheConfigS3.yaml"
+        dst: "./samples/sampleFileCacheConfigS3.yaml"
+      - src: "sampleStreamingConfigS3.yaml"
+        dst: "./samples/sampleStreamingConfigS3.yaml"
+      - src: "sampleStreamingConfigAzure.yaml"
+        dst: "./samples/sampleStreamingConfigAzure.yaml"
+  
+  - id: windows_no_gui
+    builds:
+      - windows
+      - windows-health-monitor
+    format: zip
+    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - NOTICE
+      - src: "setup/baseConfig.yaml"
+        dst: "./samples/baseConfig.yaml"
+      - src: "sampleFileCacheConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheConfigAzure.yaml"
+      - src: "sampleFileCacheWithSASConfigAzure.yaml"
+        dst: "./samples/sampleFileCacheWithSASConfigAzure.yaml"
+      - src: "sampleFileCacheConfigS3.yaml"
+        dst: "./samples/sampleFileCacheConfigS3.yaml"
+      - src: "sampleStreamingConfigS3.yaml"
+        dst: "./samples/sampleStreamingConfigS3.yaml"
+      - src: "sampleStreamingConfigAzure.yaml"
+        dst: "./samples/sampleStreamingConfigAzure.yaml"
+
+
 release:
   extra_files: 
     - glob: ./build/Output/cloudfuse_{{.Version}}_windows_amd64.exe
