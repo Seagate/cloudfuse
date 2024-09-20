@@ -215,7 +215,13 @@ func (p *lruPolicy) asyncCacheValid() {
 	for {
 		select {
 		case name := <-p.validateChan:
-			p.cacheValidate(name)
+			// validateChan only gets names that are already cached
+			// if the file is not in the map anymore, then it was deleted,
+			// which means calling cacheValidate now would be a bug
+			_, found := p.nodeMap.Load(name)
+			if found {
+				p.cacheValidate(name)
+			}
 
 		case <-p.closeSignalValidate:
 			return
