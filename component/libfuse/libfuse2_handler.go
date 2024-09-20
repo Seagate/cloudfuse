@@ -426,7 +426,7 @@ func (cf *CgofuseFS) Opendir(path string) (int, uint64) {
 // Releasedir opens the handle for the directory at the path.
 func (cf *CgofuseFS) Releasedir(path string, fh uint64) int {
 	// Get the filehandle
-	handle, exists := handlemap.Load(handlemap.HandleID(fh))
+	handle, exists := handlemap.LoadAndDelete(handlemap.HandleID(fh))
 	if !exists {
 		log.Trace("Libfuse::Releasedir : Failed to release %s, handle: %d", path, fh)
 		return -fuse.EBADF
@@ -435,7 +435,6 @@ func (cf *CgofuseFS) Releasedir(path string, fh uint64) int {
 	log.Trace("Libfuse::Releasedir : %s, handle: %d", handle.Path, handle.ID)
 
 	handle.Cleanup()
-	handlemap.Delete(handle.ID)
 	return 0
 }
 
