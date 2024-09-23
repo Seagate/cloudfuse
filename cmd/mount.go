@@ -103,10 +103,6 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 		if !os.IsNotExist(err) {
 			return fmt.Errorf("mount directory already exists")
 		}
-
-		if common.IsDirectoryMounted(opt.MountPath) {
-			return fmt.Errorf("directory is already mounted")
-		}
 	} else {
 		if _, err := os.Stat(opt.MountPath); os.IsNotExist(err) {
 			return fmt.Errorf("mount directory does not exists")
