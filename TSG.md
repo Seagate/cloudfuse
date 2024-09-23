@@ -241,8 +241,6 @@ For non-HNS accounts Cloudfuse expects special directory marker files to exist i
 
 **10. File size and LMT are updated but file contents are not refreshed**
 
-Cloudfuse supports fuse3 compatible linux distros. In all linux distros kernel cached contents of file in its page-cache. As long as cache is valid read/write are served from cache and calls will not reach to file-system drivers (Cloudfuse in our case). This page-cache is invalidated when page is swapped-out, manually cleared by user through cli or file-system driver requests for it. Cloudfuse configures libfuse to invalidate the page cache on file size or LMT change so this issue will not be hit.
-
 If user is observing that list or stat call to file shows updated time or size but contents are not reflecting accordingly, first confirm with Cloudfuse logs that file was indeed downloaded afresh. If file-cache-timeout has not expired then Cloudfuse will keep using the current version of file persisted on temp cache and contents will not be refreshed. If Cloudfuse has downloaded the latest file and user still observes stale contents then clear the kernel page-cache manually using ```sysctl -w vm.drop_caches=3``` command.
 
 If your workflow involves updating the file directly on container (not using Cloudfuse) and you wish to get latest contents on Cloudfuse mount then do the following (for fuse3 compliant linux distro only):
