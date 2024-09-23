@@ -21,8 +21,8 @@ jobs:
           - job_name: linux
             os: ubuntu-latest
             containerName: 'test-cnt-ubn'
-            fuselib: libfuse-dev
-            fuselib2: fuse
+            fuselib: libfuse3-dev
+            fuselib2: fuse3
 
     runs-on:  ${{ matrix.os }}
     env:
@@ -50,8 +50,7 @@ jobs:
 
     - name: Install libfuse
       run: |-
-        sudo apt-get update --fix-missing -o Dpkg::Options::="--force-confnew"
-        sudo apt-get install make cmake gcc g++ parallel ${{ matrix.fuselib }} ${{ matrix.fuselib2 }} -y -o Dpkg::Options::="--force-confnew"
+        sudo apt-get install ${{ matrix.fuselib }} ${{ matrix.fuselib2 }}
     
     - name: Create Directory Structure
       run: |-
@@ -1108,8 +1107,8 @@ jobs:
           - job_name: linux
             os: ubuntu-latest
             containerName: 'test-cnt-ubn'
-            fuselib: libfuse-dev
-            fuselib2: fuse
+            fuselib: libfuse3-dev
+            fuselib2: fuse3
 
     runs-on:  ${{ matrix.os }}
     timeout-minutes: 30
@@ -1126,8 +1125,7 @@ jobs:
 
     - name: Install dependency
       run: |-
-        sudo apt-get update --fix-missing -o Dpkg::Options::="--force-confnew"
-        sudo apt-get install make cmake gcc g++ parallel ${{ matrix.fuselib }} ${{ matrix.fuselib2 }} -y -o Dpkg::Options::="--force-confnew"
+        sudo apt-get install ${{ matrix.fuselib }} ${{ matrix.fuselib2 }}
       
     - name: Cleanup Blob Storage
       run: go test -timeout 120m -v test/accoutcleanup/accountcleanup_test.go

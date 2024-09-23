@@ -97,6 +97,14 @@ type Libfuse struct {
 	displayCapacityMb     uint64
 }
 
+type dirChildCache struct {
+	sIndex   uint64              // start index of current block of items
+	eIndex   uint64              // End index of current block of items
+	length   uint64              // Length of the children list
+	token    string              // Token to get next block of items from container
+	children []*internal.ObjAttr // Slice holding current block of children
+}
+
 // Note: libfuse prepends "/" to the path.
 // trimFusePath trims the first character from the path provided by libfuse
 func trimFusePath(path *C.char) string {

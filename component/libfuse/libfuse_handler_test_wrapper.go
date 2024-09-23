@@ -134,7 +134,6 @@ func testMkDirError(suite *libfuseTestSuite) {
 // testMkDirErrorAttrExist only runs on Windows to test the case that the directory already exists
 // Sine fuse3 doesn't work on windows, do nothing
 func testMkDirErrorAttrExist(suite *libfuseTestSuite) {
-	return
 }
 
 // TODO: ReadDir test

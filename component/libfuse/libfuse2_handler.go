@@ -98,6 +98,19 @@ type Libfuse struct {
 	displayCapacityMb     uint64
 }
 
+// To support pagination in readdir calls this structure holds a block of items for a given directory
+type dirChildCache struct {
+	sIndex   uint64              // start index of current block of items
+	eIndex   uint64              // End index of current block of items
+	length   uint64              // Length of the children list
+	token    string              // Token to get next block of items from container
+	children []*internal.ObjAttr // Slice holding current block of children
+	lastPage bool                // Whether current block is the last one
+}
+
+const maxNameSize = 255
+const blockSize = 4096
+
 // Note: libfuse prepends "/" to the path.
 // TODO: Not sure if this is needed for cgofuse, will need to check
 // trimFusePath trims the first character from the path provided by libfuse

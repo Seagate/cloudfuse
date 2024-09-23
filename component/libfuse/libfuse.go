@@ -45,16 +45,6 @@ import (
    - To read any new setting from config file follow the Configure method default comments
 */
 
-// To support pagination in readdir calls this structure holds a block of items for a given directory
-type dirChildCache struct {
-	sIndex   uint64              // start index of current block of items
-	eIndex   uint64              // End index of current block of items
-	length   uint64              // Length of the children list
-	token    string              // Token to get next block of items from container
-	children []*internal.ObjAttr // Slice holding current block of children
-	lastPage bool                // Whether current block is the last one
-}
-
 // LibfuseOptions defines the config parameters.
 type LibfuseOptions struct {
 	mountPath               string
@@ -84,8 +74,6 @@ const defaultEntryExpiration = 120
 const defaultAttrExpiration = 120
 const defaultNegativeEntryExpiration = 120
 const defaultMaxFuseThreads = 128
-const maxNameSize = 255
-const blockSize = 4096
 
 var fuseFS *Libfuse
 
