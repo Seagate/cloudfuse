@@ -1215,11 +1215,10 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 
 		// If chmod was done on the file before it was uploaded to container then setting up mode would have been missed
 		// Such file names are added to this map and here post upload we try to set the mode correctly
-		_, found := fc.missedChmodList.Load(options.Handle.Path)
+		// Delete the entry from map so that any further flush do not try to update the mode again
+		_, found := fc.missedChmodList.LoadAndDelete(options.Handle.Path)
 		if found {
 			// If file is found in map it means last chmod was missed on this
-			// Delete the entry from map so that any further flush do not try to update the mode again
-			fc.missedChmodList.Delete(options.Handle.Path)
 
 			// When chmod on container was missed, local file was updated with correct mode
 			// Here take the mode from local cache and update the container accordingly
