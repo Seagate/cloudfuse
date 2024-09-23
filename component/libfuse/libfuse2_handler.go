@@ -607,10 +607,10 @@ func (cf *CgofuseFS) Rmdir(path string) int {
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Rmdir : %s", name)
 
-	// empty := fuseFS.NextComponent().IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
-	// if !empty {
-	// 	return -fuse.ENOTEMPTY
-	// }
+	empty := fuseFS.NextComponent().IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
+	if !empty {
+		return -fuse.ENOTEMPTY
+	}
 
 	err := fuseFS.NextComponent().DeleteDir(internal.DeleteDirOptions{Name: name})
 	if err != nil {

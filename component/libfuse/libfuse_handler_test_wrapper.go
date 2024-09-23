@@ -33,8 +33,8 @@ package libfuse
 import "C"
 import (
 	"errors"
+	"fmt"
 	"io/fs"
-	"runtime"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -68,10 +68,16 @@ var defaultSize = int64(0)
 var defaultMode = 0777
 
 func newTestLibfuse(next internal.Component, configuration string) *Libfuse {
-	config.ReadConfigFromReader(strings.NewReader(configuration))
+	err := config.ReadConfigFromReader(strings.NewReader(configuration))
+	if err != nil {
+		panic(fmt.Sprintf("Unable to read config from reader: %v", err))
+	}
 	libfuse := NewLibfuseComponent()
 	libfuse.SetNextComponent(next)
-	libfuse.Configure(true)
+	err = libfuse.Configure(true)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to configure for testing: %v", err))
+	}
 
 	return libfuse.(*Libfuse)
 }
@@ -128,10 +134,7 @@ func testMkDirError(suite *libfuseTestSuite) {
 // testMkDirErrorAttrExist only runs on Windows to test the case that the directory already exists
 // Sine fuse3 doesn't work on windows, do nothing
 func testMkDirErrorAttrExist(suite *libfuseTestSuite) {
-	defer suite.cleanupTest()
-	if runtime.GOOS != "windows" {
-		return
-	}
+	return
 }
 
 // TODO: ReadDir test
@@ -630,10 +633,10 @@ func testStatFs(suite *libfuseTestSuite) {
 	buf := &C.statvfs_t{}
 	libfuse_statfs(path, buf)
 
-	suite.assert.Equal(int(buf.f_frsize), 1)
-	suite.assert.Equal(int(buf.f_blocks), 2)
-	suite.assert.Equal(int(buf.f_bavail), 3)
-	suite.assert.Equal(int(buf.f_bfree), 4)
+	suite.assert.Equal(1, int(buf.f_frsize))
+	suite.assert.Equal(2, int(buf.f_blocks))
+	suite.assert.Equal(3, int(buf.f_bavail))
+	suite.assert.Equal(4, int(buf.f_bfree))
 }
 
 func testStatFsNotPopulated(suite *libfuseTestSuite) {
