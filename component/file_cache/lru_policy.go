@@ -189,6 +189,8 @@ func (p *lruPolicy) CachePurge(name string) {
 	p.deleteEvent <- name
 }
 
+// Due to a race condition, this may return a false positive,
+// but it will not return a false negative.
 func (p *lruPolicy) IsCached(name string) bool {
 	log.Trace("lruPolicy::IsCached : %s", name)
 
@@ -213,7 +215,13 @@ func (p *lruPolicy) asyncCacheValid() {
 	for {
 		select {
 		case name := <-p.validateChan:
-			p.cacheValidate(name)
+			// validateChan only gets names that are already cached
+			// if the file is not in the map anymore, then it was deleted,
+			// which means calling cacheValidate now would be a bug
+			_, found := p.nodeMap.Load(name)
+			if found {
+				p.cacheValidate(name)
+			}
 
 		case <-p.closeSignalValidate:
 			return
@@ -310,12 +318,10 @@ func (p *lruPolicy) removeNode(name string) {
 
 	var node *lruNode = nil
 
-	val, found := p.nodeMap.Load(name)
+	val, found := p.nodeMap.LoadAndDelete(name)
 	if !found || val == nil {
 		return
 	}
-
-	p.nodeMap.Delete(name)
 
 	p.Lock()
 	defer p.Unlock()
