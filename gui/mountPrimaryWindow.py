@@ -63,7 +63,7 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         self.checkConfigDirectory()
         self.textEdit_output.setReadOnly(True)
         self.settings = self.allMountSettings
-        self.initSettingsFromConfig()
+        self.initSettingsFromConfig(self.settings)
 
         if platform == 'win32':
             # Windows directory and filename conventions:
@@ -264,7 +264,7 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
                 f"The components is missing in {workingDir}/config.yaml. Consider Going through the settings to create one.",
                 "Components in config missing")
             return
-        self.writeConfigFile()
+        self.writeConfigFile(self.settings)
 
     # run command and return tuple:
     # (stdOut, stdErr, exitCode, executableFound)

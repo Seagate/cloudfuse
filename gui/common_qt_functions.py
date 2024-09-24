@@ -47,7 +47,6 @@ class defaultSettingsManager():
 
     def setS3Settings(self, allMountSettings):
         # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
-        
         allMountSettings['s3storage'] = {
             'bucket-name': '',
             'key-id': '',
@@ -220,29 +219,29 @@ class customConfigFunctions():
     # defaultSettingsManager has set the settings to all default, now the code needs to pull in
     #   all the changes from the config file the user provides. This may not include all the
     #   settings defined in defaultSettingManager.
-    def initSettingsFromConfig(self):
-        dictForConfigs = self.getConfigs()
+    def initSettingsFromConfig(self, settings):
+        dictForConfigs = self.getConfigs(settings)
         for option in dictForConfigs:
             # check default settings to enforce YAML schema
-            invalidOption = not (option in self.settings)
-            invalidType = type(self.settings.get(option, None)) != type(dictForConfigs[option])
+            invalidOption = not (option in settings)
+            invalidType = type(settings.get(option, None)) != type(dictForConfigs[option])
             if invalidOption or invalidType:
                 print(f"WARNING: Ignoring invalid config option: {option} (type mismatch)")
                 continue
             if type(dictForConfigs[option]) == dict:
-                tempDict = self.settings[option]
+                tempDict = settings[option]
                 for suboption in dictForConfigs[option]:
                     tempDict[suboption] = dictForConfigs[option][suboption]
-                self.settings[option]=tempDict
+                settings[option]=tempDict
             else:
-                self.settings[option] = dictForConfigs[option]
+                settings[option] = dictForConfigs[option]
 
-    def getConfigs(self,useDefault=False):
+    def getConfigs(self,settings,useDefault=False):
         workingDir = self.getWorkingDir()
         if useDefault:
             # Use programmed defaults
-            defaultSettingsManager.setAllDefaultSettings(self,self.settings)
-            configs = self.settings
+            defaultSettingsManager.setAllDefaultSettings(self,settings)
+            configs = settings
         else:
             try:
                 with open(workingDir+'/config.yaml', 'r') as file:
@@ -266,12 +265,11 @@ class customConfigFunctions():
         workingDir = os.path.join(userDir, defaultFuseDir)
         return workingDir
 
-    def writeConfigFile(self):
-        dictForConfigs = self.settings
+    def writeConfigFile(self, settings):
         workingDir = self.getWorkingDir()
         try:
             with open(workingDir+'/config.yaml','w') as file:
-                yaml.safe_dump(dictForConfigs,file)
+                yaml.safe_dump(settings,file)
                 return True
         except:
             msg = QtWidgets.QMessageBox()
@@ -321,7 +319,7 @@ class widgetCustomFunctions(customConfigFunctions,QWidget):
             # Insert all settings to yaml file
             self.exitWindowCleanup()
             self.updateSettingsFromUIChoices()
-            if self.writeConfigFile():
+            if self.writeConfigFile(self.settings):
                 event.accept()
             else:
                 event.ignore()
