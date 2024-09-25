@@ -1,5 +1,3 @@
-//go:build linux
-
 /*
     _____           _____   _____   ____          ______  _____  ------
    |     |  |      |     | |     | |     |     | |       |            |
@@ -48,7 +46,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -195,13 +192,12 @@ func (bc *BlockCache) Configure(_ bool) error {
 	if config.IsSet(compName + ".mem-size-mb") {
 		bc.memSize = conf.MemSize * _1MB
 	} else {
-		var sysinfo syscall.Sysinfo_t
-		err = syscall.Sysinfo(&sysinfo)
+		freeRam, err := common.GetFreeRam()
 		if err != nil {
 			log.Err("BlockCache::Configure : config error %s [%s]. Assigning a pre-defined value of 4GB.", bc.Name(), err.Error())
 			bc.memSize = uint64(4192) * _1MB
 		} else {
-			bc.memSize = uint64(0.8 * (float64)(sysinfo.Freeram) * float64(sysinfo.Unit))
+			bc.memSize = uint64(0.8 * (float64)(freeRam))
 			defaultMemSize = true
 		}
 	}
@@ -256,13 +252,13 @@ func (bc *BlockCache) Configure(_ bool) error {
 				return fmt.Errorf("config error in %s [%s]", bc.Name(), err.Error())
 			}
 		}
-		var stat syscall.Statfs_t
-		err = syscall.Statfs(bc.tmpPath, &stat)
+
+		bavail, bsize, err := common.GetAvailFree(bc.tmpPath)
 		if err != nil {
 			log.Err("BlockCache::Configure : config error %s [%s]. Assigning a default value of 4GB or if any value is assigned to .disk-size-mb in config.", bc.Name(), err.Error())
 			bc.diskSize = uint64(4192) * _1MB
 		} else {
-			bc.diskSize = uint64(0.8 * float64(stat.Bavail) * float64(stat.Bsize))
+			bc.diskSize = uint64(0.8 * float64(bavail) * float64(bsize))
 		}
 	}
 
@@ -314,6 +310,7 @@ func (bc *BlockCache) CreateFile(options internal.CreateFileOptions) (*handlemap
 	handle := handlemap.NewHandle(options.Name)
 	handle.Size = 0
 	handle.Mtime = time.Now()
+	handle.FObj.Fd()
 
 	// As file is created on storage as well there is no need to mark this as dirty
 	// Any write operation to file will mark it dirty and flush will then reupload

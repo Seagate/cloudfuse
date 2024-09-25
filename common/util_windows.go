@@ -32,6 +32,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -97,6 +98,47 @@ func GetDiskUsageFromStatfs(path string) (float64, float64, error) {
 
 	usedSpace := float64(total - avail)
 	return usedSpace, float64(usedSpace) / float64(total) * 100, nil
+}
+
+// GetAvailFree: Available blocks
+func GetAvailFree(path string) (uint64, uint64, error) {
+	var free, total, avail uint64
+
+	// Get path to the cache
+	pathPtr, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return 0, 0, err
+	}
+	err = windows.GetDiskFreeSpaceEx(pathPtr, &free, &total, &avail)
+	if err != nil {
+		return 0, 0, err
+	}
+	return avail, free, nil
+}
+
+// https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/ns-sysinfoapi-memorystatusex
+type memoryStatusEx struct {
+	dwLength                uint32
+	dwMemoryLoad            uint32
+	ullTotalPhys            uint64
+	ullAvailPhys            uint64
+	ullTotalPageFile        uint64
+	ullAvailPageFile        uint64
+	ullTotalVirtual         uint64
+	ullAvailVirtual         uint64
+	ullAvailExtendedVirtual uint64
+}
+
+// GetAvailFree: Available blocks
+func GetFreeRam() (uint64, error) {
+	var mse memoryStatusEx
+	kernel32 := windows.NewLazySystemDLL("kernel32.dll")
+	globalMemoryStatusEx := kernel32.NewProc("GlobalMemoryStatusEx")
+	r1, _, err := globalMemoryStatusEx.Call(uintptr(unsafe.Pointer(&mse)))
+	if err != nil || r1 == 0 {
+		return 0, err
+	}
+	return mse.ullTotalPhys, nil
 }
 
 // List all mount points which were mounted using cloudfuse

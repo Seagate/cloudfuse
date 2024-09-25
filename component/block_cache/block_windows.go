@@ -1,4 +1,4 @@
-//go:build linux
+//go:build windows
 
 /*
     _____           _____   _____   ____          ______  _____  ------
@@ -37,8 +37,9 @@ package block_cache
 
 import (
 	"fmt"
+	"unsafe"
 
-	"golang.org/x/sys/unix"
+	"golang.org/x/sys/windows"
 )
 
 // AllocateBlock creates a new memory mapped buffer for the given size
@@ -47,15 +48,28 @@ func AllocateBlock(size uint64) (*Block, error) {
 		return nil, fmt.Errorf("invalid size")
 	}
 
-	prot, flags := unix.PROT_READ|unix.PROT_WRITE, unix.MAP_ANON|unix.MAP_PRIVATE
-	addr, err := unix.Mmap(-1, 0, int(size), prot, flags)
+	// https://learn.microsoft.com/en-us/windows/win32/memory/creating-a-file-mapping-object#file-mapping-size
+	// do not specify any length params, windows will set it according to the file size.
+	// If length > file size, truncate is required according to api definition, we don't want it.
+	h, err := windows.CreateFileMapping(windows.InvalidHandle, nil, windows.PAGE_READONLY, 0, uint32(size), nil)
+	if h == 0 {
+		return nil, fmt.Errorf("create file mapping error: %v", err)
+	}
+
+	addr, err := windows.MapViewOfFile(h, windows.FILE_MAP_READ, 0, 0, 0)
+	if addr == 0 {
+		windows.CloseHandle(h)
+		return nil, fmt.Errorf("mmap error: %v", err)
+	}
+
+	data := unsafe.Slice((*byte)(unsafe.Pointer(addr)), size)
 
 	if err != nil {
 		return nil, fmt.Errorf("mmap error: %v", err)
 	}
 
 	block := &Block{
-		data:  addr,
+		data:  data,
 		state: nil,
 		id:    -1,
 		node:  nil,
@@ -74,12 +88,12 @@ func (b *Block) Delete() error {
 		return fmt.Errorf("invalid buffer")
 	}
 
-	err := unix.Munmap(b.data)
-	b.data = nil
-	if err != nil {
-		// if we get here, there is likely memory corruption.
-		return fmt.Errorf("munmap error: %v", err)
+	addr := uintptr(unsafe.Pointer(unsafe.SliceData(b.data)))
+
+	if err := windows.UnmapViewOfFile(addr); err != nil {
+		return fmt.Errorf("cannot unmap memory mapped file: %w", err)
 	}
+	b.data = nil
 
 	return nil
 }
