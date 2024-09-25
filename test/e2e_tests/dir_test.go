@@ -291,23 +291,26 @@ func (suite *dirTestSuite) TestDirGetStats() {
 }
 
 // # Change mod of directory
-// TODO: Fix Failing Test with ADLS
-// func (suite *dirTestSuite) TestDirChmod() {
-// 	if suite.adlsTest == true {
-// 		dirName := filepath.Join(suite.testPath, "test3")
-// 		err := os.Mkdir(dirName, 0777)
-// 		suite.Equal(nil, err)
+func (suite *dirTestSuite) TestDirChmod() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping TestDirChmod on Windows")
+		return
+	}
+	if suite.adlsTest == true {
+		dirName := filepath.Join(suite.testPath, "testchmod")
+		err := os.Mkdir(dirName, 0777)
+		suite.NoError(err)
 
-// 		err = os.Chmod(dirName, 0744)
-// 		suite.Equal(nil, err)
+		err = os.Chmod(dirName, 0744)
+		suite.NoError(err)
 
-// 		stat, err := os.Stat(dirName)
-// 		suite.Equal(nil, err)
-// 		suite.Equal("-rwxr--r--", stat.Mode().Perm().String())
+		stat, err := os.Stat(dirName)
+		suite.NoError(err)
+		suite.Equal("-rwxr--r--", stat.Mode().Perm().String())
 
-// 		suite.dirTestCleanup([]string{dirName})
-// 	}
-// }
+		suite.dirTestCleanup([]string{dirName})
+	}
+}
 
 // # List directory
 func (suite *dirTestSuite) TestDirList() {
