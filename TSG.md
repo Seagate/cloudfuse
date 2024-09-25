@@ -62,7 +62,7 @@ The Cloudfuse config file should specify the accountName as the original Storage
 If the config file is correct, please verify name resolution
 dig +short myblobstorageaccount.blob.core.windows.net should return a private Ip For eg : 10.0.0.5 or so.
 
-If for some reason the translation/name resolution  fails please confirm the VNet settings to ensure that it is forwarding DNS translation requests to Azure Provided DNS 168.63.129.16. In case the Cloudfuse hosting VM is set up to forward to a Custom DNS Server, the Custom DNS settings should be verified, it should forward DNS requests to the Azure Provided DNS 168.63.129.16.
+If for some reason the translation/name resolution fails please confirm the VNet settings to ensure that it is forwarding DNS translation requests to Azure Provided DNS 168.63.129.16. In case the Cloudfuse hosting VM is set up to forward to a Custom DNS Server, the Custom DNS settings should be verified, it should forward DNS requests to the Azure Provided DNS 168.63.129.16.
 
 Here are few steps to resolve DNS issues when integrating private endpoint with Azure Private DNS:
 
@@ -102,11 +102,18 @@ For HNS account, always add `type: adls` under `azstorage` section in your confi
 
 To create a private-endpoint for DFS in Azure portal: Go to your storage account -> Networking -> Private Endpoint connections. Click `+ Private endpoint`, fill in Subscription, Resource Group, Name, Network Interface Name and Region. Click next and under Target sub-resource select `dfs`. Click Virtual network and select virtual network and Subnet. Click DNS. Select Yes for Integrate with private DNS. Select the Subscription and Resource Group for your private link DNS. Select Next, Next and select Create.
 
-**11. Failed to initialize new pipeline [config error in azstorage [account name not provided]]'**
+**11. Failed to initialize new pipeline [config error in azstorage [account name not provided]]**
 
 Make sure the configuration file has `azstorage` section in your config file.
 
-The [Cloudfuse base configuration file](https://github.com/Seagate/cloudfuse/blob/main/setup/baseConfig.yaml) contains a list of all settings and a brief explanation of each setting. Use the [sample file cache configuration file](https://github.com/Seagate/cloudfuse/blob/main/sampleFileCacheConfigAzure.yaml) or the [sample block cache configuration file](https://github.com/Seagate/cloudfuse/blob/main/sampleBlockCacheConfig.yaml) to get started quickly by using some basic settings for each of those scenarios.
+The [Cloudfuse base configuration file](https://github.com/Seagate/cloudfuse/blob/main/setup/baseConfig.yaml) contains a list of all settings and a brief explanation of each setting. Use the [sample file cache configuration file](https://github.com/Seagate/cloudfuse/blob/main/sampleFileCacheConfigAzure.yaml) or the [sample block cache configuration file](https://github.com/Seagate/cloudfuse/blob/main/sampleBlockCacheConfig.yaml) to get started quickly by using some basic settings for each of those scenarios
+
+**12. Failed to mount in proxy setup [proxyconnect tcp: dial tcp: lookup : no such host]**
+
+Make sure to set the proxy URL in the environment variable `https_proxy` or `http_proxy` and that it is accessible to Blobfuse2 process. If using private endpoint make sure that,
+
+- It is pointing to the `endpoint` in `azstorage` section in config.
+- Or, have a DNS resolution where `account.blob.core.windows.net` can be resolved back to the private endpoint. In case of HNS account, make sure to have the private endpoint configured for both blob and dfs accounts.
 
 # Common Problems after a Successful Mount
 

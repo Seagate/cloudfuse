@@ -651,6 +651,8 @@ func (cf *CgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
 		log.Err("Libfuse::Create : Failed to create %s [%s]", name, err.Error())
 		if os.IsExist(err) {
 			return -fuse.EEXIST, 0
+		} else if os.IsPermission(err) {
+			return -fuse.EACCES, 0
 		}
 
 		return -fuse.EIO, 0
