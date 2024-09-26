@@ -133,7 +133,7 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 1)
 
 	_, err = os.Stat(fileName)
 	suite.NoError(err)
@@ -161,7 +161,7 @@ func (suite *fileTestSuite) TestFileCreateEncodeChar() {
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 1)
 
 	_, err = os.Stat(fileName)
 	suite.NoError(err)
@@ -202,7 +202,7 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 	srcFile, err = os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 1)
 
 	_, err = os.Stat(fileName)
 	suite.NoError(err)
@@ -364,7 +364,7 @@ func (suite *fileTestSuite) TestFileGetStat() {
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 1)
 
 	stat, err := os.Stat(fileName)
 	suite.NoError(err)

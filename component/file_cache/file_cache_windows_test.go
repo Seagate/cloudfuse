@@ -116,8 +116,8 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	_, err := os.Stat(suite.cache_path + "/" + path)
-	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
-		time.Sleep(time.Second)
+	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
 		_, err = os.Stat(suite.cache_path + "/" + path)
 	}
 	// this check is flaky in our CI pipeline on Windows, so skip it
