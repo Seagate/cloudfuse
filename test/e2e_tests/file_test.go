@@ -135,8 +135,7 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 	srcFile.Close()
 	time.Sleep(time.Second * 2)
 
-	_, err = os.Stat(fileName)
-	suite.NoError(err)
+	suite.FileExists(fileName)
 
 	files, err := os.ReadDir(suite.testPath)
 	suite.NoError(err)
@@ -163,8 +162,7 @@ func (suite *fileTestSuite) TestFileCreateEncodeChar() {
 	srcFile.Close()
 	time.Sleep(time.Second * 2)
 
-	_, err = os.Stat(fileName)
-	suite.NoError(err)
+	suite.FileExists(fileName)
 
 	files, err := os.ReadDir(suite.testPath)
 	suite.NoError(err)
@@ -204,8 +202,7 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 	srcFile.Close()
 	time.Sleep(time.Second * 2)
 
-	_, err = os.Stat(fileName)
-	suite.NoError(err)
+	suite.FileExists(fileName)
 
 	files, err := os.ReadDir(speclDirName)
 	suite.NoError(err)

@@ -163,8 +163,7 @@ func (suite *dirTestSuite) TestDirRename() {
 	err = os.Rename(dirName, newName)
 	suite.NoError(err)
 
-	_, err = os.Stat(dirName)
-	suite.True(os.IsNotExist(err))
+	suite.NoDirExists(dirName)
 
 	// cleanup
 	suite.dirTestCleanup([]string{newName})
@@ -404,11 +403,9 @@ func (suite *dirTestSuite) TestDirRenameFull() {
 	suite.NoError(err)
 
 	//  Deleted directory shall not be present in the container now
-	_, err = os.Stat(dirName)
-	suite.True(os.IsNotExist(err))
+	suite.NoDirExists(dirName)
 
-	_, err = os.Stat(newName)
-	suite.False(os.IsNotExist(err))
+	suite.DirExists(newName)
 
 	// this should fail as the new dir should be filled
 	err = os.Remove(newName)
@@ -432,8 +429,7 @@ func (suite *dirTestSuite) TestGitStash() {
 		_, err := cmd.Output()
 		suite.NoError(err)
 
-		_, err = os.Stat(dirName)
-		suite.NoError(err)
+		suite.DirExists(dirName)
 
 		err = os.Chdir(dirName)
 		suite.NoError(err)
