@@ -1490,7 +1490,7 @@ func (suite *fileCacheTestSuite) TestTruncateFileCase2() {
 
 	// Path should be in the file cache and size should be updated
 	info, err := os.Stat(filepath.Join(suite.cache_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(info.Size(), size)
 
 	// Path should not be in fake storage
