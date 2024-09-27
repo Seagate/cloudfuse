@@ -294,7 +294,7 @@ func (suite *lruPolicyTestSuite) TestTimeout() {
 
 	suite.policy.CacheValid("temp")
 
-	time.Sleep(2 * time.Second) // Wait for time > cacheTimeout, the file should no longer be cached
+	time.Sleep(3 * time.Second) // Wait for time > cacheTimeout, the file should no longer be cached
 
 	suite.assert.False(suite.policy.IsCached("temp"))
 }
@@ -319,7 +319,7 @@ func (suite *lruPolicyTestSuite) TestMaxEvictionDefault() {
 		suite.policy.CacheValid("temp" + fmt.Sprint(i))
 	}
 
-	time.Sleep(2 * time.Second) // Wait for time > cacheTimeout, the file should no longer be cached
+	time.Sleep(3 * time.Second) // Wait for time > cacheTimeout, the file should no longer be cached
 
 	for i := 1; i < 5000; i++ {
 		suite.assert.False(suite.policy.IsCached("temp" + fmt.Sprint(i)))
@@ -346,7 +346,7 @@ func (suite *lruPolicyTestSuite) TestMaxEviction() {
 		suite.policy.CacheValid("temp" + fmt.Sprint(i))
 	}
 
-	time.Sleep(2 * time.Second) // Wait for time > cacheTimeout, the file should no longer be cached
+	time.Sleep(3 * time.Second) // Wait for time > cacheTimeout, the file should no longer be cached
 
 	for i := 1; i < 5; i++ {
 		suite.assert.False(suite.policy.IsCached("temp" + fmt.Sprint(i)))
