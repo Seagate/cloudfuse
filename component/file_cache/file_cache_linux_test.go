@@ -117,8 +117,8 @@ func (suite *fileCacheLinuxTestSuite) TestChmodNotInCache() {
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	_, err := os.Stat(suite.cache_path + "/" + path)
-	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
-		time.Sleep(time.Second)
+	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
 		_, err = os.Stat(suite.cache_path + "/" + path)
 	}
 	suite.assert.True(os.IsNotExist(err))
@@ -140,8 +140,8 @@ func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 	// Setup
 	path := "file34"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -188,8 +188,8 @@ func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
 
 	// loop until file does not exist - done due to async nature of eviction
 	_, err = os.Stat(suite.cache_path + "/" + path)
-	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
-		time.Sleep(time.Second)
+	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
 		_, err = os.Stat(suite.cache_path + "/" + path)
 	}
 	suite.assert.True(os.IsNotExist(err))
@@ -210,8 +210,8 @@ func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	_, err := os.Stat(suite.cache_path + "/" + path)
-	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
-		time.Sleep(time.Second)
+	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
 		_, err = os.Stat(suite.cache_path + "/" + path)
 	}
 	suite.assert.True(os.IsNotExist(err))
@@ -238,10 +238,8 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	// Setup
 	path := "file37"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
-	err := suite.fileCache.downloadFile(openHandle)
-	suite.assert.NoError(err)
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -251,7 +249,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	// Chown
 	owner := os.Getuid()
 	group := os.Getgid()
-	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
 	suite.assert.NoError(err)
 	// Path in fake storage and file cache should be updated
 	info, err := os.Stat(suite.cache_path + "/" + path)
