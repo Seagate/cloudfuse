@@ -250,9 +250,8 @@ func (suite *lruPolicyTestSuite) TestCachePurge() {
 	time.Sleep(100 * time.Millisecond)
 	// validate all aPaths were deleted
 	for _, path := range aPaths {
-		_, err := os.Stat(path)
-		suite.assert.Error(err)
-		suite.assert.True(os.IsNotExist(err))
+		suite.assert.NoFileExists(path)
+		suite.assert.NoDirExists(path)
 	}
 	// validate other paths were not touched
 	var otherPaths []string
