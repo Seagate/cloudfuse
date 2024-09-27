@@ -124,8 +124,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodNotInCache() {
 	suite.assert.True(os.IsNotExist(err))
 
 	// Path should be in fake storage
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	// Chmod
 	err = suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0666)})
@@ -218,8 +217,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
 	suite.assert.True(os.IsNotExist(err))
 
 	// Path should be in fake storage
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	// Chown
 	owner := os.Getuid()
@@ -246,11 +244,9 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	suite.assert.NoError(err)
 
 	// Path should be in the file cache
-	_, err = os.Stat(suite.cache_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.cache_path + "/" + path)
 	// Path should be in fake storage
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	// Chown
 	owner := os.Getuid()
@@ -296,8 +292,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownCase2() {
 	suite.assert.EqualValues(oldOwner, stat.Uid)
 	suite.assert.EqualValues(oldGroup, stat.Gid)
 	// Path should not be in fake storage
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoFileExists(suite.fake_storage_path + "/" + path)
 }
 
 // In order for 'go test' to run this suite, we need to create
