@@ -1693,8 +1693,6 @@ func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	smallHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: pathsmall, Flags: os.O_RDONLY, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
 	// try opening small file
-	err = suite.fileCache.downloadFile(smallHandle)
-	suite.assert.NoError(err)
 	suite.assert.False(smallHandle.Dirty())
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: smallHandle})
 	suite.assert.NoError(err)

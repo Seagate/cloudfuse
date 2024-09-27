@@ -240,8 +240,6 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
-	err := suite.fileCache.downloadFile(openHandle)
-	suite.assert.NoError(err)
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -251,7 +249,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	// Chown
 	owner := os.Getuid()
 	group := os.Getgid()
-	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
 	suite.assert.NoError(err)
 	// Path in fake storage and file cache should be updated
 	info, err := os.Stat(suite.cache_path + "/" + path)
