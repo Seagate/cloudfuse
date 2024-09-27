@@ -301,16 +301,16 @@ func (bc *BlockCache) Configure(_ bool) error {
 func (bc *BlockCache) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	log.Trace("BlockCache::CreateFile : name=%s, mode=%d", options.Name, options.Mode)
 
-	_, err := bc.NextComponent().CreateFile(options)
+	f, err := bc.NextComponent().CreateFile(options)
 	if err != nil {
 		log.Err("BlockCache::CreateFile : Failed to create file %s", options.Name)
 		return nil, err
 	}
+	f.GetFileObject().Close()
 
 	handle := handlemap.NewHandle(options.Name)
 	handle.Size = 0
 	handle.Mtime = time.Now()
-	handle.FObj.Fd()
 
 	// As file is created on storage as well there is no need to mark this as dirty
 	// Any write operation to file will mark it dirty and flush will then reupload
@@ -907,7 +907,7 @@ func (bc *BlockCache) download(item *workItem) {
 
 		if err == nil {
 			// If file exists then read the block from the local file
-			f, err := os.Open(localPath)
+			f, err := common.Open(localPath)
 			if err != nil {
 				// On any disk failure we do not fail the download flow
 				log.Err("BlockCache::download : Failed to open file %s [%s]", fileName, err.Error())

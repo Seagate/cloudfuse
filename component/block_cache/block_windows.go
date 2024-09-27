@@ -36,6 +36,7 @@
 package block_cache
 
 import (
+	"errors"
 	"fmt"
 	"unsafe"
 
@@ -49,16 +50,16 @@ func AllocateBlock(size uint64) (*Block, error) {
 	}
 
 	// https://learn.microsoft.com/en-us/windows/win32/memory/creating-a-file-mapping-object#file-mapping-size
-	// do not specify any length params, windows will set it according to the file size.
-	// If length > file size, truncate is required according to api definition, we don't want it.
-	h, err := windows.CreateFileMapping(windows.InvalidHandle, nil, windows.PAGE_READONLY, 0, uint32(size), nil)
-	if h == 0 {
+	h, err := windows.CreateFileMapping(windows.InvalidHandle, nil, windows.PAGE_EXECUTE_READWRITE, uint32(size>>32), uint32(size&0xffffffff), nil)
+	if err != nil {
+		if errors.Is(err, windows.ERROR_ALREADY_EXISTS) {
+			windows.CloseHandle(h)
+		}
 		return nil, fmt.Errorf("create file mapping error: %v", err)
 	}
 
-	addr, err := windows.MapViewOfFile(h, windows.FILE_MAP_READ, 0, 0, 0)
+	addr, err := windows.MapViewOfFile(h, windows.FILE_MAP_READ|windows.FILE_MAP_WRITE, 0, 0, 0)
 	if addr == 0 {
-		windows.CloseHandle(h)
 		return nil, fmt.Errorf("mmap error: %v", err)
 	}
 
