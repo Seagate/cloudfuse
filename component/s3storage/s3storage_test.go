@@ -2417,7 +2417,7 @@ func (s *s3StorageTestSuite) TestGetAttrFileTime() {
 	s.assert.NoError(err)
 	s.assert.NotNil(before.Mtime)
 
-	time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
+	time.Sleep(1 * time.Second) // Wait and then modify the file again
 
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
