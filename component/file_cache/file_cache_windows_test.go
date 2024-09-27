@@ -142,25 +142,22 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	// Setup
 	path := "file"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
-	err := suite.fileCache.downloadFile(openHandle)
-	suite.assert.NoError(err)
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
-	// Chown is not supportred on Windows, but checking that calling it does not cause an error
+	// Chown is not supported on Windows, but checking that calling it does not cause an error
 	owner := os.Getuid()
 	group := os.Getgid()
-	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
 	suite.assert.NoError(err)
 
 	// Checking that nothing changed with existing files
 	suite.assert.FileExists(suite.cache_path + "/" + path)
-
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
