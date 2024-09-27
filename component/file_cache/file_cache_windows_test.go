@@ -142,8 +142,8 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	// Setup
 	path := "file"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	err := suite.fileCache.downloadFile(openHandle)
 	suite.assert.NoError(err)
 

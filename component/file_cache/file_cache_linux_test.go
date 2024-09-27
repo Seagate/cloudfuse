@@ -140,8 +140,8 @@ func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 	// Setup
 	path := "file34"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + path)
@@ -238,8 +238,8 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	// Setup
 	path := "file37"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	err := suite.fileCache.downloadFile(openHandle)
 	suite.assert.NoError(err)
 
