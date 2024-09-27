@@ -180,7 +180,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
 
 	// Path should be in the file cache with old mode (since we failed the operation)
 	info, err := os.Stat(suite.cache_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(info.Mode(), newMode)
 
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
@@ -228,7 +228,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
 	// Path in fake storage should be updated
 	info, err := os.Stat(suite.fake_storage_path + "/" + path)
 	stat := info.Sys().(*syscall.Stat_t)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(owner, stat.Uid)
 	suite.assert.EqualValues(group, stat.Gid)
 }
@@ -256,12 +256,12 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	// Path in fake storage and file cache should be updated
 	info, err := os.Stat(suite.cache_path + "/" + path)
 	stat := info.Sys().(*syscall.Stat_t)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(owner, stat.Uid)
 	suite.assert.EqualValues(group, stat.Gid)
 	info, err = os.Stat(suite.fake_storage_path + "/" + path)
 	stat = info.Sys().(*syscall.Stat_t)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(owner, stat.Uid)
 	suite.assert.EqualValues(group, stat.Gid)
 
@@ -288,7 +288,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownCase2() {
 	// Path should be in the file cache with old group and owner (since we failed the operation)
 	info, err = os.Stat(suite.cache_path + "/" + path)
 	stat = info.Sys().(*syscall.Stat_t)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(oldOwner, stat.Uid)
 	suite.assert.EqualValues(oldGroup, stat.Gid)
 	// Path should not be in fake storage
