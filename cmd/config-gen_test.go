@@ -96,7 +96,7 @@ foreground: false
 read-only: true
 allow-other: true
 
-logging:  
+logging:
   type: base
   level: log_debug
   file-path: /home/cloudfuse.log
@@ -113,7 +113,7 @@ components:
 libfuse:
   attribute-expiration-sec: 1
   entry-expiration-sec: 1
-  
+
 file_cache:
   path: { 0 }
   timeout-sec: 180
@@ -137,8 +137,7 @@ func (suite *genConfigTestSuite) TestGenConfig() {
 	suite.assert.NoError(err)
 
 	// Out file should exist
-	_, err = os.Stat(outFile)
-	suite.assert.NoError(err)
+	suite.assert.FileExists(outFile)
 }
 
 func (suite *genConfigTestSuite) TestGenConfigGet() {
@@ -158,8 +157,7 @@ func (suite *genConfigTestSuite) TestGenConfigGet() {
 	suite.assert.NoError(err)
 
 	// Out file should exist
-	_, err = os.Stat(outFile)
-	suite.assert.NoError(err)
+	suite.assert.FileExists(outFile)
 
 	// Gen-config should correctly set the temp path for the file_cache
 	path, err := executeCommandGen(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile), "--passphrase=12312312312312312312312312312312", "--key=file_cache.path")

@@ -125,8 +125,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	// suite.assert.True(os.IsNotExist(err))
 
 	// Path should be in fake storage
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	// Checking that nothing changed with existing files
 	owner := os.Getuid()
@@ -135,8 +134,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	suite.assert.Nil(err)
 
 	// Path in fake storage should be updated
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 }
 
 func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
@@ -150,11 +148,9 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	suite.assert.NoError(err)
 
 	// Path should be in the file cache
-	_, err = os.Stat(suite.cache_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.cache_path + "/" + path)
 	// Path should be in fake storage
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	// Chown is not supportred on Windows, but checking that calling it does not cause an error
 	owner := os.Getuid()
@@ -163,11 +159,9 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	suite.assert.NoError(err)
 
 	// Checking that nothing changed with existing files
-	_, err = os.Stat(suite.cache_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.cache_path + "/" + path)
 
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
 }
