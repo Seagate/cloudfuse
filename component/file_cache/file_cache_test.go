@@ -1313,9 +1313,9 @@ func (suite *fileCacheTestSuite) TestRenameFileInCache() {
 	dst := "destination2"
 	createHandle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
 	suite.assert.NoError(err)
-	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
-	suite.assert.NoError(err)
 	openHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
+	suite.assert.NoError(err)
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	suite.assert.NoError(err)
 
 	// Path should be in the file cache
@@ -1365,8 +1365,8 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanup() {
 	src := "source4"
 	dst := "destination4"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + src)
@@ -1402,8 +1402,8 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanupWithNoTimeout() {
 	src := "source5"
 	dst := "destination5"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(suite.cache_path + "/" + src)
@@ -1457,8 +1457,8 @@ func (suite *fileCacheTestSuite) TestTruncateFileInCache() {
 	// Setup
 	path := "file31"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
@@ -1693,8 +1693,6 @@ func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	smallHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: pathsmall, Flags: os.O_RDONLY, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
 	// try opening small file
-	err = suite.fileCache.downloadFile(smallHandle)
-	suite.assert.NoError(err)
 	suite.assert.False(smallHandle.Dirty())
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: smallHandle})
 	suite.assert.NoError(err)
