@@ -936,7 +936,7 @@ func (suite *fileCacheTestSuite) TestCloseFile() {
 func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // teardown the default file cache generated
-	cacheTimeout := 5
+	cacheTimeout := 1
 	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, cacheTimeout, suite.fake_storage_path)
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
@@ -1353,7 +1353,7 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanup() {
 	defer suite.cleanupTest()
 	suite.cleanupTest()
 
-	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 2\n\nloopbackfs:\n  path: %s",
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, suite.fake_storage_path)
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 
@@ -1376,10 +1376,10 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanup() {
 	suite.assert.NoFileExists(suite.fake_storage_path + "/" + src) // Src does not exist
 	suite.assert.FileExists(suite.fake_storage_path + "/" + dst)   // Dst does exist
 
-	time.Sleep(1 * time.Second)                           // Check once before the cache cleanup that file exists
+	time.Sleep(500 * time.Millisecond)                    // Check once before the cache cleanup that file exists
 	suite.assert.FileExists(suite.cache_path + "/" + dst) // Dst shall exists in cache
 
-	time.Sleep(2 * time.Second)                           // Wait for the cache cleanup to occur
+	time.Sleep(1 * time.Second)                           // Wait for the cache cleanup to occur
 	suite.assert.FileExists(suite.cache_path + "/" + dst) // Dst shall not exists in cache
 }
 
