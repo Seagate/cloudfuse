@@ -63,6 +63,7 @@ type fileCacheTestSuite struct {
 	loopback          internal.Component
 	cache_path        string // uses os.Separator (filepath.Join)
 	fake_storage_path string // uses os.Separator (filepath.Join)
+	cleanup_handles   []*handlemap.Handle
 }
 
 func newLoopbackFS() internal.Component {
@@ -131,12 +132,18 @@ func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 }
 
 func (suite *fileCacheTestSuite) cleanupTest() {
+	// close all leftover open file handles
+	for _, handle := range suite.cleanup_handles {
+		// using loopback is fine even for handles from file cache
+		// because in either case we just need the underlying handle closed
+		_ = suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	}
+	// stop components
 	suite.loopback.Stop()
 	err := suite.fileCache.Stop()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to stop file cache [%s]", err.Error()))
 	}
-
 	// Delete the temp directories created
 	err = os.RemoveAll(suite.cache_path)
 	if err != nil {
@@ -403,9 +410,12 @@ func (suite *fileCacheTestSuite) TestStreamDirCase1() {
 	// Create files directly in "fake_storage"
 	suite.loopback.CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777})
 	suite.loopback.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1})
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file2})
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3})
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file2})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	// Read the Directory
 	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
@@ -429,9 +439,12 @@ func (suite *fileCacheTestSuite) TestStreamDirCase2() {
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777})
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
 	// By default createEmptyFile is false, so we will not create these files in cloud storage until they are closed.
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
+	handle, _ = suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
+	handle, _ = suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	// Read the Directory
 	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
@@ -455,16 +468,22 @@ func (suite *fileCacheTestSuite) TestStreamDirCase3() {
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777})
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
 	// By default createEmptyFile is false, so we will not create these files in storage until they are closed.
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
+	handle, _ = suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
+	handle, _ = suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file1, Size: 1024})
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file2, Size: 1024})
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, Size: 1024})
 	// Create the files in fake_storage and simulate different sizes
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	// Read the Directory
 	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
@@ -503,16 +522,21 @@ func (suite *fileCacheTestSuite) TestStreamDirMixed() {
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
 
 	// By default createEmptyFile is false, so we will not create these files in storage until they are closed.
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
+	handle, _ = suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file2, Size: 1024})
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, Size: 1024})
 
 	// Create the files in fake_storage and simulate different sizes
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777})
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, Size: 1024})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, Size: 0})
 
@@ -571,7 +595,8 @@ func (suite *fileCacheTestSuite) TestIsDirEmptyFalseInCache() {
 	path := "dir"
 	file := path + "/file"
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: path, Mode: 0777})
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	empty := suite.fileCache.IsDirEmpty(internal.IsDirEmptyOptions{Name: path})
 	suite.assert.False(empty)
@@ -621,6 +646,7 @@ func (suite *fileCacheTestSuite) TestCreateFile() {
 	path := "file1"
 	options := internal.CreateFileOptions{Name: path}
 	f, err := suite.fileCache.CreateFile(options)
+	suite.cleanup_handles = append(suite.cleanup_handles, f)
 	suite.assert.NoError(err)
 	suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
 
@@ -717,6 +743,7 @@ func (suite *fileCacheTestSuite) TestCreateFileInDir() {
 	path := dir + "/file"
 	options := internal.CreateFileOptions{Name: path}
 	f, err := suite.fileCache.CreateFile(options)
+	suite.cleanup_handles = append(suite.cleanup_handles, f)
 	suite.assert.NoError(err)
 	suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
 
@@ -738,6 +765,7 @@ func (suite *fileCacheTestSuite) TestCreateFileCreateEmptyFile() {
 	path := "file2"
 	options := internal.CreateFileOptions{Name: path}
 	f, err := suite.fileCache.CreateFile(options)
+	suite.cleanup_handles = append(suite.cleanup_handles, f)
 	suite.assert.NoError(err)
 	suite.assert.False(f.Dirty()) // Handle should not be dirty since it was written to storage
 
@@ -759,6 +787,7 @@ func (suite *fileCacheTestSuite) TestCreateFileInDirCreateEmptyFile() {
 	path := dir + "/file"
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: dir, Mode: 0777})
 	f, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, f)
 	suite.assert.NoError(err)
 	suite.assert.False(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
 
@@ -800,6 +829,7 @@ func (suite *fileCacheTestSuite) TestSyncFile() {
 	path = "file.fsync"
 	suite.fileCache.syncToFlush = true
 	handle, err = suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	suite.assert.NoError(err)
 	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.assert.NoError(err)
@@ -808,8 +838,6 @@ func (suite *fileCacheTestSuite) TestSyncFile() {
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
-
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 }
 
 func (suite *fileCacheTestSuite) TestDeleteFile() {
@@ -836,7 +864,8 @@ func (suite *fileCacheTestSuite) TestDeleteFileCase2() {
 	defer suite.cleanupTest()
 	// Default is to not create empty files on create file to support immutable storage.
 	path := "file5"
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
 	suite.assert.Error(err)
@@ -879,6 +908,7 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	}
 
 	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: suite.fileCache.defaultPermission})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	suite.assert.NoError(err)
 	// Download is required
 	err = suite.fileCache.downloadFile(handle)
@@ -894,6 +924,7 @@ func (suite *fileCacheTestSuite) TestOpenFileInCache() {
 	defer suite.cleanupTest()
 	path := "file8"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	testData := "test data"
 	data := []byte(testData)
 	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
@@ -901,6 +932,7 @@ func (suite *fileCacheTestSuite) TestOpenFileInCache() {
 
 	// Download is required
 	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(path, handle.Path)
 	suite.assert.False(handle.Dirty())
@@ -941,7 +973,7 @@ func (suite *fileCacheTestSuite) TestCloseFile() {
 func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // teardown the default file cache generated
-	cacheTimeout := 5
+	cacheTimeout := 1
 	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, cacheTimeout, suite.fake_storage_path)
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
@@ -1015,6 +1047,7 @@ func (suite *fileCacheTestSuite) TestOpenPreventsEviction() {
 
 	// Open file (this should prevent eviction)
 	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	suite.assert.NoError(err)
 
 	// wait until file would be evicted (if not for being opened)
@@ -1023,10 +1056,6 @@ func (suite *fileCacheTestSuite) TestOpenPreventsEviction() {
 	// File should still be in cache
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 	suite.assert.True(suite.fileCache.policy.IsCached(filepath.Join(suite.cache_path, path)))
-
-	// cleanup
-	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
-	suite.assert.NoError(err)
 }
 
 func (suite *fileCacheTestSuite) TestReadInBufferEmpty() {
@@ -1034,6 +1063,7 @@ func (suite *fileCacheTestSuite) TestReadInBufferEmpty() {
 	// Setup
 	file := "file15"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	data := make([]byte, 0)
 	length, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
@@ -1047,11 +1077,13 @@ func (suite *fileCacheTestSuite) TestReadInBufferNoFlush() {
 	// Setup
 	file := "file16"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	testData := "test data"
 	data := []byte(testData)
 	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	output := make([]byte, 9)
 	length, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output})
@@ -1065,12 +1097,14 @@ func (suite *fileCacheTestSuite) TestReadInBuffer() {
 	// Setup
 	file := "file17"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	testData := "test data"
 	data := []byte(testData)
 	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	output := make([]byte, 9)
 	length, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output})
@@ -1095,6 +1129,7 @@ func (suite *fileCacheTestSuite) TestWriteFile() {
 	// Setup
 	file := "file19"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	handle.Flags.Clear(handlemap.HandleFlagDirty) // Technically create file will mark it as dirty, we just want to check write file updates the dirty flag, so temporarily set this to false
 	testData := "test data"
@@ -1125,6 +1160,7 @@ func (suite *fileCacheTestSuite) TestFlushFileEmpty() {
 	// Setup
 	file := "file21"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	// Path should not be in fake storage
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
@@ -1143,6 +1179,7 @@ func (suite *fileCacheTestSuite) TestFlushFile() {
 	// Setup
 	file := "file22"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	testData := "test data"
 	data := []byte(testData)
 	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
@@ -1178,7 +1215,8 @@ func (suite *fileCacheTestSuite) TestGetAttrCase1() {
 	// Setup
 	file := "file24"
 	// Create files directly in "fake_storage"
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	// Read the Directory
 	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
@@ -1192,7 +1230,8 @@ func (suite *fileCacheTestSuite) TestGetAttrCase2() {
 	// Setup
 	file := "file25"
 	// By default createEmptyFile is false, so we will not create these files in cloud storage until they are closed.
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	// Read the Directory
 	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
@@ -1206,10 +1245,9 @@ func (suite *fileCacheTestSuite) TestGetAttrCase3() {
 	// Setup
 	file := "file26"
 	// By default createEmptyFile is false, so we will not create these files in cloud storage until they are closed.
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file, Size: 1024})
-	// Create the files in fake_storage and simulate different sizes
-	//suite.loopback.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777}) // Length is default 0
 
 	// Read the Directory
 	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
@@ -1229,21 +1267,21 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	// Setup
 	file := "file27"
 	// By default createEmptyFile is false, so we will not create these files in cloud storage until they are closed.
-	createHandle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	suite.assert.NoError(err)
-	suite.assert.NotNil(createHandle)
+	suite.assert.NotNil(handle)
 
 	size := (100 * 1024 * 1024)
 	data := make([]byte, size)
 
-	written, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: createHandle, Offset: 0, Data: data})
+	written, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(size, written)
 
-	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: createHandle})
+	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
-	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
 	// Wait  file is evicted
@@ -1257,7 +1295,10 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	// suite.assert.True(os.IsNotExist(err))
 
 	// open the file in parallel and try getting the size of file while open is on going
-	go suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0666})
+	go func() {
+		handle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0666})
+		suite.cleanup_handles = append(suite.cleanup_handles, handle)
+	}()
 
 	// Read the Directory
 	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
@@ -1314,6 +1355,7 @@ func (suite *fileCacheTestSuite) TestRenameFileInCache() {
 	createHandle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
 	suite.assert.NoError(err)
 	openHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
+	suite.cleanup_handles = append(suite.cleanup_handles, openHandle)
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	suite.assert.NoError(err)
@@ -1331,8 +1373,6 @@ func (suite *fileCacheTestSuite) TestRenameFileInCache() {
 	suite.assert.FileExists(filepath.Join(suite.cache_path, dst))          // Dst shall exists in cache
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, src)) // Src does not exist
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, dst))   // Dst does exist
-
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
 }
 
 func (suite *fileCacheTestSuite) TestRenameFileCase2() {
@@ -1340,7 +1380,8 @@ func (suite *fileCacheTestSuite) TestRenameFileCase2() {
 	// Default is to not create empty files on create file to support immutable storage.
 	src := "source3"
 	dst := "destination3"
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0777})
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	err := suite.fileCache.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
 	suite.assert.Error(err)
@@ -1458,6 +1499,7 @@ func (suite *fileCacheTestSuite) TestTruncateFileInCache() {
 	path := "file31"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
+	suite.cleanup_handles = append(suite.cleanup_handles, openHandle)
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
@@ -1474,15 +1516,14 @@ func (suite *fileCacheTestSuite) TestTruncateFileInCache() {
 	suite.assert.EqualValues(info.Size(), size)
 	info, _ = os.Stat(filepath.Join(suite.fake_storage_path, path))
 	suite.assert.EqualValues(info.Size(), size)
-
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
 }
 
 func (suite *fileCacheTestSuite) TestTruncateFileCase2() {
 	defer suite.cleanupTest()
 	// Default is to not create empty files on create file to support immutable storage.
 	path := "file32"
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	size := 1024
 	err := suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: path, Size: int64(size)})
@@ -1537,12 +1578,14 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 
 	file := "file39"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	testData := "test data"
 	data := []byte(testData)
 	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 
 	output := make([]byte, 9)
 	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output})
@@ -1560,11 +1603,10 @@ func (suite *fileCacheTestSuite) TestZZOffloadIO() {
 
 	file := "file40"
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(handle)
 	suite.assert.True(handle.Cached())
-
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 }
 
 func (suite *fileCacheTestSuite) TestZZZZLazyWrite() {
@@ -1603,6 +1645,7 @@ func (suite *fileCacheTestSuite) TestStatFS() {
 
 	file := "file41"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.cleanup_handles = append(suite.cleanup_handles, handle)
 	data := make([]byte, 1024*1024)
 	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
