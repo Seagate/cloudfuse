@@ -1247,9 +1247,7 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 		time.Sleep(10 * time.Millisecond)
 		_, err = os.Stat(filepath.Join(suite.cache_path, file))
 	}
-	// TODO: why is check test flaky (on both platforms)?
-	fmt.Println("Skipping TestGetAttrCase4 eviction check (flaky).")
-	// suite.assert.True(os.IsNotExist(err))
+	suite.assert.True(os.IsNotExist(err))
 
 	// open the file in parallel and try getting the size of file while open is on going
 	go suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0666})
