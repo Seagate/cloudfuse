@@ -871,12 +871,7 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 		time.Sleep(10 * time.Millisecond)
 		_, err = os.Stat(filepath.Join(suite.cache_path, path))
 	}
-	// TODO: find out why this delayed eviction check fails in CI on Windows sometimes
-	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping TestOpenFileNotInCache eviction check on Windows (flaky)")
-	} else {
-		suite.assert.True(os.IsNotExist(err))
-	}
+	suite.assert.True(os.IsNotExist(err))
 
 	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
@@ -1365,7 +1360,6 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanup() {
 	src := "source4"
 	dst := "destination4"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
-	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
@@ -1382,8 +1376,6 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanup() {
 	suite.assert.NoFileExists(suite.fake_storage_path + "/" + src) // Src does not exist
 	suite.assert.FileExists(suite.fake_storage_path + "/" + dst)   // Dst does exist
 
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
-
 	time.Sleep(1 * time.Second)                           // Check once before the cache cleanup that file exists
 	suite.assert.FileExists(suite.cache_path + "/" + dst) // Dst shall exists in cache
 
@@ -1393,11 +1385,6 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanup() {
 
 func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanupWithNoTimeout() {
 	defer suite.cleanupTest()
-	suite.cleanupTest()
-
-	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 0\n\nloopbackfs:\n  path: %s",
-		suite.cache_path, suite.fake_storage_path)
-	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 
 	src := "source5"
 	dst := "destination5"
