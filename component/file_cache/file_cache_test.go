@@ -1399,14 +1399,14 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanupWithNoTimeout() {
 	// RenameFile
 	err := suite.fileCache.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
 	suite.assert.NoError(err)
+
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
 	// Path in fake storage and file cache should be updated
 	suite.assert.False(suite.fileCache.policy.IsCached(filepath.Join(suite.cache_path, src)))
 	suite.assert.NoFileExists(suite.cache_path + "/" + src)        // Src does not exist
 	suite.assert.FileExists(suite.cache_path + "/" + dst)          // Dst shall exists in cache
 	suite.assert.NoFileExists(suite.fake_storage_path + "/" + src) // Src does not exist
 	suite.assert.FileExists(suite.fake_storage_path + "/" + dst)   // Dst does exist
-
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
 
 	time.Sleep(100 * time.Millisecond) // Wait for the cache cleanup to occur
 	suite.assert.False(suite.fileCache.policy.IsCached(filepath.Join(suite.cache_path, dst)))
