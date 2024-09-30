@@ -183,8 +183,6 @@ func (p *lruPolicy) CachePurge(name string) {
 	p.deleteEvent <- name
 }
 
-// Due to a race condition, this may return a false positive,
-// but it will not return a false negative.
 func (p *lruPolicy) IsCached(name string) bool {
 	log.Trace("lruPolicy::IsCached : %s", name)
 
