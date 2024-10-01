@@ -1437,7 +1437,7 @@ func (suite *fileCacheTestSuite) TestTruncateFileNotInCache() {
 	suite.assert.EqualValues(info.Size(), size)
 }
 
-func (suite *fileCacheTestSuite) TestTruncateFileInCache() {
+func (suite *fileCacheTestSuite) TestTruncateFileCase3() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file31"
