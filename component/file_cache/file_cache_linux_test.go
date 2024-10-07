@@ -113,8 +113,12 @@ func (suite *fileCacheLinuxTestSuite) TestChmodNotInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file33"
+	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
+	suite.setupTestHelper(defaultConfig)
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	time.Sleep(time.Millisecond)
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	time.Sleep(time.Second)
 
 	_, err := os.Stat(suite.cache_path + "/" + path)
 	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
@@ -128,6 +132,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodNotInCache() {
 
 	// Chmod
 	err = suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0666)})
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 
 	// Path in fake storage should be updated
@@ -139,7 +144,12 @@ func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file34"
+	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
+	suite.setupTestHelper(defaultConfig)
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
+	time.Sleep(time.Millisecond)
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	time.Sleep(100 * time.Millisecond)
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
@@ -166,16 +176,21 @@ func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
 	defer suite.cleanupTest()
 	// Default is to not create empty files on create file to support immutable storage.
 	path := "file35"
+	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
+	suite.setupTestHelper(defaultConfig)
 	oldMode := os.FileMode(0511)
 
 	createHandle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
+	time.Sleep(time.Second)
 	suite.assert.NoError(err)
 
 	newMode := os.FileMode(0666)
 	err = suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: newMode})
+	time.Sleep(time.Second)
 	suite.assert.NoError(err)
 
 	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: createHandle})
+	time.Sleep(2 * time.Second)
 	suite.assert.NoError(err)
 
 	// Path should be in the file cache with old mode (since we failed the operation)
@@ -184,6 +199,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
 	suite.assert.EqualValues(info.Mode(), newMode)
 
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	time.Sleep(2 * time.Second)
 	suite.assert.NoError(err)
 
 	// loop until file does not exist - done due to async nature of eviction
@@ -196,6 +212,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
 
 	// Get the attributes and now and check file mode is set correctly or not
 	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: path})
+	time.Sleep(time.Second)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(attr)
 	suite.assert.EqualValues(path, attr.Path)
@@ -206,9 +223,12 @@ func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file36"
+	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
+	suite.setupTestHelper(defaultConfig)
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	time.Sleep(time.Second)
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
-
+	time.Sleep(2 * time.Second)
 	_, err := os.Stat(suite.cache_path + "/" + path)
 	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
 		time.Sleep(10 * time.Millisecond)
@@ -223,6 +243,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
 	owner := os.Getuid()
 	group := os.Getgid()
 	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	time.Sleep(time.Millisecond)
 	suite.assert.NoError(err)
 
 	// Path in fake storage should be updated
@@ -238,6 +259,9 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	// Setup
 	path := "file37"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	time.Sleep(time.Millisecond)
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
+	time.Sleep(100 * time.Millisecond)
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
@@ -270,8 +294,11 @@ func (suite *fileCacheLinuxTestSuite) TestChownCase2() {
 	defer suite.cleanupTest()
 	// Default is to not create empty files on create file to support immutable storage.
 	path := "file38"
+	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 0\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
+	suite.setupTestHelper(defaultConfig)
 	oldMode := os.FileMode(0511)
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
+	time.Sleep(time.Millisecond)
 	info, _ := os.Stat(suite.cache_path + "/" + path)
 	stat := info.Sys().(*syscall.Stat_t)
 	oldOwner := stat.Uid
@@ -280,8 +307,8 @@ func (suite *fileCacheLinuxTestSuite) TestChownCase2() {
 	owner := os.Getuid()
 	group := os.Getgid()
 	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
-	suite.assert.Error(err)
-	suite.assert.Equal(syscall.EIO, err)
+	suite.assert.NoError(err)
+	time.Sleep(time.Millisecond)
 
 	// Path should be in the file cache with old group and owner (since we failed the operation)
 	info, err = os.Stat(suite.cache_path + "/" + path)

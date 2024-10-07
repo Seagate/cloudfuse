@@ -156,7 +156,9 @@ func (cl *Client) deleteObject(name string, isSymLink bool) error {
 	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::deleteObject : deleting object %s", key)
 
-	_, err := cl.awsS3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelFn()
+	_, err := cl.awsS3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -180,8 +182,11 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 			Key: &key,
 		}
 	}
+	// set context with timeout
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelFn()
 	// send keyList for deletion
-	result, err := cl.awsS3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
+	result, err := cl.awsS3Client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
 		Bucket: &cl.Config.authConfig.BucketName,
 		Delete: &types.Delete{
 			Objects: keyList,
@@ -189,7 +194,7 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 		},
 	})
 	if err != nil {
-		log.Err("Client::DeleteDirectory : Failed to delete %d files. Here's why: %v", len(objects), err)
+		err = parseS3Err(err, fmt.Sprintf("delete %d files", len(objects)))
 		for i := 0; i < len(result.Errors); i++ {
 			log.Err("Client::DeleteDirectory : Failed to delete key %s. Here's why: %s", result.Errors[i].Key, result.Errors[i].Message)
 		}
@@ -206,7 +211,9 @@ func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, er
 	key := cl.getKey(name, isSymlink)
 	log.Trace("Client::headObject : object %s", key)
 
-	result, err := cl.awsS3Client.HeadObject(context.Background(), &s3.HeadObjectInput{
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelFn()
+	result, err := cl.awsS3Client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
@@ -262,7 +269,9 @@ func (cl *Client) copyObject(source string, target string, isSymLink bool) error
 
 // abortMultipartUpload stops a multipart upload and verifys that the parts are deleted.
 func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
-	_, abortErr := cl.awsS3Client.AbortMultipartUpload(context.Background(), &s3.AbortMultipartUploadInput{
+	ctx, cancelAbortFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelAbortFn()
+	_, abortErr := cl.awsS3Client.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
 		Bucket:   aws.String(cl.Config.authConfig.BucketName),
 		Key:      aws.String(key),
 		UploadId: &uploadID,
@@ -272,7 +281,9 @@ func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
 	}
 
 	// AWS states you need to call listparts to verify that multipart upload was properly aborted
-	resp, listErr := cl.awsS3Client.ListParts(context.Background(), &s3.ListPartsInput{
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelFn()
+	resp, listErr := cl.awsS3Client.ListParts(ctx, &s3.ListPartsInput{
 		Bucket:   aws.String(cl.Config.authConfig.BucketName),
 		Key:      aws.String(key),
 		UploadId: &uploadID,
@@ -292,11 +303,13 @@ func (cl *Client) ListBuckets() ([]string, error) {
 
 	cntList := make([]string, 0)
 
-	result, err := cl.awsS3Client.ListBuckets(context.Background(), &s3.ListBucketsInput{})
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout)
+	defer cancelFn()
+	result, err := cl.awsS3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
 
 	if err != nil {
 		log.Err("Client::ListBuckets : Failed to list buckets. Here's why: %v", err)
-		return cntList, err
+		return cntList, parseS3Err(err, "list buckets")
 	}
 
 	for _, bucket := range result.Buckets {
@@ -367,10 +380,12 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// initialize list to be returned
 	objectAttrList := make([]*internal.ObjAttr, 0)
 	// fetch and process a single result page
-	output, err := paginator.NextPage(context.Background())
+	ctx, cancelFn := context.WithTimeout(context.Background(), cl.Config.requestTimeout*5)
+	defer cancelFn()
+	output, err := paginator.NextPage(ctx)
 	if err != nil {
-		log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
-		return objectAttrList, nil, err
+		attemptedAction := fmt.Sprintf("list objects in bucket %v with prefix %v", bucketName, prefix)
+		return objectAttrList, nil, parseS3Err(err, attemptedAction)
 	}
 
 	if output.IsTruncated != nil && *output.IsTruncated {

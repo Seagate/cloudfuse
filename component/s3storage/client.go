@@ -47,6 +47,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -128,6 +129,9 @@ func (cl *Client) Configure(cfg Config) error {
 		config.WithCredentialsProvider(credentialsProvider),
 		config.WithAppID(UserAgent()),
 		config.WithRegion(cl.Config.authConfig.Region),
+		config.WithRetryer(func() aws.Retryer {
+			return retry.AddWithMaxAttempts(retry.NewStandard(), 1)
+		}),
 	)
 
 	if err != nil {
@@ -159,6 +163,9 @@ func (cl *Client) Configure(cfg Config) error {
 			o.BaseEndpoint = aws.String(cl.Config.authConfig.Endpoint)
 		})
 	}
+
+	// set timeout
+	cl.Config.requestTimeout, _ = time.ParseDuration("1s")
 
 	// ListBuckets here to test connection to S3 backend
 	bucketList, err := cl.ListBuckets()
@@ -354,10 +361,10 @@ func (cl *Client) DeleteDirectory(name string) error {
 	for !done {
 
 		// list all objects with the prefix
-		objects, marker, err := cl.List(name, marker, 0)
-		if err != nil {
-			log.Warn("Client::DeleteDirectory : Failed to list object with prefix %s. Here's why: %v", name, err)
-			return err
+		objects, marker, listErr := cl.List(name, marker, 0)
+		if listErr != nil {
+			log.Warn("Client::DeleteDirectory : Failed to list object with prefix %s. Here's why: %v", name, listErr)
+			return listErr
 		}
 
 		// we have no way of indicating empty folders in the bucket
@@ -475,6 +482,11 @@ func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 		}
 		if err != syscall.ENOENT {
 			log.Err("Client::GetAttr : Failed to getFileAttr(%s). Here's why: %v", name, err)
+		}
+		// don't try to list directory if the cloud is unreachable
+		var e common.CloudUnreachableError
+		if errors.As(err, &e) {
+			return attr, err
 		}
 	}
 
@@ -776,7 +788,10 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		// get the existing object data
 		isSymlink := getSymlinkBool(options.Metadata)
 
-		oldData, _ := cl.ReadBuffer(name, 0, 0, isSymlink)
+		oldData, readErr := cl.ReadBuffer(name, 0, 0, isSymlink)
+		if readErr != nil && oldData == nil {
+			return readErr
+		}
 		// update the data with the new data
 		// if we're only overwriting existing data
 		if int64(len(oldData)) >= offset+length {
@@ -826,6 +841,9 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 			err = cl.ReadInBuffer(name, fileOffsets.BlockList[index].StartIndex, oldDataSize, oldDataBuffer)
 			if err != nil {
 				log.Err("BlockBlob::Write : Failed to read data in buffer %s [%s]", name, err.Error())
+				if err != syscall.ENOENT {
+					return err
+				}
 			}
 		}
 		// this gives us where the offset with respect to the buffer that holds our old data - so we can start writing the new data
