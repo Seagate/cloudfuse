@@ -14,7 +14,7 @@ jobs:
   BuildAndTest-Coverage:
     strategy:
       matrix:
-        go: ['1.22']
+        go: ['1.23']
         job_name: ['linux']
 
         include:
@@ -242,52 +242,6 @@ jobs:
         echo "    - cloudfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
         cat /tmp/configBlockProfilerTemp.yaml
         ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
-        sleep 10
-        ps -aux | grep cloudfuse
-        cd test/e2e_tests
-        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
-        cd -
-        sudo fusermount -u ${{ env.MOUNT_DIR }}
-        sleep 5
-    
-    - name: Create Config File - LFU
-      env:
-        NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-        NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
-        ACCOUNT_TYPE: block
-        ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
-        VERBOSE_LOG: false
-      run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest2.cov gen-test-config --config-file=azure_key_lfu.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
-    
-    - name: Block Blob LFU Coverage
-      run: |-
-        rm -rf ${{ env.MOUNT_DIR }}/*
-        rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_lfu.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
-        sleep 10
-        ps -aux | grep cloudfuse
-        rm -rf ${{ env.MOUNT_DIR }}/*
-        cd test/e2e_tests
-        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
-        cd -
-        sudo fusermount -u ${{ env.MOUNT_DIR }}
-        sleep 5
-      working-directory: "${{ env.WORK_DIR }}"
-    
-    - name: Create Config File - S3 LFU
-      env:
-        S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
-        S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
-        S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
-        S3_REGION: "${{ secrets.S3TEST_REGION }}"
-        S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
-      run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest2_s3.cov gen-test-config --config-file=s3_key_lfu.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
-    
-    - name: S3 LFU Coverage
-      run: |-
-        rm -rf ${{ env.MOUNT_DIR }}/*
-        rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_lfu.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
         sleep 10
         ps -aux | grep cloudfuse
         cd test/e2e_tests
@@ -548,7 +502,7 @@ jobs:
       run: |
         echo 'mode: count' > ./cloudfuse_coverage_raw.rpt
         tail -q -n +2 ./*.cov >> ./cloudfuse_coverage_raw.rpt
-        cat ./cloudfuse_coverage_raw.rpt | grep -v mock_component | grep -v base_component | grep -v loopback | grep -v tools | grep -v "common/log" | grep -v "common/exectime" | grep -v "internal/stats_manager" | grep -v "main.go" | grep -v "component/azstorage/azauthmsi.go" > ./cloudfuse_coverage.rpt 
+        cat ./cloudfuse_coverage_raw.rpt | grep -v mock_component | grep -v base_component | grep -v loopback | grep -v tools | grep -v "common/log" | grep -v "common/exectime" | grep -v "common/types.go" | grep -v "internal/stats_manager" | grep -v "main.go" | grep -v "component/azstorage/azauthmsi.go" | grep -v "component/azstorage/azauthspn.go" | grep -v "component/stream" | grep -v "component/azstorage/azauthcli.go" > ./cloudfuse_coverage.rpt 
         go tool cover -func cloudfuse_coverage.rpt  > ./cloudfuse_func_cover.rpt
         go tool cover -html=./cloudfuse_coverage.rpt -o ./cloudfuse_coverage.html
         go tool cover -html=./cloudfuse_ut.cov -o ./cloudfuse_ut.html
@@ -567,7 +521,7 @@ jobs:
   BuildAndTest-Coverage-Windows:
     strategy:
       matrix:
-        go: ['1.22']
+        go: ['1.23']
         job_name: ['windows']
 
         include:
@@ -822,56 +776,6 @@ jobs:
         kill $pid
         sleep 5
     
-    - name: Create Config File - LFU
-      shell: bash
-      env:
-        NIGHTLY_STO_ACC_NAME: "${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}"
-        NIGHTLY_STO_ACC_KEY: "${{ secrets.NIGHTLY_STO_BLOB_ACC_KEY }}"
-        ACCOUNT_TYPE: block
-        ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
-        VERBOSE_LOG: false
-      run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest2.cov gen-test-config --config-file=azure_key_lfu.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
-    
-    - name: Block Blob LFU Coverage
-      shell: bash
-      run: |-
-        rm -rf ${{ env.MOUNT_DIR }}/*
-        rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_lfu.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
-        sleep 10
-        pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
-        rm -rf ${{ env.MOUNT_DIR }}/*
-        cd test/e2e_tests
-        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
-        cd -
-        kill $pid
-        sleep 5
-      working-directory: "${{ env.WORK_DIR }}"
-    
-    - name: Create Config File - S3 LFU
-      shell: bash
-      env:
-        S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
-        S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
-        S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
-        S3_REGION: "${{ secrets.S3TEST_REGION }}"
-        S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
-      run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest2_s3.cov gen-test-config --config-file=s3_key_lfu.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
-    
-    - name: S3 LFU Coverage
-      shell: bash
-      run: |-
-        rm -rf ${{ env.MOUNT_DIR }}/*
-        rm -rf ${{ env.TEMP_DIR }}/*
-        ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_lfu.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
-        sleep 10
-        pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
-        cd test/e2e_tests
-        go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
-        cd -
-        kill $pid
-        sleep 5
-    
     - name: Create Config File - Stream
       shell: bash
       env:
@@ -1078,7 +982,7 @@ jobs:
       run: |
         echo 'mode: count' > ./cloudfuse_coverage_raw.rpt
         tail -q -n +2 ./*.cov >> ./cloudfuse_coverage_raw.rpt
-        cat ./cloudfuse_coverage_raw.rpt | grep -v mock_component | grep -v base_component | grep -v loopback | grep -v tools | grep -v "common/log" | grep -v "common/exectime" | grep -v "internal/stats_manager" | grep -v "main.go" | grep -v "component/azstorage/azauthmsi.go" > ./cloudfuse_coverage.rpt 
+        cat ./cloudfuse_coverage_raw.rpt | grep -v mock_component | grep -v base_component | grep -v loopback | grep -v tools | grep -v "common/log" | grep -v "common/exectime" | grep -v "common/types.go" | grep -v "internal/stats_manager" | grep -v "main.go" | grep -v "component/azstorage/azauthmsi.go" | grep -v "component/azstorage/azauthspn.go" | grep -v "component/stream" | grep -v "component/azstorage/azauthcli.go" > ./cloudfuse_coverage.rpt 
         go tool cover -func cloudfuse_coverage.rpt  > ./cloudfuse_func_cover.rpt
         go tool cover -html=./cloudfuse_coverage.rpt -o ./cloudfuse_coverage.html
         go tool cover -html=./cloudfuse_ut.cov -o ./cloudfuse_ut.html
@@ -1101,7 +1005,7 @@ jobs:
     - BuildAndTest-Coverage-Windows
     strategy:
       matrix:
-        go: ['1.22']
+        go: ['1.23']
         job_name: ['linux']
 
         include:

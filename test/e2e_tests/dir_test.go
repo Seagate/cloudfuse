@@ -169,8 +169,7 @@ func (suite *dirTestSuite) TestDirRename() {
 	time.Sleep(time.Second)
 	suite.NoError(err)
 
-	_, err = os.Stat(dirName)
-	suite.True(os.IsNotExist(err))
+	suite.NoDirExists(dirName)
 
 	// cleanup
 	suite.dirTestCleanup([]string{newName})
@@ -297,23 +296,26 @@ func (suite *dirTestSuite) TestDirGetStats() {
 }
 
 // # Change mod of directory
-// TODO: Fix Failing Test with ADLS
-// func (suite *dirTestSuite) TestDirChmod() {
-// 	if suite.adlsTest == true {
-// 		dirName := filepath.Join(suite.testPath, "test3")
-// 		err := os.Mkdir(dirName, 0777)
-// 		suite.Equal(nil, err)
+func (suite *dirTestSuite) TestDirChmod() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping TestDirChmod on Windows")
+		return
+	}
+	if suite.adlsTest == true {
+		dirName := filepath.Join(suite.testPath, "testchmod")
+		err := os.Mkdir(dirName, 0777)
+		suite.NoError(err)
 
-// 		err = os.Chmod(dirName, 0744)
-// 		suite.Equal(nil, err)
+		err = os.Chmod(dirName, 0744)
+		suite.NoError(err)
 
-// 		stat, err := os.Stat(dirName)
-// 		suite.Equal(nil, err)
-// 		suite.Equal("-rwxr--r--", stat.Mode().Perm().String())
+		stat, err := os.Stat(dirName)
+		suite.NoError(err)
+		suite.Equal("-rwxr--r--", stat.Mode().Perm().String())
 
-// 		suite.dirTestCleanup([]string{dirName})
-// 	}
-// }
+		suite.dirTestCleanup([]string{dirName})
+	}
+}
 
 // # List directory
 func (suite *dirTestSuite) TestDirList() {
@@ -409,11 +411,9 @@ func (suite *dirTestSuite) TestDirRenameFull() {
 	suite.NoError(err)
 
 	//  Deleted directory shall not be present in the container now
-	_, err = os.Stat(dirName)
-	suite.True(os.IsNotExist(err))
+	suite.NoDirExists(dirName)
 
-	_, err = os.Stat(newName)
-	suite.False(os.IsNotExist(err))
+	suite.DirExists(newName)
 
 	// this should fail as the new dir should be filled
 	err = os.Remove(newName)
@@ -437,8 +437,7 @@ func (suite *dirTestSuite) TestGitStash() {
 		_, err := cmd.Output()
 		suite.NoError(err)
 
-		_, err = os.Stat(dirName)
-		suite.NoError(err)
+		suite.DirExists(dirName)
 
 		err = os.Chdir(dirName)
 		suite.NoError(err)

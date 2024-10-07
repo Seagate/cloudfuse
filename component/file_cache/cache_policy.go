@@ -38,7 +38,7 @@ import (
 const DefaultEvictTime = 10
 
 type cachePolicyConfig struct {
-	tmpPath      string
+	tmpPath      string // uses os.Separator (filepath.Join)
 	cacheTimeout uint32
 	maxEviction  uint32
 
@@ -46,7 +46,7 @@ type cachePolicyConfig struct {
 	highThreshold float64
 	lowThreshold  float64
 	fileOps       *sync.Map
-	fileLocks     *common.LockMap
+	fileLocks     *common.LockMap // uses object name (common.JoinUnixFilepath)
 
 	policyTrace bool
 }

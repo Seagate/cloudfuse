@@ -26,7 +26,10 @@
 package file_cache
 
 import (
+	"io/fs"
 	"math"
+	"os"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -133,12 +136,29 @@ func (fc *FileCache) async_cloud_handler() {
 // File is already flushed locally, we just need to upload it to the cloud
 func (fc *FileCache) asyncFlushFile(options FlushFileAbstraction) error {
 
-	localPath := common.JoinUnixFilepath(fc.tmpPath, options.Name)
+	var orgMode fs.FileMode
+	modeChanged := false
+
+	localPath := filepath.Join(fc.tmpPath, options.Name)
 	uploadHandle, err := common.Open(localPath)
 
 	if err != nil {
-		log.Err("FileCache::FlushFile : error [unable to open upload handle] %s [%s]", options.Name, err.Error())
-		return err
+		if os.IsPermission(err) {
+			info, _ := os.Stat(localPath)
+			orgMode = info.Mode()
+			newMode := orgMode | 0444
+			err = os.Chmod(localPath, newMode)
+			if err == nil {
+				modeChanged = true
+				uploadHandle, err = common.Open(localPath)
+				log.Info("FileCache::FlushFile : read mode added to file %s", options.Name)
+			}
+		}
+
+		if err != nil {
+			log.Err("FileCache::FlushFile : error [unable to open upload handle] %s [%s]", options.Name, err.Error())
+			return err
+		}
 	}
 
 	err = fc.NextComponent().CopyFromFile(
@@ -148,6 +168,14 @@ func (fc *FileCache) asyncFlushFile(options FlushFileAbstraction) error {
 		})
 
 	uploadHandle.Close()
+
+	if modeChanged {
+		err1 := os.Chmod(localPath, orgMode)
+		if err1 != nil {
+			log.Err("FileCache::FlushFile : Failed to remove read mode from file %s [%s]", options.Name, err1.Error())
+		}
+	}
+
 	if err != nil {
 		log.Err("FileCache::FlushFile : %s upload failed [%s]", options.Name, err.Error())
 		return err

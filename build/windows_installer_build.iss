@@ -3,7 +3,7 @@
 ; https://jrsoftware.org/ishelp/index.php
 
 #define MyAppName "Cloudfuse"
-#define MyAppVersion "1.3.1"
+#define MyAppVersion "1.5.0"
 #define MyAppPublisher "SEAGATE TECHNOLOGY LLC"
 #define MyAppURL "https://github.com/Seagate/cloudfuse"
 #define MyAppExeName "cloudfuseGUI.exe"
@@ -34,6 +34,8 @@ ArchitecturesInstallIn64BitMode=x64
 SignTool=signtool /d $q{#MyAppName} v{#MyAppVersion}$q $f
 SignedUninstaller=yes
 VersionInfoVersion={#MyAppVersion}
+; Tell Windows Explorer to reload the environment
+ChangesEnvironment=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -69,10 +71,31 @@ Source: "..\winfsp-2.0.23075.msi"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
+[Registry]
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; \
+    ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; \
+    Check: NeedsAddPath('{app}')
+
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+function NeedsAddPath(Param: string): boolean;
+var
+  OrigPath: string;
+begin
+  if not RegQueryStringValue(HKEY_LOCAL_MACHINE,
+    'SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
+    'Path', OrigPath)
+  then begin
+    Result := True;
+    exit;
+  end;
+  { look for the path with leading and trailing semicolon }
+  { Pos() returns 0 if not found }
+  Result := Pos(';' + Param + ';', ';' + OrigPath + ';') = 0;
+end;
+
 var
   ResultCode: Integer;
 
@@ -81,27 +104,44 @@ begin
   if CurStep = ssPostInstall then
   begin
     // Install WinFSP if it is not already installed
-    if not RegKeyExists(HKLM, 'SOFTWARE\WOW6432Node\WinFsp\Services') then
+    if not RegValueExists(HKLM, 'SOFTWARE\WOW6432Node\WinFsp\Services', 'InstallDir') then
     begin
-      if MsgBox('WinFSP is required for Cloudfuse. Do you want to install it now?', mbConfirmation, MB_YESNO) = idYes then
+      if SuppressibleMsgBox('WinFSP is required for Cloudfuse. Do you want to install it now?', mbConfirmation, MB_YESNO, IDYES) = IDYES then
       begin
-        if not Exec('msiexec.exe', '/i "' + ExpandConstant('{app}\{#WinFSPInstaller}') + '"', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+        if not Exec('msiexec.exe', '/qn /i "' + ExpandConstant('{app}\{#WinFSPInstaller}') + '"', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
         begin
-          MsgBox('Failed to run the WinFSP installer. You might need to install it manually.', mbError, MB_OK);
+          SuppressibleMsgBox('Failed to run the WinFSP installer. You might need to install it manually.', mbError, MB_OK, IDOK);
         end;
       end;
-    end;
-
-    // Add cloudfuse to the path
-    if not Exec('cmd.exe', '/C SETX PATH "%PATH%;' + ExpandConstant('{app}') +'"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-    begin
-      MsgBox('Failed to update PATH. You may need to add the path manually to use Cloudfuse on the command line.', mbError, MB_OK);
     end;
 
     // Install the Cloudfuse Startup Tool
     if not Exec(ExpandConstant('{app}\{#MyAppExeCLIName}'), 'service install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
-      MsgBox('Failed to install cloudfuse as a service. You may need to do this manually from the command line.', mbError, MB_OK);
+      SuppressibleMsgBox('Failed to install cloudfuse as a service. You may need to do this manually from the command line.', mbError, MB_OK, IDOK);
+    end;
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    // Install the Cloudfuse Startup Tool
+    if not Exec(ExpandConstant('{app}\{#MyAppExeCLIName}'), 'service uninstall', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    begin
+      SuppressibleMsgBox('Failed to remove cloudfuse as a service.', mbError, MB_OK, IDOK);
+    end;
+    
+    // Ask the user if they would like to also uninstall WinFSP
+    if SuppressibleMsgBox('Do you want to uninstall WinFSP?', mbConfirmation, MB_YESNO, IDYES) = IDYES then
+    begin
+      if not Exec('msiexec.exe', '/qn /x "' + ExpandConstant('{app}\{#WinFSPInstaller}') + '"', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+      begin
+        SuppressibleMsgBox('Failed to run the WinFSP uninstaller. You might need to uninstall it manually.', mbError, MB_OK, IDOK);
+      end;
     end;
   end;
 end;

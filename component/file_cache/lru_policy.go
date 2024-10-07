@@ -207,9 +207,10 @@ func (p *lruPolicy) CachePurge(name string) {
 		p.removeNode(name)
 		p.deleteEvent <- name
 	}
-
 }
 
+// Due to a race condition, this may return a false positive,
+// but it will not return a false negative.
 func (p *lruPolicy) IsCached(name string) bool {
 	log.Trace("lruPolicy::IsCached : %s", name)
 
@@ -234,7 +235,13 @@ func (p *lruPolicy) asyncCacheValid() {
 	for {
 		select {
 		case name := <-p.validateChan:
-			p.cacheValidate(name)
+			// validateChan only gets names that are already cached
+			// if the file is not in the map anymore, then it was deleted,
+			// which means calling cacheValidate now would be a bug
+			_, found := p.nodeMap.Load(name)
+			if found {
+				p.cacheValidate(name)
+			}
 
 		case <-p.closeSignalValidate:
 			return
@@ -243,21 +250,17 @@ func (p *lruPolicy) asyncCacheValid() {
 }
 
 func (p *lruPolicy) cacheValidate(name string) {
-	var node *lruNode = nil
 
-	val, found := p.nodeMap.Load(name)
-	if !found {
-		node = &lruNode{
-			name:    name,
-			next:    nil,
-			prev:    nil,
-			usage:   0,
-			deleted: false,
-		}
-		p.nodeMap.Store(name, node)
-	} else {
-		node = val.(*lruNode)
-	}
+	// get existing entry, or if it doesn't exist then
+	//  write a new one and return it
+	val, _ := p.nodeMap.LoadOrStore(name, &lruNode{
+		name:    name,
+		next:    nil,
+		prev:    nil,
+		usage:   0,
+		deleted: false,
+	})
+	node := val.(*lruNode)
 
 	p.Lock()
 	defer p.Unlock()
@@ -335,12 +338,10 @@ func (p *lruPolicy) removeNode(name string) {
 
 	var node *lruNode = nil
 
-	val, found := p.nodeMap.Load(name)
+	val, found := p.nodeMap.LoadAndDelete(name)
 	if !found || val == nil {
 		return
 	}
-
-	p.nodeMap.Delete(name)
 
 	p.Lock()
 	defer p.Unlock()
@@ -474,7 +475,8 @@ func (p *lruPolicy) deleteExpiredNodes() {
 
 func (p *lruPolicy) deleteItem(name string) {
 	log.Trace("lruPolicy::deleteItem : Deleting %s", name)
-	azPath := strings.TrimPrefix(name, p.tmpPath)
+
+	azPath := common.NormalizeObjectName(strings.TrimPrefix(name, p.tmpPath))
 	if azPath == "" {
 		log.Err("lruPolicy::DeleteItem : Empty file name formed name : %s, tmpPath : %s", name, p.tmpPath)
 		return
@@ -501,7 +503,7 @@ func (p *lruPolicy) deleteItem(name string) {
 		return
 	}
 
-	// There are no open handles for this file so its safe to remove this
+	// There are no open handles for this file so it's safe to remove this
 	// Check if the file exists first, since this is often the second time we're calling deleteFile
 	_, err := os.Stat(name)
 	if err != nil && os.IsNotExist(err) {
