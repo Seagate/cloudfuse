@@ -26,7 +26,11 @@
 package cmd
 
 import (
+	"bufio"
 	"errors"
+	"fmt"
+	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -35,8 +39,6 @@ type serviceOptions struct {
 	ConfigFile string
 	MountPath  string
 }
-
-const SvcName = "cloudfuse.service"
 
 var servOpts serviceOptions
 
@@ -67,6 +69,34 @@ var installCmd = &cobra.Command{
 		// }
 
 		// 1. get the cloudfuse.service file from the setup folder and verify its contents (the mount path and config path is valid)
+		serviceFile, err := os.Open("./setup/cloudfuse.service") //currently assumes we are in cloudfuse repo dir. where is this file going to be for the end user?
+
+		if err != nil {
+			fmt.Println("Error opening file:", err)
+			return err
+		}
+
+		defer serviceFile.Close()
+
+		scanner := bufio.NewScanner(serviceFile)
+		serviceData := make(map[string]string)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, "#") {
+				continue
+			}
+
+			parts := strings.SplitN(line, "=", 2)
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			serviceData[key] = value
+		}
+
+		if err := scanner.Err(); err != nil {
+			fmt.Println("Error reading file:", err)
+			return err
+		}
+
 		// 2. retrieve the user account from cloudfuse.service file and make it if it doesn't exist
 		// 3. copy the cloudfuse.service file to /etc/systemd/system
 		// 4. run systemctl daemon-reload
