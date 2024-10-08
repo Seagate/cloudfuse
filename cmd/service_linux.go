@@ -97,8 +97,7 @@ var installCmd = &cobra.Command{
 			return err
 		}
 
-		//check the 'User' key. compare to the the /etc/passwd list for the value and create it if it doesn't exist.
-
+		// 2. retrieve the user account from cloudfuse.service file and make it if it doesn't exist
 		value := serviceData["User"]
 		usersList, err := os.Open("/etc/passwd")
 		if err != nil {
@@ -116,18 +115,28 @@ var installCmd = &cobra.Command{
 		}
 		if !foundUser {
 			//create the user
-			cmd := exec.Command("useradd", "-m", value)
-			err := cmd.Run()
+			userAddCmd := exec.Command("useradd", "-m", value)
+			err := userAddCmd.Run()
 			if err != nil {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
 			}
-
 		}
 
-		// 2. retrieve the user account from cloudfuse.service file and make it if it doesn't exist
 		// 3. copy the cloudfuse.service file to /etc/systemd/system
+
+		copyFileCmd := exec.Command("cp", "./setup/cloudfuse.service", "/etc/systemd/system")
+		err = copyFileCmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed to copy cloudfuse.service file to /etc/systemd/system due to following error: [%s]", err.Error())
+		}
+
 		// 4. run systemctl daemon-reload
 
+		systemctlCmd := exec.Command("systemctl", "daemon-reload")
+		err = systemctlCmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
+		}
 		return nil
 	},
 }
