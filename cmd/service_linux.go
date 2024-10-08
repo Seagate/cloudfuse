@@ -30,6 +30,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -64,12 +65,8 @@ var installCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		// if err != nil {
-		// 	return fmt.Errorf("unable to determine location of cloudfuse binary [%s]", err.Error())
-		// }
-
-		// 1. get the cloudfuse.service file from the setup folder and verify its contents (the mount path and config path is valid)
-		serviceFile, err := os.Open("./setup/cloudfuse.service") //currently assumes we are in cloudfuse repo dir. where is this file going to be for the end user?
+		// 1. get the cloudfuse.service file from the setup folder and collect relevant data (user, mount, config)
+		serviceFile, err := os.Open("./setup/cloudfuse.service")
 
 		if err != nil {
 			fmt.Println("Error opening file:", err)
@@ -82,19 +79,49 @@ var installCmd = &cobra.Command{
 		serviceData := make(map[string]string)
 		for scanner.Scan() {
 			line := scanner.Text()
-			if strings.HasPrefix(line, "#") {
-				continue
+			if strings.Contains(line, "Environment=") {
+				parts := strings.SplitN(line, "=", 3)
+				key := strings.TrimSpace(parts[1])
+				value := strings.TrimSpace(parts[2])
+				serviceData[key] = value
 			}
-
-			parts := strings.SplitN(line, "=", 2)
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-			serviceData[key] = value
+			if strings.Contains(line, "User=") {
+				parts := strings.SplitN(line, "=", 2)
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+				serviceData[key] = value
+			}
 		}
-
 		if err := scanner.Err(); err != nil {
 			fmt.Println("Error reading file:", err)
 			return err
+		}
+
+		//check the 'User' key. compare to the the /etc/passwd list for the value and create it if it doesn't exist.
+
+		value := serviceData["User"]
+		usersList, err := os.Open("/etc/passwd")
+		if err != nil {
+			return fmt.Errorf("failed to open /etc/passwd due to following error: [%s]", err.Error())
+		}
+		scanner = bufio.NewScanner(usersList)
+		var foundUser bool
+		defer usersList.Close()
+
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, value) {
+				foundUser = true
+			}
+		}
+		if !foundUser {
+			//create the user
+			cmd := exec.Command("useradd", "-m", value)
+			err := cmd.Run()
+			if err != nil {
+				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
+			}
+
 		}
 
 		// 2. retrieve the user account from cloudfuse.service file and make it if it doesn't exist
