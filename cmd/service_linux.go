@@ -66,39 +66,25 @@ var installCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// 1. get the cloudfuse.service file from the setup folder and collect relevant data (user, mount, config)
-		serviceFile, err := os.Open("./setup/cloudfuse.service")
 
+		serviceData, err := collectServiceData("./setup/cloudfuse.service")
 		if err != nil {
-			fmt.Println("Error opening file:", err)
-			return err
+			return fmt.Errorf("error collecting data from cloudfuse.service file due to the following error: ", err.Error())
 		}
 
-		defer serviceFile.Close()
-
-		scanner := bufio.NewScanner(serviceFile)
-		serviceData := make(map[string]string)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.Contains(line, "Environment=") {
-				parts := strings.SplitN(line, "=", 3)
-				key := strings.TrimSpace(parts[1])
-				value := strings.TrimSpace(parts[2])
-				serviceData[key] = value
-			}
-			if strings.Contains(line, "User=") {
-				parts := strings.SplitN(line, "=", 2)
-				key := strings.TrimSpace(parts[0])
-				value := strings.TrimSpace(parts[1])
-				serviceData[key] = value
+		//TODO: set a default mount and config path when stubbed examples are found in the file.
+		mountPath := serviceData["MoutingPoint"]
+		if mountPath == "/path/to/mounting/point" {
+			fmt.Printf("creating mount folder in $HOME/cloudfuseMount")
+			userAddCmd := exec.Command("mkdir", "$HOME/cloudfuseMount")
+			err := userAddCmd.Run()
+			if err != nil {
+				return fmt.Errorf("failed to create default mount folder due to following error: [%s]", err.Error())
 			}
 		}
-		if err := scanner.Err(); err != nil {
-			fmt.Println("Error reading file:", err)
-			return err
-		}
 
-		// 2. retrieve the user account from cloudfuse.service file and make it if it doesn't exist
-		value := serviceData["User"]
+		// 2. retrieve the user account from cloudfuse.service file and create it if it doesn't exist
+		user := serviceData["User"]
 		usersList, err := os.Open("/etc/passwd")
 		if err != nil {
 			return fmt.Errorf("failed to open /etc/passwd due to following error: [%s]", err.Error())
@@ -109,13 +95,13 @@ var installCmd = &cobra.Command{
 
 		for scanner.Scan() {
 			line := scanner.Text()
-			if strings.HasPrefix(line, value) {
+			if strings.HasPrefix(line, user) {
 				foundUser = true
 			}
 		}
 		if !foundUser {
 			//create the user
-			userAddCmd := exec.Command("useradd", "-m", value)
+			userAddCmd := exec.Command("useradd", "-m", user)
 			err := userAddCmd.Run()
 			if err != nil {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
@@ -158,6 +144,42 @@ var uninstallCmd = &cobra.Command{
 }
 
 //--------------- command section ends
+
+func collectServiceData(serviceFilePath string) (map[string]string, error) {
+	serviceFile, err := os.Open("./setup/cloudfuse.service")
+
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return nil, err
+	}
+
+	defer serviceFile.Close()
+
+	scanner := bufio.NewScanner(serviceFile)
+	serviceData := make(map[string]string)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "Environment=") {
+			parts := strings.SplitN(line, "=", 3)
+			key := strings.TrimSpace(parts[1])
+			value := strings.TrimSpace(parts[2])
+			serviceData[key] = value
+		}
+		if strings.Contains(line, "User=") {
+			parts := strings.SplitN(line, "=", 2)
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			serviceData[key] = value
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Println("Error reading file:", err)
+		return nil, err
+	}
+	return serviceData, nil
+}
+
+//TODO: add wrapper function for collecting data, creating user, setting default paths, running commands.
 
 func init() {
 	rootCmd.AddCommand(serviceCmd)
