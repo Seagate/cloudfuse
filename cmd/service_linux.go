@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -67,19 +68,31 @@ var installCmd = &cobra.Command{
 
 		// 1. get the cloudfuse.service file from the setup folder and collect relevant data (user, mount, config)
 
-		serviceData, err := collectServiceData("./setup/cloudfuse.service")
+		// get current dir
+		dir, err := os.Getwd()
 		if err != nil {
-			return fmt.Errorf("error collecting data from cloudfuse.service file due to the following error: ", err.Error())
+			return fmt.Errorf("error: [%s]", err.Error())
+		}
+
+		// assumes dir is in cloudfuse repo dir
+		serviceData, err := collectServiceData(fmt.Sprintf("%s/setup/cloudfuse.service", dir))
+		if err != nil {
+			return fmt.Errorf("error collecting data from cloudfuse.service file due to the following error: [%s]", err)
 		}
 
 		//TODO: set a default mount and config path when stubbed examples are found in the file.
 		mountPath := serviceData["MoutingPoint"]
+		configPath := serviceData["ConfigFile"]
 		if mountPath == "/path/to/mounting/point" {
-			fmt.Printf("creating mount folder in $HOME/cloudfuseMount")
-			userAddCmd := exec.Command("mkdir", "$HOME/cloudfuseMount")
-			err := userAddCmd.Run()
+			err = modifySericeFile(mountPath, dir)
 			if err != nil {
-				return fmt.Errorf("failed to create default mount folder due to following error: [%s]", err.Error())
+				return fmt.Errorf("error when attempting to write defaults into service file: [%s]", err.Error())
+			}
+		}
+		if configPath == "/path/to/config/file/config.yaml" {
+			err = modifySericeFile(configPath, dir)
+			if err != nil {
+				return fmt.Errorf("error when attempting to write defaults into service file: [%s]", err.Error())
 			}
 		}
 
@@ -89,7 +102,7 @@ var installCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to open /etc/passwd due to following error: [%s]", err.Error())
 		}
-		scanner = bufio.NewScanner(usersList)
+		scanner := bufio.NewScanner(usersList)
 		var foundUser bool
 		defer usersList.Close()
 
@@ -177,6 +190,102 @@ func collectServiceData(serviceFilePath string) (map[string]string, error) {
 		return nil, err
 	}
 	return serviceData, nil
+}
+
+func modifySericeFile(path string, curDir string) error {
+
+	var defaultMountPath string
+
+	//get current user
+	usr, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("Error: [%s]", err.Error())
+	}
+
+	//mountpath or config?
+	var oldString string
+	var newString string
+	var config bool
+	var mount bool
+
+	if strings.Contains(path, "config.yaml") {
+		oldString = "Environment=ConfigFile=/path/to/config/file/config.yaml"
+		newString = fmt.Sprintf("Environment=ConfigFile=%s/config.yaml", curDir)
+		config = true
+		mount = false
+	}
+	if strings.Contains(path, "mounting") {
+		defaultMountPath = fmt.Sprintf("/home/%s/cloudfuseMount", strings.ToLower(usr.Name))
+		fmt.Printf("creating mount folder in %s", defaultMountPath)
+
+		//Create default mount directory
+		userAddCmd := exec.Command("mkdir", defaultMountPath)
+		err = userAddCmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed to create default mount folder due to following error: [%s]", err.Error())
+		}
+		oldString = "Environment=MoutingPoint=/path/to/mounting/point"
+		newString = fmt.Sprintf("Environment=MoutingPoint=%s", defaultMountPath)
+		config = false
+		mount = true
+	}
+
+	// open service file for read write
+	file, err := os.OpenFile("./setup/cloudfuse.service", os.O_RDWR, 0644)
+	if err != nil {
+		return fmt.Errorf("Error opening file: [%s]", err.Error())
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	var lines []string
+
+	// Read the file line by line
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Check if the line contains the search string
+		if mount && strings.Contains(line, "MoutingPoint") {
+			// Modify the line by replacing the old string with the new string
+			line = strings.ReplaceAll(line, oldString, newString)
+		}
+		if config && strings.Contains(line, "ConfigFile") {
+			line = strings.ReplaceAll(line, oldString, newString)
+		}
+
+		// Append the (possibly modified) line to the slice
+		lines = append(lines, line)
+	}
+	// Check for errors during file reading
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("Error reading file: [%s]", err.Error())
+	}
+
+	// Move the file pointer to the start for overwriting
+	file.Seek(0, 0)
+
+	// Create a buffered writer to overwrite the file
+	writer := bufio.NewWriter(file)
+
+	// Write the modified lines back to the file
+	for _, line := range lines {
+		_, err := writer.WriteString(line + "\n")
+		if err != nil {
+			return fmt.Errorf("Error writing to file: [%s]", err.Error())
+		}
+	}
+
+	// Truncate the file to the new size in case the modified content is shorter
+	err = file.Truncate(int64(writer.Buffered()))
+	if err != nil {
+		return fmt.Errorf("Error truncating file: [%s]", err.Error())
+
+	}
+
+	// Flush the buffer to write all data to disk
+	writer.Flush()
+
+	return nil
 }
 
 //TODO: add wrapper function for collecting data, creating user, setting default paths, running commands.
