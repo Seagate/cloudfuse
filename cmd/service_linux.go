@@ -80,7 +80,7 @@ var installCmd = &cobra.Command{
 			return fmt.Errorf("error collecting data from cloudfuse.service file due to the following error: [%s]", err)
 		}
 
-		//TODO: set a default mount and config path when stubbed examples are found in the file.
+		// set a default mount and config path when stubbed examples are found in the file.
 		mountPath := serviceData["MoutingPoint"]
 		configPath := serviceData["ConfigFile"]
 		if mountPath == "/path/to/mounting/point" {
@@ -114,7 +114,7 @@ var installCmd = &cobra.Command{
 		}
 		if !foundUser {
 			//create the user
-			userAddCmd := exec.Command("useradd", "-m", user)
+			userAddCmd := exec.Command("sudo", "useradd", "-m", user)
 			err := userAddCmd.Run()
 			if err != nil {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
@@ -123,7 +123,7 @@ var installCmd = &cobra.Command{
 
 		// 3. copy the cloudfuse.service file to /etc/systemd/system
 
-		copyFileCmd := exec.Command("cp", "./setup/cloudfuse.service", "/etc/systemd/system")
+		copyFileCmd := exec.Command("sudo", "cp", "./setup/cloudfuse.service", "/etc/systemd/system")
 		err = copyFileCmd.Run()
 		if err != nil {
 			return fmt.Errorf("failed to copy cloudfuse.service file to /etc/systemd/system due to following error: [%s]", err.Error())
@@ -131,7 +131,7 @@ var installCmd = &cobra.Command{
 
 		// 4. run systemctl daemon-reload
 
-		systemctlCmd := exec.Command("systemctl", "daemon-reload")
+		systemctlCmd := exec.Command("sudo", "systemctl", "daemon-reload")
 		err = systemctlCmd.Run()
 		if err != nil {
 			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
@@ -216,7 +216,7 @@ func modifySericeFile(path string, curDir string) error {
 	}
 	if strings.Contains(path, "mounting") {
 		defaultMountPath = fmt.Sprintf("/home/%s/cloudfuseMount", strings.ToLower(usr.Name))
-		fmt.Printf("creating mount folder in %s", defaultMountPath)
+		fmt.Printf("creating mount folder in %s \n", defaultMountPath)
 
 		//Create default mount directory
 		userAddCmd := exec.Command("mkdir", defaultMountPath)
