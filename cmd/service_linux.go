@@ -176,7 +176,17 @@ var uninstallCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// 1. find and remove cloudfuse.service from /etc/systemd/system and run systemctl daemon-reload
-		// 2. handle errors
+		removeFileCmd := exec.Command("sudo", "rm", "/etc/systemd/system/cloudfuse.service")
+		err := removeFileCmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed to delete cloudfuse.service file from /etc/systemd/system due to following error: [%s]", err.Error())
+		}
+
+		systemctlDaemonReloadCmd := exec.Command("sudo", "systemctl", "daemon-reload")
+		err = systemctlDaemonReloadCmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
+		}
 
 		return nil
 	},
