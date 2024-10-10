@@ -96,8 +96,8 @@ var installCmd = &cobra.Command{
 			}
 		}
 
-		// 2. retrieve the user account from cloudfuse.service file and create it if it doesn't exist
-		user := serviceData["User"]
+		// 2. retrieve the newUser account from cloudfuse.service file and create it if it doesn't exist
+		newUser := serviceData["User"]
 		usersList, err := os.Open("/etc/passwd")
 		if err != nil {
 			return fmt.Errorf("failed to open /etc/passwd due to following error: [%s]", err.Error())
@@ -108,21 +108,41 @@ var installCmd = &cobra.Command{
 
 		for scanner.Scan() {
 			line := scanner.Text()
-			if strings.HasPrefix(line, user) {
+			if strings.HasPrefix(line, newUser) {
 				foundUser = true
 			}
 		}
 		if !foundUser {
 			//create the user
-			userAddCmd := exec.Command("sudo", "useradd", "-m", user)
-			err := userAddCmd.Run()
+			userAddCmd := exec.Command("sudo", "useradd", "-m", newUser)
+			err = userAddCmd.Run()
 			if err != nil {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
+			}
+
+			// use the current user for reference on permissions
+			usr, err := user.Current()
+			if err != nil {
+				return fmt.Errorf("error getting looking up current user: [%s]", err.Error())
+			}
+
+			// get a list of group from reference user
+			groups, err := usr.GroupIds()
+			if err != nil {
+				return fmt.Errorf("error getting group id list from current user: [%s]", err.Error())
+			}
+
+			// add the list of groups to the CloudfuseUser
+			for _, group := range groups {
+				usermodCmd := exec.Command("sudo", "usermod", "-aG", group, newUser)
+				err = usermodCmd.Run()
+				if err != nil {
+					return fmt.Errorf("failed to add group to user due to following error: [%s]", err.Error())
+				}
 			}
 		}
 
 		// 3. copy the cloudfuse.service file to /etc/systemd/system
-
 		copyFileCmd := exec.Command("sudo", "cp", "./setup/cloudfuse.service", "/etc/systemd/system")
 		err = copyFileCmd.Run()
 		if err != nil {
@@ -130,9 +150,15 @@ var installCmd = &cobra.Command{
 		}
 
 		// 4. run systemctl daemon-reload
+		systemctlDaemonReloadCmd := exec.Command("sudo", "systemctl", "daemon-reload")
+		err = systemctlDaemonReloadCmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
+		}
 
-		systemctlCmd := exec.Command("sudo", "systemctl", "daemon-reload")
-		err = systemctlCmd.Run()
+		// 5. Enable the service to start at system boot
+		systemctlEnableCmd := exec.Command("sudo", "systemctl", "enable", "cloudfuse.service")
+		err = systemctlEnableCmd.Run()
 		if err != nil {
 			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
 		}
@@ -250,6 +276,13 @@ func modifySericeFile(path string, curDir string) error {
 			line = strings.ReplaceAll(line, oldString, newString)
 		}
 		if config && strings.Contains(line, "ConfigFile") {
+			line = strings.ReplaceAll(line, oldString, newString)
+		}
+
+		// add the -o default_permissions if not present
+		if strings.Contains(line, "ExecStart") && !strings.Contains(line, "-o allow_other") {
+			oldString = "ExecStart=/usr/bin/cloudfuse mount ${MoutingPoint} --config-file=${ConfigFile}"
+			newString = "ExecStart=/usr/bin/cloudfuse mount ${MoutingPoint} --config-file=${ConfigFile} -o allow_other"
 			line = strings.ReplaceAll(line, oldString, newString)
 		}
 
