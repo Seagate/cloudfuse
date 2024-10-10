@@ -341,7 +341,8 @@ func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 		stat.Namemax = attr.Namemax
 	} else {
 		var free, total, avail uint64
-		total = common.TbToBytes
+		// TODO: if display capacity is specified, should it overwrite populated Bavail?
+		total = fuseFS.displayCapacityMb * common.MbToBytes
 		avail = total
 		free = total
 
@@ -425,7 +426,7 @@ func (cf *CgofuseFS) Opendir(path string) (int, uint64) {
 // Releasedir opens the handle for the directory at the path.
 func (cf *CgofuseFS) Releasedir(path string, fh uint64) int {
 	// Get the filehandle
-	handle, exists := handlemap.Load(handlemap.HandleID(fh))
+	handle, exists := handlemap.LoadAndDelete(handlemap.HandleID(fh))
 	if !exists {
 		log.Trace("Libfuse::Releasedir : Failed to release %s, handle: %d", path, fh)
 		return -fuse.EBADF
@@ -434,7 +435,6 @@ func (cf *CgofuseFS) Releasedir(path string, fh uint64) int {
 	log.Trace("Libfuse::Releasedir : %s, handle: %d", handle.Path, handle.ID)
 
 	handle.Cleanup()
-	handlemap.Delete(handle.ID)
 	return 0
 }
 
@@ -608,6 +608,8 @@ func (cf *CgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
 		log.Err("Libfuse::Create : Failed to create %s [%s]", name, err.Error())
 		if os.IsExist(err) {
 			return -fuse.EEXIST, 0
+		} else if os.IsPermission(err) {
+			return -fuse.EACCES, 0
 		}
 
 		return -fuse.EIO, 0

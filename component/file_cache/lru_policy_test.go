@@ -46,6 +46,8 @@ type lruPolicyTestSuite struct {
 	policy *lruPolicy
 }
 
+var cache_path = filepath.Join(home_dir, "file_cache")
+
 func (suite *lruPolicyTestSuite) SetupTest() {
 	// err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	// if err != nil {
@@ -245,12 +247,11 @@ func (suite *lruPolicyTestSuite) TestCachePurge() {
 
 	// wait for asynchronous deletions
 	// in local testing, 1ms was enough
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 	// validate all aPaths were deleted
 	for _, path := range aPaths {
-		_, err := os.Stat(path)
-		suite.assert.Error(err)
-		suite.assert.True(os.IsNotExist(err))
+		suite.assert.NoFileExists(path)
+		suite.assert.NoDirExists(path)
 	}
 	// validate other paths were not touched
 	var otherPaths []string
@@ -292,7 +293,7 @@ func (suite *lruPolicyTestSuite) TestTimeout() {
 
 	suite.policy.CacheValid("temp")
 
-	time.Sleep(5 * time.Second) // Wait for time > cacheTimeout, the file should no longer be cached
+	time.Sleep(3 * time.Second) // Wait for time > cacheTimeout, the file should no longer be cached
 
 	suite.assert.False(suite.policy.IsCached("temp"))
 }
@@ -317,7 +318,7 @@ func (suite *lruPolicyTestSuite) TestMaxEvictionDefault() {
 		suite.policy.CacheValid("temp" + fmt.Sprint(i))
 	}
 
-	time.Sleep(5 * time.Second) // Wait for time > cacheTimeout, the file should no longer be cached
+	time.Sleep(3 * time.Second) // Wait for time > cacheTimeout, the file should no longer be cached
 
 	for i := 1; i < 5000; i++ {
 		suite.assert.False(suite.policy.IsCached("temp" + fmt.Sprint(i)))
@@ -344,7 +345,7 @@ func (suite *lruPolicyTestSuite) TestMaxEviction() {
 		suite.policy.CacheValid("temp" + fmt.Sprint(i))
 	}
 
-	time.Sleep(5 * time.Second) // Wait for time > cacheTimeout, the file should no longer be cached
+	time.Sleep(3 * time.Second) // Wait for time > cacheTimeout, the file should no longer be cached
 
 	for i := 1; i < 5; i++ {
 		suite.assert.False(suite.policy.IsCached("temp" + fmt.Sprint(i)))

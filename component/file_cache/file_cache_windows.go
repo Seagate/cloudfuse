@@ -161,7 +161,7 @@ func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	// Get path to the cache
 	pathPtr, err := windows.UTF16PtrFromString(fc.tmpPath)
 	if err != nil {
-		panic(err)
+		return nil, false, err
 	}
 	err = windows.GetDiskFreeSpaceEx(pathPtr, &free, &total, &avail)
 	if err != nil {
@@ -183,4 +183,21 @@ func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	}
 
 	return &stat, true, nil
+}
+
+func (fc *FileCache) getAvailableSize() (uint64, error) {
+	var free, total, avail uint64
+
+	// Get path to the cache
+	pathPtr, err := windows.UTF16PtrFromString(fc.tmpPath)
+	if err != nil {
+		return 0, err
+	}
+	err = windows.GetDiskFreeSpaceEx(pathPtr, &free, &total, &avail)
+	if err != nil {
+		log.Debug("FileCache::StatFs : statfs err [%s].", err.Error())
+		return 0, err
+	}
+
+	return avail, nil
 }

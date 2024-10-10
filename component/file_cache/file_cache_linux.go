@@ -177,3 +177,15 @@ func (c *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 
 	return &stat, true, nil
 }
+
+func (fc *FileCache) getAvailableSize() (uint64, error) {
+	statfs := &unix.Statfs_t{}
+	err := unix.Statfs(fc.tmpPath, statfs)
+	if err != nil {
+		log.Debug("FileCache::getAvailableSize : statfs err [%s].", err.Error())
+		return 0, err
+	}
+
+	available := statfs.Bavail * uint64(statfs.Bsize)
+	return available, nil
+}

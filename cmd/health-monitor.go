@@ -26,7 +26,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -139,7 +138,7 @@ func validateHMonOptions() error {
 	}
 
 	if len(errMsg) != 0 {
-		return errors.New(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	return nil
