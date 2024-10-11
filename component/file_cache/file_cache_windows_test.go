@@ -120,9 +120,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 		time.Sleep(10 * time.Millisecond)
 		_, err = os.Stat(suite.cache_path + "/" + path)
 	}
-	// this check is flaky in our CI pipeline on Windows, so skip it
-	fmt.Println("Skipping TestChownNotInCache IsNotExist check on Windows because it's flaky.")
-	// suite.assert.True(os.IsNotExist(err))
+	suite.assert.True(os.IsNotExist(err))
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
