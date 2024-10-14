@@ -390,7 +390,6 @@ func (fc *FileCache) invalidateDirectory(name string) {
 	log.Trace("FileCache::invalidateDirectory : %s", name)
 
 	localPath := filepath.Join(fc.tmpPath, name)
-	// TODO : wouldn't this cause a race condition? a thread might get the lock before we purge - and the file would be non-existent
 	// WalkDir goes through the tree in lexical order so 'dir' always comes before 'dir/file'
 	var directoriesToPurge []string
 	err := filepath.WalkDir(localPath, func(path string, d fs.DirEntry, err error) error {
