@@ -116,17 +116,14 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	_, err := os.Stat(suite.cache_path + "/" + path)
-	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
-		time.Sleep(time.Second)
+	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
 		_, err = os.Stat(suite.cache_path + "/" + path)
 	}
-	// this check is flaky in our CI pipeline on Windows, so skip it
-	fmt.Println("Skipping TestChownNotInCache IsNotExist check on Windows because it's flaky.")
-	// suite.assert.True(os.IsNotExist(err))
+	suite.assert.True(os.IsNotExist(err))
 
 	// Path should be in fake storage
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	// Checking that nothing changed with existing files
 	owner := os.Getuid()
@@ -135,8 +132,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	suite.assert.Nil(err)
 
 	// Path in fake storage should be updated
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 }
 
 func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
@@ -144,30 +140,23 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	// Setup
 	path := "file"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
-	err := suite.fileCache.downloadFile(openHandle)
-	suite.assert.NoError(err)
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
-	_, err = os.Stat(suite.cache_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.cache_path + "/" + path)
 	// Path should be in fake storage
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
-	// Chown is not supportred on Windows, but checking that calling it does not cause an error
+	// Chown is not supported on Windows, but checking that calling it does not cause an error
 	owner := os.Getuid()
 	group := os.Getgid()
-	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
 	suite.assert.NoError(err)
 
 	// Checking that nothing changed with existing files
-	_, err = os.Stat(suite.cache_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
-
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.cache_path + "/" + path)
+	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
 }

@@ -66,7 +66,13 @@ func (azsas *azAuthBlobSAS) getServiceClient(stConfig *AzStorageConfig) (interfa
 		return nil, errors.New("sas key for account is empty, cannot authenticate user")
 	}
 
-	svcClient, err := service.NewClientWithNoCredential(azsas.getEndpoint(), getAzBlobServiceClientOptions(stConfig))
+	opts, err := getAzBlobServiceClientOptions(stConfig)
+	if err != nil {
+		log.Err("azAuthBlobSAS::getServiceClient : Failed to create client options [%s]", err.Error())
+		return nil, err
+	}
+
+	svcClient, err := service.NewClientWithNoCredential(azsas.getEndpoint(), opts)
 	if err != nil {
 		log.Err("azAuthBlobSAS::getServiceClient : Failed to create service client [%s]", err.Error())
 	}
@@ -85,7 +91,13 @@ func (azsas *azAuthDatalakeSAS) getServiceClient(stConfig *AzStorageConfig) (int
 		return nil, errors.New("sas key for account is empty, cannot authenticate user")
 	}
 
-	svcClient, err := serviceBfs.NewClientWithNoCredential(azsas.getEndpoint(), getAzDatalakeServiceClientOptions(stConfig))
+	opts, err := getAzDatalakeServiceClientOptions(stConfig)
+	if err != nil {
+		log.Err("azAuthDatalakeSAS::getServiceClient : Failed to create client options [%s]", err.Error())
+		return nil, err
+	}
+
+	svcClient, err := serviceBfs.NewClientWithNoCredential(azsas.getEndpoint(), opts)
 	if err != nil {
 		log.Err("azAuthDatalakeSAS::getServiceClient : Failed to create service client [%s]", err.Error())
 	}
