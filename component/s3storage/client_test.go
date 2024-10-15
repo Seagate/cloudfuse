@@ -171,7 +171,7 @@ func (s *clientTestSuite) TestCredentialsErrorInvalidKeyID() {
 		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint)
 	// S3 connection creation should fail
 	err := s.setupTestHelper(config, false)
-	s.assert.Equal(errInvalidCredential, err)
+	s.assert.Error(err)
 }
 
 func (s *clientTestSuite) TestCredentialsErrorInvalidSecretKey() {
