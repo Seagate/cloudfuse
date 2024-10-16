@@ -85,7 +85,7 @@ jobs:
       if: matrix.language == 'go' && matrix.os == 'ubuntu-latest'
       run: |-
         sudo apt-get update
-        sudo apt-get install fuse3 libfuse3-dev -y
+        sudo apt-get install fuse libfuse-dev -y
     
     - name: Build go binary
       if: matrix.language == 'go'

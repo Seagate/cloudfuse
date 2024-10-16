@@ -324,4 +324,6 @@ func (suite *utilTestSuite) TestDirectoryCleanup() {
 
 	err = TempCacheCleanup(dirName)
 	suite.assert.NoError(err)
+
+	os.Remove(dirName)
 }

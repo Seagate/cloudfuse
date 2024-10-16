@@ -72,11 +72,10 @@ var _ S3Connection = &Client{}
 // The text before the : symbol is a magic keyword
 // It cannot change as it is parsed by our plugin for network optix to provide more clear errors to the user
 var (
-	errBucketDoesNotExist = errors.New("Bucket Error: S3 bucket does not exist. Please check your bucket name is correct.")
+	errBucketDoesNotExist = errors.New("Bucket Error: S3 bucket does not exist or you do not have permission to access it. Please check your bucket name and endpoint correct.")
 	errInvalidEndpoint    = errors.New("Endpoint Error: Provided S3 endpoint is invalid. Please check endpoint is correct.")
 	errInvalidCredential  = errors.New("Credential or Endpoint Error: S3 credentials or endpoint are invalid. Please check your credentials and endpoint are correct.")
 	errInvalidSecretKey   = errors.New("Secret Error: S3 secret key is not valid. Please check that the secret key and endpoint are correct.")
-	errRegionMismatch     = errors.New("Region Error: Region provided does not match region in endpoint. Please check endpoint has correct region.")
 	errNoBucketInAccount  = errors.New("Bucket Error: No bucket exists in S3 account. Please create a bucket in your account.")
 )
 
@@ -119,7 +118,7 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	if cl.Config.authConfig.Endpoint == "" {
-		cl.Config.authConfig.Endpoint = fmt.Sprintf("https://s3.%s.lyvecloud.seagate.com", cl.Config.authConfig.Region)
+		cl.Config.authConfig.Endpoint = fmt.Sprintf("https://s3.%s.sv15.lyve.seagate.com", cl.Config.authConfig.Region)
 	}
 
 	defaultConfig, err := config.LoadDefaultConfig(
@@ -180,7 +179,7 @@ func (cl *Client) Configure(cfg Config) error {
 		var ae smithy.APIError
 		if errors.As(err, &ae) {
 			// If error is forbidden, then credentials were incorrect
-			if ae.ErrorCode() == "Forbidden" {
+			if ae.ErrorCode() == "Forbidden" || ae.ErrorCode() == "AccessDenied" {
 				return errInvalidCredential
 			}
 			// If error is forbidden, then access key is correct but secret key is incorrect
@@ -206,13 +205,10 @@ func (cl *Client) Configure(cfg Config) error {
 	// Check that the provided bucket exists and that user has access to bucket
 	exists, err := cl.headBucket()
 	if err != nil || !exists {
-		var ae smithy.APIError
-		if errors.As(err, &ae) {
-			// If error is a bad request, likely means that the region is incorrect
-			if ae.ErrorCode() == "BadRequest" {
-				return errRegionMismatch
-			}
-		}
+		// From the aws-sdk-go-v2 documentation
+		// If the bucket does not exist or you do not have permission to access it,
+		// the HEAD request returns a generic 400 Bad Request , 403 Forbidden or 404 Not Found code.
+		// We can't use the above information to reliably determine more of the issue
 		log.Err("Client::Configure : Error finding bucket. Here's why: %v", err)
 		return errBucketDoesNotExist
 	}
