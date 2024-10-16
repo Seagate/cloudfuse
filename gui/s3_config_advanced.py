@@ -38,6 +38,7 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.initWindowSizePos()
         self.setWindowTitle("Advanced S3Cloud Config Settings")
         self.populateOptions()
+        self.saveButtonClicked = False
 
         if platform == 'win32':
             # Windows directory and filename conventions:
