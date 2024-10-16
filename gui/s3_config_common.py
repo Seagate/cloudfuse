@@ -42,8 +42,7 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
         self.settings = configSettings
         self.populateOptions()
         self.showModeSettings()
-        
-        
+        self.saveButtonClicked = False
 
         # S3 naming conventions:
         #   https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
