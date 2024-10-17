@@ -34,14 +34,14 @@ bucketModeChoices = ["key", "sas", "spn", "msi"]
 azStorageType = ["block", "adls"]
 libfusePermissions = [0o777,0o666,0o644,0o444]
 
-class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form):
-    def __init__(self):
+class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
+    def __init__(self,configSettings):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("Azure Config Settings")
         self.myWindow = QSettings("CloudFUSE", "AzcWindow")
+        self.settings = configSettings
         self.initWindowSizePos()
-        self.initSettingsFromConfig()
         # Hide the pipeline mode groupbox depending on the default select is
         self.showAzureModeSettings()
         self.showModeSettings()
@@ -79,7 +79,7 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
     # Set up slots
     
     def updateAzStorage(self):
-        azStorage = self.settings.value('azstorage')
+        azStorage = self.settings['azstorage']
         azStorage['account-key'] = self.lineEdit_azure_accountKey.text()
         azStorage['sas'] = self.lineEdit_azure_sasStorage.text()
         azStorage['account-name'] = self.lineEdit_azure_accountName.text()
@@ -93,10 +93,10 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         azStorage['clientsecret'] = self.lineEdit_azure_spnClientSecret.text()
         azStorage['type'] = azStorageType[self.dropDown_azure_storageType.currentIndex()]
         azStorage['mode'] = bucketModeChoices[self.dropDown_azure_modeSetting.currentIndex()]
-        self.settings.setValue('azstorage',azStorage)
+        self.settings['azstorage'] = azStorage
             
     def openAdvanced(self):
-        self.moreSettings = azureAdvancedSettingsWidget()
+        self.moreSettings = azureAdvancedSettingsWidget(self.settings)
         self.moreSettings.setWindowModality(Qt.ApplicationModal)
         self.moreSettings.show()
 
@@ -105,14 +105,14 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
     #   There is one slot for the signal to be pointed at which is why showmodesettings is used.
     def showModeSettings(self):
         self.hideModeBoxes()
-        components = self.settings.value('components')
+        components = self.settings['components']
         pipelineIndex = self.dropDown_pipeline.currentIndex()
         components[1] = pipelineChoices[pipelineIndex]
         if pipelineChoices[pipelineIndex] == 'file_cache':
             self.groupbox_fileCache.setVisible(True)
         elif pipelineChoices[pipelineIndex] == 'stream':
             self.groupbox_streaming.setVisible(True)
-        self.settings.setValue('components',components)
+        self.settings['components'] = components
     
     def showAzureModeSettings(self):
         self.hideAzureBoxes()
@@ -129,23 +129,23 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
             
 # This widget will not display all the options in settings, only the ones written in the UI file.
     def populateOptions(self):
-        fileCache = self.settings.value('file_cache')
-        azStorage = self.settings.value('azstorage')
-        libfuse = self.settings.value('libfuse')
-        stream = self.settings.value('stream')
+        fileCache = self.settings['file_cache']
+        azStorage = self.settings['azstorage']
+        libfuse = self.settings['libfuse']
+        stream = self.settings['stream']
         
         # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices, libfusePermissions, azStorage and bucketMode
         #   reflect the index choices in human words without having to reference the UI. 
         #   Get the value in the settings and translate that to the equivalent index in the lists.
-        self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings.value('components')[1]))
-        self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(self.settings.value('libfuse')['default-permission']))
-        self.dropDown_azure_storageType.setCurrentIndex(azStorageType.index(self.settings.value('azstorage')['type']))
-        self.dropDown_azure_modeSetting.setCurrentIndex(bucketModeChoices.index(self.settings.value('azstorage')['mode']))
+        self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings['components'][1]))
+        self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(self.settings['libfuse']['default-permission']))
+        self.dropDown_azure_storageType.setCurrentIndex(azStorageType.index(self.settings['azstorage']['type']))
+        self.dropDown_azure_modeSetting.setCurrentIndex(bucketModeChoices.index(self.settings['azstorage']['mode']))
         
-        self.setCheckboxFromSetting(self.checkBox_multiUser,self.settings.value('allow-other'))
-        self.setCheckboxFromSetting(self.checkBox_nonEmptyDir,self.settings.value('nonempty'))
-        self.setCheckboxFromSetting(self.checkBox_daemonForeground,self.settings.value('foreground'))
-        self.setCheckboxFromSetting(self.checkBox_readOnly,self.settings.value('read-only'))
+        self.setCheckboxFromSetting(self.checkBox_multiUser,self.settings['allow-other'])
+        self.setCheckboxFromSetting(self.checkBox_nonEmptyDir,self.settings['nonempty'])
+        self.setCheckboxFromSetting(self.checkBox_daemonForeground,self.settings['foreground'])
+        self.setCheckboxFromSetting(self.checkBox_readOnly,self.settings['read-only'])
         self.setCheckboxFromSetting(self.checkBox_streaming_fileCachingLevel,stream['file-caching'])
         self.setCheckboxFromSetting(self.checkBox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
        
@@ -193,8 +193,8 @@ class azureSettingsWidget(defaultSettingsManager,widgetCustomFunctions, Ui_Form)
         # Reset these defaults
         checkChoice = self.popupDoubleCheckReset()
         if checkChoice == QtWidgets.QMessageBox.Yes:
-            self.setAzureSettings()
-            self.setComponentSettings()
+            defaultSettingsManager.setAzureSettings(self, self.settings)
+            defaultSettingsManager.setComponentSettings(self, self.settings)
             self.populateOptions()
     
     def updateSettingsFromUIChoices(self):

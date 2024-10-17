@@ -74,9 +74,6 @@ type lruPolicy struct {
 }
 
 const (
-	// Check for file expiry in below number of seconds
-	CacheTimeoutCheckInterval = 5
-
 	// Check for disk usage in below number of minutes
 	DiskUsageCheckInterval = 1
 )
@@ -126,13 +123,10 @@ func (p *lruPolicy) StartPolicy() error {
 		p.diskUsageMonitor = time.Tick(time.Duration(DiskUsageCheckInterval * time.Minute))
 	}
 
-	// Only start the timeoutMonitor if evictTime is non-zero.
-	// If evictTime=0, we delete on invalidate so there is no need for a timeout monitor signal to be sent.
 	log.Info("lruPolicy::StartPolicy : Policy set with %v timeout", p.cacheTimeout)
 
-	if p.cacheTimeout != 0 {
-		p.cacheTimeoutMonitor = time.Tick(time.Duration(time.Duration(p.cacheTimeout) * time.Second))
-	}
+	// if timeout is zero time.Tick will return nil
+	p.cacheTimeoutMonitor = time.Tick(time.Duration(time.Duration(p.cacheTimeout) * time.Second))
 
 	go p.clearCache()
 	go p.asyncCacheValid()
@@ -189,8 +183,6 @@ func (p *lruPolicy) CachePurge(name string) {
 	p.deleteEvent <- name
 }
 
-// Due to a race condition, this may return a false positive,
-// but it will not return a false negative.
 func (p *lruPolicy) IsCached(name string) bool {
 	log.Trace("lruPolicy::IsCached : %s", name)
 
@@ -352,18 +344,19 @@ func (p *lruPolicy) updateMarker() {
 
 	p.Lock()
 	node := p.lastMarker
+	// remove lastMarker from linked list
 	if node.next != nil {
 		node.next.prev = node.prev
 	}
-
 	if node.prev != nil {
 		node.prev.next = node.next
 	}
+	// and insert it at the head
 	node.prev = nil
 	node.next = p.head
 	p.head.prev = node
 	p.head = node
-
+	// swap lastMarker with currMarker
 	p.lastMarker = p.currMarker
 	p.currMarker = node
 

@@ -27,21 +27,23 @@ from PySide6 import QtWidgets, QtGui
 # import the custom class made from QtDesigner
 from ui_s3_config_common import Ui_Form
 from s3_config_advanced import s3AdvancedSettingsWidget
-from common_qt_functions import defaultSettingsManager,widgetCustomFunctions
+from common_qt_functions import widgetCustomFunctions, defaultSettingsManager
 
 pipelineChoices = ['file_cache','stream','block_cache']
 libfusePermissions = [0o777,0o666,0o644,0o444]
 
-class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form): 
-    def __init__(self):
+class s3SettingsWidget(widgetCustomFunctions,Ui_Form): 
+    def __init__(self, configSettings):
         super().__init__()
         self.setupUi(self)
         self.myWindow = QSettings("CloudFUSE", "s3Window")
         self.initWindowSizePos()
         self.setWindowTitle("S3Cloud Config Settings")
-        self.initSettingsFromConfig()
+        self.settings = configSettings
         self.populateOptions()
         self.showModeSettings()
+        
+        
 
         # S3 naming conventions:
         #   https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
@@ -75,7 +77,7 @@ class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
     # To open the advanced widget, make an instance, so self.moresettings was chosen.
     #   self.moresettings does not have anything to do with the QSettings package that is seen throughout this code
     def openAdvanced(self):
-        self.moreSettings = s3AdvancedSettingsWidget()
+        self.moreSettings = s3AdvancedSettingsWidget(self.settings)
         self.moreSettings.setWindowModality(Qt.ApplicationModal)
         self.moreSettings.show()
 
@@ -84,14 +86,14 @@ class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
     #   There is one slot for the signal to be pointed at which is why showmodesettings is used.
     def showModeSettings(self):
         self.hideModeBoxes()
-        components = self.settings.value('components')
+        components = self.settings['components']
         pipelineIndex = self.dropDown_pipeline.currentIndex()
         components[1] = pipelineChoices[pipelineIndex]
         if pipelineChoices[pipelineIndex] == 'file_cache':
             self.groupbox_fileCache.setVisible(True)
         elif pipelineChoices[pipelineIndex] == 'stream':
             self.groupbox_streaming.setVisible(True)
-        self.settings.setValue('components',components)
+        self.settings['components'] = components
 
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
@@ -103,30 +105,30 @@ class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
 
         # Update S3Storage re-writes everything in the S3Storage dictionary for the same reason update libfuse does.
     def updateS3Storage(self):
-        s3Storage = self.settings.value('s3storage')
+        s3Storage = self.settings['s3storage']
         s3Storage['bucket-name'] = self.lineEdit_bucketName.text()
         s3Storage['key-id'] = self.lineEdit_accessKey.text()
         s3Storage['secret-key'] = self.lineEdit_secretKey.text()
         s3Storage['endpoint'] = self.lineEdit_endpoint.text()
         s3Storage['region'] = self.lineEdit_region.text()
-        self.settings.setValue('s3storage',s3Storage) 
+        self.settings['s3storage'] = s3Storage
 
     # This widget will not display all the options in settings, only the ones written in the UI file.
     def populateOptions(self):
-        fileCache = self.settings.value('file_cache')
-        s3storage = self.settings.value('s3storage')
-        libfuse = self.settings.value('libfuse')
-        stream = self.settings.value('stream')
+        fileCache = self.settings['file_cache']
+        s3storage = self.settings['s3storage']
+        libfuse = self.settings['libfuse']
+        stream = self.settings['stream']
                 
         # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices and libfusePermissions reflect the 
         #   index choices in human words without having to reference the UI. Get the value in the settings and translate that to the equivalent index in the lists.
-        self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings.value('components')[1]))
+        self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings['components'][1]))
         self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(libfuse['default-permission']))
         
-        self.setCheckboxFromSetting(self.checkBox_multiUser, self.settings.value('allow-other'))
-        self.setCheckboxFromSetting(self.checkBox_nonEmptyDir,self.settings.value('nonempty'))
-        self.setCheckboxFromSetting(self.checkBox_daemonForeground,self.settings.value('foreground'))
-        self.setCheckboxFromSetting(self.checkBox_readOnly,self.settings.value('read-only'))
+        self.setCheckboxFromSetting(self.checkBox_multiUser, self.settings['allow-other'])
+        self.setCheckboxFromSetting(self.checkBox_nonEmptyDir,self.settings['nonempty'])
+        self.setCheckboxFromSetting(self.checkBox_daemonForeground,self.settings['foreground'])
+        self.setCheckboxFromSetting(self.checkBox_readOnly,self.settings['read-only'])
         self.setCheckboxFromSetting(self.checkBox_streaming_fileCachingLevel,stream['file-caching'])
         self.setCheckboxFromSetting(self.checkBox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
 
@@ -150,8 +152,8 @@ class s3SettingsWidget(defaultSettingsManager,widgetCustomFunctions,Ui_Form):
         # Reset these defaults
         checkChoice = self.popupDoubleCheckReset()
         if checkChoice == QtWidgets.QMessageBox.Yes:
-            self.setS3Settings()
-            self.setComponentSettings()
+            defaultSettingsManager.setS3Settings(self, self.settings)
+            defaultSettingsManager.setComponentSettings(self, self.settings)
             self.populateOptions()
     
     def updateSettingsFromUIChoices(self):

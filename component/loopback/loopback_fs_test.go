@@ -107,9 +107,7 @@ func (suite *LoopbackFSTestSuite) TestCreateDir() {
 
 	err := suite.lfs.CreateDir(internal.CreateDirOptions{Name: dirTwo, Mode: os.FileMode(0777)})
 	assert.NoError(err, "CreateDir: Failed")
-	info, err := os.Stat(filepath.Join(testPath, dirTwo))
-	assert.NoError(err, "CreateDir: Could not stat created dir")
-	assert.True(info.IsDir(), "CreateDir: not a dir")
+	suite.DirExists(filepath.Join(testPath, dirTwo))
 }
 
 func (suite *LoopbackFSTestSuite) TestDeleteDir() {
@@ -118,8 +116,7 @@ func (suite *LoopbackFSTestSuite) TestDeleteDir() {
 
 	err := suite.lfs.DeleteDir(internal.DeleteDirOptions{Name: dirEmpty})
 	assert.NoError(err, "DeleteDir: Failed")
-	_, err = os.Stat(filepath.Join(testPath, dirEmpty))
-	assert.Error(err, "DeleteDir: Failed to delete")
+	suite.NoDirExists(filepath.Join(testPath, dirEmpty), "DeleteDir: Failed to delete")
 }
 
 func (suite *LoopbackFSTestSuite) TestStreamDir() {
@@ -145,10 +142,7 @@ func (suite *LoopbackFSTestSuite) TestRenameDir() {
 	err := suite.lfs.RenameDir(internal.RenameDirOptions{Src: dirEmpty, Dst: "newempty"})
 	assert.NoError(err, "RenameDir: Failed")
 
-	info, err := os.Stat(filepath.Join(testPath, "newempty"))
-	assert.NoError(err, "RenameDir: Unable to stat renamed dir")
-
-	assert.Equal("newempty", info.Name(), "RenameDir: name does not match")
+	suite.DirExists(filepath.Join(testPath, "newempty"))
 }
 
 func (suite *LoopbackFSTestSuite) TestCreateFile() {
@@ -159,9 +153,7 @@ func (suite *LoopbackFSTestSuite) TestCreateFile() {
 	assert.NoError(err, "CreateFile: Failed")
 	assert.NotNil(handle)
 
-	info, err := os.Stat(filepath.Join(testPath, fileEmpty))
-	assert.NoError(err, "CreateFile: unable to stat created file")
-	assert.Equal(fileEmpty, info.Name())
+	assert.FileExists(filepath.Join(testPath, fileEmpty))
 
 	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
 	assert.NoError(err, "CreateFile: Failed to close file")
@@ -173,8 +165,7 @@ func (suite *LoopbackFSTestSuite) TestDeleteFile() {
 
 	err := suite.lfs.DeleteFile(internal.DeleteFileOptions{Name: fileHello})
 	assert.NoError(err, "DeleteFile: Failed")
-	_, err = os.Stat(filepath.Join(testPath, fileHello))
-	assert.Error(err, "DeleteFile: file was not deleted")
+	assert.NoFileExists(filepath.Join(testPath, fileHello), "DeleteFile: file was not deleted")
 }
 
 func (suite *LoopbackFSTestSuite) TestReadInBuffer() {
