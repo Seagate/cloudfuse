@@ -72,7 +72,7 @@ var _ S3Connection = &Client{}
 // The text before the : symbol is a magic keyword
 // It cannot change as it is parsed by our plugin for network optix to provide more clear errors to the user
 var (
-	errBucketDoesNotExist = errors.New("Bucket Error: S3 bucket does not exist or you do not have permission to access it. Please check your bucket name and endpoint correct.")
+	errBucketDoesNotExist = errors.New("Bucket Error: S3 bucket does not exist or you do not have permission to access it. Please check your bucket name and endpoint are correct.")
 	errInvalidEndpoint    = errors.New("Endpoint Error: Provided S3 endpoint is invalid. Please check endpoint is correct.")
 	errInvalidCredential  = errors.New("Credential or Endpoint Error: S3 credentials or endpoint are invalid. Please check your credentials and endpoint are correct.")
 	errInvalidSecretKey   = errors.New("Secret Error: S3 secret key is not valid. Please check that the secret key and endpoint are correct.")
