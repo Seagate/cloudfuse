@@ -46,6 +46,7 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.showAzureModeSettings()
         self.showModeSettings()
         self.populateOptions()
+        self.saveButtonClicked = False
 
         # Set up signals
         self.dropDown_pipeline.currentIndexChanged.connect(self.showModeSettings)
