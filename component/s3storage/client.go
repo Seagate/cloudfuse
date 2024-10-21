@@ -1130,81 +1130,11 @@ func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]
 
 func (cl *Client) GetUsedSize() uint64 {
 	var totalSize uint64
-	var totalEntriesFetched int32
-	var iteration int
-	var marker *string
-	var count int32 = maxResultsPerListCall
-	done := false
 
-	path := ""
+	headBucketOutput, err := cl.headBucket()
 
-	for !done {
-		// prepare parameters
-		bucketName := cl.Config.authConfig.BucketName
-		if count == 0 {
-			count = maxResultsPerListCall
-		}
-
-		// combine the configured prefix and the prefix being given to List to get a full listPath
-		listPath := cl.getKey(path, false)
-		// replace any trailing forward slash stripped by common.JoinUnixFilepath
-		if (path != "" && path[len(path)-1] == '/') || (path == "" && cl.Config.prefixPath != "") {
-			listPath += "/"
-		}
-
-		var nextMarker *string
-		var token *string
-
-		// using paginator from here: https://aws.github.io/aws-sdk-go-v2/docs/making-requests/#using-paginators
-		// List is a tricky function. Here is a great explanation of how list works:
-		// 	https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-prefixes.html
-
-		if marker != nil && *marker == "" {
-			token = nil
-		} else {
-			token = marker
-		}
-		params := &s3.ListObjectsV2Input{
-			Bucket:            aws.String(bucketName),
-			MaxKeys:           &count,
-			Prefix:            aws.String(listPath),
-			ContinuationToken: token,
-		}
-		paginator := s3.NewListObjectsV2Paginator(cl.awsS3Client, params)
-
-		// fetch and process a single result page
-		output, err := paginator.NextPage(context.Background())
-		if err != nil {
-			log.Err("Client::List : Failed to list objects in bucket %v with path %v. Here's why: %v", listPath, bucketName, err)
-			return totalSize
-		}
-
-		if output.IsTruncated != nil && *output.IsTruncated {
-			nextMarker = output.NextContinuationToken
-		} else {
-			nextMarker = nil
-		}
-
-		totalEntriesFetched = *output.KeyCount
-
-		// documentation for this S3 data structure:
-		// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
-		for _, value := range output.Contents {
-			totalSize += uint64(*value.Size)
-		}
-
-		marker = nextMarker
-
-		log.Debug("Client::GetUsedSize : %s So far retrieved %d objects in %d iterations. Total size in bytes is %d",
-			listPath, totalEntriesFetched, iteration, totalSize)
-		if marker == nil || *marker == "" {
-			done = true
-			break
-		} else {
-			log.Debug("Client::GetUsedSize : %s List iteration %d nextMarker=\"%s\"",
-				listPath, iteration, *nextMarker)
-		}
-		iteration++
+	if err != nil {
+		fmt.Println(headBucketOutput.ResultMetadata)
 	}
 
 	return totalSize
