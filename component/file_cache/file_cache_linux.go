@@ -29,12 +29,9 @@ package file_cache
 
 import (
 	"io/fs"
-	"math"
 	"os"
 	"syscall"
 	"time"
-
-	"golang.org/x/sys/unix"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -149,33 +146,7 @@ func (c *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 	// cache_size - used = f_frsize * f_bavail/1024
 	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
 	// if cache size is set to 0 then we have the root mount usage
-	maxCacheSize := c.maxCacheSize * MB
-	if maxCacheSize == 0 {
-		return nil, false, nil
-	}
-	usage, _ := common.GetUsage(c.tmpPath)
-	usage *= MB
-
-	available := maxCacheSize - usage
-	statfs := &unix.Statfs_t{}
-	err := unix.Statfs("/", statfs)
-	if err != nil {
-		log.Debug("FileCache::StatFs : statfs err [%s].", err.Error())
-		return nil, false, err
-	}
-
-	stat := common.Statfs_t{
-		Blocks:  uint64(maxCacheSize) / uint64(statfs.Frsize),
-		Bavail:  uint64(math.Max(0, available)) / uint64(statfs.Frsize),
-		Bfree:   statfs.Bavail,
-		Bsize:   statfs.Bsize,
-		Ffree:   statfs.Ffree,
-		Files:   statfs.Files,
-		Frsize:  statfs.Frsize,
-		Namemax: 255,
-	}
-
-	return &stat, true, nil
+	return c.NextComponent().StatFs()
 }
 
 func (fc *FileCache) getAvailableSize() (uint64, error) {
