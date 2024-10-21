@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -47,12 +48,14 @@ import (
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/middleware"
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	smithyHttp "github.com/aws/smithy-go/transport/http"
 )
 
 const (
@@ -1129,13 +1132,28 @@ func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]
 }
 
 func (cl *Client) GetUsedSize() uint64 {
-	var totalSize uint64
-
 	headBucketOutput, err := cl.headBucket()
-
 	if err != nil {
-		fmt.Println(headBucketOutput.ResultMetadata)
+		return 0
 	}
 
-	return totalSize
+	response, ok := middleware.GetRawResponse(headBucketOutput.ResultMetadata).(*smithyHttp.Response)
+	if !ok || response == nil {
+		return 0
+	}
+
+	headerValue, ok := response.Header["X-Rstor-Size"]
+	if !ok {
+		headerValue, ok = response.Header["X-Lyve-Size"]
+	}
+	if !ok || len(headerValue) == 0 {
+		return 0
+	}
+
+	bucketSizeBytes, err := strconv.ParseUint(headerValue[0], 10, 64)
+	if err != nil {
+		return 0
+	}
+
+	return bucketSizeBytes
 }
