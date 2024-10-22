@@ -1,5 +1,20 @@
 # Cloudfuse Changelog #
 
+## **1.6.0** ##
+
+October 22nd 2024
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#312](https://github.com/Seagate/cloudfuse/pull/312) Add option to set mount display capacity
+- [#342](https://github.com/Seagate/cloudfuse/pull/342) Update default endpoint to LC2 (sv15.lyve) and improve error handling when connecting to Lyve Cloud
+
+### Bug Fixes ###
+
+- [#323](https://github.com/Seagate/cloudfuse/pull/323) Don't evict open files
+- [#317](https://github.com/Seagate/cloudfuse/pull/317) When renaming a directory, don't delete the local copy of its contents
+
 ## **1.5.0** ##
 
 August 28th 2024
