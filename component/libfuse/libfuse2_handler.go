@@ -329,28 +329,24 @@ func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 		return -fuse.EIO
 	}
 
+	total := fuseFS.displayCapacityMb * common.MbToBytes
 	// if populated then we need to overwrite root attributes
 	if populated {
 		stat.Bsize = uint64(attr.Bsize)
 		stat.Frsize = uint64(attr.Frsize)
-		stat.Blocks = attr.Blocks
-		stat.Bavail = attr.Bavail
-		stat.Bfree = attr.Bfree
+		stat.Blocks = total / stat.Bsize
+		// attr.Blocks has the blocks used
+		stat.Bavail = stat.Blocks - attr.Blocks
+		stat.Bfree = stat.Blocks - attr.Blocks
 		stat.Files = attr.Files
 		stat.Ffree = attr.Ffree
 		stat.Namemax = attr.Namemax
 	} else {
-		var free, total, avail uint64
-		// TODO: if display capacity is specified, should it overwrite populated Bavail?
-		total = fuseFS.displayCapacityMb * common.MbToBytes
-		avail = total
-		free = total
-
 		stat.Bsize = blockSize
 		stat.Frsize = blockSize
 		stat.Blocks = total / blockSize
-		stat.Bavail = avail / blockSize
-		stat.Bfree = free / blockSize
+		stat.Bavail = total / blockSize
+		stat.Bfree = total / blockSize
 		stat.Files = 1e9
 		stat.Ffree = 1e9
 		stat.Namemax = maxNameSize

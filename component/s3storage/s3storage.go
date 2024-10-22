@@ -485,12 +485,10 @@ func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
 	// if cache size is set to 0 then we have the root mount usage
 	sizeUsed := s3.storage.GetUsedSize()
 
-	var total uint64 = 3 * common.TbToBytes
-
 	stat := common.Statfs_t{
-		Blocks:  total / blockSize,
-		Bavail:  (total - sizeUsed) / blockSize,
-		Bfree:   (total - sizeUsed) / blockSize,
+		Blocks:  sizeUsed / blockSize,
+		Bavail:  sizeUsed / blockSize,
+		Bfree:   sizeUsed / blockSize,
 		Bsize:   blockSize,
 		Ffree:   1e9,
 		Files:   1e9,
