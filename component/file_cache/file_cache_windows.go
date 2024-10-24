@@ -145,6 +145,13 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 }
 
 func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
+
+	// TODO: add flag for this
+	if true {
+		return fc.NextComponent().StatFs()
+	}
+
+	// TODO: find and fix arithmetic error here
 	// cache_size = f_blocks * f_frsize/1024
 	// cache_size - used = f_frsize * f_bavail/1024
 	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
