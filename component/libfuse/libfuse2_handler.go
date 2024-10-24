@@ -334,8 +334,10 @@ func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 	if populated {
 		stat.Bsize = uint64(attr.Bsize)
 		stat.Frsize = uint64(attr.Frsize)
-		stat.Blocks = total / stat.Bsize
 		// attr.Blocks has the blocks used
+		// if used > display capacity, we still want to report useful data
+		// so just set the capacity to the amount used (and set free to 0)
+		stat.Blocks = max(total/stat.Bsize, attr.Blocks)
 		stat.Bavail = stat.Blocks - attr.Blocks
 		stat.Bfree = stat.Blocks - attr.Blocks
 		stat.Files = attr.Files
