@@ -64,6 +64,7 @@ type FileCache struct {
 	mountPath       string   // uses os.Separator (filepath.Join)
 	allowOther      bool
 	offloadIO       bool
+	offlineAccess   bool
 	syncToFlush     bool
 	syncToDelete    bool
 	maxCacheSize    float64
@@ -95,8 +96,9 @@ type FileCacheOptions struct {
 	AllowNonEmpty   bool `config:"allow-non-empty-temp" yaml:"allow-non-empty-temp,omitempty"`
 	CleanupOnStart  bool `config:"cleanup-on-start" yaml:"cleanup-on-start,omitempty"`
 
-	EnablePolicyTrace bool `config:"policy-trace" yaml:"policy-trace,omitempty"`
-	OffloadIO         bool `config:"offload-io" yaml:"offload-io,omitempty"`
+	BlockOfflineAccess bool `config:"block-offline-access" yaml:"block-offline-access,omitempty"`
+	EnablePolicyTrace  bool `config:"policy-trace" yaml:"policy-trace,omitempty"`
+	OffloadIO          bool `config:"offload-io" yaml:"offload-io,omitempty"`
 
 	// v1 support
 	V1Timeout     uint32 `config:"file-cache-timeout-in-seconds" yaml:"-"`
@@ -234,6 +236,7 @@ func (c *FileCache) Configure(_ bool) error {
 	c.cleanupOnStart = conf.CleanupOnStart
 	c.policyTrace = conf.EnablePolicyTrace
 	c.offloadIO = conf.OffloadIO
+	c.offlineAccess = !conf.BlockOfflineAccess
 	c.syncToFlush = conf.SyncToFlush
 	c.syncToDelete = !conf.SyncNoOp
 	c.refreshSec = conf.RefreshSec
@@ -323,8 +326,8 @@ func (c *FileCache) Configure(_ bool) error {
 		c.diskHighWaterMark = (((conf.MaxSizeMB * MB) * float64(cacheConfig.highThreshold)) / 100)
 	}
 
-	log.Info("FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
-		c.createEmptyFile, int(c.cacheTimeout), c.tmpPath, int(cacheConfig.maxSizeMB), int(cacheConfig.highThreshold), int(cacheConfig.lowThreshold), c.refreshSec, cacheConfig.maxEviction, c.hardLimit, conf.Policy, c.allowNonEmpty, c.cleanupOnStart, c.policyTrace, c.offloadIO, c.syncToFlush, c.syncToDelete, c.defaultPermission, c.diskHighWaterMark, c.maxCacheSize, c.mountPath)
+	log.Info("FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, offline-access %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
+		c.createEmptyFile, int(c.cacheTimeout), c.tmpPath, int(cacheConfig.maxSizeMB), int(cacheConfig.highThreshold), int(cacheConfig.lowThreshold), c.refreshSec, cacheConfig.maxEviction, c.hardLimit, conf.Policy, c.allowNonEmpty, c.cleanupOnStart, c.policyTrace, c.offloadIO, c.offlineAccess, c.syncToFlush, c.syncToDelete, c.defaultPermission, c.diskHighWaterMark, c.maxCacheSize, c.mountPath)
 
 	return nil
 }
