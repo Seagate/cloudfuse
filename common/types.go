@@ -84,7 +84,7 @@ func CloudfuseVersion_() string {
 	return cloudfuseVersion_
 }
 
-// custom error shared by different components
+// custom errors shared by different components
 type CloudUnreachableError struct {
 	Message           string
 	CloudStorageError error
@@ -104,6 +104,28 @@ func (e CloudUnreachableError) Unwrap() error {
 }
 func (e CloudUnreachableError) Is(target error) bool {
 	_, ok := target.(*CloudUnreachableError)
+	return ok
+}
+
+type NoCachedDataError struct {
+	Message    string
+	CacheError error
+}
+
+func NewNoCachedDataError(originalError error) CloudUnreachableError {
+	return CloudUnreachableError{
+		Message:           "Failed to connect to cloud storage",
+		CloudStorageError: originalError,
+	}
+}
+func (e NoCachedDataError) Error() string {
+	return fmt.Sprintf("%s. Here's why: %v", e.Message, e.CacheError)
+}
+func (e NoCachedDataError) Unwrap() error {
+	return e.CacheError
+}
+func (e NoCachedDataError) Is(target error) bool {
+	_, ok := target.(*NoCachedDataError)
 	return ok
 }
 
