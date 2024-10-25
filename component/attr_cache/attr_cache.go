@@ -424,8 +424,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			}
 		}
 	} else {
-		var cloudUnreachableError *common.CloudUnreachableError
-		if errors.As(err, &cloudUnreachableError) {
+		if errors.Is(err, &common.CloudUnreachableError{}) {
 			// return whatever entries we have (but only if the token is empty)
 			entry, found := ac.cache.get(options.Name)
 			if options.Token == "" && found {
@@ -449,6 +448,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	pathList = slices.CompactFunc[[]*internal.ObjAttr, *internal.ObjAttr](pathList, func(a, b *internal.ObjAttr) bool {
 		return a.Path == b.Path
 	})
+	// cache the listing (if there was no error)
 	if err == nil {
 		ac.cacheListSegment(pathList, options.Name, options.Token, nextToken)
 	} else {
@@ -963,18 +963,11 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	value, found := ac.cache.get(options.Name)
 	ac.cacheLock.RUnlock()
 	if found && value.valid() && time.Since(value.cachedAt).Seconds() < float64(ac.cacheTimeout) {
-		// Try to serve the request from the attribute cache
-		// Is the entry marked deleted?
-		if !value.exists() {
-			log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
-			return nil, syscall.ENOENT
-		}
-		// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
-		// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
-		// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
-		if value.attr.IsMetadataRetrieved() || (!ac.enableSymlinks && !options.RetrieveMetadata) {
-			// path exists and we have all the metadata required or we do not care about metadata
-			return value.attr, nil
+		// Serve the request from the attribute cache
+		attr, err, metadataOkay := ac.getAttrFromItem(value, options)
+		// we need to make sure metadata flags look good (this is only an issue for Azure)
+		if metadataOkay {
+			return attr, err
 		}
 	}
 
@@ -994,15 +987,45 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
-	} else if err == syscall.ENOENT {
-		// cache this entity not existing
-		ac.cache.insert(insertOptions{
-			attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
-			exists:   false,
-			cachedAt: time.Now(),
-		})
+	} else {
+		if err == syscall.ENOENT {
+			// cache this entity not existing
+			ac.cache.insert(insertOptions{
+				attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
+				exists:   false,
+				cachedAt: time.Now(),
+			})
+		}
+		// is the cloud connection down?
+		if errors.Is(err, &common.CloudUnreachableError{}) {
+			// do we have an entry, but it's expired? Let's serve that.
+			if found && value.valid() {
+				// Serve the request from the attribute cache
+				attr, getAttrErr, metadataOkay := ac.getAttrFromItem(value, options)
+				// we need to make sure metadata flags look good (this is only an issue for Azure)
+				if metadataOkay {
+					return attr, errors.Join(getAttrErr, err)
+				}
+			}
+		}
 	}
 	return pathAttr, err
+}
+
+// return a GetAttr response from the attribute cache item
+func (ac *AttrCache) getAttrFromItem(value *attrCacheItem, options internal.GetAttrOptions) (attr *internal.ObjAttr, err error, metadataOkay bool) {
+	// Is the entry marked deleted?
+	if !value.exists() {
+		log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
+		err = syscall.ENOENT
+		metadataOkay = true
+	} else {
+		// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
+		// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
+		// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
+		metadataOkay = value.attr.IsMetadataRetrieved() || (!ac.enableSymlinks && !options.RetrieveMetadata)
+	}
+	return value.attr, err, metadataOkay
 }
 
 // CreateLink : Mark the new link invalid
