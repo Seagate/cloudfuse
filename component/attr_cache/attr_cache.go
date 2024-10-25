@@ -27,6 +27,7 @@ package attr_cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -36,6 +37,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -421,11 +423,22 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 					options.Name, numAdded, len(pathList))
 			}
 		}
-	}
-	// add cached items in
-	if len(cachedPathList) > 0 {
-		log.Info("AttrCache::StreamDir : %s merging in %d list cache entries...", options.Name, len(cachedPathList))
-		pathList = append(pathList, cachedPathList...)
+	} else {
+		var cloudUnreachableError *common.CloudUnreachableError
+		if errors.As(err, &cloudUnreachableError) {
+			// return whatever entries we have (but only if the token is empty)
+			entry, found := ac.cache.get(options.Name)
+			if options.Token == "" && found {
+				for _, v := range entry.children {
+					if v.exists() && v.valid() {
+						pathList = append(pathList, v.attr)
+					}
+				}
+			} else {
+				// the cloud is unavailable, and we have nothing to provide
+				return pathList, nextToken, common.NewNoCachedDataError(err)
+			}
+		}
 	}
 	// values should be returned in ascending order by key, without duplicates
 	// sort
@@ -436,7 +449,11 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	pathList = slices.CompactFunc[[]*internal.ObjAttr, *internal.ObjAttr](pathList, func(a, b *internal.ObjAttr) bool {
 		return a.Path == b.Path
 	})
-	ac.cacheListSegment(pathList, options.Name, options.Token, nextToken)
+	if err == nil {
+		ac.cacheListSegment(pathList, options.Name, options.Token, nextToken)
+	} else {
+		log.Err("AttrCache::StreamDir : %s encountered error [%v]", err)
+	}
 	log.Trace("AttrCache::StreamDir : %s returning %d entries", options.Name, len(pathList))
 	return pathList, nextToken, err
 }
@@ -457,7 +474,7 @@ func (ac *AttrCache) fetchCachedDirList(path string, token string) ([]*internal.
 	listDirCache, found := ac.cache.get(path)
 	if !found {
 		log.Warn("AttrCache::fetchCachedDirList : %s directory not found in cache", path)
-		return pathList, "", fmt.Errorf("%s directory not found in cache", path)
+		return pathList, "", common.NewNoCachedDataError(fmt.Errorf("%s directory not found in cache", path))
 	}
 	// is the requested data cached?
 	if listDirCache.listCache == nil {
