@@ -423,20 +423,18 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 					options.Name, numAdded, len(pathList))
 			}
 		}
-	} else {
-		if errors.Is(err, &common.CloudUnreachableError{}) {
-			// return whatever entries we have (but only if the token is empty)
-			entry, found := ac.cache.get(options.Name)
-			if options.Token == "" && found {
-				for _, v := range entry.children {
-					if v.exists() && v.valid() {
-						pathList = append(pathList, v.attr)
-					}
+	} else if errors.Is(err, &common.CloudUnreachableError{}) {
+		// return whatever entries we have (but only if the token is empty)
+		entry, found := ac.cache.get(options.Name)
+		if options.Token == "" && found {
+			for _, v := range entry.children {
+				if v.exists() && v.valid() {
+					pathList = append(pathList, v.attr)
 				}
-			} else {
-				// the cloud is unavailable, and we have nothing to provide
-				return pathList, nextToken, common.NewNoCachedDataError(err)
 			}
+		} else {
+			// the cloud is unavailable, and we have nothing to provide
+			return pathList, nextToken, common.NewNoCachedDataError(err)
 		}
 	}
 	// values should be returned in ascending order by key, without duplicates
