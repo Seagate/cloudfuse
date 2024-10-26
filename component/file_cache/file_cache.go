@@ -27,6 +27,7 @@ package file_cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -61,6 +62,7 @@ type FileCache struct {
 	cleanupOnStart  bool
 	policyTrace     bool
 	missedChmodList sync.Map // uses object name (common.JoinUnixFilepath)
+	offlineOps      sync.Map // uses object name (common.JoinUnixFilepath)
 	mountPath       string   // uses os.Separator (filepath.Join)
 	allowOther      bool
 	offloadIO       bool
@@ -428,9 +430,30 @@ func (fc *FileCache) invalidateDirectory(name string) {
 	}
 }
 
-// Note: The primary purpose of the file cache is to keep track of files that are opened by the user.
-// So we do not need to support some APIs like Create Directory since the file cache will manage
-// creating local directories as needed.
+func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
+	log.Trace("FileCache::CreateDir : %s", options.Name)
+
+	err := fc.NextComponent().CreateDir(options)
+	offline := errors.Is(err, &common.CloudUnreachableError{})
+	if err == nil || errors.Is(err, os.ErrExist) || offline && fc.offlineAccess {
+		// make sure the directory exists in local cache
+		flock := fc.fileLocks.Get(options.Name)
+		flock.Lock()
+		defer flock.Unlock()
+		localPath := filepath.Join(fc.tmpPath, options.Name)
+		mkdirErr := os.MkdirAll(localPath, options.Mode.Perm())
+		if offline {
+			if !errors.Is(err, os.ErrExist) {
+				// This directory's probably local, so remember to sync it later
+				fc.offlineOps.Store(options.Name, internal.CreateObjAttrDir(options.Name))
+			}
+			// offline access is enabled, so don't return the offline error
+			err = mkdirErr
+		}
+	}
+
+	return err
+}
 
 // DeleteDir: Recursively invalidate the directory and its children
 func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
@@ -438,9 +461,32 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 
 	err := fc.NextComponent().DeleteDir(options)
 	if err != nil {
-		log.Err("FileCache::DeleteDir : %s failed", options.Name)
+		log.Err("FileCache::DeleteDir : %s failed. Here's why: %v", options.Name, err)
 		// There is a chance that meta file for directory was not created in which case
 		// rest api delete will fail while we still need to cleanup the local cache for the same
+	}
+	// is the cloud connection down?
+	if errors.Is(err, &common.CloudUnreachableError{}) {
+		// if offline access is disabled, do not touch the local file cache
+		if !fc.offlineAccess {
+			return err
+		}
+		// offline access is enabled
+		// to prevent consistency issues: if this is not a local directory, don't delete it locally
+		attr, getAttrErr := fc.GetAttr(internal.GetAttrOptions{Name: options.Name})
+		// is the directory in cloud storage?
+		if getAttrErr == nil || attr != nil {
+			// directory exists in cloud storage - so do nothing
+			return err
+		}
+		// do we *know* that the directory does not exist in cloud storage?
+		if !errors.Is(getAttrErr, os.ErrNotExist) || errors.Is(getAttrErr, &common.NoCachedDataError{}) {
+			// directory *might* exist in cloud storage (we do not know) - so do nothing
+			return err
+		}
+		// we're pretty sure the directory does not exist in cloud storage
+		// so it was a local directory, and we need to remove it from the deferred cloud operations
+		fc.offlineOps.Delete(options.Name)
 	}
 
 	fc.invalidateDirectory(options.Name)
@@ -456,6 +502,13 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 
 	// To cover case 1, grab all entries from storage
 	attrs, token, err := fc.NextComponent().StreamDir(options)
+	if errors.Is(err, &common.CloudUnreachableError{}) && fc.offlineAccess {
+		// we're offline and offline access is allowed, so let's check if we have valid a listing
+		if !errors.Is(err, &common.NoCachedDataError{}) {
+			// we have a valid listing. Let's drop the error message
+			err = nil
+		}
+	}
 	if err != nil {
 		return attrs, token, err
 	}
@@ -1267,9 +1320,9 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
 	localPath := filepath.Join(fc.tmpPath, options.Name)
-	info, err := os.Stat(localPath)
+	info, statErr := os.Stat(localPath)
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
-	if err == nil && !info.IsDir() {
+	if statErr == nil && !info.IsDir() {
 		if exists { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
 			// Return from local cache only if file is not under download or deletion
 			// If file is under download then taking size or mod time from it will be incorrect.
