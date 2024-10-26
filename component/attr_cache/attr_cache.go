@@ -450,7 +450,13 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	})
 	// cache the listing (if there was no error)
 	if err == nil {
+		// record when the directory was listed, an up to what token
+		// this will allow us to serve directory listings from this cache
 		ac.cacheListSegment(pathList, options.Name, options.Token, nextToken)
+		// if the listing is complete, record the fact that we have a complete listing
+		if nextToken == "" {
+			ac.markListingComplete(options.Name)
+		}
 	} else {
 		log.Err("AttrCache::StreamDir : %s encountered error [%v]", err)
 	}
@@ -560,6 +566,15 @@ func (ac *AttrCache) cacheListSegment(pathList []*internal.ObjAttr, listDirPath 
 	}
 	log.Trace("AttrCache::cacheListSegment : %s cached list entries \"%s\"-\"%s\" (%d items)",
 		listDirPath, token, nextToken, len(pathList))
+}
+
+func (ac *AttrCache) markListingComplete(listDirPath string) {
+	ac.cacheLock.Lock()
+	defer ac.cacheLock.Unlock()
+	listDirItem, found := ac.cache.get(listDirPath)
+	if found {
+		listDirItem.listingComplete = true
+	}
 }
 
 // IsDirEmpty: Whether or not the directory is empty
@@ -1005,6 +1020,26 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 				// we need to make sure metadata flags look good (this is only an issue for Azure)
 				if metadataOkay {
 					return attr, errors.Join(getAttrErr, err)
+				}
+			} else if found && value.attrFlag.IsSet(AttrFlagExists) {
+				// This entry says the item exists, but the entry is invalid
+				// When we flush or sync files or directories, we create entries like this
+				// These entries correspond to items that *might* exist in the cloud
+				// So we have to not claim to know whether they exist
+				return nil, common.NewNoCachedDataError(err)
+			} else {
+				// we have no cached data about this item
+				// but do we have a complete listing for its parent directory?
+				entry, found := ac.cache.get(getParentDir(options.Name))
+				if found && entry.listingComplete {
+					return nil, errors.Join(syscall.ENOENT, err)
+				} else {
+					// we have no way of knowing whether the requested item is in the directory in the cloud
+					// NOTE:
+					// the OS can call GetAttr on a file without listing its parent directory
+					// so having a valid file entry in cache does not mean we have a complete listing of its parent
+					// so we can't just check if the directory has any children as a proxy for whether it's been listed
+					return nil, common.NewNoCachedDataError(err)
 				}
 			}
 		}
