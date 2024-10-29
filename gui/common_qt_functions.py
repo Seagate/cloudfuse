@@ -248,10 +248,10 @@ class customConfigFunctions():
                     configs = yaml.safe_load(file)
                     if configs is None:
                        # The configs file exists, but is empty, use default settings
-                       configs = self.getConfigs(True)
+                       configs = self.getConfigs(settings,True)
             except:
                 # Could not open or config file does not exist, use default settings
-                configs = self.getConfigs(True)
+                configs = self.getConfigs(settings,True)
         return configs
     
 
