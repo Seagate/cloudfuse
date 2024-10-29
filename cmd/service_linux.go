@@ -34,6 +34,7 @@ import (
 	"os/user"
 	"strings"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/spf13/cobra"
 )
 
@@ -64,6 +65,7 @@ var installCmd = &cobra.Command{
 	SuggestFor:        []string{"ins", "inst"},
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
+	Args:              cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// 1. get the cloudfuse.service file from the setup folder and collect relevant data (user, mount, config)
@@ -80,67 +82,40 @@ var installCmd = &cobra.Command{
 			return fmt.Errorf("error collecting data from cloudfuse.service file due to the following error: [%s]", err)
 		}
 
-		// set a default mount and config path when stubbed examples are found in the file.
-		mountPath := serviceData["MoutingPoint"]
-		configPath := serviceData["ConfigFile"]
-		if mountPath == "/path/to/mounting/point" {
-			err = modifySericeFile(mountPath, dir)
-			if err != nil {
-				return fmt.Errorf("error when attempting to write defaults into service file: [%s]", err.Error())
-			}
+		// TODO: get arguments of cloudfuse service install and pass that to be values written to the service file's config file and mount point paths.
+		mountPath := args[0]
+		configPath := args[1]
+
+		mountExists := common.DirectoryExists(mountPath)
+		if !mountExists {
+			return fmt.Errorf("error, the mount path provided does not exist")
+			// TODO: add useage output upon failure with input
 		}
-		if configPath == "/path/to/config/file/config.yaml" {
-			err = modifySericeFile(configPath, dir)
-			if err != nil {
-				return fmt.Errorf("error when attempting to write defaults into service file: [%s]", err.Error())
-			}
+		isDirEmpty := common.IsDirectoryEmpty(mountPath)
+		if !isDirEmpty {
+			return fmt.Errorf("error, the mount path provided is not empty")
+			// TODO: add useage output upon failure with input
+		}
+
+		configExists := common.DirectoryExists(configPath)
+		if !configExists {
+			return fmt.Errorf("error, the configfile path provided does not exist") // TODO: add useage output upon failure with input
+		}
+
+		err = modifySericeFile(mountPath, dir)
+		if err != nil {
+			return fmt.Errorf("error when attempting to write defaults into service file: [%s]", err.Error())
+		}
+
+		err = modifySericeFile(configPath, dir)
+		if err != nil {
+			return fmt.Errorf("error when attempting to write defaults into service file: [%s]", err.Error())
 		}
 
 		// 2. retrieve the newUser account from cloudfuse.service file and create it if it doesn't exist
-		newUser := serviceData["User"]
-		usersList, err := os.Open("/etc/passwd")
-		if err != nil {
-			return fmt.Errorf("failed to open /etc/passwd due to following error: [%s]", err.Error())
-		}
-		scanner := bufio.NewScanner(usersList)
-		var foundUser bool
-		defer usersList.Close()
 
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.HasPrefix(line, newUser) {
-				foundUser = true
-			}
-		}
-		if !foundUser {
-			//create the user
-			userAddCmd := exec.Command("sudo", "useradd", "-m", newUser)
-			err = userAddCmd.Run()
-			if err != nil {
-				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
-			}
-
-			// use the current user for reference on permissions
-			usr, err := user.Current()
-			if err != nil {
-				return fmt.Errorf("error getting looking up current user: [%s]", err.Error())
-			}
-
-			// get a list of group from reference user
-			groups, err := usr.GroupIds()
-			if err != nil {
-				return fmt.Errorf("error getting group id list from current user: [%s]", err.Error())
-			}
-
-			// add the list of groups to the CloudfuseUser
-			for _, group := range groups {
-				usermodCmd := exec.Command("sudo", "usermod", "-aG", group, newUser)
-				err = usermodCmd.Run()
-				if err != nil {
-					return fmt.Errorf("failed to add group to user due to following error: [%s]", err.Error())
-				}
-			}
-		}
+		serviceUser := serviceData["User"]
+		setUser(serviceUser)
 
 		// 3. copy the cloudfuse.service file to /etc/systemd/system
 		copyFileCmd := exec.Command("sudo", "cp", "./setup/cloudfuse.service", "/etc/systemd/system")
@@ -208,12 +183,6 @@ func collectServiceData(serviceFilePath string) (map[string]string, error) {
 	serviceData := make(map[string]string)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.Contains(line, "Environment=") {
-			parts := strings.SplitN(line, "=", 3)
-			key := strings.TrimSpace(parts[1])
-			value := strings.TrimSpace(parts[2])
-			serviceData[key] = value
-		}
 		if strings.Contains(line, "User=") {
 			parts := strings.SplitN(line, "=", 2)
 			key := strings.TrimSpace(parts[0])
@@ -230,14 +199,6 @@ func collectServiceData(serviceFilePath string) (map[string]string, error) {
 
 func modifySericeFile(path string, curDir string) error {
 
-	var defaultMountPath string
-
-	//get current user
-	usr, err := user.Current()
-	if err != nil {
-		return fmt.Errorf("Error: [%s]", err.Error())
-	}
-
 	//mountpath or config?
 	var oldString string
 	var newString string
@@ -250,18 +211,10 @@ func modifySericeFile(path string, curDir string) error {
 		config = true
 		mount = false
 	}
-	if strings.Contains(path, "mounting") {
-		defaultMountPath = fmt.Sprintf("/home/%s/cloudfuseMount", strings.ToLower(usr.Name))
-		fmt.Printf("creating mount folder in %s \n", defaultMountPath)
 
-		//Create default mount directory
-		userAddCmd := exec.Command("mkdir", defaultMountPath)
-		err = userAddCmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed to create default mount folder due to following error: [%s]", err.Error())
-		}
+	if common.IsDirectoryEmpty(path) {
 		oldString = "Environment=MoutingPoint=/path/to/mounting/point"
-		newString = fmt.Sprintf("Environment=MoutingPoint=%s", defaultMountPath)
+		newString = fmt.Sprintf("Environment=MoutingPoint=%s", path)
 		config = false
 		mount = true
 	}
@@ -328,6 +281,53 @@ func modifySericeFile(path string, curDir string) error {
 	// Flush the buffer to write all data to disk
 	writer.Flush()
 
+	return nil
+}
+
+func setUser(serviceUser string) error {
+	usersList, err := os.Open("/etc/passwd")
+	if err != nil {
+		return fmt.Errorf("failed to open /etc/passwd due to following error: [%s]", err.Error())
+	}
+	scanner := bufio.NewScanner(usersList)
+	var foundUser bool
+	defer usersList.Close()
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, serviceUser) {
+			foundUser = true
+		}
+	}
+	if !foundUser {
+		//create the user
+		userAddCmd := exec.Command("sudo", "useradd", "-m", serviceUser)
+		err = userAddCmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
+		}
+
+		// use the current user for reference on permissions
+		usr, err := user.Current()
+		if err != nil {
+			return fmt.Errorf("error getting looking up current user: [%s]", err.Error())
+		}
+
+		// get a list of group from reference user
+		groups, err := usr.GroupIds()
+		if err != nil {
+			return fmt.Errorf("error getting group id list from current user: [%s]", err.Error())
+		}
+
+		// add the list of groups to the CloudfuseUser
+		for _, group := range groups {
+			usermodCmd := exec.Command("sudo", "usermod", "-aG", group, serviceUser)
+			err = usermodCmd.Run()
+			if err != nil {
+				return fmt.Errorf("failed to add group to user due to following error: [%s]", err.Error())
+			}
+		}
+	}
 	return nil
 }
 
