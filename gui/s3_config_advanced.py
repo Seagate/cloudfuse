@@ -33,7 +33,7 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
     def __init__(self,configSettings):
         super().__init__()
         self.setupUi(self)
-        self.myWindow = QSettings("CloudFUSE", "S3AdvancedWindow")
+        self.myWindow = QSettings("Cloudfuse", "S3AdvancedWindow")
         self.settings = configSettings
         self.initWindowSizePos()
         self.setWindowTitle("Advanced S3Cloud Config Settings")

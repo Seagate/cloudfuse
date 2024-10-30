@@ -260,7 +260,7 @@ class customConfigFunctions():
             defaultFuseDir = 'Cloudfuse'
             userDir = os.getenv('APPDATA')
         else:
-            defaultFuseDir = '.Cloudfuse'
+            defaultFuseDir = '.cloudfuse'
             userDir = os.getenv('HOME')
         workingDir = os.path.join(userDir, defaultFuseDir)
         return workingDir
