@@ -248,10 +248,10 @@ class customConfigFunctions():
                     configs = yaml.safe_load(file)
                     if configs is None:
                        # The configs file exists, but is empty, use default settings
-                       configs = self.getConfigs(True)
+                       configs = self.getConfigs(settings,True)
             except:
                 # Could not open or config file does not exist, use default settings
-                configs = self.getConfigs(True)
+                configs = self.getConfigs(settings,True)
         return configs
     
 
@@ -283,6 +283,7 @@ class widgetCustomFunctions(customConfigFunctions,QWidget):
         super().__init__()
 
     def exitWindow(self):
+        self.saveButtonClicked = True
         self.close()
 
     def exitWindowCleanup(self):
@@ -309,13 +310,8 @@ class widgetCustomFunctions(customConfigFunctions,QWidget):
         msg.setText("The settings have been modified.")
         msg.setStandardButtons(QtWidgets.QMessageBox.Discard | QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Save)
         msg.setDefaultButton(QtWidgets.QMessageBox.Cancel)
-        ret = msg.exec()
-        if ret == QtWidgets.QMessageBox.Discard:
-            self.exitWindowCleanup()
-            event.accept()
-        elif ret == QtWidgets.QMessageBox.Cancel:
-            event.ignore()
-        elif ret == QtWidgets.QMessageBox.Save:
+
+        if self.saveButtonClicked == True:
             # Insert all settings to yaml file
             self.exitWindowCleanup()
             self.updateSettingsFromUIChoices()
@@ -323,6 +319,21 @@ class widgetCustomFunctions(customConfigFunctions,QWidget):
                 event.accept()
             else:
                 event.ignore()
+        else:
+            ret = msg.exec()
+            if ret == QtWidgets.QMessageBox.Discard:
+                self.exitWindowCleanup()
+                event.accept()
+            elif ret == QtWidgets.QMessageBox.Cancel:
+                event.ignore()
+            elif ret == QtWidgets.QMessageBox.Save:
+                # Insert all settings to yaml file
+                self.exitWindowCleanup()
+                self.updateSettingsFromUIChoices()
+                if self.writeConfigFile(self.settings):
+                    event.accept()
+                else:
+                    event.ignore()
 
     def updateSettingsFromUIChoices(self):
         # Each individual widget will need to override this function
