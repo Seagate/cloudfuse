@@ -3,7 +3,7 @@
 ; https://jrsoftware.org/ishelp/index.php
 
 #define MyAppName "Cloudfuse"
-#define MyAppVersion "1.5.0"
+#define MyAppVersion "1.6.1"
 #define MyAppPublisher "SEAGATE TECHNOLOGY LLC"
 #define MyAppURL "https://github.com/Seagate/cloudfuse"
 #define MyAppExeCLIName "cloudfuse.exe"
@@ -120,7 +120,7 @@ begin
     begin
       SuppressibleMsgBox('Failed to remove cloudfuse registry.', mbError, MB_OK, IDOK);
     end;
-    
+
     // Ask the user if they would like to also uninstall WinFSP
     if SuppressibleMsgBox('Do you want to uninstall WinFSP?', mbConfirmation, MB_YESNO, IDYES) = IDYES then
     begin
