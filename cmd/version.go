@@ -36,7 +36,7 @@ import (
 var check bool
 
 var versionCmd = &cobra.Command{
-	Use:               "version [--check]",
+	Use:               "version",
 	Short:             "Command to print the current version along with optional check for latest version",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
