@@ -34,7 +34,7 @@ import (
 )
 
 var generateCmd = &cobra.Command{
-	Use:               "generate [component name]",
+	Use:               "generate <component name>",
 	Hidden:            true,
 	Short:             "Generate a new component for Cloudfuse",
 	Long:              "Generate a new component for Cloudfuse",
