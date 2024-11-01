@@ -329,26 +329,35 @@ func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 		return -fuse.EIO
 	}
 
-	total := fuseFS.displayCapacityMb * common.MbToBytes
 	// if populated then we need to overwrite root attributes
 	if populated {
 		stat.Bsize = uint64(attr.Bsize)
 		stat.Frsize = uint64(attr.Frsize)
-		// attr.Blocks has the blocks used
-		// if used > display capacity, we still want to report useful data
-		// so just set the capacity to the amount used (and set free to 0)
-		stat.Blocks = max(total/stat.Bsize, attr.Blocks)
-		stat.Bavail = stat.Blocks - attr.Blocks
-		stat.Bfree = stat.Blocks - attr.Blocks
+		// cloud storage always sets free and avail to zero
+		statsFromCloudStorage := attr.Bfree == 0 && attr.Bavail == 0
+		// calculate blocks used from attr
+		usedBlocks := attr.Blocks - attr.Bfree
+		// we only use displayCapacity to complement used size from cloud storage
+		if statsFromCloudStorage {
+			displayCapacityBlocks := fuseFS.displayCapacityMb * common.MbToBytes / uint64(attr.Bsize)
+			// if used > displayCapacity, then report used and show that we are out of space
+			stat.Blocks = max(displayCapacityBlocks, usedBlocks)
+		} else {
+			stat.Blocks = attr.Blocks
+		}
+		// adjust avail and free to make sure we display used space correctly
+		stat.Bavail = stat.Blocks - usedBlocks
+		stat.Bfree = stat.Blocks - usedBlocks
 		stat.Files = attr.Files
 		stat.Ffree = attr.Ffree
 		stat.Namemax = attr.Namemax
 	} else {
 		stat.Bsize = blockSize
 		stat.Frsize = blockSize
-		stat.Blocks = total / blockSize
-		stat.Bavail = total / blockSize
-		stat.Bfree = total / blockSize
+		displayCapacityBlocks := fuseFS.displayCapacityMb * common.MbToBytes / blockSize
+		stat.Blocks = displayCapacityBlocks
+		stat.Bavail = displayCapacityBlocks
+		stat.Bfree = displayCapacityBlocks
 		stat.Files = 1e9
 		stat.Ffree = 1e9
 		stat.Namemax = maxNameSize
