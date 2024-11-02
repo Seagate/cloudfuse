@@ -1131,15 +1131,15 @@ func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]
 	return newBlockList, nil
 }
 
-func (cl *Client) GetUsedSize() uint64 {
+func (cl *Client) GetUsedSize() (uint64, error) {
 	headBucketOutput, err := cl.headBucket()
 	if err != nil {
-		return 0
+		return 0, err
 	}
 
 	response, ok := middleware.GetRawResponse(headBucketOutput.ResultMetadata).(*smithyHttp.Response)
 	if !ok || response == nil {
-		return 0
+		return 0, fmt.Errorf("Failed GetRawResponse from HeadBucketOutput")
 	}
 
 	headerValue, ok := response.Header["X-Rstor-Size"]
@@ -1147,13 +1147,13 @@ func (cl *Client) GetUsedSize() uint64 {
 		headerValue, ok = response.Header["X-Lyve-Size"]
 	}
 	if !ok || len(headerValue) == 0 {
-		return 0
+		return 0, fmt.Errorf("HeadBucket response has no size header (is the endpoint not Lyve Cloud?)")
 	}
 
 	bucketSizeBytes, err := strconv.ParseUint(headerValue[0], 10, 64)
 	if err != nil {
-		return 0
+		return 0, err
 	}
 
-	return bucketSizeBytes
+	return bucketSizeBytes, nil
 }
