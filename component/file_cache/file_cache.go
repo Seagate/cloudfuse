@@ -55,6 +55,7 @@ type FileCache struct {
 	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
 	policy    cachePolicy
 
+	statFsFromCache bool
 	createEmptyFile bool
 	allowNonEmpty   bool
 	cacheTimeout    float64
@@ -91,6 +92,7 @@ type FileCacheOptions struct {
 	HighThreshold uint32  `config:"high-threshold" yaml:"high-threshold,omitempty"`
 	LowThreshold  uint32  `config:"low-threshold" yaml:"low-threshold,omitempty"`
 
+	StatFsFromCache bool `config:"usage-from-cache" yaml:"usage-from-cache,omitempty"`
 	CreateEmptyFile bool `config:"create-empty-file" yaml:"create-empty-file,omitempty"`
 	AllowNonEmpty   bool `config:"allow-non-empty-temp" yaml:"allow-non-empty-temp,omitempty"`
 	CleanupOnStart  bool `config:"cleanup-on-start" yaml:"cleanup-on-start,omitempty"`
@@ -218,6 +220,7 @@ func (c *FileCache) Configure(_ bool) error {
 		return fmt.Errorf("config error in %s [%s]", c.Name(), err.Error())
 	}
 
+	c.statFsFromCache = conf.StatFsFromCache
 	c.createEmptyFile = conf.CreateEmptyFile
 	if config.IsSet(compName + ".file-cache-timeout-in-seconds") {
 		c.cacheTimeout = float64(conf.V1Timeout)
@@ -323,8 +326,8 @@ func (c *FileCache) Configure(_ bool) error {
 		c.diskHighWaterMark = (((conf.MaxSizeMB * MB) * float64(cacheConfig.highThreshold)) / 100)
 	}
 
-	log.Info("FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
-		c.createEmptyFile, int(c.cacheTimeout), c.tmpPath, int(cacheConfig.maxSizeMB), int(cacheConfig.highThreshold), int(cacheConfig.lowThreshold), c.refreshSec, cacheConfig.maxEviction, c.hardLimit, conf.Policy, c.allowNonEmpty, c.cleanupOnStart, c.policyTrace, c.offloadIO, c.syncToFlush, c.syncToDelete, c.defaultPermission, c.diskHighWaterMark, c.maxCacheSize, c.mountPath)
+	log.Info("FileCache::Configure : usage-from-cache %t, create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
+		c.statFsFromCache, c.createEmptyFile, int(c.cacheTimeout), c.tmpPath, int(cacheConfig.maxSizeMB), int(cacheConfig.highThreshold), int(cacheConfig.lowThreshold), c.refreshSec, cacheConfig.maxEviction, c.hardLimit, conf.Policy, c.allowNonEmpty, c.cleanupOnStart, c.policyTrace, c.offloadIO, c.syncToFlush, c.syncToDelete, c.defaultPermission, c.diskHighWaterMark, c.maxCacheSize, c.mountPath)
 
 	return nil
 }
@@ -340,6 +343,7 @@ func (c *FileCache) OnConfigChange() {
 		log.Err("FileCache: config error [invalid config attributes]")
 	}
 
+	c.statFsFromCache = conf.StatFsFromCache
 	c.createEmptyFile = conf.CreateEmptyFile
 	c.cacheTimeout = float64(conf.Timeout)
 	c.policyTrace = conf.EnablePolicyTrace
