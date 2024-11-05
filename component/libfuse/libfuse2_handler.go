@@ -336,18 +336,19 @@ func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 		// cloud storage always sets free and avail to zero
 		statsFromCloudStorage := attr.Bfree == 0 && attr.Bavail == 0
 		// calculate blocks used from attr
-		usedBlocks := attr.Blocks - attr.Bfree
+		blocksUnavailable := attr.Blocks - attr.Bavail
+		blocksUsed := attr.Blocks - attr.Bfree
 		// we only use displayCapacity to complement used size from cloud storage
 		if statsFromCloudStorage {
 			displayCapacityBlocks := fuseFS.displayCapacityMb * common.MbToBytes / uint64(attr.Bsize)
 			// if used > displayCapacity, then report used and show that we are out of space
-			stat.Blocks = max(displayCapacityBlocks, usedBlocks)
+			stat.Blocks = max(displayCapacityBlocks, blocksUnavailable)
 		} else {
 			stat.Blocks = attr.Blocks
 		}
 		// adjust avail and free to make sure we display used space correctly
-		stat.Bavail = stat.Blocks - usedBlocks
-		stat.Bfree = stat.Blocks - usedBlocks
+		stat.Bavail = stat.Blocks - blocksUnavailable
+		stat.Bfree = stat.Blocks - blocksUsed
 		stat.Files = attr.Files
 		stat.Ffree = attr.Ffree
 		stat.Namemax = attr.Namemax
