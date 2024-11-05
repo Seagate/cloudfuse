@@ -181,13 +181,12 @@ func (suite *fileCacheTestSuite) TestConfig() {
 	maxDeletion := 10
 	highThreshold := 90
 	lowThreshold := 10
-	usageFromCache := true
 	createEmptyFile := true
 	allowNonEmptyTemp := true
 	cleanupOnStart := true
 	syncToFlush := false
-	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  policy: %s\n  max-size-mb: %d\n  timeout-sec: %d\n  max-eviction: %d\n  high-threshold: %d\n  low-threshold: %d\n  usage-from-cache: %t\n  create-empty-file: %t\n  allow-non-empty-temp: %t\n  cleanup-on-start: %t\n  sync-to-flush: %t",
-		suite.cache_path, policy, maxSizeMb, cacheTimeout, maxDeletion, highThreshold, lowThreshold, usageFromCache, createEmptyFile, allowNonEmptyTemp, cleanupOnStart, syncToFlush)
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  policy: %s\n  max-size-mb: %d\n  timeout-sec: %d\n  max-eviction: %d\n  high-threshold: %d\n  low-threshold: %d\n  create-empty-file: %t\n  allow-non-empty-temp: %t\n  cleanup-on-start: %t\n  sync-to-flush: %t",
+		suite.cache_path, policy, maxSizeMb, cacheTimeout, maxDeletion, highThreshold, lowThreshold, createEmptyFile, allowNonEmptyTemp, cleanupOnStart, syncToFlush)
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 
 	suite.assert.Equal("file_cache", suite.fileCache.Name())
@@ -199,7 +198,6 @@ func (suite *fileCacheTestSuite) TestConfig() {
 	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).highThreshold, highThreshold)
 	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).lowThreshold, lowThreshold)
 
-	suite.assert.Equal(suite.fileCache.statFsFromCache, usageFromCache)
 	suite.assert.Equal(suite.fileCache.createEmptyFile, createEmptyFile)
 	suite.assert.Equal(suite.fileCache.allowNonEmpty, allowNonEmptyTemp)
 	suite.assert.EqualValues(suite.fileCache.cacheTimeout, cacheTimeout)
@@ -253,12 +251,11 @@ func (suite *fileCacheTestSuite) TestConfigPolicyTimeout() {
 	maxDeletion := 10
 	highThreshold := 90
 	lowThreshold := 10
-	usageFromCache := true
 	createEmptyFile := true
 	allowNonEmptyTemp := true
 	cleanupOnStart := true
-	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  policy: %s\n  max-size-mb: %d\n  timeout-sec: %d\n  max-eviction: %d\n  high-threshold: %d\n  low-threshold: %d\n  usage-from-cache: %t\n  create-empty-file: %t\n  allow-non-empty-temp: %t\n  cleanup-on-start: %t",
-		suite.cache_path, policy, maxSizeMb, cacheTimeout, maxDeletion, highThreshold, lowThreshold, usageFromCache, createEmptyFile, allowNonEmptyTemp, cleanupOnStart)
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  policy: %s\n  max-size-mb: %d\n  timeout-sec: %d\n  max-eviction: %d\n  high-threshold: %d\n  low-threshold: %d\n  create-empty-file: %t\n  allow-non-empty-temp: %t\n  cleanup-on-start: %t",
+		suite.cache_path, policy, maxSizeMb, cacheTimeout, maxDeletion, highThreshold, lowThreshold, createEmptyFile, allowNonEmptyTemp, cleanupOnStart)
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 
 	suite.assert.Equal("file_cache", suite.fileCache.Name())
@@ -271,7 +268,6 @@ func (suite *fileCacheTestSuite) TestConfigPolicyTimeout() {
 	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).lowThreshold, lowThreshold)
 	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).cacheTimeout, cacheTimeout)
 
-	suite.assert.Equal(suite.fileCache.statFsFromCache, usageFromCache)
 	suite.assert.Equal(suite.fileCache.createEmptyFile, createEmptyFile)
 	suite.assert.Equal(suite.fileCache.allowNonEmpty, allowNonEmptyTemp)
 	suite.assert.EqualValues(suite.fileCache.cacheTimeout, cacheTimeout)
@@ -1585,7 +1581,7 @@ func (suite *fileCacheTestSuite) TestStatFS() {
 	defer suite.cleanupTest()
 	cacheTimeout := 5
 	maxSizeMb := 2
-	config := fmt.Sprintf("file_cache:\n  path: %s\n  max-size-mb: %d\n  usage-from-cache: true\n  offload-io: true\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  max-size-mb: %d\n  offload-io: true\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, maxSizeMb, cacheTimeout, suite.fake_storage_path)
 	os.Mkdir(suite.cache_path, 0777)
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
@@ -1598,23 +1594,13 @@ func (suite *fileCacheTestSuite) TestStatFS() {
 	stat, ret, err := suite.fileCache.StatFs()
 	suite.assert.True(ret)
 	suite.assert.NoError(err)
-	suite.assert.NotNil(&common.Statfs_t{}, stat)
+	suite.assert.NotEqual(&common.Statfs_t{}, stat)
 
 	// Added additional checks for StatFS
 	suite.assert.Equal(int64(4096), stat.Bsize)
 	suite.assert.Equal(int64(4096), stat.Frsize)
 	suite.assert.Equal(uint64(512), stat.Blocks)
 	suite.assert.Equal(uint64(255), stat.Namemax)
-}
-
-func (suite *fileCacheTestSuite) TestStatFSCloud() {
-	defer suite.cleanupTest()
-
-	stat, ret, err := suite.fileCache.StatFs()
-	// make sure it's not returning its own data
-	suite.assert.False(ret)
-	suite.assert.Nil(stat)
-	suite.assert.NoError(err)
 }
 
 func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {

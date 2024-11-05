@@ -102,7 +102,6 @@ file_cache:
   max-size-mb: <maximum cache size allowed. Default - 80% of free disk space>
   high-threshold: <% disk space consumed which triggers eviction. This parameter overrides 'timeout-sec' parameter and cached files will be removed even if they have not expired. Default - 80>
   low-threshold: <% disk space consumed which triggers eviction to stop when previously triggered by the high-threshold. Default - 60>
-  usage-from-cache: true|false <use file cache to report drive size and storage statistics (StatFs)>
   create-empty-file: true|false <create an empty file on container when create call is received from kernel>
   allow-non-empty-temp: true|false <allow non empty temp directory at startup. Set true to persist local cache across reboots.>
   cleanup-on-start: true|false <cleanup the temp directory on startup, if it's not empty>
