@@ -52,6 +52,7 @@ type Config struct {
 	checksumAlgorithm         types.ChecksumAlgorithm
 	usePathStyle              bool
 	disableSymlink            bool
+	disableUsage              bool
 }
 
 // TODO: move s3AuthConfig to s3auth.go

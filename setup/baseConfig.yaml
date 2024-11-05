@@ -187,6 +187,7 @@ s3storage:
   enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
   checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - SHA1>
   usePathStyle: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
+  disable-usage: true|false <do not use bucket size from Lyve Cloud to report drive size and storage statistics (StatFs)>
 
 # Mount all configuration
 mountall:

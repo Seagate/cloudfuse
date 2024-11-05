@@ -479,6 +479,10 @@ func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 const blockSize = 4096
 
 func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
+	if s3.stConfig.disableUsage {
+		return nil, false, nil
+	}
+
 	log.Trace("S3Storage::StatFs")
 	// cache_size = f_blocks * f_frsize/1024
 	// cache_size - used = f_frsize * f_bavail/1024
@@ -487,7 +491,7 @@ func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
 	sizeUsed, err := s3.storage.GetUsedSize()
 	if err != nil {
 		// TODO: will returning EIO break any applications that depend on StatFs?
-		return nil, false, err
+		return nil, true, err
 	}
 
 	stat := common.Statfs_t{
