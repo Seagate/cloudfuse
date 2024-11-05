@@ -36,10 +36,11 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.setupUi(self)
         self.setWindowTitle("Advanced Azure Config Settings")
         self.settings = configSettings
-        self.myWindow = QSettings("CloudFUSE", "AzAdvancedWindow")
+        self.myWindow = QSettings("Cloudfuse", "AzAdvancedWindow")
         self.initWindowSizePos()
         self.populateOptions()
-        
+        self.saveButtonClicked = False
+
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
