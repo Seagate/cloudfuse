@@ -1,5 +1,18 @@
 # Cloudfuse Changelog #
 
+## **1.7.0** ##
+
+November 6th 2024
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#358](https://github.com/Seagate/cloudfuse/pull/358) Use Lyve Cloud bucket size by default for StatFs
+
+### Bug Fixes ###
+
+- [#358](https://github.com/Seagate/cloudfuse/pull/358) Fix StatFs used capacity math bug in file cache
+
 ## **1.6.1** ##
 
 October 31st 2024
