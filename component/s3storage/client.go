@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -47,12 +48,14 @@ import (
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/middleware"
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	smithyHttp "github.com/aws/smithy-go/transport/http"
 )
 
 const (
@@ -203,7 +206,7 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	// Check that the provided bucket exists and that user has access to bucket
-	exists, err := cl.headBucket()
+	exists, err := cl.bucketExists()
 	if err != nil || !exists {
 		// From the aws-sdk-go-v2 documentation
 		// If the bucket does not exist or you do not have permission to access it,
@@ -275,6 +278,11 @@ func (cl *Client) SetPrefixPath(path string) error {
 	log.Trace("Client::SetPrefixPath : path %s", path)
 	cl.Config.prefixPath = path
 	return nil
+}
+
+func (cl *Client) bucketExists() (bool, error) {
+	_, err := cl.headBucket()
+	return err != syscall.ENOENT, err
 }
 
 // CreateFile : Create a new file in the bucket/virtual directory
@@ -1121,4 +1129,31 @@ func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]
 		}
 	}
 	return newBlockList, nil
+}
+
+func (cl *Client) GetUsedSize() (uint64, error) {
+	headBucketOutput, err := cl.headBucket()
+	if err != nil {
+		return 0, err
+	}
+
+	response, ok := middleware.GetRawResponse(headBucketOutput.ResultMetadata).(*smithyHttp.Response)
+	if !ok || response == nil {
+		return 0, fmt.Errorf("Failed GetRawResponse from HeadBucketOutput")
+	}
+
+	headerValue, ok := response.Header["X-Rstor-Size"]
+	if !ok {
+		headerValue, ok = response.Header["X-Lyve-Size"]
+	}
+	if !ok || len(headerValue) == 0 {
+		return 0, fmt.Errorf("HeadBucket response has no size header (is the endpoint not Lyve Cloud?)")
+	}
+
+	bucketSizeBytes, err := strconv.ParseUint(headerValue[0], 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return bucketSizeBytes, nil
 }
