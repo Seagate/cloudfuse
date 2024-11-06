@@ -36,8 +36,8 @@ import (
 var check bool
 
 var versionCmd = &cobra.Command{
-	Use:               "version [--check]",
-	Short:             "Command to print the current version along with optional check for latest version",
+	Use:               "version",
+	Short:             "Print the current version and optionally check for latest version",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("cloudfuse version:", common.CloudfuseVersion)

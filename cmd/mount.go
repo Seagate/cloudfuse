@@ -263,9 +263,9 @@ func parseConfig() error {
 // We use the cobra library to provide a CLI for Cloudfuse.
 // Look at https://cobra.dev/ for more information
 var mountCmd = &cobra.Command{
-	Use:               "mount [path]",
-	Short:             "Mounts the container as a filesystem",
-	Long:              "Mounts the container as a filesystem",
+	Use:               "mount <mount path>",
+	Short:             "Mount the container as a filesystem",
+	Long:              "Mount the container as a filesystem",
 	SuggestFor:        []string{"mnt", "mout"},
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,

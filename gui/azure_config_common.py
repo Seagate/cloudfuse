@@ -39,13 +39,14 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("Azure Config Settings")
-        self.myWindow = QSettings("CloudFUSE", "AzcWindow")
+        self.myWindow = QSettings("Cloudfuse", "AzcWindow")
         self.settings = configSettings
         self.initWindowSizePos()
         # Hide the pipeline mode groupbox depending on the default select is
         self.showAzureModeSettings()
         self.showModeSettings()
         self.populateOptions()
+        self.saveButtonClicked = False
 
         # Set up signals
         self.dropDown_pipeline.currentIndexChanged.connect(self.showModeSettings)

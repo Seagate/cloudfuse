@@ -88,7 +88,7 @@ block_cache:
   disk-size-mb: <maximum disk cache size allowed. Default - 80% of free disk space>
   disk-timeout-sec: <default disk cache eviction timeout (in sec). Default - 120 sec>
   prefetch: <number of blocks to be prefetched in serial read case. Min - 11, Default - 2 times number of CPU cores>
-  parallelism: <number of parallel threads downloading the data and writing to disk cache. Default - 3 times number of CPU cores> 
+  parallelism: <number of parallel threads downloading the data and writing to disk cache. Default - 3 times number of CPU cores>
   prefetch-on-open: true|false <prefetch blocks on open. This shall be used only when user application is going to read file from offset 0>
 
 # Disk cache related configuration
@@ -188,6 +188,7 @@ s3storage:
   enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
   checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - SHA1>
   usePathStyle: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
+  disable-usage: true|false <do not use bucket size from Lyve Cloud to report drive size and storage statistics (StatFs). If not using Lyve Cloud, set to true.>
 
 # Mount all configuration
 mountall:

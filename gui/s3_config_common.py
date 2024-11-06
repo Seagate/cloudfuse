@@ -36,14 +36,13 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
     def __init__(self, configSettings):
         super().__init__()
         self.setupUi(self)
-        self.myWindow = QSettings("CloudFUSE", "s3Window")
+        self.myWindow = QSettings("Cloudfuse", "s3Window")
         self.initWindowSizePos()
         self.setWindowTitle("S3Cloud Config Settings")
         self.settings = configSettings
         self.populateOptions()
         self.showModeSettings()
-        
-        
+        self.saveButtonClicked = False
 
         # S3 naming conventions:
         #   https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html

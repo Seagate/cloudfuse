@@ -381,6 +381,51 @@ func (c *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 	return cacheConfig
 }
 
+func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
+
+	statfs, populated, err := fc.NextComponent().StatFs()
+	if populated {
+		return statfs, populated, err
+	}
+
+	log.Trace("FileCache::StatFs")
+
+	// cache_size = f_blocks * f_frsize/1024
+	// cache_size - used = f_frsize * f_bavail/1024
+	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
+	// if cache size is set to 0 then we have the root mount usage
+	maxCacheSize := fc.maxCacheSize * MB
+	if maxCacheSize == 0 {
+		log.Err("FileCache::StatFs : Not responding to StatFs because max cache size is zero")
+		return nil, false, nil
+	}
+	usage, _ := common.GetUsage(fc.tmpPath)
+	available := maxCacheSize - usage*MB
+
+	// how much space is available on the underlying file system?
+	availableOnCacheFS, err := fc.getAvailableSize()
+	if err != nil {
+		log.Err("FileCache::StatFs : Not responding to StatFs because getAvailableSize failed. Here's why: %v", err)
+		return nil, false, err
+	}
+
+	const blockSize = 4096
+
+	stat := common.Statfs_t{
+		Blocks:  uint64(maxCacheSize) / uint64(blockSize),
+		Bavail:  uint64(max(0, available)) / uint64(blockSize),
+		Bfree:   availableOnCacheFS / uint64(blockSize),
+		Bsize:   blockSize,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  blockSize,
+		Namemax: 255,
+	}
+
+	log.Debug("FileCache::StatFs : responding with free=%d avail=%d blocks=%d (bsize=%d)", stat.Bfree, stat.Bavail, stat.Blocks, stat.Bsize)
+	return &stat, true, nil
+}
+
 // isLocalDirEmpty: Whether or not the local directory is empty.
 func isLocalDirEmpty(path string) bool {
 	f, _ := common.Open(path)
