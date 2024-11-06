@@ -252,7 +252,11 @@ func (c *FileCache) Configure(_ bool) error {
 	}
 
 	err = config.UnmarshalKey("mount-path", &c.mountPath)
-	if err == nil && filepath.Clean(c.mountPath) == filepath.Clean(c.tmpPath) {
+	if err != nil {
+		log.Err("FileCache: config error [unable to obtain Mount Path]")
+		return fmt.Errorf("config error in %s [%s]", c.Name(), err.Error())
+	}
+	if filepath.Clean(c.mountPath) == filepath.Clean(c.tmpPath) {
 		log.Err("FileCache: config error [tmp-path is same as mount path]")
 		return fmt.Errorf("config error in %s error [tmp-path is same as mount path]", c.Name())
 	}

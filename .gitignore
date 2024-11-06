@@ -12,7 +12,7 @@ cfusemon.exe
 adlsgen1fuse
 venv/
 *.backup
-__debug_bin
+__debug_bin*
 .env
 **/var.ps1
 *.prof
@@ -35,3 +35,5 @@ dist/
 **/Output/
 /gui/build/**
 /build/winfsp-*
+component/azstorage/logfile.txt
+.venv/
