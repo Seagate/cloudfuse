@@ -26,7 +26,7 @@ builds:
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
-    
+
   - id: windows-startup
     main: ./tools/windows-startup/main.go
     binary: windows-startup
@@ -41,7 +41,7 @@ builds:
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
-    
+
   - id: windows-health-monitor
     main: ./tools/health-monitor/main.go
     binary: cfusemon
@@ -86,7 +86,7 @@ builds:
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
-  
+
   - id: linux-arm64
     goos:
       - linux
@@ -241,7 +241,7 @@ archives:
         dst: "./samples/sampleStreamingConfigAzure.yaml"
 
 release:
-  extra_files: 
+  extra_files:
     - glob: ./build/Output/cloudfuse_{{.Version}}_windows_amd64.exe
     - glob: ./build/Output/cloudfuse_no_gui_{{.Version}}_windows_amd64.exe
 
@@ -278,7 +278,7 @@ nfpms:
     # GoReleaser will automatically add the binaries.
     contents:
       # Basic file that applies to all packagers
-      - src: './dist/linux-{{ .Arch }}-health-monitor_linux_{{ .Arch }}{{- if eq .Arch "amd64" }}_{{ .Amd64 }}{{- else }}{{ end }}/cfusemon'
+      - src: './dist/linux-{{ .Arch }}-health-monitor_linux_{{ .Arch }}{{- if eq .Arch "amd64" }}_{{ .Amd64 }}{{ end }}/cfusemon'
         dst: /usr/bin/cfusemon
       - src: NOTICE
         dst: /usr/share/doc/cloudfuse/NOTICE
@@ -301,7 +301,7 @@ nfpms:
         dst: /usr/share/applications/cloudfuse.desktop
       - src: "./gui/dist/cloudfuseGUI_Linux/*"
         dst: "/opt/cloudfuse"
-  
+
     overrides:
       deb:
         dependencies:
@@ -345,7 +345,7 @@ nfpms:
     # GoReleaser will automatically add the binaries.
     contents:
       # Basic file that applies to all packagers
-      - src: './dist/linux-{{ .Arch }}-health-monitor_linux_{{ .Arch }}{{- if eq .Arch "amd64" }}_{{ .Amd64 }}{{- else }}{{ end }}/cfusemon'
+      - src: './dist/linux-{{ .Arch }}-health-monitor_linux_{{ .Arch }}{{- if eq .Arch "amd64" }}_{{ .Amd64 }}{{ end }}/cfusemon'
         dst: /usr/bin/cfusemon
       - src: NOTICE
         dst: /usr/share/doc/cloudfuse/NOTICE
@@ -363,7 +363,7 @@ nfpms:
         dst: /usr/share/doc/cloudfuse/examples/sampleStreamingConfigS3.yaml
       - src: sampleStreamingConfigAzure.yaml
         dst: /usr/share/doc/cloudfuse/examples/sampleStreamingConfigAzure.yaml
-  
+
     overrides:
       deb:
         dependencies:

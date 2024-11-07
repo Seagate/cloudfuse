@@ -38,7 +38,7 @@ jobs:
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         run: pip3 install -r gui/requirements.txt
         shell: bash
-      - 
+      -
         name: Install libxcb-cursor0
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit && matrix.os == 'ubuntu-latest' }}
         run: |-
@@ -226,7 +226,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-        
+
       - name: Install Zig
         run: |
           curl -L https://ziglang.org/download/${{ env.zig }}/zig-linux-x86_64-${{ env.zig }}.tar.xz -o zig.tar.xz
@@ -288,6 +288,7 @@ jobs:
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
+          version: '~> v2.3'
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
