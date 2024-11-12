@@ -345,8 +345,8 @@ func (suite *fileCacheTestSuite) TestCreateDir() {
 	err := suite.fileCache.CreateDir(options)
 	suite.assert.NoError(err)
 
-	// Path should not be added to the file cache
-	suite.assert.NoDirExists(filepath.Join(suite.cache_path, path))
+	// Path should be added to the file cache
+	suite.assert.DirExists(filepath.Join(suite.cache_path, path))
 	// Path should be in fake storage
 	suite.assert.DirExists(filepath.Join(suite.fake_storage_path, path))
 }
@@ -1378,8 +1378,8 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanup() {
 	time.Sleep(500 * time.Millisecond)                    // Check once before the cache cleanup that file exists
 	suite.assert.FileExists(suite.cache_path + "/" + dst) // Dst shall exists in cache
 
-	time.Sleep(1 * time.Second)                           // Wait for the cache cleanup to occur
-	suite.assert.FileExists(suite.cache_path + "/" + dst) // Dst shall not exists in cache
+	time.Sleep(1 * time.Second)                             // Wait for the cache cleanup to occur
+	suite.assert.NoFileExists(suite.cache_path + "/" + dst) // Dst shall not exists in cache
 }
 
 func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanupWithNoTimeout() {
