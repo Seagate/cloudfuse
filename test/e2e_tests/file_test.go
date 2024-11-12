@@ -365,7 +365,7 @@ func (suite *fileTestSuite) TestFileGetStat() {
 
 	stat, err := os.Stat(fileName)
 	suite.NoError(err)
-	modTineDiff := time.Now().Sub(stat.ModTime())
+	modTineDiff := time.Since(stat.ModTime())
 
 	suite.False(stat.IsDir())
 	suite.Equal("test", stat.Name())
@@ -494,7 +494,7 @@ func (suite *fileTestSuite) TestLinkWrite() {
 	suite.NoError(err)
 
 	stat, err := os.Stat(targetName)
-	modTineDiff := time.Now().Sub(stat.ModTime())
+	modTineDiff := time.Since(stat.ModTime())
 	suite.NoError(err)
 	suite.LessOrEqual(modTineDiff.Minutes(), float64(1))
 	suite.fileTestCleanup([]string{targetName})

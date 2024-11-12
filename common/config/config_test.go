@@ -155,6 +155,7 @@ func (suite *ConfigTestSuite) TestOverlapShadowConfigReader() {
 	templAppFlag.Changed = true
 	BindPFlag("template.metadata.labels.app", templAppFlag)
 	err = os.Setenv("CF_TEST_TEMPLABELS_APP", "somethingthatshouldnotshowup")
+	assert.NoError(err)
 	BindEnv("template.metadata.labels.app", "CF_TEST_TEMPLABELS_APP")
 
 	err = ReadConfigFromReader(strings.NewReader(specconf))
@@ -306,6 +307,7 @@ func (suite *ConfigTestSuite) TestPlainConfig1Reader() {
 	}{}
 
 	err = Unmarshal(&randOpts)
+	assert.NoError(err)
 	assert.Empty(randOpts)
 }
 
