@@ -354,8 +354,8 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// fetch and process a single result page
 	output, err := paginator.NextPage(context.Background())
 	if err != nil {
-		log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
-		return objectAttrList, nil, err
+		attemptedAction := fmt.Sprintf("list objects in bucket %v with prefix %v", bucketName, prefix)
+		return objectAttrList, nil, parseS3Err(err, attemptedAction)
 	}
 
 	if output.IsTruncated != nil && *output.IsTruncated {
