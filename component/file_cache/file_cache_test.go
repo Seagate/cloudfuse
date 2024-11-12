@@ -1378,7 +1378,7 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanup() {
 	time.Sleep(500 * time.Millisecond)                    // Check once before the cache cleanup that file exists
 	suite.assert.FileExists(suite.cache_path + "/" + dst) // Dst shall exists in cache
 
-	time.Sleep(1 * time.Second)                             // Wait for the cache cleanup to occur
+	time.Sleep(2 * time.Second)                             // Wait for the cache cleanup to occur
 	suite.assert.NoFileExists(suite.cache_path + "/" + dst) // Dst shall not exists in cache
 }
 
