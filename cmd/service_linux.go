@@ -29,6 +29,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"os/user"
@@ -91,8 +92,8 @@ var installCmd = &cobra.Command{
 			// TODO: add useage output upon failure with input
 		}
 
-		configExists := common.DirectoryExists(configPath)
-		if !configExists {
+		_, err = os.Stat(configPath)
+		if errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("error, the configfile path provided does not exist") // TODO: add useage output upon failure with input
 		}
 
