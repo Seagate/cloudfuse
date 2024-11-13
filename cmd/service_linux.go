@@ -60,8 +60,8 @@ var serviceCmd = &cobra.Command{
 
 var installCmd = &cobra.Command{
 	Use:               "install",
-	Short:             "Installs the startup process for Cloudfuse. Requires elevated permissions.",
-	Long:              "Installs the startup process for Cloudfuse which remounts any active previously active mounts on startup. elevated permissions.",
+	Short:             "Installs a service file for a single mount with Cloudfuse. Requires elevated permissions.",
+	Long:              "Installs a service file for a single mount with Cloudfuse which remounts any active previously active mounts on startup. elevated permissions.",
 	SuggestFor:        []string{"ins", "inst"},
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
@@ -74,12 +74,6 @@ var installCmd = &cobra.Command{
 		dir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("error: [%s]", err.Error())
-		}
-
-		// assumes dir is in cloudfuse repo dir
-		serviceData, err := collectServiceData(fmt.Sprintf("%s/setup/cloudfuse.service", dir))
-		if err != nil {
-			return fmt.Errorf("error collecting data from cloudfuse.service file due to the following error: [%s]", err)
 		}
 
 		// TODO: get arguments of cloudfuse service install and pass that to be values written to the service file's config file and mount point paths.
@@ -114,6 +108,11 @@ var installCmd = &cobra.Command{
 
 		// 2. retrieve the newUser account from cloudfuse.service file and create it if it doesn't exist
 
+		// assumes dir is in cloudfuse repo dir
+		serviceData, err := collectServiceData(fmt.Sprintf("%s/setup/cloudfuse.service", dir))
+		if err != nil {
+			return fmt.Errorf("error collecting data from cloudfuse.service file due to the following error: [%s]", err)
+		}
 		serviceUser := serviceData["User"]
 		setUser(serviceUser)
 
