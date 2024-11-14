@@ -97,14 +97,9 @@ var installCmd = &cobra.Command{
 			return fmt.Errorf("error, the configfile path provided does not exist") // TODO: add useage output upon failure with input
 		}
 
-		err = modifySericeFile(mountPath, dir)
+		serviceFile, err := newSericeFile(mountPath, configPath)
 		if err != nil {
-			return fmt.Errorf("error when attempting to write defaults into service file: [%s]", err.Error())
-		}
-
-		err = modifySericeFile(configPath, dir)
-		if err != nil {
-			return fmt.Errorf("error when attempting to write defaults into service file: [%s]", err.Error())
+			return fmt.Errorf("error when attempting to create service file: [%s]", err.Error())
 		}
 
 		// 2. retrieve the newUser account from cloudfuse.service file and create it if it doesn't exist
@@ -118,7 +113,7 @@ var installCmd = &cobra.Command{
 		setUser(serviceUser)
 
 		// 3. copy the cloudfuse.service file to /etc/systemd/system
-		copyFileCmd := exec.Command("sudo", "cp", "./setup/cloudfuse.service", "/etc/systemd/system")
+		copyFileCmd := exec.Command("sudo", "cp", serviceFile, "/etc/systemd/system")
 		err = copyFileCmd.Run()
 		if err != nil {
 			return fmt.Errorf("failed to copy cloudfuse.service file to /etc/systemd/system due to following error: [%s]", err.Error())
@@ -132,7 +127,7 @@ var installCmd = &cobra.Command{
 		}
 
 		// 5. Enable the service to start at system boot
-		systemctlEnableCmd := exec.Command("sudo", "systemctl", "enable", "cloudfuse.service")
+		systemctlEnableCmd := exec.Command("sudo", "systemctl", "enable", serviceFile)
 		err = systemctlEnableCmd.Run()
 		if err != nil {
 			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
@@ -197,7 +192,7 @@ func collectServiceData(serviceFilePath string) (map[string]string, error) {
 	return serviceData, nil
 }
 
-func modifySericeFile(path string, curDir string) error {
+func newSericeFile(mountPath string, configPath string) (string, error) {
 
 	//mountpath or config?
 	var oldString string
@@ -205,28 +200,28 @@ func modifySericeFile(path string, curDir string) error {
 	var config bool
 	var mount bool
 
-	if strings.Contains(path, "config.yaml") {
+	if strings.Contains(configPath, "config.yaml") {
 		oldString = "Environment=ConfigFile=/path/to/config/file/config.yaml"
-		newString = fmt.Sprintf("Environment=ConfigFile=%s/config.yaml", curDir)
+		newString = fmt.Sprintf("Environment=ConfigFile=%s", configPath)
 		config = true
 		mount = false
 	}
 
-	if common.IsDirectoryEmpty(path) {
+	if common.IsDirectoryEmpty(mountPath) {
 		oldString = "Environment=MoutingPoint=/path/to/mounting/point"
-		newString = fmt.Sprintf("Environment=MoutingPoint=%s", path)
+		newString = fmt.Sprintf("Environment=MoutingPoint=%s", mountPath)
 		config = false
 		mount = true
 	}
 
-	// open service file for read write
-	file, err := os.OpenFile("./setup/cloudfuse.service", os.O_RDWR, 0644)
+	// open service defaultFile for read write
+	defaultFile, err := os.OpenFile("./setup/cloudfuse.service", os.O_RDWR, 0644)
 	if err != nil {
-		return fmt.Errorf("Error opening file: [%s]", err.Error())
+		return "", fmt.Errorf("error opening file: [%s]", err.Error())
 	}
-	defer file.Close()
+	defer defaultFile.Close()
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(defaultFile)
 	var lines []string
 
 	// Read the file line by line
@@ -254,34 +249,33 @@ func modifySericeFile(path string, curDir string) error {
 	}
 	// Check for errors during file reading
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("Error reading file: [%s]", err.Error())
+		return "", fmt.Errorf("error reading file: [%s]", err.Error())
 	}
 
-	// Move the file pointer to the start for overwriting
-	file.Seek(0, 0)
+	mountDirs := strings.Split(mountPath, "/")
+	serviceName := mountDirs[len(mountDirs)] + ".service"
+	newFile, err := os.Create(serviceName)
+	if err != nil {
+		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
+	}
+
+	// Open a new file and write all lines to the new file.
 
 	// Create a buffered writer to overwrite the file
-	writer := bufio.NewWriter(file)
+	writer := bufio.NewWriter(newFile)
 
 	// Write the modified lines back to the file
 	for _, line := range lines {
 		_, err := writer.WriteString(line + "\n")
 		if err != nil {
-			return fmt.Errorf("Error writing to file: [%s]", err.Error())
+			return "", fmt.Errorf("error writing to file: [%s]", err.Error())
 		}
-	}
-
-	// Truncate the file to the new size in case the modified content is shorter
-	err = file.Truncate(int64(writer.Buffered()))
-	if err != nil {
-		return fmt.Errorf("Error truncating file: [%s]", err.Error())
-
 	}
 
 	// Flush the buffer to write all data to disk
 	writer.Flush()
 
-	return nil
+	return serviceName, nil
 }
 
 func setUser(serviceUser string) error {
