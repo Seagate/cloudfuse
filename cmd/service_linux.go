@@ -97,7 +97,7 @@ var installCmd = &cobra.Command{
 			return fmt.Errorf("error, the configfile path provided does not exist") // TODO: add useage output upon failure with input
 		}
 
-		serviceFile, err := newSericeFile(mountPath, configPath)
+		serviceFile, err := newSericeFile(mountPath, configPath, dir)
 		if err != nil {
 			return fmt.Errorf("error when attempting to create service file: [%s]", err.Error())
 		}
@@ -111,13 +111,6 @@ var installCmd = &cobra.Command{
 		}
 		serviceUser := serviceData["User"]
 		setUser(serviceUser)
-
-		// 3. copy the cloudfuse.service file to /etc/systemd/system
-		copyFileCmd := exec.Command("sudo", "cp", serviceFile, "/etc/systemd/system")
-		err = copyFileCmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed to copy cloudfuse.service file to /etc/systemd/system due to following error: [%s]", err.Error())
-		}
 
 		// 4. run systemctl daemon-reload
 		systemctlDaemonReloadCmd := exec.Command("sudo", "systemctl", "daemon-reload")
@@ -192,27 +185,17 @@ func collectServiceData(serviceFilePath string) (map[string]string, error) {
 	return serviceData, nil
 }
 
-func newSericeFile(mountPath string, configPath string) (string, error) {
+func newSericeFile(mountPath string, configPath string, dir string) (string, error) {
 
 	//mountpath or config?
 	var oldString string
 	var newString string
-	var config bool
-	var mount bool
 
-	if strings.Contains(configPath, "config.yaml") {
-		oldString = "Environment=ConfigFile=/path/to/config/file/config.yaml"
-		newString = fmt.Sprintf("Environment=ConfigFile=%s", configPath)
-		config = true
-		mount = false
-	}
+	oldConfigStr := "Environment=ConfigFile=/path/to/config/file/config.yaml"
+	newConfigStr := fmt.Sprintf("Environment=ConfigFile=%s", common.JoinUnixFilepath(dir, configPath))
 
-	if common.IsDirectoryEmpty(mountPath) {
-		oldString = "Environment=MoutingPoint=/path/to/mounting/point"
-		newString = fmt.Sprintf("Environment=MoutingPoint=%s", mountPath)
-		config = false
-		mount = true
-	}
+	oldMountStr := "Environment=MoutingPoint=/path/to/mounting/point"
+	newMountStr := fmt.Sprintf("Environment=MoutingPoint=%s", common.JoinUnixFilepath(dir, mountPath))
 
 	// open service defaultFile for read write
 	defaultFile, err := os.OpenFile("./setup/cloudfuse.service", os.O_RDWR, 0644)
@@ -229,12 +212,12 @@ func newSericeFile(mountPath string, configPath string) (string, error) {
 		line := scanner.Text()
 
 		// Check if the line contains the search string
-		if mount && strings.Contains(line, "MoutingPoint") {
+		if strings.Contains(line, "MoutingPoint") {
 			// Modify the line by replacing the old string with the new string
-			line = strings.ReplaceAll(line, oldString, newString)
+			line = strings.ReplaceAll(line, oldMountStr, newMountStr)
 		}
-		if config && strings.Contains(line, "ConfigFile") {
-			line = strings.ReplaceAll(line, oldString, newString)
+		if strings.Contains(line, "ConfigFile") {
+			line = strings.ReplaceAll(line, oldConfigStr, newConfigStr)
 		}
 
 		// add the -o default_permissions if not present
@@ -252,9 +235,8 @@ func newSericeFile(mountPath string, configPath string) (string, error) {
 		return "", fmt.Errorf("error reading file: [%s]", err.Error())
 	}
 
-	mountDirs := strings.Split(mountPath, "/")
-	serviceName := mountDirs[len(mountDirs)] + ".service"
-	newFile, err := os.Create(serviceName)
+	folderList := strings.Split(mountPath, "/")
+	newFile, err := os.Create("/etc/systemd/system/" + folderList[len(folderList)-1] + ".service")
 	if err != nil {
 		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
 	}
