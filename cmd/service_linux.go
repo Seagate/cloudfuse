@@ -157,33 +157,6 @@ var uninstallCmd = &cobra.Command{
 
 //--------------- command section ends
 
-func collectServiceUser(serviceFilePath string) (string, error) {
-	serviceFile, err := os.Open("./setup/cloudfuse.service")
-
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return nil, err
-	}
-
-	defer serviceFile.Close()
-	var serviceUser string
-
-	scanner := bufio.NewScanner(serviceFile)
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if strings.Contains(line, "User=") {
-			parts := strings.SplitN(line, "=", 2)
-			serviceUser = strings.TrimSpace(parts[1])
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		fmt.Println("Error reading file:", err)
-		return nil, err
-	}
-	return serviceUser, nil
-}
-
 func newServiceFile(mountPath string, configPath string, dir string) (string, error) {
 
 	//mountpath or config?
@@ -258,6 +231,33 @@ func newServiceFile(mountPath string, configPath string, dir string) (string, er
 	writer.Flush()
 
 	return serviceName, nil
+}
+
+func collectServiceUser(serviceFilePath string) (string, error) {
+	serviceFile, err := os.Open("./setup/cloudfuse.service")
+
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return nil, err
+	}
+
+	defer serviceFile.Close()
+	var serviceUser string
+
+	scanner := bufio.NewScanner(serviceFile)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if strings.Contains(line, "User=") {
+			parts := strings.SplitN(line, "=", 2)
+			serviceUser = strings.TrimSpace(parts[1])
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Println("Error reading file:", err)
+		return nil, err
+	}
+	return serviceUser, nil
 }
 
 func setUser(serviceUser string) error {
