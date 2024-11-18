@@ -843,7 +843,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 		}
 
 		// Open the file in write mode.
-		f, err = common.OpenFile(localPath, flags, fMode)
+		f, err = common.OpenFile(localPath, os.O_CREATE|os.O_RDWR, fMode)
 		if err != nil {
 			log.Err("FileCache::downloadFile : error creating new file %s [%s]", handle.Path, err.Error())
 			return err
@@ -965,10 +965,12 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	// create handle and record openFileOptions for later
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetValue("openFileOptions", openFileOptions{flags: options.Flags, fMode: options.Mode})
-	// Increment the handle count in this lock item as there is one handle open for this now
+
 	if options.Flags&os.O_APPEND != 0 {
 		handle.Flags.Set(handlemap.HandleOpenedAppend)
 	}
+
+	// Increment the handle count in this lock item as there is one handle open for this now
 	flock.Inc()
 
 	return handle, nil
