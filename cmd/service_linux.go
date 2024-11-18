@@ -97,7 +97,7 @@ var installCmd = &cobra.Command{
 			return fmt.Errorf("error, the configfile path provided does not exist") // TODO: add useage output upon failure with input
 		}
 
-		serviceFile, err := newSericeFile(mountPath, configPath, dir)
+		serviceFile, err := newServiceFile(mountPath, configPath, dir)
 		if err != nil {
 			return fmt.Errorf("error when attempting to create service file: [%s]", err.Error())
 		}
@@ -157,7 +157,7 @@ var uninstallCmd = &cobra.Command{
 
 //--------------- command section ends
 
-func collectServiceData(serviceFilePath string) (map[string]string, error) {
+func collectServiceUser(serviceFilePath string) (string, error) {
 	serviceFile, err := os.Open("./setup/cloudfuse.service")
 
 	if err != nil {
@@ -166,26 +166,25 @@ func collectServiceData(serviceFilePath string) (map[string]string, error) {
 	}
 
 	defer serviceFile.Close()
+	var serviceUser string
 
 	scanner := bufio.NewScanner(serviceFile)
-	serviceData := make(map[string]string)
 	for scanner.Scan() {
 		line := scanner.Text()
+
 		if strings.Contains(line, "User=") {
 			parts := strings.SplitN(line, "=", 2)
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-			serviceData[key] = value
+			serviceUser = strings.TrimSpace(parts[1])
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Println("Error reading file:", err)
 		return nil, err
 	}
-	return serviceData, nil
+	return serviceUser, nil
 }
 
-func newSericeFile(mountPath string, configPath string, dir string) (string, error) {
+func newServiceFile(mountPath string, configPath string, dir string) (string, error) {
 
 	//mountpath or config?
 	var oldString string
@@ -236,7 +235,8 @@ func newSericeFile(mountPath string, configPath string, dir string) (string, err
 	}
 
 	folderList := strings.Split(mountPath, "/")
-	newFile, err := os.Create("/etc/systemd/system/" + folderList[len(folderList)-1] + ".service")
+	serviceName := folderList[len(folderList)-1] + ".service"
+	newFile, err := os.Create("/etc/systemd/system/" + serviceName)
 	if err != nil {
 		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
 	}
