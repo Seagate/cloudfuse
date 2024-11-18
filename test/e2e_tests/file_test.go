@@ -254,6 +254,34 @@ func (suite *fileTestSuite) TestFileCreateLabel() {
 	suite.fileTestCleanup([]string{fileName})
 }
 
+func (suite *fileTestSuite) TestFileAppend() {
+	fileName := filepath.Join(suite.testPath, "append_test.txt")
+	initialContent := []byte("Initial content\n")
+	appendContent := []byte("Appended content\n")
+
+	// Create and write initial content to the file
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0777)
+	suite.NoError(err)
+	_, err = srcFile.Write(initialContent)
+	suite.NoError(err)
+	srcFile.Close()
+
+	// Open the file with O_APPEND and append new content
+	appendFile, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0777)
+	suite.NoError(err)
+	_, err = appendFile.Write(appendContent)
+	suite.NoError(err)
+	appendFile.Close()
+
+	// Read the file and verify the content
+	data, err := os.ReadFile(fileName)
+	suite.NoError(err)
+	expectedContent := append(initialContent, appendContent...)
+	suite.Equal(expectedContent, data)
+
+	suite.fileTestCleanup([]string{fileName})
+}
+
 // # Write a small file
 func (suite *fileTestSuite) TestFileWriteSmall() {
 	fileName := filepath.Join(suite.testPath, "small_write.txt")

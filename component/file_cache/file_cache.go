@@ -965,6 +965,11 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	// create handle and record openFileOptions for later
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetValue("openFileOptions", openFileOptions{flags: options.Flags, fMode: options.Mode})
+
+	if options.Flags&os.O_APPEND != 0 {
+		handle.Flags.Set(handlemap.HandleOpenedAppend)
+	}
+
 	// Increment the handle count in this lock item as there is one handle open for this now
 	flock.Inc()
 
@@ -1117,7 +1122,13 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	// Removing Pwrite as it is not supported on Windows
 	// bytesWritten, err := syscall.Pwrite(options.Handle.FD(), options.Data, options.Offset)
-	bytesWritten, err := f.WriteAt(options.Data, options.Offset)
+
+	var bytesWritten int
+	if options.Handle.Flags.IsSet(handlemap.HandleOpenedAppend) {
+		bytesWritten, err = f.Write(options.Data)
+	} else {
+		bytesWritten, err = f.WriteAt(options.Data, options.Offset)
+	}
 
 	if err == nil {
 		// Mark the handle dirty so the file is written back to storage on FlushFile.
