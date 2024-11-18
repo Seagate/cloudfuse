@@ -43,10 +43,11 @@ const InvalidHandleID HandleID = 0
 
 // Flags represented in BitMap for various flags in the handle
 const (
-	HandleFlagUnknown uint16 = iota
-	HandleFlagDirty          // File has been modified with write operation or is a new file
-	HandleFlagFSynced        // User has called fsync on the file explicitly
-	HandleFlagCached         // File is cached in the local system by cloudfuse
+	HandleFlagUnknown  uint16 = iota
+	HandleFlagDirty           // File has been modified with write operation or is a new file
+	HandleFlagFSynced         // User has called fsync on the file explicitly
+	HandleFlagCached          // File is cached in the local system by cloudfuse
+	HandleOpenedAppend        // File is opened for Append
 )
 
 // Structure to hold in memory cache for streaming layer
