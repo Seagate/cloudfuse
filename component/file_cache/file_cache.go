@@ -843,7 +843,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 		}
 
 		// Open the file in write mode.
-		f, err = common.OpenFile(localPath, os.O_CREATE|os.O_RDWR, fMode)
+		f, err = common.OpenFile(localPath, flags, fMode)
 		if err != nil {
 			log.Err("FileCache::downloadFile : error creating new file %s [%s]", handle.Path, err.Error())
 			return err
@@ -966,6 +966,9 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetValue("openFileOptions", openFileOptions{flags: options.Flags, fMode: options.Mode})
 	// Increment the handle count in this lock item as there is one handle open for this now
+	if options.Flags&os.O_APPEND != 0 {
+		handle.Flags.Set(handlemap.HandleOpenedAppend)
+	}
 	flock.Inc()
 
 	return handle, nil
@@ -1117,7 +1120,13 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	// Removing Pwrite as it is not supported on Windows
 	// bytesWritten, err := syscall.Pwrite(options.Handle.FD(), options.Data, options.Offset)
-	bytesWritten, err := f.WriteAt(options.Data, options.Offset)
+
+	var bytesWritten int
+	if options.Handle.Flags.IsSet(handlemap.HandleOpenedAppend) {
+		bytesWritten, err = f.Write(options.Data)
+	} else {
+		bytesWritten, err = f.WriteAt(options.Data, options.Offset)
+	}
 
 	if err == nil {
 		// Mark the handle dirty so the file is written back to storage on FlushFile.
