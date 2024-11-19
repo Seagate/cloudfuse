@@ -1,5 +1,82 @@
 # Cloudfuse Changelog #
 
+## **1.7.1** ##
+
+November 8th 2024
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#364](https://github.com/Seagate/cloudfuse/pull/364) Fix daemon issue on builds with golang 1.23.2
+
+## **1.7.0** ##
+
+November 6th 2024
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#358](https://github.com/Seagate/cloudfuse/pull/358) Use Lyve Cloud bucket size by default for StatFs
+
+### Bug Fixes ###
+
+- [#358](https://github.com/Seagate/cloudfuse/pull/358) Fix StatFs used capacity math bug in file cache
+
+## **1.6.1** ##
+
+October 31st 2024
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#354](https://github.com/Seagate/cloudfuse/pull/354) Fix cloudfuse naming in gui to be consistent
+- [#352](https://github.com/Seagate/cloudfuse/pull/352) Properly pass settings and default use in get configs when config file does not exist
+- [#349](https://github.com/Seagate/cloudfuse/pull/349) Bump pyside6 from 6.8.0 to 6.8.0.2 to fix GUI issues for Ubuntu 24.04
+- [#343](https://github.com/Seagate/cloudfuse/pull/343) Change save button behavior in widgets
+
+## **1.6.0** ##
+
+October 22nd 2024
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#312](https://github.com/Seagate/cloudfuse/pull/312) Add option to set mount display capacity
+- [#342](https://github.com/Seagate/cloudfuse/pull/342) Update default endpoint to LC2 (sv15.lyve) and improve error handling when connecting to Lyve Cloud
+
+### Bug Fixes ###
+
+- [#323](https://github.com/Seagate/cloudfuse/pull/323) Don't evict open files
+- [#317](https://github.com/Seagate/cloudfuse/pull/317) When renaming a directory, don't delete the local copy of its contents
+
+## **1.5.0** ##
+
+August 28th 2024
+This version is based on [blobfuse2 2.3.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.0) (upstream).
+
+### Changes ###
+
+- [#307](https://github.com/Seagate/cloudfuse/pull/307) Allow all users to write to the mount by default (Windows only)
+- [#309](https://github.com/Seagate/cloudfuse/pull/309) Uninstaller now removes WinFSP (Windows only)
+
+## **1.4.0** ##
+
+August 7th 2024
+This version is based on [blobfuse2 2.3.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.0) (upstream).
+
+### Changes ###
+
+- [#297](https://github.com/Seagate/cloudfuse/pull/297) Add installation without GUI front-end
+
+## **1.3.2** ##
+
+July 23th 2024
+This version is based on [blobfuse2 2.3.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.0) (upstream).
+
+### Bug Fixes ###
+
+- [#294](https://github.com/Seagate/cloudfuse/pull/294) Fix setting system path on Windows install
+
 ## **1.3.1** ##
 
 July 11th 2024

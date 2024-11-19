@@ -133,10 +133,9 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 1)
 
-	_, err = os.Stat(fileName)
-	suite.NoError(err)
+	suite.FileExists(fileName)
 
 	files, err := os.ReadDir(suite.testPath)
 	suite.NoError(err)
@@ -161,10 +160,9 @@ func (suite *fileTestSuite) TestFileCreateEncodeChar() {
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 1)
 
-	_, err = os.Stat(fileName)
-	suite.NoError(err)
+	suite.FileExists(fileName)
 
 	files, err := os.ReadDir(suite.testPath)
 	suite.NoError(err)
@@ -202,10 +200,9 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 	srcFile, err = os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 1)
 
-	_, err = os.Stat(fileName)
-	suite.NoError(err)
+	suite.FileExists(fileName)
 
 	files, err := os.ReadDir(speclDirName)
 	suite.NoError(err)
@@ -253,6 +250,34 @@ func (suite *fileTestSuite) TestFileCreateLabel() {
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
+
+	suite.fileTestCleanup([]string{fileName})
+}
+
+func (suite *fileTestSuite) TestFileAppend() {
+	fileName := filepath.Join(suite.testPath, "append_test.txt")
+	initialContent := []byte("Initial content\n")
+	appendContent := []byte("Appended content\n")
+
+	// Create and write initial content to the file
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0777)
+	suite.NoError(err)
+	_, err = srcFile.Write(initialContent)
+	suite.NoError(err)
+	srcFile.Close()
+
+	// Open the file with O_APPEND and append new content
+	appendFile, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0777)
+	suite.NoError(err)
+	_, err = appendFile.Write(appendContent)
+	suite.NoError(err)
+	appendFile.Close()
+
+	// Read the file and verify the content
+	data, err := os.ReadFile(fileName)
+	suite.NoError(err)
+	expectedContent := append(initialContent, appendContent...)
+	suite.Equal(expectedContent, data)
 
 	suite.fileTestCleanup([]string{fileName})
 }
@@ -364,7 +389,7 @@ func (suite *fileTestSuite) TestFileGetStat() {
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 1)
 
 	stat, err := os.Stat(fileName)
 	suite.NoError(err)

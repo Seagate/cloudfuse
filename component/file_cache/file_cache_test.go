@@ -26,11 +26,16 @@
 package file_cache
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"fmt"
+	"io/fs"
+	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -56,8 +61,8 @@ type fileCacheTestSuite struct {
 	assert            *assert.Assertions
 	fileCache         *FileCache
 	loopback          internal.Component
-	cache_path        string
-	fake_storage_path string
+	cache_path        string // uses os.Separator (filepath.Join)
+	fake_storage_path string // uses os.Separator (filepath.Join)
 }
 
 func newLoopbackFS() internal.Component {
@@ -91,8 +96,8 @@ func (suite *fileCacheTestSuite) SetupTest() {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 	rand := randomString(8)
-	suite.cache_path = common.JoinUnixFilepath(home_dir, "file_cache"+rand)
-	suite.fake_storage_path = common.JoinUnixFilepath(home_dir, "fake_storage"+rand)
+	suite.cache_path = filepath.Join(home_dir, "file_cache"+rand)
+	suite.fake_storage_path = filepath.Join(home_dir, "fake_storage"+rand)
 	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 0\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
 	log.Debug(defaultConfig)
 
@@ -170,7 +175,7 @@ func (suite *fileCacheTestSuite) TestEmpty() {
 func (suite *fileCacheTestSuite) TestConfig() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // teardown the default file cache generated
-	policy := "lfu"
+	policy := "lru"
 	maxSizeMb := 1024
 	cacheTimeout := 60
 	maxDeletion := 10
@@ -188,10 +193,10 @@ func (suite *fileCacheTestSuite) TestConfig() {
 	suite.assert.Equal(suite.fileCache.tmpPath, suite.cache_path)
 	suite.assert.Equal(suite.fileCache.policy.Name(), policy)
 
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).maxSizeMB, maxSizeMb)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).maxEviction, maxDeletion)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).highThreshold, highThreshold)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).lowThreshold, lowThreshold)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).maxSizeMB, maxSizeMb)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).maxEviction, maxDeletion)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).highThreshold, highThreshold)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).lowThreshold, lowThreshold)
 
 	suite.assert.Equal(suite.fileCache.createEmptyFile, createEmptyFile)
 	suite.assert.Equal(suite.fileCache.allowNonEmpty, allowNonEmptyTemp)
@@ -200,10 +205,47 @@ func (suite *fileCacheTestSuite) TestConfig() {
 	suite.assert.Equal(suite.fileCache.syncToFlush, syncToFlush)
 }
 
+func (suite *fileCacheTestSuite) TestDefaultCacheSize() {
+	defer suite.cleanupTest()
+	// Setup
+	config := fmt.Sprintf("file_cache:\n  path: %s\n", suite.cache_path)
+	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+	var freeDisk int
+	if runtime.GOOS == "windows" {
+		cmd := exec.Command("fsutil", "volume", "diskfree", suite.cache_path)
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		err := cmd.Run()
+		suite.assert.NoError(err)
+
+		output := out.String()
+		re := regexp.MustCompile(`Total free bytes\s+:\s+([\d,]+)`)
+		matches := re.FindStringSubmatch(output)
+		suite.assert.GreaterOrEqual(len(matches), 2)
+		totalFreeBytesStr := strings.ReplaceAll(matches[1], ",", "")
+		freeDisk, err = strconv.Atoi(totalFreeBytesStr)
+		suite.assert.NoError(err)
+	} else {
+		cmd := exec.Command("bash", "-c", fmt.Sprintf("df -B1 %s | awk 'NR==2{print $4}'", suite.cache_path))
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		err := cmd.Run()
+		fmt.Println(err)
+		suite.assert.NoError(err)
+		freeDisk, err = strconv.Atoi(strings.TrimSpace(out.String()))
+		suite.assert.NoError(err)
+	}
+	expected := uint64(0.8 * float64(freeDisk))
+	actual := suite.fileCache.maxCacheSize
+	difference := math.Abs(float64(actual) - float64(expected))
+	tolerance := 0.10 * float64(math.Max(float64(actual), float64(expected)))
+	suite.assert.LessOrEqual(difference, tolerance, "mssg:", actual, expected)
+}
+
 func (suite *fileCacheTestSuite) TestConfigPolicyTimeout() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // teardown the default file cache generated
-	policy := "lfu"
+	policy := "lru"
 	maxSizeMb := 1024
 	cacheTimeout := 60
 	maxDeletion := 10
@@ -220,11 +262,11 @@ func (suite *fileCacheTestSuite) TestConfigPolicyTimeout() {
 	suite.assert.Equal(suite.fileCache.tmpPath, suite.cache_path)
 	suite.assert.Equal(suite.fileCache.policy.Name(), policy)
 
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).maxSizeMB, maxSizeMb)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).maxEviction, maxDeletion)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).highThreshold, highThreshold)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).lowThreshold, lowThreshold)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).cacheTimeout, cacheTimeout)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).maxSizeMB, maxSizeMb)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).maxEviction, maxDeletion)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).highThreshold, highThreshold)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).lowThreshold, lowThreshold)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).cacheTimeout, cacheTimeout)
 
 	suite.assert.Equal(suite.fileCache.createEmptyFile, createEmptyFile)
 	suite.assert.Equal(suite.fileCache.allowNonEmpty, allowNonEmptyTemp)
@@ -235,7 +277,7 @@ func (suite *fileCacheTestSuite) TestConfigPolicyTimeout() {
 func (suite *fileCacheTestSuite) TestConfigPolicyDefaultTimeout() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // teardown the default file cache generated
-	policy := "lfu"
+	policy := "lru"
 	maxSizeMb := 1024
 	cacheTimeout := defaultFileCacheTimeout
 	maxDeletion := 10
@@ -252,11 +294,11 @@ func (suite *fileCacheTestSuite) TestConfigPolicyDefaultTimeout() {
 	suite.assert.Equal(suite.fileCache.tmpPath, suite.cache_path)
 	suite.assert.Equal(suite.fileCache.policy.Name(), policy)
 
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).maxSizeMB, maxSizeMb)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).maxEviction, maxDeletion)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).highThreshold, highThreshold)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).lowThreshold, lowThreshold)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).cacheTimeout, cacheTimeout)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).maxSizeMB, maxSizeMb)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).maxEviction, maxDeletion)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).highThreshold, highThreshold)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).lowThreshold, lowThreshold)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).cacheTimeout, cacheTimeout)
 
 	suite.assert.Equal(suite.fileCache.createEmptyFile, createEmptyFile)
 	suite.assert.Equal(suite.fileCache.allowNonEmpty, allowNonEmptyTemp)
@@ -267,7 +309,7 @@ func (suite *fileCacheTestSuite) TestConfigPolicyDefaultTimeout() {
 func (suite *fileCacheTestSuite) TestConfigZero() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // teardown the default file cache generated
-	policy := "lfu"
+	policy := "lru"
 	maxSizeMb := 1024
 	cacheTimeout := 0
 	maxDeletion := 10
@@ -284,10 +326,10 @@ func (suite *fileCacheTestSuite) TestConfigZero() {
 	suite.assert.Equal(suite.fileCache.tmpPath, suite.cache_path)
 	suite.assert.Equal(suite.fileCache.policy.Name(), policy)
 
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).maxSizeMB, maxSizeMb)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).maxEviction, maxDeletion)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).highThreshold, highThreshold)
-	suite.assert.EqualValues(suite.fileCache.policy.(*lfuPolicy).lowThreshold, lowThreshold)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).maxSizeMB, maxSizeMb)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).maxEviction, maxDeletion)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).highThreshold, highThreshold)
+	suite.assert.EqualValues(suite.fileCache.policy.(*lruPolicy).lowThreshold, lowThreshold)
 
 	suite.assert.Equal(suite.fileCache.createEmptyFile, createEmptyFile)
 	suite.assert.Equal(suite.fileCache.allowNonEmpty, allowNonEmptyTemp)
@@ -304,11 +346,9 @@ func (suite *fileCacheTestSuite) TestCreateDir() {
 	suite.assert.NoError(err)
 
 	// Path should not be added to the file cache
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoDirExists(filepath.Join(suite.cache_path, path))
 	// Path should be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.DirExists(filepath.Join(suite.fake_storage_path, path))
 }
 
 func (suite *fileCacheTestSuite) TestDeleteDir() {
@@ -336,7 +376,10 @@ func (suite *fileCacheTestSuite) TestDeleteDir() {
 	// Delete the directory
 	err = suite.fileCache.DeleteDir(internal.DeleteDirOptions{Name: dir})
 	suite.assert.NoError(err)
-	suite.assert.False(suite.fileCache.policy.IsCached(dir)) // Directory should not be cached
+	// wait for asynchronous deletion
+	time.Sleep(100 * time.Millisecond)
+	// Directory should not be cached
+	suite.assert.NoDirExists(filepath.Join(suite.cache_path, dir))
 }
 
 func (suite *fileCacheTestSuite) TestStreamDirError() {
@@ -494,8 +537,9 @@ func (suite *fileCacheTestSuite) TestStreamDirMixed() {
 
 func (suite *fileCacheTestSuite) TestFileUsed() {
 	defer suite.cleanupTest()
-	suite.fileCache.FileUsed("temp")
-	suite.fileCache.policy.IsCached("temp")
+	err := suite.fileCache.FileUsed("temp")
+	suite.assert.NoError(err)
+	suite.assert.True(suite.fileCache.policy.IsCached(filepath.Join(suite.cache_path, "temp")))
 }
 
 // File cache does not have CreateDir Method implemented hence results are undefined here
@@ -555,17 +599,20 @@ func (suite *fileCacheTestSuite) TestRenameDir() {
 	}
 	// The file (and directory) is in the cache and storage (see TestCreateFileInDirCreateEmptyFile)
 
-	// Delete the directory
+	// Rename the directory
 	err = suite.fileCache.RenameDir(internal.RenameDirOptions{Src: src, Dst: dst})
 	suite.assert.NoError(err)
-	suite.assert.False(suite.fileCache.policy.IsCached(src)) // Directory should not be cached
 	// wait for asynchronous deletion
-	time.Sleep(1 * time.Second)
-	// directory should not exist in local filesystem
-	fInfo, err := os.Stat(filepath.Join(suite.cache_path, src))
-	suite.assert.Nil(fInfo)
-	suite.assert.Error(err)
-	suite.assert.True(os.IsNotExist(err))
+	time.Sleep(100 * time.Millisecond)
+	// src directory should not exist in local filesystem
+	suite.assert.NoDirExists(filepath.Join(suite.cache_path, src))
+	// dst directory should exist and have contents from src
+	dstEntries, err := os.ReadDir(filepath.Join(suite.cache_path, dst))
+	suite.assert.NoError(err)
+	suite.assert.Len(dstEntries, 5)
+	for i, entry := range dstEntries {
+		suite.assert.Equal("file"+strconv.Itoa(i), entry.Name())
+	}
 }
 
 func (suite *fileCacheTestSuite) TestCreateFile() {
@@ -578,11 +625,89 @@ func (suite *fileCacheTestSuite) TestCreateFile() {
 	suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
 
 	// Path should be added to the file cache
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 	// Path should not be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
+}
+
+func (suite *fileCacheTestSuite) TestCreateFileWithNoPerm() {
+	if runtime.GOOS == "windows" {
+		defer suite.cleanupTest()
+		// Default is to not create empty files on create file to support immutable storage.
+		path := "file1"
+		options := internal.CreateFileOptions{Name: path, Mode: 0444}
+		f, err := suite.fileCache.CreateFile(options)
+		suite.assert.NoError(err)
+		suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in storage
+
+		// Path should be added to the file cache
+		suite.assert.FileExists(suite.cache_path + "/" + path)
+		// Path should not be in fake storage
+		suite.assert.NoFileExists(suite.fake_storage_path + "/" + path)
+		err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
+		suite.assert.NoError(err)
+		info, _ := os.Stat(suite.cache_path + "/" + path)
+		suite.assert.Equal(info.Mode(), os.FileMode(0444))
+	} else {
+		defer suite.cleanupTest()
+		// Default is to not create empty files on create file to support immutable storage.
+		path := "file1"
+		options := internal.CreateFileOptions{Name: path, Mode: 0000}
+		f, err := suite.fileCache.CreateFile(options)
+		suite.assert.NoError(err)
+		suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in storage
+
+		// Path should be added to the file cache
+		suite.assert.FileExists(suite.cache_path + "/" + path)
+		// Path should not be in fake storage
+		suite.assert.NoFileExists(suite.fake_storage_path + "/" + path)
+		err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
+		suite.assert.NoError(err)
+		info, _ := os.Stat(suite.cache_path + "/" + path)
+		suite.assert.Equal(info.Mode(), os.FileMode(0000))
+	}
+}
+
+func (suite *fileCacheTestSuite) TestCreateFileWithWritePerm() {
+	if runtime.GOOS == "windows" {
+		defer suite.cleanupTest()
+		// Default is to not create empty files on create file to support immutable storage.
+		path := "file1"
+		options := internal.CreateFileOptions{Name: path, Mode: 0444}
+		f, err := suite.fileCache.CreateFile(options)
+		suite.assert.NoError(err)
+		suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in storage
+
+		os.Chmod(suite.cache_path+"/"+path, 0666)
+
+		// Path should be added to the file cache
+		suite.assert.FileExists(suite.cache_path + "/" + path)
+		// Path should not be in fake storage
+		suite.assert.NoFileExists(suite.fake_storage_path + "/" + path)
+		err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
+		suite.assert.NoError(err)
+		info, _ := os.Stat(suite.cache_path + "/" + path)
+		suite.assert.Equal(info.Mode(), fs.FileMode(0666))
+	} else {
+		defer suite.cleanupTest()
+		// Default is to not create empty files on create file to support immutable storage.
+		path := "file1"
+		options := internal.CreateFileOptions{Name: path, Mode: 0222}
+		f, err := suite.fileCache.CreateFile(options)
+		suite.assert.NoError(err)
+		suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in storage
+
+		os.Chmod(suite.cache_path+"/"+path, 0331)
+
+		// Path should be added to the file cache
+		suite.assert.FileExists(suite.cache_path + "/" + path)
+		// Path should not be in fake storage
+		suite.assert.NoFileExists(suite.fake_storage_path + "/" + path)
+		err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
+		suite.assert.NoError(err)
+		info, _ := os.Stat(suite.cache_path + "/" + path)
+		suite.assert.Equal(info.Mode(), fs.FileMode(0331))
+	}
 }
 
 func (suite *fileCacheTestSuite) TestCreateFileInDir() {
@@ -596,13 +721,10 @@ func (suite *fileCacheTestSuite) TestCreateFileInDir() {
 	suite.assert.True(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
 
 	// Path should be added to the file cache, including directory
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, dir))
-	suite.assert.True(err == nil || os.IsExist(err))
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.DirExists(filepath.Join(suite.cache_path, dir))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 	// Path should not be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
 func (suite *fileCacheTestSuite) TestCreateFileCreateEmptyFile() {
@@ -620,11 +742,9 @@ func (suite *fileCacheTestSuite) TestCreateFileCreateEmptyFile() {
 	suite.assert.False(f.Dirty()) // Handle should not be dirty since it was written to storage
 
 	// Path should be added to the file cache
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 	// Path should be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
 func (suite *fileCacheTestSuite) TestCreateFileInDirCreateEmptyFile() {
@@ -643,15 +763,11 @@ func (suite *fileCacheTestSuite) TestCreateFileInDirCreateEmptyFile() {
 	suite.assert.False(f.Dirty()) // Handle should be dirty since it was not created in cloud storage
 
 	// Path should be added to the file cache, including directory
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, dir))
-	suite.assert.True(err == nil || os.IsExist(err))
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.DirExists(filepath.Join(suite.cache_path, dir))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 	// Path should be in fake storage, including directory
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, dir))
-	suite.assert.True(err == nil || os.IsExist(err))
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.DirExists(filepath.Join(suite.fake_storage_path, dir))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
 func (suite *fileCacheTestSuite) TestSyncFile() {
@@ -679,8 +795,7 @@ func (suite *fileCacheTestSuite) TestSyncFile() {
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// Path should not be in file cache
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
 
 	path = "file.fsync"
 	suite.fileCache.syncToFlush = true
@@ -692,8 +807,7 @@ func (suite *fileCacheTestSuite) TestSyncFile() {
 	err = suite.fileCache.SyncFile(internal.SyncFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
-	_, err = os.Stat(suite.fake_storage_path + "/" + path)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 }
@@ -711,11 +825,9 @@ func (suite *fileCacheTestSuite) TestDeleteFile() {
 	suite.assert.NoError(err)
 
 	// Path should not be in file cache
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
 	// Path should not be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
 // Case 2 Test cover when the file does not exist in cloud storage but it exists in the local cache.
@@ -731,11 +843,9 @@ func (suite *fileCacheTestSuite) TestDeleteFileCase2() {
 	suite.assert.Equal(syscall.EIO, err)
 
 	// Path should not be in local cache (since we failed the operation)
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 	// Path should not be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
 func (suite *fileCacheTestSuite) TestDeleteFileError() {
@@ -756,17 +866,12 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// loop until file does not exist - done due to async nature of eviction
-	_, err := os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
-		time.Sleep(time.Second)
-		_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
+	_, err := os.Stat(filepath.Join(suite.cache_path, path))
+	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
+		_, err = os.Stat(filepath.Join(suite.cache_path, path))
 	}
-	// TODO: find out why this delayed eviction check fails in CI on Windows sometimes
-	if runtime.GOOS == "windows" {
-		fmt.Println("Skipping TestOpenFileNotInCache eviction check on Windows (flaky)")
-	} else {
-		suite.assert.True(os.IsNotExist(err))
-	}
+	suite.assert.True(os.IsNotExist(err))
 
 	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
@@ -777,8 +882,7 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	suite.assert.False(handle.Dirty())
 
 	// File should exist in cache
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 }
 
 func (suite *fileCacheTestSuite) TestOpenFileInCache() {
@@ -797,8 +901,7 @@ func (suite *fileCacheTestSuite) TestOpenFileInCache() {
 	suite.assert.False(handle.Dirty())
 
 	// File should exist in cache
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 }
 
 // Tests for GetProperties in OpenFile should be done in E2E tests
@@ -817,26 +920,23 @@ func (suite *fileCacheTestSuite) TestCloseFile() {
 	suite.assert.NoError(err)
 
 	// loop until file does not exist - done due to async nature of eviction
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
-		time.Sleep(time.Second)
-		_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
+	_, err = os.Stat(filepath.Join(suite.cache_path, path))
+	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
+		_, err = os.Stat(filepath.Join(suite.cache_path, path))
 	}
 	suite.assert.True(os.IsNotExist(err))
 
-	suite.assert.False(suite.fileCache.policy.IsCached(path)) // File should be invalidated
 	// File should not be in cache
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
 	// File should be in cloud storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
 func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // teardown the default file cache generated
-	cacheTimeout := 5
+	cacheTimeout := 1
 	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, cacheTimeout, suite.fake_storage_path)
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
@@ -849,29 +949,79 @@ func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
 	// CloseFile
 	err := suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
-	suite.assert.False(suite.fileCache.policy.IsCached(path)) // File should be invalidated
 
 	// File should be in cache
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 	// File should be in cloud storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
 
 	// loop until file does not exist - done due to async nature of eviction
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	for i := 0; i < (cacheTimeout*3) && !os.IsNotExist(err); i++ {
-		time.Sleep(time.Second)
-		_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
+	_, err = os.Stat(filepath.Join(suite.cache_path, path))
+	for i := 0; i < (cacheTimeout*300) && !os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
+		_, err = os.Stat(filepath.Join(suite.cache_path, path))
 	}
 
 	// File should not be in cache
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(os.IsNotExist(err))
-
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
+	// File should be invalidated
+	suite.assert.False(suite.fileCache.policy.IsCached(filepath.Join(suite.cache_path, path)))
 	// File should be in cloud storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
+}
+
+func (suite *fileCacheTestSuite) TestOpenCloseHandleCount() {
+	defer suite.cleanupTest()
+	// Setup
+	file := "file11"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	// check that flock handle count is correct
+	flock := suite.fileCache.fileLocks.Get(file)
+	suite.assert.Zero(flock.Count())
+}
+
+func (suite *fileCacheTestSuite) TestOpenPreventsEviction() {
+	defer suite.cleanupTest()
+	// Setup
+	suite.cleanupTest() // teardown the default file cache generated
+	cacheTimeout := 1
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, cacheTimeout, suite.fake_storage_path)
+	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+
+	path := "file12"
+
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.assert.NoError(err)
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+	// File should be in cache and cloud storage
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
+
+	// Open file (this should prevent eviction)
+	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	suite.assert.NoError(err)
+
+	// wait until file would be evicted (if not for being opened)
+	time.Sleep(time.Second * time.Duration(cacheTimeout*3))
+
+	// File should still be in cache
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	suite.assert.True(suite.fileCache.policy.IsCached(filepath.Join(suite.cache_path, path)))
+
+	// cleanup
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
 }
 
 func (suite *fileCacheTestSuite) TestReadInBufferEmpty() {
@@ -949,7 +1099,7 @@ func (suite *fileCacheTestSuite) TestWriteFile() {
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(len(data), length)
 	// Check that the local cache updated with data
-	d, _ := os.ReadFile(common.JoinUnixFilepath(suite.cache_path, file))
+	d, _ := os.ReadFile(filepath.Join(suite.cache_path, file))
 	suite.assert.EqualValues(data, d)
 	suite.assert.True(handle.Dirty())
 }
@@ -972,17 +1122,15 @@ func (suite *fileCacheTestSuite) TestFlushFileEmpty() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 
 	// Path should not be in fake storage
-	_, err := os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, file))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
 
 	// Flush the Empty File
-	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
+	err := suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
 
 	// Path should be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, file))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
 }
 
 func (suite *fileCacheTestSuite) TestFlushFile() {
@@ -995,19 +1143,17 @@ func (suite *fileCacheTestSuite) TestFlushFile() {
 	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 
 	// Path should not be in fake storage
-	_, err := os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, file))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
 
 	// Flush the Empty File
-	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
+	err := suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
 
 	// Path should be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, file))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
 	// Check that fake_storage updated with data
-	d, _ := os.ReadFile(common.JoinUnixFilepath(suite.fake_storage_path, file))
+	d, _ := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
 	suite.assert.EqualValues(data, d)
 }
 
@@ -1096,14 +1242,12 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	suite.assert.NoError(err)
 
 	// Wait  file is evicted
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, file))
-	for i := 0; i < 20 && !os.IsNotExist(err); i++ {
-		time.Sleep(time.Second)
-		_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, file))
+	_, err = os.Stat(filepath.Join(suite.cache_path, file))
+	for i := 0; i < 2000 && !os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
+		_, err = os.Stat(filepath.Join(suite.cache_path, file))
 	}
-	// TODO: why is check test flaky (on both platforms)?
-	fmt.Println("Skipping TestGetAttrCase4 eviction check (flaky).")
-	// suite.assert.True(os.IsNotExist(err))
+	suite.assert.True(os.IsNotExist(err))
 
 	// open the file in parallel and try getting the size of file while open is on going
 	go suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0666})
@@ -1136,26 +1280,23 @@ func (suite *fileCacheTestSuite) TestRenameFileNotInCache() {
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, src))
-	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
-		time.Sleep(time.Second)
-		_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, src))
+	_, err = os.Stat(filepath.Join(suite.cache_path, src))
+	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
+		_, err = os.Stat(filepath.Join(suite.cache_path, src))
 	}
 	suite.assert.True(os.IsNotExist(err))
 
 	// Path should be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, src))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, src))
 
 	// RenameFile
 	err = suite.fileCache.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
 	suite.assert.NoError(err)
 
 	// Path in fake storage should be updated
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, src)) // Src does not exist
-	suite.assert.True(os.IsNotExist(err))
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, dst)) // Dst does exist
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, src)) // Src does not exist
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, dst))   // Dst does exist
 }
 
 func (suite *fileCacheTestSuite) TestRenameFileInCache() {
@@ -1165,32 +1306,24 @@ func (suite *fileCacheTestSuite) TestRenameFileInCache() {
 	dst := "destination2"
 	createHandle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
 	suite.assert.NoError(err)
-	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
-	suite.assert.NoError(err)
 	openHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
 	suite.assert.NoError(err)
-	err = suite.fileCache.downloadFile(openHandle)
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	suite.assert.NoError(err)
 
 	// Path should be in the file cache
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, src))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, src))
 	// Path should be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, src))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, src))
 
 	// RenameFile
 	err = suite.fileCache.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
 	suite.assert.NoError(err)
 	// Path in fake storage and file cache should be updated
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, src)) // Src does not exist
-	suite.assert.True(os.IsNotExist(err))
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, dst)) // Dst shall exists in cache
-	suite.assert.True(err == nil || os.IsExist(err))
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, src)) // Src does not exist
-	suite.assert.True(os.IsNotExist(err))
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, dst)) // Dst does exist
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, src))        // Src does not exist
+	suite.assert.FileExists(filepath.Join(suite.cache_path, dst))          // Dst shall exists in cache
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, src)) // Src does not exist
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, dst))   // Dst does exist
 
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
 }
@@ -1207,21 +1340,18 @@ func (suite *fileCacheTestSuite) TestRenameFileCase2() {
 	suite.assert.Equal(syscall.EIO, err)
 
 	// Src should be in local cache (since we failed the operation)
-	_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, src))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, src))
 	// Src should not be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, src))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, src))
 	// Dst should not be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, dst))
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, dst))
 }
 
 func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanup() {
 	defer suite.cleanupTest()
 	suite.cleanupTest()
 
-	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 10\n\nloopbackfs:\n  path: %s",
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, suite.fake_storage_path)
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 
@@ -1229,80 +1359,55 @@ func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanup() {
 	dst := "destination4"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
-	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
 
 	// Path should be in the file cache
-	_, err := os.Stat(suite.cache_path + "/" + src)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.cache_path + "/" + src)
 	// Path should be in fake storage
-	_, err = os.Stat(suite.fake_storage_path + "/" + src)
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(suite.fake_storage_path + "/" + src)
 
 	// RenameFile
-	err = suite.fileCache.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+	err := suite.fileCache.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
 	suite.assert.NoError(err)
 	// Path in fake storage and file cache should be updated
-	_, err = os.Stat(suite.cache_path + "/" + src) // Src does not exist
-	suite.assert.True(os.IsNotExist(err))
-	_, err = os.Stat(suite.cache_path + "/" + dst) // Dst shall exists in cache
-	suite.assert.True(err == nil || os.IsExist(err))
-	_, err = os.Stat(suite.fake_storage_path + "/" + src) // Src does not exist
-	suite.assert.True(os.IsNotExist(err))
-	_, err = os.Stat(suite.fake_storage_path + "/" + dst) // Dst does exist
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.False(suite.fileCache.policy.IsCached(filepath.Join(suite.cache_path, src)))
+	suite.assert.NoFileExists(suite.cache_path + "/" + src)        // Src does not exist
+	suite.assert.FileExists(suite.cache_path + "/" + dst)          // Dst shall exists in cache
+	suite.assert.NoFileExists(suite.fake_storage_path + "/" + src) // Src does not exist
+	suite.assert.FileExists(suite.fake_storage_path + "/" + dst)   // Dst does exist
 
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
+	time.Sleep(500 * time.Millisecond)                    // Check once before the cache cleanup that file exists
+	suite.assert.FileExists(suite.cache_path + "/" + dst) // Dst shall exists in cache
 
-	time.Sleep(5 * time.Second)                    // Check once before the cache cleanup that file exists
-	_, err = os.Stat(suite.cache_path + "/" + dst) // Dst shall exists in cache
-	suite.assert.True(err == nil || os.IsExist(err))
-
-	time.Sleep(8 * time.Second)                    // Wait for the cache cleanup to occur
-	_, err = os.Stat(suite.cache_path + "/" + dst) // Dst shall not exists in cache
-	suite.assert.True(err == nil || os.IsNotExist(err))
+	time.Sleep(1 * time.Second)                           // Wait for the cache cleanup to occur
+	suite.assert.FileExists(suite.cache_path + "/" + dst) // Dst shall not exists in cache
 }
 
 func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanupWithNoTimeout() {
 	defer suite.cleanupTest()
-	suite.cleanupTest()
-
-	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 0\n\nloopbackfs:\n  path: %s",
-		suite.cache_path, suite.fake_storage_path)
-	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 
 	src := "source5"
 	dst := "destination5"
-	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
-	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Mode: 0666})
-	err := suite.fileCache.downloadFile(openHandle)
-	suite.assert.NoError(err)
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 
-	// Path should be in the file cache
-	_, err = os.Stat(suite.cache_path + "/" + src)
-	suite.assert.True(err == nil || os.IsExist(err))
-	// Path should be in fake storage
-	_, err = os.Stat(suite.fake_storage_path + "/" + src)
-	suite.assert.True(err == nil || os.IsExist(err))
+	// Path _might_ be in the file cache
+	// Path _should_ be in fake storage
+	suite.assert.FileExists(suite.fake_storage_path + "/" + src)
 
 	// RenameFile
-	err = suite.fileCache.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+	err := suite.fileCache.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
 	suite.assert.NoError(err)
-	// Path in fake storage and file cache should be updated
-	_, err = os.Stat(suite.cache_path + "/" + src) // Src does not exist
-	suite.assert.True(os.IsNotExist(err))
-	_, err = os.Stat(suite.cache_path + "/" + dst) // Dst shall exists in cache
-	suite.assert.True(err == nil || os.IsExist(err))
-	_, err = os.Stat(suite.fake_storage_path + "/" + src) // Src does not exist
-	suite.assert.True(os.IsNotExist(err))
-	_, err = os.Stat(suite.fake_storage_path + "/" + dst) // Dst does exist
-	suite.assert.True(err == nil || os.IsExist(err))
 
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
+	// Dst _might_ exist in cache, and the rename should be complete in fake storage
+	suite.assert.NoFileExists(suite.fake_storage_path + "/" + src) // Src does not exist
+	suite.assert.FileExists(suite.fake_storage_path + "/" + dst)   // Dst does exist
 
-	time.Sleep(1 * time.Second)                    // Wait for the cache cleanup to occur
-	_, err = os.Stat(suite.cache_path + "/" + dst) // Dst shall not exists in cache
-	suite.assert.True(err == nil || os.IsNotExist(err))
+	time.Sleep(100 * time.Millisecond) // Wait for the cache cleanup to occur
+	// cache should be completely clean
+	suite.assert.False(suite.fileCache.policy.IsCached(filepath.Join(suite.cache_path, src)))
+	suite.assert.False(suite.fileCache.policy.IsCached(filepath.Join(suite.cache_path, dst)))
+	suite.assert.NoFileExists(suite.cache_path + "/" + src)
+	suite.assert.NoFileExists(suite.cache_path + "/" + dst)
 }
 
 func (suite *fileCacheTestSuite) TestTruncateFileNotInCache() {
@@ -1312,16 +1417,15 @@ func (suite *fileCacheTestSuite) TestTruncateFileNotInCache() {
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 
-	_, err := os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	for i := 0; i < 10 && !os.IsNotExist(err); i++ {
-		time.Sleep(time.Second)
-		_, err = os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
+	_, err := os.Stat(filepath.Join(suite.cache_path, path))
+	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
+		_, err = os.Stat(filepath.Join(suite.cache_path, path))
 	}
 	suite.assert.True(os.IsNotExist(err))
 
 	// Path should be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
 
 	// Chmod
 	size := 1024
@@ -1329,33 +1433,31 @@ func (suite *fileCacheTestSuite) TestTruncateFileNotInCache() {
 	suite.assert.NoError(err)
 
 	// Path in fake storage should be updated
-	info, _ := os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
+	info, _ := os.Stat(filepath.Join(suite.fake_storage_path, path))
 	suite.assert.EqualValues(info.Size(), size)
 }
 
-func (suite *fileCacheTestSuite) TestTruncateFileInCache() {
+func (suite *fileCacheTestSuite) TestTruncateFileCase3() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file31"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache
-	_, err := os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 	// Path should be in fake storage
-	_, err = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
 
 	// Chmod
 	size := 1024
-	err = suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: path, Size: int64(size)})
+	err := suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: path, Size: int64(size)})
 	suite.assert.NoError(err)
 	// Path in fake storage and file cache should be updated
-	info, _ := os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
+	info, _ := os.Stat(filepath.Join(suite.cache_path, path))
 	suite.assert.EqualValues(info.Size(), size)
-	info, _ = os.Stat(common.JoinUnixFilepath(suite.fake_storage_path, path))
+	info, _ = os.Stat(filepath.Join(suite.fake_storage_path, path))
 	suite.assert.EqualValues(info.Size(), size)
 
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: openHandle})
@@ -1372,14 +1474,13 @@ func (suite *fileCacheTestSuite) TestTruncateFileCase2() {
 	suite.assert.NoError(err)
 
 	// Path should be in the file cache and size should be updated
-	info, err := os.Stat(common.JoinUnixFilepath(suite.cache_path, path))
-	suite.assert.True(err == nil || os.IsExist(err))
+	info, err := os.Stat(filepath.Join(suite.cache_path, path))
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(info.Size(), size)
 
 	// Path should not be in fake storage
 	// With new changes we always download and then truncate so file will exists in local path
-	// _, err = os.Stat(suite.fake_storage_path + "/" + path)
-	// suite.assert.True(os.IsNotExist(err))
+	// suite.assert.NoFileExists(suite.fake_storage_path + "/" + path)
 }
 
 func (suite *fileCacheTestSuite) TestZZMountPathConflict() {
@@ -1427,9 +1528,6 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 	suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: file, Mode: 0777})
-
-	err = suite.fileCache.downloadFile(handle)
-	suite.assert.NoError(err)
 
 	output := make([]byte, 9)
 	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output})
@@ -1509,7 +1607,7 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	defer suite.cleanupTest()
 	// Configure to create empty files so we create the file in cloud storage
 	createEmptyFile := true
-	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n  timeout-sec: 1000\n  refresh-sec: 10\n\nloopbackfs:\n  path: %s",
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n  timeout-sec: 1000\n  refresh-sec: 1\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, createEmptyFile, suite.fake_storage_path)
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 
@@ -1545,11 +1643,11 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: f})
 	suite.assert.NoError(err)
 
-	// Now wait for 5 seconds and we shall get the updated content on next read
+	// Now wait for refresh timeout and we shall get the updated content on next read
 	byteArr = []byte("test data123456")
 	err = os.WriteFile(suite.fake_storage_path+"/"+path, []byte("test data123456"), 0777)
 	suite.assert.NoError(err)
-	time.Sleep(12 * time.Second)
+	time.Sleep(2 * time.Second)
 	f, err = suite.fileCache.OpenFile(options)
 	suite.assert.NoError(err)
 	suite.assert.False(f.Dirty())
@@ -1580,8 +1678,6 @@ func (suite *fileCacheTestSuite) TestHardLimitOnSize() {
 	smallHandle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: pathsmall, Flags: os.O_RDONLY, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
 	// try opening small file
-	err = suite.fileCache.downloadFile(smallHandle)
-	suite.assert.NoError(err)
 	suite.assert.False(smallHandle.Dirty())
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: smallHandle})
 	suite.assert.NoError(err)

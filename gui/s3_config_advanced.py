@@ -30,18 +30,16 @@ from common_qt_functions import widgetCustomFunctions
 file_cache_eviction_choices = ['lru','lfu']
 
 class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
-    def __init__(self):
+    def __init__(self,configSettings):
         super().__init__()
         self.setupUi(self)
-        self.myWindow = QSettings("CloudFUSE", "S3AdvancedWindow")
-        # Get the config settings from the QSettings repo - do not inherit from defaultManager, it resets the settings to default
-        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "settings")
-        
+        self.myWindow = QSettings("Cloudfuse", "S3AdvancedWindow")
+        self.settings = configSettings
         self.initWindowSizePos()
         self.setWindowTitle("Advanced S3Cloud Config Settings")
         self.populateOptions()
-        
-       
+        self.saveButtonClicked = False
+
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
@@ -58,9 +56,9 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.button_resetDefaultSettings.clicked.connect(self.populateOptions)
 
     def populateOptions(self):
-        fileCache = self.settings.value('file_cache')
-        libfuse = self.settings.value('libfuse')
-        s3Storage = self.settings.value('s3storage')
+        fileCache = self.settings['file_cache']
+        libfuse = self.settings['libfuse']
+        s3Storage = self.settings['s3storage']
         
         # The index of file_cache_eviction is matched with the default 
         #   index values in the ui code, so translate the value from settings to index number
@@ -93,9 +91,9 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
             self.checkBox_libfuse_networkshare.setToolTip("Network share is only supported on Windows")
 
     def updateOptionalS3Storage(self):
-        s3Storage = self.settings.value('s3storage')
+        s3Storage = self.settings['s3storage']
         s3Storage['subdirectory'] = self.lineEdit_subdirectory.text()
-        self.settings.setValue('s3storage',s3Storage) 
+        self.settings['s3storage'] = s3Storage 
 
     def updateSettingsFromUIChoices(self):
         self.updateOptionalFileCache()

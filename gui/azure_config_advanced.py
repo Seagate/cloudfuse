@@ -31,15 +31,16 @@ file_cache_eviction_choices = ['lru','lfu']
 az_blob_tier = ['none','hot','cool','archive']
 
 class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
-    def __init__(self):
+    def __init__(self,configSettings):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("Advanced Azure Config Settings")
-        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "settings")
-        self.myWindow = QSettings("CloudFUSE", "AzAdvancedWindow")
+        self.settings = configSettings
+        self.myWindow = QSettings("Cloudfuse", "AzAdvancedWindow")
         self.initWindowSizePos()
         self.populateOptions()
-        
+        self.saveButtonClicked = False
+
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
@@ -56,9 +57,9 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         
 
     def populateOptions(self):
-        fileCache = self.settings.value('file_cache')
-        azStorage = self.settings.value('azstorage')
-        libfuse = self.settings.value('libfuse')
+        fileCache = self.settings['file_cache']
+        azStorage = self.settings['azstorage']
+        libfuse = self.settings['libfuse']
         
         self.setCheckboxFromSetting(self.checkBox_libfuse_disableWriteback,libfuse['disable-writeback-cache'])
         self.setCheckboxFromSetting(self.checkBox_libfuse_networkshare, libfuse['network-share'])
@@ -107,7 +108,7 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
             self.checkBox_libfuse_networkshare.setToolTip("Network share is only supported on Windows")
 
     def updateOptionalAzStorage(self):
-        azStorage = self.settings.value('azstorage')
+        azStorage = self.settings['azstorage']
         azStorage['block-size-mb'] = self.spinBox_azure_blockSize.value()
         azStorage['max-concurrency'] = self.spinBox_azure_maxConcurrency.value()
         azStorage['block-list-on-mount-sec'] = self.spinBox_azure_blockOnMount.value()
@@ -131,7 +132,7 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         azStorage['auth-resource'] = self.lineEdit_azure_authResource.text()
         
         azStorage['tier'] = az_blob_tier[self.dropDown_azure_blobTier.currentIndex()]
-        self.settings.setValue('azstorage',azStorage)
+        self.settings['azstorage'] = azStorage
     
     def updateSettingsFromUIChoices(self):
         self.updateOptionalAzStorage()

@@ -53,6 +53,7 @@ type Options struct {
 	EnableChecksum            bool                    `config:"enable-checksum" yaml:"enable-checksum,omitempty"`
 	ChecksumAlgorithm         types.ChecksumAlgorithm `config:"checksum-algorithm" yaml:"checksum-algorithm,omitempty"`
 	UsePathStyle              bool                    `config:"use-path-style" yaml:"use-path-style,omitempty"`
+	DisableUsage              bool                    `config:"disable-usage" yaml:"disable-usage,omitempty"`
 }
 
 type ConfigSecrets struct {
@@ -81,6 +82,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
 	s3.stConfig.disableConcurrentDownload = opt.DisableConcurrentDownload
 	s3.stConfig.usePathStyle = opt.UsePathStyle
+	s3.stConfig.disableUsage = opt.DisableUsage
 
 	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
 	if opt.PartSizeMb < 5 || opt.PartSizeMb > MaxPartSizeMb {

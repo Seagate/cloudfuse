@@ -91,7 +91,7 @@ foreground: false
 read-only: true
 allow-other: true
 
-logging:  
+logging:
   type: base
   level: log_debug
   file-path: /home/cloudfuse.log
@@ -127,8 +127,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncrypt() {
 	suite.assert.NoError(err)
 
 	// Config file should be deleted
-	_, err = os.Stat(confFile.Name())
-	suite.assert.Error(err)
+	suite.assert.NoFileExists(confFile.Name())
 }
 
 func (suite *secureConfigTestSuite) TestSecureConfigEncryptNoOutfile() {
@@ -149,12 +148,10 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncryptNoOutfile() {
 	suite.assert.NoError(err)
 
 	// Config file should be deleted
-	_, err = os.Stat(confFile.Name())
-	suite.assert.Error(err)
+	suite.assert.NoFileExists(confFile.Name())
 
 	// Outfile should exist with proper extension
-	_, err = os.Stat(outFile)
-	suite.assert.NoError(err)
+	suite.assert.FileExists(outFile)
 }
 
 func (suite *secureConfigTestSuite) TestSecureConfigEncryptNotExistent() {
@@ -226,8 +223,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigDecrypt() {
 	suite.assert.NoError(err)
 
 	// Config file should be deleted
-	_, err = os.Stat(confFile.Name())
-	suite.assert.Error(err)
+	suite.assert.NoFileExists(confFile.Name())
 
 	_, err = executeCommandSecure(rootCmd, "secure", "decrypt", fmt.Sprintf("--config-file=%s", outFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=./tmp.yaml"))
 	suite.assert.NoError(err)
@@ -258,23 +254,19 @@ func (suite *secureConfigTestSuite) TestSecureConfigDecryptNoOutputFile() {
 	suite.assert.NoError(err)
 
 	// Config file should be deleted
-	_, err = os.Stat(confFile.Name())
-	suite.assert.Error(err)
+	suite.assert.NoFileExists(confFile.Name())
 
 	// Encrypted file should exist
-	_, err = os.Stat(outFile)
-	suite.assert.NoError(err)
+	suite.assert.FileExists(outFile)
 
 	_, err = executeCommandSecure(rootCmd, "secure", "decrypt", fmt.Sprintf("--config-file=%s", outFile), fmt.Sprintf("--passphrase=%s", passphrase))
 	suite.assert.NoError(err)
 
 	// Config file should exist
-	_, err = os.Stat(confFile.Name())
-	suite.assert.NoError(err)
+	suite.assert.FileExists(confFile.Name())
 
 	// Encrypted file should be deleted
-	_, err = os.Stat(outFile)
-	suite.assert.Error(err)
+	suite.assert.NoFileExists(outFile)
 
 	data, err := os.ReadFile(confFile.Name())
 	suite.assert.NoError(err)

@@ -503,6 +503,43 @@ func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 	return s3.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
 }
 
+const blockSize = 4096
+
+func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
+	if s3.stConfig.disableUsage {
+		return nil, false, nil
+	}
+
+	log.Trace("S3Storage::StatFs")
+	// cache_size = f_blocks * f_frsize/1024
+	// cache_size - used = f_frsize * f_bavail/1024
+	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
+	// if cache size is set to 0 then we have the root mount usage
+	sizeUsed, err := s3.storage.GetUsedSize()
+	if err != nil {
+		// TODO: will returning EIO break any applications that depend on StatFs?
+		return nil, true, err
+	}
+
+	stat := common.Statfs_t{
+		Blocks: sizeUsed / blockSize,
+		// there is no set capacity limit in cloud storage
+		// so we use zero for free and avail
+		// this zero value is used in the libfuse component to recognize that cloud storage responded
+		Bavail:  0,
+		Bfree:   0,
+		Bsize:   blockSize,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  blockSize,
+		Namemax: 255,
+	}
+
+	log.Debug("S3Storage::StatFs : responding with free=%d avail=%d blocks=%d (bsize=%d)", stat.Bfree, stat.Bavail, stat.Blocks, stat.Bsize)
+
+	return &stat, true, nil
+}
+
 // TODO: decide if the TODO below is relevant and delete if not
 // TODO : Below methods are pending to be implemented
 // FlushFile(*handlemap.Handle) error

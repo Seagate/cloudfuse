@@ -65,7 +65,7 @@ var serviceCmd = &cobra.Command{
 var installCmd = &cobra.Command{
 	Use:               "install",
 	Short:             "Installs the startup process for Cloudfuse. Requires running as admin.",
-	Long:              "Installs the startup process for Cloudfuse which remounts any active previously active mounts on startup. . Requires running as admin.",
+	Long:              "Installs the startup process for Cloudfuse which remounts any active previously active mounts on startup. Requires running as admin.",
 	SuggestFor:        []string{"ins", "inst"},
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
@@ -114,6 +114,39 @@ var uninstallCmd = &cobra.Command{
 	},
 }
 
+var addRegistryCmd = &cobra.Command{
+	Use:               "add-registry",
+	Short:             "Add registry information for WinFSP to launch cloudfuse. Requires running as admin.",
+	Long:              "Add registry information for WinFSP to launch cloudfuse. Requires running as admin.",
+	SuggestFor:        []string{"add"},
+	Example:           "cloudfuse service add-registry",
+	FlagErrorHandling: cobra.ExitOnError,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		err := winservice.CreateWinFspRegistry()
+		if err != nil {
+			return fmt.Errorf("error adding Windows registry for WinFSP support [%s]", err.Error())
+		}
+		return nil
+	},
+}
+
+var removeRegistryCmd = &cobra.Command{
+	Use:               "remove-registry",
+	Short:             "Remove registry information for WinFSP to launch cloudfuse. Requires running as admin.",
+	Long:              "Remove registry information for WinFSP to launch cloudfuse. Requires running as admin.",
+	SuggestFor:        []string{"remove"},
+	Example:           "cloudfuse service remove-registry",
+	FlagErrorHandling: cobra.ExitOnError,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		err := winservice.RemoveWinFspRegistry()
+		if err != nil {
+			return fmt.Errorf("error removing Windows registry from WinFSP [%s]", err.Error())
+		}
+
+		return nil
+	},
+}
+
 //--------------- command section ends
 
 func makeLink(src string, dst string) error {
@@ -154,4 +187,6 @@ func init() {
 	rootCmd.AddCommand(serviceCmd)
 	serviceCmd.AddCommand(installCmd)
 	serviceCmd.AddCommand(uninstallCmd)
+	serviceCmd.AddCommand(addRegistryCmd)
+	serviceCmd.AddCommand(removeRegistryCmd)
 }

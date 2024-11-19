@@ -53,6 +53,7 @@ type Config struct {
 	checksumAlgorithm         types.ChecksumAlgorithm
 	usePathStyle              bool
 	disableSymlink            bool
+	disableUsage              bool
 }
 
 // TODO: move s3AuthConfig to s3auth.go
@@ -113,4 +114,5 @@ type S3Connection interface {
 	StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 	NewCredentialKey(_, _ string) error
+	GetUsedSize() (uint64, error)
 }

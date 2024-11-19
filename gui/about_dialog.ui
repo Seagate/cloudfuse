@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>About CloudFUSE</string>
+   <string>About Cloudfuse</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="2" column="0">

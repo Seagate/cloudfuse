@@ -95,6 +95,7 @@ type storageTestConfiguration struct {
 	UploadCutoffMb            int64  `json:"upload-cutoff-mb"`
 	DisableConcurrentDownload bool   `json:"disable-concurrent-download"`
 	UsePathStyle              bool   `json:"use-path-style"`
+	DisableUsage              bool   `json:"disable-usage"`
 }
 
 var storageTestConfigurationParameters storageTestConfiguration
@@ -325,10 +326,10 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, bucket string
 func generateConfigYaml(testParams storageTestConfiguration) string {
 	return fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n"+
 		"  region: %s\n  profile: %s\n  endpoint: %s\n  subdirectory: %s\n  restricted-characters-windows: %t\n"+
-		"  part-size-mb: %d\n  upload-cutoff-mb: %d\n  disable-concurrent-download: %t\n  use-path-style: %t\n",
+		"  part-size-mb: %d\n  upload-cutoff-mb: %d\n  disable-concurrent-download: %t\n  use-path-style: %t\n  disable-usage: %t\n",
 		testParams.BucketName, testParams.KeyID, testParams.SecretKey,
 		testParams.Region, testParams.Profile, testParams.Endpoint, testParams.Prefix, testParams.RestrictedCharsWin, testParams.PartSizeMb,
-		testParams.UploadCutoffMb, testParams.DisableConcurrentDownload, testParams.UsePathStyle)
+		testParams.UploadCutoffMb, testParams.DisableConcurrentDownload, testParams.UsePathStyle, testParams.DisableUsage)
 }
 
 func (s *s3StorageTestSuite) tearDownTestHelper(delete bool) {
@@ -2417,7 +2418,7 @@ func (s *s3StorageTestSuite) TestGetAttrFileTime() {
 	s.assert.NoError(err)
 	s.assert.NotNil(before.Mtime)
 
-	time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
+	time.Sleep(1 * time.Second) // Wait and then modify the file again
 
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	s.assert.NoError(err)
