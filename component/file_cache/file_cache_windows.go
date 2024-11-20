@@ -29,7 +29,6 @@ package file_cache
 
 import (
 	"io/fs"
-	"math"
 	"os"
 	"syscall"
 	"time"
@@ -142,47 +141,6 @@ func (fc *FileCache) isDownloadRequired(localPath string, blobPath string, flock
 	}
 
 	return downloadRequired, fileExists, attr, err
-}
-
-func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
-	// cache_size = f_blocks * f_frsize/1024
-	// cache_size - used = f_frsize * f_bavail/1024
-	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
-	// if cache size is set to 0 then we have the root mount usage
-	maxCacheSize := fc.maxCacheSize * MB
-	if maxCacheSize == 0 {
-		return nil, false, nil
-	}
-	usage, _ := common.GetUsage(fc.tmpPath)
-	available := maxCacheSize - usage
-
-	var free, total, avail uint64
-
-	// Get path to the cache
-	pathPtr, err := windows.UTF16PtrFromString(fc.tmpPath)
-	if err != nil {
-		return nil, false, err
-	}
-	err = windows.GetDiskFreeSpaceEx(pathPtr, &free, &total, &avail)
-	if err != nil {
-		log.Debug("FileCache::StatFs : statfs err [%s].", err.Error())
-		return nil, false, err
-	}
-
-	const blockSize = 4096
-
-	stat := common.Statfs_t{
-		Blocks:  uint64(maxCacheSize) / uint64(blockSize),
-		Bavail:  uint64(math.Max(0, available)) / uint64(blockSize),
-		Bfree:   free / uint64(blockSize),
-		Bsize:   blockSize,
-		Ffree:   1e9,
-		Files:   1e9,
-		Frsize:  blockSize,
-		Namemax: 255,
-	}
-
-	return &stat, true, nil
 }
 
 func (fc *FileCache) getAvailableSize() (uint64, error) {

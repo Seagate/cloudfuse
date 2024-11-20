@@ -38,7 +38,7 @@ jobs:
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         run: pip3 install -r gui/requirements.txt
         shell: bash
-      - 
+      -
         name: Install libxcb-cursor0
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit && matrix.os == 'ubuntu-latest' }}
         run: |-
@@ -67,7 +67,7 @@ jobs:
     needs: compile-gui
     runs-on: windows-latest
     env:
-      go: '1.23'
+      go: '1.23.2'
       cgo: '0'
       winfsp: winfsp-2.0.23075.msi
     steps:
@@ -209,7 +209,7 @@ jobs:
     needs: create-installer
     runs-on: ubuntu-latest
     env:
-      go: '1.23'
+      go: '1.23.2'
       zig: 0.13.0
 
     steps:
@@ -231,7 +231,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-        
+
       - name: Install Zig
         run: |
           curl -L https://ziglang.org/download/${{ env.zig }}/zig-linux-x86_64-${{ env.zig }}.tar.xz -o zig.tar.xz

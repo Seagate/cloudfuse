@@ -88,6 +88,7 @@ func newTestClient(configuration string) (*Client, error) {
 		partSize:                  conf.PartSizeMb * common.MbToBytes,
 		uploadCutoff:              conf.UploadCutoffMb * common.MbToBytes,
 		usePathStyle:              conf.UsePathStyle,
+		disableUsage:              conf.DisableUsage,
 	}
 	// create a Client
 	client, err := NewConnection(configForS3Client)
