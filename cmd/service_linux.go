@@ -26,9 +26,9 @@
 package cmd
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
+	"html/template"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -102,14 +102,8 @@ var installCmd = &cobra.Command{
 			return fmt.Errorf("error, the configfile path provided does not exist") // TODO: add useage output upon failure with input
 		}
 
-		// extract the user from the service file
-		serviceUser, err := extractValue("User=", fmt.Sprintf("%s/setup/cloudfuse.service", dir))
-		if err != nil {
-			return fmt.Errorf("error collecting data from cloudfuse.service file due to the following error: [%s]", err)
-		}
-
 		//create the new user and set permissions
-		err = setUser(serviceUser, mountPath)
+		err = setUser("CloudfuseUser", mountPath)
 		if err != nil {
 			fmt.Println("Error setting permissions for user:", err)
 			return err
@@ -167,48 +161,36 @@ var uninstallCmd = &cobra.Command{
 
 func newServiceFile(mountPath string, configPath string, dir string) (string, error) {
 
-	oldConfigStr := "Environment=ConfigFile=/path/to/config/file/config.yaml"
-	newConfigStr := fmt.Sprintf("Environment=ConfigFile=%s", configPath)
+	serviceTemplate := ` [Unit]
+	Description=Cloudfuse is an open source project developed to provide a virtual filesystem backed by S3 or Azure storage.
+	After=network-online.target
+	Requires=network-online.target
 
-	oldMountStr := "Environment=MoutingPoint=/path/to/mounting/point"
-	newMountStr := fmt.Sprintf("Environment=MoutingPoint=%s", mountPath)
+	[Service]
+	# User service will run as.
+	User=CloudfuseUser
+	# Path to the location Cloudfuse will mount to. Note this folder must currently exist.
+	Environment=MountingPoint={{.MountPath}}
+	# Path to the configuration file.
+	Environment=ConfigFile={{.ConfigFile}}
 
-	// open service defaultFile for read write
-	defaultFile, err := os.OpenFile("./setup/cloudfuse.service", os.O_RDWR, 0644)
+	# Under the hood
+	Type=forking
+	ExecStart=/usr/bin/cloudfuse mount ${MountingPoint} --config-file=${ConfigFile}
+	ExecStop=/usr/bin/fusermount -u ${MountingPoint} -z
+
+	[Install]
+	WantedBy=multi-user.target
+	`
+
+	config := serviceOptions{
+		ConfigFile: configPath,
+		MountPath:  mountPath,
+	}
+
+	tmpl, err := template.New("service").Parse(serviceTemplate)
 	if err != nil {
-		return "", fmt.Errorf("error opening file: [%s]", err.Error())
-	}
-	defer defaultFile.Close()
-
-	scanner := bufio.NewScanner(defaultFile)
-	var lines []string
-
-	// Read the file line by line
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Check if the line contains the search string
-		if strings.Contains(line, "MoutingPoint") {
-			// Modify the line by replacing the old string with the new string
-			line = strings.ReplaceAll(line, oldMountStr, newMountStr)
-		}
-		if strings.Contains(line, "ConfigFile") {
-			line = strings.ReplaceAll(line, oldConfigStr, newConfigStr)
-		}
-
-		// add the -o default_permissions if not present
-		if strings.Contains(line, "ExecStart") && !strings.Contains(line, "-o allow_other") {
-			oldString := "ExecStart=/usr/bin/cloudfuse mount ${MoutingPoint} --config-file=${ConfigFile}"
-			newString := "ExecStart=/usr/bin/cloudfuse mount ${MoutingPoint} --config-file=${ConfigFile} -o allow_other"
-			line = strings.ReplaceAll(line, oldString, newString)
-		}
-
-		// Append the (possibly modified) line to the slice
-		lines = append(lines, line)
-	}
-	// Check for errors during file reading
-	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("error reading file: [%s]", err.Error())
+		fmt.Errorf("error creating new service file: [%s]", err.Error())
 	}
 
 	folderList := strings.Split(common.JoinUnixFilepath(dir, mountPath), "/")
@@ -218,54 +200,12 @@ func newServiceFile(mountPath string, configPath string, dir string) (string, er
 		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
 	}
 
-	// Open a new file and write all lines to the new file.
-
-	// Create a buffered writer to overwrite the file
-	writer := bufio.NewWriter(newFile)
-
-	// Write the modified lines back to the file
-	for _, line := range lines {
-		_, err := writer.WriteString(line + "\n")
-		if err != nil {
-			return "", fmt.Errorf("error writing to file: [%s]", err.Error())
-		}
+	err = tmpl.Execute(newFile, config)
+	if err != nil {
+		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
 	}
-
-	// Flush the buffer to write all data to disk
-	writer.Flush()
 
 	return serviceName, nil
-}
-
-func extractValue(key string, filePath string) (string, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return "", err
-	}
-	defer file.Close()
-
-	var value string
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.Contains(line, key) {
-			if strings.Contains(key, "=") {
-				parts := strings.SplitN(line, "=", 2)
-				value = strings.TrimSpace(parts[1])
-			}
-			if strings.Contains(key, ":") {
-				parts := strings.SplitN(line, ":", 2)
-				value = strings.TrimSpace(parts[1])
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		fmt.Println("Error reading file:", err)
-		return "", err
-	}
-	return value, nil
 }
 
 func setUser(serviceUser string, mountPath string) error {
@@ -279,9 +219,17 @@ func setUser(serviceUser string, mountPath string) error {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
 			}
 
-			sudoUser := os.Getenv("SUDO_USER")
+			curUserGrp := os.Getenv("SUDO_USER")
+			if curUserGrp == "" {
+				curUser, err := user.Current()
+				if err != nil {
+					return fmt.Errorf("failed to add service user to group due to error: [%s]", err.Error())
+				}
+				curUserGrp = curUser.Username
+			}
+
 			//add current user to serviceUser group
-			usermodCmd := exec.Command("sudo", "usermod", "-aG", sudoUser, serviceUser)
+			usermodCmd := exec.Command("sudo", "usermod", "-aG", curUserGrp, serviceUser)
 			err = usermodCmd.Run()
 			if err != nil {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
