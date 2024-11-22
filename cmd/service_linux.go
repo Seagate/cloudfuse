@@ -34,6 +34,7 @@ import (
 	"os/exec"
 	"os/user"
 	"strings"
+	"syscall"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/spf13/cobra"
@@ -103,7 +104,7 @@ var installCmd = &cobra.Command{
 		}
 
 		//create the new user and set permissions
-		err = setUser("CloudfuseUser", mountPath)
+		err = setUser("CloudfuseUser", mountPath, configPath)
 		if err != nil {
 			fmt.Println("Error setting permissions for user:", err)
 			return err
@@ -176,7 +177,7 @@ func newServiceFile(mountPath string, configPath string, dir string) (string, er
 
 	# Under the hood
 	Type=forking
-	ExecStart=/usr/bin/cloudfuse mount ${MountingPoint} --config-file=${ConfigFile}
+	ExecStart=/usr/bin/cloudfuse mount ${MountingPoint} --config-file=${ConfigFile} -o allow_other
 	ExecStop=/usr/bin/fusermount -u ${MountingPoint} -z
 
 	[Install]
@@ -208,7 +209,7 @@ func newServiceFile(mountPath string, configPath string, dir string) (string, er
 	return serviceName, nil
 }
 
-func setUser(serviceUser string, mountPath string) error {
+func setUser(serviceUser string, mountPath string, configPath string) error {
 	_, err := user.Lookup(serviceUser)
 	if err != nil {
 		if strings.Contains(err.Error(), "unknown user") {
@@ -219,17 +220,26 @@ func setUser(serviceUser string, mountPath string) error {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
 			}
 
-			curUserGrp := os.Getenv("SUDO_USER")
-			if curUserGrp == "" {
-				curUser, err := user.Current()
-				if err != nil {
-					return fmt.Errorf("failed to add service user to group due to error: [%s]", err.Error())
-				}
-				curUserGrp = curUser.Username
+			configFileInfo, err := os.Stat(configPath)
+			if err != nil {
+				return fmt.Errorf("Failed to stat file: %v", err)
 			}
 
-			//add current user to serviceUser group
-			usermodCmd := exec.Command("sudo", "usermod", "-aG", curUserGrp, serviceUser)
+			// Get file's group ID
+			stat, ok := configFileInfo.Sys().(*syscall.Stat_t)
+			if !ok {
+				return fmt.Errorf("Failed to get file system stats")
+			}
+			groupID := stat.Gid
+
+			// Get group name
+			group, err := user.LookupGroupId(fmt.Sprint(groupID))
+			if err != nil {
+				return fmt.Errorf("Failed to lookup group: %v", err)
+			}
+
+			//add group to serviceUser group
+			usermodCmd := exec.Command("sudo", "usermod", "-aG", group.Name, serviceUser)
 			err = usermodCmd.Run()
 			if err != nil {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
