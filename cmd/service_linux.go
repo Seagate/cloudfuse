@@ -46,8 +46,6 @@ type serviceOptions struct {
 	ServiceUser string
 }
 
-var servOpts serviceOptions
-
 // Section defining all the command that we have in secure feature
 var serviceCmd = &cobra.Command{
 	Use:               "service",
