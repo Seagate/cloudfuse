@@ -224,7 +224,44 @@ func newServiceFile(mountPath string, configPath string, serviceUser string) (st
 }
 
 func setUser(serviceUser string, mountPath string, configPath string) error {
-	_, err := user.Lookup(serviceUser)
+
+	configFileInfo, err := os.Stat(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat file: %v", err)
+	}
+
+	// Get file's group ID
+	stat, ok := configFileInfo.Sys().(*syscall.Stat_t)
+	if !ok {
+		return fmt.Errorf("failed to get file system stats")
+	}
+	configGroupID := stat.Gid
+
+	// Get configFileGroup name
+	configFileGroup, err := user.LookupGroupId(fmt.Sprint(configGroupID))
+	if err != nil {
+		return fmt.Errorf("failed to lookup group: %v", err)
+	}
+
+	mountPathInfo, err := os.Stat(mountPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat file: %v", err)
+	}
+
+	// Get file's group ID
+	stat, ok = mountPathInfo.Sys().(*syscall.Stat_t)
+	if !ok {
+		return fmt.Errorf("failed to get file system stats")
+	}
+	mountGroupID := stat.Gid
+
+	// Get configFileGroup name
+	mountPathGroup, err := user.LookupGroupId(fmt.Sprint(mountGroupID))
+	if err != nil {
+		return fmt.Errorf("failed to lookup group: %v", err)
+	}
+
+	_, err = user.Lookup(serviceUser)
 	if err != nil {
 		if strings.Contains(err.Error(), "unknown user") {
 			//create the user
@@ -234,32 +271,19 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
 			}
 
-			configFileInfo, err := os.Stat(configPath)
-			if err != nil {
-				return fmt.Errorf("Failed to stat file: %v", err)
-			}
-
-			// Get file's group ID
-			stat, ok := configFileInfo.Sys().(*syscall.Stat_t)
-			if !ok {
-				return fmt.Errorf("Failed to get file system stats")
-			}
-			groupID := stat.Gid
-
-			// Get group name
-			group, err := user.LookupGroupId(fmt.Sprint(groupID))
-			if err != nil {
-				return fmt.Errorf("Failed to lookup group: %v", err)
-			}
-
 			//add group to serviceUser group
-			usermodCmd := exec.Command("sudo", "usermod", "-aG", group.Name, serviceUser)
+			usermodCmd := exec.Command("sudo", "usermod", "-aG", configFileGroup.Name, serviceUser)
+			err = usermodCmd.Run()
+			if err != nil {
+				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
+			}
+			usermodCmd = exec.Command("sudo", "usermod", "-aG", mountPathGroup.Name, serviceUser)
 			err = usermodCmd.Run()
 			if err != nil {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
 			}
 
-			// set set folder permission on the mount path
+			//set set folder permission on the mount path
 			chmodCmd := exec.Command("sudo", "chmod", "770", mountPath)
 			err = chmodCmd.Run()
 			if err != nil {
@@ -269,7 +293,28 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 		} else {
 			fmt.Printf("An error occurred: %v\n", err)
 		}
+	} else {
+		//add group to serviceUser group
+		usermodCmd := exec.Command("sudo", "usermod", "-aG", configFileGroup.Name, serviceUser)
+		err = usermodCmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
+		}
+		usermodCmd = exec.Command("sudo", "usermod", "-aG", mountPathGroup.Name, serviceUser)
+		err = usermodCmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
+		}
+
+		//set set folder permission on the mount path
+		chmodCmd := exec.Command("sudo", "chmod", "770", mountPath)
+		err = chmodCmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed set permisions on mount path due to following error: [%s]", err.Error())
+		}
+
 	}
+
 	return nil
 }
 
