@@ -63,11 +63,11 @@ var mountPath string
 var configPath string
 var serviceUser string
 var installCmd = &cobra.Command{
-	Use:               "install --mountPath=<path/to/mount/point> --configPath=<path/to/config/file> --user=<username>",
+	Use:               "install",
 	Short:             "Installs a service file for a single mount with Cloudfuse. Requires elevated permissions.",
 	Long:              "Installs a service file for a single mount with Cloudfuse which remounts any active previously active mounts on startup. elevated permissions.",
 	SuggestFor:        []string{"ins", "inst"},
-	Example:           "cloudfuse service install",
+	Example:           "cloudfuse service install --mount-path=<path/to/mount/point> --config-file=<path/to/config/file> --user=<username>",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -130,28 +130,44 @@ var installCmd = &cobra.Command{
 	},
 }
 
+var serviceName string
 var uninstallCmd = &cobra.Command{
 	Use:               "uninstall",
 	Short:             "Uninstall the startup process for Cloudfuse. Requires running as admin.",
 	Long:              "Uninstall the startup process for Cloudfuse. Requires running as admin.",
 	SuggestFor:        []string{"uninst", "uninstal"},
-	Example:           "cloudfuse service uninstall",
+	Example:           "cloudfuse service uninstall --mount-path=<path/to/mount/path>",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		// 1. find and remove cloudfuse.service from /etc/systemd/system and run systemctl daemon-reload
-		removeFileCmd := exec.Command("sudo", "rm", "/etc/systemd/system/cloudfuse.service")
-		err := removeFileCmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed to delete cloudfuse.service file from /etc/systemd/system due to following error: [%s]", err.Error())
+		// get absolute path of provided relative mount path
+		if strings.Contains(serviceName, ".") || strings.Contains(serviceName, "..") {
+			dir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("error: [%s]", err.Error())
+			}
+			mountPath = common.JoinUnixFilepath(dir, serviceName)
+
 		}
 
+		// get service file name and service file path
+		folderList := strings.Split(serviceName, "/")
+		serviceName = folderList[len(folderList)-1] + ".service"
+		servicePath := "/etc/systemd/system/" + serviceName
+
+		// delete service file
+		removeFileCmd := exec.Command("sudo", "rm", servicePath)
+		err := removeFileCmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system due to following error: [%s]", err.Error())
+		}
+
+		// reload daemon
 		systemctlDaemonReloadCmd := exec.Command("sudo", "systemctl", "daemon-reload")
 		err = systemctlDaemonReloadCmd.Run()
 		if err != nil {
 			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
 		}
-
 		return nil
 	},
 }
@@ -261,9 +277,14 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 
 func init() {
 	rootCmd.AddCommand(serviceCmd)
+	rootCmd.SilenceUsage = false
 	serviceCmd.AddCommand(installCmd)
 	installCmd.Flags().StringVar(&mountPath, "mount-path", "", "Input mount path")
 	installCmd.Flags().StringVar(&configPath, "config-file", "", "Input config file")
 	installCmd.Flags().StringVar(&serviceUser, "user", "CloudfuseUser", "Input service user")
+	installCmd.MarkFlagRequired("mount-path")
+	installCmd.MarkFlagRequired("config-file")
 	serviceCmd.AddCommand(uninstallCmd)
+	uninstallCmd.Flags().StringVar(&serviceName, "mount-path", "", "Input mount path")
+	uninstallCmd.MarkFlagRequired("mount-path")
 }
