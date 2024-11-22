@@ -41,8 +41,9 @@ import (
 )
 
 type serviceOptions struct {
-	ConfigFile string
-	MountPath  string
+	ConfigFile  string
+	MountPath   string
+	ServiceUser string
 }
 
 var servOpts serviceOptions
@@ -60,14 +61,16 @@ var serviceCmd = &cobra.Command{
 	},
 }
 
+var mountPath string
+var configPath string
+var serviceUser string
 var installCmd = &cobra.Command{
-	Use:               "install [mount path] [config path]",
+	Use:               "install --mountPath=<path/to/mount/point> --configPath=<path/to/config/file> --user=<username>",
 	Short:             "Installs a service file for a single mount with Cloudfuse. Requires elevated permissions.",
 	Long:              "Installs a service file for a single mount with Cloudfuse which remounts any active previously active mounts on startup. elevated permissions.",
 	SuggestFor:        []string{"ins", "inst"},
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
-	Args:              cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// get current dir
@@ -75,9 +78,6 @@ var installCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("error: [%s]", err.Error())
 		}
-
-		mountPath := args[0]
-		configPath := args[1]
 
 		if strings.Contains(mountPath, ".") || strings.Contains(mountPath, "..") {
 			mountPath = common.JoinUnixFilepath(dir, mountPath)
@@ -104,13 +104,13 @@ var installCmd = &cobra.Command{
 		}
 
 		//create the new user and set permissions
-		err = setUser("CloudfuseUser", mountPath, configPath)
+		err = setUser(serviceUser, mountPath, configPath)
 		if err != nil {
 			fmt.Println("Error setting permissions for user:", err)
 			return err
 		}
 
-		serviceFile, err := newServiceFile(mountPath, configPath, dir)
+		serviceFile, err := newServiceFile(mountPath, configPath, serviceUser)
 		if err != nil {
 			return fmt.Errorf("error when attempting to create service file: [%s]", err.Error())
 		}
@@ -160,8 +160,7 @@ var uninstallCmd = &cobra.Command{
 
 //--------------- command section ends
 
-func newServiceFile(mountPath string, configPath string, dir string) (string, error) {
-
+func newServiceFile(mountPath string, configPath string, serviceUser string) (string, error) {
 	serviceTemplate := ` [Unit]
 	Description=Cloudfuse is an open source project developed to provide a virtual filesystem backed by S3 or Azure storage.
 	After=network-online.target
@@ -169,7 +168,7 @@ func newServiceFile(mountPath string, configPath string, dir string) (string, er
 
 	[Service]
 	# User service will run as.
-	User=CloudfuseUser
+	User={{.ServiceUser}}
 	# Path to the location Cloudfuse will mount to. Note this folder must currently exist.
 	Environment=MountingPoint={{.MountPath}}
 	# Path to the configuration file.
@@ -185,8 +184,9 @@ func newServiceFile(mountPath string, configPath string, dir string) (string, er
 	`
 
 	config := serviceOptions{
-		ConfigFile: configPath,
-		MountPath:  mountPath,
+		ConfigFile:  configPath,
+		MountPath:   mountPath,
+		ServiceUser: serviceUser,
 	}
 
 	tmpl, err := template.New("service").Parse(serviceTemplate)
@@ -194,7 +194,7 @@ func newServiceFile(mountPath string, configPath string, dir string) (string, er
 		fmt.Errorf("error creating new service file: [%s]", err.Error())
 	}
 
-	folderList := strings.Split(common.JoinUnixFilepath(dir, mountPath), "/")
+	folderList := strings.Split(mountPath, "/")
 	serviceName := folderList[len(folderList)-1] + ".service"
 	newFile, err := os.Create("/etc/systemd/system/" + serviceName)
 	if err != nil {
@@ -264,5 +264,8 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 func init() {
 	rootCmd.AddCommand(serviceCmd)
 	serviceCmd.AddCommand(installCmd)
+	installCmd.Flags().StringVar(&mountPath, "mount-path", "", "Input mount path")
+	installCmd.Flags().StringVar(&configPath, "config-file", "", "Input config file")
+	installCmd.Flags().StringVar(&serviceUser, "user", "CloudfuseUser", "Input service user")
 	serviceCmd.AddCommand(uninstallCmd)
 }
