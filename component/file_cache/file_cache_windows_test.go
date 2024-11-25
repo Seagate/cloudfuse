@@ -33,7 +33,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -61,7 +60,7 @@ func (suite *fileCacheWindowsTestSuite) SetupTest() {
 	rand := randomString(8)
 	suite.cache_path = common.JoinUnixFilepath(home_dir, "file_cache"+rand)
 	suite.fake_storage_path = common.JoinUnixFilepath(home_dir, "fake_storage"+rand)
-	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 0\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
+	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
 	log.Debug(defaultConfig)
 
 	// Delete the temp directories created
@@ -112,15 +111,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file"
-	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
-
-	_, err := os.Stat(suite.cache_path + "/" + path)
-	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
-		time.Sleep(10 * time.Millisecond)
-		_, err = os.Stat(suite.cache_path + "/" + path)
-	}
-	suite.assert.True(os.IsNotExist(err))
+	suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
@@ -128,7 +119,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	// Checking that nothing changed with existing files
 	owner := os.Getuid()
 	group := os.Getgid()
-	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
 	suite.assert.Nil(err)
 
 	// Path in fake storage should be updated
