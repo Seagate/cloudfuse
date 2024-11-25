@@ -57,9 +57,6 @@ type lruPolicy struct {
 	closeSignal         chan int
 	closeSignalValidate chan int
 
-	// Channel to contain files that needs to be deleted immediately
-	deleteEvent chan string
-
 	// Channel to contain files that are in use so push them up in lru list
 	validateChan chan string
 
@@ -108,8 +105,6 @@ func (p *lruPolicy) StartPolicy() error {
 
 	p.closeSignal = make(chan int)
 	p.closeSignalValidate = make(chan int)
-
-	p.deleteEvent = make(chan string, 1000)
 	p.validateChan = make(chan string, 10000)
 
 	_, err := common.GetUsage(p.tmpPath)
@@ -268,11 +263,6 @@ func (p *lruPolicy) clearCache() {
 
 	for {
 		select {
-		case name := <-p.deleteEvent:
-			log.Trace("lruPolicy::Clear-delete")
-			// we are asked to delete file explicitly
-			p.deleteItem(name)
-
 		case <-p.cacheTimeoutMonitor:
 			log.Trace("lruPolicy::Clear-timeout monitor")
 			// File cache timeout has hit so delete all unused files for past N seconds
