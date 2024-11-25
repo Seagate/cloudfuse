@@ -238,16 +238,13 @@ func (suite *lruPolicyTestSuite) TestCachePurge() {
 	suite.assert.False(ok)
 	suite.assert.Nil(n)
 
-	// test asynchronous file and folder deletion
+	// test synchronous file and folder deletion
 	// purge all aPaths, in reverse order
 	aPaths, abPaths, acPaths := suite.generateNestedDirectory("temp")
 	for i := len(aPaths) - 1; i >= 0; i-- {
 		suite.policy.CachePurge(aPaths[i])
 	}
 
-	// wait for asynchronous deletions
-	// in local testing, 1ms was enough
-	time.Sleep(100 * time.Millisecond)
 	// validate all aPaths were deleted
 	for _, path := range aPaths {
 		suite.assert.NoFileExists(path)

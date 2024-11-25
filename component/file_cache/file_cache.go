@@ -777,11 +777,6 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	}
 
 	localPath := filepath.Join(fc.tmpPath, options.Name)
-	err = deleteFile(localPath)
-	if err != nil && !os.IsNotExist(err) {
-		log.Err("FileCache::DeleteFile : failed to delete local file %s [%s]", localPath, err.Error())
-	}
-
 	fc.policy.CachePurge(localPath)
 
 	return nil

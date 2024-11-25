@@ -180,7 +180,10 @@ func (p *lruPolicy) CachePurge(name string) {
 	log.Trace("lruPolicy::CachePurge : %s", name)
 
 	p.removeNode(name)
-	p.deleteEvent <- name
+	err := deleteFile(name)
+	if err != nil && !os.IsNotExist(err) {
+		log.Err("lruPolicy::CachePurge : failed to delete local file %s. Here's why: %v", name, err)
+	}
 }
 
 func (p *lruPolicy) IsCached(name string) bool {
