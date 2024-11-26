@@ -652,12 +652,6 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 		fc.policy.CachePurge(directoriesToPurge[i])
 	}
 
-	if fc.cacheTimeout == 0 {
-		// delete destination path immediately
-		log.Info("FileCache::RenameDir : Timeout is zero, so removing local destination %s", options.Dst)
-		go fc.invalidateDirectory(options.Dst)
-	}
-
 	return nil
 }
 
@@ -1001,8 +995,6 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 	// if file has not been interactively read or written to by end user, then there is no cached file to close.
 	_, noCachedHandle := options.Handle.GetValue("openFileOptions")
 
-	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
-
 	err := fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true}) //nolint
 	if err != nil {
 		log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
@@ -1039,7 +1031,6 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 		return nil
 	}
 
-	fc.policy.CacheInvalidate(localPath) // Invalidate the file from the local cache if the timeout is zero.
 	return nil
 }
 
@@ -1390,11 +1381,6 @@ func (fc *FileCache) renameCachedFile(localSrcPath string, localDstPath string) 
 	// delete the source from our cache policy
 	// this will also delete the source file from local storage (if rename failed)
 	fc.policy.CachePurge(localSrcPath)
-
-	if fc.cacheTimeout == 0 {
-		// Destination file needs to be deleted immediately
-		go fc.policy.CachePurge(localDstPath)
-	}
 }
 
 // TruncateFile: Update the file with its new size.

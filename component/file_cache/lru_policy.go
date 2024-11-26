@@ -72,7 +72,8 @@ type lruPolicy struct {
 
 const (
 	// Check for disk usage in below number of minutes
-	DiskUsageCheckInterval = 1
+	DiskUsageCheckInterval  = 1
+	minimumEvictionInterval = 100 * time.Millisecond
 )
 
 var _ cachePolicy = &lruPolicy{}
@@ -120,8 +121,9 @@ func (p *lruPolicy) StartPolicy() error {
 
 	log.Info("lruPolicy::StartPolicy : Policy set with %v timeout", p.cacheTimeout)
 
-	// if timeout is zero time.Tick will return nil
-	p.cacheTimeoutMonitor = time.Tick(time.Duration(time.Duration(p.cacheTimeout) * time.Second))
+	// run the timeout monitor even with timeout set to zero
+	timeoutInterval := time.Duration(p.cacheTimeout) * time.Second
+	p.cacheTimeoutMonitor = time.Tick(max(timeoutInterval, minimumEvictionInterval))
 
 	go p.clearCache()
 	go p.asyncCacheValid()
@@ -153,21 +155,6 @@ func (p *lruPolicy) CacheValid(name string) {
 		p.cacheValidate(name)
 	} else {
 		p.validateChan <- name
-	}
-}
-
-func (p *lruPolicy) CacheInvalidate(name string) {
-	log.Trace("lruPolicy::CacheInvalidate : %s", name)
-
-	// We check if the file is not in the nodeMap to deal with the case
-	// where timeout is 0 and there are multiple handles open to the file.
-	// When the first close comes, we will remove the entry from the map
-	// and attempt to delete the file. This deletion will fail (and be skipped)
-	// since there are other open handles. When the last close comes in, the map
-	// will be clean so we we need to try deleting the file.
-	_, found := p.nodeMap.Load(name)
-	if p.cacheTimeout == 0 || !found {
-		p.CachePurge(name)
 	}
 }
 
@@ -241,18 +228,7 @@ func (p *lruPolicy) cacheValidate(name string) {
 	if node == p.head {
 		return
 	}
-	// remove node from its current position
-	if node.next != nil {
-		node.next.prev = node.prev
-	}
-	if node.prev != nil {
-		node.prev.next = node.next
-	}
-	// set node as head
-	node.prev = nil
-	node.next = p.head
-	p.head.prev = node
-	p.head = node
+	p.moveToHead(node)
 
 	node.usage++
 }
@@ -336,8 +312,22 @@ func (p *lruPolicy) updateMarker() {
 	log.Trace("lruPolicy::updateMarker")
 
 	p.Lock()
-	node := p.lastMarker
-	// remove lastMarker from linked list
+	p.moveToHead(p.lastMarker)
+	// evict everything when timeout is zero
+	if p.cacheTimeout == 0 {
+		p.moveToHead(p.currMarker)
+	} else {
+		// swap lastMarker with currMarker
+		swap := p.lastMarker
+		p.lastMarker = p.currMarker
+		p.currMarker = swap
+	}
+
+	p.Unlock()
+}
+
+func (p *lruPolicy) moveToHead(node *lruNode) {
+	// remove the node from its position
 	if node.next != nil {
 		node.next.prev = node.prev
 	}
@@ -349,11 +339,6 @@ func (p *lruPolicy) updateMarker() {
 	node.next = p.head
 	p.head.prev = node
 	p.head = node
-	// swap lastMarker with currMarker
-	p.lastMarker = p.currMarker
-	p.currMarker = node
-
-	p.Unlock()
 }
 
 func (p *lruPolicy) deleteExpiredNodes() {
