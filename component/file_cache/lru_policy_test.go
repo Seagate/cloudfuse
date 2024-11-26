@@ -200,7 +200,6 @@ func (suite *lruPolicyTestSuite) TestCachePurge() {
 		highThreshold: defaultMaxThreshold,
 		lowThreshold:  defaultMinThreshold,
 		fileLocks:     &common.LockMap{},
-		policyTrace:   true,
 	}
 	suite.setupTestHelper(config)
 
