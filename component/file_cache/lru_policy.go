@@ -75,7 +75,8 @@ type lruPolicy struct {
 
 const (
 	// Check for disk usage in below number of minutes
-	DiskUsageCheckInterval = 1
+	DiskUsageCheckInterval  = 1
+	minimumEvictionInterval = 100 * time.Millisecond
 )
 
 var _ cachePolicy = &lruPolicy{}
@@ -126,7 +127,8 @@ func (p *lruPolicy) StartPolicy() error {
 	log.Info("lruPolicy::StartPolicy : Policy set with %v timeout", p.cacheTimeout)
 
 	// run the timeout monitor even with timeout set to zero
-	p.cacheTimeoutMonitor = time.Tick(time.Duration(time.Duration(max(p.cacheTimeout, 1)) * time.Second))
+	timeoutInterval := time.Duration(p.cacheTimeout) * time.Second
+	p.cacheTimeoutMonitor = time.Tick(max(timeoutInterval, minimumEvictionInterval))
 
 	go p.clearCache()
 	go p.asyncCacheValid()
@@ -158,21 +160,6 @@ func (p *lruPolicy) CacheValid(name string) {
 		p.cacheValidate(name)
 	} else {
 		p.validateChan <- name
-	}
-}
-
-func (p *lruPolicy) CacheInvalidate(name string) {
-	log.Trace("lruPolicy::CacheInvalidate : %s", name)
-
-	// We check if the file is not in the nodeMap to deal with the case
-	// where timeout is 0 and there are multiple handles open to the file.
-	// When the first close comes, we will remove the entry from the map
-	// and attempt to delete the file. This deletion will fail (and be skipped)
-	// since there are other open handles. When the last close comes in, the map
-	// will be clean so we we need to try deleting the file.
-	_, found := p.nodeMap.Load(name)
-	if p.cacheTimeout == 0 || !found {
-		p.CachePurge(name)
 	}
 }
 

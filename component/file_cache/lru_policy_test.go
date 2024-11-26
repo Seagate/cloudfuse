@@ -189,21 +189,8 @@ func (suite *lruPolicyTestSuite) TestCacheValid() {
 	suite.assert.EqualValues(1, node.usage)
 }
 
-func (suite *lruPolicyTestSuite) TestCacheInvalidate() {
+func (suite *lruPolicyTestSuite) TestCachePurge() {
 	defer suite.cleanupTest()
-	f, _ := os.Create(cache_path + "/temp")
-	f.Close()
-	suite.policy.CacheValid("temp")
-	suite.policy.CacheInvalidate("temp") // this is equivalent to purge since timeout=0
-
-	n, ok := suite.policy.nodeMap.Load("temp")
-	suite.assert.False(ok)
-	suite.assert.Nil(n)
-}
-
-func (suite *lruPolicyTestSuite) TestCacheInvalidateTimeout() {
-	defer suite.cleanupTest()
-	suite.cleanupTest()
 
 	config := cachePolicyConfig{
 		tmpPath:       cache_path,
@@ -213,23 +200,10 @@ func (suite *lruPolicyTestSuite) TestCacheInvalidateTimeout() {
 		highThreshold: defaultMaxThreshold,
 		lowThreshold:  defaultMinThreshold,
 		fileLocks:     &common.LockMap{},
+		policyTrace:   true,
 	}
-
 	suite.setupTestHelper(config)
 
-	suite.policy.CacheValid("temp")
-	suite.policy.CacheInvalidate("temp")
-
-	n, ok := suite.policy.nodeMap.Load("temp")
-	suite.assert.True(ok)
-	suite.assert.NotNil(n)
-	node := n.(*lruNode)
-	suite.assert.EqualValues("temp", node.name)
-	suite.assert.EqualValues(1, node.usage)
-}
-
-func (suite *lruPolicyTestSuite) TestCachePurge() {
-	defer suite.cleanupTest()
 	// test policy cache data
 	suite.policy.CacheValid("temp")
 	suite.policy.CachePurge("temp")
