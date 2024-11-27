@@ -896,8 +896,8 @@ func (suite *fileCacheTestSuite) TestOpenFileInCache() {
 func (suite *fileCacheTestSuite) TestCloseFileAndEvict() {
 	defer suite.cleanupTest()
 	suite.cleanupTest()
-	configuration := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s",
-		suite.cache_path, suite.fake_storage_path)
+	configuration := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, minimumFileCacheTimeout, suite.fake_storage_path)
 	suite.setupTestHelper(configuration)
 
 	path := "file10"
@@ -913,10 +913,10 @@ func (suite *fileCacheTestSuite) TestCloseFileAndEvict() {
 	// File should be in cloud storage
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
 
-	time.Sleep(time.Second)
+	time.Sleep(minimumFileCacheTimeout * time.Second)
 	// loop until file does not exist - done due to async nature of eviction
 	_, err = os.Stat(filepath.Join(suite.cache_path, path))
-	for i := 0; i < (minimumFileCacheTimeout*30) && !os.IsNotExist(err); i++ {
+	for i := 0; i < 30*minimumFileCacheTimeout && !os.IsNotExist(err); i++ {
 		time.Sleep(100 * time.Millisecond)
 		_, err = os.Stat(filepath.Join(suite.cache_path, path))
 	}
@@ -951,6 +951,11 @@ func (suite *fileCacheTestSuite) TestOpenCloseHandleCount() {
 func (suite *fileCacheTestSuite) TestOpenPreventsEviction() {
 	defer suite.cleanupTest()
 
+	suite.cleanupTest()
+	configuration := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, minimumFileCacheTimeout, suite.fake_storage_path)
+	suite.setupTestHelper(configuration)
+
 	// Setup
 	path := "file12"
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
@@ -966,7 +971,7 @@ func (suite *fileCacheTestSuite) TestOpenPreventsEviction() {
 	suite.assert.NoError(err)
 
 	// wait until file would be evicted (if not for being opened)
-	time.Sleep(time.Second * time.Duration(minimumFileCacheTimeout*3))
+	time.Sleep(3 * minimumFileCacheTimeout * time.Second)
 
 	// File should still be in cache
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
@@ -1170,6 +1175,12 @@ func (suite *fileCacheTestSuite) TestGetAttrCase3() {
 
 func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	defer suite.cleanupTest()
+
+	suite.cleanupTest()
+	configuration := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, minimumFileCacheTimeout, suite.fake_storage_path)
+	suite.setupTestHelper(configuration)
+
 	// Setup
 	file := "file27"
 	// By default createEmptyFile is false, so we will not create these files in cloud storage until they are closed.
@@ -1191,9 +1202,9 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	suite.assert.NoError(err)
 
 	// Wait  file is evicted
-	time.Sleep(time.Second)
+	time.Sleep(minimumFileCacheTimeout * time.Second)
 	_, err = os.Stat(filepath.Join(suite.cache_path, file))
-	for i := 0; i < 20 && !os.IsNotExist(err); i++ {
+	for i := 0; i < 20*minimumFileCacheTimeout && !os.IsNotExist(err); i++ {
 		time.Sleep(100 * time.Millisecond)
 		_, err = os.Stat(filepath.Join(suite.cache_path, file))
 	}
@@ -1291,6 +1302,11 @@ func (suite *fileCacheTestSuite) TestRenameFileCase2() {
 func (suite *fileCacheTestSuite) TestRenameFileAndEvict() {
 	defer suite.cleanupTest()
 
+	suite.cleanupTest()
+	configuration := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, minimumFileCacheTimeout, suite.fake_storage_path)
+	suite.setupTestHelper(configuration)
+
 	src := "source4"
 	dst := "destination4"
 	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
@@ -1314,9 +1330,9 @@ func (suite *fileCacheTestSuite) TestRenameFileAndEvict() {
 	suite.assert.FileExists(suite.cache_path + "/" + dst) // Dst shall exists in cache
 
 	// Wait for the cache cleanup to occur
-	time.Sleep(time.Second)
+	time.Sleep(minimumFileCacheTimeout * time.Second)
 	_, err = os.Stat(filepath.Join(suite.cache_path, dst))
-	for i := 0; i < 20 && !os.IsNotExist(err); i++ {
+	for i := 0; i < 20*minimumFileCacheTimeout && !os.IsNotExist(err); i++ {
 		time.Sleep(100 * time.Millisecond)
 		_, err = os.Stat(filepath.Join(suite.cache_path, dst))
 	}
@@ -1443,8 +1459,8 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 
 func (suite *fileCacheTestSuite) TestZZOffloadIO() {
 	defer suite.cleanupTest()
-	configuration := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: 0\n\nloopbackfs:\n  path: %s",
-		suite.cache_path, suite.fake_storage_path)
+	configuration := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, minimumFileCacheTimeout, suite.fake_storage_path)
 
 	suite.setupTestHelper(configuration)
 
