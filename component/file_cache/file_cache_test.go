@@ -916,8 +916,8 @@ func (suite *fileCacheTestSuite) TestCloseFileAndEvict() {
 	time.Sleep(time.Second)
 	// loop until file does not exist - done due to async nature of eviction
 	_, err = os.Stat(filepath.Join(suite.cache_path, path))
-	for i := 0; i < (minimumFileCacheTimeout*300) && !os.IsNotExist(err); i++ {
-		time.Sleep(10 * time.Millisecond)
+	for i := 0; i < (minimumFileCacheTimeout*30) && !os.IsNotExist(err); i++ {
+		time.Sleep(100 * time.Millisecond)
 		_, err = os.Stat(filepath.Join(suite.cache_path, path))
 	}
 
@@ -1193,8 +1193,8 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	// Wait  file is evicted
 	time.Sleep(time.Second)
 	_, err = os.Stat(filepath.Join(suite.cache_path, file))
-	for i := 0; i < 200 && !os.IsNotExist(err); i++ {
-		time.Sleep(10 * time.Millisecond)
+	for i := 0; i < 20 && !os.IsNotExist(err); i++ {
+		time.Sleep(100 * time.Millisecond)
 		_, err = os.Stat(filepath.Join(suite.cache_path, file))
 	}
 	suite.assert.True(os.IsNotExist(err))
@@ -1316,8 +1316,8 @@ func (suite *fileCacheTestSuite) TestRenameFileAndEvict() {
 	// Wait for the cache cleanup to occur
 	time.Sleep(time.Second)
 	_, err = os.Stat(filepath.Join(suite.cache_path, dst))
-	for i := 0; i < 200 && !os.IsNotExist(err); i++ {
-		time.Sleep(10 * time.Millisecond)
+	for i := 0; i < 20 && !os.IsNotExist(err); i++ {
+		time.Sleep(100 * time.Millisecond)
 		_, err = os.Stat(filepath.Join(suite.cache_path, dst))
 	}
 	suite.assert.NoFileExists(filepath.Join(suite.cache_path, dst)) // Dst shall not exists in cache
@@ -1473,8 +1473,8 @@ func (suite *fileCacheTestSuite) TestZZZZLazyWrite() {
 	// File is uploaded async on close
 	_ = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	// Wait for the upload
-	for i := 0; i < 500 && handle.Dirty(); i++ {
-		time.Sleep(10 * time.Millisecond)
+	for i := 0; i < 50 && handle.Dirty(); i++ {
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	suite.assert.False(handle.Dirty())
