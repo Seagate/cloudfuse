@@ -1176,11 +1176,6 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 	//defer exectime.StatTimeCurrentBlock("FileCache::FlushFile")()
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
-	// lock the file state
-	flock := fc.fileLocks.Get(options.Handle.Path)
-	flock.Lock()
-	defer flock.Unlock()
-
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 	fc.policy.CacheValid(localPath)
@@ -1453,10 +1448,6 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 // Chmod : Update the file with its new permissions
 func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 	log.Trace("FileCache::Chmod : Change mode of path %s", options.Name)
-
-	flock := fc.fileLocks.Get(options.Name)
-	flock.Lock()
-	defer flock.Unlock()
 
 	// Update the file in cloud storage
 	err := fc.NextComponent().Chmod(options)
