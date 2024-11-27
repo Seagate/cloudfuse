@@ -113,7 +113,8 @@ func (suite *fileCacheLinuxTestSuite) TestChmodNotInCache() {
 	defer suite.cleanupTest()
 	// Setup - create file directly in fake storage
 	path := "file33"
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
@@ -198,7 +199,8 @@ func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file36"
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)

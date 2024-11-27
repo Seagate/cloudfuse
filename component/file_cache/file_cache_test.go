@@ -396,9 +396,12 @@ func (suite *fileCacheTestSuite) TestStreamDirCase1() {
 	// Create files directly in "fake_storage"
 	suite.loopback.CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777})
 	suite.loopback.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1})
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file2})
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3})
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file2})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// Read the Directory
 	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
@@ -455,9 +458,12 @@ func (suite *fileCacheTestSuite) TestStreamDirCase3() {
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, Size: 1024})
 	// Create the files in fake_storage and simulate different sizes
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// Read the Directory
 	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
@@ -502,10 +508,12 @@ func (suite *fileCacheTestSuite) TestStreamDirMixed() {
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, Size: 1024})
 
 	// Create the files in fake_storage and simulate different sizes
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
-
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777})
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, Size: 1024})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, Size: 0})
 
@@ -1141,7 +1149,8 @@ func (suite *fileCacheTestSuite) TestGetAttrCase1() {
 	// Setup
 	file := "file24"
 	// Create files directly in "fake_storage"
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// Read the Directory
 	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
@@ -1244,7 +1253,8 @@ func (suite *fileCacheTestSuite) TestRenameFileNotInCache() {
 	// Setup
 	src := "source1"
 	dst := "destination1"
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0777})
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// Path should be in fake storage
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, src))
@@ -1378,7 +1388,8 @@ func (suite *fileCacheTestSuite) TestTruncateFileNotInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file30"
-	suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// Path should be in fake storage
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
