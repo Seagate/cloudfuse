@@ -1329,11 +1329,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
 	localPath := filepath.Join(fc.tmpPath, options.Name)
-	flock := fc.fileLocks.Get(options.Name)
-	// TODO: should we use a RWMutex and use RLock for stat calls?
-	flock.Lock()
 	info, err := os.Stat(localPath)
-	flock.Unlock()
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
 	if err == nil && !info.IsDir() {
 		if exists { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
