@@ -1211,12 +1211,7 @@ func (suite *fileCacheTestSuite) TestGetAttrCase3() {
 	suite.assert.NoError(err)
 	suite.assert.NotNil(attr)
 	suite.assert.EqualValues(file, attr.Path)
-	// this check is flaky in our CI pipeline on Linux, so skip it
-	if runtime.GOOS != "windows" {
-		fmt.Println("Skipping TestGetAttrCase3 attr.Size check on Linux because it's flaky.")
-	} else {
-		suite.assert.EqualValues(1024, attr.Size)
-	}
+	suite.assert.EqualValues(1024, attr.Size)
 }
 
 func (suite *fileCacheTestSuite) TestGetAttrCase4() {
