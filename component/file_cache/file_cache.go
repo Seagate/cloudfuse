@@ -630,8 +630,8 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 			newPath := strings.Replace(path, localSrcPath, localDstPath, 1)
 			if !d.IsDir() {
 				log.Debug("FileCache::RenameDir : Renaming local file %s -> %s", path, newPath)
-				srcFlock := fc.fileLocks.Get(path)
-				dstFlock := fc.fileLocks.Get(newPath)
+				srcFlock := fc.fileLocks.Get(common.JoinUnixFilepath(options.Src, path))
+				dstFlock := fc.fileLocks.Get(common.JoinUnixFilepath(options.Dst, path))
 				srcFlock.Lock()
 				dstFlock.Lock()
 				fc.renameCachedFile(path, newPath)
