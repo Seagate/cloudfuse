@@ -73,8 +73,7 @@ type lruPolicy struct {
 
 const (
 	// Check for disk usage in below number of minutes
-	DiskUsageCheckInterval  = 1
-	minimumEvictionInterval = 100 * time.Millisecond
+	DiskUsageCheckInterval = 1
 )
 
 var _ cachePolicy = &lruPolicy{}
@@ -122,9 +121,8 @@ func (p *lruPolicy) StartPolicy() error {
 
 	log.Info("lruPolicy::StartPolicy : Policy set with %v timeout", p.cacheTimeout)
 
-	// run the timeout monitor even with timeout set to zero
-	timeoutInterval := time.Duration(p.cacheTimeout) * time.Second
-	p.cacheTimeoutMonitor = time.Tick(max(timeoutInterval, minimumEvictionInterval))
+	// start the timeout monitor
+	p.cacheTimeoutMonitor = time.Tick(time.Duration(p.cacheTimeout) * time.Second)
 
 	go p.clearCache()
 	go p.asyncCacheValid()
@@ -236,7 +234,8 @@ func (p *lruPolicy) cacheValidate(name string) {
 	if node == p.head {
 		return
 	}
-	p.moveToHead(node)
+	p.extractNode(node)
+	p.setHead(node)
 }
 
 // For all other timer based activities we check the stuff here
@@ -298,51 +297,44 @@ func (p *lruPolicy) removeNode(name string) {
 	node.deleted = true
 	node.Unlock()
 
-	if node == p.head {
-		p.head = node.next
-		p.head.prev = nil
-		node.next = nil
-		return
-	}
-
-	if node.next != nil {
-		node.next.prev = node.prev
-	}
-
-	if node.prev != nil {
-		node.prev.next = node.next
-	}
-	node.prev = nil
-	node.next = nil
+	p.extractNode(node)
 }
 
 func (p *lruPolicy) updateMarker() {
 	log.Trace("lruPolicy::updateMarker")
 
 	p.Lock()
-	p.moveToHead(p.lastMarker)
-	// evict everything when timeout is zero
-	if p.cacheTimeout == 0 {
-		p.moveToHead(p.currMarker)
-	} else {
-		// swap lastMarker with currMarker
-		swap := p.lastMarker
-		p.lastMarker = p.currMarker
-		p.currMarker = swap
-	}
+	p.extractNode(p.lastMarker)
+	p.setHead(p.lastMarker)
+	// swap lastMarker with currMarker
+	swap := p.lastMarker
+	p.lastMarker = p.currMarker
+	p.currMarker = swap
 
 	p.Unlock()
 }
 
-func (p *lruPolicy) moveToHead(node *lruNode) {
-	// remove the node from its position
+func (p *lruPolicy) extractNode(node *lruNode) {
+	// remove the node from its position in the list
+
+	// head case
+	if node == p.head {
+		p.head = node.next
+	}
+
 	if node.next != nil {
 		node.next.prev = node.prev
 	}
 	if node.prev != nil {
 		node.prev.next = node.next
 	}
-	// and insert it at the head
+
+	node.prev = nil
+	node.next = nil
+}
+
+func (p *lruPolicy) setHead(node *lruNode) {
+	// insert node at the head
 	node.prev = nil
 	node.next = p.head
 	p.head.prev = node
