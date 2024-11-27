@@ -98,7 +98,7 @@ func (suite *fileCacheTestSuite) SetupTest() {
 	rand := randomString(8)
 	suite.cache_path = filepath.Join(home_dir, "file_cache"+rand)
 	suite.fake_storage_path = filepath.Join(home_dir, "fake_storage"+rand)
-	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
+	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
 	log.Debug(defaultConfig)
 
 	// Delete the temp directories created
@@ -893,35 +893,12 @@ func (suite *fileCacheTestSuite) TestOpenFileInCache() {
 // Tests for GetProperties in OpenFile should be done in E2E tests
 // - there is no good way to test it here with a loopback FS without a mock component.
 
-func (suite *fileCacheTestSuite) TestCloseFile() {
+func (suite *fileCacheTestSuite) TestCloseFileAndEvict() {
 	defer suite.cleanupTest()
-	// Default is to not create empty files on create file to support immutable storage.
-	path := "file9"
-
-	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	// The file is in the cache but not in cloud storage (see TestCreateFileInDirCreateEmptyFile)
-
-	// CloseFile
-	err := suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-
-	// loop until file does not exist - done due to async nature of eviction
-	time.Sleep(time.Second)
-	_, err = os.Stat(filepath.Join(suite.cache_path, path))
-	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
-		time.Sleep(10 * time.Millisecond)
-		_, err = os.Stat(filepath.Join(suite.cache_path, path))
-	}
-	suite.assert.True(os.IsNotExist(err))
-
-	// File should not be in cache
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
-	// File should be in cloud storage
-	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
-}
-
-func (suite *fileCacheTestSuite) TestCloseFileTimeout() {
-	defer suite.cleanupTest()
+	suite.cleanupTest()
+	configuration := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, suite.fake_storage_path)
+	suite.setupTestHelper(configuration)
 
 	path := "file10"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
@@ -1311,7 +1288,7 @@ func (suite *fileCacheTestSuite) TestRenameFileCase2() {
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, dst))
 }
 
-func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanup() {
+func (suite *fileCacheTestSuite) TestRenameFileAndEvict() {
 	defer suite.cleanupTest()
 
 	src := "source4"
@@ -1535,9 +1512,8 @@ func (suite *fileCacheTestSuite) TestStatFS() {
 func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	defer suite.cleanupTest()
 	// Configure to create empty files so we create the file in cloud storage
-	createEmptyFile := true
-	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n  timeout-sec: 1000\n  refresh-sec: 1\n\nloopbackfs:\n  path: %s",
-		suite.cache_path, createEmptyFile, suite.fake_storage_path)
+	config := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  refresh-sec: 1\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, suite.fake_storage_path)
 	suite.setupTestHelper(config) // setup a new file cache with a custom config (teardown will occur after the test as usual)
 
 	path := "file42"
