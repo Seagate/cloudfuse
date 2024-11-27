@@ -528,8 +528,13 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 				info, err := dirent.Info()
 
 				if err == nil {
-					attr.Mtime = info.ModTime()
-					attr.Size = info.Size()
+					// attr is a pointer returned by NextComponent
+					// modifying attr could corrupt cached directory listings
+					// to update properties, we need to make a deep copy first
+					newAttr := *attr
+					newAttr.Mtime = info.ModTime()
+					newAttr.Size = info.Size()
+					attrs[i] = &newAttr
 				}
 			}
 			i++
@@ -1320,8 +1325,13 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			// If file is under download then taking size or mod time from it will be incorrect.
 			if !fc.fileLocks.Locked(options.Name) {
 				log.Debug("FileCache::GetAttr : updating %s from local cache", options.Name)
-				attrs.Size = info.Size()
-				attrs.Mtime = info.ModTime()
+				// attrs is a pointer returned by NextComponent
+				// modifying attrs could corrupt cached directory listings
+				// to update properties, we need to make a deep copy first
+				newAttr := *attrs
+				newAttr.Mtime = info.ModTime()
+				newAttr.Size = info.Size()
+				attrs = &newAttr
 			} else {
 				log.Debug("FileCache::GetAttr : %s is locked, use storage attributes", options.Name)
 			}
