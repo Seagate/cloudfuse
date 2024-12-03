@@ -119,6 +119,7 @@ const (
 	defaultMaxThreshold     = 80
 	defaultMinThreshold     = 60
 	defaultFileCacheTimeout = 120
+	minimumFileCacheTimeout = 1
 	defaultCacheUpdateCount = 100
 	MB                      = 1024 * 1024
 )
@@ -220,9 +221,9 @@ func (c *FileCache) Configure(_ bool) error {
 
 	c.createEmptyFile = conf.CreateEmptyFile
 	if config.IsSet(compName + ".file-cache-timeout-in-seconds") {
-		c.cacheTimeout = float64(conf.V1Timeout)
+		c.cacheTimeout = max(float64(conf.V1Timeout), minimumFileCacheTimeout)
 	} else if config.IsSet(compName + ".timeout-sec") {
-		c.cacheTimeout = float64(conf.Timeout)
+		c.cacheTimeout = max(float64(conf.Timeout), minimumFileCacheTimeout)
 	} else {
 		c.cacheTimeout = float64(defaultFileCacheTimeout)
 	}
@@ -341,7 +342,7 @@ func (c *FileCache) OnConfigChange() {
 	}
 
 	c.createEmptyFile = conf.CreateEmptyFile
-	c.cacheTimeout = float64(conf.Timeout)
+	c.cacheTimeout = max(float64(conf.Timeout), minimumFileCacheTimeout)
 	c.policyTrace = conf.EnablePolicyTrace
 	c.offloadIO = conf.OffloadIO
 	c.maxCacheSize = conf.MaxSizeMB
