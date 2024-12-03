@@ -525,12 +525,20 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			j++
 		} else {
 			// Case 3: Item is in both local cache and cloud
-			if !attr.IsDir() && !fc.fileLocks.Locked(attr.Path) {
-				info, err := dirent.Info()
-
+			if !attr.IsDir() {
+				flock := fc.fileLocks.Get(attr.Path)
+				flock.Lock()
+				// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
+				info, err := os.Stat(filepath.Join(localPath, dirent.Name())) // Grab local cache attributes
+				flock.Unlock()
 				if err == nil {
-					attr.Mtime = info.ModTime()
-					attr.Size = info.Size()
+					// attr is a pointer returned by NextComponent
+					// modifying attr could corrupt cached directory listings
+					// to update properties, we need to make a deep copy first
+					newAttr := *attr
+					newAttr.Mtime = info.ModTime()
+					newAttr.Size = info.Size()
+					attrs[i] = &newAttr
 				}
 			}
 			i++
@@ -542,14 +550,19 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	if token == "" {
 		for _, entry := range dirents {
 			entryPath := common.JoinUnixFilepath(options.Name, entry.Name())
-			if !entry.IsDir() && !fc.fileLocks.Locked(entryPath) {
+			if !entry.IsDir() {
 				// This is an overhead for streamdir for now
 				// As list is paginated we have no way to know whether this particular item exists both in local cache
 				// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
 				// If entry does not exists on storage then only return a local item here.
 				_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath})
 				if err != nil && (err == syscall.ENOENT || os.IsNotExist(err)) {
-					info, err := entry.Info() // Grab local cache attributes
+					// get the lock on the file, to allow any pending operation to complete
+					flock := fc.fileLocks.Get(entryPath)
+					flock.Lock()
+					// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
+					info, err := os.Stat(filepath.Join(localPath, entry.Name())) // Grab local cache attributes
+					flock.Unlock()
 					// If local file is not locked then only use its attributes otherwise rely on container attributes
 					if err == nil {
 						// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
@@ -1059,7 +1072,9 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 
 	// Read and write operations are very frequent so updating cache policy for every read is a costly operation
 	// Update cache policy every 1K operations (includes both read and write) instead
+	options.Handle.Lock()
 	options.Handle.OptCnt++
+	options.Handle.Unlock()
 	if (options.Handle.OptCnt % defaultCacheUpdateCount) == 0 {
 		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 		fc.policy.CacheValid(localPath)
@@ -1106,7 +1121,9 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	// Read and write operations are very frequent so updating cache policy for every read is a costly operation
 	// Update cache policy every 1K operations (includes both read and write) instead
+	options.Handle.Lock()
 	options.Handle.OptCnt++
+	options.Handle.Unlock()
 	if (options.Handle.OptCnt % defaultCacheUpdateCount) == 0 {
 		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 		fc.policy.CacheValid(localPath)
@@ -1313,28 +1330,28 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
 	localPath := filepath.Join(fc.tmpPath, options.Name)
+	// If the file is being downloaded or deleted, the size and mod time will be incorrect
+	// wait for download or deletion to complete before getting local file info
+	flock := fc.fileLocks.Get(options.Name)
+	flock.Lock()
+	// TODO: Do we need to call NextComponent().GetAttr in this same critical section to avoid a data race with the cloud?
 	info, err := os.Stat(localPath)
+	flock.Unlock()
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
 	if err == nil && !info.IsDir() {
 		if exists { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
-			// Return from local cache only if file is not under download or deletion
-			// If file is under download then taking size or mod time from it will be incorrect.
-			if !fc.fileLocks.Locked(options.Name) {
-				log.Debug("FileCache::GetAttr : updating %s from local cache", options.Name)
-				attrs.Size = info.Size()
-				attrs.Mtime = info.ModTime()
-			} else {
-				log.Debug("FileCache::GetAttr : %s is locked, use storage attributes", options.Name)
-			}
+			log.Debug("FileCache::GetAttr : updating %s from local cache", options.Name)
+			// attrs is a pointer returned by NextComponent
+			// modifying attrs could corrupt cached directory listings
+			// to update properties, we need to make a deep copy first
+			newAttr := *attrs
+			newAttr.Mtime = info.ModTime()
+			newAttr.Size = info.Size()
+			attrs = &newAttr
 		} else { // Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
-			if !strings.Contains(localPath, fc.tmpPath) {
-				// Here if the path is going out of the temp directory then return ENOENT
-				exists = false
-			} else {
-				log.Debug("FileCache::GetAttr : serving %s attr from local cache", options.Name)
-				exists = true
-				attrs = newObjAttr(options.Name, info)
-			}
+			log.Debug("FileCache::GetAttr : serving %s attr from local cache", options.Name)
+			exists = true
+			attrs = newObjAttr(options.Name, info)
 		}
 	}
 
