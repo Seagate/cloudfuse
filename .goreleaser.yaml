@@ -64,13 +64,14 @@ builds:
       - amd64
     env:
       - CGO_ENABLED=1
-      - CC=zig cc -target x86_64-linux-gnu
-      - CXX=zig c++ -target x86_64-linux-gnu
+      - CGO_LDFLAGS=-L/usr/lib/x86_64-linux-gnu
+      - CC=zig cc -target x86_64-linux-gnu -isystem /usr/lib/x86_64-linux-gnu -iwithsysroot /usr/include
+      - CXX=zig c++ -target x86_64-linux-gnu -isystem /usr/lib/x86_64-linux-gnu -iwithsysroot /usr/include
     flags:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
-      - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
+      - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }} -L /usr/lib/x86_64-linux-gnu
 
   - id: linux-amd64-health-monitor
     main: ./tools/health-monitor/main.go
@@ -94,8 +95,9 @@ builds:
       - arm64
     env:
       - CGO_ENABLED=1
-      - CC=zig cc -target aarch64-linux-gnu
-      - CXX=zig c++ -target aarch64-linux-gnu
+      - CGO_LDFLAGS=-L/usr/lib/aarch64-linux-gnu
+      - CC=zig cc -target aarch64-linux-gnu -isystem /usr/lib/aarch64-linux-gnu -iwithsysroot /usr/include
+      - CXX=zig c++ -target aarch64-linux-gnu  -isystem /usr/lib/aarch64-linux-gnu -iwithsysroot /usr/include
     flags:
       - -trimpath
     mod_timestamp: '{{ .CommitTimestamp }}'
@@ -145,7 +147,7 @@ archives:
         dst: "./samples/sampleStreamingConfigS3.yaml"
       - src: "sampleStreamingConfigAzure.yaml"
         dst: "./samples/sampleStreamingConfigAzure.yaml"
-
+  
   - id: linux-amd64_no_gui
     builds:
       - linux-amd64
@@ -168,7 +170,7 @@ archives:
         dst: "./samples/sampleStreamingConfigS3.yaml"
       - src: "sampleStreamingConfigAzure.yaml"
         dst: "./samples/sampleStreamingConfigAzure.yaml"
-
+  
   - id: linux-arm64_no_gui
     builds:
       - linux-arm64
@@ -191,7 +193,7 @@ archives:
         dst: "./samples/sampleStreamingConfigS3.yaml"
       - src: "sampleStreamingConfigAzure.yaml"
         dst: "./samples/sampleStreamingConfigAzure.yaml"
-
+  
   - id: windows
     builds:
       - windows
@@ -216,7 +218,7 @@ archives:
         dst: "./samples/sampleStreamingConfigS3.yaml"
       - src: "sampleStreamingConfigAzure.yaml"
         dst: "./samples/sampleStreamingConfigAzure.yaml"
-
+  
   - id: windows_no_gui
     builds:
       - windows
@@ -239,6 +241,7 @@ archives:
         dst: "./samples/sampleStreamingConfigS3.yaml"
       - src: "sampleStreamingConfigAzure.yaml"
         dst: "./samples/sampleStreamingConfigAzure.yaml"
+
 
 release:
   extra_files:
@@ -305,11 +308,11 @@ nfpms:
     overrides:
       deb:
         dependencies:
-          - libfuse-dev
+          - libfuse3-dev
 
       rpm:
         dependencies:
-          - fuse-devel
+          - fuse3-devel
 
   - id: linux_no_gui
 
@@ -367,11 +370,11 @@ nfpms:
     overrides:
       deb:
         dependencies:
-          - libfuse-dev
+          - libfuse3-dev
 
       rpm:
         dependencies:
-          - fuse-devel
+          - fuse3-devel
 
 metadata:
   mod_timestamp: "{{ .CommitTimestamp }}"
