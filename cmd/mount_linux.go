@@ -45,8 +45,8 @@ import (
 func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName string, pidFilePerm os.FileMode, umask int, fname string) error {
 	dmnCtx := &daemon.Context{
 		PidFileName: pidFileName,
-		PidFilePerm: 0644,
-		Umask:       022,
+		PidFilePerm: pidFilePerm,
+		Umask:       umask,
 		LogFileName: fname, // this will redirect stderr of child to given file
 	}
 
@@ -70,10 +70,10 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 		log.Err("mount : failed to daemonize application [%v]", err)
 		return Destroy(fmt.Sprintf("failed to daemonize application [%s]", err.Error()))
 	}
+	defer dmnCtx.Release()
 
 	log.Debug("mount: foreground disabled, child = %v", daemon.WasReborn())
 	if child == nil { // execute in child only
-		defer dmnCtx.Release() // nolint
 		setGOConfig()
 		go startDynamicProfiler()
 
