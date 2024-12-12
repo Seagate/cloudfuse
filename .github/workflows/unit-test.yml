@@ -98,7 +98,7 @@ jobs:
           localstack start -d                       # Start LocalStack in the background
 
           echo "Waiting for LocalStack startup..."  # Wait 20 seconds for the LocalStack container
-          localstack wait -t 20                     # to become ready before timing out 
+          localstack wait -t 20                     # to become ready before timing out
           echo "Startup complete"
 
       - name: Install Azurite
