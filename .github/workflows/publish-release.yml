@@ -174,7 +174,7 @@ jobs:
 
       - name: Set Version
         id: get_version
-        run: echo "::set-output name=VERSION::$( echo ${REF_NAME} | tr -d 'v' )"
+        run: echo "VERSION=$(echo ${REF_NAME} | tr -d 'v')" >> $GITHUB_OUTPUT
         env:
           REF_NAME: ${{ github.ref_name }}
 
@@ -186,12 +186,6 @@ jobs:
         working-directory: ./build
         run: |
           .\run-iscc_no_gui.bat
-
-      - name: Set Version No Gui
-        id: get_version_no_gui
-        run: echo "::set-output name=VERSION::$( echo ${REF_NAME} | tr -d 'v' )"
-        env:
-          REF_NAME: ${{ github.ref_name }}
 
       - name: Rename installer No Gui
         run: |
@@ -254,7 +248,7 @@ jobs:
 
       - name: Set Version
         id: get_version
-        run: echo "::set-output name=VERSION::$( echo ${REF_NAME} | tr -d 'v' )"
+        run: echo "VERSION=$(echo ${REF_NAME} | tr -d 'v')" >> $GITHUB_OUTPUT
         env:
           REF_NAME: ${{ github.ref_name }}
 
@@ -266,12 +260,6 @@ jobs:
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
           fail-on-cache-miss: true
-
-      - name: Set Version No GUi
-        id: get_version_no_gui
-        run: echo "::set-output name=VERSION::$( echo ${REF_NAME} | tr -d 'v' )"
-        env:
-          REF_NAME: ${{ github.ref_name }}
 
         # Get cached intermediate build products
       - name: Restore cached Windows installer No Gui
