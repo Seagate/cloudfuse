@@ -39,7 +39,7 @@ jobs:
 
       - name: Set Version
         id: get_version
-        run: echo "VERSION=${REF_NAME}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${REF_NAME#3}" >> $GITHUB_OUTPUT
         env:
           REF_NAME: ${{ github.ref_name }}
 
