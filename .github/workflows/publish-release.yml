@@ -128,45 +128,21 @@ jobs:
         # don't continue if we fail get the compiled GUI for the Windows installer
         continue-on-error: false
       - # Build the installer and save it to actions/cache
-        name: Create PFX KeyCert File
-        working-directory: ./build
-        shell: bash
-        run: |
-          echo "${{ secrets.INSTALLER_SIGNATURE_PRIVATE_KEY }}" >> combined.pem
-          cat codeSigning.crt >> combined.pem
-          cat combined.pem | openssl pkcs12 -export -out signingKey.pfx -passout pass:
-          rm combined.pem
-      -
-        name: Prep Inno Setup Script
-        working-directory: ./build
-        shell: bash
-        # Inno Setup is pre-installed on GitHub's windows-latest image
-        # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
-        run: |
-          printf '%s ' >run-iscc.bat \
-            '"C:/Program Files (x86)/Inno Setup 6/iscc.exe"' \
-            '"/Ssigntool=$qC:\Program Files (x86)\Windows Kits\10\App Certification Kit\signtool.exe$q' \
-            'sign /fd SHA256 /a /f $q${{ github.workspace }}\build\signingKey.pfx$q' \
-            '/n $qSEAGATE TECHNOLOGY LLC$q /t http://timestamp.digicert.com $p"' \
-            "windows_installer_build.iss"
-      -
-        name: Prep Inno Setup Script for No Gui
-        working-directory: ./build
-        shell: bash
-        # Inno Setup is pre-installed on GitHub's windows-latest image
-        # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
-        run: |
-          printf '%s ' >run-iscc_no_gui.bat \
-            '"C:/Program Files (x86)/Inno Setup 6/iscc.exe"' \
-            '"/Ssigntool=$qC:\Program Files (x86)\Windows Kits\10\App Certification Kit\signtool.exe$q' \
-            'sign /fd SHA256 /a /f $q${{ github.workspace }}\build\signingKey.pfx$q' \
-            '/n $qSEAGATE TECHNOLOGY LLC$q /t http://timestamp.digicert.com $p"' \
-            "windows_installer_build_no_gui.iss"
-      -
         name: Run Inno Setup
         working-directory: ./build
+        shell: bash
+        # Inno Setup is pre-installed on GitHub's windows-latest image
+        # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
         run: |
-          .\run-iscc.bat
+          "C:/Program Files (x86)/Inno Setup 6/iscc.exe" windows_installer_build.iss
+      -
+        name: Run Inno Setup for No Gui
+        working-directory: ./build
+        shell: bash
+        # Inno Setup is pre-installed on GitHub's windows-latest image
+        # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
+        run: |
+          "C:/Program Files (x86)/Inno Setup 6/iscc.exe" windows_installer_build_no_gui.iss
       -
         name: Set Version
         id: get_version
