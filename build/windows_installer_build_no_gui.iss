@@ -30,8 +30,6 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
-SignTool=signtool /d $q{#MyAppName} v{#MyAppVersion}$q $f
-SignedUninstaller=yes
 VersionInfoVersion={#MyAppVersion}
 ; Tell Windows Explorer to reload the environment
 ChangesEnvironment=yes
