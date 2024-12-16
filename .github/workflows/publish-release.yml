@@ -2,7 +2,7 @@ name: Release binaries
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   compile-gui:
@@ -13,11 +13,12 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      -
-        name: Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
-      -
-        name: Fetch cached compiled GUI
+        with:
+          persist-credentials: false
+
+      - name: Fetch cached compiled GUI
         id: restore-compiled-gui
         uses: actions/cache/restore@v4
         with:
@@ -26,34 +27,34 @@ jobs:
           enableCrossOsArchive: true
           path: gui/dist/cloudfuseGUI_${{ runner.os }}
           key: ${{ runner.os }}-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
-      -
-        name: Install Python
+
+      - name: Install Python
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-          cache: 'pip'
-      -
-        name: Install pip dependencies
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install pip dependencies
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         run: pip3 install -r gui/requirements.txt
         shell: bash
-      -
-        name: Install libxcb-cursor0
+
+      - name: Install libxcb-cursor0
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit && matrix.os == 'ubuntu-latest' }}
         run: |-
           sudo apt-get update
           sudo apt-get install libxcb-cursor0 -y
-      -
-        name: Compile GUI
+
+      - name: Compile GUI
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         shell: bash
         run: |
           cd gui
           ./create_gui.sh
           mv dist/cloudfuseGUI dist/cloudfuseGUI_${{ runner.os }}
-      -
-        name: Cache compiled GUI
+
+      - name: Cache compiled GUI
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         uses: actions/cache/save@v4
         with:
@@ -67,26 +68,27 @@ jobs:
     needs: compile-gui
     runs-on: windows-latest
     env:
-      go: '1.23.2'
-      cgo: '0'
+      go: "1.23.2"
+      cgo: "0"
       winfsp: winfsp-2.0.23075.msi
     steps:
-      - # Build the command-line program
-        name: Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
-      -
-        name: Install Go
+        with:
+          persist-credentials: false
+
+      - name: Install Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.go }}
           check-latest: true
-      -
-        name: Set CGO
+
+      - name: Set CGO
         shell: bash
         run: |
           if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
-      -
-        name: Build
+
+      - name: Build
         shell: bash
         run: |
           commitDate=$(TZ=UTC0 git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)
@@ -97,28 +99,29 @@ jobs:
           touch -m -d $commitDate cloudfuse.exe
           touch -m -d $commitDate cfusemon.exe
           touch -m -d $commitDate windows-startup.exe
-      - # Get the WinFSP installer (from cache or download)
-        name: Get cached WinFSP installer
+
+        # Get the WinFSP installer (from cache or download)
+      - name: Get cached WinFSP installer
         id: restore-winfsp-installer
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
-      -
-        name: Download WinFSP installer
+
+      - name: Download WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
         shell: bash
         run: |
           curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.0/${{ env.winfsp }}
-      -
-        name: Cache WinFSP installer
+
+      - name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
         uses: actions/cache/save@v4
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
-      -
-        name: Fetch cached compiled GUI
+
+      - name: Fetch cached compiled GUI
         uses: actions/cache/restore@v4
         with:
           enableCrossOsArchive: true
@@ -127,52 +130,51 @@ jobs:
           fail-on-cache-miss: true
         # don't continue if we fail get the compiled GUI for the Windows installer
         continue-on-error: false
-      - # Build the installer and save it to actions/cache
-        name: Run Inno Setup
+
+        # Build the installer and save it to actions/cache
+      - name: Run Inno Setup
         working-directory: ./build
         shell: bash
         # Inno Setup is pre-installed on GitHub's windows-latest image
         # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
         run: |
           "C:/Program Files (x86)/Inno Setup 6/iscc.exe" windows_installer_build.iss
-      -
-        name: Run Inno Setup for No Gui
+
+      - name: Run Inno Setup for No Gui
         working-directory: ./build
         shell: bash
         # Inno Setup is pre-installed on GitHub's windows-latest image
         # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
         run: |
           "C:/Program Files (x86)/Inno Setup 6/iscc.exe" windows_installer_build_no_gui.iss
-      -
-        name: Set Version
+
+      - name: Set Version
         id: get_version
-        run: echo "::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )"
-      -
-        name: Rename installer
+        run: echo "VERSION=${REF_NAME#v}" >> $GITHUB_OUTPUT
+        env:
+          REF_NAME: ${{ github.ref_name }}
+
+      - name: Rename installer
         run: |
           mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
-      -
-        name: Run Inno Setup No Gui
+
+      - name: Run Inno Setup No Gui
         working-directory: ./build
         run: |
           .\run-iscc_no_gui.bat
-      -
-        name: Set Version No Gui
-        id: get_version_no_gui
-        run: echo "::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )"
-      -
-        name: Rename installer No Gui
+
+      - name: Rename installer No Gui
         run: |
           mv build/Output/cloudfuse.exe build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
-      -
-        name: Cache windows installer
+
+      - name: Cache windows installer
         uses: actions/cache/save@v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
-      -
-        name: Cache windows installer No GUi
+
+      - name: Cache windows installer No GUi
         uses: actions/cache/save@v4
         with:
           enableCrossOsArchive: true
@@ -185,23 +187,26 @@ jobs:
     needs: create-installer
     runs-on: ubuntu-latest
     env:
-      go: '1.23.2'
+      go: "1.23.2"
       zig: 0.13.0
 
     steps:
-      - # libfuse-dev is required to build our command-line program
-        name: Install Libfuse
+      # libfuse-dev is required to build our command-line program
+      - name: Install Libfuse
         run: |
           sudo apt-get install -y libfuse-dev
-      - # enable GoReleaser to build for ARM64
-        name: Install ARM64 compilers
+
+        # enable GoReleaser to build for ARM64
+      - name: Install ARM64 compilers
         run: |
           sudo apt-get install -y gcc-aarch64-linux-gnu
-      - # Get code and Go ready
-        name: Checkout code
+
+        # Get code and Go ready
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install Zig
         run: |
@@ -216,40 +221,40 @@ jobs:
         with:
           go-version: ${{ env.go }}
           check-latest: true
-      -
-        name: Set Version
+
+      - name: Set Version
         id: get_version
-        run: echo "::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )"
-      - # Get cached intermediate build products
-        name: Restore cached Windows installer
+        run: echo "VERSION=${REF_NAME#v}" >> $GITHUB_OUTPUT
+        env:
+          REF_NAME: ${{ github.ref_name }}
+
+        # Get cached intermediate build products
+      - name: Restore cached Windows installer
         uses: actions/cache/restore@v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
           fail-on-cache-miss: true
-      -
-        name: Set Version No GUi
-        id: get_version_no_gui
-        run: echo "::set-output name=VERSION::$( echo ${{github.ref_name}} | tr -d 'v' )"
-      - # Get cached intermediate build products
-        name: Restore cached Windows installer No Gui
+
+        # Get cached intermediate build products
+      - name: Restore cached Windows installer No Gui
         uses: actions/cache/restore@v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-no-gui-installer-${{ github.sha }}
           fail-on-cache-miss: true
-      -
-        name: Restore Linux compiled GUI
+
+      - name: Restore Linux compiled GUI
         uses: actions/cache/restore@v4
         with:
           path: gui/dist/cloudfuseGUI_Linux
           key: Linux-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
           fail-on-cache-miss: true
         continue-on-error: false
-      -
-        name: Restore Windows compiled GUI
+
+      - name: Restore Windows compiled GUI
         uses: actions/cache/restore@v4
         with:
           enableCrossOsArchive: true
@@ -260,8 +265,9 @@ jobs:
           # see documentation: https://github.com/actions/cache/blob/main/restore/README.md#inputs
           restore-keys: Windows-compiled-gui-
         continue-on-error: false
-      - # Run GoReleaser (see .goreleaser.yaml)
-        name: Run GoReleaser
+
+        # Run GoReleaser (see .goreleaser.yaml)
+      - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           args: release --clean
