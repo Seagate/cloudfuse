@@ -158,11 +158,6 @@ jobs:
         run: |
           mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
 
-      - name: Run Inno Setup No Gui
-        working-directory: ./build
-        run: |
-          .\run-iscc_no_gui.bat
-
       - name: Rename installer No Gui
         run: |
           mv build/Output/cloudfuse.exe build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
