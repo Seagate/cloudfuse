@@ -5,11 +5,13 @@ requires the third party utility [WinFsp](https://winfsp.dev/). WinFSP installs 
 can also run the WinFsp installer found [here](https://winfsp.dev/rel/) yourself.
 
 ## Running in foreground mode
+
 To run in foreground mode, you must pass the option `--foreground=true` when using the `mount` command.
 
         cloudfuse.exe mount <mount path> --config-file=<config file> --foreground=true
 
 ## Running in background mode (recommended)
+
 Cloudfuse runs in the background by default. It uses the WinFSP launcher to run the mount in the background.
 Cloudfuse will also automatically restart existing mounts on user login.
 
@@ -49,7 +51,7 @@ but to allow them to be seen on Windows they will be replaced with similar looki
 | `>` | `＞` |
 | `:` | `：` |
 | `"` | `＂` |
-| `|` | `｜` |
+| `\|` | `｜` |
 | `?` | `？` |
 | `*` | `＊` |
 

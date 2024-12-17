@@ -42,15 +42,17 @@ function dump_footer
 
 function append_lic_to_notice
 {
-    echo >> $output_file
-    echo -e "\n\n" >> $output_file
-    echo "****************************************************************************" >> $output_file
-    echo -e "\n============================================================================" >> $output_file
-    echo -e ">>>" $1 >> $output_file
-    echo -e "==============================================================================" >> $output_file
-    
-    echo >> $output_file
-    cat lic.tmp >> $output_file
+    {
+        echo
+        echo -e "\n\n"
+        echo "****************************************************************************"
+        echo -e "\n============================================================================"
+        echo -e ">>>" "$1"
+        echo -e "=============================================================================="
+        echo
+        cat lic.tmp
+    } >> $output_file
+
     rm -rf lic.tmp 
 }
 
@@ -61,33 +63,26 @@ function download_and_dump
     # Cleanup old tmp file
     rm -rf lic.tmp
 
-    # Fetch the raw license file
-    wget -q -O lic.tmp $2
-
-    if [[ $? -eq 0 ]]
+    if wget -q -O lic.tmp "$2"
     then
-        append_lic_to_notice $1
+        append_lic_to_notice "$1"
         return 0
     fi
 
-    return -1
+    return 1
 }
 
 function try_differ_names()
 {
     # Try lic file without any extension
-    download_and_dump $1 $2
-
-    if [[ $? -ne 0 ]]
+    if ! download_and_dump "$1" "$2"
     then
         # Try with .txt extension
-        download_and_dump $line $lic_path.txt
-    fi
-
-    if [[ $? -ne 0 ]]
-    then
-        # Try with .md extension
-        download_and_dump $line $lic_path.md
+        if ! download_and_dump "$line" "$lic_path".txt
+            then
+            # Try with .md extension
+            download_and_dump "$line" "$lic_path".md
+        fi
     fi
 
     return $?
@@ -104,8 +99,7 @@ function download_notice
         then
             lic_path="https://raw.githubusercontent.com/Azure/go-autorest/master/LICENSE"
 
-            download_and_dump "github.com/Azure/go-autorest/autorest" $lic_path
-            if [[ $? -ne 0 ]]
+            if ! download_and_dump "github.com/Azure/go-autorest/autorest" $lic_path
             then
                 # This might need manual intervention
                 echo "Failed to get LICENSE from : AutoRest"
@@ -117,57 +111,31 @@ function download_notice
 
     github.com*)
         # Try standard lic path first to get the info with 'master' branch
-        lic_path="https://raw.githubusercontent.com/"`echo $line | cut -d "/" --complement -f1`"/master/LICENSE"
-        
-        try_differ_names $line $lic_path
-        
-        # If basic name fails try removing subfolders and search outside
-        if [[ $? -ne 0 ]]
-        then
-            lic_path="https://raw.githubusercontent.com/"`echo $line | cut -d "/" -f2-3`"/master/LICENSE"
-            try_differ_names $line $lic_path
+        # Define an array of possible license paths
+        license_paths=(
+            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" --complement -f1)/master/LICENSE"
+            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" -f2-3)/master/LICENSE"
+            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" --complement -f1)/main/LICENSE"
+            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" -f2-3)/main/LICENSE"
+            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" --complement -f1)/master/COPYING"
+            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" -f2-3)/master/License"
+            "https://raw.githubusercontent.com/$(echo "$line" | cut -d "/" -f2-3)/main/License"
+        )
+
+        # Iterate over each license path and try to find the license
+        license_found=false
+        for lic_path in "${license_paths[@]}"; do
+            if try_differ_names "$line" "$lic_path"; then
+                license_found=true
+                break
+            fi
+        done
+
+        # If no license was found, print a failure message
+        if ! $license_found; then
+            echo "Failed to get LICENSE from: $line"
         fi
 
-        # Try searching if there is main branch instead of master
-        if [[ $? -ne 0 ]]
-        then
-            lic_path="https://raw.githubusercontent.com/"`echo $line |  cut -d "/" --complement -f1`"/main/LICENSE"
-            try_differ_names $line $lic_path
-        fi
-
-        # If basic name fails try removing subfolders and search outside for main branch
-        if [[ $? -ne 0 ]]
-        then
-            lic_path="https://raw.githubusercontent.com/"`echo $line | cut -d "/" -f2-3`"/main/LICENSE"
-            try_differ_names $line $lic_path
-        fi
-
-        # Some have COPYING file for license
-        if [[ $? -ne 0 ]]
-        then
-            lic_path="https://raw.githubusercontent.com/"`echo $line | cut -d "/" --complement -f1`"/master/COPYING"
-            download_and_dump $line $lic_path
-        fi
-
-        # Camel case name search in master branch
-        if [[ $? -ne 0 ]]
-        then
-            lic_path="https://raw.githubusercontent.com/"`echo $line | cut -d "/" -f2-3`"/master/License"
-            try_differ_names $line $lic_path
-        fi
-
-        # Camel case name search in main branch
-        if [[ $? -ne 0 ]]
-        then
-            lic_path="https://raw.githubusercontent.com/"`echo $line | cut -d "/" -f2-3`"/main/License"
-            try_differ_names $line $lic_path
-        fi
-
-        if [[ $? -ne 0 ]]
-        then
-            # This might need manual intervention
-            echo "Failed to get LICENSE from : $line"
-        fi
         echo -ne "." ;;
 
     *etcd.io/etcd*)
@@ -176,8 +144,7 @@ function download_notice
         then
             lic_path="https://raw.githubusercontent.com/etcd-io/etcd/main/LICENSE"
 
-            download_and_dump "go.etcd.io/etcd" $lic_path
-            if [[ $? -ne 0 ]]
+            if ! download_and_dump "go.etcd.io/etcd" $lic_path
             then
                 # This might need manual intervention
                 echo "Failed to get LICENSE from : etcd.id"
@@ -191,9 +158,7 @@ function download_notice
     *golang.org/x* | *rsc.io/* | *cloud.google.com/* | *google.golang.org/* | *go.uber.org/* | *go.opencensus.io* | *go.opentelemetry.io/*) 
         #echo ">>> " $line
         # Get the contents of this package
-        wget -q -O lic.tmp "https://pkg.go.dev/$line?tab=licenses"
-        
-        if [[ $? -ne 0 ]]
+        if ! wget -q -O lic.tmp "https://pkg.go.dev/$line?tab=licenses"
         then
             # This might need manual intervention
             echo "Failed to get LICENSE from : $line"
@@ -204,33 +169,31 @@ function download_notice
             sed '1d;$d' lic1.tmp >> lic.tmp
 
             # now dump it to our notice file
-            append_lic_to_notice $line
+            append_lic_to_notice "$line"
         fi
         echo -ne "." ;;
 
     *gopkg.in/ini.v1*)
-        wget -q -O lic.tmp "https://raw.githubusercontent.com/go-ini/ini/v1.63.2/LICENSE"
-        if [[ $? -ne 0 ]]
+        if ! wget -q -O lic.tmp "https://raw.githubusercontent.com/go-ini/ini/v1.63.2/LICENSE"
         then
             # This might need manual intervention
             echo "Failed to get LICENSE from : $line"
         else
-            append_lic_to_notice $line
+            append_lic_to_notice "$line"
         fi
 
         echo -ne "." ;;
 
     *gopkg.in/*)
         #https://raw.githubusercontent.com/go-yaml/yaml/v3/LICENSE
-        pkg=`echo $line | cut -d "/" -f 2 | cut -d "." -f 1`
-        ver=`echo $line | cut -d "/" -f 2 | cut -d "." -f 2`
-        wget -q -O lic.tmp "https://raw.githubusercontent.com/go-$pkg/$pkg/$ver/LICENSE"
-        if [[ $? -ne 0 ]]
+        pkg=$(echo "$line" | cut -d "/" -f 2 | cut -d "." -f 1)
+        ver=$(echo "$line" | cut -d "/" -f 2 | cut -d "." -f 2)
+        if ! wget -q -O lic.tmp "https://raw.githubusercontent.com/go-$pkg/$pkg/$ver/LICENSE"
         then
             # This might need manual intervention
             echo "Failed to get LICENSE from : $line"
         else
-            append_lic_to_notice $line
+            append_lic_to_notice "$line"
         fi
 
         echo -ne "." ;;
@@ -238,30 +201,28 @@ function download_notice
     *dmitri.shuralyov.com*)
         #dmitri.shuralyov.com/gpu/mtl    
         # Get the contents of this package
-        wget -q -O lic.tmp "https://$line\$file/LICENSE"
-        if [[ $? -ne 0 ]]
+        if ! wget -q -O lic.tmp "https://$line\$file/LICENSE"
         then
             # This might need manual intervention
             echo "Failed to get LICENSE from : $line"
         else
-            append_lic_to_notice $line
+            append_lic_to_notice "$line"
         fi
         echo -ne "." ;;
 
     *honnef.co/go/tools*)
         # Get the contents of this package
-        wget -q -O lic.tmp "https://raw.githubusercontent.com/dominikh/go-tools/master/LICENSE"
-        if [[ $? -ne 0 ]]
+        if ! wget -q -O lic.tmp "https://raw.githubusercontent.com/dominikh/go-tools/master/LICENSE"
         then
             # This might need manual intervention
             echo "Failed to get LICENSE from : $line"
         else
-            append_lic_to_notice $line
+            append_lic_to_notice "$line"
         fi
         echo -ne "." ;;
 
     *)
-        echo "Others: " $line;;
+        echo "Others: " "$line";;
     esac
 }
 
@@ -276,7 +237,7 @@ function generate_notices
                 echo -ne "." 
             else
                #echo "Missing $line in old file" 
-               download_notice $line
+               download_notice "$line"
                ret=1
             fi
             echo -ne "." ;;
@@ -287,7 +248,7 @@ function generate_notices
                 echo -ne "." 
             else
                #echo "Missing $line in old file" 
-               download_notice $line
+               download_notice "$line"
                ret=1
             fi
             echo -ne "." ;;
@@ -298,7 +259,7 @@ function generate_notices
                 echo -ne "."
             else
                 #echo "Missing $line in old file"
-                download_notice $line
+                download_notice "$line"
                 ret=1
             fi
             echo -ne "." ;;
@@ -315,12 +276,13 @@ function generate_qt_notice
     then
         echo -ne "." 
     else
-        echo -e "\n\n" >> $output_file
-        echo "****************************************************************************" >> $output_file
-        echo -e "\n============================================================================" >> $output_file
-        echo -e ">>> qt6" >> $output_file
-        echo -e "==============================================================================" >> $output_file
-        echo -e "                   GNU LESSER GENERAL PUBLIC LICENSE
+        {  
+            echo -e "\n\n"
+            echo "****************************************************************************"
+            echo -e "\n============================================================================"
+            echo -e ">>> qt6"
+            echo -e "=============================================================================="
+            echo -e "                   GNU LESSER GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 
  Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
@@ -483,8 +445,9 @@ General Public License ever published by the Free Software Foundation.
 whether future versions of the GNU Lesser General Public License shall
 apply, that proxy's public statement of acceptance of any version is
 permanent authorization for you to choose that version for the
-Library." >> $output_file
-        echo >> $output_file
+Library."
+            echo
+        }  >> $output_file
     fi
 }
 
@@ -493,12 +456,12 @@ Library." >> $output_file
 rm -rf ./notice_tmp
 mkdir ./notice_tmp/
 chmod 777 ./notice_tmp/
-cd ./notice_tmp/
+cd ./notice_tmp/ || exit
 
 
 # From go.sum file create unique list of dependencies we have
 echo "Searching for dependencies"
-cat ../go.sum | cut -d " " -f 1 | sort -u > $dependency_list
+< ../go.sum cut -d " " -f 1 | sort -u > $dependency_list
 
 echo "github.com/winfsp/winfsp" >> $dependency_list
 
@@ -519,17 +482,13 @@ fi
 # Generate notices in a temp file now
 generate_notices
 
-generate_qt_notice
-
-
-# Generate footer for the file
-if [[ $? -ne 0 ]]
+if ! generate_qt_notice
 then
     # File is modified make space for fotter
     echo -e "\n" >> $output_file
 fi
+# Generate footer for the file
 dump_footer
-
 
 echo "Comparing missing dependencies"
 # Compare the input list and notice file for final consolidation
@@ -538,7 +497,7 @@ diff $dependency_list notice.lst | grep -v "go-autorest" | grep -v "go.etcd.io"
 
 # Delete the temp directory
 cp $output_file ../NOTICE
-cd -
+cd - || exit
 rm -rf ./notice_tmp/
 
 echo "NOTICE updated..."

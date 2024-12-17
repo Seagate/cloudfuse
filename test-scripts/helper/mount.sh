@@ -7,16 +7,16 @@ set -o nounset
 source ./helper/var.env
 
 # Cleanup
-source ./helper/cleanup.sh
-if [ $? -ne 0 ]; then
-    echo "command failed with exit code $?"
+if ! source ./helper/cleanup.sh; then
+    ret=$?
+    echo "command failed with exit code $ret"
     echo "Stopping script"
-    exit $?
+    exit $ret
 fi
 
 # Mount step
 echo "Mounting into mount directory"
-$WORK_DIR/cloudfuse mount $MOUNT_DIR --config-file=$WORK_DIR/config.yaml
+"$WORK_DIR"/cloudfuse mount "$MOUNT_DIR" --config-file="$WORK_DIR"/config.yaml
 
 sleep 5s
 

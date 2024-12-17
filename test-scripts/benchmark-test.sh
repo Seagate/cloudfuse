@@ -7,11 +7,11 @@ set -o nounset
 source ./helper/var.env
 
 # Mount the directory
-source ./helper/mount.sh
-if [ $? -ne 0 ]; then
-    echo "command failed with exit code $?"
+if ! source ./helper/mount.sh; then
+    ret=$?
+    echo "command failed with exit code $ret"
     echo "Stopping script"
-    exit $?
+    exit $ret
 fi
 
 # Run e2e tests
@@ -19,7 +19,7 @@ echo "-------------------------------------------------------------------"
 echo "Starting Benchmark Test"
 
 # run test
-go test -timeout=120m -p 1 -v ../test/benchmark_test/benchmark_test.go -args -mnt-path=$MOUNT_DIR
+go test -timeout=120m -p 1 -v ../test/benchmark_test/benchmark_test.go -args -mnt-path="$MOUNT_DIR"
 
 cat cloudfuse-logs.txt
 
