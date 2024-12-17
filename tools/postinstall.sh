@@ -9,12 +9,12 @@ cloudfuse completion bash >/etc/bash_completion.d/cloudfuse
 for user in $(getent passwd {1000..60000} | cut -d: -f1); do
   home=$(eval echo "~${user}")
   # Autocompletes for zsh shell
-  if cat /etc/shells | grep -q "zsh"; then
+  if /etc/shells | grep -q "zsh"; then
     echo "Found zsh..... Generating autocompletes......"
     cloudfuse completion zsh >"${home}"/.oh-my-zsh/custom/plugins/zsh-autosuggestions/_cloudfuse
   fi
   # Autocompletes for fish shell
-  if cat /etc/shells | grep -q "fish"; then
+  if /etc/shells | grep -q "fish"; then
     echo "Found fish..... Generating autocompletes"
     cloudfuse completion fish >"${home}".config/fish/completions/cloudfuse.fish
   fi
