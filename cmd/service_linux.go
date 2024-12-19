@@ -90,11 +90,7 @@ var installCmd = &cobra.Command{
 			return fmt.Errorf("the mount path provided does not exist")
 			// TODO: add useage output upon failure with input
 		}
-		isDirEmpty := common.IsDirectoryEmpty(mountPath)
-		if !isDirEmpty {
-			return fmt.Errorf("error, the mount path provided is not empty")
-			// TODO: add useage output upon failure with input
-		}
+		// TODO: consider logging a warning if the mount path is empty
 
 		_, err = os.Stat(configPath)
 		if errors.Is(err, fs.ErrNotExist) {
