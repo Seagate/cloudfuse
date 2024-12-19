@@ -129,8 +129,8 @@ var installCmd = &cobra.Command{
 var serviceName string
 var uninstallCmd = &cobra.Command{
 	Use:               "uninstall",
-	Short:             "Uninstall the startup process for Cloudfuse. Requires running as admin.",
-	Long:              "Uninstall the startup process for Cloudfuse. Requires running as admin.",
+	Short:             "Uninstall a startup process for Cloudfuse.",
+	Long:              "Uninstall a startup process for Cloudfuse.",
 	SuggestFor:        []string{"uninst", "uninstal"},
 	Example:           "cloudfuse service uninstall --mount-path=<path/to/mount/path>",
 	FlagErrorHandling: cobra.ExitOnError,
