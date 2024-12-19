@@ -33,6 +33,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -77,12 +78,11 @@ var installCmd = &cobra.Command{
 			return fmt.Errorf("error: [%s]", err.Error())
 		}
 
-		if strings.Contains(mountPath, ".") || strings.Contains(mountPath, "..") {
-			mountPath = common.JoinUnixFilepath(dir, mountPath)
+		if !filepath.IsAbs(mountPath) {
+			mountPath = filepath.Clean(mountPath)
 		}
-
-		if strings.Contains(configPath, ".") || strings.Contains(configPath, "..") {
-			configPath = common.JoinUnixFilepath(dir, configPath)
+		if !filepath.IsAbs(configPath) {
+			configPath = filepath.Clean(configPath)
 		}
 
 		mountExists := common.DirectoryExists(mountPath)
