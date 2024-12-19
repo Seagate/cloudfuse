@@ -65,7 +65,7 @@ var serviceUser string
 var installCmd = &cobra.Command{
 	Use:               "install",
 	Short:             "Installs a service file for a single mount with Cloudfuse. Requires elevated permissions.",
-	Long:              "Installs a service file for a single mount with Cloudfuse which remounts any active previously active mounts on startup. elevated permissions.",
+	Long:              "Installs a service file for a single mount with Cloudfuse. Requires elevated permissions.",
 	SuggestFor:        []string{"ins", "inst"},
 	Example:           "cloudfuse service install --mount-path=<path/to/mount/point> --config-file=<path/to/config/file> --user=<username>",
 	FlagErrorHandling: cobra.ExitOnError,
