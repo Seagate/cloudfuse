@@ -71,13 +71,6 @@ var installCmd = &cobra.Command{
 	Example:           "cloudfuse service install --mount-path=<path/to/mount/point> --config-file=<path/to/config/file> --user=<username>",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		// get current dir
-		dir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("error: [%s]", err.Error())
-		}
-
 		if !filepath.IsAbs(mountPath) {
 			mountPath = filepath.Clean(mountPath)
 		}
@@ -180,9 +173,9 @@ func newServiceFile(mountPath string, configPath string, serviceUser string) (st
 	# User service will run as.
 	User={{.ServiceUser}}
 	# Path to the location Cloudfuse will mount to. Note this folder must currently exist.
-	Environment=MountingPoint={{.MountPath}}
+	MountingPoint={{.MountPath}}
 	# Path to the configuration file.
-	Environment=ConfigFile={{.ConfigFile}}
+	ConfigFile={{.ConfigFile}}
 
 	# Under the hood
 	Type=forking
