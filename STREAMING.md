@@ -15,7 +15,7 @@ since the file does not have to be downloaded in full before reading or writing 
     - Not recommended to be used for multiple writer or single writer multiple reader scenarios
     - If writing through multiple handles, the last handle closed will win and may not persist writes from previously
       closed handles if their data buffers overlap
-    - If writing on one handle, modified data will only be visible by handles opened after the writer handle closes. 
+    - If writing on one handle, modified data will only be visible by handles opened after the writer handle closes.
 
 2. **File-Name based Caching**
     - Separate file handles pointing to the same file share buffers
@@ -34,7 +34,9 @@ components:
     - attr_cache
     - azstorage
 ```
+
 or
+
 ```yaml
 components:
     - libfuse
@@ -44,10 +46,11 @@ components:
 ```
 
 The different configuration options for stream are,
+
 - `block-size-mb: 16`: Integer parameter that specifies the size of each block to be cached in memory (in MB). When
   using S3 storage, the parameter part-size-mb in s3storage should be set to the same value as this one.
-- `max-buffers: 16`: Integer parameter that specifies the total number of buffers to be cached in memory (in MB). 
-- `buffer-size-mb: 16`: Integer parameter that specifies the size of each buffer to be cached in memory (in MB). 
+- `max-buffers: 16`: Integer parameter that specifies the total number of buffers to be cached in memory (in MB).
+- `buffer-size-mb: 16`: Integer parameter that specifies the size of each buffer to be cached in memory (in MB).
 - `file-caching: true|false`: Boolean parameter to specify file name based caching. Default is false which specifies
   file handle based caching.
 
@@ -55,6 +58,7 @@ The different configuration options for stream are,
 
 After adding the components, add the following section to your Cloudfuse config file. The following example enables
 Cloudfuse to use up to 64 * 128 MB of memory to cache data buffers with file handle based caching
+
 ```yaml
 stream:
   block-size-mb: 64
@@ -65,4 +69,4 @@ stream:
 
 ### Disable Caching
 
-To disable caching and stream straight from S3 or Azure Storage, set all stream buffer configuration options to 0. 
+To disable caching and stream straight from S3 or Azure Storage, set all stream buffer configuration options to 0.
