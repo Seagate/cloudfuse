@@ -171,7 +171,7 @@ var uninstallCmd = &cobra.Command{
 //--------------- command section ends
 
 func newServiceFile(mountPath string, configPath string, serviceUser string) (string, error) {
-	serviceTemplate := ` [Unit]
+	serviceTemplate := `[Unit]
 	Description=Cloudfuse is an open source project developed to provide a virtual filesystem backed by S3 or Azure storage.
 	After=network-online.target
 	Requires=network-online.target
