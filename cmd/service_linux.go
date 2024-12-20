@@ -71,19 +71,9 @@ var installCmd = &cobra.Command{
 	Example:           "cloudfuse service install --mount-path=<path/to/mount/point> --config-file=<path/to/config/file> --user=<username>",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var err error
-		if !filepath.IsAbs(mountPath) {
-			mountPath, err = filepath.Abs(mountPath)
-			if err != nil {
-				return fmt.Errorf("couldn't format the mount path string")
-			}
-		}
-		if !filepath.IsAbs(configPath) {
-			configPath, err = filepath.Abs(configPath)
-			if err != nil {
-				return fmt.Errorf("couldn't format the config path string")
-			}
-		}
+
+		mountPath = getAbsPath(mountPath)
+		configPath = getAbsPath(configPath)
 
 		mountExists := common.DirectoryExists(mountPath)
 		if !mountExists {
@@ -92,7 +82,7 @@ var installCmd = &cobra.Command{
 		}
 		// TODO: consider logging a warning if the mount path is empty
 
-		_, err = os.Stat(configPath)
+		_, err := os.Stat(configPath)
 		if errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("error, the configfile path provided does not exist")
 		}
@@ -315,6 +305,18 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 }
 
 //TODO: add wrapper function for collecting data, creating user, setting default paths, running commands.
+
+func getAbsPath(leaf string) string {
+	var absPath string
+	var err error
+	if !filepath.IsAbs(leaf) {
+		absPath, err = filepath.Abs(leaf)
+		if err != nil {
+			return fmt.Errorf("couldn't format the path string")
+		}
+	}
+	return absPath
+}
 
 func init() {
 	rootCmd.AddCommand(serviceCmd)
