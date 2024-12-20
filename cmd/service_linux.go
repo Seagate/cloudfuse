@@ -71,11 +71,18 @@ var installCmd = &cobra.Command{
 	Example:           "cloudfuse service install --mount-path=<path/to/mount/point> --config-file=<path/to/config/file> --user=<username>",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var err error
 		if !filepath.IsAbs(mountPath) {
-			mountPath = filepath.Clean(mountPath)
+			mountPath, err = filepath.Abs(mountPath)
+			if err != nil {
+				return fmt.Errorf("couldn't format the mount path string")
+			}
 		}
 		if !filepath.IsAbs(configPath) {
-			configPath = filepath.Clean(configPath)
+			configPath, err = filepath.Abs(configPath)
+			if err != nil {
+				return fmt.Errorf("couldn't format the config path string")
+			}
 		}
 
 		mountExists := common.DirectoryExists(mountPath)
@@ -85,7 +92,7 @@ var installCmd = &cobra.Command{
 		}
 		// TODO: consider logging a warning if the mount path is empty
 
-		_, err := os.Stat(configPath)
+		_, err = os.Stat(configPath)
 		if errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("error, the configfile path provided does not exist")
 		}
