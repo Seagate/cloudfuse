@@ -85,7 +85,7 @@ var installCmd = &cobra.Command{
 		}
 		// TODO: consider logging a warning if the mount path is empty
 
-		_, err = os.Stat(configPath)
+		_, err := os.Stat(configPath)
 		if errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("error, the configfile path provided does not exist")
 		}
