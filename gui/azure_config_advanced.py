@@ -1,6 +1,6 @@
 # Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 #
-# Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+# Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -50,17 +50,17 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
             # Allow anything BUT Nul
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
             self.lineEdit_azure_subDirectory.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
-        
+
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_resetDefaultSettings.clicked.connect(self.populateOptions)
-        
+
 
     def populateOptions(self):
         fileCache = self.settings['file_cache']
         azStorage = self.settings['azstorage']
         libfuse = self.settings['libfuse']
-        
+
         self.setCheckboxFromSetting(self.checkBox_libfuse_disableWriteback,libfuse['disable-writeback-cache'])
         self.setCheckboxFromSetting(self.checkBox_libfuse_networkshare, libfuse['network-share'])
         self.setCheckboxFromSetting(self.checkBox_fileCache_allowNonEmptyTmp,fileCache['allow-non-empty-temp'])
@@ -76,7 +76,7 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.setCheckboxFromSetting(self.checkBox_azure_sdkTrace,azStorage['sdk-trace'])
         self.setCheckboxFromSetting(self.checkBox_azure_virtualDirectory,azStorage['virtual-directory'])
         self.setCheckboxFromSetting(self.checkBox_azure_disableCompression,azStorage['disable-compression'])
-        
+
         self.spinBox_fileCache_evictionTimeout.setValue(fileCache['timeout-sec'])
         self.spinBox_fileCache_maxEviction.setValue(fileCache['max-eviction'])
         self.spinBox_fileCache_maxCacheSize.setValue(fileCache['max-size-mb'])
@@ -97,10 +97,10 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.lineEdit_azure_httpProxy.setText(azStorage['http-proxy'])
         self.lineEdit_azure_httpsProxy.setText(azStorage['https-proxy'])
         self.lineEdit_azure_authResource.setText(azStorage['auth-resource'])
-        
+
         self.dropDown_azure_blobTier.setCurrentIndex(az_blob_tier.index(azStorage['tier']))
         self.dropDown_fileCache_evictionPolicy.setCurrentIndex(file_cache_eviction_choices.index(fileCache['policy']))
-        
+
         if platform == "win32":
             self.checkBox_libfuse_networkshare.setToolTip("Runs as a network share - may improve performance when latency to cloud is high.")
         else:
@@ -116,7 +116,7 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         azStorage['max-retry-timeout-sec'] = self.spinBox_azure_maxRetryTimeout.value()
         azStorage['retry-backoff-sec'] = self.spinBox_azure_retryBackoff.value()
         azStorage['max-retry-delay-sec'] = self.spinBox_azure_maxRetryDelay.value()
-        
+
         azStorage['use-http'] = self.checkBox_azure_useHttp.isChecked()
         azStorage['validate-md5'] = self.checkBox_azure_validateMd5.isChecked()
         azStorage['update-md5'] = self.checkBox_azure_updateMd5.isChecked()
@@ -124,16 +124,16 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         azStorage['sdk-trace'] = self.checkBox_azure_sdkTrace.isChecked()
         azStorage['virtual-directory'] = self.checkBox_azure_virtualDirectory.isChecked()
         azStorage['disable-compression'] = self.checkBox_azure_disableCompression.isChecked()
-        
+
         azStorage['aadendpoint'] = self.lineEdit_azure_aadEndpoint.text()
         azStorage['subdirectory'] = self.lineEdit_azure_subDirectory.text()
         azStorage['http-proxy'] = self.lineEdit_azure_httpProxy.text()
         azStorage['https-proxy'] = self.lineEdit_azure_httpsProxy.text()
         azStorage['auth-resource'] = self.lineEdit_azure_authResource.text()
-        
+
         azStorage['tier'] = az_blob_tier[self.dropDown_azure_blobTier.currentIndex()]
         self.settings['azstorage'] = azStorage
-    
+
     def updateSettingsFromUIChoices(self):
         self.updateOptionalAzStorage()
         self.updateOptionalFileCache()

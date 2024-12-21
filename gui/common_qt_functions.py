@@ -1,6 +1,6 @@
 # Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 #
-# Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+# Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -145,7 +145,7 @@ class defaultSettingsManager():
             'buffer-size-mb': 0,
             'file-caching': False # false = handle level caching ON
             }
-        
+
         # the block cache component and its settings are not exposed in the GUI
         allMountSettings['block_cache'] = {
             'block-size-mb': 16,
@@ -185,7 +185,7 @@ class defaultSettingsManager():
             'max-files': 5000000,
             'no-cache-dirs': False
             }
-        
+
         allMountSettings['loopbackfs'] = {
             'path': ''
             }
@@ -194,7 +194,7 @@ class defaultSettingsManager():
             'container-allowlist': [],
             'container-denylist': []
             }
-        
+
         allMountSettings['health_monitor'] = {
             'enable-monitoring': False,
             'stats-poll-interval-sec': 10,
@@ -202,7 +202,7 @@ class defaultSettingsManager():
             'output-path':'',
             'monitor-disable-list': []
             }
-        
+
         allMountSettings['logging'] = {
             'type' : 'syslog',
             'level' : 'log_err',
@@ -253,7 +253,7 @@ class customConfigFunctions():
                 # Could not open or config file does not exist, use default settings
                 configs = self.getConfigs(settings,True)
         return configs
-    
+
 
     def getWorkingDir(self):
         if platform == "win32":

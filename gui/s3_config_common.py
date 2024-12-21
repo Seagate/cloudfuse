@@ -1,6 +1,6 @@
 # Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 #
-# Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+# Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -32,7 +32,7 @@ from common_qt_functions import widgetCustomFunctions, defaultSettingsManager
 pipelineChoices = ['file_cache','stream','block_cache']
 libfusePermissions = [0o777,0o666,0o644,0o444]
 
-class s3SettingsWidget(widgetCustomFunctions,Ui_Form): 
+class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
     def __init__(self, configSettings):
         super().__init__()
         self.setupUi(self)
@@ -59,7 +59,7 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
             # Allow anything BUT Nul
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
             self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
-        
+
         # Hide sensitive data QtWidgets.QLineEdit.EchoMode.PasswordEchoOnEdit
         self.lineEdit_accessKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.lineEdit_secretKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
@@ -70,9 +70,9 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_advancedSettings.clicked.connect(self.openAdvanced)
         self.button_resetDefaultSettings.clicked.connect(self.resetDefaults)
-       
+
     # Set up slots for the signals:
-            
+
     # To open the advanced widget, make an instance, so self.moresettings was chosen.
     #   self.moresettings does not have anything to do with the QSettings package that is seen throughout this code
     def openAdvanced(self):
@@ -97,10 +97,10 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
         self.lineEdit_fileCache_path.setText('{}'.format(directory))
-        
+
     def hideModeBoxes(self):
         self.groupbox_fileCache.setVisible(False)
-        self.groupbox_streaming.setVisible(False)      
+        self.groupbox_streaming.setVisible(False)
 
         # Update S3Storage re-writes everything in the S3Storage dictionary for the same reason update libfuse does.
     def updateS3Storage(self):
@@ -118,12 +118,12 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
         s3storage = self.settings['s3storage']
         libfuse = self.settings['libfuse']
         stream = self.settings['stream']
-                
-        # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices and libfusePermissions reflect the 
+
+        # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices and libfusePermissions reflect the
         #   index choices in human words without having to reference the UI. Get the value in the settings and translate that to the equivalent index in the lists.
         self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings['components'][1]))
         self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(libfuse['default-permission']))
-        
+
         self.setCheckboxFromSetting(self.checkBox_multiUser, self.settings['allow-other'])
         self.setCheckboxFromSetting(self.checkBox_nonEmptyDir,self.settings['nonempty'])
         self.setCheckboxFromSetting(self.checkBox_daemonForeground,self.settings['foreground'])
@@ -131,7 +131,7 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
         self.setCheckboxFromSetting(self.checkBox_streaming_fileCachingLevel,stream['file-caching'])
         self.setCheckboxFromSetting(self.checkBox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
 
-        # Spinbox automatically sanitizes inputs for decimal values only, so no need to check for the appropriate data type. 
+        # Spinbox automatically sanitizes inputs for decimal values only, so no need to check for the appropriate data type.
         self.spinBox_libfuse_attExp.setValue(libfuse['attribute-expiration-sec'])
         self.spinBox_libfuse_entExp.setValue(libfuse['entry-expiration-sec'])
         self.spinBox_libfuse_negEntryExp.setValue(libfuse['negative-entry-expiration-sec'])
@@ -146,7 +146,7 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
         self.lineEdit_accessKey.setText(s3storage['key-id'])
         self.lineEdit_region.setText(s3storage['region'])
         self.lineEdit_fileCache_path.setText(fileCache['path'])
-        
+
     def resetDefaults(self):
         # Reset these defaults
         checkChoice = self.popupDoubleCheckReset()
@@ -154,7 +154,7 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
             defaultSettingsManager.setS3Settings(self, self.settings)
             defaultSettingsManager.setComponentSettings(self, self.settings)
             self.populateOptions()
-    
+
     def updateSettingsFromUIChoices(self):
         self.updateFileCachePath()
         self.updateLibfuse()
