@@ -875,14 +875,11 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 
 	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
-	// Download is required
-	err = suite.fileCache.openFileInternal(handle)
-	suite.assert.NoError(err)
 	suite.assert.EqualValues(path, handle.Path)
 	suite.assert.False(handle.Dirty())
 
-	// File should exist in cache
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	// File should not exist in cache
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
 }
 
 func (suite *fileCacheTestSuite) TestOpenFileInCache() {
