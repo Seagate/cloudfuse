@@ -1,7 +1,7 @@
 #!/bin/bash
 # This script is packaged with the .deb or .rpm package and executed as a post install script.
 # It setups up the autocompletion scripts for various shells depending upon it's existence in the system
-
+set -e
 # Autocompletions for bash shell
 echo "Generating bash autocompletes........."
 cloudfuse completion bash >/etc/bash_completion.d/cloudfuse

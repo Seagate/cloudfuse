@@ -10,6 +10,7 @@ cloudfuse
 cloudfuse.exe
 cfusemon.exe
 adlsgen1fuse
+missing_log.lst
 venv/
 *.backup
 __debug_bin
@@ -35,3 +36,5 @@ dist/
 **/Output/
 /gui/build/**
 /build/winfsp-*
+manpages/
+changelog.yml

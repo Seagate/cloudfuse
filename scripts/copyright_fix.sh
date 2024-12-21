@@ -5,7 +5,7 @@ searchStr="Copyright ©"
 copyLine=$(grep -h "$searchStr" LICENSE)
 
 if [[ "$1" == "replace" ]]
-then 
+then
     find . -name '*.go' -print0 | while IFS= read -r -d '' i; do
         result=$(grep "$searchStr" "$i")
         if [ $? -ne 1 ]

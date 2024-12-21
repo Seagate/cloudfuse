@@ -53,7 +53,7 @@ function append_lic_to_notice
         cat lic.tmp
     } >> $output_file
 
-    rm -rf lic.tmp 
+    rm -rf lic.tmp
 }
 
 # Function to download the file and add it to Notice file with formatting
@@ -103,7 +103,7 @@ function download_notice
             then
                 # This might need manual intervention
                 echo "Failed to get LICENSE from : AutoRest"
-            else 
+            else
                 autorest_done=1
             fi
         fi
@@ -148,14 +148,14 @@ function download_notice
             then
                 # This might need manual intervention
                 echo "Failed to get LICENSE from : etcd.id"
-            else 
+            else
                 etcd_done=1
             fi
         fi
         echo -ne "." ;;
 
 
-    *golang.org/x* | *rsc.io/* | *cloud.google.com/* | *google.golang.org/* | *go.uber.org/* | *go.opencensus.io* | *go.opentelemetry.io/*) 
+    *golang.org/x* | *rsc.io/* | *cloud.google.com/* | *google.golang.org/* | *go.uber.org/* | *go.opencensus.io* | *go.opentelemetry.io/*)
         #echo ">>> " $line
         # Get the contents of this package
         if ! wget -q -O lic.tmp "https://pkg.go.dev/$line?tab=licenses"
@@ -199,7 +199,7 @@ function download_notice
         echo -ne "." ;;
 
     *dmitri.shuralyov.com*)
-        #dmitri.shuralyov.com/gpu/mtl    
+        #dmitri.shuralyov.com/gpu/mtl
         # Get the contents of this package
         if ! wget -q -O lic.tmp "https://$line\$file/LICENSE"
         then
@@ -234,9 +234,9 @@ function generate_notices
         *go-autorest/*)
             if grep -q ">>> github.com/Azure/go-autorest/autorest" $output_file
             then
-                echo -ne "." 
+                echo -ne "."
             else
-               #echo "Missing $line in old file" 
+               #echo "Missing $line in old file"
                download_notice "$line"
                ret=1
             fi
@@ -245,14 +245,14 @@ function generate_notices
         *etcd.io/etcd*)
             if grep -q ">>> go.etcd.io/etcd" $output_file
             then
-                echo -ne "." 
+                echo -ne "."
             else
-               #echo "Missing $line in old file" 
+               #echo "Missing $line in old file"
                download_notice "$line"
                ret=1
             fi
             echo -ne "." ;;
-            
+
         *)
             if grep -q ">>> $line" $output_file
             then
@@ -269,14 +269,14 @@ function generate_notices
     return $ret
 }
 
-function generate_qt_notice 
+function generate_qt_notice
 {
     # Add qt6 license only if it is not already in the notice file
     if grep -q "qt6" $output_file
     then
-        echo -ne "." 
+        echo -ne "."
     else
-        {  
+        {
             echo -e "\n\n"
             echo "****************************************************************************"
             echo -e "\n============================================================================"
@@ -452,7 +452,7 @@ Library."
 }
 
 
-# Create temp directory for working on this 
+# Create temp directory for working on this
 rm -rf ./notice_tmp
 mkdir ./notice_tmp/
 chmod 777 ./notice_tmp/
@@ -501,5 +501,3 @@ cd - || exit
 rm -rf ./notice_tmp/
 
 echo "NOTICE updated..."
-
-

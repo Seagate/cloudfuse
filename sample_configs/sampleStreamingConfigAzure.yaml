@@ -6,18 +6,20 @@ logging:
 
 components:
   - libfuse
-  - file_cache
+  - stream
   - attr_cache
   - azstorage
 
 libfuse:
+  attribute-expiration-sec: 120
+  entry-expiration-sec: 120
+  negative-entry-expiration-sec: 240
   network-share: true
 
-file_cache:
-  path: /<PATH>/<TO>/<CACHE_DIR>
-  timeout-sec: 64000000
-  allow-non-empty-temp: true
-  ignore-sync: true
+stream:
+  block-size-mb: 8
+  max-buffers: 64
+  buffer-size-mb: 36
 
 attr_cache:
   timeout-sec: 7200

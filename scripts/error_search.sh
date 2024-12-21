@@ -16,7 +16,7 @@ for i in $(find . -name "*.go"  | grep -v "_test.go"| grep -v "manual_scripts");
             echo "Logs not present for all errors in $i ($err_cnt : $log_cnt)"
         }  >> missing_log.lst
         grep -A 5 "err :*= " "$i" >> missing_log.lst
-    #else 
+    #else
     #    echo "Logs present for all errors in $i"
     fi
 done
