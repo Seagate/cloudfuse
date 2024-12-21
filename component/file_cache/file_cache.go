@@ -982,6 +982,9 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		handle.Flags.Set(handlemap.HandleOpenedAppend)
 	}
 
+	// Increment the handle count in this lock item as there is one handle open for this now
+	flock.Inc()
+
 	// if there is no object in cloud storage, open the local file right away
 	// there is no performance penalty, and not doing this poses a consistency problem (open(O_CREATE), then stat)
 	if err != nil && os.IsNotExist(err) {
