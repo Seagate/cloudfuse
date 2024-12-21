@@ -795,7 +795,7 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	return nil
 }
 
-func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
+func (fc *FileCache) openFileInternal(handle *handlemap.Handle) error {
 	log.Trace("FileCache::downloadFile : name=%s", handle.Path)
 
 	handle.Lock()
@@ -1130,7 +1130,7 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	// log.Debug("FileCache::ReadInBuffer : Reading %v bytes from %s", len(options.Data), options.Handle.Path)
 
-	err := fc.downloadFile(options.Handle)
+	err := fc.openFileInternal(options.Handle)
 	if err != nil {
 		return 0, fmt.Errorf("error downloading file %s [%s]", options.Handle.Path, err)
 	}
@@ -1167,7 +1167,7 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
 
-	err := fc.downloadFile(options.Handle)
+	err := fc.openFileInternal(options.Handle)
 	if err != nil {
 		return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
 	}
@@ -1513,7 +1513,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			log.Err("FileCache::TruncateFile : Error calling OpenFile with %s [%s]", options.Name, err.Error())
 		}
 
-		err = fc.downloadFile(h)
+		err = fc.openFileInternal(h)
 		if err != nil {
 			log.Err("FileCache::TruncateFile : Error calling downloadFile with %s [%s]", options.Name, err.Error())
 			return err

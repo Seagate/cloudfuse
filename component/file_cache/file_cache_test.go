@@ -876,7 +876,7 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
 	// Download is required
-	err = suite.fileCache.downloadFile(handle)
+	err = suite.fileCache.openFileInternal(handle)
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(path, handle.Path)
 	suite.assert.False(handle.Dirty())
