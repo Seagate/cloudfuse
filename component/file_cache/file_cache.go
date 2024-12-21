@@ -955,18 +955,6 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		return nil, err
 	}
 
-	// if there is no object in cloud storage, we can just open the file locally
-	if err != nil && os.IsNotExist(err) {
-		handle, err := fc.OpenFileCase2(options)
-		if err == nil {
-			// Update the last download time of this file
-			flock.SetDownloadTime()
-			// Increment the handle count in this lock item as there is one handle open for this now
-			flock.Inc()
-		}
-		return handle, err
-	}
-
 	fileSize := int64(0)
 	if attr != nil {
 		fileSize = int64(attr.Size)
@@ -994,67 +982,12 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		handle.Flags.Set(handlemap.HandleOpenedAppend)
 	}
 
-	return handle, nil
-}
-
-func (fc *FileCache) OpenFileCase2(options internal.OpenFileOptions) (*handlemap.Handle, error) {
-
-	localPath := filepath.Join(fc.tmpPath, options.Name)
-
-	// create the local file if it does not exist
-	_, statErr := os.Stat(localPath)
-	if statErr != nil && os.IsNotExist(statErr) {
-		// create directories
-		err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
-		if err != nil {
-			log.Err("FileCache::OpenFile : error creating directory structure for file %s [%s]", options.Name, err.Error())
-			return nil, err
-		}
-		// Open the file in write mode.
-		f, err := os.OpenFile(localPath, os.O_CREATE|os.O_RDWR, options.Mode)
-		if err != nil {
-			log.Err("FileCache::OpenFile : error creating new file %s [%s]", options.Name, err.Error())
-			return nil, err
-		}
-		f.Close()
+	// if there is no object in cloud storage, open the local file right away
+	// there is no performance penalty, and not doing this poses a consistency problem (open(O_CREATE), then stat)
+	if err != nil && os.IsNotExist(err) {
+		err := fc.openFileInternal(handle, flock)
+		return handle, err
 	}
-
-	// If user has selected some non default mode in config then every local file shall be created with that mode only
-	err := os.Chmod(localPath, fc.defaultPermission)
-	if err != nil {
-		log.Err("FileCache::OpenFile : Failed to change mode of file %s [%s]", options.Name, err.Error())
-	}
-
-	// Open the file and grab a shared lock to prevent deletion by the cache policy.
-	f, err := os.OpenFile(localPath, options.Flags, options.Mode)
-	if err != nil {
-		log.Err("FileCache::OpenFile : error opening cached file %s [%s]", options.Name, err.Error())
-		return nil, err
-	}
-
-	// mark the file valid in cache
-	fc.policy.CacheValid(localPath)
-
-	// create handle
-	handle := handlemap.NewHandle(options.Name)
-
-	// populate handle
-	// size
-	inf, err := f.Stat()
-	if err == nil {
-		handle.Size = inf.Size()
-	}
-	// local handle number
-	handle.UnixFD = uint64(f.Fd())
-	// flags
-	if !fc.offloadIO {
-		handle.Flags.Set(handlemap.HandleFlagCached)
-	}
-	// local file object
-	handle.SetFileObject(f)
-
-	log.Info("FileCache::OpenFile : file=%s, fd=%d", options.Name, f.Fd())
-	fileCacheStatsCollector.UpdateStats(stats_manager.Increment, cacheServed, (int64)(1))
 
 	return handle, nil
 }
