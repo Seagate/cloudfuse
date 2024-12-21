@@ -901,6 +901,25 @@ func (suite *fileCacheTestSuite) TestOpenFileInCache() {
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
 }
 
+func (suite *fileCacheTestSuite) TestOpenCreateGetAttr() {
+	defer suite.cleanupTest()
+	path := "file8a"
+
+	// we report file does not exist before it is created
+	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.assert.Nil(attr)
+	suite.assert.Error(err)
+	suite.assert.ErrorIs(err, os.ErrNotExist)
+	// since it does not exist, we allow the file to be created using OpenFile
+	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(path, handle.Path)
+	// we should report that the file exists now
+	attr, err = suite.fileCache.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.assert.NoError(err)
+	suite.NotNil(attr)
+}
+
 // Tests for GetProperties in OpenFile should be done in E2E tests
 // - there is no good way to test it here with a loopback FS without a mock component.
 
