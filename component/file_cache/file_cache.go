@@ -1328,7 +1328,13 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
 	localPath := filepath.Join(fc.tmpPath, options.Name)
+	// If the file is being downloaded or deleted, the size and mod time will be incorrect
+	// wait for download or deletion to complete before getting local file info
+	flock := fc.fileLocks.Get(options.Name)
+	flock.Lock()
+	// TODO: Do we need to call NextComponent().GetAttr in this same critical section to avoid a data race with the cloud?
 	info, err := os.Stat(localPath)
+	flock.Unlock()
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
 	if err == nil && !info.IsDir() {
 		if exists { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
