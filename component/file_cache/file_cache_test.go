@@ -861,14 +861,11 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 
 	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
-	// Download is required
-	err = suite.fileCache.downloadFile(handle)
-	suite.assert.NoError(err)
 	suite.assert.EqualValues(path, handle.Path)
 	suite.assert.False(handle.Dirty())
 
-	// File should exist in cache
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	// File should not exist in cache
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
 }
 
 func (suite *fileCacheTestSuite) TestOpenFileInCache() {
@@ -888,6 +885,25 @@ func (suite *fileCacheTestSuite) TestOpenFileInCache() {
 
 	// File should exist in cache
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+}
+
+func (suite *fileCacheTestSuite) TestOpenCreateGetAttr() {
+	defer suite.cleanupTest()
+	path := "file8a"
+
+	// we report file does not exist before it is created
+	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.assert.Nil(attr)
+	suite.assert.Error(err)
+	suite.assert.ErrorIs(err, os.ErrNotExist)
+	// since it does not exist, we allow the file to be created using OpenFile
+	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(path, handle.Path)
+	// we should report that the file exists now
+	attr, err = suite.fileCache.GetAttr(internal.GetAttrOptions{Name: path})
+	suite.assert.NoError(err)
+	suite.NotNil(attr)
 }
 
 // Tests for GetProperties in OpenFile should be done in E2E tests
