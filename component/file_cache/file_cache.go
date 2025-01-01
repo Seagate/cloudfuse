@@ -1042,16 +1042,10 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 	_, noCachedHandle := options.Handle.GetValue("openFileOptions")
 
 	if !noCachedHandle {
-		// note whether the handle is dirty before flushing
-		flushUploads := options.Handle.Dirty()
-		// upload if dirty
-		err := fc.flushFileInternal(internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true}) //nolint
+		err := fc.flushFileInternal(internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true}, flock) //nolint
 		if err != nil {
 			log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
 			return err
-		} else if flushUploads {
-			// no error; upload succeeded, so update file state
-			flock.InCloud = true
 		}
 
 		f := options.Handle.GetFileObject()
@@ -1256,16 +1250,10 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 		defer flock.Unlock()
 	}
 
-	err := fc.flushFileInternal(options)
-	if err == nil && flock != nil {
-		// file was uploaded, so update file state
-		flock.InCloud = true
-	}
-
-	return err
+	return fc.flushFileInternal(options, flock)
 }
 
-func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error {
+func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions, flock *common.LockMapItem) error {
 	//defer exectime.StatTimeCurrentBlock("FileCache::FlushFile")()
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
@@ -1352,6 +1340,9 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		if err != nil {
 			log.Err("FileCache::FlushFile : %s upload failed [%s]", options.Handle.Path, err.Error())
 			return err
+		} else {
+			// upload succeeded, so update file state
+			flock.InCloud = true
 		}
 
 		options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
