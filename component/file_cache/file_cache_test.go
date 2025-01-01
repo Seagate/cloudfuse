@@ -894,10 +894,9 @@ func (suite *fileCacheTestSuite) TestOpenCreateGetAttr() {
 	// we report file does not exist before it is created
 	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: path})
 	suite.assert.Nil(attr)
-	suite.assert.Error(err)
 	suite.assert.ErrorIs(err, os.ErrNotExist)
 	// since it does not exist, we allow the file to be created using OpenFile
-	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_CREATE, Mode: 0777})
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(path, handle.Path)
 	// we should report that the file exists now

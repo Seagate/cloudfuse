@@ -44,6 +44,10 @@ type LockMapItem struct {
 	exLocked     bool
 	mtx          sync.Mutex
 	downloadTime time.Time
+	// file state flags
+	InCache  bool
+	InCloud  bool
+	LazyOpen bool
 }
 
 // Map holding locks for all the files
