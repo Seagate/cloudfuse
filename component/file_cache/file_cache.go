@@ -1041,13 +1041,19 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 	// if file has not been interactively read or written to by end user, then there is no cached file to close.
 	_, noCachedHandle := options.Handle.GetValue("openFileOptions")
 
-	err := fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true}) //nolint
-	if err != nil {
-		log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
-		return err
-	}
-
 	if !noCachedHandle {
+		// note whether the handle is dirty before flushing
+		flushUploads := options.Handle.Dirty()
+		// upload if dirty
+		err := fc.flushFileInternal(internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true}) //nolint
+		if err != nil {
+			log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
+			return err
+		} else if flushUploads {
+			// no error; upload succeeded, so update file state
+			flock.InCloud = true
+		}
+
 		f := options.Handle.GetFileObject()
 		if f == nil {
 			log.Err("FileCache::closeFileInternal : error [missing fd in handle object] %s", options.Handle.Path)
@@ -1062,6 +1068,17 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 	}
 
 	flock.Dec()
+
+	// unnecessary but tidy bookkeeping
+	if noCachedHandle {
+		//set boolean in isDownloadNeeded value to signal that the file has been downloaded
+		options.Handle.RemoveValue("openFileOptions")
+		// was this the only handle?
+		if flock.Count() == 0 {
+			// update file state
+			flock.LazyOpen = false
+		}
+	}
 
 	// If it is an fsync op then purge the file
 	if options.Handle.Fsynced() {
@@ -1217,19 +1234,38 @@ func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 // func (fc *FileCache) SyncDir(options internal.SyncDirOptions) error {
 // 	log.Trace("FileCache::SyncDir : %s", options.Name)
 
-// 	err := fc.NextComponent().SyncDir(options)
-// 	if err != nil {
-// 		log.Err("FileCache::SyncDir : %s failed", options.Name)
-// 		return err
-// 	}
-// 	// TODO: we can decide here if we want to flush all the files in the directory first or not. Currently I'm just invalidating files
-// 	// within the dir
-// 	go fc.invalidateDirectory(options.Name)
-// 	return nil
-// }
-
+//		err := fc.NextComponent().SyncDir(options)
+//		if err != nil {
+//			log.Err("FileCache::SyncDir : %s failed", options.Name)
+//			return err
+//		}
+//		// TODO: we can decide here if we want to flush all the files in the directory first or not. Currently I'm just invalidating files
+//		// within the dir
+//		go fc.invalidateDirectory(options.Name)
+//		return nil
+//	}
+//
 // FlushFile: Flush the local file to storage
 func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
+	var flock *common.LockMapItem
+
+	// if flush will upload the file, then acquire the file lock
+	if options.Handle.Dirty() && (!fc.lazyWrite || options.CloseInProgress) {
+		flock = fc.fileLocks.Get(options.Handle.Path)
+		flock.Lock()
+		defer flock.Unlock()
+	}
+
+	err := fc.flushFileInternal(options)
+	if err == nil && flock != nil {
+		// file was uploaded, so update file state
+		flock.InCloud = true
+	}
+
+	return err
+}
+
+func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error {
 	//defer exectime.StatTimeCurrentBlock("FileCache::FlushFile")()
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
