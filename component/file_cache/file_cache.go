@@ -825,7 +825,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 
 	fc.policy.CacheValid(localPath)
 	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, handle.Path, flock)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		log.Err("FileCache::openFileInternal : Failed to check if download is required for %s [%s]", handle.Path, err.Error())
 	}
 
@@ -886,6 +886,8 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 
 		// Update the last download time of this file
 		flock.SetDownloadTime()
+		// update file state
+		flock.LazyOpen = false
 
 		log.Debug("FileCache::openFileInternal : Download of %s is complete", handle.Path)
 		f.Close()
@@ -935,6 +937,8 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 
 	//set boolean in isDownloadNeeded value to signal that the file has been downloaded
 	handle.RemoveValue("openFileOptions")
+	// update file state
+	flock.LazyOpen = false
 
 	return nil
 }
@@ -948,19 +952,17 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	flock.Lock()
 	defer flock.Unlock()
 
-	attr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+	localPath := filepath.Join(fc.tmpPath, options.Name)
+	downloadRequired, _, cloudAttr, err := fc.isDownloadRequired(localPath, options.Name, flock)
 
 	// return err in case of authorization permission mismatch
 	if err != nil && err == syscall.EACCES {
 		return nil, err
 	}
 
-	fileSize := int64(0)
-	if attr != nil {
-		fileSize = int64(attr.Size)
-	}
-
-	if fileSize > 0 {
+	// check if we are running out of space
+	if downloadRequired && cloudAttr != nil {
+		fileSize := int64(cloudAttr.Size)
 		if fc.diskHighWaterMark != 0 {
 			currSize, err := common.GetUsage(fc.tmpPath)
 			if err != nil {
@@ -977,22 +979,25 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	// create handle and record openFileOptions for later
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetValue("openFileOptions", openFileOptions{flags: options.Flags, fMode: options.Mode})
-
 	if options.Flags&os.O_APPEND != 0 {
 		handle.Flags.Set(handlemap.HandleOpenedAppend)
 	}
 
-	// Increment the handle count in this lock item as there is one handle open for this now
+	// Increment the handle count
 	flock.Inc()
 
-	// if there is no object in cloud storage, open the local file right away
-	// there is no performance penalty, and not doing this poses a consistency problem (open(O_CREATE), then stat)
-	if err != nil && os.IsNotExist(err) {
-		err := fc.openFileInternal(handle, flock)
-		return handle, err
+	// will opening the file require downloading it?
+	var openErr error
+	if !downloadRequired {
+		// use the local file to complete the open operation now
+		openErr = fc.openFileInternal(handle, flock)
+	} else {
+		// update file state
+		flock.LazyOpen = true
 	}
+	// otherwise, use a lazy open algorithm to avoid downloading unnecessarily
 
-	return handle, nil
+	return handle, openErr
 }
 
 // CloseFile: Flush the file and invalidate it from the cache.
