@@ -791,13 +791,14 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	err = deleteFile(localPath)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("FileCache::DeleteFile : failed to delete local file %s [%s]", localPath, err.Error())
+	} else if err == nil || os.IsNotExist(err) {
+		flock.InCache = false
 	}
 
 	fc.policy.CachePurge(localPath)
 
 	// update file state
 	flock.InCloud = false
-	flock.InCache = false
 	flock.LazyOpen = false
 
 	return nil
@@ -1065,8 +1066,11 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 		log.Trace("FileCache::closeFileInternal : fsync/sync op, purging %s", options.Handle.Path)
 		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 
-		err = deleteFile(localPath)
-		if err != nil && !os.IsNotExist(err) {
+		err := deleteFile(localPath)
+		if err == nil || os.IsNotExist(err) {
+			// update file state
+			flock.InCache = false
+		} else if err != nil && !os.IsNotExist(err) {
 			log.Err("FileCache::closeFileInternal : failed to delete local file %s [%s]", localPath, err.Error())
 		}
 

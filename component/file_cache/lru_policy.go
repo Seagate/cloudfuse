@@ -438,6 +438,10 @@ func (p *lruPolicy) deleteItem(name string) {
 		return
 	}
 	err = deleteFile(name)
+	if err == nil || os.IsNotExist(err) {
+		// update file state
+		flock.InCache = false
+	}
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("lruPolicy::DeleteItem : failed to delete local file %s [%s]", name, err.Error())
 	}
