@@ -869,6 +869,8 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 			log.Err("FileCache::openFileInternal : error creating new file %s [%s]", handle.Path, err.Error())
 			return err
 		}
+		// update file state
+		flock.InCache = true
 
 		if flags&os.O_TRUNC != 0 {
 			fileSize = 0
@@ -1001,10 +1003,10 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		// use the local file to complete the open operation now
 		openErr = fc.openFileInternal(handle, flock)
 	} else {
+		// use a lazy open algorithm to avoid downloading unnecessarily (do nothing for now)
 		// update file state
 		flock.LazyOpen = true
 	}
-	// otherwise, use a lazy open algorithm to avoid downloading unnecessarily
 
 	return handle, openErr
 }
