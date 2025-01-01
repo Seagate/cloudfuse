@@ -795,6 +795,11 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 	fc.policy.CachePurge(localPath)
 
+	// update file state
+	flock.InCloud = false
+	flock.InCache = false
+	flock.LazyOpen = false
+
 	return nil
 }
 
