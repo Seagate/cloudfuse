@@ -635,7 +635,20 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 			newPath := strings.Replace(path, localSrcPath, localDstPath, 1)
 			if !d.IsDir() {
 				log.Debug("FileCache::RenameDir : Renaming local file %s -> %s", path, newPath)
-				fc.renameCachedFile(path, newPath)
+				srcRelPath, err := filepath.Rel(fc.tmpPath, path)
+				if err != nil {
+					srcRelPath = strings.TrimPrefix(path, fc.tmpPath+string(filepath.Separator))
+					log.Warn("FileCache::RenameDir : filepath.Rel failed on path %s [%v]. Using TrimPrefix: %s", path, err, srcRelPath)
+				}
+				srcObjName := common.NormalizeObjectName(srcRelPath)
+				dstObjName := strings.Replace(srcObjName, options.Src, options.Dst, 1)
+				sflock := fc.fileLocks.Get(srcObjName)
+				dflock := fc.fileLocks.Get(dstObjName)
+				sflock.Lock()
+				dflock.Lock()
+				fc.renameCachedFile(path, newPath, sflock, dflock)
+				dflock.Unlock()
+				sflock.Unlock()
 			} else {
 				log.Debug("FileCache::RenameDir : Creating local destination directory %s", newPath)
 				// create the new directory
@@ -1448,6 +1461,10 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	if err != nil {
 		log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
 		return err
+	} else {
+		// update file states
+		sflock.InCloud = false
+		dflock.InCloud = true
 	}
 
 	localSrcPath := filepath.Join(fc.tmpPath, options.Src)
@@ -1457,18 +1474,21 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	// if we do not perform rename operation locally and those destination files are cached then next time they are read
 	// we will be serving the wrong content (as we did not rename locally, we still be having older destination files with
 	// stale content). We either need to remove dest file as well from cache or just run rename to replace the content.
-	fc.renameCachedFile(localSrcPath, localDstPath)
+	fc.renameCachedFile(localSrcPath, localDstPath, sflock, dflock)
 
 	return nil
 }
 
-func (fc *FileCache) renameCachedFile(localSrcPath string, localDstPath string) {
+func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock, dflock *common.LockMapItem) {
 	err := os.Rename(localSrcPath, localDstPath)
 	if err != nil {
 		// if rename fails, we just delete the source file anyway
 		log.Warn("FileCache::RenameDir : Failed to rename local file %s -> %s. Here's why: %v", localSrcPath, localDstPath, err)
 	} else {
 		fc.policy.CacheValid(localDstPath)
+		// update file states
+		sflock.InCache = false
+		dflock.InCache = true
 	}
 	// delete the source from our cache policy
 	// this will also delete the source file from local storage (if rename failed)
