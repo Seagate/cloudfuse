@@ -680,15 +680,14 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 
 	// createEmptyFile was added to optionally support immutable containers. If customers do not care about immutability they can set this to true.
 	if fc.createEmptyFile {
-		// We tried moving CreateFile to a separate thread for better perf.
-		// However, before it is created in cloud storage, if GetAttr is called, the call will fail since the file
-		// does not exist in cloud storage yet, failing the whole CreateFile sequence in FUSE.
 		newF, err := fc.NextComponent().CreateFile(options)
 		if err != nil {
 			log.Err("FileCache::CreateFile : Failed to create file %s", options.Name)
 			return nil, err
 		}
 		newF.GetFileObject().Close()
+		// update state
+		flock.InCloud = true
 	}
 
 	// Create the file in local cache
@@ -729,6 +728,10 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	if !fc.createEmptyFile {
 		handle.Flags.Set(handlemap.HandleFlagDirty)
 	}
+
+	// update state
+	flock.InCache = true
+	flock.LazyOpen = false
 
 	return handle, nil
 }
