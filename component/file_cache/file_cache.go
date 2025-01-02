@@ -445,9 +445,7 @@ func (fc *FileCache) invalidateDirectory(name string, flocks []*common.LockMapIt
 				log.Debug("FileCache::invalidateDirectory : removing file %s from cache", path)
 				objPath := common.JoinUnixFilepath(name, d.Name())
 				flock := fc.fileLocks.Get(objPath)
-				flock.Lock()
 				fc.policy.CachePurge(path, flock)
-				flock.Unlock()
 			} else {
 				// remember to delete the directory later (after its children)
 				directoriesToPurge = append(directoriesToPurge, path)
@@ -508,11 +506,6 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 		log.Err("FileCache::DeleteDir : %s failed", options.Name)
 		// There is a chance that meta file for directory was not created in which case
 		// rest api delete will fail while we still need to cleanup the local cache for the same
-	} else {
-		// update file states
-		for _, flock := range flocks {
-			flock.InCloud = false
-		}
 	}
 
 	fc.invalidateDirectory(options.Name, flocks)
@@ -764,74 +757,34 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("FileCache::RenameDir : src=%s, dst=%s", options.Src, options.Dst)
 
-	// get list of cloud objects in the source directory
-	srcCloudObjects, err := fc.listCloudObjects(options.Src)
+	// get a list of source objects form both cloud and cache
+	objectNames, err := fc.listAllObjects(options.Src)
 	if err != nil {
-		log.Err("FileCache::RenameDir : %s listCloudObjects failed. Here's why: %v", options.Src, err)
+		log.Err("FileCache::RenameDir : %s listAllObjects failed. Here's why: %v", options.Src, err)
 		return err
 	}
-	// generate list of cloud object destinations
-	var dstCloudObjects []string
-	for _, srcName := range srcCloudObjects {
-		dstName := strings.Replace(srcName, options.Src, options.Dst, 1)
-		dstCloudObjects = append(dstCloudObjects, dstName)
-	}
-	// get a list of local objects in the source directory
-	srcLocalObects, err := fc.listCachedObjects(options.Src)
-	if err != nil {
-		log.Err("FileCache::RenameDir : %s listCachedObjects failed. Here's why: %v", options.Src, err)
-		return err
-	}
-	// generate list of local object destinations
-	var dstLocalObjects []string
-	for _, srcName := range srcLocalObects {
-		dstName := strings.Replace(srcName, options.Src, options.Dst, 1)
-		dstLocalObjects = append(dstLocalObjects, dstName)
-	}
-	// get a combined list of source objects
-	srcObjectNames := combineLists(srcCloudObjects, srcLocalObects)
-	// get a combined list of destination objects
-	dstObjectNames := combineLists(dstCloudObjects, dstLocalObjects)
 
-	// acquire a file lock on each entry, in lexical order (and defer unlock)
-	var listA, listB []string
-	if options.Src < options.Dst {
-		listA = srcObjectNames
-		listB = dstObjectNames
-	} else {
-		listA = dstObjectNames
-		listB = srcObjectNames
+	// add object destinations, and sort the result
+	for _, srcName := range objectNames {
+		dstName := strings.Replace(srcName, options.Src, options.Dst, 1)
+		objectNames = append(objectNames, dstName)
 	}
-	// get locks and lock them, for each file in each list
-	var flocksA []*common.LockMapItem
-	for _, objectName := range listA {
+	sort.Strings(objectNames)
+
+	// acquire a file lock on each entry (and defer unlock)
+	var flocks []*common.LockMapItem
+	for _, objectName := range objectNames {
 		flock := fc.fileLocks.Get(objectName)
-		flocksA = append(flocksA, flock)
+		flocks = append(flocks, flock)
 		flock.Lock()
 	}
-	var flocksB []*common.LockMapItem
-	for _, objectName := range listB {
-		flock := fc.fileLocks.Get(objectName)
-		flocksB = append(flocksB, flock)
-		flock.Lock()
-	}
-	defer unlockAll(flocksA)
-	defer unlockAll(flocksB)
+	defer unlockAll(flocks)
 
 	// rename the directory in the cloud
 	err = fc.NextComponent().RenameDir(options)
 	if err != nil {
 		log.Err("FileCache::RenameDir : error %s [%s]", options.Src, err.Error())
 		return err
-	}
-	// update file states
-	for _, srcCloudObjectName := range srcCloudObjects {
-		sflock := fc.fileLocks.Get(srcCloudObjectName)
-		sflock.InCloud = false
-	}
-	for _, dstCloudObjectName := range dstCloudObjects {
-		sflock := fc.fileLocks.Get(dstCloudObjectName)
-		sflock.InCloud = true
 	}
 
 	// move the files in local storage
@@ -900,8 +853,6 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 			return nil, err
 		}
 		newF.GetFileObject().Close()
-		// update state
-		flock.InCloud = true
 	}
 
 	// Create the file in local cache
@@ -944,7 +895,6 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	}
 
 	// update state
-	flock.InCache = true
 	flock.LazyOpen = false
 
 	return handle, nil
@@ -1004,7 +954,6 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	fc.policy.CachePurge(localPath, flock)
 
 	// update file state
-	flock.InCloud = false
 	flock.LazyOpen = false
 
 	return nil
@@ -1075,8 +1024,6 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 			log.Err("FileCache::openFileInternal : error creating new file %s [%s]", handle.Path, err.Error())
 			return err
 		}
-		// update file state
-		flock.InCache = true
 
 		if flags&os.O_TRUNC != 0 {
 			fileSize = 0
@@ -1537,9 +1484,6 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions, flock 
 		if err != nil {
 			log.Err("FileCache::FlushFile : %s upload failed [%s]", options.Handle.Path, err.Error())
 			return err
-		} else {
-			// upload succeeded, so update file state
-			flock.InCloud = true
 		}
 
 		options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
@@ -1650,10 +1594,6 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	if err != nil {
 		log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
 		return err
-	} else {
-		// update file states
-		sflock.InCloud = false
-		dflock.InCloud = true
 	}
 
 	localSrcPath := filepath.Join(fc.tmpPath, options.Src)
@@ -1675,9 +1615,6 @@ func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock,
 		log.Warn("FileCache::RenameDir : Failed to rename local file %s -> %s. Here's why: %v", localSrcPath, localDstPath, err)
 	} else {
 		fc.policy.CacheValid(localDstPath)
-		// update file states
-		sflock.InCache = false
-		dflock.InCache = true
 	}
 	// delete the source from our cache policy
 	// this will also delete the source file from local storage (if rename failed)
