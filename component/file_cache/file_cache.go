@@ -480,6 +480,14 @@ func (fc *FileCache) invalidateDirectory(name string) {
 func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("FileCache::DeleteDir : %s", options.Name)
 
+	// TODO: we need to lock every file involved in this operation, before starting any of it
+	// that means:
+	// 1. get a complete recursive listing from the container of all objects "in" the given "directory"
+	// 2. get a complete recursive listing of local files in cache in the given directory
+	// 3. create a complete list of all files and objects touched by this operation, and sort the list in lexical order
+	// 4. acquire a file lock on each entry, in lexical order (and defer unlock)
+	// 5. delete the directory (in cloud and then locally)
+
 	err := fc.NextComponent().DeleteDir(options)
 	if err != nil {
 		log.Err("FileCache::DeleteDir : %s failed", options.Name)
@@ -619,6 +627,16 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("FileCache::RenameDir : src=%s, dst=%s", options.Src, options.Dst)
 
+	// TODO: we need to lock every file involved in this operation, before starting any of it
+	// that means:
+	// 1. get a complete recursive listing from the container of all objects in the source prefix
+	// 2. check the destination for each one to see if an object with that name already exists
+	// 3. get a complete recursive listing of local files in the source directory
+	// 4. check for any existing files at the destination paths
+	// 5. create a complete list of all files and objects touched by this operation, and sort the list in lexical order
+	// 6. acquire a file lock on each entry, in lexical order (and defer unlock)
+	// 7. rename the directory (in cloud and then locally)
+
 	err := fc.NextComponent().RenameDir(options)
 	if err != nil {
 		log.Err("FileCache::RenameDir : error %s [%s]", options.Src, err.Error())
@@ -652,6 +670,8 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 					dflock.Lock()
 					sflock.Lock()
 				}
+				sflock.InCloud = false
+				dflock.InCloud = true
 				fc.renameCachedFile(path, newPath, sflock, dflock)
 				dflock.Unlock()
 				sflock.Unlock()
