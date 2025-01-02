@@ -33,6 +33,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -432,11 +433,10 @@ func isLocalDirEmpty(path string) bool {
 }
 
 // invalidateDirectory: Recursively invalidates a directory in the file cache.
-func (fc *FileCache) invalidateDirectory(name string) {
+func (fc *FileCache) invalidateDirectory(name string, flocks []*common.LockMapItem) {
 	log.Trace("FileCache::invalidateDirectory : %s", name)
 
 	localPath := filepath.Join(fc.tmpPath, name)
-	// TODO : wouldn't this cause a race condition? a thread might get the lock before we purge - and the file would be non-existent
 	// WalkDir goes through the tree in lexical order so 'dir' always comes before 'dir/file'
 	var directoriesToPurge []string
 	err := filepath.WalkDir(localPath, func(path string, d fs.DirEntry, err error) error {
@@ -480,23 +480,156 @@ func (fc *FileCache) invalidateDirectory(name string) {
 func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("FileCache::DeleteDir : %s", options.Name)
 
-	// TODO: we need to lock every file involved in this operation, before starting any of it
-	// that means:
-	// 1. get a complete recursive listing from the container of all objects "in" the given "directory"
-	// 2. get a complete recursive listing of local files in cache in the given directory
-	// 3. create a complete list of all files and objects touched by this operation, and sort the list in lexical order
-	// 4. acquire a file lock on each entry, in lexical order (and defer unlock)
-	// 5. delete the directory (in cloud and then locally)
+	// we need to lock every file involved in this operation, before starting any of it
 
-	err := fc.NextComponent().DeleteDir(options)
+	// 1. get a complete recursive listing of all cloud objects and local files in the given directory, sorted in lexical order
+	objectNames, err := fc.listAllObjects(options.Name)
+	if err != nil {
+		log.Err("FileCache::DeleteDir : %s listAllObjects failed. Here's why: %v", options.Name, err)
+		return err
+	}
+
+	// 2. acquire a file lock on each entry, in lexical order (and defer unlock)
+	var flocks []*common.LockMapItem
+	for _, objectName := range objectNames {
+		flock := fc.fileLocks.Get(objectName)
+		flocks = append(flocks, flock)
+		flock.Lock()
+	}
+	defer unlockAll(flocks)
+
+	// 3. delete the directory as normal (in cloud and then locally)
+	err = fc.NextComponent().DeleteDir(options)
 	if err != nil {
 		log.Err("FileCache::DeleteDir : %s failed", options.Name)
 		// There is a chance that meta file for directory was not created in which case
 		// rest api delete will fail while we still need to cleanup the local cache for the same
+	} else {
+		// update file states
+		for _, flock := range flocks {
+			flock.InCloud = false
+		}
 	}
 
-	fc.invalidateDirectory(options.Name)
+	fc.invalidateDirectory(options.Name, flocks)
 	return err
+}
+
+func (fc *FileCache) listAllObjects(prefix string) (objectNames []string, err error) {
+	// get cloud objects
+	var cloudObjects []string
+	cloudObjects, err = fc.listCloudObjects(prefix)
+	if err != nil {
+		return
+	}
+	// get local / cached objects
+	var localObjects []string
+	localObjects, err = fc.listCachedObjects(prefix)
+	if err != nil {
+		return
+	}
+	// combine the lists
+	objectNames = combineLists(cloudObjects, localObjects)
+
+	return
+}
+
+// recursively list all objects in the container at the given prefix / directory
+func (fc *FileCache) listCloudObjects(prefix string) (objectNames []string, err error) {
+	var done bool
+	var token string
+	for !done {
+		var attrSlice []*internal.ObjAttr
+		attrSlice, token, err = fc.NextComponent().StreamDir(internal.StreamDirOptions{Name: prefix, Token: token})
+		if err != nil {
+			return
+		}
+		for i := len(attrSlice) - 1; i >= 0; i-- {
+			attr := attrSlice[i]
+			if !attr.IsDir() {
+				objectNames = append(objectNames, attr.Path)
+			} else {
+				// recurse!
+				var subdirObjectNames []string
+				subdirObjectNames, err = fc.listCloudObjects(attr.Path)
+				if err != nil {
+					return
+				}
+				objectNames = append(objectNames, subdirObjectNames...)
+			}
+		}
+		done = token == ""
+	}
+	sort.Strings(objectNames)
+	return
+}
+
+// recursively list all files in the directory
+func (fc *FileCache) listCachedObjects(directory string) (objectNames []string, err error) {
+	localDirPath := filepath.Join(fc.tmpPath, directory)
+	walkDirErr := filepath.WalkDir(localDirPath, func(path string, d fs.DirEntry, err error) error {
+		if err == nil && d != nil {
+			if !d.IsDir() {
+				objectName := fc.getObjectName(path)
+				objectNames = append(objectNames, objectName)
+			}
+		} else {
+			// stat(localPath) failed. err is the one returned by stat
+			// documentation: https://pkg.go.dev/io/fs#WalkDirFunc
+			if os.IsNotExist(err) {
+				// none of the files that were moved actually exist in local storage
+				log.Info("FileCache::listObjects : %s does not exist in local cache.", directory)
+			} else if err != nil {
+				log.Warn("FileCache::listObjects : %s stat err [%v].", directory, err)
+			}
+		}
+		return nil
+	})
+	if walkDirErr != nil && !os.IsNotExist(walkDirErr) {
+		err = walkDirErr
+	}
+	sort.Strings(objectNames)
+	return
+}
+
+func (fc *FileCache) getObjectName(localPath string) string {
+	relPath, err := filepath.Rel(fc.tmpPath, localPath)
+	if err != nil {
+		relPath = strings.TrimPrefix(localPath, fc.tmpPath+string(filepath.Separator))
+		log.Warn("FileCache::getObjectName : filepath.Rel failed on path %s [%v]. Using TrimPrefix: %s", localPath, err, relPath)
+	}
+	return common.NormalizeObjectName(relPath)
+}
+
+func combineLists(listA, listB []string) []string {
+	// since both lists are sorted, we can combine the two lists using a double-indexed for loop
+	combinedList := listA
+	i := 0 // Index for listA
+	j := 0 // Index for listB
+	// Iterate through both lists, adding entries from B that are missing from A
+	for i < len(listA) && j < len(listB) {
+		itemA := listA[i]
+		itemB := listB[j]
+		if itemA < itemB {
+			i++
+		} else if itemA > itemB {
+			// we could insert here, but it's probably better to just sort later
+			combinedList = append(combinedList, itemB)
+			j++
+		} else {
+			i++
+			j++
+		}
+	}
+	// sort and return
+	sort.Strings(combinedList)
+	return combinedList
+}
+
+func unlockAll(flocks []*common.LockMapItem) {
+	for _, flock := range flocks {
+		flock.Unlock()
+	}
 }
 
 // StreamDir : Add local files to the list retrieved from storage container
@@ -627,20 +760,74 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("FileCache::RenameDir : src=%s, dst=%s", options.Src, options.Dst)
 
-	// TODO: we need to lock every file involved in this operation, before starting any of it
-	// that means:
-	// 1. get a complete recursive listing from the container of all objects in the source prefix
-	// 2. check the destination for each one to see if an object with that name already exists
-	// 3. get a complete recursive listing of local files in the source directory
-	// 4. check for any existing files at the destination paths
-	// 5. create a complete list of all files and objects touched by this operation, and sort the list in lexical order
-	// 6. acquire a file lock on each entry, in lexical order (and defer unlock)
-	// 7. rename the directory (in cloud and then locally)
+	// get list of cloud objects in the source directory
+	srcCloudObjects, err := fc.listCloudObjects(options.Src)
+	if err != nil {
+		log.Err("FileCache::RenameDir : %s listCloudObjects failed. Here's why: %v", options.Src, err)
+		return err
+	}
+	// generate list of cloud object destinations
+	var dstCloudObjects []string
+	for _, srcName := range srcCloudObjects {
+		dstName := strings.Replace(srcName, options.Src, options.Dst, 1)
+		dstCloudObjects = append(dstCloudObjects, dstName)
+	}
+	// get a list of local objects in the source directory
+	srcLocalObects, err := fc.listCachedObjects(options.Src)
+	if err != nil {
+		log.Err("FileCache::RenameDir : %s listCachedObjects failed. Here's why: %v", options.Src, err)
+		return err
+	}
+	// generate list of local object destinations
+	var dstLocalObjects []string
+	for _, srcName := range srcLocalObects {
+		dstName := strings.Replace(srcName, options.Src, options.Dst, 1)
+		dstLocalObjects = append(dstLocalObjects, dstName)
+	}
+	// get a combined list of source objects
+	srcObjectNames := combineLists(srcCloudObjects, srcLocalObects)
+	// get a combined list of destination objects
+	dstObjectNames := combineLists(dstCloudObjects, dstLocalObjects)
 
-	err := fc.NextComponent().RenameDir(options)
+	// acquire a file lock on each entry, in lexical order (and defer unlock)
+	var listA, listB []string
+	if options.Src < options.Dst {
+		listA = srcObjectNames
+		listB = dstObjectNames
+	} else {
+		listA = dstObjectNames
+		listB = srcObjectNames
+	}
+	// get locks and lock them, for each file in each list
+	var flocksA []*common.LockMapItem
+	for _, objectName := range listA {
+		flock := fc.fileLocks.Get(objectName)
+		flocksA = append(flocksA, flock)
+		flock.Lock()
+	}
+	var flocksB []*common.LockMapItem
+	for _, objectName := range listB {
+		flock := fc.fileLocks.Get(objectName)
+		flocksB = append(flocksB, flock)
+		flock.Lock()
+	}
+	defer unlockAll(flocksA)
+	defer unlockAll(flocksB)
+
+	// rename the directory in the cloud
+	err = fc.NextComponent().RenameDir(options)
 	if err != nil {
 		log.Err("FileCache::RenameDir : error %s [%s]", options.Src, err.Error())
 		return err
+	}
+	// update file states
+	for _, srcCloudObjectName := range srcCloudObjects {
+		sflock := fc.fileLocks.Get(srcCloudObjectName)
+		sflock.InCloud = false
+	}
+	for _, dstCloudObjectName := range dstCloudObjects {
+		sflock := fc.fileLocks.Get(dstCloudObjectName)
+		sflock.InCloud = true
 	}
 
 	// move the files in local storage
@@ -653,28 +840,12 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 			newPath := strings.Replace(path, localSrcPath, localDstPath, 1)
 			if !d.IsDir() {
 				log.Debug("FileCache::RenameDir : Renaming local file %s -> %s", path, newPath)
-				srcRelPath, err := filepath.Rel(fc.tmpPath, path)
-				if err != nil {
-					srcRelPath = strings.TrimPrefix(path, fc.tmpPath+string(filepath.Separator))
-					log.Warn("FileCache::RenameDir : filepath.Rel failed on path %s [%v]. Using TrimPrefix: %s", path, err, srcRelPath)
-				}
-				srcObjName := common.NormalizeObjectName(srcRelPath)
+				// update the file state
+				srcObjName := fc.getObjectName(path)
 				dstObjName := strings.Replace(srcObjName, options.Src, options.Dst, 1)
 				sflock := fc.fileLocks.Get(srcObjName)
 				dflock := fc.fileLocks.Get(dstObjName)
-				// always lock files in lexical order to prevent deadlock
-				if srcObjName < dstObjName {
-					sflock.Lock()
-					dflock.Lock()
-				} else {
-					dflock.Lock()
-					sflock.Lock()
-				}
-				sflock.InCloud = false
-				dflock.InCloud = true
 				fc.renameCachedFile(path, newPath, sflock, dflock)
-				dflock.Unlock()
-				sflock.Unlock()
 			} else {
 				log.Debug("FileCache::RenameDir : Creating local destination directory %s", newPath)
 				// create the new directory
