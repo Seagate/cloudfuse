@@ -57,7 +57,7 @@ type cachePolicy interface {
 	UpdateConfig(cachePolicyConfig) error
 
 	CacheValid(name string) // Mark the file as hit
-	CachePurge(name string) // Schedule the file for deletion
+	CachePurge(name string) // Delete the file from cache
 
 	IsCached(name string) bool // Whether or not the cache policy considers this file cached
 

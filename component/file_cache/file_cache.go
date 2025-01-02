@@ -443,7 +443,11 @@ func (fc *FileCache) invalidateDirectory(name string, flocks []*common.LockMapIt
 		if err == nil && d != nil {
 			if !d.IsDir() {
 				log.Debug("FileCache::invalidateDirectory : removing file %s from cache", path)
+				objPath := common.JoinUnixFilepath(name, d.Name())
+				flock := fc.fileLocks.Get(objPath)
+				flock.Lock()
 				fc.policy.CachePurge(path)
+				flock.Unlock()
 			} else {
 				// remember to delete the directory later (after its children)
 				directoriesToPurge = append(directoriesToPurge, path)
@@ -982,7 +986,6 @@ func (fc *FileCache) validateStorageError(path string, err error, method string,
 	return nil
 }
 
-// DeleteFile: Invalidate the file in local cache.
 func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("FileCache::DeleteFile : name=%s", options.Name)
 
@@ -998,13 +1001,6 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	}
 
 	localPath := filepath.Join(fc.tmpPath, options.Name)
-	err = deleteFile(localPath)
-	if err != nil && !os.IsNotExist(err) {
-		log.Err("FileCache::DeleteFile : failed to delete local file %s [%s]", localPath, err.Error())
-	} else if err == nil || os.IsNotExist(err) {
-		flock.InCache = false
-	}
-
 	fc.policy.CachePurge(localPath)
 
 	// update file state
@@ -1288,15 +1284,6 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 	if options.Handle.Fsynced() {
 		log.Trace("FileCache::closeFileInternal : fsync/sync op, purging %s", options.Handle.Path)
 		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
-
-		err := deleteFile(localPath)
-		if err == nil || os.IsNotExist(err) {
-			// update file state
-			flock.InCache = false
-		} else if err != nil && !os.IsNotExist(err) {
-			log.Err("FileCache::closeFileInternal : failed to delete local file %s [%s]", localPath, err.Error())
-		}
-
 		fc.policy.CachePurge(localPath)
 		return nil
 	}
@@ -1799,6 +1786,10 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 // Chown : Update the file with its new owner and group
 func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	log.Trace("FileCache::Chown : Change owner of path %s", options.Name)
+
+	flock := fc.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
 
 	// Update the file in cloud storage
 	err := fc.NextComponent().Chown(options)
