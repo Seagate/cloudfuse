@@ -1372,17 +1372,17 @@ func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 // func (fc *FileCache) SyncDir(options internal.SyncDirOptions) error {
 // 	log.Trace("FileCache::SyncDir : %s", options.Name)
 
-//		err := fc.NextComponent().SyncDir(options)
-//		if err != nil {
-//			log.Err("FileCache::SyncDir : %s failed", options.Name)
-//			return err
-//		}
-//		// TODO: we can decide here if we want to flush all the files in the directory first or not. Currently I'm just invalidating files
-//		// within the dir
-//		go fc.invalidateDirectory(options.Name)
-//		return nil
-//	}
-//
+// 	err := fc.NextComponent().SyncDir(options)
+// 	if err != nil {
+// 		log.Err("FileCache::SyncDir : %s failed", options.Name)
+// 		return err
+// 	}
+// 	// TODO: we can decide here if we want to flush all the files in the directory first or not. Currently I'm just invalidating files
+// 	// within the dir
+// 	go fc.invalidateDirectory(options.Name)
+// 	return nil
+// }
+
 // FlushFile: Flush the local file to storage
 func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 	var flock *common.LockMapItem
