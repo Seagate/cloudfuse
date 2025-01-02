@@ -644,8 +644,14 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				dstObjName := strings.Replace(srcObjName, options.Src, options.Dst, 1)
 				sflock := fc.fileLocks.Get(srcObjName)
 				dflock := fc.fileLocks.Get(dstObjName)
-				sflock.Lock()
-				dflock.Lock()
+				// always lock files in lexical order to prevent deadlock
+				if srcObjName < dstObjName {
+					sflock.Lock()
+					dflock.Lock()
+				} else {
+					dflock.Lock()
+					sflock.Lock()
+				}
 				fc.renameCachedFile(path, newPath, sflock, dflock)
 				dflock.Unlock()
 				sflock.Unlock()
@@ -1449,11 +1455,16 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("FileCache::RenameFile : src=%s, dst=%s", options.Src, options.Dst)
 
 	sflock := fc.fileLocks.Get(options.Src)
-	sflock.Lock()
-	defer sflock.Unlock()
-
 	dflock := fc.fileLocks.Get(options.Dst)
-	dflock.Lock()
+	// always lock files in lexical order to prevent deadlock
+	if options.Src < options.Dst {
+		sflock.Lock()
+		dflock.Lock()
+	} else {
+		dflock.Lock()
+		sflock.Lock()
+	}
+	defer sflock.Unlock()
 	defer dflock.Unlock()
 
 	err := fc.NextComponent().RenameFile(options)
