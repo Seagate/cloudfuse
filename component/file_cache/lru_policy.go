@@ -157,13 +157,19 @@ func (p *lruPolicy) CacheValid(name string) {
 	}
 }
 
-func (p *lruPolicy) CachePurge(name string) {
+func (p *lruPolicy) CachePurge(name string, flock *common.LockMapItem) {
 	log.Trace("lruPolicy::CachePurge : %s", name)
 
 	p.removeNode(name)
 	err := deleteFile(name)
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("lruPolicy::CachePurge : failed to delete local file %s. Here's why: %v", name, err)
+	} else if err == nil || os.IsNotExist(err) {
+		// directories do not provide a flock (yet?)
+		if flock != nil {
+			// update the file state
+			flock.InCache = false
+		}
 	}
 }
 

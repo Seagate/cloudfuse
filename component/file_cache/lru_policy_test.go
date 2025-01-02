@@ -205,7 +205,7 @@ func (suite *lruPolicyTestSuite) TestCachePurge() {
 
 	// test policy cache data
 	suite.policy.CacheValid("temp")
-	suite.policy.CachePurge("temp")
+	suite.policy.CachePurge("temp", nil)
 
 	n, ok := suite.policy.nodeMap.Load("temp")
 	suite.assert.False(ok)
@@ -215,7 +215,7 @@ func (suite *lruPolicyTestSuite) TestCachePurge() {
 	// purge all aPaths, in reverse order
 	aPaths, abPaths, acPaths := suite.generateNestedDirectory("temp")
 	for i := len(aPaths) - 1; i >= 0; i-- {
-		suite.policy.CachePurge(aPaths[i])
+		suite.policy.CachePurge(aPaths[i], nil)
 	}
 
 	// validate all aPaths were deleted

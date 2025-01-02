@@ -446,7 +446,7 @@ func (fc *FileCache) invalidateDirectory(name string, flocks []*common.LockMapIt
 				objPath := common.JoinUnixFilepath(name, d.Name())
 				flock := fc.fileLocks.Get(objPath)
 				flock.Lock()
-				fc.policy.CachePurge(path)
+				fc.policy.CachePurge(path, flock)
 				flock.Unlock()
 			} else {
 				// remember to delete the directory later (after its children)
@@ -467,7 +467,7 @@ func (fc *FileCache) invalidateDirectory(name string, flocks []*common.LockMapIt
 	// clean up leftover source directories in reverse order
 	for i := len(directoriesToPurge) - 1; i >= 0; i-- {
 		log.Debug("FileCache::invalidateDirectory : removing dir %s from cache", directoriesToPurge[i])
-		fc.policy.CachePurge(directoriesToPurge[i])
+		fc.policy.CachePurge(directoriesToPurge[i], nil)
 	}
 
 	if err != nil {
@@ -877,7 +877,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	// clean up leftover source directories in reverse order
 	for i := len(directoriesToPurge) - 1; i >= 0; i-- {
 		log.Debug("FileCache::RenameDir : Removing local directory %s", directoriesToPurge[i])
-		fc.policy.CachePurge(directoriesToPurge[i])
+		fc.policy.CachePurge(directoriesToPurge[i], nil)
 	}
 
 	return nil
@@ -1001,7 +1001,7 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	}
 
 	localPath := filepath.Join(fc.tmpPath, options.Name)
-	fc.policy.CachePurge(localPath)
+	fc.policy.CachePurge(localPath, flock)
 
 	// update file state
 	flock.InCloud = false
@@ -1284,7 +1284,7 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 	if options.Handle.Fsynced() {
 		log.Trace("FileCache::closeFileInternal : fsync/sync op, purging %s", options.Handle.Path)
 		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
-		fc.policy.CachePurge(localPath)
+		fc.policy.CachePurge(localPath, flock)
 		return nil
 	}
 
@@ -1681,7 +1681,7 @@ func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock,
 	}
 	// delete the source from our cache policy
 	// this will also delete the source file from local storage (if rename failed)
-	fc.policy.CachePurge(localSrcPath)
+	fc.policy.CachePurge(localSrcPath, sflock)
 }
 
 // TruncateFile: Update the file with its new size.
