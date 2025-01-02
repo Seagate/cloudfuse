@@ -71,8 +71,6 @@ func (fc *FileCache) isDownloadRequired(localPath string, objectPath string, flo
 	// check if the file exists locally
 	finfo, statErr := os.Stat(localPath)
 	if statErr == nil {
-		// update state
-		flock.InCache = true
 		// The file does not need to be downloaded as long as it is in the cache policy
 		fileInPolicyCache := fc.policy.IsCached(localPath)
 		if fileInPolicyCache {
@@ -95,10 +93,6 @@ func (fc *FileCache) isDownloadRequired(localPath string, objectPath string, flo
 
 	// get cloud attributes
 	cloudAttr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: objectPath})
-	if err == nil {
-		// update file state
-		flock.InCloud = true
-	}
 	if err != nil && !os.IsNotExist(err) {
 		log.Err("FileCache::isDownloadRequired : Failed to get attr of %s [%s]", objectPath, err.Error())
 	}
