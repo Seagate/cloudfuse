@@ -1500,7 +1500,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions, flock 
 			localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 			info, err := os.Stat(localPath)
 			if err == nil {
-				err = fc.Chmod(internal.ChmodOptions{Name: options.Handle.Path, Mode: info.Mode()})
+				err = fc.chmodInternal(internal.ChmodOptions{Name: options.Handle.Path, Mode: info.Mode()}, flock)
 				if err != nil {
 					// chmod was missed earlier for this file and doing it now also
 					// resulted in error so ignore this one and proceed for flush handling
@@ -1694,6 +1694,13 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 	flock := fc.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
+
+	return fc.chmodInternal(options, flock)
+}
+
+// Chmod : Update the file with its new permissions
+func (fc *FileCache) chmodInternal(options internal.ChmodOptions, flock *common.LockMapItem) error {
+	log.Trace("FileCache::Chmod : Change mode of path %s", options.Name)
 
 	// Update the file in cloud storage
 	err := fc.NextComponent().Chmod(options)
