@@ -443,7 +443,7 @@ func (fc *FileCache) invalidateDirectory(name string, flocks []*common.LockMapIt
 		if err == nil && d != nil {
 			if !d.IsDir() {
 				log.Debug("FileCache::invalidateDirectory : removing file %s from cache", path)
-				objPath := common.JoinUnixFilepath(name, d.Name())
+				objPath := fc.getObjectName(path)
 				flock := fc.fileLocks.Get(objPath)
 				fc.policy.CachePurge(path, flock)
 			} else {
