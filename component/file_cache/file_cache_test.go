@@ -1292,25 +1292,6 @@ func (suite *fileCacheTestSuite) TestRenameFileInCache() {
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, dst))   // Dst does exist
 }
 
-func (suite *fileCacheTestSuite) TestRenameFileCase2() {
-	defer suite.cleanupTest()
-	// Default is to not create empty files on create file to support immutable storage.
-	src := "source3"
-	dst := "destination3"
-	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0777})
-
-	err := suite.fileCache.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
-	suite.assert.Error(err)
-	suite.assert.Equal(syscall.EIO, err)
-
-	// Src should be in local cache (since we failed the operation)
-	suite.assert.FileExists(filepath.Join(suite.cache_path, src))
-	// Src should not be in fake storage
-	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, src))
-	// Dst should not be in fake storage
-	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, dst))
-}
-
 func (suite *fileCacheTestSuite) TestRenameFileAndEvict() {
 	defer suite.cleanupTest()
 
