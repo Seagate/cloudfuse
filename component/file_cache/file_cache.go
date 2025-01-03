@@ -647,7 +647,11 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 					sflock.Lock()
 				}
 				// complete local rename
-				fc.renameCachedFile(path, newPath, sflock, dflock)
+				err := fc.renameCachedFile(path, newPath, sflock, dflock)
+				if err != nil {
+					// there's really not much we can do to handle the error, so just log it
+					log.Err("FileCache::RenameDir : %s file rename failed. Directory state is inconsistent!", path)
+				}
 				sflock.Unlock()
 				dflock.Unlock()
 			} else {
@@ -1461,7 +1465,7 @@ func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock,
 			// if the file is not open, it should be backed up already
 			if sflock.Count() > 0 {
 				// abort rename to prevent data loss!
-				log.Err("FileCache::renameCachedFile : %s Failed rename and src is open! Aborting rename...", localSrcPath)
+				log.Err("FileCache::renameCachedFile : %s Failed rename and src is open! Rename should be aborted...", localSrcPath)
 				return err
 			}
 		}
