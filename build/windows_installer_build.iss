@@ -3,7 +3,7 @@
 ; https://jrsoftware.org/ishelp/index.php
 
 #define MyAppName "Cloudfuse"
-#define MyAppVersion "1.6.1"
+#define MyAppVersion "1.7.2"
 #define MyAppPublisher "SEAGATE TECHNOLOGY LLC"
 #define MyAppURL "https://github.com/Seagate/cloudfuse"
 #define MyAppExeName "cloudfuseGUI.exe"
@@ -31,8 +31,6 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
-SignTool=signtool /d $q{#MyAppName} v{#MyAppVersion}$q $f
-SignedUninstaller=yes
 VersionInfoVersion={#MyAppVersion}
 ; Tell Windows Explorer to reload the environment
 ChangesEnvironment=yes
