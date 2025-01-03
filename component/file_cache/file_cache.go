@@ -1404,6 +1404,7 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	defer dflock.Unlock()
 
 	err := fc.NextComponent().RenameFile(options)
+	localOnly := os.IsNotExist(err)
 	err = fc.validateStorageError(options.Src, err, "RenameFile", true)
 	if err != nil {
 		log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
@@ -1420,16 +1421,19 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	localRenameErr := fc.renameCachedFile(localSrcPath, localDstPath, sflock, dflock)
 	if localRenameErr != nil {
 		// renameCachedFile only returns an error when we are at risk for data loss
-		// we must reverse the rename operation to prevent data loss
-		err := fc.NextComponent().RenameFile(internal.RenameFileOptions{
-			Src: options.Dst,
-			Dst: options.Src,
-		})
-		err = fc.validateStorageError(options.Src, err, "RenameFile", true)
-		if err != nil {
-			log.Err("FileCache::RenameFile : %s failed to reverse cloud rename to avoid data loss! [%v]", options.Src, err)
+		if !localOnly {
+			// we must reverse the cloud rename operation to prevent data loss
+			err := fc.NextComponent().RenameFile(internal.RenameFileOptions{
+				Src: options.Dst,
+				Dst: options.Src,
+			})
+			err = fc.validateStorageError(options.Src, err, "RenameFile", false)
+			if err != nil {
+				log.Err("FileCache::RenameFile : %s failed to reverse cloud rename to avoid data loss! [%v]", options.Src, err)
+			}
+			localRenameErr = errors.Join(localRenameErr, err)
 		}
-		return errors.Join(localRenameErr, err)
+		return localRenameErr
 	}
 
 	// update any open handles to the file with its new name
