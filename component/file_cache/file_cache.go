@@ -27,6 +27,7 @@ package file_cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -635,7 +636,20 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 			newPath := strings.Replace(path, localSrcPath, localDstPath, 1)
 			if !d.IsDir() {
 				log.Debug("FileCache::RenameDir : Renaming local file %s -> %s", path, newPath)
-				fc.renameCachedFile(path, newPath)
+				// get locks
+				sflock := fc.fileLocks.Get(fc.getObjectName(path))
+				dflock := fc.fileLocks.Get(fc.getObjectName(newPath))
+				if path < newPath {
+					sflock.Lock()
+					dflock.Lock()
+				} else {
+					dflock.Lock()
+					sflock.Lock()
+				}
+				// complete local rename
+				fc.renameCachedFile(path, newPath, sflock, dflock)
+				sflock.Unlock()
+				dflock.Unlock()
 			} else {
 				log.Debug("FileCache::RenameDir : Creating local destination directory %s", newPath)
 				// create the new directory
@@ -667,6 +681,15 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	}
 
 	return nil
+}
+
+func (fc *FileCache) getObjectName(localPath string) string {
+	relPath, err := filepath.Rel(fc.tmpPath, localPath)
+	if err != nil {
+		relPath = strings.TrimPrefix(localPath, fc.tmpPath+string(filepath.Separator))
+		log.Warn("FileCache::getObjectName : filepath.Rel failed on path %s [%v]. Using TrimPrefix: %s", localPath, err, relPath)
+	}
+	return common.NormalizeObjectName(relPath)
 }
 
 // CreateFile: Create the file in local cache.
@@ -1366,16 +1389,22 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("FileCache::RenameFile : src=%s, dst=%s", options.Src, options.Dst)
 
+	// acquire file locks
 	sflock := fc.fileLocks.Get(options.Src)
-	sflock.Lock()
-	defer sflock.Unlock()
-
 	dflock := fc.fileLocks.Get(options.Dst)
-	dflock.Lock()
+	// prevent deadlock
+	if options.Src < options.Dst {
+		sflock.Lock()
+		dflock.Lock()
+	} else {
+		dflock.Lock()
+		sflock.Lock()
+	}
+	defer sflock.Unlock()
 	defer dflock.Unlock()
 
 	err := fc.NextComponent().RenameFile(options)
-	err = fc.validateStorageError(options.Src, err, "RenameFile", false)
+	err = fc.validateStorageError(options.Src, err, "RenameFile", true)
 	if err != nil {
 		log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
 		return err
@@ -1388,22 +1417,59 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	// if we do not perform rename operation locally and those destination files are cached then next time they are read
 	// we will be serving the wrong content (as we did not rename locally, we still be having older destination files with
 	// stale content). We either need to remove dest file as well from cache or just run rename to replace the content.
-	fc.renameCachedFile(localSrcPath, localDstPath)
+	localRenameErr := fc.renameCachedFile(localSrcPath, localDstPath, sflock, dflock)
+	if localRenameErr != nil {
+		// renameCachedFile only returns an error when we are at risk for data loss
+		// we must reverse the rename operation to prevent data loss
+		err := fc.NextComponent().RenameFile(internal.RenameFileOptions{
+			Src: options.Dst,
+			Dst: options.Src,
+		})
+		err = fc.validateStorageError(options.Src, err, "RenameFile", true)
+		if err != nil {
+			log.Err("FileCache::RenameFile : %s failed to reverse cloud rename to avoid data loss! [%v]", options.Src, err)
+		}
+		return errors.Join(localRenameErr, err)
+	}
+
+	// update any open handles to the file with its new name
+	if sflock.Count() > 0 {
+		handlemap.GetHandles().Range(func(key, value any) bool {
+			handle := value.(*handlemap.Handle)
+			if handle.Path == options.Src {
+				handle.Path = options.Dst
+			}
+			return true
+		})
+	}
 
 	return nil
 }
 
-func (fc *FileCache) renameCachedFile(localSrcPath string, localDstPath string) {
+func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock, dflock *common.LockMapItem) error {
 	err := os.Rename(localSrcPath, localDstPath)
 	if err != nil {
-		// if rename fails, we just delete the source file anyway
-		log.Warn("FileCache::RenameDir : Failed to rename local file %s -> %s. Here's why: %v", localSrcPath, localDstPath, err)
-	} else {
+		if os.IsNotExist(err) {
+			// Case 1
+			log.Info("FileCache::renameCachedFile : %s source file not cached", localSrcPath)
+		} else {
+			log.Warn("FileCache::renameCachedFile : %s -> %s Failed to rename local file. Here's why: %v", localSrcPath, localDstPath, err)
+			// if the file is not open, it should be backed up already
+			if sflock.Count() > 0 {
+				// abort rename to prevent data loss!
+				log.Err("FileCache::renameCachedFile : %s Failed rename and src is open! Aborting rename...", localSrcPath)
+				return err
+			}
+		}
+	} else if err == nil {
+		log.Debug("FileCache::renameCachedFile : %s -> %s Successfully renamed local file", localSrcPath, localDstPath)
 		fc.policy.CacheValid(localDstPath)
 	}
 	// delete the source from our cache policy
 	// this will also delete the source file from local storage (if rename failed)
 	fc.policy.CachePurge(localSrcPath)
+
+	return nil
 }
 
 // TruncateFile: Update the file with its new size.
