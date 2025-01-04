@@ -1589,12 +1589,14 @@ func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock,
 			log.Warn("FileCache::renameCachedFile : %s -> %s Failed to rename local file. Here's why: %v", localSrcPath, localDstPath, err)
 			// if the file is not open, it should be backed up already
 			if sflock.Count() > 0 {
-				if !sflock.LazyOpen {
-					log.Err("FileCache::renameCachedFile : %s Failed rename and src is lazy open. Source file will be deleted.", localSrcPath)
+				if sflock.LazyOpen {
+					log.Err("FileCache::renameCachedFile : %s Failed rename src is in lazy open state. Source file will be deleted.", localSrcPath)
+				} else {
+					// file is fully open, with possible local data that has not been uploaded
+					// abort rename to prevent data loss!
+					log.Err("FileCache::renameCachedFile : %s Failed rename and src is open! Aborting rename...", localSrcPath)
+					return err
 				}
-				// abort rename to prevent data loss!
-				log.Err("FileCache::renameCachedFile : %s Failed rename and src is open! Aborting rename...", localSrcPath)
-				return err
 			}
 		}
 	} else if err == nil {
