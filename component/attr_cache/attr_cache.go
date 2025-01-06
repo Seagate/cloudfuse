@@ -1021,12 +1021,6 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 				if metadataOkay {
 					return attr, errors.Join(getAttrErr, err)
 				}
-			} else if found && value.attrFlag.IsSet(AttrFlagExists) {
-				// This entry says the item exists, but the entry is invalid
-				// When we flush or sync files or directories, we create entries like this
-				// These entries correspond to items that *might* exist in the cloud
-				// So we have to not claim to know whether they exist
-				return nil, common.NewNoCachedDataError(err)
 			} else {
 				// we have no cached data about this item
 				// but do we have a complete listing for its parent directory?
