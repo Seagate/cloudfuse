@@ -135,11 +135,12 @@ var uninstallCmd = &cobra.Command{
 
 		// get absolute path of provided relative mount path
 		if strings.Contains(serviceName, ".") || strings.Contains(serviceName, "..") {
+			// TODO: since the serviceName is the same as the mount folder name, we can use the getAbsPath() for our mount path
 			dir, err := os.Getwd()
 			if err != nil {
 				return fmt.Errorf("error: [%s]", err.Error())
 			}
-			mountPath = common.JoinUnixFilepath(dir, serviceName)
+			mountPath := common.JoinUnixFilepath(dir, serviceName)
 
 		}
 
