@@ -203,7 +203,7 @@ func newServiceFile(mountPath string, configPath string, serviceUser string) (st
 	}
 
 	folderList := strings.Split(mountPath, "/")
-	serviceName := folderList[len(folderList)-1] + ".service"
+	serviceName := "cloudfuse-" + folderList[len(folderList)-1] + ".service"
 	newFile, err := os.Create("/etc/systemd/system/" + serviceName)
 	if err != nil {
 		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
