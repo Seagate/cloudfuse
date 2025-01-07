@@ -482,33 +482,15 @@ func (fc *FileCache) invalidateDirectory(name string, flocks []*common.LockMapIt
 func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("FileCache::DeleteDir : %s", options.Name)
 
-	// we need to lock every file involved in this operation, before starting any of it
-
-	// 1. get a complete recursive listing of all cloud objects and local files in the given directory, sorted in lexical order
-	objectNames, err := fc.listAllObjects(options.Name)
-	if err != nil {
-		log.Err("FileCache::DeleteDir : %s listAllObjects failed. Here's why: %v", options.Name, err)
-		return err
-	}
-
-	// 2. acquire a file lock on each entry, in lexical order (and defer unlock)
-	var flocks []*common.LockMapItem
-	for _, objectName := range objectNames {
-		flock := fc.fileLocks.Get(objectName)
-		flocks = append(flocks, flock)
-		flock.Lock()
-	}
-	defer unlockAll(flocks)
-
-	// 3. delete the directory as normal (in cloud and then locally)
-	err = fc.NextComponent().DeleteDir(options)
+	// The libfuse component only calls DeleteDir on empty directories, so this directory must be empty
+	err := fc.NextComponent().DeleteDir(options)
 	if err != nil {
 		log.Err("FileCache::DeleteDir : %s failed", options.Name)
 		// There is a chance that meta file for directory was not created in which case
 		// rest api delete will fail while we still need to cleanup the local cache for the same
 	}
 
-	fc.invalidateDirectory(options.Name, flocks)
+	fc.invalidateDirectory(options.Name, nil)
 	return err
 }
 
