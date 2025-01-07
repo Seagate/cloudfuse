@@ -478,23 +478,65 @@ func (fc *FileCache) invalidateDirectory(name string) {
 
 func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("FileCache::CreateDir : %s", options.Name)
+	localPath := filepath.Join(fc.tmpPath, options.Name)
 
+	// when offline access is enabled, directories are cached here, in file cache
+	// this is done so we can tell which directories are local, for the purposes of offline access
+	if fc.offlineAccess {
+		// first, check if the directory exists in cloud storage
+		_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+		// are we offline?
+		if errors.Is(err, &common.CloudUnreachableError{}) {
+			// if we have no information, just return the error
+			if errors.Is(err, &common.NoCachedDataError{}) {
+				// no ops are allowed when the directory's cloud state is unknown
+				log.Err("FileCache::CreateDir :  Failed to get attr of %s [%s]", options.Name, err.Error())
+				return err
+			}
+			// we have valid information - clean up the error
+			if errors.Is(err, os.ErrNotExist) {
+				err = syscall.ENOENT
+			} else {
+				err = nil
+			}
+		}
+		// are we online, but GetAttr failed?
+		if err != nil && !os.IsNotExist(err) {
+			log.Err("FileCache::CreateDir : Failed to get attr of %s [%s]", options.Name, err.Error())
+			return err
+		}
+		// Only two possiblities remain: either it exists in cloud storage, or it doesn't
+		var returnErr error
+		// does the directory exist?
+		if os.IsNotExist(err) {
+			// great! We can create the directory
+			err := os.Mkdir(localPath, options.Mode.Perm())
+			if err != nil {
+				return err
+			}
+			// record this directory to sync to cloud later
+			// Note: the s3storgae component does nothing and returns success on CreateDir
+			//  the thread that pushes local changes to the cloud will have to account for this
+			//  to avoid creating an entry in the attribute cache for this directory,
+			//  which would give us the false impression that the directory is in the cloud
+			fc.offlineOps.Store(options.Name, internal.CreateObjAttrDir(options.Name))
+		} else {
+			returnErr = os.ErrExist
+		}
+		return returnErr
+	}
+
+	// offline access is not enabled
 	err := fc.NextComponent().CreateDir(options)
-	offline := errors.Is(err, &common.CloudUnreachableError{})
-	if err == nil || errors.Is(err, os.ErrExist) || offline && fc.offlineAccess {
+	if err == nil || errors.Is(err, os.ErrExist) {
+		// creating the directory in cloud either worked, or it already exists
 		// make sure the directory exists in local cache
 		flock := fc.fileLocks.Get(options.Name)
 		flock.Lock()
 		defer flock.Unlock()
-		localPath := filepath.Join(fc.tmpPath, options.Name)
 		mkdirErr := os.MkdirAll(localPath, options.Mode.Perm())
-		if offline {
-			if !errors.Is(err, os.ErrExist) {
-				// This directory's probably local, so remember to sync it later
-				fc.offlineOps.Store(options.Name, internal.CreateObjAttrDir(options.Name))
-			}
-			// offline access is enabled, so don't return the offline error
-			err = mkdirErr
+		if mkdirErr != nil {
+			log.Err("FileCache::CreateDir : %s failed to create local directory [%v]", localPath, mkdirErr)
 		}
 	}
 
