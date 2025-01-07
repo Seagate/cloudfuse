@@ -432,48 +432,6 @@ func isLocalDirEmpty(path string) bool {
 	return err == io.EOF
 }
 
-// invalidateDirectory: Recursively invalidates a directory in the file cache.
-func (fc *FileCache) invalidateDirectory(name string, flocks []*common.LockMapItem) {
-	log.Trace("FileCache::invalidateDirectory : %s", name)
-
-	localPath := filepath.Join(fc.tmpPath, name)
-	// WalkDir goes through the tree in lexical order so 'dir' always comes before 'dir/file'
-	var directoriesToPurge []string
-	err := filepath.WalkDir(localPath, func(path string, d fs.DirEntry, err error) error {
-		if err == nil && d != nil {
-			if !d.IsDir() {
-				log.Debug("FileCache::invalidateDirectory : removing file %s from cache", path)
-				objPath := fc.getObjectName(path)
-				flock := fc.fileLocks.Get(objPath)
-				fc.policy.CachePurge(path, flock)
-			} else {
-				// remember to delete the directory later (after its children)
-				directoriesToPurge = append(directoriesToPurge, path)
-			}
-		} else {
-			// stat(localPath) failed. err is the one returned by stat
-			// documentation: https://pkg.go.dev/io/fs#WalkDirFunc
-			if os.IsNotExist(err) {
-				log.Info("FileCache::invalidateDirectory : %s does not exist in local cache.", name)
-			} else if err != nil {
-				log.Warn("FileCache::invalidateDirectory : %s stat err [%s].", name, err.Error())
-			}
-		}
-		return nil
-	})
-
-	// clean up leftover source directories in reverse order
-	for i := len(directoriesToPurge) - 1; i >= 0; i-- {
-		log.Debug("FileCache::invalidateDirectory : removing dir %s from cache", directoriesToPurge[i])
-		fc.policy.CachePurge(directoriesToPurge[i], nil)
-	}
-
-	if err != nil {
-		log.Debug("FileCache::invalidateDirectory : Failed to walk directory %s. Here's why: %v", localPath, err)
-		return
-	}
-}
-
 // Note: The primary purpose of the file cache is to keep track of files that are opened by the user.
 // So we do not need to support some APIs like Create Directory since the file cache will manage
 // creating local directories as needed.
@@ -488,9 +446,10 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 		log.Err("FileCache::DeleteDir : %s failed", options.Name)
 		// There is a chance that meta file for directory was not created in which case
 		// rest api delete will fail while we still need to cleanup the local cache for the same
+	} else {
+		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name), nil)
 	}
 
-	fc.invalidateDirectory(options.Name, nil)
 	return err
 }
 
