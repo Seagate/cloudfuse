@@ -141,10 +141,8 @@ var uninstallCmd = &cobra.Command{
 			return err
 		}
 
-		// TODO: take the serviceName and simply find "cloudfuse-serviceName.service" in the /etc/systemd/system
-
-		// get service file name and service file path
-		serviceFile := fmt.Sprintf("cloudfuse-" + serviceName + ".service")
+		folderList := strings.Split(mountPath, "/")
+		serviceFile := "cloudfuse-" + folderList[len(folderList)-1] + ".service"
 		serviceFilePath := "/etc/systemd/system/" + serviceFile
 		if _, err := os.Stat(serviceFilePath); err == nil {
 			removeFileCmd := exec.Command("sudo", "rm", serviceFilePath)
@@ -152,6 +150,8 @@ var uninstallCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system due to following error: [%s]", err.Error())
 			}
+		} else if os.IsNotExist(err) {
+			return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system due to following error: [%s]", err.Error())
 		}
 
 		// reload daemon
