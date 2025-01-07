@@ -331,7 +331,7 @@ func init() {
 	serviceCmd.AddCommand(installCmd)
 	installCmd.Flags().StringVar(&mountPath, "mount-path", "", "Input mount path")
 	installCmd.Flags().StringVar(&configPath, "config-file", "", "Input config file")
-	installCmd.Flags().StringVar(&serviceUser, "user", "CloudfuseUser", "Input service user")
+	installCmd.Flags().StringVar(&serviceUser, "user", "cloudfuse", "Input service user")
 	installCmd.MarkFlagRequired("mount-path")
 	installCmd.MarkFlagRequired("config-file")
 	serviceCmd.AddCommand(uninstallCmd)
