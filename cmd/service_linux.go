@@ -72,8 +72,8 @@ var installCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		mountPath = getAbsPath(mountPath)
-		configPath = getAbsPath(configPath)
+		mountPath, err := getAbsPath(mountPath)
+		configPath, err := getAbsPath(configPath)
 
 		mountExists := common.DirectoryExists(mountPath)
 		if !mountExists {
@@ -82,7 +82,7 @@ var installCmd = &cobra.Command{
 		}
 		// TODO: consider logging a warning if the mount path is empty
 
-		_, err := os.Stat(configPath)
+		_, err = os.Stat(configPath)
 		if errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("error, the configfile path provided does not exist")
 		}
