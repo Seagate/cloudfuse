@@ -253,8 +253,6 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 		return fmt.Errorf("failed to lookup group: %v", err)
 	}
 
-	// TODO: use configFileGroup and mountPathGroup to check if service user has these groups. complain / warn if it doesn't
-
 	_, err = user.Lookup(serviceUser)
 	if err != nil {
 		if strings.Contains(err.Error(), "unknown user") {
@@ -265,30 +263,20 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
 			}
 
-			//add group to serviceUser group
-			usermodCmd := exec.Command("sudo", "usermod", "-aG", configFileGroup.Name, serviceUser)
-			err = usermodCmd.Run()
-			if err != nil {
-				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
-			}
-			usermodCmd = exec.Command("sudo", "usermod", "-aG", mountPathGroup.Name, serviceUser)
-			err = usermodCmd.Run()
-			if err != nil {
-				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
-			}
+			fmt.Println("user " + serviceUser + " has been created")
 
-			//set set folder permission on the mount path
-			chmodCmd := exec.Command("sudo", "chmod", "770", mountPath)
-			err = chmodCmd.Run()
-			if err != nil {
-				return fmt.Errorf("failed set permisions on mount path due to following error: [%s]", err.Error())
-			}
+			//suggest usermod -aG commands here to the end user.
+			fmt.Println("groups: " + configFileGroup.Name + " and " + mountPathGroup.Name + " need to be added to the user, " + serviceUser)
+
+			// suggest the chmod 770 command
+			fmt.Println("please ensure the " + mountPathGroup.Name + "has read and write permissions for " + mountPath)
 
 		} else {
 			fmt.Printf("An error occurred: %v\n", err)
 		}
 	} else {
-		//add group to serviceUser group
+
+		// TODO: use configFileGroup and mountPathGroup to check if service user has these groups. complain / warn if it doesn't
 		usermodCmd := exec.Command("sudo", "usermod", "-aG", configFileGroup.Name, serviceUser)
 		err = usermodCmd.Run()
 		if err != nil {
