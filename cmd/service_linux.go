@@ -257,7 +257,7 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 	if err != nil {
 		if strings.Contains(err.Error(), "unknown user") {
 			//create the user
-			userAddCmd := exec.Command("sudo", "useradd", "-m", serviceUser)
+			userAddCmd := exec.Command("sudo", "useradd", "-r", serviceUser)
 			err = userAddCmd.Run()
 			if err != nil {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
