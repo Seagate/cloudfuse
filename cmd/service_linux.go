@@ -306,16 +306,16 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 
 //TODO: add wrapper function for collecting data, creating user, setting default paths, running commands.
 
-func getAbsPath(leaf string) string {
+func getAbsPath(leaf string) (string, error) {
 	var absPath string
 	var err error
 	if !filepath.IsAbs(leaf) {
 		absPath, err = filepath.Abs(leaf)
 		if err != nil {
-			return fmt.Errorf("couldn't format the path string")
+			return "", fmt.Errorf("couldn't format the path string", err.Error())
 		}
 	}
-	return absPath
+	return absPath, err
 }
 
 func init() {
