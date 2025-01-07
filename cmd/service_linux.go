@@ -253,6 +253,8 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 		return fmt.Errorf("failed to lookup group: %v", err)
 	}
 
+	// TODO: use configFileGroup and mountPathGroup to check if service user has these groups. complain / warn if it doesn't
+
 	_, err = user.Lookup(serviceUser)
 	if err != nil {
 		if strings.Contains(err.Error(), "unknown user") {
