@@ -135,26 +135,23 @@ var uninstallCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// get absolute path of provided relative mount path
-		if strings.Contains(serviceName, ".") || strings.Contains(serviceName, "..") {
-			// TODO: since the serviceName is the same as the mount folder name, we can use the getAbsPath() for our mount path
-			dir, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("error: [%s]", err.Error())
-			}
-			mountPath = common.JoinUnixFilepath(dir, serviceName)
-
+		var err error
+		mountPath, err = getAbsPath(serviceName)
+		if err != nil {
+			return err
 		}
 
-		// get service file name and service file path
-		folderList := strings.Split(serviceName, "/")
-		serviceName = folderList[len(folderList)-1] + ".service"
-		servicePath := "/etc/systemd/system/" + serviceName
+		// TODO: take the serviceName and simply find "cloudfuse-serviceName.service" in the /etc/systemd/system
 
-		// delete service file
-		removeFileCmd := exec.Command("sudo", "rm", servicePath)
-		err := removeFileCmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system due to following error: [%s]", err.Error())
+		// get service file name and service file path
+		serviceFile := fmt.Sprintf("cloudfuse-" + serviceName + ".service")
+		serviceFilePath := "/etc/systemd/system/" + serviceFile
+		if _, err := os.Stat(serviceFilePath); err == nil {
+			removeFileCmd := exec.Command("sudo", "rm", serviceFilePath)
+			err := removeFileCmd.Run()
+			if err != nil {
+				return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system due to following error: [%s]", err.Error())
+			}
 		}
 
 		// reload daemon
@@ -315,6 +312,7 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 
 //TODO: add wrapper function for collecting data, creating user, setting default paths, running commands.
 
+// takes a file or folder name and returns its absolute path
 func getAbsPath(leaf string) (string, error) {
 	var absPath string
 	var err error
