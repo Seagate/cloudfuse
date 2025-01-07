@@ -60,6 +60,10 @@ var serviceCmd = &cobra.Command{
 	},
 }
 
+var mountPath string
+var configPath string
+var serviceUser string
+
 var installCmd = &cobra.Command{
 	Use:               "install",
 	Short:             "Installs a service file for a single mount with Cloudfuse. Requires elevated permissions.",
@@ -69,8 +73,6 @@ var installCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		var mountPath string
-		var configPath string
 		var err error
 		mountPath, err = getAbsPath(mountPath)
 		if err != nil {
@@ -94,7 +96,6 @@ var installCmd = &cobra.Command{
 		}
 
 		//create the new user and set permissions
-		var serviceUser string
 		err = setUser(serviceUser, mountPath, configPath)
 		if err != nil {
 			fmt.Println("Error setting permissions for user:", err)
@@ -140,7 +141,7 @@ var uninstallCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("error: [%s]", err.Error())
 			}
-			mountPath := common.JoinUnixFilepath(dir, serviceName)
+			mountPath = common.JoinUnixFilepath(dir, serviceName)
 
 		}
 
