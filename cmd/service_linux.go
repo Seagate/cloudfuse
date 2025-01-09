@@ -107,14 +107,14 @@ var installCmd = &cobra.Command{
 		}
 
 		// run systemctl daemon-reload
-		systemctlDaemonReloadCmd := exec.Command("sudo", "systemctl", "daemon-reload")
+		systemctlDaemonReloadCmd := exec.Command("systemctl", "daemon-reload")
 		err = systemctlDaemonReloadCmd.Run()
 		if err != nil {
 			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
 		}
 
 		// Enable the service to start at system boot
-		systemctlEnableCmd := exec.Command("sudo", "systemctl", "enable", serviceFile)
+		systemctlEnableCmd := exec.Command("systemctl", "enable", serviceFile)
 		err = systemctlEnableCmd.Run()
 		if err != nil {
 			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
@@ -144,7 +144,7 @@ var uninstallCmd = &cobra.Command{
 		serviceFile := "cloudfuse-" + folderList[len(folderList)-1] + ".service"
 		serviceFilePath := "/etc/systemd/system/" + serviceFile
 		if _, err := os.Stat(serviceFilePath); err == nil {
-			removeFileCmd := exec.Command("sudo", "rm", serviceFilePath)
+			removeFileCmd := exec.Command("rm", serviceFilePath)
 			err := removeFileCmd.Run()
 			if err != nil {
 				return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system due to following error: [%s]", err.Error())
@@ -154,7 +154,7 @@ var uninstallCmd = &cobra.Command{
 		}
 
 		// reload daemon
-		systemctlDaemonReloadCmd := exec.Command("sudo", "systemctl", "daemon-reload")
+		systemctlDaemonReloadCmd := exec.Command("systemctl", "daemon-reload")
 		err = systemctlDaemonReloadCmd.Run()
 		if err != nil {
 			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
@@ -235,7 +235,7 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 	if err != nil {
 		if strings.Contains(err.Error(), "unknown user") {
 			// create the user
-			userAddCmd := exec.Command("sudo", "useradd", "-m", serviceUser)
+			userAddCmd := exec.Command("useradd", "-m", serviceUser)
 			err = userAddCmd.Run()
 			if err != nil {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
