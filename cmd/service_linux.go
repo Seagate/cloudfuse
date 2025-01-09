@@ -35,7 +35,6 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/spf13/cobra"
@@ -167,27 +166,28 @@ var uninstallCmd = &cobra.Command{
 //--------------- command section ends
 
 func newServiceFile(mountPath string, configPath string, serviceUser string) (string, error) {
-	serviceTemplate := `[Unit]
-	Description=Cloudfuse is an open source project developed to provide a virtual filesystem backed by S3 or Azure storage.
-	After=network-online.target
-	Requires=network-online.target
+	serviceTemplate := `
+[Unit]
+Description=Cloudfuse is an open source project developed to provide a virtual filesystem backed by S3 or Azure storage.
+After=network-online.target
+Requires=network-online.target
 
-	[Service]
-	# User service will run as.
-	User={{.ServiceUser}}
-	# Path to the location Cloudfuse will mount to. Note this folder must currently exist.
-	MountingPoint={{.MountPath}}
-	# Path to the configuration file.
-	ConfigFile={{.ConfigFile}}
+[Service]
+# User service will run as.
+User={{.ServiceUser}}
+# Path to the location Cloudfuse will mount to. Note this folder must currently exist.
+Environment=MountingPoint={{.MountPath}}
+# Path to the configuration file.
+Environment=ConfigFile={{.ConfigFile}}
 
-	# Under the hood
-	Type=forking
-	ExecStart=/usr/bin/cloudfuse mount ${MountingPoint} --config-file=${ConfigFile} -o allow_other
-	ExecStop=/usr/bin/fusermount -u ${MountingPoint} -z
+# Under the hood
+Type=forking
+ExecStart=/usr/bin/cloudfuse mount ${MountingPoint} --config-file=${ConfigFile} -o allow_other
+ExecStop=/usr/bin/fusermount -u ${MountingPoint} -z
 
-	[Install]
-	WantedBy=multi-user.target
-	`
+[Install]
+WantedBy=multi-user.target
+`
 
 	config := serviceOptions{
 		ConfigFile:  configPath,
@@ -197,14 +197,29 @@ func newServiceFile(mountPath string, configPath string, serviceUser string) (st
 
 	tmpl, err := template.New("service").Parse(serviceTemplate)
 	if err != nil {
-		fmt.Errorf("error creating new service file: [%s]", err.Error())
+		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
 	}
 
 	folderList := strings.Split(mountPath, "/")
 	serviceName := "cloudfuse-" + folderList[len(folderList)-1] + ".service"
-	newFile, err := os.Create("/etc/systemd/system/" + serviceName)
-	if err != nil {
-		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
+	servicePath := "/etc/systemd/system/" + serviceName
+
+	var newFile *os.File
+	if _, err = os.Stat(servicePath); os.IsNotExist(err) {
+		newFile, err = os.Create(servicePath)
+		if err != nil {
+			return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
+		}
+	} else {
+		delServFileCmd := exec.Command("rm", servicePath)
+		err = delServFileCmd.Run()
+		if err != nil {
+			return "", fmt.Errorf("failed to replace the service file due to the following error: [%s]", err.Error())
+		}
+		newFile, err = os.Create(servicePath)
+		if err != nil {
+			return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
+		}
 	}
 
 	err = tmpl.Execute(newFile, config)
@@ -216,91 +231,23 @@ func newServiceFile(mountPath string, configPath string, serviceUser string) (st
 }
 
 func setUser(serviceUser string, mountPath string, configPath string) error {
-
-	configFileInfo, err := os.Stat(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to stat file: %v", err)
-	}
-
-	// Get file's group ID
-	stat, ok := configFileInfo.Sys().(*syscall.Stat_t)
-	if !ok {
-		return fmt.Errorf("failed to get file system stats")
-	}
-	configGroupID := stat.Gid
-
-	// Get configFileGroup name
-	configFileGroup, err := user.LookupGroupId(fmt.Sprint(configGroupID))
-	if err != nil {
-		return fmt.Errorf("failed to lookup group: %v", err)
-	}
-
-	mountPathInfo, err := os.Stat(mountPath)
-	if err != nil {
-		return fmt.Errorf("failed to stat file: %v", err)
-	}
-
-	// Get file's group ID
-	stat, ok = mountPathInfo.Sys().(*syscall.Stat_t)
-	if !ok {
-		return fmt.Errorf("failed to get file system stats")
-	}
-	mountGroupID := stat.Gid
-
-	// Get configFileGroup name
-	mountPathGroup, err := user.LookupGroupId(fmt.Sprint(mountGroupID))
-	if err != nil {
-		return fmt.Errorf("failed to lookup group: %v", err)
-	}
-
-	_, err = user.Lookup(serviceUser)
+	_, err := user.Lookup(serviceUser)
 	if err != nil {
 		if strings.Contains(err.Error(), "unknown user") {
-			//create the user
-			userAddCmd := exec.Command("sudo", "useradd", "-r", serviceUser)
+			// create the user
+			userAddCmd := exec.Command("sudo", "useradd", "-m", serviceUser)
 			err = userAddCmd.Run()
 			if err != nil {
 				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
 			}
-
 			fmt.Println("user " + serviceUser + " has been created")
-
-			//suggest usermod -aG commands here to the end user.
-			fmt.Println("groups: " + configFileGroup.Name + " and " + mountPathGroup.Name + " need to be added to the user, " + serviceUser)
-
-			// suggest the chmod 770 command
-			fmt.Println("please ensure the " + mountPathGroup.Name + "has read and write permissions for " + mountPath)
-
-		} else {
-			fmt.Printf("An error occurred: %v\n", err)
 		}
-	} else {
-
-		// TODO: use configFileGroup and mountPathGroup to check if service user has these groups. complain / warn if it doesn't
-		usermodCmd := exec.Command("sudo", "usermod", "-aG", configFileGroup.Name, serviceUser)
-		err = usermodCmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
-		}
-		usermodCmd = exec.Command("sudo", "usermod", "-aG", mountPathGroup.Name, serviceUser)
-		err = usermodCmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
-		}
-
-		//set set folder permission on the mount path
-		chmodCmd := exec.Command("sudo", "chmod", "770", mountPath)
-		err = chmodCmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed set permisions on mount path due to following error: [%s]", err.Error())
-		}
-
 	}
+	// advise on required permissions
+	fmt.Println("ensure the user, " + serviceUser + ", has the following access: \n" + mountPath + ": read, write, and execute \n" + configPath + ": read \n")
 
 	return nil
 }
-
-//TODO: add wrapper function for collecting data, creating user, setting default paths, running commands.
 
 // takes a file or folder name and returns its absolute path
 func getAbsPath(leaf string) (string, error) {
