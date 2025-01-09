@@ -175,15 +175,11 @@ Requires=network-online.target
 [Service]
 # User service will run as.
 User={{.ServiceUser}}
-# Path to the location Cloudfuse will mount to. Note this folder must currently exist.
-Environment=MountingPoint={{.MountPath}}
-# Path to the configuration file.
-Environment=ConfigFile={{.ConfigFile}}
 
 # Under the hood
 Type=forking
-ExecStart=/usr/bin/cloudfuse mount ${MountingPoint} --config-file=${ConfigFile} -o allow_other
-ExecStop=/usr/bin/fusermount -u ${MountingPoint} -z
+ExecStart=/usr/bin/cloudfuse mount {{.MountPath}} --config-file={{.ConfigFile}} -o allow_other
+ExecStop=/usr/bin/fusermount -u {{.MountPath}} -z
 
 [Install]
 WantedBy=multi-user.target
