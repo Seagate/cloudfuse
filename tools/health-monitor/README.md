@@ -107,6 +107,3 @@ the oldest output file.
     ]
 }
 ```
-
-
-

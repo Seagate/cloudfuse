@@ -1,4 +1,4 @@
-
+#!/bin/bash
 logFile="./overnightstress.log"
 
 mntPath=/home/AzureUser/mcdhee/mcdhee_fs
@@ -69,6 +69,3 @@ do
 done
 
 echo "Ending Test Suite" >> $logFile
-
-
-

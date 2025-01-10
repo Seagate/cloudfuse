@@ -17,7 +17,7 @@ file_check() {
     flag=0
 
     for i in $(grep "value=\"file" ./cloudfuse_coverage.html | cut -d ">" -f2 | cut -d "<" -f1 | sed -e "s/ //g")
-    do 
+    do
         fileName=$(echo $i | cut -d "(" -f1)
         percent=$(echo $i | cut -d "(" -f2 | cut -d "%" -f1)
         percentValue=$(expr $percent | awk '{printf("%d\n", $1)}')

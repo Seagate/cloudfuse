@@ -12,8 +12,8 @@ rm $outputPath
 echo "| Case | latest v2 | v1 |" >> $outputPath
 echo "| -- | -- | -- |" >> $outputPath
 
-for i in {1..3}; 
-do 
+for i in {1..3};
+do
 	echo "| Run $i |" >> $outputPath
 done
 
@@ -37,8 +37,8 @@ ps -aux | grep cloudfuse
 
 sed_line=3
 cloudfuse_average=0
-for i in {1..3}; 
-do 
+for i in {1..3};
+do
 	echo "Cloudfuse Run $i"
 
 	start_time=`date +%s`
@@ -50,7 +50,7 @@ do
 	if [ $time_diff -eq 0 ]
 	then
 		time_diff=1
-	fi	
+	fi
 	echo $time_diff
 	sed -i "${sed_line}s/$/ ${time_diff} |/" $outputPath
 
@@ -72,8 +72,8 @@ ps -aux | grep blobfuse
 
 sed_line=3
 blobfuse_average=0
-for i in {1..3}; 
-do 
+for i in {1..3};
+do
 	echo "Blobfuse Run $i"
 
 	start_time=`date +%s`
@@ -85,7 +85,7 @@ do
 	if [ $time_diff -eq 0 ]
 	then
 		time_diff=1
-	fi	
+	fi
 	echo $time_diff
 	sed -i "${sed_line}s/$/ ${time_diff} |/" $outputPath
 

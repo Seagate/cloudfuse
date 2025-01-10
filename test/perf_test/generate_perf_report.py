@@ -37,7 +37,7 @@ if __name__ == "__main__":
     parser.add_argument('-lf',
                         '--log',
                         default="./cloudfuse-perf.json",
-                        help='path of log file', 
+                        help='path of log file',
                         required=False)
     args = vars(parser.parse_args())
     log_file = args['log']
@@ -46,4 +46,3 @@ if __name__ == "__main__":
     metrics_list = args['metrics']
 
     compare_numbers(job_one_name, job_two_name, metrics_list, log_file)
-    
