@@ -6,7 +6,7 @@ logging:
 
 components:
   - libfuse
-  - stream
+  - block_cache
   - attr_cache
   - azstorage
 
@@ -16,10 +16,11 @@ libfuse:
   negative-entry-expiration-sec: 240
   network-share: true
 
-stream:
-  block-size-mb: 8
-  max-buffers: 64
-  buffer-size-mb: 36
+block_cache:
+  block-size-mb: 32
+  mem-size-mb: 4096
+  prefetch: 80
+  parallelism: 128
 
 attr_cache:
   timeout-sec: 7200
