@@ -35,11 +35,13 @@ Download and run the .exe installer from our latest release [here](https://githu
 #### Debian /Ubuntu
 
 Download the .deb file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal:
+
 `sudo apt-get install ./cloudfuse*.deb`
 
 #### CentOS / RHEL
 
 Download the .rpm file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal:
+
 `sudo rpm -i ./cloudfuse*.rpm`
 
 #### Enable Running With Systemd
@@ -98,6 +100,7 @@ Visit [here](https://github.com/Seagate/cloudfuse/wiki/Health-Monitor) to set it
 ## Command Line Interface
 
 The general format of the Cloudfuse Linux commands is:
+
 `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
 
 Available commands:
@@ -130,6 +133,7 @@ Available commands:
 ### Secure Options
 
 To use security options the general format for cloudfuse commands is:
+
 `cloudfuse [command] [arguments] --[flag-name]=[flag-value]`
 
 - `secure decrypt` - Decrypts a config file
@@ -189,6 +193,7 @@ Kindly avoid using this feature for write while we investigate and resolve it.
 - When Cloudfuse is mounted on a docker container, SYS_ADMIN privileges are required
   for it to interact with the fuse driver. If container is created without the
   privilege, mount will fail. Sample command to spawn a docker container is
+
     `docker run -it --rm --cap-add=SYS_ADMIN --device=/dev/fuse --security-opt
     apparmor:unconfined <environment variables> <docker image>`
 
