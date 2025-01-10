@@ -30,6 +30,7 @@ The Cloudfuse Health Monitor is also fully supported on Windows.
 ## Enable Health Monitor
 
 The different configuration options for the health monitor are,
+
 - `enable-monitoring: true|false`: Boolean parameter to enable health monitor. By default it is disabled
 - `stats-poll-interval-sec: <TIME IN SECONDS>`: Cloudfuse stats polling interval (in sec). Default is 10 seconds
 - `process-monitor-interval-sec: <TIME IN SECONDS>`: CPU and memory usage polling interval (in sec). Default is 30 sec
@@ -37,15 +38,16 @@ The different configuration options for the health monitor are,
   default, if not specified. Output file name will be `monitor_<pid>.json`
 - `monitor-disable-list: <LIST OF MONITORS>`: List of monitors to be disabled. To disable a monitor, add its
   corresponding name in the list
-    - `cloudfuse_stats` - Disable cloudfuse stats polling
-    - `cpu_profiler` - Disable CPU monitoring on cloudfuse process
-    - `memory_profiler` - Disable memory monitoring on cloudfuse process
-    - `file_cache_monitor` - Disable file cache directory monitor
+  - `cloudfuse_stats` - Disable cloudfuse stats polling
+  - `cpu_profiler` - Disable CPU monitoring on cloudfuse process
+  - `memory_profiler` - Disable memory monitoring on cloudfuse process
+  - `file_cache_monitor` - Disable file cache directory monitor
 
 ### Sample Config
 
 Add the following section to your cloudfuse config file. Here file cache and memory monitors are disabled. If you want
 to enable all monitors simply remove the monitor-disable-list section.
+
 ```yaml
 health_monitor:
   enable-monitoring: true
@@ -66,7 +68,7 @@ the oldest output file.
 
 ### Sample Output
 
-```
+```json
 {
     "Timestamp": "t1",
     "CPUUsage": "value in %",
