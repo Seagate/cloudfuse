@@ -454,123 +454,6 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	return err
 }
 
-func (fc *FileCache) listAllObjects(prefix string) (objectNames []string, err error) {
-	// get cloud objects
-	var cloudObjects []string
-	cloudObjects, err = fc.listCloudObjects(prefix)
-	if err != nil {
-		return
-	}
-	// get local / cached objects
-	var localObjects []string
-	localObjects, err = fc.listCachedObjects(prefix)
-	if err != nil {
-		return
-	}
-	// combine the lists
-	objectNames = combineLists(cloudObjects, localObjects)
-
-	return
-}
-
-// recursively list all objects in the container at the given prefix / directory
-func (fc *FileCache) listCloudObjects(prefix string) (objectNames []string, err error) {
-	var done bool
-	var token string
-	for !done {
-		var attrSlice []*internal.ObjAttr
-		attrSlice, token, err = fc.NextComponent().StreamDir(internal.StreamDirOptions{Name: prefix, Token: token})
-		if err != nil {
-			return
-		}
-		for i := len(attrSlice) - 1; i >= 0; i-- {
-			attr := attrSlice[i]
-			if !attr.IsDir() {
-				objectNames = append(objectNames, attr.Path)
-			} else {
-				// recurse!
-				var subdirObjectNames []string
-				subdirObjectNames, err = fc.listCloudObjects(attr.Path)
-				if err != nil {
-					return
-				}
-				objectNames = append(objectNames, subdirObjectNames...)
-			}
-		}
-		done = token == ""
-	}
-	sort.Strings(objectNames)
-	return
-}
-
-// recursively list all files in the directory
-func (fc *FileCache) listCachedObjects(directory string) (objectNames []string, err error) {
-	localDirPath := filepath.Join(fc.tmpPath, directory)
-	walkDirErr := filepath.WalkDir(localDirPath, func(path string, d fs.DirEntry, err error) error {
-		if err == nil && d != nil {
-			if !d.IsDir() {
-				objectName := fc.getObjectName(path)
-				objectNames = append(objectNames, objectName)
-			}
-		} else {
-			// stat(localPath) failed. err is the one returned by stat
-			// documentation: https://pkg.go.dev/io/fs#WalkDirFunc
-			if os.IsNotExist(err) {
-				// none of the files that were moved actually exist in local storage
-				log.Info("FileCache::listObjects : %s does not exist in local cache.", directory)
-			} else if err != nil {
-				log.Warn("FileCache::listObjects : %s stat err [%v].", directory, err)
-			}
-		}
-		return nil
-	})
-	if walkDirErr != nil && !os.IsNotExist(walkDirErr) {
-		err = walkDirErr
-	}
-	sort.Strings(objectNames)
-	return
-}
-
-func (fc *FileCache) getObjectName(localPath string) string {
-	relPath, err := filepath.Rel(fc.tmpPath, localPath)
-	if err != nil {
-		relPath = strings.TrimPrefix(localPath, fc.tmpPath+string(filepath.Separator))
-		log.Warn("FileCache::getObjectName : filepath.Rel failed on path %s [%v]. Using TrimPrefix: %s", localPath, err, relPath)
-	}
-	return common.NormalizeObjectName(relPath)
-}
-
-func combineLists(listA, listB []string) []string {
-	// since both lists are sorted, we can combine the two lists using a double-indexed for loop
-	combinedList := listA
-	i := 0 // Index for listA
-	j := 0 // Index for listB
-	// Iterate through both lists, adding entries from B that are missing from A
-	for i < len(listA) && j < len(listB) {
-		itemA := listA[i]
-		itemB := listB[j]
-		if itemA < itemB {
-			i++
-		} else if itemA > itemB {
-			// we could insert here, but it's probably better to just sort later
-			combinedList = append(combinedList, itemB)
-			j++
-		} else {
-			i++
-			j++
-		}
-	}
-	// sort and return
-	sort.Strings(combinedList)
-	return combinedList
-}
-
-func unlockAll(flocks []*common.LockMapItem) {
-	for _, flock := range flocks {
-		flock.Unlock()
-	}
-}
-
 // StreamDir : Add local files to the list retrieved from storage container
 func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
 	// For stream directory, there are three different child path situations we have to potentially handle.
@@ -788,6 +671,123 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	}
 
 	return nil
+}
+
+func (fc *FileCache) listAllObjects(prefix string) (objectNames []string, err error) {
+	// get cloud objects
+	var cloudObjects []string
+	cloudObjects, err = fc.listCloudObjects(prefix)
+	if err != nil {
+		return
+	}
+	// get local / cached objects
+	var localObjects []string
+	localObjects, err = fc.listCachedObjects(prefix)
+	if err != nil {
+		return
+	}
+	// combine the lists
+	objectNames = combineLists(cloudObjects, localObjects)
+
+	return
+}
+
+// recursively list all objects in the container at the given prefix / directory
+func (fc *FileCache) listCloudObjects(prefix string) (objectNames []string, err error) {
+	var done bool
+	var token string
+	for !done {
+		var attrSlice []*internal.ObjAttr
+		attrSlice, token, err = fc.NextComponent().StreamDir(internal.StreamDirOptions{Name: prefix, Token: token})
+		if err != nil {
+			return
+		}
+		for i := len(attrSlice) - 1; i >= 0; i-- {
+			attr := attrSlice[i]
+			if !attr.IsDir() {
+				objectNames = append(objectNames, attr.Path)
+			} else {
+				// recurse!
+				var subdirObjectNames []string
+				subdirObjectNames, err = fc.listCloudObjects(attr.Path)
+				if err != nil {
+					return
+				}
+				objectNames = append(objectNames, subdirObjectNames...)
+			}
+		}
+		done = token == ""
+	}
+	sort.Strings(objectNames)
+	return
+}
+
+// recursively list all files in the directory
+func (fc *FileCache) listCachedObjects(directory string) (objectNames []string, err error) {
+	localDirPath := filepath.Join(fc.tmpPath, directory)
+	walkDirErr := filepath.WalkDir(localDirPath, func(path string, d fs.DirEntry, err error) error {
+		if err == nil && d != nil {
+			if !d.IsDir() {
+				objectName := fc.getObjectName(path)
+				objectNames = append(objectNames, objectName)
+			}
+		} else {
+			// stat(localPath) failed. err is the one returned by stat
+			// documentation: https://pkg.go.dev/io/fs#WalkDirFunc
+			if os.IsNotExist(err) {
+				// none of the files that were moved actually exist in local storage
+				log.Info("FileCache::listObjects : %s does not exist in local cache.", directory)
+			} else if err != nil {
+				log.Warn("FileCache::listObjects : %s stat err [%v].", directory, err)
+			}
+		}
+		return nil
+	})
+	if walkDirErr != nil && !os.IsNotExist(walkDirErr) {
+		err = walkDirErr
+	}
+	sort.Strings(objectNames)
+	return
+}
+
+func combineLists(listA, listB []string) []string {
+	// since both lists are sorted, we can combine the two lists using a double-indexed for loop
+	combinedList := listA
+	i := 0 // Index for listA
+	j := 0 // Index for listB
+	// Iterate through both lists, adding entries from B that are missing from A
+	for i < len(listA) && j < len(listB) {
+		itemA := listA[i]
+		itemB := listB[j]
+		if itemA < itemB {
+			i++
+		} else if itemA > itemB {
+			// we could insert here, but it's probably better to just sort later
+			combinedList = append(combinedList, itemB)
+			j++
+		} else {
+			i++
+			j++
+		}
+	}
+	// sort and return
+	sort.Strings(combinedList)
+	return combinedList
+}
+
+func (fc *FileCache) getObjectName(localPath string) string {
+	relPath, err := filepath.Rel(fc.tmpPath, localPath)
+	if err != nil {
+		relPath = strings.TrimPrefix(localPath, fc.tmpPath+string(filepath.Separator))
+		log.Warn("FileCache::getObjectName : filepath.Rel failed on path %s [%v]. Using TrimPrefix: %s", localPath, err, relPath)
+	}
+	return common.NormalizeObjectName(relPath)
+}
+
+func unlockAll(flocks []*common.LockMapItem) {
+	for _, flock := range flocks {
+		flock.Unlock()
+	}
 }
 
 // CreateFile: Create the file in local cache.
