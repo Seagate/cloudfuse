@@ -1,6 +1,6 @@
 # Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 #
-# Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+# Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -73,12 +73,12 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
             # Allow anything BUT Nul
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
             self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
-        
+
         self.lineEdit_azure_accountKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.lineEdit_azure_spnClientSecret.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
-   
+
     # Set up slots
-    
+
     def updateAzStorage(self):
         azStorage = self.settings['azstorage']
         azStorage['account-key'] = self.lineEdit_azure_accountKey.text()
@@ -95,7 +95,7 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         azStorage['type'] = azStorageType[self.dropDown_azure_storageType.currentIndex()]
         azStorage['mode'] = bucketModeChoices[self.dropDown_azure_modeSetting.currentIndex()]
         self.settings['azstorage'] = azStorage
-            
+
     def openAdvanced(self):
         self.moreSettings = azureAdvancedSettingsWidget(self.settings)
         self.moreSettings.setWindowModality(Qt.ApplicationModal)
@@ -114,7 +114,7 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         elif pipelineChoices[pipelineIndex] == 'stream':
             self.groupbox_streaming.setVisible(True)
         self.settings['components'] = components
-    
+
     def showAzureModeSettings(self):
         self.hideAzureBoxes()
         modeSelectionIndex = self.dropDown_azure_modeSetting.currentIndex()
@@ -126,30 +126,30 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         elif bucketModeChoices[modeSelectionIndex] == "spn":
             self.groupbox_spn.setVisible(True)
         elif bucketModeChoices[modeSelectionIndex] == "msi":
-            self.groupbox_msi.setVisible(True) 
-            
+            self.groupbox_msi.setVisible(True)
+
 # This widget will not display all the options in settings, only the ones written in the UI file.
     def populateOptions(self):
         fileCache = self.settings['file_cache']
         azStorage = self.settings['azstorage']
         libfuse = self.settings['libfuse']
         stream = self.settings['stream']
-        
+
         # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices, libfusePermissions, azStorage and bucketMode
-        #   reflect the index choices in human words without having to reference the UI. 
+        #   reflect the index choices in human words without having to reference the UI.
         #   Get the value in the settings and translate that to the equivalent index in the lists.
         self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings['components'][1]))
         self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(self.settings['libfuse']['default-permission']))
         self.dropDown_azure_storageType.setCurrentIndex(azStorageType.index(self.settings['azstorage']['type']))
         self.dropDown_azure_modeSetting.setCurrentIndex(bucketModeChoices.index(self.settings['azstorage']['mode']))
-        
+
         self.setCheckboxFromSetting(self.checkBox_multiUser,self.settings['allow-other'])
         self.setCheckboxFromSetting(self.checkBox_nonEmptyDir,self.settings['nonempty'])
         self.setCheckboxFromSetting(self.checkBox_daemonForeground,self.settings['foreground'])
         self.setCheckboxFromSetting(self.checkBox_readOnly,self.settings['read-only'])
         self.setCheckboxFromSetting(self.checkBox_streaming_fileCachingLevel,stream['file-caching'])
         self.setCheckboxFromSetting(self.checkBox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
-       
+
         # Spinbox automatically sanitizes inputs for decimal values only, so no need to check for the appropriate data type.
         self.spinBox_libfuse_attExp.setValue(libfuse['attribute-expiration-sec'])
         self.spinBox_libfuse_entExp.setValue(libfuse['entry-expiration-sec'])
@@ -157,7 +157,7 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.spinBox_streaming_blockSize.setValue(stream['block-size-mb'])
         self.spinBox_streaming_buffSize.setValue(stream['buffer-size-mb'])
         self.spinBox_streaming_maxBuff.setValue(stream['max-buffers'])
-        
+
         # There is no sanitizing for lineEdit at the moment, the GUI depends on the user being correct.
 
         self.lineEdit_azure_accountKey.setText(azStorage['account-key'])
@@ -172,18 +172,18 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.lineEdit_azure_spnClientID.setText(azStorage['clientid'])
         self.lineEdit_azure_spnClientSecret.setText(azStorage['clientsecret'])
         self.lineEdit_fileCache_path.setText(fileCache['path'])
-    
+
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
         self.lineEdit_fileCache_path.setText('{}'.format(directory))
-        # Update the settings 
+        # Update the settings
         self.updateFileCachePath()
- 
+
     def hideModeBoxes(self):
         self.groupbox_fileCache.setVisible(False)
         self.groupbox_streaming.setVisible(False)
-        
-        
+
+
     def hideAzureBoxes(self):
         self.groupbox_accountKey.setVisible(False)
         self.groupbox_sasStorage.setVisible(False)
@@ -197,7 +197,7 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
             defaultSettingsManager.setAzureSettings(self, self.settings)
             defaultSettingsManager.setComponentSettings(self, self.settings)
             self.populateOptions()
-    
+
     def updateSettingsFromUIChoices(self):
         self.updateFileCachePath()
         self.updateLibfuse()

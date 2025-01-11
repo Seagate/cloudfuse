@@ -190,10 +190,10 @@ jobs:
 
       - name: Notice file check
         run: |
-          ./notices_fix.sh
+          ./scripts/notices_fix.sh
           result=$(git diff NOTICE | wc -l)
           if [ $result -ne 0 ]; then
-            echo "Notices needs a fix. Run ./notices_fix.sh and commit NOTICE file."
+            echo "Notices needs a fix. Run ./scripts/notices_fix.sh and commit NOTICE file."
             exit 1
           else
             echo "Notices are up to date."
