@@ -146,7 +146,7 @@ func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSym
 	}
 
 	if err == nil {
-		CloudStorageSize.Add(size)
+		CloudStorageSize.Add(uint64(size))
 	}
 
 	attemptedAction := fmt.Sprintf("upload object %s", key)
@@ -165,7 +165,7 @@ func (cl *Client) deleteObject(name string, isSymLink bool, size int64) error {
 	})
 
 	if err == nil {
-		CloudStorageSize.Add(-size)
+		CloudStorageSize.Add(-uint64(size))
 	}
 
 	attemptedAction := fmt.Sprintf("delete object %s", key)
@@ -208,7 +208,7 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 	// Adjust CloudStorageSize for successfully deleted objects
 	for _, deleted := range result.Deleted {
 		if size, exists := objectSizeMap[*deleted.Key]; exists {
-			CloudStorageSize.Add(-size)
+			CloudStorageSize.Add(-uint64(size))
 		}
 	}
 
@@ -260,7 +260,7 @@ func (cl *Client) copyObject(source string, target string, isSymLink bool, size 
 		return parseS3Err(err, attemptedAction)
 	}
 
-	CloudStorageSize.Add(size)
+	CloudStorageSize.Add(uint64(size))
 
 	return nil
 }

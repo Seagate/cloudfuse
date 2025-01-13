@@ -1895,7 +1895,7 @@ func (s *s3StorageTestSuite) TestOverwriteBlocks() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	CloudStorageSize.Add(int64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
+	CloudStorageSize.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
 	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
@@ -1941,7 +1941,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocks() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	CloudStorageSize.Add(int64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
+	CloudStorageSize.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
 	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
@@ -1985,7 +1985,7 @@ func (s *s3StorageTestSuite) TestAppendBlocks() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	CloudStorageSize.Add(int64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
+	CloudStorageSize.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
 	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
@@ -2029,7 +2029,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksLargeFile() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	CloudStorageSize.Add(int64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
+	CloudStorageSize.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
 	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
@@ -2073,7 +2073,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksMiddleLargeFile() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	CloudStorageSize.Add(int64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
+	CloudStorageSize.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
 	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())

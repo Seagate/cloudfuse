@@ -49,7 +49,7 @@ type S3Storage struct {
 
 const compName = "s3storage"
 
-var CloudStorageSize atomic.Int64
+var CloudStorageSize atomic.Uint64
 
 // Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &S3Storage{}
@@ -500,7 +500,7 @@ func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
 			return nil, true, err
 		}
 	} else {
-		sizeUsed = uint64(CloudStorageSize.Load())
+		sizeUsed = CloudStorageSize.Load()
 	}
 
 	stat := common.Statfs_t{
