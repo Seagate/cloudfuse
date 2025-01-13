@@ -53,7 +53,7 @@ Source: "..\cfusemon.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\windows-startup.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\sample_configs\setup\baseConfig.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
+Source: "..\setup\baseConfig.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
 Source: "..\sample_configs\sampleFileCacheConfigAzure.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
 Source: "..\sample_configs\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
 Source: "..\sample_configs\sampleFileCacheWithSASConfigAzure.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
