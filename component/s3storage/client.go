@@ -760,14 +760,14 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	truncatedDataReader := bytes.NewReader(objectData)
 
 	// Subtract the original size. Put object will add the truncated size if upload is successful
-	CloudStorageSize.Add(-originalSize)
+	sizeTracker.Subtract(originalSize)
 
 	err = cl.putObject(name, truncatedDataReader, int64(len(objectData)), false)
 	if err != nil {
 		log.Err("Client::TruncateFile : Failed to write truncated data to object %s", name)
 
 		// Add the original size back if we failed to truncate the file
-		CloudStorageSize.Add(originalSize)
+		sizeTracker.Add(originalSize)
 	}
 
 	return err
@@ -824,7 +824,7 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		}
 
 		// Subtract the original size. WriteFromBuffer add the truncated size if upload is successful
-		CloudStorageSize.Add(-uint64(lenOldData))
+		sizeTracker.Subtract(uint64(lenOldData))
 
 		// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple parts
 		err := cl.WriteFromBuffer(name, options.Metadata, *dataBuffer)
@@ -832,7 +832,7 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 			log.Err("Client::Write : Failed to upload to object. Here's why: %v ", name, err)
 
 			// Add size if Write was not successful
-			CloudStorageSize.Add(uint64(lenOldData))
+			sizeTracker.Add(uint64(lenOldData))
 			return err
 		}
 	} else {
@@ -857,7 +857,7 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		}
 
 		// Subtract the original size. WriteFromBuffer add the truncated size if upload is successful
-		CloudStorageSize.Add(-uint64(oldDataSize))
+		sizeTracker.Subtract(uint64(oldDataSize))
 
 		// this gives us where the offset with respect to the buffer that holds our old data - so we can start writing the new data
 		blockOffset := offset - fileOffsets.BlockList[index].StartIndex
@@ -865,10 +865,10 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		err := cl.stageAndCommitModifiedBlocks(name, oldDataBuffer, fileOffsets)
 		if err != nil {
 			// Add size if Write was not successful
-			CloudStorageSize.Add(uint64(oldDataSize))
+			sizeTracker.Add(uint64(oldDataSize))
 		} else {
 			// Add size new size if successful write
-			CloudStorageSize.Add(uint64(len(oldDataBuffer)))
+			sizeTracker.Add(uint64(len(oldDataBuffer)))
 		}
 		return err
 	}

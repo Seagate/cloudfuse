@@ -49,7 +49,7 @@ type S3Storage struct {
 
 const compName = "s3storage"
 
-var CloudStorageSize atomic.Uint64
+var sizeTracker *SizeTracker
 
 // Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &S3Storage{}
@@ -94,6 +94,12 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 	err = s3.configureAndTest(isParent)
 	if err != nil {
 		log.Err("S3Storage::Configure : Failed to validate storage account [%s]", err.Error())
+		return err
+	}
+
+	sizeTracker, err = CreateSizeJournal()
+	if err != nil {
+		log.Err("S3Storage::Configure : Failed to create size tracker to track size of directory [%s]", err.Error())
 		return err
 	}
 
@@ -500,7 +506,7 @@ func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
 			return nil, true, err
 		}
 	} else {
-		sizeUsed = CloudStorageSize.Load()
+		sizeUsed = sizeTracker.GetSize()
 	}
 
 	stat := common.Statfs_t{

@@ -1043,13 +1043,13 @@ func (s *s3StorageTestSuite) TestDeleteFile() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(testData), CloudStorageSize.Load())
+	s.assert.EqualValues(len(testData), sizeTracker.GetSize())
 
 	err = s.s3Storage.DeleteFile(internal.DeleteFileOptions{Name: name})
 	s.assert.NoError(err)
 
 	// Assert that tracking the CloudStorageSize is working
-	s.assert.Zero(CloudStorageSize.Load())
+	s.assert.Zero(sizeTracker.GetSize())
 
 	// This is similar to the s3 bucket command, use getObject for now
 	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
@@ -1129,7 +1129,7 @@ func (s *s3StorageTestSuite) TestCopyFromFile() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(testData), CloudStorageSize.Load())
+	s.assert.EqualValues(len(testData), sizeTracker.GetSize())
 
 	// Object will be updated with new data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1297,7 +1297,7 @@ func (s *s3StorageTestSuite) TestWriteFile() {
 	s.assert.EqualValues(len(data), count)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(testData), CloudStorageSize.Load())
+	s.assert.EqualValues(len(testData), sizeTracker.GetSize())
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1332,7 +1332,7 @@ func (s *s3StorageTestSuite) TestWriteFileMultipartUpload() {
 	s.assert.EqualValues(len(data), count)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(fileSize, CloudStorageSize.Load())
+	s.assert.EqualValues(fileSize, sizeTracker.GetSize())
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1408,13 +1408,13 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileSmaller() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(testData), CloudStorageSize.Load())
+	s.assert.EqualValues(len(testData), sizeTracker.GetSize())
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(truncatedLength, CloudStorageSize.Load())
+	s.assert.EqualValues(truncatedLength, sizeTracker.GetSize())
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1481,13 +1481,13 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileSmaller() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(testData), CloudStorageSize.Load())
+	s.assert.EqualValues(len(testData), sizeTracker.GetSize())
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(truncatedLength, CloudStorageSize.Load())
+	s.assert.EqualValues(truncatedLength, sizeTracker.GetSize())
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1516,13 +1516,13 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileEqual() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(testData), CloudStorageSize.Load())
+	s.assert.EqualValues(len(testData), sizeTracker.GetSize())
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(truncatedLength, CloudStorageSize.Load())
+	s.assert.EqualValues(truncatedLength, sizeTracker.GetSize())
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1551,13 +1551,13 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileEqual() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(testData), CloudStorageSize.Load())
+	s.assert.EqualValues(len(testData), sizeTracker.GetSize())
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(truncatedLength, CloudStorageSize.Load())
+	s.assert.EqualValues(truncatedLength, sizeTracker.GetSize())
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1586,13 +1586,13 @@ func (s *s3StorageTestSuite) TestTruncateSmallFileBigger() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(testData), CloudStorageSize.Load())
+	s.assert.EqualValues(len(testData), sizeTracker.GetSize())
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(truncatedLength, CloudStorageSize.Load())
+	s.assert.EqualValues(truncatedLength, sizeTracker.GetSize())
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1617,13 +1617,13 @@ func (s *s3StorageTestSuite) TestTruncateEmptyFileBigger() {
 	truncatedLength := 15
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(0, CloudStorageSize.Load())
+	s.assert.EqualValues(0, sizeTracker.GetSize())
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(truncatedLength, CloudStorageSize.Load())
+	s.assert.EqualValues(truncatedLength, sizeTracker.GetSize())
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1652,13 +1652,13 @@ func (s *s3StorageTestSuite) TestTruncateChunkedFileBigger() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(testData), CloudStorageSize.Load())
+	s.assert.EqualValues(len(testData), sizeTracker.GetSize())
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(truncatedLength, CloudStorageSize.Load())
+	s.assert.EqualValues(truncatedLength, sizeTracker.GetSize())
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -1700,7 +1700,7 @@ func (s *s3StorageTestSuite) TestWriteSmallFile() {
 	defer os.Remove(f.Name())
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(dataLen, CloudStorageSize.Load())
+	s.assert.EqualValues(dataLen, sizeTracker.GetSize())
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.NoError(err)
@@ -1728,7 +1728,7 @@ func (s *s3StorageTestSuite) TestOverwriteSmallFile() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(dataLen, CloudStorageSize.Load())
+	s.assert.EqualValues(dataLen, sizeTracker.GetSize())
 
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
@@ -1738,7 +1738,7 @@ func (s *s3StorageTestSuite) TestOverwriteSmallFile() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(dataLen, CloudStorageSize.Load())
+	s.assert.EqualValues(dataLen, sizeTracker.GetSize())
 
 	currentData := []byte("test-newdata-data")
 	output := make([]byte, len(currentData))
@@ -1768,7 +1768,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendToSmallFile() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(testData), CloudStorageSize.Load())
+	s.assert.EqualValues(len(testData), sizeTracker.GetSize())
 
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
@@ -1782,7 +1782,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendToSmallFile() {
 	output := make([]byte, dataLen)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(dataLen, CloudStorageSize.Load())
+	s.assert.EqualValues(dataLen, sizeTracker.GetSize())
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.NoError(err)
@@ -1809,7 +1809,7 @@ func (s *s3StorageTestSuite) TestAppendToSmallFile() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(testData), CloudStorageSize.Load())
+	s.assert.EqualValues(len(testData), sizeTracker.GetSize())
 
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
@@ -1823,7 +1823,7 @@ func (s *s3StorageTestSuite) TestAppendToSmallFile() {
 	output := make([]byte, dataLen)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(dataLen, CloudStorageSize.Load())
+	s.assert.EqualValues(dataLen, sizeTracker.GetSize())
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.NoError(err)
@@ -1850,7 +1850,7 @@ func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSmallFile() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(testData), CloudStorageSize.Load())
+	s.assert.EqualValues(len(testData), sizeTracker.GetSize())
 
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
@@ -1864,7 +1864,7 @@ func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSmallFile() {
 	output := make([]byte, dataLen)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(dataLen, CloudStorageSize.Load())
+	s.assert.EqualValues(dataLen, sizeTracker.GetSize())
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.NoError(err)
@@ -1895,7 +1895,7 @@ func (s *s3StorageTestSuite) TestOverwriteBlocks() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	CloudStorageSize.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
+	sizeTracker.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
 	s.assert.NoError(err)
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
@@ -1908,7 +1908,7 @@ func (s *s3StorageTestSuite) TestOverwriteBlocks() {
 	output := make([]byte, dataLen)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(dataLen, CloudStorageSize.Load())
+	s.assert.EqualValues(dataLen, sizeTracker.GetSize())
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.NoError(err)
@@ -1941,7 +1941,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocks() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	CloudStorageSize.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
+	sizeTracker.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
 	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
@@ -1954,7 +1954,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocks() {
 	output := make([]byte, dataLen)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(dataLen, CloudStorageSize.Load())
+	s.assert.EqualValues(dataLen, sizeTracker.GetSize())
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.NoError(err)
@@ -1985,7 +1985,7 @@ func (s *s3StorageTestSuite) TestAppendBlocks() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	CloudStorageSize.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
+	sizeTracker.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
 	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
@@ -1998,7 +1998,7 @@ func (s *s3StorageTestSuite) TestAppendBlocks() {
 	output := make([]byte, dataLen)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(dataLen, CloudStorageSize.Load())
+	s.assert.EqualValues(dataLen, sizeTracker.GetSize())
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.NoError(err)
@@ -2029,7 +2029,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksLargeFile() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	CloudStorageSize.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
+	sizeTracker.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
 	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
@@ -2042,7 +2042,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksLargeFile() {
 	output := make([]byte, dataLen)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(dataLen, CloudStorageSize.Load())
+	s.assert.EqualValues(dataLen, sizeTracker.GetSize())
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.NoError(err)
@@ -2073,7 +2073,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksMiddleLargeFile() {
 
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	err = s.uploadReaderAtToObject(ctx, bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
-	CloudStorageSize.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
+	sizeTracker.Add(uint64(len(data))) // Add here since we are uploading outside of standard s3storage with the above call. TODO Cleanup these tests
 	s.assert.NoError(err)
 	f, _ := os.CreateTemp("", name+".tmp")
 	defer os.Remove(f.Name())
@@ -2087,7 +2087,7 @@ func (s *s3StorageTestSuite) TestOverwriteAndAppendBlocksMiddleLargeFile() {
 	output := make([]byte, dataLen)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(dataLen, CloudStorageSize.Load())
+	s.assert.EqualValues(dataLen, sizeTracker.GetSize())
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.NoError(err)
@@ -2115,7 +2115,7 @@ func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSize() {
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(data), CloudStorageSize.Load())
+	s.assert.EqualValues(len(data), sizeTracker.GetSize())
 
 	f, err := os.CreateTemp("", name+".tmp")
 	s.assert.NoError(err)
@@ -2129,7 +2129,7 @@ func (s *s3StorageTestSuite) TestAppendOffsetLargerThanSize() {
 	output := make([]byte, dataLen)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(dataLen, CloudStorageSize.Load())
+	s.assert.EqualValues(dataLen, sizeTracker.GetSize())
 
 	err = s.s3Storage.CopyToFile(internal.CopyToFileOptions{Name: name, File: f})
 	s.assert.NoError(err)
@@ -2227,14 +2227,14 @@ func (s *s3StorageTestSuite) TestRenameFile() {
 	_, err = s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Data: data})
 	s.assert.NoError(err)
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(data), CloudStorageSize.Load())
+	s.assert.EqualValues(len(data), sizeTracker.GetSize())
 	dst := generateFileName()
 
 	err = s.s3Storage.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
 	s.assert.NoError(err)
 
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(data), CloudStorageSize.Load())
+	s.assert.EqualValues(len(data), sizeTracker.GetSize())
 
 	// Src should not be in the account
 	srcKey := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, src)
@@ -3337,12 +3337,12 @@ func (s *s3StorageTestSuite) UtilityFunctionTestTruncateFileToSmaller(size int, 
 	data := make([]byte, size)
 	s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(data), CloudStorageSize.Load())
+	s.assert.EqualValues(len(data), sizeTracker.GetSize())
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
 	s.assert.NoError(err)
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(int64(truncatedLength), CloudStorageSize.Load())
+	s.assert.EqualValues(int64(truncatedLength), sizeTracker.GetSize())
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
@@ -3376,12 +3376,12 @@ func (s *s3StorageTestSuite) UtilityFunctionTruncateFileToLarger(size int, trunc
 	data := make([]byte, size)
 	s.s3Storage.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(len(data), CloudStorageSize.Load())
+	s.assert.EqualValues(len(data), sizeTracker.GetSize())
 
 	err = s.s3Storage.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
 	s.assert.NoError(err)
 	// Check that the uploaded data is tracked correctly in CloudStorageSize
-	s.assert.EqualValues(int64(truncatedLength), CloudStorageSize.Load())
+	s.assert.EqualValues(int64(truncatedLength), sizeTracker.GetSize())
 
 	// Object should have updated data
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
