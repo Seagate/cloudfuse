@@ -145,13 +145,17 @@ func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSym
 		_, err = uploader.Upload(ctx, putObjectInput)
 	}
 
+	if err == nil {
+		CloudStorageSize.Add(size)
+	}
+
 	attemptedAction := fmt.Sprintf("upload object %s", key)
 	return parseS3Err(err, attemptedAction)
 }
 
 // Wrapper for awsS3Client.DeleteObject.
 // name is the path to the file.
-func (cl *Client) deleteObject(name string, isSymLink bool) error {
+func (cl *Client) deleteObject(name string, isSymLink bool, size int64) error {
 	key := cl.getKey(name, isSymLink)
 	log.Trace("Client::deleteObject : deleting object %s", key)
 
@@ -159,6 +163,10 @@ func (cl *Client) deleteObject(name string, isSymLink bool) error {
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
 	})
+
+	if err == nil {
+		CloudStorageSize.Add(-size)
+	}
 
 	attemptedAction := fmt.Sprintf("delete object %s", key)
 	return parseS3Err(err, attemptedAction)
@@ -173,11 +181,13 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 	log.Trace("Client::deleteObjects : deleting %d objects", len(objects))
 	// build list to send to DeleteObjects
 	keyList := make([]types.ObjectIdentifier, len(objects))
+	objectSizeMap := make(map[string]int64, len(objects))
 	for i, object := range objects {
 		key := cl.getKey(object.Path, object.IsSymlink())
 		keyList[i] = types.ObjectIdentifier{
 			Key: &key,
 		}
+		objectSizeMap[key] = object.Size
 	}
 	// send keyList for deletion
 	result, err := cl.awsS3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
@@ -187,10 +197,18 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 			Quiet:   aws.Bool(true),
 		},
 	})
+
 	if err != nil {
 		log.Err("Client::DeleteDirectory : Failed to delete %d files. Here's why: %v", len(objects), err)
 		for i := 0; i < len(result.Errors); i++ {
 			log.Err("Client::DeleteDirectory : Failed to delete key %s. Here's why: %s", result.Errors[i].Key, result.Errors[i].Message)
+		}
+	}
+
+	// Adjust CloudStorageSize for successfully deleted objects
+	for _, deleted := range result.Deleted {
+		if size, exists := objectSizeMap[*deleted.Key]; exists {
+			CloudStorageSize.Add(-size)
 		}
 	}
 
@@ -227,7 +245,7 @@ func (cl *Client) headBucket() (*s3.HeadBucketOutput, error) {
 }
 
 // Wrapper for awsS3Client.CopyObject
-func (cl *Client) copyObject(source string, target string, isSymLink bool) error {
+func (cl *Client) copyObject(source string, target string, isSymLink bool, size int64) error {
 	// copy the object to its new key
 	sourceKey := cl.getKey(source, isSymLink)
 	targetKey := cl.getKey(target, isSymLink)
@@ -242,7 +260,9 @@ func (cl *Client) copyObject(source string, target string, isSymLink bool) error
 		return parseS3Err(err, attemptedAction)
 	}
 
-	return err
+	CloudStorageSize.Add(size)
+
+	return nil
 }
 
 // abortMultipartUpload stops a multipart upload and verifys that the parts are deleted.

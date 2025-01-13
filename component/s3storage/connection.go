@@ -53,6 +53,7 @@ type Config struct {
 	usePathStyle              bool
 	disableSymlink            bool
 	disableUsage              bool
+	disableTrackedFileSize    bool
 }
 
 // TODO: move s3AuthConfig to s3auth.go

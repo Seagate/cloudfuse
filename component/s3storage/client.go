@@ -334,7 +334,7 @@ func (cl *Client) DeleteFile(name string) error {
 	isSymLink := attr.IsSymlink()
 
 	// delete the object
-	err = cl.deleteObject(name, isSymLink)
+	err = cl.deleteObject(name, isSymLink, attr.Size)
 	if err != nil {
 		log.Err("Client::DeleteFile : Failed to delete object %s. Here's why: %v", name, err)
 		return err
@@ -406,7 +406,13 @@ func (cl *Client) DeleteDirectory(name string) error {
 func (cl *Client) RenameFile(source string, target string, isSymLink bool) error {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
-	err := cl.copyObject(source, target, isSymLink)
+	attr, err := cl.getFileAttr(source)
+	if err == syscall.ENOENT {
+		log.Err("Client::RenameFile : %s does not exist", source)
+		return syscall.ENOENT
+	}
+
+	err = cl.copyObject(source, target, isSymLink, attr.Size)
 	if err != nil {
 		log.Err("Client::RenameFile : copyObject(%s->%s) failed. Here's why: %v", source, target, err)
 		return err
@@ -414,7 +420,7 @@ func (cl *Client) RenameFile(source string, target string, isSymLink bool) error
 	// Copy of the file is done so now delete the older file
 	// in this case we don't need to check if the file exists, so we use deleteObject, not DeleteFile
 	// this is what S3's DeleteObject spec is meant for: to make sure the object doesn't exist anymore
-	err = cl.deleteObject(source, isSymLink)
+	err = cl.deleteObject(source, isSymLink, attr.Size)
 	if err != nil {
 		log.Err("Client::RenameFile : deleteObject(%s) failed. Here's why: %v", source, err)
 	}
@@ -735,6 +741,9 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 		log.Err("Client::TruncateFile : Failed to read object data from %v. Here's why: %v", name, err)
 		return err
 	}
+
+	originalSize := int64(len(objectData))
+
 	// ensure data is of the expected length
 	if int64(len(objectData)) > size {
 		// truncate
@@ -749,9 +758,16 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	}
 	// overwrite the object with the truncated data
 	truncatedDataReader := bytes.NewReader(objectData)
+
+	// Subtract the original size. Put object will add the truncated size if upload is successful
+	CloudStorageSize.Add(-originalSize)
+
 	err = cl.putObject(name, truncatedDataReader, int64(len(objectData)), false)
 	if err != nil {
 		log.Err("Client::TruncateFile : Failed to write truncated data to object %s", name)
+
+		// Add the original size back if we failed to truncate the file
+		CloudStorageSize.Add(originalSize)
 	}
 
 	return err
@@ -781,15 +797,16 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		isSymlink := getSymlinkBool(options.Metadata)
 
 		oldData, _ := cl.ReadBuffer(name, 0, 0, isSymlink)
+		lenOldData := len(oldData)
 		// update the data with the new data
 		// if we're only overwriting existing data
-		if int64(len(oldData)) >= offset+length {
+		if int64(lenOldData) >= offset+length {
 			copy(oldData[offset:], data)
 			dataBuffer = &oldData
 			// else appending and/or overwriting
 		} else {
 			// if the file is not empty then we need to combine the data
-			if len(oldData) > 0 {
+			if lenOldData > 0 {
 				// new data buffer with the size of old and new data
 				newDataBuffer := make([]byte, offset+length)
 				// copy the old data into it
@@ -806,10 +823,16 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 			}
 		}
 
+		// Subtract the original size. WriteFromBuffer add the truncated size if upload is successful
+		CloudStorageSize.Add(-int64(lenOldData))
+
 		// WriteFromBuffer should be able to handle the case where now the block is too big and gets split into multiple parts
 		err := cl.WriteFromBuffer(name, options.Metadata, *dataBuffer)
 		if err != nil {
 			log.Err("Client::Write : Failed to upload to object. Here's why: %v ", name, err)
+
+			// Add size if Write was not successful
+			CloudStorageSize.Add(int64(lenOldData))
 			return err
 		}
 	} else {
@@ -832,10 +855,21 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 				log.Err("BlockBlob::Write : Failed to read data in buffer %s [%s]", name, err.Error())
 			}
 		}
+
+		// Subtract the original size. WriteFromBuffer add the truncated size if upload is successful
+		CloudStorageSize.Add(-int64(oldDataSize))
+
 		// this gives us where the offset with respect to the buffer that holds our old data - so we can start writing the new data
 		blockOffset := offset - fileOffsets.BlockList[index].StartIndex
 		copy(oldDataBuffer[blockOffset:], data)
 		err := cl.stageAndCommitModifiedBlocks(name, oldDataBuffer, fileOffsets)
+		if err != nil {
+			// Add size if Write was not successful
+			CloudStorageSize.Add(int64(oldDataSize))
+		} else {
+			// Add size new size if successful write
+			CloudStorageSize.Add(int64(len(oldDataBuffer)))
+		}
 		return err
 	}
 

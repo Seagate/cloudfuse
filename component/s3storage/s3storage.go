@@ -49,6 +49,8 @@ type S3Storage struct {
 
 const compName = "s3storage"
 
+var CloudStorageSize atomic.Int64
+
 // Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &S3Storage{}
 
@@ -483,15 +485,22 @@ func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
 		return nil, false, nil
 	}
 
-	log.Trace("S3Storage::StatFs")
-	// cache_size = f_blocks * f_frsize/1024
-	// cache_size - used = f_frsize * f_bavail/1024
-	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
-	// if cache size is set to 0 then we have the root mount usage
-	sizeUsed, err := s3.storage.GetUsedSize()
-	if err != nil {
-		// TODO: will returning EIO break any applications that depend on StatFs?
-		return nil, true, err
+	var err error
+	var sizeUsed uint64
+
+	if s3.stConfig.disableTrackedFileSize {
+		log.Trace("S3Storage::StatFs")
+		// cache_size = f_blocks * f_frsize/1024
+		// cache_size - used = f_frsize * f_bavail/1024
+		// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
+		// if cache size is set to 0 then we have the root mount usage
+		sizeUsed, err = s3.storage.GetUsedSize()
+		if err != nil {
+			// TODO: will returning EIO break any applications that depend on StatFs?
+			return nil, true, err
+		}
+	} else {
+		sizeUsed = uint64(CloudStorageSize.Load())
 	}
 
 	stat := common.Statfs_t{
