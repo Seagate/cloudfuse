@@ -24,42 +24,42 @@ def read_batch(batch):
         f1 = ""
         with open(os.path.join(data_dir, filename), "rb") as f:
             open_end_time = datetime.datetime.now() - open_start_time
-            
+
             start_time = datetime.datetime.now()
             size = 0
             cnt = 0
             while True:
                 cnt += 1
                 data = f.read(blockSize)
-                
+
                 # Needed for data validation, increases time taken so remove if not needed
                 f1+=str(data)
                 size += len(data)
                 if not data:
                     break
-        
+
         end_time = datetime.datetime.now()
         print(filename + ":readtime:" + str(end_time - start_time) + ":opentime:" + str(open_end_time)+ ":openstarttime:" + str(open_start_time) + "size: " + str(size))
         f.close()
-        
+
         hash = hashlib.md5(f1.encode()).hexdigest()
         print(hash)
 
 # Number of iterations to run
-count = 1 
+count = 1
 while count>0:
     count -= 1
-    
+
     # list files and calculate list time
     start_time = datetime.datetime.now()
     filenames = os.listdir(data_dir)
 
     end_time = datetime.datetime.now()
     print("FileListTime: " + str(end_time - start_time))
-    
+
     # for local testing use by name
     #filenames = ["sample31", "sample31"]
-    
+
     random.shuffle(filenames)
 
     # create batches and threads

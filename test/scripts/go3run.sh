@@ -1,4 +1,3 @@
-
 #!/bin/bash
 sudo fusermount -u ~/blob_mnt
 rm -rf ~/blob_mnt/*

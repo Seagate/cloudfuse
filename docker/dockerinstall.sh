@@ -1,4 +1,4 @@
-
+#!/bin/bash
 # Cleanup old installation
 sudo apt remove docker-desktop
 rm-r $HOME/.docker/desktop
@@ -16,7 +16,7 @@ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o 
 # Create file for installation
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"| sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-# Install docker 
+# Install docker
 sudo apt-get update
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
 sudo apt-get update
@@ -42,4 +42,3 @@ docker images ls
 
 # List docker instances running
 docker container ls
-

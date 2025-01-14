@@ -14,8 +14,8 @@ rm $outputPath
 echo "| Case | latest cf write IOPS | latest cf read IOPS | blob2 write IOPS | blob2 read IOPS |" >> $outputPath
 echo "| -- | -- | -- | -- | -- |" >> $outputPath
 
-for i in {1..5}; 
-do 
+for i in {1..5};
+do
 	echo "| Run $i |" >> $outputPath
 done
 
@@ -40,7 +40,7 @@ fi
 
 echo -n "Test command: "
 echo $fiocmd
-echo 
+echo
 
 # Mount Cloudfuse
 ./cloudfuse mount $mntPath --config-file=$v2configPath
@@ -54,8 +54,8 @@ sed_line=3
 cloudfuse_write_average=0
 cloudfuse_read_average=0
 
-for i in {1..5}; 
-do 
+for i in {1..5};
+do
 	echo "Cloudfuse Run $i"
 
     fio_result=`$fiocmd$i`
@@ -91,8 +91,8 @@ ps -aux | grep cloudfuse
 sed_line=3
 blobfuse_write_average=0
 blobfuse_read_average=0
-for i in {1..5}; 
-do 
+for i in {1..5};
+do
 	echo "Cloudfuse Run $i"
 
     fio_result=`$fiocmd$i`

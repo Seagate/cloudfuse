@@ -7,7 +7,7 @@
 
 extern struct fuse_operations storage_callbacks;
 
-void *ext_init(struct fuse_conn_info *conn) 
+void *ext_init(struct fuse_conn_info *conn)
 {
     syslog(LOG_DEBUG, "EXT : Fuse Init called back in Extension");
 
@@ -156,7 +156,7 @@ int ext_release(const char *path, struct fuse_file_info * fi)
     syslog(LOG_DEBUG, "EXT : Fuse release called back in Extension");
 
     // Pass on the call to storage endpoint
-    return storage_callbacks.release(path, fi);  
+    return storage_callbacks.release(path, fi);
 }
 
 int ext_unlink(const char *path)
@@ -164,7 +164,7 @@ int ext_unlink(const char *path)
     syslog(LOG_DEBUG, "EXT : Fuse unlink called back in Extension");
 
     // Pass on the call to storage endpoint
-    return storage_callbacks.unlink(path); 
+    return storage_callbacks.unlink(path);
 }
 
 int ext_rename(const char *src, const char *dst)
@@ -172,7 +172,7 @@ int ext_rename(const char *src, const char *dst)
     syslog(LOG_DEBUG, "EXT : Fuse rename called back in Extension");
 
     // Pass on the call to storage endpoint
-    return storage_callbacks.rename(src, dst);    
+    return storage_callbacks.rename(src, dst);
 }
 
 int ext_symlink(const char *from, const char *to)
@@ -188,7 +188,7 @@ int ext_readlink(const char *path, char *buf, size_t size)
     syslog(LOG_DEBUG, "EXT : Fuse readlink called back in Extension");
 
     // Pass on the call to storage endpoint
-    return storage_callbacks.readlink(path, buf, size);  
+    return storage_callbacks.readlink(path, buf, size);
 }
 
 int ext_fsync(const char * path, int flag, struct fuse_file_info *fi)
@@ -196,7 +196,7 @@ int ext_fsync(const char * path, int flag, struct fuse_file_info *fi)
     syslog(LOG_DEBUG, "EXT : Fuse fsync called back in Extension");
 
     // Pass on the call to storage endpoint
-    return storage_callbacks.fsync(path, flag, fi);      
+    return storage_callbacks.fsync(path, flag, fi);
 }
 
 int ext_fsyncdir(const char *path, int flag, struct fuse_file_info *fi)
@@ -204,7 +204,7 @@ int ext_fsyncdir(const char *path, int flag, struct fuse_file_info *fi)
     syslog(LOG_DEBUG, "EXT : Fuse fsyncdir called back in Extension");
 
     // Pass on the call to storage endpoint
-    return storage_callbacks.fsyncdir(path, flag, fi); 
+    return storage_callbacks.fsyncdir(path, flag, fi);
 }
 
 int ext_chmod(const char *path, mode_t mode)
@@ -212,5 +212,5 @@ int ext_chmod(const char *path, mode_t mode)
     syslog(LOG_DEBUG, "EXT : Fuse chmod called back in Extension");
 
     // Pass on the call to storage endpoint
-    return storage_callbacks.chmod(path, mode);    
+    return storage_callbacks.chmod(path, mode);
 }

@@ -42,7 +42,7 @@ int register_fuse_callbacks(struct fuse_operations *opts)
 
     opts->init           = ext_init;
     opts->destroy        = ext_destroy;
-    
+
     opts->statfs         = ext_statfs;
     opts->getattr        = ext_getattr;
 
@@ -79,7 +79,7 @@ int register_fuse_callbacks(struct fuse_operations *opts)
 int register_storage_callbacks(struct fuse_operations *opts)
 {
     syslog(LOG_INFO, "EXT : Populating storage callbacks");
-    
+
     if (!signature_verified) {
         syslog(LOG_ERR, "EXT : Not a friendly neighbour.");
         return -1;

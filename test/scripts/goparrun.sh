@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 mntPath=$1

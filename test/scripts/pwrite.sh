@@ -2,9 +2,9 @@
 
 thread=$1
 count=$2
-size=$3 
-mntPath=$4 
-outputPath=$5 
+size=$3
+mntPath=$4
+outputPath=$5
 sed_line=$6
 
 start_time=`date +%s`
@@ -27,5 +27,3 @@ echo "Upload time is        : " $time_diff " Seconds"
 echo "Upload rate is        : " $rate " Mbps"
 
 sed -i "${sed_line}s/$/ ${time_diff} |/" $outputPath
-
-

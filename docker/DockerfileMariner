@@ -9,7 +9,7 @@ COPY ./cloudfuse /usr/local/bin/
 COPY ./config.yaml /usr/share/cloudfuse/
 
 # Install fuse library
-RUN tdnf update 
+RUN tdnf update
 RUN tdnf install -y ca-certificates fuse3
 
 RUN echo "user_allow_other" >> /etc/fuse.conf
@@ -29,10 +29,7 @@ RUN \
 	chmod 777 /usr/share/cloudfuse/cloudfuse-mount.sh && \
 	chmod 777 /usr/share/cloudfuse/cloudfuse-umount.sh && \
 	ln -s  /usr/share/cloudfuse/cloudfuse-mount.sh /usr/local/bin/fuse && \
-	ln -s  /usr/share/cloudfuse/cloudfuse-umount.sh /usr/local/bin/unfuse 
+	ln -s  /usr/share/cloudfuse/cloudfuse-umount.sh /usr/local/bin/unfuse
 
 
 ENTRYPOINT ["bash", "fuse"]
-
-
-

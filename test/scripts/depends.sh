@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 go mod graph > graph.lst
@@ -14,7 +13,7 @@ getSource()
 
     if grep -q $1 graph.tmp
     then
-        # echo "$EMPTY >> " $lib " : Already done" 
+        # echo "$EMPTY >> " $lib " : Already done"
         return
     fi
 
@@ -31,4 +30,3 @@ getSource()
 }
 
 getSource $1
-

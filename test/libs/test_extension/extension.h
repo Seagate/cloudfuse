@@ -20,49 +20,49 @@
 extern "C" {
 #endif
 
-/*  
+/*
     ---------------------------------------------------------
         Blobfuse / Cloudfuse supports only below operations
     ---------------------------------------------------------
 
     // System level operations
-    fuse_operations.init        
-    fuse_operations.destroy     
+    fuse_operations.init
+    fuse_operations.destroy
 
     // FS level operations
-    fuse_operations.getattr     
-    fuse_operations.statfs      
-    
+    fuse_operations.getattr
+    fuse_operations.statfs
+
     // Dir level operations
     fuse_operations.opendir
     fuse_operations.releasedir
-    fuse_operations.readdir     
-    fuse_operations.mkdir       
-    fuse_operations.rmdir       
+    fuse_operations.readdir
+    fuse_operations.mkdir
+    fuse_operations.rmdir
 
     // File level operations
-    fuse_operations.open        
-    fuse_operations.create      
-    fuse_operations.read        
-    fuse_operations.write       
-    fuse_operations.flush       
-    fuse_operations.truncate    
-    fuse_operations.release     
-    
-    fuse_operations.unlink      
-    fuse_operations.rename 
+    fuse_operations.open
+    fuse_operations.create
+    fuse_operations.read
+    fuse_operations.write
+    fuse_operations.flush
+    fuse_operations.truncate
+    fuse_operations.release
+
+    fuse_operations.unlink
+    fuse_operations.rename
 
     // Symlink level operations
-    fuse_operations.readlink    
-    fuse_operations.symlink     
-    
+    fuse_operations.readlink
+    fuse_operations.symlink
+
     // Sync operations
-    fuse_operations.fsync       
-    fuse_operations.fsyncdir    
+    fuse_operations.fsync
+    fuse_operations.fsyncdir
 
     // Permission operations
-    fuse_operations.chmod       
-    
+    fuse_operations.chmod
+
 */
 
 // Global variable to hold the storage callback table

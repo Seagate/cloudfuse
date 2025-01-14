@@ -1,4 +1,4 @@
-
+#!/bin/bash
 # Build cloudfuse binary
 ver=`../cloudfuse --version | cut -d " " -f 3`
 tag="azure-cloudfuse.$ver"

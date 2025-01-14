@@ -1,4 +1,4 @@
-
+#!/bin/bash
 # Build cloudfuse binary
 cd ..
 echo "Building cloudfuse with libfuse"

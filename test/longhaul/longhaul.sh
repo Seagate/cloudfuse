@@ -1,3 +1,4 @@
+#!/bin/bash
 SERVICE="cloudfuse"
 SCRIPT="longhaul.sh"
 WORKDIR="/home/cloudfuse/cloudfuse"

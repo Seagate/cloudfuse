@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 
@@ -24,4 +23,3 @@ echo "Last modified time is : " $last_mod
 echo "Current time is       : " $curr_time
 echo "Upload time is        : " $upload_time
 echo "Upload rate is        : " $rate " MBps"
-
