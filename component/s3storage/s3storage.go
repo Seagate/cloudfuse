@@ -97,12 +97,6 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 		return err
 	}
 
-	sizeTracker, err = CreateSizeJournal()
-	if err != nil {
-		log.Err("S3Storage::Configure : Failed to create size tracker to track size of directory [%s]", err.Error())
-		return err
-	}
-
 	return nil
 }
 
@@ -154,6 +148,7 @@ func (s3 *S3Storage) Start(ctx context.Context) error {
 func (s3 *S3Storage) Stop() error {
 	log.Trace("S3Storage::Stop : Stopping component %s", s3.Name())
 	s3StatsCollector.Destroy()
+	s3.storage.Stop()
 	return nil
 }
 

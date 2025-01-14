@@ -79,6 +79,7 @@ func NewConnection(cfg Config) (S3Connection, error) {
 
 type S3Connection interface {
 	Configure(cfg Config) error
+	Stop() error
 	UpdateConfig(cfg Config) error
 
 	ListBuckets() ([]string, error)

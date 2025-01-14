@@ -125,6 +125,12 @@ func (s *clientTestSuite) SetupTest() {
 		os.Exit(1)
 	}
 
+	sizeTracker, err = CreateSizeJournal()
+	if err != nil {
+		log.Err("S3Storage::Configure : Failed to create size tracker to track size of directory [%s]", err.Error())
+		os.Exit(1)
+	}
+
 	cfgFile.Close()
 	s.setupTestHelper("", true)
 }

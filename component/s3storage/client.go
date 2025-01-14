@@ -223,7 +223,19 @@ func (cl *Client) Configure(cfg Config) error {
 		return err
 	}
 
+	sizeTracker, err = CreateSizeJournal()
+	if err != nil {
+		log.Err("Client::Configure : Failed to create size tracker to track size of directory [%s]", err.Error())
+		return err
+	}
+
 	return nil
+}
+
+// Stop : Disconnect all running operations here
+func (cl *Client) Stop() error {
+	log.Trace("Client::Stop : Stopping awsS3Client client")
+	return sizeTracker.CloseFile()
 }
 
 func getRegionFromEndpoint(endpoint string) (string, error) {

@@ -28,9 +28,11 @@ import (
 	"encoding/binary"
 	"os"
 	"sync"
+
+	"github.com/Seagate/cloudfuse/common"
 )
 
-var jornalFile string
+var journalFile string
 
 type SizeTracker struct {
 	size uint64
@@ -39,7 +41,8 @@ type SizeTracker struct {
 }
 
 func CreateSizeJournal() (*SizeTracker, error) {
-	f, err := os.OpenFile(jornalFile, os.O_CREATE|os.O_RDWR, 0644)
+	journalFile = common.JoinUnixFilepath(common.DefaultWorkDir, "directory_size.dat")
+	f, err := os.OpenFile(journalFile, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -59,13 +62,9 @@ func CreateSizeJournal() (*SizeTracker, error) {
 		}
 
 		size = binary.BigEndian.Uint64(buf)
-	} else {
-		if err := writeSizeToFile(f, 0); err != nil {
-			return nil, err
-		}
 	}
 
-	return &SizeTracker{size: size, file: f}, nil
+	return &SizeTracker{size: size, file: f, mu: sync.Mutex{}}, nil
 }
 
 func (s *SizeTracker) GetSize() uint64 {
@@ -75,14 +74,10 @@ func (s *SizeTracker) GetSize() uint64 {
 }
 
 func (s *SizeTracker) Add(delta uint64) uint64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	return s.updateSize(delta)
 }
 
 func (s *SizeTracker) Subtract(delta uint64) uint64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	return s.updateSize(-delta)
 }
 
@@ -96,16 +91,17 @@ func (s *SizeTracker) updateSize(delta uint64) uint64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.size += delta
+	_ = s.writeSizeToFile()
 	return s.size
 }
 
-func writeSizeToFile(f *os.File, size uint64) error {
+func (s *SizeTracker) writeSizeToFile() error {
 	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, size)
+	binary.BigEndian.PutUint64(buf, s.size)
 
-	if _, err := f.WriteAt(buf, 0); err != nil {
+	if _, err := s.file.WriteAt(buf, 0); err != nil {
 		return err
 	}
 
-	return f.Sync()
+	return s.file.Sync()
 }
