@@ -7,14 +7,14 @@ Requires=network-online.target
 # User service will run as.
 User=CloudfuseUser
 # Path to the location Cloudfuse will mount to. Note this folder must currently exist.
-Environment=MoutingPoint=/path/to/mounting/point
+Environment=MoutingPoint=/home/jfan/Desktop/mount
 # Path to the configuration file.
-Environment=ConfigFile=/path/to/config/file/config.yaml
+Environment=ConfigFile=/home/jfan/code/cloudfuse/config.yaml
 
 # Under the hood
 Type=forking
-ExecStart=/usr/bin/cloudfuse mount ${MoutingPoint} --config-file=${ConfigFile}
-ExecStop=/usr/bin/fusermount -u ${MoutingPoint} -z
+ExecStart=/usr/bin/cloudfuse mount /home/jfan/Desktop/mount --config-file=/home/jfan/code/cloudfuse/config.yaml
+ExecStop=/usr/bin/fusermount -u /home/jfan/Desktop/mount -z
 
 [Install]
 WantedBy=multi-user.target

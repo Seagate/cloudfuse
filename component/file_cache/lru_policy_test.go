@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -189,21 +189,8 @@ func (suite *lruPolicyTestSuite) TestCacheValid() {
 	suite.assert.EqualValues(1, node.usage)
 }
 
-func (suite *lruPolicyTestSuite) TestCacheInvalidate() {
+func (suite *lruPolicyTestSuite) TestCachePurge() {
 	defer suite.cleanupTest()
-	f, _ := os.Create(cache_path + "/temp")
-	f.Close()
-	suite.policy.CacheValid("temp")
-	suite.policy.CacheInvalidate("temp") // this is equivalent to purge since timeout=0
-
-	n, ok := suite.policy.nodeMap.Load("temp")
-	suite.assert.False(ok)
-	suite.assert.Nil(n)
-}
-
-func (suite *lruPolicyTestSuite) TestCacheInvalidateTimeout() {
-	defer suite.cleanupTest()
-	suite.cleanupTest()
 
 	config := cachePolicyConfig{
 		tmpPath:       cache_path,
@@ -214,22 +201,8 @@ func (suite *lruPolicyTestSuite) TestCacheInvalidateTimeout() {
 		lowThreshold:  defaultMinThreshold,
 		fileLocks:     &common.LockMap{},
 	}
-
 	suite.setupTestHelper(config)
 
-	suite.policy.CacheValid("temp")
-	suite.policy.CacheInvalidate("temp")
-
-	n, ok := suite.policy.nodeMap.Load("temp")
-	suite.assert.True(ok)
-	suite.assert.NotNil(n)
-	node := n.(*lruNode)
-	suite.assert.EqualValues("temp", node.name)
-	suite.assert.EqualValues(1, node.usage)
-}
-
-func (suite *lruPolicyTestSuite) TestCachePurge() {
-	defer suite.cleanupTest()
 	// test policy cache data
 	suite.policy.CacheValid("temp")
 	suite.policy.CachePurge("temp")

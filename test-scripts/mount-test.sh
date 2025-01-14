@@ -7,17 +7,17 @@ set -o nounset
 source ./helper/var.env
 
 # Cleanup test
-source ./helper/cleanup.sh
-if [ $? -ne 0 ]; then
-    echo "command failed with exit code $?"
+if ! source ./helper/cleanup.sh; then
+    ret=$?
+    echo "command failed with exit code $ret"
     echo "Stopping script"
-    exit $?
+    exit $ret
 fi
 
 echo "-------------------------------------------------------------------"
 echo "Starting Mount Test"
 
-go test -timeout=120m -p 1 -v ../test/mount_test/mount_test.go -args -working-dir=$WORK_DIR -mnt-path=$MOUNT_DIR -config-file=$WORK_DIR/config.yaml
+go test -timeout=120m -p 1 -v ../test/mount_test/mount_test.go -args -working-dir="$WORK_DIR" -mnt-path="$MOUNT_DIR" -config-file="$WORK_DIR"/config.yaml
 
 # Cleanup test
 source ./helper/cleanup.sh

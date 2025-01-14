@@ -1,6 +1,6 @@
 # Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 #
-# Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+# Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +30,7 @@ class aboutPage(QWidget, Ui_About):
     def __init__(self,cloudfuseVersion):
         super().__init__()
         self.setupUi(self)
-        
+
         # By default, hyperlinks are set to look for local files in the current directory; set the behavior to  open the
         #   external link in the system's default browser
         self.textBrowser.setOpenExternalLinks(True)
