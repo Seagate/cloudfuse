@@ -1,5 +1,15 @@
 # Cloudfuse Changelog #
 
+## **1.7.3** ##
+
+January 13th 2024
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#404](https://github.com/Seagate/cloudfuse/pull/404) Fix error with open file handles when renaming files
+- [#397](https://github.com/Seagate/cloudfuse/pull/370) Add man pages and follow best practices for RHEL and Debian builds
+
 ## **1.7.2** ##
 
 December 11th 2024
