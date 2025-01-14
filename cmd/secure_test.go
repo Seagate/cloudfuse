@@ -218,7 +218,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigDecrypt() {
 	// Config file should be deleted
 	suite.assert.NoFileExists(confFile.Name())
 
-	_, err = executeCommandSecure(rootCmd, "secure", "decrypt", fmt.Sprintf("--config-file=%s", outFile.Name()), "--passphrase=12312312312312312312312312312312", fmt.Sprintf("--output-file=./tmp.yaml"))
+	_, err = executeCommandSecure(rootCmd, "secure", "decrypt", fmt.Sprintf("--config-file=%s", outFile.Name()), "--passphrase=12312312312312312312312312312312", "--output-file=./tmp.yaml")
 	suite.assert.NoError(err)
 
 	data, err := os.ReadFile("./tmp.yaml")

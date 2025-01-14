@@ -196,7 +196,7 @@ func decryptConfigFile(saveConfig bool) ([]byte, error) {
 
 // saveToFile: Save the newly generated config file and delete the source if requested
 func saveToFile(configFileName string, data []byte, deleteSource bool) error {
-	err := os.WriteFile(configFileName, data, 0777)
+	err := os.WriteFile(configFileName, data, 0644)
 	if err != nil {
 		return err
 	}

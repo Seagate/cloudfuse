@@ -45,7 +45,7 @@ func (cfs *CloudfuseStats) statsReader() error {
 		return err
 	}
 
-	f, err := os.OpenFile(cfs.transferPipe, os.O_RDONLY, os.ModeNamedPipe)
+	f, err := os.Open(cfs.transferPipe)
 	if err != nil {
 		log.Err("StatsReader::statsReader : unable to open pipe file [%v]", err)
 		return err
@@ -84,7 +84,7 @@ func (cfs *CloudfuseStats) statsPoll() {
 		return
 	}
 
-	pf, err := os.OpenFile(cfs.pollingPipe, os.O_CREATE|os.O_WRONLY, 0777)
+	pf, err := os.OpenFile(cfs.pollingPipe, os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Err("StatsReader::statsPoll : unable to open pipe file [%v]", err)
 		return

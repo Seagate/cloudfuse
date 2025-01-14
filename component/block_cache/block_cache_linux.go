@@ -967,7 +967,7 @@ func (bc *BlockCache) download(item *workItem) {
 	item.block.endIndex = item.block.offset + uint64(n)
 
 	if bc.tmpPath != "" {
-		err := os.MkdirAll(filepath.Dir(localPath), 0777)
+		err := os.MkdirAll(filepath.Dir(localPath), 0755)
 		if err != nil {
 			log.Err("BlockCache::download : error creating directory structure for file %s [%s]", localPath, err.Error())
 			return
@@ -1376,7 +1376,7 @@ func (bc *BlockCache) upload(item *workItem) {
 	if bc.tmpPath != "" {
 		localPath := filepath.Join(bc.tmpPath, fileName)
 
-		err := os.MkdirAll(filepath.Dir(localPath), 0777)
+		err := os.MkdirAll(filepath.Dir(localPath), 0755)
 		if err != nil {
 			log.Err("BlockCache::upload : error creating directory structure for file %s [%s]", localPath, err.Error())
 			goto return_safe

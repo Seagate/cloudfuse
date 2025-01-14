@@ -276,7 +276,7 @@ func (suite *dirTestSuite) TestDirGetStats() {
 
 	stat, err := os.Stat(dirName)
 	suite.NoError(err)
-	modTineDiff := time.Now().Sub(stat.ModTime())
+	modTineDiff := time.Since(stat.ModTime())
 
 	// for directory block blob may still return timestamp as 0
 	// So compare the time only if epoch is non-zero

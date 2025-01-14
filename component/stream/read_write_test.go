@@ -339,11 +339,7 @@ func (suite *streamTestSuite) TestStreamOnly() {
 
 	// create new handle
 	handle = &handlemap.Handle{Size: int64(4 * MB), Path: fileNames[0]}
-	getFileBlockOffsetsOptions = internal.GetFileBlockOffsetsOptions{Name: fileNames[0]}
 	openFileOptions = internal.OpenFileOptions{Name: fileNames[0], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
-	bol = &common.BlockOffsetList{
-		BlockList: []*common.Block{{StartIndex: 0, EndIndex: 2 * MB}, {StartIndex: 2, EndIndex: 4 * MB}},
-	}
 
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle, nil)
 	_, _ = suite.stream.OpenFile(openFileOptions)

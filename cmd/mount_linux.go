@@ -45,8 +45,8 @@ import (
 func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName string, pidFilePerm os.FileMode, umask int, fname string) error {
 	dmnCtx := &daemon.Context{
 		PidFileName: pidFileName,
-		PidFilePerm: 0644,
-		Umask:       022,
+		PidFilePerm: pidFilePerm,
+		Umask:       umask,
 		LogFileName: fname, // this will redirect stderr of child to given file
 	}
 
