@@ -526,8 +526,7 @@ var mountCmd = &cobra.Command{
 			pid := os.Getpid()
 			fname := fmt.Sprintf("/tmp/cloudfuse.%v", pid)
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := context.Background()
 			err = createDaemon(pipeline, ctx, pidFileName, 0644, 022, fname)
 			if err != nil {
 				return fmt.Errorf("mount: failed to create daemon [%v]", err.Error())
