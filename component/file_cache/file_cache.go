@@ -1569,8 +1569,8 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 		return localRenameErr
 	}
 
-	// update any open handles to the file with its new name
 	if sflock.Count() > 0 {
+		// update any open handles to the file with its new name
 		handlemap.GetHandles().Range(func(key, value any) bool {
 			handle := value.(*handlemap.Handle)
 			if handle.Path == options.Src {
@@ -1578,6 +1578,11 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 			}
 			return true
 		})
+		// copy the number of open handles to the new name
+		for sflock.Count() > 0 {
+			sflock.Dec()
+			dflock.Inc()
+		}
 	}
 
 	return nil
