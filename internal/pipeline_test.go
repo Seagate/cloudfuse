@@ -26,6 +26,7 @@
 package internal
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -104,7 +105,7 @@ func (s *pipelineTestSuite) TestStartStopCreateNewPipeline() {
 	p, err := NewPipeline([]string{"ComponentA", "ComponentB"}, false)
 	s.assert.NoError(err)
 
-	err = p.Start(nil)
+	err = p.Start(context.TODO())
 	s.assert.NoError(err)
 
 	err = p.Stop()
