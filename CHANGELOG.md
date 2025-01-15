@@ -1,5 +1,14 @@
 # Cloudfuse Changelog #
 
+## **1.7.4** ##
+
+January 15th 2024
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#374](https://github.com/Seagate/cloudfuse/pull/374) Fix issue with items remaining in cache and remove race conditions
+
 ## **1.7.3** ##
 
 January 13th 2024
