@@ -18,7 +18,7 @@ def compare_numbers(job_one, job_two, metrics_list, log_file):
             result['performance_diff'][i] = metric_value
             sys.stdout.write('{} has regressed - there is a perf regression of {}%\n'.format(i, metric_value))
             if metric_value < -3:
-                raise ValueError("large perf regression in {} detected of {}".format(i, metric_value))
+                raise ValueError('large perf regression in {} detected of {}'.format(i, metric_value))
         if metric_value >= 0:
             result['performance_diff'][i] = metric_value
             sys.stdout.write('{} has a perf improvement of {}%\n'.format(i, metric_value))
@@ -28,15 +28,15 @@ def compare_numbers(job_one, job_two, metrics_list, log_file):
     f.close()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # parse argument
-    parser = argparse.ArgumentParser("compare performance")
+    parser = argparse.ArgumentParser('compare performance')
     parser.add_argument('-j1', '--job1', default='main', help='name of the first job', required=False)
     parser.add_argument('-j2', '--job2', default='binary', help='name of the second job', required=False)
     parser.add_argument('-m','--metrics', nargs='+', help='metrics to compare from log file', required=True)
     parser.add_argument('-lf',
                         '--log',
-                        default="./cloudfuse-perf.json",
+                        default='./cloudfuse-perf.json',
                         help='path of log file',
                         required=False)
     args = vars(parser.parse_args())

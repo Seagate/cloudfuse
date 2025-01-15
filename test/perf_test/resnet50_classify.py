@@ -11,8 +11,8 @@ from tensorflow.keras.preprocessing.image import img_to_array
 from tensorflow.keras.applications.imagenet_utils import decode_predictions
 
 # we're not using any GPUs
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #15
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'   # see issue #15
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
 
 def classify_images(images):
@@ -38,15 +38,15 @@ def chunks(paths, batch_size):
     for i in range(0, len(paths), batch_size):
         yield paths[i:i + batch_size]
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # parse argument
-    parser = argparse.ArgumentParser("classify dataset")
+    parser = argparse.ArgumentParser('classify dataset')
     parser.add_argument('-d', '--dataset', help='dataset dir path', required=True)
     parser.add_argument('-n', '--job', help='name of the resnet job', required=True)
     parser.add_argument('-p', '--procs', default=32, help='number of parallel processes', required=False)
     parser.add_argument('-lf',
                         '--log',
-                        default="./cloudfuse-perf.json",
+                        default='./cloudfuse-perf.json',
                         help='path of log file',
                         required=False)
 

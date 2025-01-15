@@ -30,16 +30,16 @@ from azure_config_advanced import azureAdvancedSettingsWidget
 from common_qt_functions import widgetCustomFunctions, defaultSettingsManager
 
 pipelineChoices = ['file_cache','stream','block_cache']
-bucketModeChoices = ["key", "sas", "spn", "msi"]
-azStorageType = ["block", "adls"]
+bucketModeChoices = ['key', 'sas', 'spn', 'msi']
+azStorageType = ['block', 'adls']
 libfusePermissions = [0o777,0o666,0o644,0o444]
 
 class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
     def __init__(self,configSettings):
         super().__init__()
         self.setupUi(self)
-        self.setWindowTitle("Azure Config Settings")
-        self.myWindow = QSettings("Cloudfuse", "AzcWindow")
+        self.setWindowTitle('Azure Config Settings')
+        self.myWindow = QSettings('Cloudfuse', 'AzcWindow')
         self.settings = configSettings
         self.initWindowSizePos()
         # Hide the pipeline mode groupbox depending on the default select is
@@ -60,9 +60,9 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         # Documentation for the allowed characters for azure:
         #   https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftstorage
         # Allow lowercase alphanumeric characters plus [-]
-        self.lineEdit_azure_container.setValidator(QtGui.QRegularExpressionValidator(r"^[a-z0-9-]*$",self))
+        self.lineEdit_azure_container.setValidator(QtGui.QRegularExpressionValidator(r'^[a-z0-9-]*$',self))
         # Allow alphanumeric characters plus [.,-,_]
-        self.lineEdit_azure_accountName.setValidator(QtGui.QRegularExpressionValidator(r"^[a-zA-Z0-9-._]*$",self))
+        self.lineEdit_azure_accountName.setValidator(QtGui.QRegularExpressionValidator(r'^[a-zA-Z0-9-._]*$',self))
 
         if platform == 'win32':
             # Windows directory and filename conventions:
@@ -119,13 +119,13 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.hideAzureBoxes()
         modeSelectionIndex = self.dropDown_azure_modeSetting.currentIndex()
         # Azure mode group boxes
-        if bucketModeChoices[modeSelectionIndex] == "key":
+        if bucketModeChoices[modeSelectionIndex] == 'key':
             self.groupbox_accountKey.setVisible(True)
-        elif bucketModeChoices[modeSelectionIndex] == "sas":
+        elif bucketModeChoices[modeSelectionIndex] == 'sas':
             self.groupbox_sasStorage.setVisible(True)
-        elif bucketModeChoices[modeSelectionIndex] == "spn":
+        elif bucketModeChoices[modeSelectionIndex] == 'spn':
             self.groupbox_spn.setVisible(True)
-        elif bucketModeChoices[modeSelectionIndex] == "msi":
+        elif bucketModeChoices[modeSelectionIndex] == 'msi':
             self.groupbox_msi.setVisible(True)
 
 # This widget will not display all the options in settings, only the ones written in the UI file.

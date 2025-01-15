@@ -33,10 +33,10 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
     def __init__(self,configSettings):
         super().__init__()
         self.setupUi(self)
-        self.myWindow = QSettings("Cloudfuse", "S3AdvancedWindow")
+        self.myWindow = QSettings('Cloudfuse', 'S3AdvancedWindow')
         self.settings = configSettings
         self.initWindowSizePos()
-        self.setWindowTitle("Advanced S3Cloud Config Settings")
+        self.setWindowTitle('Advanced S3Cloud Config Settings')
         self.populateOptions()
         self.saveButtonClicked = False
 
@@ -84,11 +84,11 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
 
         self.lineEdit_subdirectory.setText(s3Storage['subdirectory'])
 
-        if platform == "win32":
-            self.checkBox_libfuse_networkshare.setToolTip("Runs as a network share - may improve performance when latency to cloud is high.")
+        if platform == 'win32':
+            self.checkBox_libfuse_networkshare.setToolTip('Runs as a network share - may improve performance when latency to cloud is high.')
         else:
             self.checkBox_libfuse_networkshare.setEnabled(False)
-            self.checkBox_libfuse_networkshare.setToolTip("Network share is only supported on Windows")
+            self.checkBox_libfuse_networkshare.setToolTip('Network share is only supported on Windows')
 
     def updateOptionalS3Storage(self):
         s3Storage = self.settings['s3storage']

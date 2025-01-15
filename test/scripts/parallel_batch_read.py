@@ -6,8 +6,8 @@ import datetime
 import random
 # Directory containing the files
 
-mountroot = "/tmp/mntpoint1"
-mountpath = "/smallfiles/createfiles"
+mountroot = '/tmp/mntpoint1'
+mountpath = '/smallfiles/createfiles'
 data_dir = mountroot + mountpath
 
 # Number of files to read in each batch
@@ -19,10 +19,10 @@ blockSize = 8 * 1024 * 1024
 def read_batch(batch):
     for filename in batch:
         open_start_time = datetime.datetime.now()
-        print("filename: "+ filename + "PID: " + str(os.getpid()) + "TID: "+ str(threading.get_native_id()))
+        print('filename: '+ filename + 'PID: ' + str(os.getpid()) + 'TID: '+ str(threading.get_native_id()))
 
-        f1 = ""
-        with open(os.path.join(data_dir, filename), "rb") as f:
+        f1 = ''
+        with open(os.path.join(data_dir, filename), 'rb') as f:
             open_end_time = datetime.datetime.now() - open_start_time
 
             start_time = datetime.datetime.now()
@@ -39,7 +39,7 @@ def read_batch(batch):
                     break
 
         end_time = datetime.datetime.now()
-        print(filename + ":readtime:" + str(end_time - start_time) + ":opentime:" + str(open_end_time)+ ":openstarttime:" + str(open_start_time) + "size: " + str(size))
+        print(filename + ':readtime:' + str(end_time - start_time) + ':opentime:' + str(open_end_time)+ ':openstarttime:' + str(open_start_time) + 'size: ' + str(size))
         f.close()
 
         hash = hashlib.md5(f1.encode()).hexdigest()
@@ -55,7 +55,7 @@ while count>0:
     filenames = os.listdir(data_dir)
 
     end_time = datetime.datetime.now()
-    print("FileListTime: " + str(end_time - start_time))
+    print('FileListTime: ' + str(end_time - start_time))
 
     # for local testing use by name
     #filenames = ["sample31", "sample31"]
@@ -80,4 +80,4 @@ while count>0:
         t.join()
 
     end_time = datetime.datetime.now()
-    print("FileOpenReadCloseTime: " + end_time - start_time)
+    print('FileOpenReadCloseTime: ' + end_time - start_time)
