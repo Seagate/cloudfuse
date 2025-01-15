@@ -1713,7 +1713,7 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 
 	// Now wait for refresh timeout and we shall get the updated content on next read
 	byteArr = []byte("test data123456")
-	err = os.WriteFile(suite.fake_storage_path+"/"+path, []byte("test data123456"), 0777)
+	err = os.WriteFile(suite.fake_storage_path+"/"+path, byteArr, 0777)
 	suite.assert.NoError(err)
 	time.Sleep(2 * time.Second)
 	handle, err = suite.fileCache.OpenFile(options)
