@@ -352,6 +352,9 @@ var mountCmd = &cobra.Command{
 				pipeline = append(pipeline, "attr_cache")
 			}
 
+			// TODO: when there is a config file and components is empty, look at the s3 or azure section to add the appropriate cloud componenet
+			// when there is no config file at all, what other charicteristics can be used to determine the appropriate cloud component?
+
 			pipeline = append(pipeline, "s3storage")
 			options.Components = pipeline
 		}
