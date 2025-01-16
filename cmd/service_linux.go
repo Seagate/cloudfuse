@@ -199,22 +199,15 @@ WantedBy=multi-user.target
 	serviceFile := serviceName + ".service"
 	serviceFilePath := "/etc/systemd/system/" + serviceFile
 
+	err = os.Remove(serviceFilePath)
+	if err != nil && !os.IsNotExist(err) {
+		return "", fmt.Errorf("failed to replace the service file due to the following error: [%s]", err.Error())
+	}
+
 	var newFile *os.File
-	if _, err = os.Stat(serviceFilePath); os.IsNotExist(err) {
-		newFile, err = os.Create(serviceFilePath)
-		if err != nil {
-			return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
-		}
-	} else {
-		delServFileCmd := exec.Command("rm", serviceFilePath)
-		err = delServFileCmd.Run()
-		if err != nil {
-			return "", fmt.Errorf("failed to replace the service file due to the following error: [%s]", err.Error())
-		}
-		newFile, err = os.Create(serviceFilePath)
-		if err != nil {
-			return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
-		}
+	newFile, err = os.Create(serviceFilePath)
+	if err != nil {
+		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
 	}
 
 	err = tmpl.Execute(newFile, config)
