@@ -249,11 +249,9 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 func getAbsPath(leaf string) (string, error) {
 	var absPath string
 	var err error
-	if !filepath.IsAbs(leaf) {
-		absPath, err = filepath.Abs(leaf)
-		if err != nil {
-			return "", fmt.Errorf("couldn't format the path string", err.Error())
-		}
+	absPath, err = filepath.Abs(leaf)
+	if err != nil {
+		return "", fmt.Errorf("couldn't format the path string due to the following error [%s]", err.Error())
 	}
 	return absPath, err
 }
