@@ -231,7 +231,6 @@ func (suite *fileCacheTestSuite) TestDefaultCacheSize() {
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		err := cmd.Run()
-		fmt.Println(err)
 		suite.assert.NoError(err)
 		freeDisk, err = strconv.Atoi(strings.TrimSpace(out.String()))
 		suite.assert.NoError(err)
