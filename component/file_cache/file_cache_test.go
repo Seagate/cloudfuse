@@ -451,20 +451,17 @@ func (suite *fileCacheTestSuite) TestStreamDirCase3() {
 	file3 := name + "/file3"
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777})
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
-	// By default createEmptyFile is false, so we will not create these files in storage until they are closed.
+	// Truncate causes these files to be written to fake storage
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file1, Size: 1024})
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file2, Size: 1024})
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, Size: 1024})
-	// Create the files in fake_storage and simulate different sizes
-	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
-	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
-	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
-	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
-	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
-	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	// Change the sizes directly in fake storage
+	suite.loopback.TruncateFile(internal.TruncateFileOptions{Name: file1}) // Length is default 0
+	suite.loopback.TruncateFile(internal.TruncateFileOptions{Name: file2})
+	suite.loopback.TruncateFile(internal.TruncateFileOptions{Name: file3})
 
 	// Read the Directory
 	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
@@ -511,9 +508,8 @@ func (suite *fileCacheTestSuite) TestStreamDirMixed() {
 	// Create the files in fake_storage and simulate different sizes
 	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
 	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
-	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
-	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
-	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777})
+	suite.loopback.TruncateFile(internal.TruncateFileOptions{Name: file3})
+	handle, _ = suite.loopback.CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777}) // Length is default 0
 	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, Size: 1024})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, Size: 0})
@@ -1339,13 +1335,11 @@ func (suite *fileCacheTestSuite) TestRenameOpenFileCase1() {
 	dst := "destination5"
 
 	// create file in cloud
-	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
-	suite.assert.NoError(err)
-	err = suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
-	suite.assert.NoError(err)
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// open file for writing
-	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Flags: os.O_RDWR, Mode: 0777})
+	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Flags: os.O_RDWR, Mode: 0777})
 	suite.assert.NoError(err)
 	handlemap.Add(handle)
 	// Path should not be in the file cache (lazy open)
