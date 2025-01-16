@@ -354,13 +354,14 @@ var mountCmd = &cobra.Command{
 
 			// TODO: refer to the getBucketListS3() that mount_all does and getContainerListAzure() and let the restuls determine path.
 
-			containers, err := getContainerListAzure()
-			if len(containers) != 0 && err != nil {
-				pipeline = append(pipeline, "azstorage")
-			}
-			containers, err = getBucketListS3()
+			containers, err := getBucketListS3()
 			if len(containers) != 0 && err != nil {
 				pipeline = append(pipeline, "s3storage")
+			}
+
+			containers, err = getContainerListAzure()
+			if len(containers) != 0 && err != nil {
+				pipeline = append(pipeline, "azstorage")
 			}
 
 			options.Components = pipeline
