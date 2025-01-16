@@ -1161,15 +1161,9 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 
 	flock.Dec()
 
-	// unnecessary but tidy bookkeeping
-	if noCachedHandle {
-		//set boolean in isDownloadNeeded value to signal that the file has been downloaded
-		options.Handle.RemoveValue("openFileOptions")
-		// was this the only handle?
-		if flock.Count() == 0 {
-			// update file state
-			flock.LazyOpen = false
-		}
+	// if this is the last lazy handle, clear the lazy flag
+	if noCachedHandle && flock.Count() == 0 {
+		flock.LazyOpen = false
 	}
 
 	// If it is an fsync op then purge the file
