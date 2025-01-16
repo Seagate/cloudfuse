@@ -137,9 +137,9 @@ var uninstallCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
-		folderList := strings.Split(mountPath, "/")
-		serviceFile := "cloudfuse-" + folderList[len(folderList)-1] + ".service"
+		serviceName := strings.Replace(mountPath, "/", "-", -1)
+		serviceName = strings.TrimPrefix(serviceName, "-")
+		serviceFile := serviceName + ".service"
 		serviceFilePath := "/etc/systemd/system/" + serviceFile
 		if _, err := os.Stat(serviceFilePath); err == nil {
 			removeFileCmd := exec.Command("rm", serviceFilePath)
@@ -194,23 +194,24 @@ WantedBy=multi-user.target
 		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
 	}
 
-	folderList := strings.Split(mountPath, "/")
-	serviceName := "cloudfuse-" + folderList[len(folderList)-1] + ".service"
-	servicePath := "/etc/systemd/system/" + serviceName
+	serviceName := strings.Replace(mountPath, "/", "-", -1)
+	serviceName = strings.TrimPrefix(serviceName, "-")
+	serviceFile := serviceName + ".service"
+	serviceFilePath := "/etc/systemd/system/" + serviceFile
 
 	var newFile *os.File
-	if _, err = os.Stat(servicePath); os.IsNotExist(err) {
-		newFile, err = os.Create(servicePath)
+	if _, err = os.Stat(serviceFilePath); os.IsNotExist(err) {
+		newFile, err = os.Create(serviceFilePath)
 		if err != nil {
 			return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
 		}
 	} else {
-		delServFileCmd := exec.Command("rm", servicePath)
+		delServFileCmd := exec.Command("rm", serviceFilePath)
 		err = delServFileCmd.Run()
 		if err != nil {
 			return "", fmt.Errorf("failed to replace the service file due to the following error: [%s]", err.Error())
 		}
-		newFile, err = os.Create(servicePath)
+		newFile, err = os.Create(serviceFilePath)
 		if err != nil {
 			return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
 		}
