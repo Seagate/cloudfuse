@@ -140,13 +140,9 @@ func (suite *fileCacheTestSuite) cleanupTest() {
 
 	// Delete the temp directories created
 	err = os.RemoveAll(suite.cache_path)
-	if err != nil {
-		fmt.Printf("fileCacheTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
-	}
+	suite.assert.NoError(err)
 	err = os.RemoveAll(suite.fake_storage_path)
-	if err != nil {
-		fmt.Printf("fileCacheTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
-	}
+	suite.assert.NoError(err)
 }
 
 // Tests the default configuration of file cache
