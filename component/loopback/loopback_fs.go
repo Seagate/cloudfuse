@@ -91,6 +91,12 @@ func (lfs *LoopbackFS) Start(ctx context.Context) error {
 	return nil
 }
 
+func (lfs *LoopbackFS) Stop() error {
+	log.Info("Stopping Loopback FS")
+	os.RemoveAll(lfs.path)
+	return nil
+}
+
 func (lfs *LoopbackFS) Priority() internal.ComponentPriority {
 	return internal.EComponentPriority.Consumer()
 }
