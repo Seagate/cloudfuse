@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -26,6 +26,7 @@
 package internal
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -104,7 +105,7 @@ func (s *pipelineTestSuite) TestStartStopCreateNewPipeline() {
 	p, err := NewPipeline([]string{"ComponentA", "ComponentB"}, false)
 	s.assert.NoError(err)
 
-	err = p.Start(nil)
+	err = p.Start(context.TODO())
 	s.assert.NoError(err)
 
 	err = p.Stop()

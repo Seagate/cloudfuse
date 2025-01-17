@@ -1,6 +1,6 @@
 # Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 #
-# Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+# Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -30,12 +30,12 @@ class underConstruction(QWidget, Ui_Form):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.setWindowTitle("Feature Not available Yet")
+        self.setWindowTitle('Feature Not available Yet')
 
         # Close the window when the ok button is clicked
         self.okay_button.clicked.connect(self.close)
-        
+
         # Use a label to pipe in a png picture
         pictureLabel = QLabel(self)
-        pixMap = QPixmap("gui/construction.png")
+        pixMap = QPixmap('gui/construction.png')
         pictureLabel.setPixmap(pixMap)

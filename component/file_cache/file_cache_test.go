@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -149,13 +149,9 @@ func (suite *fileCacheTestSuite) cleanupTest() {
 
 	// Delete the temp directories created
 	err = os.RemoveAll(suite.cache_path)
-	if err != nil {
-		fmt.Printf("fileCacheTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
-	}
+	suite.assert.NoError(err)
 	err = os.RemoveAll(suite.fake_storage_path)
-	if err != nil {
-		fmt.Printf("fileCacheTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
-	}
+	suite.assert.NoError(err)
 }
 
 // Tests the default configuration of file cache
@@ -240,7 +236,6 @@ func (suite *fileCacheTestSuite) TestDefaultCacheSize() {
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		err := cmd.Run()
-		fmt.Println(err)
 		suite.assert.NoError(err)
 		freeDisk, err = strconv.Atoi(strings.TrimSpace(out.String()))
 		suite.assert.NoError(err)
@@ -460,20 +455,17 @@ func (suite *fileCacheTestSuite) TestStreamDirCase3() {
 	file3 := name + "/file3"
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: name, Mode: 0777})
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: subdir, Mode: 0777})
-	// By default createEmptyFile is false, so we will not create these files in storage until they are closed.
+	// Truncate causes these files to be written to fake storage
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file1, Size: 1024})
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file2, Size: 1024})
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, Size: 1024})
-	// Create the files in fake_storage and simulate different sizes
-	handle, _ := suite.nextComponent.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
-	suite.nextComponent.CloseFile(internal.CloseFileOptions{Handle: handle})
-	handle, _ = suite.nextComponent.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
-	suite.nextComponent.CloseFile(internal.CloseFileOptions{Handle: handle})
-	handle, _ = suite.nextComponent.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
-	suite.nextComponent.CloseFile(internal.CloseFileOptions{Handle: handle})
+	// Change the sizes directly in fake storage
+	suite.nextComponent.TruncateFile(internal.TruncateFileOptions{Name: file1}) // Length is default 0
+	suite.nextComponent.TruncateFile(internal.TruncateFileOptions{Name: file2})
+	suite.nextComponent.TruncateFile(internal.TruncateFileOptions{Name: file3})
 
 	// Read the Directory
 	dir, _, err := suite.fileCache.StreamDir(internal.StreamDirOptions{Name: name})
@@ -520,9 +512,8 @@ func (suite *fileCacheTestSuite) TestStreamDirMixed() {
 	// Create the files in fake_storage and simulate different sizes
 	handle, _ := suite.nextComponent.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777}) // Length is default 0
 	suite.nextComponent.CloseFile(internal.CloseFileOptions{Handle: handle})
-	handle, _ = suite.nextComponent.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
-	suite.nextComponent.CloseFile(internal.CloseFileOptions{Handle: handle})
-	handle, _ = suite.nextComponent.CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777})
+	suite.nextComponent.TruncateFile(internal.TruncateFileOptions{Name: file3})
+	handle, _ = suite.nextComponent.CreateFile(internal.CreateFileOptions{Name: file4, Mode: 0777}) // Length is default 0
 	suite.nextComponent.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, Size: 1024})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file4, Size: 0})
@@ -921,9 +912,9 @@ func (suite *fileCacheTestSuite) TestOpenCreateGetAttr() {
 func (suite *fileCacheTestSuite) TestCloseFileAndEvict() {
 	defer suite.cleanupTest()
 	suite.cleanupTest()
-	config := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
+	configuration := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, minimumFileCacheTimeout, suite.fake_storage_path)
-	suite.setupTestHelper(config, false) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+	suite.setupTestHelper(configuration, false)
 
 	path := "file10"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
@@ -977,9 +968,9 @@ func (suite *fileCacheTestSuite) TestOpenPreventsEviction() {
 	defer suite.cleanupTest()
 
 	suite.cleanupTest()
-	config := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
+	configuration := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, minimumFileCacheTimeout, suite.fake_storage_path)
-	suite.setupTestHelper(config, false) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+	suite.setupTestHelper(configuration, false)
 
 	// Setup
 	path := "file12"
@@ -1301,13 +1292,13 @@ func (suite *fileCacheTestSuite) TestRenameFileInCache() {
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, dst))   // Dst does exist
 }
 
-func (suite *fileCacheTestSuite) TestRenameFileAndEvict() {
+func (suite *fileCacheTestSuite) TestRenameFileAndCacheCleanup() {
 	defer suite.cleanupTest()
 
 	suite.cleanupTest()
-	config := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
+	configuration := fmt.Sprintf("file_cache:\n  path: %s\n  timeout-sec: %d\n\nloopbackfs:\n  path: %s",
 		suite.cache_path, minimumFileCacheTimeout, suite.fake_storage_path)
-	suite.setupTestHelper(config, false)
+	suite.setupTestHelper(configuration, false)
 
 	src := "source4"
 	dst := "destination4"
@@ -1348,13 +1339,11 @@ func (suite *fileCacheTestSuite) TestRenameOpenFileCase1() {
 	dst := "destination5"
 
 	// create file in cloud
-	handle, err := suite.nextComponent.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
-	suite.assert.NoError(err)
-	err = suite.nextComponent.CloseFile(internal.CloseFileOptions{Handle: handle})
-	suite.assert.NoError(err)
+	handle, _ := suite.nextComponent.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0777})
+	suite.nextComponent.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// open file for writing
-	handle, err = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Flags: os.O_RDWR, Mode: 0777})
+	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Flags: os.O_RDWR, Mode: 0777})
 	suite.assert.NoError(err)
 	handlemap.Add(handle)
 	// Path should not be in the file cache (lazy open)
@@ -1722,7 +1711,7 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 
 	// Now wait for refresh timeout and we shall get the updated content on next read
 	byteArr = []byte("test data123456")
-	err = os.WriteFile(suite.fake_storage_path+"/"+path, []byte("test data123456"), 0777)
+	err = os.WriteFile(suite.fake_storage_path+"/"+path, byteArr, 0777)
 	suite.assert.NoError(err)
 	time.Sleep(2 * time.Second)
 	handle, err = suite.fileCache.OpenFile(options)

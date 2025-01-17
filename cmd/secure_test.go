@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -218,7 +218,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigDecrypt() {
 	// Config file should be deleted
 	suite.assert.NoFileExists(confFile.Name())
 
-	_, err = executeCommandSecure(rootCmd, "secure", "decrypt", fmt.Sprintf("--config-file=%s", outFile.Name()), "--passphrase=12312312312312312312312312312312", fmt.Sprintf("--output-file=./tmp.yaml"))
+	_, err = executeCommandSecure(rootCmd, "secure", "decrypt", fmt.Sprintf("--config-file=%s", outFile.Name()), "--passphrase=12312312312312312312312312312312", "--output-file=./tmp.yaml")
 	suite.assert.NoError(err)
 
 	data, err := os.ReadFile("./tmp.yaml")

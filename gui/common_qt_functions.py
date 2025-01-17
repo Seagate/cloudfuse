@@ -1,6 +1,6 @@
 # Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 #
-# Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+# Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -145,7 +145,7 @@ class defaultSettingsManager():
             'buffer-size-mb': 0,
             'file-caching': False # false = handle level caching ON
             }
-        
+
         # the block cache component and its settings are not exposed in the GUI
         allMountSettings['block_cache'] = {
             'block-size-mb': 16,
@@ -185,7 +185,7 @@ class defaultSettingsManager():
             'max-files': 5000000,
             'no-cache-dirs': False
             }
-        
+
         allMountSettings['loopbackfs'] = {
             'path': ''
             }
@@ -194,7 +194,7 @@ class defaultSettingsManager():
             'container-allowlist': [],
             'container-denylist': []
             }
-        
+
         allMountSettings['health_monitor'] = {
             'enable-monitoring': False,
             'stats-poll-interval-sec': 10,
@@ -202,7 +202,7 @@ class defaultSettingsManager():
             'output-path':'',
             'monitor-disable-list': []
             }
-        
+
         allMountSettings['logging'] = {
             'type' : 'syslog',
             'level' : 'log_err',
@@ -253,10 +253,10 @@ class customConfigFunctions():
                 # Could not open or config file does not exist, use default settings
                 configs = self.getConfigs(settings,True)
         return configs
-    
+
 
     def getWorkingDir(self):
-        if platform == "win32":
+        if platform == 'win32':
             defaultFuseDir = 'Cloudfuse'
             userDir = os.getenv('APPDATA')
         else:
@@ -273,8 +273,8 @@ class customConfigFunctions():
                 return True
         except:
             msg = QtWidgets.QMessageBox()
-            msg.setWindowTitle("Write Failed")
-            msg.setInformativeText("Writing the config file failed. Check file permissions and try again.")
+            msg.setWindowTitle('Write Failed')
+            msg.setInformativeText('Writing the config file failed. Check file permissions and try again.')
             msg.exec()
             return False
 
@@ -288,13 +288,13 @@ class widgetCustomFunctions(customConfigFunctions,QWidget):
 
     def exitWindowCleanup(self):
     # Save this specific window's size and position
-        self.myWindow.setValue("window size", self.size())
-        self.myWindow.setValue("window position", self.pos())
+        self.myWindow.setValue('window size', self.size())
+        self.myWindow.setValue('window position', self.pos())
 
     def popupDoubleCheckReset(self):
         checkMsg = QtWidgets.QMessageBox()
-        checkMsg.setWindowTitle("Are you sure?")
-        checkMsg.setInformativeText("ResetDefault settings will reset all settings for this target.")
+        checkMsg.setWindowTitle('Are you sure?')
+        checkMsg.setInformativeText('ResetDefault settings will reset all settings for this target.')
         checkMsg.setStandardButtons(QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Yes)
         checkMsg.setDefaultButton(QtWidgets.QMessageBox.Cancel)
         choice = checkMsg.exec()
@@ -305,9 +305,9 @@ class widgetCustomFunctions(customConfigFunctions,QWidget):
     #   when changes have been made
     def closeEvent(self, event):
         msg = QtWidgets.QMessageBox()
-        msg.setWindowTitle("Are you sure?")
-        msg.setInformativeText("Do you want to save you changes?")
-        msg.setText("The settings have been modified.")
+        msg.setWindowTitle('Are you sure?')
+        msg.setInformativeText('Do you want to save you changes?')
+        msg.setText('The settings have been modified.')
         msg.setStandardButtons(QtWidgets.QMessageBox.Discard | QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Save)
         msg.setDefaultButton(QtWidgets.QMessageBox.Cancel)
 
@@ -341,8 +341,8 @@ class widgetCustomFunctions(customConfigFunctions,QWidget):
 
     def initWindowSizePos(self):
         try:
-            self.resize(self.myWindow.value("window size"))
-            self.move(self.myWindow.value("window position"))
+            self.resize(self.myWindow.value('window size'))
+            self.move(self.myWindow.value('window position'))
         except:
             desktopCenter = QScreen.availableGeometry(QtWidgets.QApplication.primaryScreen()).center()
             myWindowGeometry = self.frameGeometry()

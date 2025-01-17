@@ -4,7 +4,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -60,7 +60,7 @@ func createSingleFile(size float32, path string) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return float64(time.Now().Sub(start)), nil
+	return float64(time.Since(start)), nil
 }
 
 func (suite *benchmarkSuite) TestCreateSingleFiles() {

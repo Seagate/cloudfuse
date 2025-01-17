@@ -11,7 +11,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -43,7 +43,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	mrand "math/rand/v2"
 	"os"
@@ -335,7 +334,7 @@ func (suite *blockCacheTestSuite) TestFileOpenClose() {
 	storagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 5*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(storagePath, data, 0777)
+	os.WriteFile(storagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -560,15 +559,16 @@ func (suite *blockCacheTestSuite) TestFileReadBlockCacheTmpPath() {
 
 	tmpPath := tobj.blockCache.tmpPath
 
-	files, err := ioutil.ReadDir(tmpPath)
+	files, err := os.ReadDir(tmpPath)
 	suite.assert.NoError(err)
 
 	var size1048576, size7 bool
 	for _, file := range files {
-		if file.Size() == 1048576 {
+		info, _ := file.Info()
+		if info.Size() == 1048576 {
 			size1048576 = true
 		}
-		if file.Size() == 7 {
+		if info.Size() == 7 {
 			size7 = true
 		}
 	}
@@ -592,7 +592,7 @@ func (suite *blockCacheTestSuite) TestFileReadSerial() {
 	storagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 50*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(storagePath, data, 0777)
+	os.WriteFile(storagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -634,7 +634,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandom() {
 	storagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 100*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(storagePath, data, 0777)
+	os.WriteFile(storagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -675,7 +675,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 	storagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 100*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(storagePath, data, 0777)
+	os.WriteFile(storagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -792,7 +792,7 @@ func (suite *blockCacheTestSuite) TestOpenWithTruncate() {
 	storagePath := filepath.Join(tobj.fake_storage_path, fileName)
 	data := make([]byte, 5*_1MB)
 	_, _ = rand.Read(data)
-	ioutil.WriteFile(storagePath, data, 0777)
+	os.WriteFile(storagePath, data, 0777)
 
 	options := internal.OpenFileOptions{Name: fileName}
 	h, err := tobj.blockCache.OpenFile(options)
@@ -885,7 +885,6 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlock() {
 	suite.assert.NotNil(tobj.blockCache)
 
 	path := getTestFileName(suite.T().Name())
-	storagePath := filepath.Join(tobj.fake_storage_path, path)
 
 	data := make([]byte, 5*_1MB)
 	_, _ = rand.Read(data)
@@ -908,7 +907,7 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlock() {
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 
-	storagePath = filepath.Join(tobj.fake_storage_path, path)
+	storagePath := filepath.Join(tobj.fake_storage_path, path)
 	fs, err := os.Stat(storagePath)
 	suite.assert.NoError(err)
 	suite.assert.Equal(fs.Size(), int64(len(data)))
@@ -924,7 +923,6 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlockWithOverwrite() {
 	suite.assert.NotNil(tobj.blockCache)
 
 	path := getTestFileName(suite.T().Name())
-	storagePath := filepath.Join(tobj.fake_storage_path, path)
 
 	data := make([]byte, 5*_1MB)
 	_, _ = rand.Read(data)
@@ -959,7 +957,7 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlockWithOverwrite() {
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 
-	storagePath = filepath.Join(tobj.fake_storage_path, path)
+	storagePath := filepath.Join(tobj.fake_storage_path, path)
 	fs, err := os.Stat(storagePath)
 	suite.assert.NoError(err)
 	suite.assert.Equal(fs.Size(), int64(len(data)))

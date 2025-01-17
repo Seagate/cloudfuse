@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -339,11 +339,7 @@ func (suite *streamTestSuite) TestFilenameStreamOnly() {
 
 	// open new file
 	handle = &handlemap.Handle{Size: int64(4 * MB), Path: fileNames[1]}
-	getFileBlockOffsetsOptions = internal.GetFileBlockOffsetsOptions{Name: fileNames[0]}
 	openFileOptions = internal.OpenFileOptions{Name: fileNames[1], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
-	bol = &common.BlockOffsetList{
-		BlockList: []*common.Block{{StartIndex: 0, EndIndex: 2 * MB}, {StartIndex: 2, EndIndex: 4 * MB}},
-	}
 
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle, nil)
 	_, _ = suite.stream.OpenFile(openFileOptions)

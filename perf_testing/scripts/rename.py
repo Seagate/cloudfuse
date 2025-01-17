@@ -31,8 +31,8 @@ def rename_files(folder_path):
     return end_time - start_time
 
 # Specify the folder path
-base_folder = "./"
-timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+base_folder = './'
+timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
 folder_path = os.path.join(base_folder, f"test_folder_{timestamp}")
 
 # Specify the number of files
@@ -42,7 +42,7 @@ num_files = 5000
 file_size = 1024 * 1024
 
 # Output file
-output_file = "output.txt"
+output_file = 'output.txt'
 
 # Create unique folder for each run
 create_folder(folder_path)
@@ -58,4 +58,4 @@ rename_time = rename_files(folder_path)
 # Clear the test data
 shutil.rmtree(folder_path)
 
-print(json.dumps({"name": "rename_5000_1MB_files", "rename_time": rename_time, "create_time": create_time, "unit": "seconds"}))
+print(json.dumps({'name': 'rename_5000_1MB_files', 'rename_time': rename_time, 'create_time': create_time, 'unit': 'seconds'}))

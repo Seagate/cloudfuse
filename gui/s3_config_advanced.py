@@ -1,6 +1,6 @@
 # Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 #
-# Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+# Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -33,10 +33,10 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
     def __init__(self,configSettings):
         super().__init__()
         self.setupUi(self)
-        self.myWindow = QSettings("Cloudfuse", "S3AdvancedWindow")
+        self.myWindow = QSettings('Cloudfuse', 'S3AdvancedWindow')
         self.settings = configSettings
         self.initWindowSizePos()
-        self.setWindowTitle("Advanced S3Cloud Config Settings")
+        self.setWindowTitle('Advanced S3Cloud Config Settings')
         self.populateOptions()
         self.saveButtonClicked = False
 
@@ -49,8 +49,8 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
             # Allow anything BUT Nul
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
             self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
-        
-        
+
+
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_resetDefaultSettings.clicked.connect(self.populateOptions)
@@ -59,8 +59,8 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         fileCache = self.settings['file_cache']
         libfuse = self.settings['libfuse']
         s3Storage = self.settings['s3storage']
-        
-        # The index of file_cache_eviction is matched with the default 
+
+        # The index of file_cache_eviction is matched with the default
         #   index values in the ui code, so translate the value from settings to index number
         policyIndex = file_cache_eviction_choices.index(fileCache['policy'])
         self.dropDown_fileCache_evictionPolicy.setCurrentIndex(policyIndex)
@@ -81,19 +81,19 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.spinBox_fileCache_evictMinThresh.setValue(fileCache['low-threshold'])
         self.spinBox_fileCache_refreshSec.setValue(fileCache['refresh-sec'])
         self.spinBox_libfuse_maxFuseThreads.setValue(libfuse['max-fuse-threads'])
-        
+
         self.lineEdit_subdirectory.setText(s3Storage['subdirectory'])
-        
-        if platform == "win32":
-            self.checkBox_libfuse_networkshare.setToolTip("Runs as a network share - may improve performance when latency to cloud is high.")
+
+        if platform == 'win32':
+            self.checkBox_libfuse_networkshare.setToolTip('Runs as a network share - may improve performance when latency to cloud is high.')
         else:
             self.checkBox_libfuse_networkshare.setEnabled(False)
-            self.checkBox_libfuse_networkshare.setToolTip("Network share is only supported on Windows")
+            self.checkBox_libfuse_networkshare.setToolTip('Network share is only supported on Windows')
 
     def updateOptionalS3Storage(self):
         s3Storage = self.settings['s3storage']
         s3Storage['subdirectory'] = self.lineEdit_subdirectory.text()
-        self.settings['s3storage'] = s3Storage 
+        self.settings['s3storage'] = s3Storage
 
     def updateSettingsFromUIChoices(self):
         self.updateOptionalFileCache()
