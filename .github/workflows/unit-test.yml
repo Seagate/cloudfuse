@@ -1,4 +1,6 @@
 name: Unit-Tests
+permissions: {}
+
 on:
   push:
     branches:

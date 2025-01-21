@@ -1,4 +1,6 @@
 name: Release binaries
+permissions: {}
+
 on:
   push:
     tags:

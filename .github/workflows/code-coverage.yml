@@ -1,4 +1,6 @@
 name: Code_Coverage
+permissions: {}
+
 on:
   push:
     branches:

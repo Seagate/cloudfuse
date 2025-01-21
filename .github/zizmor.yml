@@ -1,5 +1,5 @@
 rules:
   template-injection:
     ignore:
-      - publish-release.yml:150
-      - publish-release.yml:162
+      - publish-release.yml:152
+      - publish-release.yml:164
