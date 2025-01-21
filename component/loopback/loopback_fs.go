@@ -91,12 +91,6 @@ func (lfs *LoopbackFS) Start(ctx context.Context) error {
 	return nil
 }
 
-func (lfs *LoopbackFS) Stop() error {
-	log.Info("Stopping Loopback FS")
-	os.RemoveAll(lfs.path)
-	return nil
-}
-
 func (lfs *LoopbackFS) Priority() internal.ComponentPriority {
 	return internal.EComponentPriority.Consumer()
 }
@@ -237,7 +231,15 @@ func (lfs *LoopbackFS) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("LoopbackFS::RenameFile : %s -> %s", options.Src, options.Dst)
 	oldPath := filepath.Join(lfs.path, options.Src)
 	newPath := filepath.Join(lfs.path, options.Dst)
-	return os.Rename(oldPath, newPath)
+	err := os.Rename(oldPath, newPath)
+	handlemap.GetHandles().Range(func(key, value any) bool {
+		handle := value.(*handlemap.Handle)
+		if handle.Path == options.Src {
+			handle.Path = options.Dst
+		}
+		return true
+	})
+	return err
 }
 
 func (lfs *LoopbackFS) ReadLink(options internal.ReadLinkOptions) (string, error) {
