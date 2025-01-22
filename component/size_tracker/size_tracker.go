@@ -2,7 +2,6 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -56,7 +55,7 @@ type SizeTrackerOptions struct {
 
 const compName = "size_tracker"
 const blockSize = int64(4096)
-const default_journal_name = "directory_size.dat"
+const default_journal_name = "mount_size.dat"
 
 // Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &SizeTracker{}
