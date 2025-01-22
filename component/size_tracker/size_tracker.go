@@ -172,10 +172,10 @@ func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
 }
 
 func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error) {
-	var origSize int64
+	var oldSize int64
 	attr, getAttrErr1 := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
 	if getAttrErr1 == nil {
-		origSize = attr.Size
+		oldSize = attr.Size
 	} else {
 		log.Err("SizeTracker::WriteFile : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v", options.Handle.Path, getAttrErr1)
 	}
@@ -197,7 +197,7 @@ func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error)
 		return bytesWritten, nil
 	}
 
-	diff := newSize - origSize
+	diff := newSize - oldSize
 
 	// File already exists and CopyFromFile succeeded subtract difference in file size
 	if diff < 0 {
@@ -222,7 +222,7 @@ func (st *SizeTracker) TruncateFile(options internal.TruncateFileOptions) error 
 	// File already exists and truncate succeeded subtract difference in file size
 	if err == nil && getAttrErr == nil && newSize < 0 {
 		st.mountSize.Subtract(uint64(-newSize))
-	} else if err == nil && attr == nil && newSize >= 0 {
+	} else if err == nil && getAttrErr == nil && newSize >= 0 {
 		st.mountSize.Add(uint64(newSize))
 	}
 

@@ -30,6 +30,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -64,8 +65,12 @@ const MB = 1024 * 1024
 
 func getFakeStoragePath(base string) string {
 	tmp_path := filepath.Join(home_dir, base+randomString(8))
-	_ = os.Mkdir(tmp_path, 0777)
+	_ = os.Mkdir(tmp_path, 0755)
 	return tmp_path
+}
+
+func generateFileName() string {
+	return "file" + randomString(8)
 }
 
 func randomString(length int) string {
@@ -136,10 +141,10 @@ func (suite *sizeTrackerTestSuite) TestDeleteDir() {
 	// Setup
 
 	dir := "dir"
-	path := dir + "/file"
-	err := suite.sizeTracker.CreateDir(internal.CreateDirOptions{Name: dir, Mode: 0777})
+	path := path.Join(dir, generateFileName())
+	err := suite.sizeTracker.CreateDir(internal.CreateDirOptions{Name: dir, Mode: 0755})
 	suite.assert.NoError(err)
-	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
 	suite.assert.NoError(err)
 
 	testData := "test data"
@@ -169,11 +174,11 @@ func (suite *sizeTrackerTestSuite) TestRenameDir() {
 	dst := "dst"
 	testData := "test data"
 	data := []byte(testData)
-	err := suite.sizeTracker.CreateDir(internal.CreateDirOptions{Name: src, Mode: 0777})
+	err := suite.sizeTracker.CreateDir(internal.CreateDirOptions{Name: src, Mode: 0755})
 	suite.assert.NoError(err)
-	path := src + "/file"
+	path := path.Join(src, generateFileName())
 	for i := 0; i < 5; i++ {
-		handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: path + strconv.Itoa(i), Mode: 0777})
+		handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: path + strconv.Itoa(i), Mode: 0644})
 		suite.assert.NoError(err)
 		_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 		suite.assert.NoError(err)
@@ -192,7 +197,7 @@ func (suite *sizeTrackerTestSuite) TestRenameDir() {
 func (suite *sizeTrackerTestSuite) TestCreateFile() {
 	defer suite.cleanupTest()
 	// Default is to not create empty files on create file to support immutable storage.
-	path := "file4"
+	path := generateFileName()
 	options := internal.CreateFileOptions{Name: path}
 	_, err := suite.sizeTracker.CreateFile(options)
 	suite.assert.NoError(err)
@@ -204,9 +209,9 @@ func (suite *sizeTrackerTestSuite) TestCreateFile() {
 
 func (suite *sizeTrackerTestSuite) TestDeleteFile() {
 	defer suite.cleanupTest()
-	path := "file4"
+	path := generateFileName()
 
-	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
 	suite.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
@@ -224,7 +229,7 @@ func (suite *sizeTrackerTestSuite) TestDeleteFile() {
 
 func (suite *sizeTrackerTestSuite) TestDeleteFileError() {
 	defer suite.cleanupTest()
-	path := "file6"
+	path := generateFileName()
 	err := suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: path})
 	suite.assert.Error(err)
 	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
@@ -233,8 +238,8 @@ func (suite *sizeTrackerTestSuite) TestDeleteFileError() {
 func (suite *sizeTrackerTestSuite) TestWriteFile() {
 	defer suite.cleanupTest()
 	// Setup
-	file := "file19"
-	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	file := generateFileName()
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
 	suite.assert.NoError(err)
 
 	testData := "test data"
@@ -244,10 +249,43 @@ func (suite *sizeTrackerTestSuite) TestWriteFile() {
 	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
 }
 
+func (suite *sizeTrackerTestSuite) TestWriteFileMultiple() {
+	defer suite.cleanupTest()
+	// Setup
+	file := generateFileName()
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
+	suite.assert.NoError(err)
+
+	data := make([]byte, 1024*1024)
+	_, _ = rand.Read(data)
+	_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
+
+	_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: int64(len(data)), Data: data})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(2*len(data), suite.sizeTracker.mountSize.GetSize())
+
+	_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 512, Data: data})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(2*len(data), suite.sizeTracker.mountSize.GetSize())
+
+	_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 2*int64(len(data)) + 512, Data: data})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(3*len(data)+512, suite.sizeTracker.mountSize.GetSize())
+
+	_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 3 * int64(len(data)), Data: data})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(4*len(data), int(suite.sizeTracker.mountSize.GetSize()))
+
+	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: file})
+	suite.assert.NoError(err)
+}
+
 func (suite *sizeTrackerTestSuite) TestWriteFileErrorBadFd() {
 	defer suite.cleanupTest()
 	// Setup
-	file := "file20"
+	file := generateFileName()
 	handle := handlemap.NewHandle(file)
 	length, err := suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle})
 	suite.assert.Error(err)
@@ -258,8 +296,8 @@ func (suite *sizeTrackerTestSuite) TestWriteFileErrorBadFd() {
 func (suite *sizeTrackerTestSuite) TestFlushFileEmpty() {
 	defer suite.cleanupTest()
 	// Setup
-	file := "file21"
-	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	file := generateFileName()
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
 	suite.assert.NoError(err)
 
 	// Flush the Empty File
@@ -274,8 +312,8 @@ func (suite *sizeTrackerTestSuite) TestFlushFileEmpty() {
 func (suite *sizeTrackerTestSuite) TestFlushFile() {
 	defer suite.cleanupTest()
 	// Setup
-	file := "file22"
-	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	file := generateFileName()
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
 	suite.assert.NoError(err)
 	testData := "test data"
 	data := []byte(testData)
@@ -293,7 +331,7 @@ func (suite *sizeTrackerTestSuite) TestFlushFile() {
 func (suite *sizeTrackerTestSuite) TestFlushFileErrorBadFd() {
 	defer suite.cleanupTest()
 	// Setup
-	file := "file23"
+	file := generateFileName()
 	handle := handlemap.NewHandle(file)
 	handle.Flags.Set(handlemap.HandleFlagDirty)
 	err := suite.sizeTracker.FlushFile(internal.FlushFileOptions{Handle: handle})
@@ -304,9 +342,9 @@ func (suite *sizeTrackerTestSuite) TestFlushFileErrorBadFd() {
 func (suite *sizeTrackerTestSuite) TestRenameFile() {
 	defer suite.cleanupTest()
 	// Setup
-	src := "source2"
-	dst := "destination2"
-	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
+	src := "src1"
+	dst := "dst1"
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0644})
 	suite.assert.NoError(err)
 
 	testData := "test data"
@@ -327,15 +365,11 @@ func (suite *sizeTrackerTestSuite) TestRenameFile() {
 func (suite *sizeTrackerTestSuite) TestRenameOpenFile() {
 	defer suite.cleanupTest()
 
-	src := "source6"
-	dst := "destination6"
+	src := "src2"
+	dst := "dst2"
 
 	// create source file
-	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
-	suite.assert.NoError(err)
-
-	// rename open file
-	err = suite.sizeTracker.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0644})
 	suite.assert.NoError(err)
 
 	// write to file handle
@@ -344,47 +378,128 @@ func (suite *sizeTrackerTestSuite) TestRenameOpenFile() {
 	suite.assert.NoError(err)
 	suite.assert.Equal(len(data), n)
 
+	// rename open file
+	err = suite.sizeTracker.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+	suite.assert.NoError(err)
+
 	// Close file handle
 	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 	fmt.Println(suite.sizeTracker.mountSize.GetSize())
 
 	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
+
+	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: dst})
+	suite.assert.NoError(err)
+}
+
+func (suite *sizeTrackerTestSuite) TestRenameWriteFile() {
+	defer suite.cleanupTest()
+
+	src := "src3"
+	dst := "dst3"
+
+	// create source file
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0644})
+	suite.assert.NoError(err)
+
+	// write to file handle
+	data := []byte("newdata")
+	n, err := suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data, Offset: 0})
+	suite.assert.NoError(err)
+	suite.assert.Equal(len(data), n)
+	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
+
+	// rename open file
+	err = suite.sizeTracker.RenameFile(internal.RenameFileOptions{Src: src, Dst: dst})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
+
+	// write to file handle
+	n, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data, Offset: int64(len(data))})
+	suite.assert.NoError(err)
+	suite.assert.Equal(len(data), n)
+
+	err = suite.sizeTracker.FlushFile(internal.FlushFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	// Close file handle
+	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+	fmt.Println(suite.sizeTracker.mountSize.GetSize())
+
+	suite.assert.EqualValues(2*len(data), suite.sizeTracker.mountSize.GetSize())
+
+	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: dst})
+	suite.assert.NoError(err)
 }
 
 func (suite *sizeTrackerTestSuite) TestTruncateFile() {
 	defer suite.cleanupTest()
 	// Setup
-	path := "file30"
-	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	path := generateFileName()
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.assert.NoError(err)
+	err = suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
 
 	size := 1024
-	err := suite.sizeTracker.TruncateFile(internal.TruncateFileOptions{Name: path, Size: int64(size)})
+	err = suite.sizeTracker.TruncateFile(internal.TruncateFileOptions{Name: path, Size: int64(size)})
 	suite.assert.NoError(err)
 
 	suite.assert.EqualValues(size, suite.sizeTracker.mountSize.GetSize())
+
+	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: path})
+	suite.assert.NoError(err)
+}
+
+func (suite *sizeTrackerTestSuite) TestTruncateFileOpen() {
+	defer suite.cleanupTest()
+	// Setup
+	path := generateFileName()
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.assert.NoError(err)
+
+	size := 1024
+	err = suite.sizeTracker.TruncateFile(internal.TruncateFileOptions{Name: path, Size: int64(size)})
+	suite.assert.NoError(err)
+
+	suite.assert.EqualValues(size, suite.sizeTracker.mountSize.GetSize())
+
+	err = suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: path})
+	suite.assert.NoError(err)
 }
 
 func (suite *sizeTrackerTestSuite) TestStatFS() {
 	defer suite.cleanupTest()
 
-	file := "file41"
-	handle, _ := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	file := generateFileName()
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
+	suite.assert.NoError(err)
 	data := make([]byte, 1024*1024)
-	_, err := suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	_, _ = rand.Read(data)
+	_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.assert.NoError(err)
 	err = suite.sizeTracker.FlushFile(internal.FlushFileOptions{Handle: handle})
 	suite.assert.NoError(err)
+	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
 	stat, ret, err := suite.sizeTracker.StatFs()
 	suite.assert.True(ret)
 	suite.assert.NoError(err)
 	suite.assert.NotEqual(&common.Statfs_t{}, stat)
 
-	suite.assert.Equal(uint64(512), stat.Blocks)
+	suite.assert.Equal(uint64(len(data)/4096), stat.Blocks)
 	suite.assert.Equal(int64(4096), stat.Bsize)
 	suite.assert.Equal(int64(4096), stat.Frsize)
 	suite.assert.Equal(uint64(255), stat.Namemax)
+
+	err = suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: file})
+	suite.assert.NoError(err)
 }
 
 // In order for 'go test' to run this suite, we need to create

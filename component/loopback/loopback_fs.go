@@ -182,6 +182,7 @@ func (lfs *LoopbackFS) CreateFile(options internal.CreateFileOptions) (*handlema
 	}
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetFileObject(f)
+	handlemap.Add(handle)
 
 	return handle, nil
 }
@@ -212,6 +213,7 @@ func (lfs *LoopbackFS) OpenFile(options internal.OpenFileOptions) (*handlemap.Ha
 	}
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetFileObject(f)
+	handlemap.Add(handle)
 	return handle, nil
 }
 
@@ -224,6 +226,7 @@ func (lfs *LoopbackFS) CloseFile(options internal.CloseFileOptions) error {
 		return syscall.EBADF
 	}
 
+	handlemap.Delete(options.Handle.ID)
 	return f.Close()
 }
 
@@ -274,10 +277,6 @@ func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, 
 	options.Handle.RLock()
 	defer options.Handle.RUnlock()
 
-	if f == nil {
-		log.Err("LoopbackFS::ReadInBuffer : error [invalid file object]")
-		return 0, os.ErrInvalid
-	}
 	return f.ReadAt(options.Data, options.Offset)
 }
 
