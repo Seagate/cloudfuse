@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -48,7 +48,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/aws/smithy-go"
 )
 
 const symlinkStr = ".rclonelink"
@@ -220,25 +219,11 @@ func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, er
 }
 
 // Wrapper for awsS3Client.HeadBucket
-func (cl *Client) headBucket() (bool, error) {
-	_, err := cl.awsS3Client.HeadBucket(context.Background(), &s3.HeadBucketInput{
+func (cl *Client) headBucket() (*s3.HeadBucketOutput, error) {
+	headBucketOutput, err := cl.awsS3Client.HeadBucket(context.Background(), &s3.HeadBucketInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 	})
-	exists := true
-	if err != nil {
-		var apiError smithy.APIError
-		if errors.As(err, &apiError) {
-			switch apiError.(type) {
-			case *types.NotFound:
-				log.Err("Client::headBucket : Bucket %s does not exist: ", err.Error())
-				exists = false
-			default:
-				log.Err("Client::headBucket : Bucket %s exists but you do not have access to bucket or other error occurred : ", err.Error())
-			}
-		}
-	}
-
-	return exists, err
+	return headBucketOutput, parseS3Err(err, "HeadBucket "+cl.Config.authConfig.BucketName)
 }
 
 // Wrapper for awsS3Client.CopyObject

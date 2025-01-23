@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -56,7 +56,7 @@ type containerListingOptions struct {
 var mountAllOpts containerListingOptions
 
 var mountAllCmd = &cobra.Command{
-	Use:               "all [path] <flags>",
+	Use:               "all <mount path>",
 	Short:             "Mounts all containers for a given cloud account as a filesystem",
 	Long:              "Mounts all containers for a given cloud account as a filesystem",
 	SuggestFor:        []string{"mnta", "mout"},

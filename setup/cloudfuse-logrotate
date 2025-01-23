@@ -1,4 +1,4 @@
-/var/log/cloudfuse.log 
+/var/log/cloudfuse.log
 /var/log/cfusemon.log
 /var/log/cloudfuse-rest.log {
     rotate 10
@@ -14,4 +14,3 @@
 		systemctl kill -s HUP rsyslog.service
 	endscript
 }
-

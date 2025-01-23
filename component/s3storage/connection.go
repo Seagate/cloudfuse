@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -52,6 +52,7 @@ type Config struct {
 	checksumAlgorithm         types.ChecksumAlgorithm
 	usePathStyle              bool
 	disableSymlink            bool
+	disableUsage              bool
 }
 
 // TODO: move s3AuthConfig to s3auth.go
@@ -112,4 +113,5 @@ type S3Connection interface {
 	StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 	NewCredentialKey(_, _ string) error
+	GetUsedSize() (uint64, error)
 }

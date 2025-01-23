@@ -100,9 +100,9 @@ iterate_fio_files() {
   for job_file in "${jobs_dir}"/*.fio; do
     job_name=$(basename "${job_file}")
     job_name="${job_name%.*}"
-    
+
     mount_blobfuse
-    
+
     execute_test $job_file
 
     blobfuse2 unmount all
@@ -138,7 +138,7 @@ list_files() {
 
   # ------------------------------
   # Measure time taken to delete these files
-  cat ${work_dir}/lst.out | wc -l  
+  cat ${work_dir}/lst.out | wc -l
   cat ${work_dir}/lst.out | rev | cut -d " " -f 1 | rev | tail +2  > ${work_dir}/lst.out1
 
   cd ${mount_dir}
@@ -146,14 +146,14 @@ list_files() {
   cd -
   cat ${work_dir}/del.txt
 
-  # Extract Deletion time 
+  # Extract Deletion time
   del_time=`cat del.txt | grep "Elapsed" | rev | cut -d " " -f 1 | rev`
   echo $del_time
 
   IFS=':'; time_fragments=($del_time); unset IFS;
   del_min=`printf '%5.5f' ${time_fragments[0]}`
   del_sec=`printf '%5.5f' ${time_fragments[1]}`
-  
+
   avg_del_time=`printf %5.5f $(echo "scale = 10; ($del_min * 60) + $del_sec" | bc)`
 
   # Unmount and cleanup now
@@ -179,7 +179,7 @@ read_write_using_app() {
 
   # Run the python script to write files
   echo `date` ' : Starting write tests'
-  for i in {1,10,40,100} 
+  for i in {1,10,40,100}
   do
     echo `date` " : Write test for ${i} GB file"
     python3 ./perf_testing/scripts/write.py ${mount_dir} ${i} > ${output}/app_write_${i}.json
@@ -196,7 +196,7 @@ read_write_using_app() {
 
   # Run the python script to read files
   echo `date` ' : Starting read tests'
-  for i in {1,10,40,100} 
+  for i in {1,10,40,100}
   do
     echo `date` " : Read test for ${i} GB file"
     python3 ./perf_testing/scripts/read.py ${mount_dir} ${i} > ${output}/app_read_${i}.json
@@ -211,7 +211,7 @@ read_write_using_app() {
 
   # Local SSD Writing just for comparison
   # echo `date` ' : Starting Local write tests'
-  # for i in {1,10,40,100} 
+  # for i in {1,10,40,100}
   # do
   #   echo `date` ' : Write test for ${i} GB file'
   #   python3 ./perf_testing/scripts/write.py ${mount_dir} ${i} > ${output}/app_local_write_${i}.json
@@ -220,14 +220,14 @@ read_write_using_app() {
 
 
   # ----- HighSpeed tests -----------
-  # Mount blobfuse 
+  # Mount blobfuse
   mount_blobfuse
   rm -rf ${mount_dir}/20GFile*
 
   # Run the python script to read files
   echo `date` ' : Starting highspeed tests'
   python3 ./perf_testing/scripts/highspeed_create.py ${mount_dir} 10 > ${output}/highspeed_app_write.json
-  
+
   blobfuse2 unmount all
   sleep 3
   mount_blobfuse
@@ -284,26 +284,26 @@ prepare_system
 
 # --------------------------------------------------------------------------------------------------
 executed=1
-if [[ ${test_name} == "write" ]] 
+if [[ ${test_name} == "write" ]]
 then
   # Execute write benchmark using fio
   echo "Running Write test cases"
   cache_path="--block-cache-path=/mnt/tempcache"
-  iterate_fio_files "./perf_testing/config/write" 
-  
-elif [[ ${test_name} == "read" ]] 
+  iterate_fio_files "./perf_testing/config/write"
+
+elif [[ ${test_name} == "read" ]]
 then
   # Execute read benchmark using fio
   echo "Running Read test cases"
-  iterate_fio_files "./perf_testing/config/read" 
-elif [[ ${test_name} == "highlyparallel" ]] 
+  iterate_fio_files "./perf_testing/config/read"
+elif [[ ${test_name} == "highlyparallel" ]]
 then
   # Execute multi-threaded benchmark using fio
   echo "Running Highly Parallel test cases"
   cache_path="--block-cache-path=/mnt/tempcache"
   iterate_fio_files "./perf_testing/config/high_threads"
-elif [[ ${test_name} == "create" ]] 
-then  
+elif [[ ${test_name} == "create" ]]
+then
   # Set log type to silent as this is going to generate a lot of logs
   log_type="silent"
   iterations=1
@@ -312,28 +312,28 @@ then
   mount_blobfuse
   echo "Deleting old data"
   cd ${mount_dir}
-  find . -name "create_1000_files_in_10_threads*" -delete  
-  find . -name "create_1000_files_in_100_threads*" -delete  
-  find . -name "create_1l_files_in_20_threads*" -delete  
+  find . -name "create_1000_files_in_10_threads*" -delete
+  find . -name "create_1000_files_in_100_threads*" -delete
+  find . -name "create_1l_files_in_20_threads*" -delete
   cd -
   ./blobfuse2 unmount all
 
   # Execute file create tests
   echo "Running Create test cases"
-  iterate_fio_files "./perf_testing/config/create" 
-elif [[ ${test_name} == "list" ]] 
-then 
+  iterate_fio_files "./perf_testing/config/create"
+elif [[ ${test_name} == "list" ]]
+then
   # Set log type to silent as this is going to generate a lot of logs
   log_type="silent"
-  
+
   # Execute file listing tests
   echo "Running File listing test cases"
-  list_files 
-  
+  list_files
+
   # No need to generate bandwidth or latecy related reports in this case
-  executed=0 
-elif [[ ${test_name} == "app" ]] 
-then  
+  executed=0
+elif [[ ${test_name} == "app" ]]
+then
   # App based read/write tests being executed
   # This is done using a python script which read/write in sequential order
   echo "Running App based tests"
@@ -341,24 +341,24 @@ then
 
   # No need to generate bandwidth or latecy related reports in this case
   executed=0
-elif [[ ${test_name} == "rename" ]] 
-then 
+elif [[ ${test_name} == "rename" ]]
+then
   # Set log type to silent as this is going to generate a lot of logs
   log_type="silent"
 
   # Execute rename tests
   echo "Running File rename test cases"
   rename_files
-  
+
   # No need to generate bandwidth or latecy related reports in this case
-  executed=0 
+  executed=0
 else
-  executed=0  
+  executed=0
   echo "Invalid argument. Please provide either 'read', 'write', 'multi' or 'create' as argument"
 fi
 
 # --------------------------------------------------------------------------------------------------
-if [[ $executed -eq 1 ]] 
+if [[ $executed -eq 1 ]]
 then
   # Merge all results and generate a json summary for bandwidth
   jq -n '[inputs]' ${output}/*_bandwidth_summary.json | tee ./${output}/bandwidth_results.json
