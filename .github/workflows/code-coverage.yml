@@ -225,7 +225,7 @@ jobs:
           sleep 10
           ps -aux | grep cloudfuse
           cd test/e2e_tests
-          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -size-tracker=true
+          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
           cd -
           sudo fusermount -u ${{ env.MOUNT_DIR }}
           sleep 5
@@ -257,9 +257,9 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+          AWS_REGION: "${{ secrets.S3TEST_REGION }}"
           S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
           S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
-          S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
 
       - name: Create Config File - S3 with Size Tracker
         env:
