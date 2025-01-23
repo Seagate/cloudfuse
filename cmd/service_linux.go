@@ -81,17 +81,14 @@ var installCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
 		mountExists := common.DirectoryExists(mountPath)
 		if !mountExists {
 			return fmt.Errorf("the mount path provided does not exist")
 		}
-
 		_, err = os.Stat(configPath)
 		if errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("error, the configfile path provided does not exist")
 		}
-
 		//create the new user and set permissions
 		err = setUser(serviceUser, mountPath, configPath)
 		if err != nil {
@@ -103,14 +100,12 @@ var installCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("error when attempting to create service file: [%s]", err.Error())
 		}
-
 		// run systemctl daemon-reload
 		systemctlDaemonReloadCmd := exec.Command("systemctl", "daemon-reload")
 		err = systemctlDaemonReloadCmd.Run()
 		if err != nil {
 			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
 		}
-
 		// Enable the service to start at system boot
 		systemctlEnableCmd := exec.Command("systemctl", "enable", serviceName)
 		err = systemctlEnableCmd.Run()
@@ -130,7 +125,6 @@ var uninstallCmd = &cobra.Command{
 	Example:           "cloudfuse service uninstall --mount-path=<path/to/mount/path>",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
 		// get absolute path of provided relative mount path
 		var err error
 		mountPath, err = getAbsPath(mountPath)
@@ -147,7 +141,6 @@ var uninstallCmd = &cobra.Command{
 		} else if os.IsNotExist(err) {
 			return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system due to following error: [%s]", err.Error())
 		}
-
 		// reload daemon
 		systemctlDaemonReloadCmd := exec.Command("systemctl", "daemon-reload")
 		err = systemctlDaemonReloadCmd.Run()
@@ -179,7 +172,6 @@ ExecStop=/usr/bin/fusermount -u {{.MountPath}} -z
 [Install]
 WantedBy=multi-user.target
 `
-
 	config := serviceOptions{
 		ConfigFile:  configPath,
 		MountPath:   mountPath,
@@ -190,9 +182,7 @@ WantedBy=multi-user.target
 	if err != nil {
 		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
 	}
-
 	serviceName, serviceFilePath := getService(mountPath)
-
 	err = os.Remove(serviceFilePath)
 	if err != nil && !os.IsNotExist(err) {
 		return "", fmt.Errorf("failed to replace the service file due to the following error: [%s]", err.Error())
@@ -208,7 +198,6 @@ WantedBy=multi-user.target
 	if err != nil {
 		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
 	}
-
 	return serviceName, nil
 }
 
@@ -227,7 +216,6 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 	}
 	// advise on required permissions
 	fmt.Println("ensure the user, " + serviceUser + ", has the following access: \n" + mountPath + ": read, write, and execute \n" + configPath + ": read \n")
-
 	return nil
 }
 
