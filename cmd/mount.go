@@ -165,7 +165,7 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 
 	if err != nil && os.IsNotExist(err) {
 		// create the default work dir
-		if err = os.MkdirAll(common.ExpandPath(common.DefaultWorkDir), 0777); err != nil {
+		if err = os.MkdirAll(common.ExpandPath(common.DefaultWorkDir), 0755); err != nil {
 			return fmt.Errorf("failed to create default work dir [%s]", err.Error())
 		}
 	}
@@ -537,8 +537,8 @@ var mountCmd = &cobra.Command{
 			pid := os.Getpid()
 			fname := fmt.Sprintf("/tmp/cloudfuse.%v", pid)
 
-			ctx, _ := context.WithCancel(context.Background()) //nolint
-			err = createDaemon(pipeline, ctx, pidFileName, 0644, 027, fname)
+			ctx := context.Background()
+			err = createDaemon(pipeline, ctx, pidFileName, 0644, 022, fname)
 			if err != nil {
 				return fmt.Errorf("mount: failed to create daemon [%v]", err.Error())
 			}

@@ -11,4 +11,3 @@ group_reporting
 [create_1000_files_in_10_threads]
 numjobs=10
 rw=write
-

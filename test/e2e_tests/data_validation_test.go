@@ -182,13 +182,6 @@ func writeSparseData(suite *dataValidationTestSuite, fh *os.File, offsets []int6
 	}
 }
 
-func min(x, y int) int {
-	if x < y {
-		return x
-	}
-	return y
-}
-
 // Creates the file with filePath and puts random data of size bytes
 func generateFileWithRandomData(suite *dataValidationTestSuite, filePath string, size int) {
 	fh, err := os.Create(filePath)

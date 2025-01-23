@@ -256,7 +256,7 @@ class customConfigFunctions():
 
 
     def getWorkingDir(self):
-        if platform == "win32":
+        if platform == 'win32':
             defaultFuseDir = 'Cloudfuse'
             userDir = os.getenv('APPDATA')
         else:
@@ -273,8 +273,8 @@ class customConfigFunctions():
                 return True
         except:
             msg = QtWidgets.QMessageBox()
-            msg.setWindowTitle("Write Failed")
-            msg.setInformativeText("Writing the config file failed. Check file permissions and try again.")
+            msg.setWindowTitle('Write Failed')
+            msg.setInformativeText('Writing the config file failed. Check file permissions and try again.')
             msg.exec()
             return False
 
@@ -288,13 +288,13 @@ class widgetCustomFunctions(customConfigFunctions,QWidget):
 
     def exitWindowCleanup(self):
     # Save this specific window's size and position
-        self.myWindow.setValue("window size", self.size())
-        self.myWindow.setValue("window position", self.pos())
+        self.myWindow.setValue('window size', self.size())
+        self.myWindow.setValue('window position', self.pos())
 
     def popupDoubleCheckReset(self):
         checkMsg = QtWidgets.QMessageBox()
-        checkMsg.setWindowTitle("Are you sure?")
-        checkMsg.setInformativeText("ResetDefault settings will reset all settings for this target.")
+        checkMsg.setWindowTitle('Are you sure?')
+        checkMsg.setInformativeText('ResetDefault settings will reset all settings for this target.')
         checkMsg.setStandardButtons(QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Yes)
         checkMsg.setDefaultButton(QtWidgets.QMessageBox.Cancel)
         choice = checkMsg.exec()
@@ -305,9 +305,9 @@ class widgetCustomFunctions(customConfigFunctions,QWidget):
     #   when changes have been made
     def closeEvent(self, event):
         msg = QtWidgets.QMessageBox()
-        msg.setWindowTitle("Are you sure?")
-        msg.setInformativeText("Do you want to save you changes?")
-        msg.setText("The settings have been modified.")
+        msg.setWindowTitle('Are you sure?')
+        msg.setInformativeText('Do you want to save you changes?')
+        msg.setText('The settings have been modified.')
         msg.setStandardButtons(QtWidgets.QMessageBox.Discard | QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Save)
         msg.setDefaultButton(QtWidgets.QMessageBox.Cancel)
 
@@ -341,8 +341,8 @@ class widgetCustomFunctions(customConfigFunctions,QWidget):
 
     def initWindowSizePos(self):
         try:
-            self.resize(self.myWindow.value("window size"))
-            self.move(self.myWindow.value("window position"))
+            self.resize(self.myWindow.value('window size'))
+            self.move(self.myWindow.value('window position'))
         except:
             desktopCenter = QScreen.availableGeometry(QtWidgets.QApplication.primaryScreen()).center()
             myWindowGeometry = self.frameGeometry()

@@ -76,6 +76,7 @@ func (suite *cachePolicyTestSuite) TestGetUsageSizeOnDisk() {
 	f, _ := os.Create(cache_path + "/test")
 	data := make([]byte, 4097)
 	f.Write(data)
+	f.Close()
 	result, err := common.GetUsage(cache_path)
 	suite.assert.NoError(err)
 

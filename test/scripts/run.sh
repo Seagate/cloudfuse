@@ -51,7 +51,7 @@ count=0
 sed_line=3
 
 while IFS=\| read -r casenum case v2write v2read v1write v1read; do
-	# Swapping order of blobfuse and cloudfuse so that cloudfuse taking less time reflects it being better than blobfuse. 
+	# Swapping order of blobfuse and cloudfuse so that cloudfuse taking less time reflects it being better than blobfuse.
 	writeDiff=$(( $v1write - $v2write ))
 	readDiff=$(( $v1read - $v2read ))
 
@@ -69,7 +69,7 @@ tail -n +3 $outputPath > temp.out
 totalWriteImprove=`cut -d "|" -f 7 temp.out | sed -e 's/ //g' | paste -sd+ | bc`
 totalReadImprove=`cut -d "|" -f 8 temp.out | sed -e 's/ //g' | paste -sd+ | bc`
 
-echo "| $count Test Case Average Improvement | -- | -- | -- | -- | `echo "scale=2; $totalWriteImprove / $count" | bc` | `echo "scale=2; $totalReadImprove / $count" | bc` |" >> $outputPath 
+echo "| $count Test Case Average Improvement | -- | -- | -- | -- | `echo "scale=2; $totalWriteImprove / $count" | bc` | `echo "scale=2; $totalReadImprove / $count" | bc` |" >> $outputPath
 rm -rf temp.out
 
 # Run v2 with block cache

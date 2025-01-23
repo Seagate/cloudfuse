@@ -569,7 +569,7 @@ func (bb *BlockBlob) List(prefix string, marker *string, count int32) ([]*intern
 	var dirList = make(map[string]bool)
 	for _, blobInfo := range listBlob.Segment.BlobItems {
 		blobInfo.Name = bb.getFileName(*blobInfo.Name)
-		attr := &internal.ObjAttr{}
+		var attr *internal.ObjAttr
 		if blobInfo.Properties.CustomerProvidedKeySHA256 != nil && *blobInfo.Properties.CustomerProvidedKeySHA256 != "" {
 			log.Trace("BlockBlob::List : blob is encrypted with customer provided key so fetching metadata explicitly using REST")
 			attr, err = bb.getAttrUsingRest(*blobInfo.Name)
