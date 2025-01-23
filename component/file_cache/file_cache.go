@@ -457,12 +457,9 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 		if err == nil || errors.Is(err, os.ErrExist) {
 			// creating the directory in cloud either worked, or it already exists
 			// make sure the directory exists in local cache
-			flock := fc.fileLocks.Get(options.Name)
-			flock.Lock()
-			defer flock.Unlock()
 			mkdirErr := os.MkdirAll(localPath, options.Mode.Perm())
 			if mkdirErr != nil {
-				log.Err("FileCache::CreateDir : %s failed to create local directory [%v]", localPath, mkdirErr)
+				log.Err("FileCache::CreateDir : %s failed to create local directory. Here's why: %v", localPath, mkdirErr)
 			}
 		}
 		return err
@@ -476,7 +473,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 		// if we have no information, just return the error
 		if errors.Is(err, &common.NoCachedDataError{}) {
 			// no ops are allowed when the directory's cloud state is unknown
-			log.Err("FileCache::CreateDir :  Failed to get attr of %s [%s]", options.Name, err.Error())
+			log.Err("FileCache::CreateDir : %s GetAttr failed. We are offline and we have no attribute data for this path.", options.Name)
 			return err
 		}
 		// we have valid information - clean up the error
@@ -503,7 +500,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 		return os.ErrExist
 	} else { // we are online, but GetAttr failed for some other reason
 		// report and return the error
-		log.Err("FileCache::CreateDir : %s failed to get attr [%s]", options.Name, err.Error())
+		log.Err("FileCache::CreateDir : %s GetAttr failed. Here's why: %v", options.Name, err)
 		return err
 	}
 }
