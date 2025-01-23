@@ -253,7 +253,7 @@ func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, 
 	f := options.Handle.GetFileObject()
 
 	if f == nil {
-		f1, err := os.OpenFile(filepath.Join(lfs.path, options.Handle.Path), os.O_RDONLY, 0666)
+		f1, err := os.Open(filepath.Join(lfs.path, options.Handle.Path))
 		if err != nil {
 			return 0, nil
 		}
@@ -354,7 +354,7 @@ func (lfs *LoopbackFS) GetAttr(options internal.GetAttrOptions) (*internal.ObjAt
 	info, err := os.Lstat(path)
 	if err != nil {
 		log.Err("LoopbackFS::GetAttr : error [%s]", err)
-		return &internal.ObjAttr{}, err
+		return nil, err
 	}
 	attr := &internal.ObjAttr{
 		Path:  options.Name,
@@ -397,7 +397,7 @@ func (lfs *LoopbackFS) Chown(options internal.ChownOptions) error {
 func (lfs *LoopbackFS) StageData(options internal.StageDataOptions) error {
 	log.Trace("LoopbackFS::StageData : name=%s, id=%s", options.Name, options.Id)
 	path := fmt.Sprintf("%s_%s", filepath.Join(lfs.path, options.Name), strings.ReplaceAll(options.Id, "/", "_"))
-	return os.WriteFile(path, options.Data, 0777)
+	return os.WriteFile(path, options.Data, 0644)
 }
 
 func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
@@ -405,7 +405,7 @@ func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
 
 	mainFilepath := filepath.Join(lfs.path, options.Name)
 
-	blob, err := os.OpenFile(mainFilepath, os.O_RDWR|os.O_CREATE, os.FileMode(0777))
+	blob, err := os.OpenFile(mainFilepath, os.O_RDWR|os.O_CREATE, os.FileMode(0644))
 	if err != nil {
 		log.Err("LoopbackFS::CommitData : error opening [%s]", err)
 		return err
@@ -415,7 +415,7 @@ func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
 		path := fmt.Sprintf("%s_%s", filepath.Join(lfs.path, options.Name), strings.ReplaceAll(id, "/", "_"))
 		info, err := os.Lstat(path)
 		if err == nil {
-			block, err := os.OpenFile(path, os.O_RDONLY, os.FileMode(0666))
+			block, err := os.Open(path)
 			if err != nil {
 				return err
 			}

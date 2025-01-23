@@ -1,5 +1,5 @@
 # Create container based on Ubuntu-22.04 Jammy Jellyfish image
-FROM --platform=linux/arm64 mcr.microsoft.com/mirror/docker/library/ubuntu:22.04 
+FROM --platform=linux/arm64 mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
 
 # Create directory to hold samples
 RUN mkdir -p /usr/share/cloudfuse
@@ -37,10 +37,7 @@ RUN \
 	chmod 777 /usr/share/cloudfuse/cloudfuse-mount.sh && \
 	chmod 777 /usr/share/cloudfuse/cloudfuse-umount.sh && \
 	ln -s  /usr/share/cloudfuse/cloudfuse-mount.sh /usr/local/bin/fuse && \
-	ln -s  /usr/share/cloudfuse/cloudfuse-umount.sh /usr/local/bin/unfuse 
+	ln -s  /usr/share/cloudfuse/cloudfuse-umount.sh /usr/local/bin/unfuse
 
 
 ENTRYPOINT ["bash", "fuse"]
-
-
-

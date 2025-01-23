@@ -29,9 +29,9 @@ def main(folder, num_files):
     total_data_written = num_files * 20  # in GB
     speed_gbps = (total_data_written * 8) / total_time  # converting GB to Gb and then calculating Gbps
 
-    print(json.dumps({"name": "create_10_20GB_file", "total_time": total_time, "speed": speed_gbps, "unit": "GiB/s"}))
+    print(json.dumps({'name': 'create_10_20GB_file', 'total_time': total_time, 'speed': speed_gbps, 'unit': 'GiB/s'}))
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create multiple 20GB files in parallel.')
     parser.add_argument('folder', type=str, help='The folder where the files will be written.')
     parser.add_argument('num_files', type=int, help='The number of 20GB files to create.')

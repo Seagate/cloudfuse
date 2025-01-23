@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 #rm -rf /home/vibhansa/blob_mnt/testfile*
@@ -22,4 +21,3 @@ do
 	sudo rm -rf /mnt/blobfusetmp/*
 	sudo rm -rf /tmp/ramdisk/*
 done
-
