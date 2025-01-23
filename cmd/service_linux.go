@@ -99,7 +99,7 @@ var installCmd = &cobra.Command{
 			return err
 		}
 
-		serviceFile, err := newServiceFile(mountPath, configPath, serviceUser)
+		serviceName, err := newService(mountPath, configPath, serviceUser)
 		if err != nil {
 			return fmt.Errorf("error when attempting to create service file: [%s]", err.Error())
 		}
@@ -112,7 +112,7 @@ var installCmd = &cobra.Command{
 		}
 
 		// Enable the service to start at system boot
-		systemctlEnableCmd := exec.Command("systemctl", "enable", serviceFile)
+		systemctlEnableCmd := exec.Command("systemctl", "enable", serviceName)
 		err = systemctlEnableCmd.Run()
 		if err != nil {
 			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
@@ -137,10 +137,7 @@ var uninstallCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		serviceName := strings.Replace(mountPath, "/", "-", -1)
-		serviceName = strings.TrimPrefix(serviceName, "-")
-		serviceFile := serviceName + ".service"
-		serviceFilePath := "/etc/systemd/system/" + serviceFile
+		serviceName, serviceFilePath := getService(mountPath)
 		if _, err := os.Stat(serviceFilePath); err == nil {
 			removeFileCmd := exec.Command("rm", serviceFilePath)
 			err := removeFileCmd.Run()
@@ -163,7 +160,7 @@ var uninstallCmd = &cobra.Command{
 
 //--------------- command section ends
 
-func newServiceFile(mountPath string, configPath string, serviceUser string) (string, error) {
+func newService(mountPath string, configPath string, serviceUser string) (string, error) {
 	serviceTemplate := `
 [Unit]
 Description=Cloudfuse is an open source project developed to provide a virtual filesystem backed by S3 or Azure storage.
@@ -194,10 +191,7 @@ WantedBy=multi-user.target
 		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
 	}
 
-	serviceName := strings.Replace(mountPath, "/", "-", -1)
-	serviceName = strings.TrimPrefix(serviceName, "-")
-	serviceFile := serviceName + ".service"
-	serviceFilePath := "/etc/systemd/system/" + serviceFile
+	serviceName, serviceFilePath := getService(mountPath)
 
 	err = os.Remove(serviceFilePath)
 	if err != nil && !os.IsNotExist(err) {
@@ -235,6 +229,13 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 	fmt.Println("ensure the user, " + serviceUser + ", has the following access: \n" + mountPath + ": read, write, and execute \n" + configPath + ": read \n")
 
 	return nil
+}
+
+func getService(mountPath string) (string, string) {
+	serviceName := strings.Replace(mountPath, "/", "-", -1)
+	serviceFile := "cloudfuse" + serviceName + ".service"
+	serviceFilePath := "/etc/systemd/system/" + serviceFile
+	return serviceName, serviceFilePath
 }
 
 // takes a file or folder name and returns its absolute path
