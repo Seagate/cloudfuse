@@ -48,7 +48,7 @@ type dirTestSuite struct {
 	suite.Suite
 	testPath      string
 	adlsTest      bool
-	s3storageTest bool
+	sizeTracker   bool
 	testCachePath string
 	minBuff       []byte
 	medBuff       []byte
@@ -61,7 +61,7 @@ var adlsPtr string
 var clonePtr string
 var streamDirectPtr string
 var enableSymlinkADLS string
-var s3storagePtr string
+var sizeTrackerPtr string
 
 func regDirTestFlag(p *string, name string, value string, usage string) {
 	if flag.Lookup(name) == nil {
@@ -80,7 +80,7 @@ func initDirFlags() {
 	clonePtr = getDirTestFlag("clone")
 	streamDirectPtr = getDirTestFlag("stream-direct-test")
 	enableSymlinkADLS = getDirTestFlag("enable-symlink-adls")
-	s3storagePtr = getDirTestFlag("s3storage")
+	sizeTrackerPtr = getDirTestFlag("size-tracker")
 }
 
 func getTestDirName(n int) string {
@@ -102,14 +102,14 @@ func (suite *dirTestSuite) dirTestCleanup(toRemove []string) {
 
 // # Create Directory with a simple name
 func (suite *dirTestSuite) TestDirCreateSimple() {
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "test1")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	// cleanup
@@ -118,7 +118,7 @@ func (suite *dirTestSuite) TestDirCreateSimple() {
 
 // # Create Directory that already exists
 func (suite *dirTestSuite) TestDirCreateDuplicate() {
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "test1")
@@ -133,7 +133,7 @@ func (suite *dirTestSuite) TestDirCreateDuplicate() {
 		suite.Contains(err.Error(), "file exists")
 	}
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	// cleanup
@@ -146,14 +146,14 @@ func (suite *dirTestSuite) TestDirCreateSplChar() {
 		fmt.Println("Skipping TestDirCreateSplChar on Windows")
 		return
 	}
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "@#$^&*()_+=-{}[]|?><.,~")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	// cleanup
@@ -166,14 +166,14 @@ func (suite *dirTestSuite) TestDirCreateSlashChar() {
 		fmt.Println("Skipping TestDirCreateSlashChar on Windows")
 		return
 	}
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "PRQ\\STUV")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	// cleanup
@@ -182,7 +182,7 @@ func (suite *dirTestSuite) TestDirCreateSlashChar() {
 
 // # Rename a directory
 func (suite *dirTestSuite) TestDirRename() {
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "test1")
@@ -195,7 +195,7 @@ func (suite *dirTestSuite) TestDirRename() {
 
 	suite.NoDirExists(dirName)
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	// cleanup
@@ -204,7 +204,7 @@ func (suite *dirTestSuite) TestDirRename() {
 
 // # Move an empty directory
 func (suite *dirTestSuite) TestDirMoveEmpty() {
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	dir2Name := filepath.Join(suite.testPath, "test2")
@@ -219,7 +219,7 @@ func (suite *dirTestSuite) TestDirMoveEmpty() {
 	time.Sleep(1 * time.Second)
 	suite.NoError(err)
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	// cleanup
@@ -228,7 +228,7 @@ func (suite *dirTestSuite) TestDirMoveEmpty() {
 
 // # Move an non-empty directory
 func (suite *dirTestSuite) TestDirMoveNonEmpty() {
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	dir2Name := filepath.Join(suite.testPath, "test2NE")
@@ -251,7 +251,7 @@ func (suite *dirTestSuite) TestDirMoveNonEmpty() {
 	time.Sleep(1 * time.Second)
 	suite.NoError(err)
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	// cleanup
@@ -260,14 +260,14 @@ func (suite *dirTestSuite) TestDirMoveNonEmpty() {
 
 // # Delete non-empty directory
 func (suite *dirTestSuite) TestDirDeleteEmpty() {
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "test1_new")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	suite.dirTestCleanup([]string{dirName})
@@ -275,7 +275,7 @@ func (suite *dirTestSuite) TestDirDeleteEmpty() {
 
 // # Delete non-empty directory
 func (suite *dirTestSuite) TestDirDeleteNonEmpty() {
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	dir3Name := filepath.Join(suite.testPath, "test3NE")
@@ -294,7 +294,7 @@ func (suite *dirTestSuite) TestDirDeleteNonEmpty() {
 		suite.Contains(err.Error(), "directory not empty")
 	}
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	// cleanup
@@ -326,7 +326,7 @@ func (suite *dirTestSuite) TestDirDeleteNonEmpty() {
 
 // # Get stats of a directory
 func (suite *dirTestSuite) TestDirGetStats() {
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "test3")
@@ -346,7 +346,7 @@ func (suite *dirTestSuite) TestDirGetStats() {
 		suite.GreaterOrEqual(float64(1), modTineDiff.Hours())
 	}
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	// Cleanup
@@ -360,7 +360,7 @@ func (suite *dirTestSuite) TestDirChmod() {
 		return
 	}
 	if suite.adlsTest == true {
-		if suite.s3storageTest {
+		if suite.sizeTracker {
 			suite.EqualValues(0, DiskSize(pathPtr))
 		}
 		dirName := filepath.Join(suite.testPath, "testchmod")
@@ -374,7 +374,7 @@ func (suite *dirTestSuite) TestDirChmod() {
 		suite.NoError(err)
 		suite.Equal("-rwxr--r--", stat.Mode().Perm().String())
 
-		if suite.s3storageTest {
+		if suite.sizeTracker {
 			suite.EqualValues(0, DiskSize(pathPtr))
 		}
 		suite.dirTestCleanup([]string{dirName})
@@ -383,7 +383,7 @@ func (suite *dirTestSuite) TestDirChmod() {
 
 // # List directory
 func (suite *dirTestSuite) TestDirList() {
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	testDir := filepath.Join(suite.testPath, "bigTestDir")
@@ -409,7 +409,7 @@ func (suite *dirTestSuite) TestDirList() {
 	suite.NoError(err)
 	suite.Len(files, 4)
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	// Cleanup
@@ -460,7 +460,7 @@ func (suite *dirTestSuite) TestDirRenameFull() {
 		return
 	}
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "full_dir")
@@ -479,14 +479,14 @@ func (suite *dirTestSuite) TestDirRenameFull() {
 		suite.NoError(err)
 	}
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(10*len(suite.medBuff), DiskSize(pathPtr))
 	}
 
 	err = os.Rename(dirName, newName)
 	suite.NoError(err)
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(10*len(suite.medBuff), DiskSize(pathPtr))
 	}
 
@@ -604,7 +604,7 @@ func (suite *dirTestSuite) TestReadDirLink() {
 		return
 	}
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "test_hns")
@@ -626,7 +626,7 @@ func (suite *dirTestSuite) TestReadDirLink() {
 		suite.NoError(err)
 	}
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(4*len(suite.minBuff), DiskSize(pathPtr))
 	}
 
@@ -671,7 +671,7 @@ func (suite *dirTestSuite) TestReadDirLink() {
 	// validating data
 	suite.Equal(data1, data2)
 
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(4*len(suite.minBuff), DiskSize(pathPtr))
 	}
 
@@ -681,7 +681,7 @@ func (suite *dirTestSuite) TestReadDirLink() {
 }
 
 func (suite *dirTestSuite) TestStatfs() {
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(0, DiskSize(pathPtr))
 	}
 
@@ -695,7 +695,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.WriteFile(newFile, suite.minBuff, 0777)
 		suite.NoError(err)
 	}
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(12*len(suite.minBuff), DiskSize(pathPtr))
 	}
 
@@ -704,7 +704,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)
 	}
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(12*4096, DiskSize(pathPtr))
 	}
 
@@ -713,7 +713,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.WriteFile(file, suite.medBuff, 0777)
 		suite.NoError(err)
 	}
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(12*len(suite.medBuff), DiskSize(pathPtr))
 	}
 
@@ -724,7 +724,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.Rename(oldFile, newFile)
 		suite.NoError(err)
 	}
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(12*len(suite.medBuff), DiskSize(pathPtr))
 	}
 
@@ -733,7 +733,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)
 	}
-	if suite.s3storageTest {
+	if suite.sizeTracker {
 		suite.EqualValues(12*4096, DiskSize(pathPtr))
 	}
 
@@ -760,11 +760,11 @@ func TestDirTestSuite(t *testing.T) {
 	if adlsPtr == "true" || adlsPtr == "True" {
 		fmt.Println("ADLS Testing...")
 		dirTest.adlsTest = true
-	} else if s3storagePtr == "true" || adlsPtr == "True" {
-		fmt.Println("S3 Storage Testing...")
-		dirTest.s3storageTest = true
-	} else {
-		fmt.Println("Azure Block Blob Testing...")
+	}
+
+	if sizeTrackerPtr == "true" || adlsPtr == "True" {
+		fmt.Println("Size Tracker Testing...")
+		dirTest.sizeTracker = true
 	}
 
 	// Sanity check in the off chance the same random name was generated twice and was still around somehow
@@ -798,5 +798,5 @@ func init() {
 	regDirTestFlag(&tempPathPtr, "tmp-path", "", "Cache dir path")
 	regDirTestFlag(&streamDirectPtr, "stream-direct-test", "false", "Run stream direct tests")
 	regDirTestFlag(&enableSymlinkADLS, "enable-symlink-adls", "false", "Enable symlink support for ADLS accounts")
-	regDirTestFlag(&s3storagePtr, "s3storage", "false", "Using S3 Storage")
+	regDirTestFlag(&sizeTrackerPtr, "size-tracker", "false", "Using size_tracker component")
 }
