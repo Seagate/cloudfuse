@@ -559,7 +559,7 @@ func (suite *dirTestSuite) TestReadDirLink() {
 	err = os.WriteFile(fileName, suite.minBuff, 0777)
 	suite.NoError(err)
 
-	// Write three more files so one blokc, 4096 bytes, is filled
+	// Write three more files so one block, 4096 bytes, is filled
 	for i := 0; i < 3; i++ {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.minBuff, 0777)
