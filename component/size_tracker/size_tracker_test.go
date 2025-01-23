@@ -472,6 +472,30 @@ func (suite *sizeTrackerTestSuite) TestTruncateFileOpen() {
 	suite.assert.NoError(err)
 }
 
+func (suite *sizeTrackerTestSuite) TestSymlink() {
+	defer suite.cleanupTest()
+	// Setup
+	file := generateFileName()
+	symlink := generateFileName() + ".lnk"
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
+	suite.assert.NoError(err)
+
+	testData := "test data"
+	data := []byte(testData)
+	_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
+
+	suite.sizeTracker.CreateLink(internal.CreateLinkOptions{Name: symlink, Target: file})
+	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
+
+	suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: symlink})
+	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
+
+	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: file})
+	suite.assert.NoError(err)
+}
+
 func (suite *sizeTrackerTestSuite) TestStatFS() {
 	defer suite.cleanupTest()
 

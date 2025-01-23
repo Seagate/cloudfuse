@@ -149,8 +149,8 @@ func (st *SizeTracker) DeleteFile(options internal.DeleteFileOptions) error {
 
 	err := st.NextComponent().DeleteFile(options)
 
-	// File already exists and delete succeeded so remove old file size
-	if err == nil && getAttrErr == nil {
+	// If the file is a symlink then it has no size so don't change the size
+	if err == nil && getAttrErr == nil && !attr.IsSymlink() {
 		st.mountSize.Subtract(uint64(attr.Size))
 	}
 
@@ -291,20 +291,6 @@ func (st *SizeTracker) FlushFile(options internal.FlushFileOptions) error {
 	}
 
 	return nil
-}
-
-// Symlink operations
-func (st *SizeTracker) CreateLink(options internal.CreateLinkOptions) error {
-	attr, _ := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
-
-	err := st.NextComponent().CreateLink(options)
-
-	// File already exists but create succeeded so remove old file size
-	if err == nil && attr != nil {
-		st.mountSize.Subtract(uint64(attr.Size))
-	}
-
-	return err
 }
 
 // Filesystem level operations
