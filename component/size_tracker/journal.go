@@ -27,6 +27,7 @@ package size_tracker
 import (
 	"encoding/binary"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -41,7 +42,7 @@ type MountSize struct {
 }
 
 func CreateSizeJournal(filename string) (*MountSize, error) {
-	journalFile = common.JoinUnixFilepath(common.DefaultWorkDir, filename)
+	journalFile = filepath.Join(common.DefaultWorkDir, filename)
 	f, err := os.OpenFile(journalFile, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return nil, err
