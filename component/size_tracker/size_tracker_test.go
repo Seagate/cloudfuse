@@ -31,6 +31,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -198,9 +199,12 @@ func (suite *sizeTrackerTestSuite) TestCreateFile() {
 	// Default is to not create empty files on create file to support immutable storage.
 	path := generateFileName()
 	options := internal.CreateFileOptions{Name: path}
-	_, err := suite.sizeTracker.CreateFile(options)
+	h, err := suite.sizeTracker.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
+
+	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
 
 	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: path})
 	suite.assert.NoError(err)
@@ -276,6 +280,9 @@ func (suite *sizeTrackerTestSuite) TestWriteFileMultiple() {
 	_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 3 * int64(len(data)), Data: data})
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(4*len(data), int(suite.sizeTracker.mountSize.GetSize()))
+
+	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
 
 	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: file})
 	suite.assert.NoError(err)
@@ -362,6 +369,10 @@ func (suite *sizeTrackerTestSuite) TestRenameFile() {
 }
 
 func (suite *sizeTrackerTestSuite) TestRenameOpenFile() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test on Windows")
+		return
+	}
 	defer suite.cleanupTest()
 
 	src := "src2"
@@ -393,6 +404,10 @@ func (suite *sizeTrackerTestSuite) TestRenameOpenFile() {
 }
 
 func (suite *sizeTrackerTestSuite) TestRenameWriteFile() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test on Windows")
+		return
+	}
 	defer suite.cleanupTest()
 
 	src := "src3"
@@ -473,6 +488,10 @@ func (suite *sizeTrackerTestSuite) TestTruncateFileOpen() {
 }
 
 func (suite *sizeTrackerTestSuite) TestSymlink() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test on Windows")
+		return
+	}
 	defer suite.cleanupTest()
 	// Setup
 	file := generateFileName()

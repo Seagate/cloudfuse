@@ -249,7 +249,7 @@ jobs:
           sleep 10
           ps -aux | grep cloudfuse
           cd test/e2e_tests
-          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
+          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -s3storage=true
           cd -
           sudo fusermount -u ${{ env.MOUNT_DIR }}
           sleep 5
@@ -293,7 +293,7 @@ jobs:
           sleep 10
           ps -aux | grep cloudfuse
           cd test/e2e_tests
-          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
+          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -s3storage=true
           cd -
           sudo fusermount -u ${{ env.MOUNT_DIR }}
           sleep 5

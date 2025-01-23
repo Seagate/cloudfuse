@@ -55,6 +55,7 @@ type SizeTrackerOptions struct {
 
 const compName = "size_tracker"
 const blockSize = int64(4096)
+const emptyDirSize = uint64(4096)
 const default_journal_name = "mount_size.dat"
 
 // Verification to check satisfaction criteria with Component Interface
@@ -116,12 +117,6 @@ func (st *SizeTracker) Priority() internal.ComponentPriority {
 
 // OnConfigChange : If component has registered, on config file change this method is called
 func (st *SizeTracker) OnConfigChange() {
-}
-
-// Directory operations
-func (st *SizeTracker) DeleteDir(options internal.DeleteDirOptions) error {
-	// Libfuse only allows deleting empty directories, so we should not need to update the size here
-	return st.NextComponent().DeleteDir(options)
 }
 
 func (st *SizeTracker) RenameDir(options internal.RenameDirOptions) error {
