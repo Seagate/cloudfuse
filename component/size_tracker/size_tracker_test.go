@@ -90,7 +90,8 @@ func newTestSizeTracker(next internal.Component, configuration string) *SizeTrac
 	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
 	sizeTracker := NewSizeTrackerComponent()
 	sizeTracker.SetNextComponent(next)
-	_ = sizeTracker.Configure(true)
+	err := sizeTracker.Configure(true)
+	fmt.Println("Result from Configure is: ", err)
 
 	return sizeTracker.(*SizeTracker)
 }
