@@ -28,7 +28,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	github.com/vibhansa-msft/tlru v0.0.0-20240410102558-9e708419e21f
-	github.com/winfsp/cgofuse v1.5.0
+	github.com/winfsp/cgofuse v1.6.0
 	go.uber.org/atomic v1.11.0
 	golang.org/x/sys v0.29.0
 	gopkg.in/ini.v1 v1.67.0
