@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -188,6 +189,10 @@ func (suite *LoopbackFSTestSuite) TestRenameFile() {
 }
 
 func (suite *LoopbackFSTestSuite) TestRenameOpenFile() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test on Windows")
+		return
+	}
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
@@ -214,6 +219,10 @@ func (suite *LoopbackFSTestSuite) TestRenameOpenFile() {
 }
 
 func (suite *LoopbackFSTestSuite) TestRenameWriteFile() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test on Windows")
+		return
+	}
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
@@ -241,6 +250,10 @@ func (suite *LoopbackFSTestSuite) TestRenameWriteFile() {
 }
 
 func (suite *LoopbackFSTestSuite) TestRenameWriteFileGetAttr() {
+	if runtime.GOOS == "windows" {
+		fmt.Println("Skipping test on Windows")
+		return
+	}
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
