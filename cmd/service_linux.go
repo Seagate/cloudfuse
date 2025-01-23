@@ -133,7 +133,7 @@ var uninstallCmd = &cobra.Command{
 
 		// get absolute path of provided relative mount path
 		var err error
-		mountPath, err = getAbsPath(serviceName)
+		mountPath, err = getAbsPath(mountPath)
 		if err != nil {
 			return err
 		}
