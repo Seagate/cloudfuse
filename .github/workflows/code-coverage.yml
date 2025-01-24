@@ -821,6 +821,7 @@ jobs:
           S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
 
       - name: Create Config File - S3 with Size Tracker
+        shell: bash
         env:
           S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
           S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
@@ -830,6 +831,7 @@ jobs:
         run: "./cloudfuse.test gen-test-config --config-file=s3_key_size_tracker.yaml --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
 
       - name: S3 Coverage with Size Tracker
+        shell: bash
         run: |-
           rm -rf ${{ env.MOUNT_DIR }}/*
           rm -rf ${{ env.TEMP_DIR }}/*
