@@ -20,6 +20,7 @@ jobs:
     strategy:
       matrix:
         go: ["1.23.2"]
+        job_name: ["linux-fuse3", "linux-fuse2"]
         include:
           - job_name: linux-fuse3
             os: ubuntu-latest
