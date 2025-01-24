@@ -25,7 +25,7 @@ jobs:
         include:
           - job_name: linux-fuse3
             os: ubuntu-latest
-            containerName: 'test-cnt-ubn'
+            containerName: "test-cnt-ubn"
             fuselib: libfuse3-dev
             fuselib2: fuse3
           - job_name: linux-fuse2

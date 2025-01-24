@@ -36,6 +36,8 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
+
+	"github.com/winfsp/cgofuse/fuse"
 )
 
 /* NOTES:
@@ -44,6 +46,44 @@ import (
    - Order of calls : Constructor -> Configure -> Start ..... -> Stop
    - To read any new setting from config file follow the Configure method default comments
 */
+
+// Libfuse holds the settings and information for the FUSE component.
+type Libfuse struct {
+	internal.BaseComponent
+	host                  *fuse.FileSystemHost
+	mountPath             string
+	dirPermission         uint
+	filePermission        uint
+	readOnly              bool
+	attributeExpiration   uint32
+	entryExpiration       uint32
+	negativeTimeout       uint32
+	allowOther            bool
+	allowRoot             bool
+	ownerUID              uint32
+	ownerGID              uint32
+	traceEnable           bool
+	extensionPath         string
+	disableWritebackCache bool
+	ignoreOpenFlags       bool
+	nonEmptyMount         bool
+	networkShare          bool // Run as a network file share on Windows
+	lsFlags               common.BitMap16
+	maxFuseThreads        uint32
+	directIO              bool
+	umask                 uint32
+	displayCapacityMb     uint64
+}
+
+// To support pagination in readdir calls this structure holds a block of items for a given directory
+type dirChildCache struct {
+	sIndex   uint64              // start index of current block of items
+	eIndex   uint64              // End index of current block of items
+	length   uint64              // Length of the children list
+	token    string              // Token to get next block of items from container
+	children []*internal.ObjAttr // Slice holding current block of children
+	lastPage bool                // Whether current block is the last one
+}
 
 // LibfuseOptions defines the config parameters.
 type LibfuseOptions struct {
@@ -74,6 +114,8 @@ const defaultEntryExpiration = 120
 const defaultAttrExpiration = 120
 const defaultNegativeEntryExpiration = 120
 const defaultMaxFuseThreads = 128
+const maxNameSize = 255
+const blockSize = 4096
 
 var fuseFS *Libfuse
 

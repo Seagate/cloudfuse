@@ -68,47 +68,6 @@ type CgofuseFS struct {
 	gid uint32
 }
 
-// Libfuse holds the settings and information for the FUSE component.
-type Libfuse struct {
-	internal.BaseComponent
-	host                  *fuse.FileSystemHost
-	mountPath             string
-	dirPermission         uint
-	filePermission        uint
-	readOnly              bool
-	attributeExpiration   uint32
-	entryExpiration       uint32
-	negativeTimeout       uint32
-	allowOther            bool
-	allowRoot             bool
-	ownerUID              uint32
-	ownerGID              uint32
-	traceEnable           bool
-	extensionPath         string
-	disableWritebackCache bool
-	ignoreOpenFlags       bool
-	nonEmptyMount         bool
-	networkShare          bool // Run as a network file share on Windows
-	lsFlags               common.BitMap16
-	maxFuseThreads        uint32
-	directIO              bool
-	umask                 uint32
-	displayCapacityMb     uint64
-}
-
-// To support pagination in readdir calls this structure holds a block of items for a given directory
-type dirChildCache struct {
-	sIndex   uint64              // start index of current block of items
-	eIndex   uint64              // End index of current block of items
-	length   uint64              // Length of the children list
-	token    string              // Token to get next block of items from container
-	children []*internal.ObjAttr // Slice holding current block of children
-	lastPage bool                // Whether current block is the last one
-}
-
-const maxNameSize = 255
-const blockSize = 4096
-
 // Note: libfuse prepends "/" to the path.
 // TODO: Not sure if this is needed for cgofuse, will need to check
 // trimFusePath trims the first character from the path provided by libfuse
