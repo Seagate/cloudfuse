@@ -95,8 +95,11 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 			if err != nil {
 				log.Err("mount: failed to read child [%v] failure logs [%s]", child.Pid, err.Error())
 				return Destroy(fmt.Sprintf("failed to mount, please check logs [%s]", err.Error()))
-			} else {
+			} else if len(buff) > 0 {
 				return Destroy(string(buff))
+			} else {
+				// Nothing was logged, so mount succeeded
+				return nil
 			}
 
 		case <-time.After(options.WaitForMount):
