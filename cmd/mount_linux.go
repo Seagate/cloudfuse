@@ -70,10 +70,15 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 		log.Err("mount : failed to daemonize application [%v]", err)
 		return Destroy(fmt.Sprintf("failed to daemonize application [%s]", err.Error()))
 	}
-	defer dmnCtx.Release()
 
 	log.Debug("mount: foreground disabled, child = %v", daemon.WasReborn())
 	if child == nil { // execute in child only
+		defer func() {
+			if err := dmnCtx.Release(); err != nil {
+				log.Err("Unable to release pid-file: %s", err.Error())
+			}
+		}()
+
 		setGOConfig()
 		go startDynamicProfiler()
 
