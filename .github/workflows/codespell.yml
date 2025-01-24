@@ -3,6 +3,8 @@
 # https://github.com/codespell-project/actions-codespell
 # https://github.com/codespell-project/codespell
 name: codespell
+permissions: {}
+
 on:
   push:
     branches:
@@ -17,9 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - uses: codespell-project/actions-codespell@v2
         with:
           check_filenames: true
           skip: ./.git,./.github/workflows/codespell.yml,.git,*.png,*.jpg,*.svg,*.sum,./vendor,go.sum,./NOTICE
           ignore_words_list: filetest,dum,varius,KeyPair,keypair,ro,WRONLY,wronly,AKS,ser,datas
-          

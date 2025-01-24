@@ -6,7 +6,7 @@ To run on Linux follow the following steps:
 
 1. First go into the helper folder and run
    ./setup.sh
-   
+
    This will create a file that stores environment variables for the
    tests. Some of the variables store locations where the tests will
    be mounted and a cache folder. In particular the folders at
@@ -17,7 +17,7 @@ To run on Linux follow the following steps:
    file var.env (the file is included in .gitignore so don't worry about
    editing it).
 
-2. Ensure that you have a config.yaml file in the cloudfuse 
+2. Ensure that you have a config.yaml file in the cloudfuse
    repository. These tests will run with that config file.
 
 3. Run the test by running the scripts. You must be in the test-scripts
@@ -54,11 +54,11 @@ To run on Windows follow the following steps:
    This will create a file that stores environment variables for the
    tests. Some of the variables store locations where the tests will
    be mounted and a cache folder. The default to mount the directory is
-   in the Z: directory. Also thethe folder at ~/e2e-temp is assumed to exist. 
-   So you will need to create these or change them to ones you prefer. 
-   Additionally it assumed that the directory where cloudfuse is 
-   installed is at ~\cloudfuse. If your git repo is at a different 
-   folder then edit this variable in this file var.env (the file is included 
+   in the Z: directory. Also thethe folder at ~/e2e-temp is assumed to exist.
+   So you will need to create these or change them to ones you prefer.
+   Additionally it assumed that the directory where cloudfuse is
+   installed is at ~\cloudfuse. If your git repo is at a different
+   folder then edit this variable in this file var.env (the file is included
    in .gitignore so don't worry about editing it).
 
 2. When running the e2e tests you will need to open a separate terminal and mount cloudfuse

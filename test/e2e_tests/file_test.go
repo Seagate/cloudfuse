@@ -4,7 +4,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -393,7 +393,7 @@ func (suite *fileTestSuite) TestFileGetStat() {
 
 	stat, err := os.Stat(fileName)
 	suite.NoError(err)
-	modTineDiff := time.Now().Sub(stat.ModTime())
+	modTineDiff := time.Since(stat.ModTime())
 
 	suite.False(stat.IsDir())
 	suite.Equal("test", stat.Name())
@@ -522,7 +522,7 @@ func (suite *fileTestSuite) TestLinkWrite() {
 	suite.NoError(err)
 
 	stat, err := os.Stat(targetName)
-	modTineDiff := time.Now().Sub(stat.ModTime())
+	modTineDiff := time.Since(stat.ModTime())
 	suite.NoError(err)
 	suite.LessOrEqual(modTineDiff.Minutes(), float64(1))
 	suite.fileTestCleanup([]string{targetName})

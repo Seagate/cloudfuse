@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -59,7 +59,7 @@ func (suite *lruPolicyTestSuite) SetupTest() {
 
 	config := cachePolicyConfig{
 		tmpPath:       cache_path,
-		cacheTimeout:  0,
+		cacheTimeout:  1,
 		maxEviction:   defaultMaxEviction,
 		maxSizeMB:     0,
 		highThreshold: defaultMaxThreshold,
@@ -149,7 +149,7 @@ func (suite *lruPolicyTestSuite) generateNestedDirectory(aPath string) ([]string
 func (suite *lruPolicyTestSuite) TestDefault() {
 	defer suite.cleanupTest()
 	suite.assert.EqualValues("lru", suite.policy.Name())
-	suite.assert.EqualValues(0, suite.policy.cacheTimeout) // cacheTimeout does not change
+	suite.assert.EqualValues(1, suite.policy.cacheTimeout) // cacheTimeout does not change
 	suite.assert.EqualValues(defaultMaxEviction, suite.policy.maxEviction)
 	suite.assert.EqualValues(0, suite.policy.maxSizeMB)
 	suite.assert.EqualValues(defaultMaxThreshold, suite.policy.highThreshold)
@@ -170,7 +170,7 @@ func (suite *lruPolicyTestSuite) TestUpdateConfig() {
 	suite.policy.UpdateConfig(config)
 
 	suite.assert.NotEqualValues(120, suite.policy.cacheTimeout) // cacheTimeout does not change
-	suite.assert.EqualValues(0, suite.policy.cacheTimeout)      // cacheTimeout does not change
+	suite.assert.EqualValues(1, suite.policy.cacheTimeout)      // cacheTimeout does not change
 	suite.assert.EqualValues(100, suite.policy.maxEviction)
 	suite.assert.EqualValues(10, suite.policy.maxSizeMB)
 	suite.assert.EqualValues(70, suite.policy.highThreshold)
@@ -189,21 +189,8 @@ func (suite *lruPolicyTestSuite) TestCacheValid() {
 	suite.assert.EqualValues(1, node.usage)
 }
 
-func (suite *lruPolicyTestSuite) TestCacheInvalidate() {
+func (suite *lruPolicyTestSuite) TestCachePurge() {
 	defer suite.cleanupTest()
-	f, _ := os.Create(cache_path + "/temp")
-	f.Close()
-	suite.policy.CacheValid("temp")
-	suite.policy.CacheInvalidate("temp") // this is equivalent to purge since timeout=0
-
-	n, ok := suite.policy.nodeMap.Load("temp")
-	suite.assert.False(ok)
-	suite.assert.Nil(n)
-}
-
-func (suite *lruPolicyTestSuite) TestCacheInvalidateTimeout() {
-	defer suite.cleanupTest()
-	suite.cleanupTest()
 
 	config := cachePolicyConfig{
 		tmpPath:       cache_path,
@@ -214,40 +201,23 @@ func (suite *lruPolicyTestSuite) TestCacheInvalidateTimeout() {
 		lowThreshold:  defaultMinThreshold,
 		fileLocks:     &common.LockMap{},
 	}
-
 	suite.setupTestHelper(config)
 
-	suite.policy.CacheValid("temp")
-	suite.policy.CacheInvalidate("temp")
-
-	n, ok := suite.policy.nodeMap.Load("temp")
-	suite.assert.True(ok)
-	suite.assert.NotNil(n)
-	node := n.(*lruNode)
-	suite.assert.EqualValues("temp", node.name)
-	suite.assert.EqualValues(1, node.usage)
-}
-
-func (suite *lruPolicyTestSuite) TestCachePurge() {
-	defer suite.cleanupTest()
 	// test policy cache data
 	suite.policy.CacheValid("temp")
-	suite.policy.CachePurge("temp")
+	suite.policy.CachePurge("temp", nil)
 
 	n, ok := suite.policy.nodeMap.Load("temp")
 	suite.assert.False(ok)
 	suite.assert.Nil(n)
 
-	// test asynchronous file and folder deletion
+	// test synchronous file and folder deletion
 	// purge all aPaths, in reverse order
 	aPaths, abPaths, acPaths := suite.generateNestedDirectory("temp")
 	for i := len(aPaths) - 1; i >= 0; i-- {
-		suite.policy.CachePurge(aPaths[i])
+		suite.policy.CachePurge(aPaths[i], nil)
 	}
 
-	// wait for asynchronous deletions
-	// in local testing, 1ms was enough
-	time.Sleep(100 * time.Millisecond)
 	// validate all aPaths were deleted
 	for _, path := range aPaths {
 		suite.assert.NoFileExists(path)
@@ -277,42 +247,19 @@ func (suite *lruPolicyTestSuite) TestIsCachedFalse() {
 
 func (suite *lruPolicyTestSuite) TestTimeout() {
 	defer suite.cleanupTest()
-	suite.cleanupTest()
-
-	config := cachePolicyConfig{
-		tmpPath:       cache_path,
-		cacheTimeout:  1,
-		maxEviction:   defaultMaxEviction,
-		maxSizeMB:     0,
-		highThreshold: defaultMaxThreshold,
-		lowThreshold:  defaultMinThreshold,
-		fileLocks:     &common.LockMap{},
-	}
-
-	suite.setupTestHelper(config)
 
 	suite.policy.CacheValid("temp")
 
-	time.Sleep(3 * time.Second) // Wait for time > cacheTimeout, the file should no longer be cached
+	// Wait for time > cacheTimeout, the file should no longer be cached
+	for i := 0; i < 300 && suite.policy.IsCached("temp"); i++ {
+		time.Sleep(10 * time.Millisecond)
+	}
 
 	suite.assert.False(suite.policy.IsCached("temp"))
 }
 
 func (suite *lruPolicyTestSuite) TestMaxEvictionDefault() {
 	defer suite.cleanupTest()
-	suite.cleanupTest()
-
-	config := cachePolicyConfig{
-		tmpPath:       cache_path,
-		cacheTimeout:  1,
-		maxEviction:   defaultMaxEviction,
-		maxSizeMB:     0,
-		highThreshold: defaultMaxThreshold,
-		lowThreshold:  defaultMinThreshold,
-		fileLocks:     &common.LockMap{},
-	}
-
-	suite.setupTestHelper(config)
 
 	for i := 1; i < 5000; i++ {
 		suite.policy.CacheValid("temp" + fmt.Sprint(i))

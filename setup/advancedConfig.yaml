@@ -76,7 +76,7 @@ libfuse:
 
 # Streaming configuration – remove and redirect to block-cache
 stream:
-  # If block-size-mb, max-buffers or buffer-size-mb are 0, the stream component will not cache blocks. 
+  # If block-size-mb, max-buffers or buffer-size-mb are 0, the stream component will not cache blocks.
   block-size-mb: <for read only mode size of each block to be cached in memory while streaming (in MB). For read/write size of newly created blocks. Default - 0 MB>
   max-buffers: <total number of buffers to store blocks in. Default - 0>
   buffer-size-mb: <size for each buffer. Default - 0 MB>
@@ -90,7 +90,7 @@ block_cache:
   disk-size-mb: <maximum disk cache size allowed. Default - 80% of free disk space>
   disk-timeout-sec: <default disk cache eviction timeout (in sec). Default - 120 sec>
   prefetch: <number of blocks to be prefetched in serial read case. Min - 11, Default - 2 times number of CPU cores>
-  parallelism: <number of parallel threads downloading the data and writing to disk cache. Default - 3 times number of CPU cores> 
+  parallelism: <number of parallel threads downloading the data and writing to disk cache. Default - 3 times number of CPU cores>
   prefetch-on-open: true|false <prefetch blocks on open. This shall be used only when user application is going to read file from offset 0>
 
 # Disk cache related configuration
@@ -113,7 +113,7 @@ file_cache:
   refresh-sec: <number of seconds after which compare lmt of file in local cache and container and refresh file if container has the latest copy>
   ignore-sync: true|false <sync call will be ignored and locally cached file will not be deleted>
   hard-limit: true|false <if set to true, file-cache will not allow read/writes to file which exceed the configured limits>
-  
+
 # Attribute cache related configuration
 attr_cache:
   timeout-sec: <time attributes and directory contents can be cached (in sec). Default - 120 sec>

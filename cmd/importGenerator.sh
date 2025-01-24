@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Cloudfuse Regenerating component imports..." 
+echo "Cloudfuse Regenerating component imports..."
 
 # Regenrate the loadcomponent.go to include all components present in folder
 loader_file="./cmd/imports.go"

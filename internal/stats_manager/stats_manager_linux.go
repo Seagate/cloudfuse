@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -48,7 +48,7 @@ func (sc *StatsCollector) statsDumper() {
 		return
 	}
 
-	f, err := os.OpenFile(common.TransferPipe, os.O_CREATE|os.O_WRONLY, 0777)
+	f, err := os.OpenFile(common.TransferPipe, os.O_WRONLY, 0)
 	if err != nil {
 		log.Err("stats_manager::statsDumper : unable to open pipe file [%v]", err)
 		disableMonitoring()
@@ -137,7 +137,7 @@ func statsPolling() {
 	}
 
 	// open polling pipe
-	pf, err := os.OpenFile(common.PollingPipe, os.O_RDONLY, os.ModeNamedPipe)
+	pf, err := os.Open(common.PollingPipe)
 	if err != nil {
 		fmt.Printf("stats_manager::statsPolling : unable to open pipe file [%v]", err)
 		return
@@ -157,7 +157,7 @@ func statsPolling() {
 	}
 
 	// open transfer pipe
-	tf, err := os.OpenFile(common.TransferPipe, os.O_CREATE|os.O_WRONLY, 0777)
+	tf, err := os.OpenFile(common.TransferPipe, os.O_WRONLY, 0)
 	if err != nil {
 		log.Err("stats_manager::statsPolling : unable to open pipe file [%v]", err)
 		disableMonitoring()

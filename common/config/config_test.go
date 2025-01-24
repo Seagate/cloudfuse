@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -155,6 +155,7 @@ func (suite *ConfigTestSuite) TestOverlapShadowConfigReader() {
 	templAppFlag.Changed = true
 	BindPFlag("template.metadata.labels.app", templAppFlag)
 	err = os.Setenv("CF_TEST_TEMPLABELS_APP", "somethingthatshouldnotshowup")
+	assert.NoError(err)
 	BindEnv("template.metadata.labels.app", "CF_TEST_TEMPLABELS_APP")
 
 	err = ReadConfigFromReader(strings.NewReader(specconf))
@@ -306,6 +307,7 @@ func (suite *ConfigTestSuite) TestPlainConfig1Reader() {
 	}{}
 
 	err = Unmarshal(&randOpts)
+	assert.NoError(err)
 	assert.Empty(randOpts)
 }
 

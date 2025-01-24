@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 while true
@@ -28,4 +27,3 @@ do
                 sleep 300
         done < $1
 done
-
