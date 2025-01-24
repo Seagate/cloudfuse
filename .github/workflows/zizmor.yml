@@ -1,4 +1,5 @@
 name: Zizmor CI/CD linting
+permissions: {}
 
 on:
   push:
