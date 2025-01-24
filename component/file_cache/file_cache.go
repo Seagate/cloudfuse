@@ -505,7 +505,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 	}
 }
 
-// DeleteDir: Recursively invalidate the directory and its children
+// DeleteDir: Delete empty directory
 func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("FileCache::DeleteDir : %s", options.Name)
 
@@ -526,7 +526,7 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 		}
 		// offline access is enabled
 		// to prevent consistency issues: if this is not a local directory, don't delete it locally
-		attr, getAttrErr := fc.GetAttr(internal.GetAttrOptions{Name: options.Name})
+		attr, getAttrErr := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 		// is the directory in cloud storage?
 		if getAttrErr == nil || attr != nil {
 			// directory exists in cloud storage - so do nothing
