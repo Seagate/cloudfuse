@@ -549,6 +549,7 @@ func (suite *dirTestSuite) TestGitStash() {
 		suite.NoError(err)
 		suite.EqualValues(10, n)
 		suite.EqualValues("TestString", string(data))
+		_ = f.Close()
 
 		cmd = exec.Command("git", "status")
 		cliOut, err = cmd.Output()
@@ -716,6 +717,8 @@ func (suite *dirTestSuite) TestStatfs() {
 	if suite.sizeTracker {
 		suite.EqualValues(12*len(suite.medBuff), DiskSize(pathPtr))
 	}
+
+	time.Sleep(time.Second * 1)
 
 	renameFile := filepath.Join(dirName, "small_file_rename")
 	for i := 0; i < 12; i++ {
