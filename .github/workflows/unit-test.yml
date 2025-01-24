@@ -74,7 +74,7 @@ jobs:
       - name: Install libfuse on Linux
         shell: bash
         run: |
-          sudo apt-get install fuse3 libfuse3-dev rpm pkg-config
+          sudo apt-get install ${{ matrix.fuselib }} ${{ matrix.fuselib2 }} rpm pkg-config
 
       - name: Build
         run: |

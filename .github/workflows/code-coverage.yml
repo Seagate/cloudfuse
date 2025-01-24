@@ -59,7 +59,6 @@ jobs:
 
       - name: Install libfuse
         run: |-
-          sudo apt-get update --fix-missing -o Dpkg::Options::="--force-confnew"
           sudo apt-get install ${{ matrix.fuselib }} ${{ matrix.fuselib2 }}
 
       - name: Create Directory Structure
@@ -1058,7 +1057,6 @@ jobs:
 
       - name: Install dependency
         run: |-
-          sudo apt-get update --fix-missing -o Dpkg::Options::="--force-confnew"
           sudo apt-get install ${{ matrix.fuselib }} ${{ matrix.fuselib2 }}
 
       - name: Cleanup Blob Storage
