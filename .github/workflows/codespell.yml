@@ -3,6 +3,8 @@
 # https://github.com/codespell-project/actions-codespell
 # https://github.com/codespell-project/codespell
 name: codespell
+permissions: {}
+
 on:
   push:
     branches:
