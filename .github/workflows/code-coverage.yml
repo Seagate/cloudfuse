@@ -20,11 +20,16 @@ jobs:
         job_name: ["linux"]
 
         include:
-          - job_name: linux
+          - job_name: linux-fuse3
             os: ubuntu-latest
             containerName: 'test-cnt-ubn'
             fuselib: libfuse3-dev
             fuselib2: fuse3
+          - job_name: linux-fuse2
+            os: ubuntu-latest
+            containerName: 'test-cnt-ubn'
+            fuselib: libfuse-dev
+            fuselib2: fuse
 
     runs-on: ${{ matrix.os }}
     env:
@@ -68,7 +73,11 @@ jobs:
 
       - name: Build
         run: |
-          ./build.sh
+          if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
+            ./build.sh -fuse2
+          else
+            ./build.sh
+          fi
 
       - name: Create Azure Configuration File
         run: |-
@@ -111,10 +120,23 @@ jobs:
           echo "}" >> $cnfFile
 
       - name: UT Code Coverage
-        run: go test -v -timeout=1h ./... --tags=unittest,storagetest -covermode count -coverprofile ./cloudfuse_ut.cov
+        run: |
+          if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
+            go test -v -timeout=1h ./... --tags=unittest,storagetest -covermode count -coverprofile ./cloudfuse_ut.cov
+          else
+            go test -v -timeout=1h ./... --tags=unittest,storagetest,fuse3 -covermode count -coverprofile ./cloudfuse_ut.cov
+          fi
 
       - name: Build coverage binary
         run: go test -coverpkg="./..." -covermode=count -c -o cloudfuse.test
+
+      - name: Build coverage binary
+        run: |
+          if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
+            go test -coverpkg="./..." -covermode=count -c -o cloudfuse.test
+          else
+            go test -coverpkg="./..." --tags=fuse3 -covermode=count -c -o cloudfuse.test
+          fi
 
       - name: Create Config File - Block Blob
         env:

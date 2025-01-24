@@ -70,6 +70,7 @@ builds:
     flags:
       - -trimpath
       - -buildmode=pie
+      - -tags=fuse3
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }} -L /usr/lib/x86_64-linux-gnu
@@ -103,6 +104,7 @@ builds:
     flags:
       - -trimpath
       - -buildmode=pie
+      - -tags=fuse3
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
@@ -205,7 +207,6 @@ archives:
         dst: ./samples/baseConfig.yaml
       - src: sample_configs/*
         dst: ./samples/
-
 
 release:
   extra_files:

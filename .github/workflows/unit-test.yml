@@ -17,9 +17,24 @@ on:
 jobs:
   linux-unit-test:
     name: Build and Test on Linux
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.23.2"]
+        job_name: ["linux"]
+
+        include:
+          - job_name: linux-fuse3
+            os: ubuntu-latest
+            containerName: 'test-cnt-ubn'
+            fuselib: libfuse3-dev
+            fuselib2: fuse3
+          - job_name: linux-fuse2
+            os: ubuntu-latest
+            fuselib: libfuse-dev
+            fuselib2: fuse
+
+    runs-on: ${{ matrix.os }}
     env:
-      go: "1.23.2"
       cgo: ""
       containerName: "test-cnt-ubn"
 
@@ -63,7 +78,11 @@ jobs:
 
       - name: Build
         run: |
-          ./build.sh
+          if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
+            ./build.sh -fuse2
+          else
+            ./build.sh
+          fi
 
       - name: Create Azure Configuration File on Linux
         run: |-
@@ -115,7 +134,12 @@ jobs:
           awslocal s3 ls
 
       - name: Run unit tests
-        run: go test -v -timeout=1h ./... --tags=unittest,azurite
+        run: |
+          if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
+            go test -v -timeout=1h ./... --tags=unittest,azurite
+          else
+            go test -v -timeout=1h ./... --tags=unittest,azurite,fuse3
+          fi
 
   test:
     name: Build and Test on Windows

@@ -4,11 +4,11 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     then
         rm -rf cloudfuse
         # Build cloudfuse with fuse2
-        go build -o cloudfuse -tags fuse2
+        go build -o cloudfuse
     else
         rm -rf cloudfuse
         # Build cloudfuse with fuse3
-        go build -o cloudfuse
+        go build -o cloudfuse -tags fuse3
     fi
 
     # Build Health Monitor binary
