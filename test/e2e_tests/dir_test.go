@@ -696,6 +696,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.WriteFile(newFile, suite.minBuff, 0777)
 		suite.NoError(err)
 	}
+	time.Sleep(time.Second * 2)
 	if suite.sizeTracker {
 		suite.EqualValues(12*len(suite.minBuff), DiskSize(pathPtr))
 	}
@@ -705,6 +706,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)
 	}
+	time.Sleep(time.Second * 2)
 	if suite.sizeTracker {
 		suite.EqualValues(12*4096, DiskSize(pathPtr))
 	}
@@ -714,11 +716,10 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.WriteFile(file, suite.medBuff, 0777)
 		suite.NoError(err)
 	}
+	time.Sleep(time.Second * 2)
 	if suite.sizeTracker {
 		suite.EqualValues(12*len(suite.medBuff), DiskSize(pathPtr))
 	}
-
-	time.Sleep(time.Second * 1)
 
 	renameFile := filepath.Join(dirName, "small_file_rename")
 	for i := 0; i < 12; i++ {
@@ -727,6 +728,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.Rename(oldFile, newFile)
 		suite.NoError(err)
 	}
+	time.Sleep(time.Second * 2)
 	if suite.sizeTracker {
 		suite.EqualValues(12*len(suite.medBuff), DiskSize(pathPtr))
 	}
@@ -736,6 +738,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)
 	}
+	time.Sleep(time.Second * 2)
 	if suite.sizeTracker {
 		suite.EqualValues(12*4096, DiskSize(pathPtr))
 	}

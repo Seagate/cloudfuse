@@ -44,5 +44,5 @@ func DiskSize(path string) int {
 		return 0
 	}
 
-	return int(total)
+	return int(total - free)
 }
