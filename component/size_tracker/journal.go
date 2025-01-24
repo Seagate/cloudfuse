@@ -80,25 +80,25 @@ func (s *MountSize) GetSize() uint64 {
 }
 
 func (s *MountSize) Add(delta uint64) (uint64, error) {
-	return s.updateSize(delta)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.size += delta
+	err := s.writeSizeToFile()
+	return s.size, err
 }
 
 func (s *MountSize) Subtract(delta uint64) (uint64, error) {
-	return s.updateSize(-delta)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.size -= delta
+	err := s.writeSizeToFile()
+	return s.size, err
 }
 
 func (s *MountSize) CloseFile() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.file.Close()
-}
-
-func (s *MountSize) updateSize(delta uint64) (uint64, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.size += delta
-	err := s.writeSizeToFile()
-	return s.size, err
 }
 
 func (s *MountSize) writeSizeToFile() error {

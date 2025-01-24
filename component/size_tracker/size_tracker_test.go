@@ -90,8 +90,7 @@ func newTestSizeTracker(next internal.Component, configuration string) *SizeTrac
 	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
 	sizeTracker := NewSizeTrackerComponent()
 	sizeTracker.SetNextComponent(next)
-	err := sizeTracker.Configure(true)
-	fmt.Println("Result from Configure is: ", err)
+	_ = sizeTracker.Configure(true)
 
 	return sizeTracker.(*SizeTracker)
 }
@@ -133,12 +132,12 @@ func (suite *sizeTrackerTestSuite) cleanupTest() {
 func (suite *sizeTrackerTestSuite) TestDefault() {
 	defer suite.cleanupTest()
 	suite.assert.Equal("size_tracker", suite.sizeTracker.Name())
-	print(suite.sizeTracker.mountSize.GetSize())
 	suite.assert.EqualValues(uint64(0), suite.sizeTracker.mountSize.GetSize())
 }
 
 func (suite *sizeTrackerTestSuite) TestDeleteDir() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	// Setup
 
 	dir := "dir"
@@ -169,6 +168,7 @@ func (suite *sizeTrackerTestSuite) TestDeleteDir() {
 
 func (suite *sizeTrackerTestSuite) TestRenameDir() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 
 	// Setup
 	src := "src"
@@ -197,6 +197,7 @@ func (suite *sizeTrackerTestSuite) TestRenameDir() {
 
 func (suite *sizeTrackerTestSuite) TestCreateFile() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	// Default is to not create empty files on create file to support immutable storage.
 	path := generateFileName()
 	options := internal.CreateFileOptions{Name: path}
@@ -213,6 +214,7 @@ func (suite *sizeTrackerTestSuite) TestCreateFile() {
 
 func (suite *sizeTrackerTestSuite) TestDeleteFile() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	path := generateFileName()
 
 	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
@@ -233,6 +235,7 @@ func (suite *sizeTrackerTestSuite) TestDeleteFile() {
 
 func (suite *sizeTrackerTestSuite) TestDeleteFileError() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	path := generateFileName()
 	err := suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: path})
 	suite.assert.Error(err)
@@ -241,6 +244,7 @@ func (suite *sizeTrackerTestSuite) TestDeleteFileError() {
 
 func (suite *sizeTrackerTestSuite) TestWriteFile() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	// Setup
 	file := generateFileName()
 	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
@@ -251,10 +255,17 @@ func (suite *sizeTrackerTestSuite) TestWriteFile() {
 	_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
+
+	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: file})
+	suite.assert.NoError(err)
 }
 
 func (suite *sizeTrackerTestSuite) TestWriteFileMultiple() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	// Setup
 	file := generateFileName()
 	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
@@ -291,6 +302,7 @@ func (suite *sizeTrackerTestSuite) TestWriteFileMultiple() {
 
 func (suite *sizeTrackerTestSuite) TestWriteFileErrorBadFd() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	// Setup
 	file := generateFileName()
 	handle := handlemap.NewHandle(file)
@@ -302,6 +314,7 @@ func (suite *sizeTrackerTestSuite) TestWriteFileErrorBadFd() {
 
 func (suite *sizeTrackerTestSuite) TestFlushFileEmpty() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	// Setup
 	file := generateFileName()
 	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
@@ -318,6 +331,7 @@ func (suite *sizeTrackerTestSuite) TestFlushFileEmpty() {
 
 func (suite *sizeTrackerTestSuite) TestFlushFile() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	// Setup
 	file := generateFileName()
 	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
@@ -337,6 +351,7 @@ func (suite *sizeTrackerTestSuite) TestFlushFile() {
 
 func (suite *sizeTrackerTestSuite) TestFlushFileErrorBadFd() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	// Setup
 	file := generateFileName()
 	handle := handlemap.NewHandle(file)
@@ -348,6 +363,7 @@ func (suite *sizeTrackerTestSuite) TestFlushFileErrorBadFd() {
 
 func (suite *sizeTrackerTestSuite) TestRenameFile() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	// Setup
 	src := "src1"
 	dst := "dst1"
@@ -375,6 +391,7 @@ func (suite *sizeTrackerTestSuite) TestRenameOpenFile() {
 		return
 	}
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 
 	src := "src2"
 	dst := "dst2"
@@ -410,6 +427,7 @@ func (suite *sizeTrackerTestSuite) TestRenameWriteFile() {
 		return
 	}
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 
 	src := "src3"
 	dst := "dst3"
@@ -451,6 +469,7 @@ func (suite *sizeTrackerTestSuite) TestRenameWriteFile() {
 
 func (suite *sizeTrackerTestSuite) TestTruncateFile() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	// Setup
 	path := generateFileName()
 	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
@@ -470,6 +489,7 @@ func (suite *sizeTrackerTestSuite) TestTruncateFile() {
 
 func (suite *sizeTrackerTestSuite) TestTruncateFileOpen() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	// Setup
 	path := generateFileName()
 	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
@@ -494,6 +514,7 @@ func (suite *sizeTrackerTestSuite) TestSymlink() {
 		return
 	}
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	// Setup
 	file := generateFileName()
 	symlink := generateFileName() + ".lnk"
@@ -518,6 +539,7 @@ func (suite *sizeTrackerTestSuite) TestSymlink() {
 
 func (suite *sizeTrackerTestSuite) TestStatFS() {
 	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 
 	file := generateFileName()
 	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
