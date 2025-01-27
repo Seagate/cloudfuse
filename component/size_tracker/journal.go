@@ -53,7 +53,6 @@ func CreateSizeJournal(filename string) (*MountSize, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 
 	fileInfo, err := f.Stat()
 	if err != nil {
@@ -80,26 +79,26 @@ func (s *MountSize) GetSize() uint64 {
 	return s.size
 }
 
-func (s *MountSize) Add(delta uint64) uint64 {
-	return s.updateSize(delta)
+func (s *MountSize) Add(delta uint64) (uint64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.size += delta
+	err := s.writeSizeToFile()
+	return s.size, err
 }
 
-func (s *MountSize) Subtract(delta uint64) uint64 {
-	return s.updateSize(-delta)
+func (s *MountSize) Subtract(delta uint64) (uint64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.size -= delta
+	err := s.writeSizeToFile()
+	return s.size, err
 }
 
 func (s *MountSize) CloseFile() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.file.Close()
-}
-
-func (s *MountSize) updateSize(delta uint64) uint64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.size += delta
-	_ = s.writeSizeToFile()
-	return s.size
 }
 
 func (s *MountSize) writeSizeToFile() error {
