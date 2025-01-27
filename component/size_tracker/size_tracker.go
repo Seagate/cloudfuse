@@ -162,7 +162,7 @@ func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
 
 	err := st.NextComponent().RenameFile(options)
 
-	// If dst already exista and rename succeeds, remove overwritten dst size
+	// If dst already exists and rename succeeds, remove overwritten dst size
 	if dstErr == nil && err == nil {
 		_, journalErr := st.mountSize.Subtract(uint64(dstAttr.Size))
 		if journalErr != nil {
