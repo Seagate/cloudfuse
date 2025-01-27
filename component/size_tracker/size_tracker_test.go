@@ -90,8 +90,7 @@ func newTestSizeTracker(next internal.Component, configuration string) *SizeTrac
 	_ = config.ReadConfigFromReader(strings.NewReader(configuration))
 	sizeTracker := NewSizeTrackerComponent()
 	sizeTracker.SetNextComponent(next)
-	err := sizeTracker.Configure(true)
-	fmt.Println("Result from Configure is: ", err)
+	_ = sizeTracker.Configure(true)
 
 	return sizeTracker.(*SizeTracker)
 }
@@ -396,7 +395,6 @@ func (suite *sizeTrackerTestSuite) TestRenameOpenFile() {
 	// Close file handle
 	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
-	fmt.Println(suite.sizeTracker.mountSize.GetSize())
 
 	suite.assert.EqualValues(len(data), suite.sizeTracker.mountSize.GetSize())
 
@@ -441,7 +439,6 @@ func (suite *sizeTrackerTestSuite) TestRenameWriteFile() {
 	// Close file handle
 	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
-	fmt.Println(suite.sizeTracker.mountSize.GetSize())
 
 	suite.assert.EqualValues(2*len(data), suite.sizeTracker.mountSize.GetSize())
 

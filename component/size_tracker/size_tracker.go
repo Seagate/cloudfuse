@@ -177,22 +177,11 @@ func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error)
 	if err != nil {
 		return bytesWritten, err
 	}
-
-	var newSize int64
-	attr, getAttrErr2 := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
-	if getAttrErr2 == nil {
-		newSize = attr.Size
-	} else {
-		log.Err("SizeTracker::WriteFile : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v", options.Handle.Path, getAttrErr2)
-	}
-
-	if getAttrErr1 != nil || getAttrErr2 != nil {
-		return bytesWritten, nil
-	}
+	newSize := max(oldSize, options.Offset+int64(len(options.Data)))
 
 	diff := newSize - oldSize
 
-	// File already exists and CopyFromFile succeeded subtract difference in file size
+	// File already exists and WriteFile succeeded subtract difference in file size
 	if diff < 0 {
 		st.mountSize.Subtract(uint64(-diff))
 	} else {
