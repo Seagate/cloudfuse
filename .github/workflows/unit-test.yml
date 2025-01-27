@@ -19,7 +19,7 @@ jobs:
     name: Build and Test on Linux
     strategy:
       matrix:
-        go: ["1.23.2"]
+        go: ["1.23"]
         job_name: ["linux-fuse3", "linux-fuse2"]
         include:
           - job_name: linux-fuse3
@@ -144,7 +144,7 @@ jobs:
     name: Build and Test on Windows
     runs-on: windows-latest
     env:
-      go: "1.23.2"
+      go: "1.23"
       cgo: "0"
       containerName: "test-cnt-win"
 
@@ -178,7 +178,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     env:
-      go: "1.23.2"
+      go: "1.23"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

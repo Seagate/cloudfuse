@@ -16,8 +16,9 @@ jobs:
   BuildAndTest-Coverage:
     strategy:
       matrix:
-        go: ["1.23.2"]
+        go: ["1.23"]
         job_name: ["linux-fuse3", "linux-fuse2"]
+
         include:
           - job_name: linux-fuse3
             os: ubuntu-latest
@@ -545,7 +546,7 @@ jobs:
   BuildAndTest-Coverage-Windows:
     strategy:
       matrix:
-        go: ["1.23.2"]
+        go: ["1.23"]
         job_name: ["windows"]
 
         include:
@@ -1029,7 +1030,7 @@ jobs:
       - BuildAndTest-Coverage-Windows
     strategy:
       matrix:
-        go: ["1.23.2"]
+        go: ["1.23"]
         job_name: ["linux"]
 
         include:
