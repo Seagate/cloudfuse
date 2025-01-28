@@ -214,7 +214,7 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 		}
 	}
 	// advise on required permissions
-	fmt.Println("ensure the user, " + serviceUser + ", has the following access: \n" + mountPath + ": read, write, and execute \n" + configPath + ": read \n")
+	fmt.Println("ensure the user, " + serviceUser + ", has the following access: \n" + mountPath + ": read, write, and execute \n" + configPath + ": read")
 	return nil
 }
 
