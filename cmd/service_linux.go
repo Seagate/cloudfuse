@@ -241,6 +241,6 @@ func init() {
 	markFlagErrorChk(installCmd, "mount-path")
 	markFlagErrorChk(installCmd, "config-file")
 	serviceCmd.AddCommand(uninstallCmd)
-	uninstallCmd.Flags().StringVar(&serviceName, "mount-path", "", "Input mount path")
+	uninstallCmd.Flags().StringVar(&mountPath, "mount-path", "", "Input mount path")
 	markFlagErrorChk(uninstallCmd, "mount-path")
 }
