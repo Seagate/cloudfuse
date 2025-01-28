@@ -449,7 +449,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 
 	// Do not call nextComponent.CreateDir when we are offline.
 	// Otherwise the attribute cache could go out of sync with the cloud.
-	// TODO: create a new component API function to check this, instead of using StatFs
+	// TODO: create a new component API function to check this (SRGDEV-614), instead of using StatFs
 	_, _, err := fc.NextComponent().StatFs()
 	if !errors.Is(err, &common.CloudUnreachableError{}) {
 		// we have a cloud connection, so it's safe to call the next component
