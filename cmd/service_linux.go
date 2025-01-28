@@ -116,7 +116,6 @@ var installCmd = &cobra.Command{
 	},
 }
 
-var serviceName string
 var uninstallCmd = &cobra.Command{
 	Use:               "uninstall",
 	Short:             "Uninstall a startup process for Cloudfuse.",
@@ -244,7 +243,10 @@ func init() {
 	installCmd.Flags().StringVar(&mountPath, "mount-path", "", "Input mount path")
 	installCmd.Flags().StringVar(&configPath, "config-file", "", "Input config file")
 	installCmd.Flags().StringVar(&serviceUser, "user", "cloudfuse", "Input service user")
-	installCmd.MarkFlagRequired("mount-path")
+	err := installCmd.MarkFlagRequired("mount-path")
+	if err != nil {
+		return
+	}
 	installCmd.MarkFlagRequired("config-file")
 	serviceCmd.AddCommand(uninstallCmd)
 	uninstallCmd.Flags().StringVar(&serviceName, "mount-path", "", "Input mount path")
