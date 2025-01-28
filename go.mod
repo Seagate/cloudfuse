@@ -1,11 +1,11 @@
 module github.com/Seagate/cloudfuse
 
-go 1.23.2
+go 1.23
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.1
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.5.0
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake v1.3.0
 	github.com/JeffreyRichter/enum v0.0.0-20180725232043-2567042f9cda
 	github.com/aws/aws-sdk-go-v2 v1.32.8
@@ -21,14 +21,14 @@ require (
 	github.com/montanaflynn/stats v0.7.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/radovskyb/watcher v1.0.7
-	github.com/sevlyar/go-daemon v0.1.6
+	github.com/sevlyar/go-daemon v0.1.7-0.20240723083326-c2a11b2b57fc
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	github.com/vibhansa-msft/tlru v0.0.0-20240410102558-9e708419e21f
-	github.com/winfsp/cgofuse v1.5.0
+	github.com/winfsp/cgofuse v1.6.0
 	go.uber.org/atomic v1.11.0
 	golang.org/x/sys v0.29.0
 	gopkg.in/ini.v1 v1.67.0
@@ -78,7 +78,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.32.0 // indirect
-	golang.org/x/exp v0.0.0-20240823005443-9b4947da3948 // indirect
+	golang.org/x/exp v0.0.0-20241210194714-1829a127f884 // indirect
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

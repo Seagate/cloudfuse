@@ -10,6 +10,7 @@
 # supported CodeQL languages.
 #
 name: "CodeQL"
+permissions: {}
 
 on:
   pull_request:
@@ -51,7 +52,7 @@ jobs:
         if: matrix.language == 'go'
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23.2"
+          go-version: "1.23"
           check-latest: true
 
       - name: Go Version
