@@ -433,7 +433,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		} else {
 			// return whatever entries we have (but only if the token is empty)
 			entry, found := ac.cache.get(options.Name)
-			if options.Token == "" && found {
+			if options.Token == "" && found && entry.listingComplete {
 				for _, v := range entry.children {
 					if v.exists() && v.valid() {
 						pathList = append(pathList, v.attr)
