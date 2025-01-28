@@ -357,13 +357,11 @@ var mountCmd = &cobra.Command{
 			containers, err := getBucketListS3()
 			if len(containers) != 0 && err == nil {
 				pipeline = append(pipeline, "s3storage")
-			}
-
-			containers, err = getContainerListAzure()
-			if len(containers) != 0 && err == nil {
-				pipeline = append(pipeline, "azstorage")
-			}
-			if err != nil {
+			} else if containers, err := getContainerListAzure(); err == nil {
+				if len(containers) != 0 && err == nil {
+					pipeline = append(pipeline, "azstorage")
+				}
+			} else if err != nil {
 				return fmt.Errorf("failed to mount instance [%s]", err.Error())
 			}
 
