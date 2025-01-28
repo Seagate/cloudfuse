@@ -72,15 +72,15 @@ var installCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		var err error
-		mountPath, err = getAbsPath(mountPath)
+		mountPath, err := filepath.Abs(mountPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("couldn't couldn't determine absolute path from string [%s]", err.Error())
 		}
-		configPath, err = getAbsPath(configPath)
+		configPath, err := filepath.Abs(configPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("couldn't couldn't determine absolute path from string [%s]", err.Error())
 		}
+
 		mountExists := common.DirectoryExists(mountPath)
 		if !mountExists {
 			return fmt.Errorf("the mount path provided does not exist")
@@ -125,10 +125,10 @@ var uninstallCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// get absolute path of provided relative mount path
-		var err error
-		mountPath, err = getAbsPath(mountPath)
+
+		mountPath, err := filepath.Abs(mountPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("couldn't couldn't determine absolute path from string [%s]", err.Error())
 		}
 		serviceName, serviceFilePath := getService(mountPath)
 		if _, err := os.Stat(serviceFilePath); err == nil {
@@ -223,17 +223,6 @@ func getService(mountPath string) (string, string) {
 	serviceFile := "cloudfuse" + serviceName + ".service"
 	serviceFilePath := "/etc/systemd/system/" + serviceFile
 	return serviceName, serviceFilePath
-}
-
-// takes a file or folder name and returns its absolute path
-func getAbsPath(leaf string) (string, error) {
-	var absPath string
-	var err error
-	absPath, err = filepath.Abs(leaf)
-	if err != nil {
-		return "", fmt.Errorf("couldn't format the path string due to the following error [%s]", err.Error())
-	}
-	return absPath, err
 }
 
 func markFlagErrorChk(cmd *cobra.Command, flagName string) {
