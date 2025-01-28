@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -199,7 +199,7 @@ func decryptConfigFile(saveConfig bool) ([]byte, error) {
 
 // saveToFile: Save the newly generated config file and delete the source if requested
 func saveToFile(configFileName string, data []byte, deleteSource bool) error {
-	err := os.WriteFile(configFileName, data, 0777)
+	err := os.WriteFile(configFileName, data, 0644)
 	if err != nil {
 		return err
 	}

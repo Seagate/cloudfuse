@@ -3,7 +3,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -45,8 +45,8 @@ import (
 func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName string, pidFilePerm os.FileMode, umask int, fname string) error {
 	dmnCtx := &daemon.Context{
 		PidFileName: pidFileName,
-		PidFilePerm: 0644,
-		Umask:       022,
+		PidFilePerm: pidFilePerm,
+		Umask:       umask,
 		LogFileName: fname, // this will redirect stderr of child to given file
 	}
 
@@ -73,7 +73,12 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 
 	log.Debug("mount: foreground disabled, child = %v", daemon.WasReborn())
 	if child == nil { // execute in child only
-		defer dmnCtx.Release() // nolint
+		defer func() {
+			if err := dmnCtx.Release(); err != nil {
+				log.Err("Unable to release pid-file: %s", err.Error())
+			}
+		}()
+
 		setGOConfig()
 		go startDynamicProfiler()
 
@@ -95,8 +100,11 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 			if err != nil {
 				log.Err("mount: failed to read child [%v] failure logs [%s]", child.Pid, err.Error())
 				return Destroy(fmt.Sprintf("failed to mount, please check logs [%s]", err.Error()))
-			} else {
+			} else if len(buff) > 0 {
 				return Destroy(string(buff))
+			} else {
+				// Nothing was logged, so mount succeeded
+				return nil
 			}
 
 		case <-time.After(options.WaitForMount):

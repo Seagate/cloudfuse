@@ -1,4 +1,4 @@
-
+#!/bin/bash
 
 logFile="./overnight.log"
 

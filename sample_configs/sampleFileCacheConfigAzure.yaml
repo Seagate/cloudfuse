@@ -6,21 +6,18 @@ logging:
 
 components:
   - libfuse
-  - block_cache
+  - file_cache
   - attr_cache
   - azstorage
 
 libfuse:
-  attribute-expiration-sec: 120
-  entry-expiration-sec: 120
-  negative-entry-expiration-sec: 240
   network-share: true
 
-block_cache:
-  block-size-mb: 32
-  mem-size-mb: 4096
-  prefetch: 80
-  parallelism: 128
+file_cache:
+  path: /<PATH>/<TO>/<CACHE_DIR>
+  timeout-sec: 64000000
+  allow-non-empty-temp: true
+  ignore-sync: true
 
 attr_cache:
   timeout-sec: 7200
