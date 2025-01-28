@@ -39,7 +39,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"runtime"
 	"strconv"
 	"strings"
@@ -390,27 +389,48 @@ func (s *s3StorageTestSuite) TestCreateDir() {
 		log.Debug(path)
 		s.Run(path, func() {
 			err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: path})
-			// this does nothing, so just make sure it doesn't return an error
 			s.assert.NoError(err)
+
+			// Directory should be in the account
+			key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, internal.ExtendDirName(path))
+			result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+				Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+				Key:    aws.String(key),
+			})
+			s.assert.NoError(err)
+			s.assert.NotNil(result)
+			s.assert.EqualValues(0, *result.ContentLength)
 		})
 	}
 }
 
 func (s *s3StorageTestSuite) TestDeleteDir() {
 	defer s.cleanupTest()
-	// Setup
-	dirName := generateDirectoryName()
-	// A directory isn't created unless there is a file in that directory, therefore create a file with
-	// 		the directory prefix instead of s.s3Storage.CreateDir(internal.CreateDirOptions{Name: name})
-	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: path.Join(dirName, generateFileName())})
-	s.assert.NoError(err)
+	// Testing dir and dir/
+	var paths = []string{generateDirectoryName(), generateDirectoryName() + "/"}
+	for _, path := range paths {
+		log.Debug(path)
+		s.Run(path, func() {
+			err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: path})
+			s.assert.NoError(err)
 
-	err = s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: dirName})
-	s.assert.NoError(err)
+			err = s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: path})
+			s.assert.NoError(err)
 
-	// Directory should not be in the account
-	dirEmpty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: dirName})
-	s.assert.True(dirEmpty)
+			s.assert.NoError(err)
+			// Directory should not be in the account
+			key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, path)
+			_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+				Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+				Key:    aws.String(key),
+			})
+			s.assert.Error(err)
+
+			// Directory should not be in the account
+			dirEmpty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: path})
+			s.assert.True(dirEmpty)
+		})
+	}
 }
 
 // Directory structure
@@ -631,7 +651,6 @@ func (s *s3StorageTestSuite) TestStreamDirNoVirtualDirectory() {
 			s.assert.EqualValues(name, entries[0].Path)
 			s.assert.EqualValues(name, entries[0].Name)
 			s.assert.True(entries[0].IsDir())
-			s.assert.True(entries[0].IsMetadataRetrieved())
 			s.assert.True(entries[0].IsModeDefault())
 		})
 	}
@@ -651,13 +670,11 @@ func (s *s3StorageTestSuite) TestStreamDirHierarchy() {
 	s.assert.EqualValues(base+"/c1", entries[0].Path)
 	s.assert.EqualValues("c1", entries[0].Name)
 	s.assert.True(entries[0].IsDir())
-	s.assert.True(entries[0].IsMetadataRetrieved())
 	s.assert.True(entries[0].IsModeDefault())
 	// Check the file
 	s.assert.EqualValues(base+"/c2", entries[1].Path)
 	s.assert.EqualValues("c2", entries[1].Name)
 	s.assert.False(entries[1].IsDir())
-	s.assert.True(entries[1].IsMetadataRetrieved())
 	s.assert.True(entries[1].IsModeDefault())
 }
 
@@ -680,19 +697,16 @@ func (s *s3StorageTestSuite) TestStreamDirRoot() {
 			s.assert.EqualValues(base, entries[0].Path)
 			s.assert.EqualValues(base, entries[0].Name)
 			s.assert.True(entries[0].IsDir())
-			s.assert.True(entries[0].IsMetadataRetrieved())
 			s.assert.True(entries[0].IsModeDefault())
 			// Check the baseb dir
 			s.assert.EqualValues(base+"b", entries[1].Path)
 			s.assert.EqualValues(base+"b", entries[1].Name)
 			s.assert.True(entries[1].IsDir())
-			s.assert.True(entries[1].IsMetadataRetrieved())
 			s.assert.True(entries[1].IsModeDefault())
 			// Check the basec file
 			s.assert.EqualValues(base+"c", entries[2].Path)
 			s.assert.EqualValues(base+"c", entries[2].Name)
 			s.assert.False(entries[2].IsDir())
-			s.assert.True(entries[2].IsMetadataRetrieved())
 			s.assert.True(entries[2].IsModeDefault())
 		})
 	}
@@ -712,7 +726,6 @@ func (s *s3StorageTestSuite) TestStreamDirSubDir() {
 	s.assert.EqualValues(base+"/c1"+"/gc1", entries[0].Path)
 	s.assert.EqualValues("gc1", entries[0].Name)
 	s.assert.False(entries[0].IsDir())
-	s.assert.True(entries[0].IsMetadataRetrieved())
 	s.assert.True(entries[0].IsModeDefault())
 }
 
@@ -733,7 +746,6 @@ func (s *s3StorageTestSuite) TestStreamDirSubDirPrefixPath() {
 	s.assert.EqualValues("c1"+"/gc1", entries[0].Path)
 	s.assert.EqualValues("gc1", entries[0].Name)
 	s.assert.False(entries[0].IsDir())
-	s.assert.True(entries[0].IsMetadataRetrieved())
 	s.assert.True(entries[0].IsModeDefault())
 }
 
@@ -2086,6 +2098,7 @@ func (s *s3StorageTestSuite) TestStreamDirSmallCountNoDuplicates() {
 		objectList = append(objectList, newList...)
 		marker = nextMarker
 		iteration++
+		fmt.Println(newList[0].Path)
 
 		log.Debug("s3StorageTestSuite::TestStreamDirSmallCountNoDuplicates : So far retrieved %d objects in %d iterations", len(objectList), iteration)
 		if nextMarker == "" {
@@ -2281,16 +2294,13 @@ func (s *s3StorageTestSuite) TestReadLinkDisabled() {
 func (s *s3StorageTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
 	// Setup
-	dirName := generateDirectoryName()
+	dirName := generateDirectoryName() + "/"
+	fmt.Println(dirName)
 	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: dirName})
-	s.assert.NoError(err)
-	// since CreateDir doesn't do anything, let's put an object with that prefix
-	filename := dirName + "/" + generateFileName()
-	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: filename})
 	s.assert.NoError(err)
 	// Now we should be able to see the directory
 	props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: dirName})
-	deleteError := s.s3Storage.DeleteFile(internal.DeleteFileOptions{Name: filename})
+	deleteError := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: dirName})
 	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.True(props.IsDir())

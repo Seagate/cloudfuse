@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -294,6 +295,9 @@ func (cl *Client) CreateFile(name string, mode os.FileMode) error {
 
 // CreateDirectory : Create a new directory in the bucket/virtual directory
 func (cl *Client) CreateDirectory(name string) error {
+	// make sure name has a trailing slash
+	name = internal.ExtendDirName(name)
+
 	log.Trace("Client::CreateDirectory : name %s", name)
 	// MinIO does not support creating an empty file to indicate a directory
 	// directories will be represented only as object prefixes
@@ -302,6 +306,12 @@ func (cl *Client) CreateDirectory(name string) error {
 	// but that would be a performance penalty for a check that the OS already does.
 	// So, let's make it clear: we expect the OS to call GetAttr() on the directory
 	// to make sure it doesn't exist before trying to create it.
+
+	err := cl.putObject(name, nil, 0, false)
+	if err != nil {
+		log.Err("Client::CreateDirectory : putObject(%s) failed. Here's why: %v", name, err)
+		return err
+	}
 	return nil
 }
 
@@ -355,6 +365,14 @@ func (cl *Client) DeleteDirectory(name string) error {
 	done := false
 	var marker *string
 	var err error
+
+	// Include deleting the current directory
+	var objectsToDelete []*internal.ObjAttr
+	objectsToDelete = append(objectsToDelete, &internal.ObjAttr{
+		Path: name,
+		Name: filepath.Base(name),
+	})
+
 	for !done {
 
 		// list all objects with the prefix
@@ -376,13 +394,13 @@ func (cl *Client) DeleteDirectory(name string) error {
 		// Delete all found objects *and prefixes ("directories")*.
 		// For improved performance, we'll use one call to delete all objects in this directory.
 		// 	To make one call, we need to make a list of objects to delete first.
-		var objectsToDelete []*internal.ObjAttr
 		for _, object := range objects {
 			if object.IsDir() {
 				err = cl.DeleteDirectory(object.Path)
 				if err != nil {
 					log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", object.Path, err)
 				}
+				objectsToDelete = append(objectsToDelete, object)
 			} else {
 				objectsToDelete = append(objectsToDelete, object) //consider just object instead of object.path to pass down attributes that come from list.
 			}
@@ -397,6 +415,7 @@ func (cl *Client) DeleteDirectory(name string) error {
 			done = true
 		}
 
+		objectsToDelete = []*internal.ObjAttr{}
 	}
 
 	return err
@@ -467,6 +486,10 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 // If name is a directory, the trailing slash is optional.
 func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::GetAttr : name %s", name)
+	// if name ends in trailing slash then is a directory
+	if len(name) > 0 && name[len(name)-1] == '/' {
+		return cl.headDir(name)
+	}
 
 	// first let's suppose the caller is looking for a file
 	// there are no objects with trailing slashes (MinIO doesn't support them)

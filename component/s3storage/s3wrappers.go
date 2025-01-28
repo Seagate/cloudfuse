@@ -218,6 +218,27 @@ func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, er
 	return object, nil
 }
 
+// Wrapper for awsS3Client.HeadObject.
+// HeadObject() acts just like GetObject, except no contents are returned.
+// So this is used to get metadata / attributes for a directory.
+// name is the path to the directory.
+func (cl *Client) headDir(name string) (*internal.ObjAttr, error) {
+	key := cl.getKey(name, false)
+	log.Trace("Client::headDir : object %s", key)
+
+	_, err := cl.awsS3Client.HeadObject(context.Background(), &s3.HeadObjectInput{
+		Bucket: aws.String(cl.Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		attemptedAction := fmt.Sprintf("HeadObject(%s)", name)
+		return nil, parseS3Err(err, attemptedAction)
+	}
+
+	attr := internal.CreateObjAttrDir(name)
+	return attr, nil
+}
+
 // Wrapper for awsS3Client.HeadBucket
 func (cl *Client) headBucket() (*s3.HeadBucketOutput, error) {
 	headBucketOutput, err := cl.awsS3Client.HeadBucket(context.Background(), &s3.HeadBucketInput{
@@ -449,7 +470,6 @@ func createObjAttr(path string, size int64, lastModified time.Time, isSymLink bo
 		Flags:  internal.NewFileBitMap(),
 	}
 	// set flags
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	attr.Metadata = make(map[string]*string)
@@ -474,7 +494,6 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) { //nolint
 	attr.Mode = os.ModeDir
 	// set flags
 	attr.Flags = internal.NewDirBitMap()
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	return attr
