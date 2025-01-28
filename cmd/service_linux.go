@@ -236,6 +236,12 @@ func getAbsPath(leaf string) (string, error) {
 	return absPath, err
 }
 
+func markFlagErrorChk(cmd *cobra.Command, flagName string) {
+	if err := cmd.MarkFlagRequired(flagName); err != nil {
+		panic(fmt.Sprintf("Failed to mark flag as required: %v", err))
+	}
+}
+
 func init() {
 	rootCmd.AddCommand(serviceCmd)
 	rootCmd.SilenceUsage = false
@@ -243,12 +249,9 @@ func init() {
 	installCmd.Flags().StringVar(&mountPath, "mount-path", "", "Input mount path")
 	installCmd.Flags().StringVar(&configPath, "config-file", "", "Input config file")
 	installCmd.Flags().StringVar(&serviceUser, "user", "cloudfuse", "Input service user")
-	err := installCmd.MarkFlagRequired("mount-path")
-	if err != nil {
-		return
-	}
-	installCmd.MarkFlagRequired("config-file")
+	markFlagErrorChk(installCmd, "mount-path")
+	markFlagErrorChk(installCmd, "config-file")
 	serviceCmd.AddCommand(uninstallCmd)
 	uninstallCmd.Flags().StringVar(&serviceName, "mount-path", "", "Input mount path")
-	uninstallCmd.MarkFlagRequired("mount-path")
+	markFlagErrorChk(uninstallCmd, "mount-path")
 }
