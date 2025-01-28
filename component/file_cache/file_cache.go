@@ -650,16 +650,8 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	f, err := common.Open(localPath)
 	if err == nil {
 		log.Debug("FileCache::IsDirEmpty : %s found in local cache", options.Name)
-
 		// Check local cache directory is empty or not
-		path, err := f.Readdirnames(1)
-
-		// If the local directory has a path in it, it is likely due to !createEmptyFile.
-		if err == nil && !fc.createEmptyFile && len(path) > 0 {
-			log.Debug("FileCache::IsDirEmpty : %s had a subpath in the local cache (%s)", options.Name, path[0])
-			return false
-		}
-
+		_, err := f.Readdirnames(1)
 		// If there are files in local cache then don't allow deletion of directory
 		if err != io.EOF {
 			// Local directory is not empty fail the call
