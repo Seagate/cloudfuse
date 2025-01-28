@@ -626,7 +626,6 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 					// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
 					info, err := os.Stat(filepath.Join(localPath, entry.Name())) // Grab local cache attributes
 					flock.Unlock()
-					// If local file is not locked then only use its attributes otherwise rely on container attributes
 					if err == nil {
 						// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
 						log.Debug("FileCache::StreamDir : serving %s from local cache", entryPath)

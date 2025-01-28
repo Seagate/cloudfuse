@@ -426,17 +426,23 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			}
 		}
 	} else if errors.Is(err, &common.CloudUnreachableError{}) {
-		// return whatever entries we have (but only if the token is empty)
-		entry, found := ac.cache.get(options.Name)
-		if options.Token == "" && found {
-			for _, v := range entry.children {
-				if v.exists() && v.valid() {
-					pathList = append(pathList, v.attr)
-				}
-			}
+		// return expired cachedPathList
+		if cachedPathList != nil {
+			pathList = cachedPathList
+			nextToken = cachedToken
 		} else {
-			// the cloud is unavailable, and we have nothing to provide
-			return pathList, nextToken, common.NewNoCachedDataError(err)
+			// return whatever entries we have (but only if the token is empty)
+			entry, found := ac.cache.get(options.Name)
+			if options.Token == "" && found {
+				for _, v := range entry.children {
+					if v.exists() && v.valid() {
+						pathList = append(pathList, v.attr)
+					}
+				}
+			} else {
+				// the cloud is unavailable, and we have nothing to provide
+				err = common.NewNoCachedDataError(err)
+			}
 		}
 	}
 	// values should be returned in ascending order by key, without duplicates
@@ -458,7 +464,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			ac.markListingComplete(options.Name)
 		}
 	} else {
-		log.Err("AttrCache::StreamDir : %s encountered error [%v]", err)
+		log.Err("AttrCache::StreamDir : %s encountered error [%v]", options.Name, err)
 	}
 	log.Trace("AttrCache::StreamDir : %s returning %d entries", options.Name, len(pathList))
 	return pathList, nextToken, err
@@ -469,9 +475,8 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 // and the token for the next page (if there is one).
 // If page requests are repeated or backtrack, this may cause unexpected OS behavior.
 func (ac *AttrCache) fetchCachedDirList(path string, token string) ([]*internal.ObjAttr, string, error) {
-	var pathList []*internal.ObjAttr
 	if !ac.cacheOnList {
-		return pathList, "", fmt.Errorf("cache on list is disabled")
+		return nil, "", fmt.Errorf("cache on list is disabled")
 	}
 	// start accessing the cache
 	ac.cacheLock.RLock()
@@ -480,25 +485,20 @@ func (ac *AttrCache) fetchCachedDirList(path string, token string) ([]*internal.
 	listDirCache, found := ac.cache.get(path)
 	if !found {
 		log.Warn("AttrCache::fetchCachedDirList : %s directory not found in cache", path)
-		return pathList, "", common.NewNoCachedDataError(fmt.Errorf("%s directory not found in cache", path))
+		return nil, "", common.NewNoCachedDataError(fmt.Errorf("%s directory not found in cache", path))
 	}
 	// is the requested data cached?
-	if listDirCache.listCache == nil {
-		listDirCache.listCache = make(map[string]listCacheSegment)
-	}
 	cachedListSegment, found := listDirCache.listCache[token]
 	if !found {
 		// the data for this token is not in the cache
 		// don't provide cached data when new (uncached) data is being requested
 		log.Info("AttrCache::fetchCachedDirList : %s listing segment %s not cached", path, token)
-		return pathList, "", fmt.Errorf("%s directory listing segment %s not cached", path, token)
+		return nil, "", fmt.Errorf("%s directory listing segment %s not cached", path, token)
 	}
 	// check timeout
 	if time.Since(cachedListSegment.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
 		log.Info("AttrCache::fetchCachedDirList : %s listing segment %s cache expired", path, token)
-		// drop the invalid segment from the list cache
-		delete(listDirCache.listCache, token)
-		return pathList, "", fmt.Errorf("%s directory listing segment %s cache expired", path, token)
+		return cachedListSegment.entries, "", fmt.Errorf("%s directory listing segment %s cache expired", path, token)
 	}
 	log.Trace("AttrCache::fetchCachedDirList : %s token=\"%s\"->\"%s\" serving %d items from cache",
 		path, token, cachedListSegment.nextToken, len(cachedListSegment.entries))
@@ -558,12 +558,6 @@ func (ac *AttrCache) cacheListSegment(pathList []*internal.ObjAttr, listDirPath 
 	}
 	// add the new entry
 	listDirItem.listCache[token] = newListCacheSegment
-	// scan the listing cache and remove expired entries
-	for k, v := range listDirItem.listCache {
-		if currTime.Sub(v.cachedAt).Seconds() >= float64(ac.cacheTimeout) {
-			delete(listDirItem.listCache, k)
-		}
-	}
 	log.Trace("AttrCache::cacheListSegment : %s cached list entries \"%s\"-\"%s\" (%d items)",
 		listDirPath, token, nextToken, len(pathList))
 }
