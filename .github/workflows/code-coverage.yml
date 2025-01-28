@@ -24,12 +24,10 @@ jobs:
             os: ubuntu-latest
             containerName: "test-cnt-ubn"
             fuselib: libfuse3-dev
-            fuselib2: fuse3
           - job_name: linux-fuse2
             os: ubuntu-latest
             containerName: "test-cnt-ubn"
             fuselib: libfuse-dev
-            fuselib2: fuse
 
     runs-on: ${{ matrix.os }}
     env:
@@ -59,7 +57,7 @@ jobs:
 
       - name: Install libfuse
         run: |-
-          sudo apt-get install ${{ matrix.fuselib }} ${{ matrix.fuselib2 }}
+          sudo apt-get install ${{ matrix.fuselib }}
 
       - name: Create Directory Structure
         run: |-

@@ -26,15 +26,13 @@ jobs:
             os: ubuntu-latest
             containerName: "test-cnt-ubn"
             fuselib: libfuse3-dev
-            fuselib2: fuse3
           - job_name: linux-fuse2
             os: ubuntu-latest
             fuselib: libfuse-dev
-            fuselib2: fuse
 
     runs-on: ${{ matrix.os }}
     env:
-      cgo: ""
+      cgo: "1"
       containerName: "test-cnt-ubn"
 
       AWS_ENDPOINT: http://localhost:4566
@@ -73,7 +71,7 @@ jobs:
       - name: Install libfuse on Linux
         shell: bash
         run: |
-          sudo apt-get install ${{ matrix.fuselib }} ${{ matrix.fuselib2 }} rpm pkg-config
+          sudo apt-get install ${{ matrix.fuselib }}
 
       - name: Build
         run: |
