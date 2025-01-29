@@ -392,7 +392,7 @@ func (s *s3StorageTestSuite) TestCreateDir() {
 			s.assert.NoError(err)
 
 			// Directory should be in the account
-			key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, internal.ExtendDirName(path))
+			key := internal.ExtendDirName(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, path))
 			result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 				Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
 				Key:    aws.String(key),
@@ -447,15 +447,14 @@ func (s *s3StorageTestSuite) TestDeleteDir() {
 // ac
 func generateNestedDirectory(path string) (*list.List, *list.List, *list.List) {
 	aPaths := list.New()
-	aPaths.PushBack(internal.TruncateDirName(path))
+	aPaths.PushBack(path + "/")
 
-	aPaths.PushBack(path + "/c1")
+	aPaths.PushBack(path + "/c1/")
 	aPaths.PushBack(path + "/c2")
 	aPaths.PushBack(path + "/c1" + "/gc1")
 
 	abPaths := list.New()
-	path = internal.TruncateDirName(path)
-	abPaths.PushBack(path + "b")
+	abPaths.PushBack(path + "b/")
 	abPaths.PushBack(path + "b" + "/c1")
 
 	acPaths := list.New()
@@ -519,7 +518,6 @@ func (s *s3StorageTestSuite) TestDeleteDirHierarchy() {
 	// Setup
 	base := generateDirectoryName()
 	a, ab, ac := s.setupHierarchy(base)
-
 	err := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: base})
 
 	s.assert.NoError(err)
@@ -545,12 +543,12 @@ func (s *s3StorageTestSuite) TestDeleteSubDirPrefixPath() {
 	err := s.s3Storage.storage.SetPrefixPath(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, base))
 	s.assert.NoError(err)
 
-	attr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: "c1"})
+	attr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: "c1/"})
 	s.assert.NoError(err)
 	s.assert.NotNil(attr)
 	s.assert.True(attr.IsDir())
 
-	err = s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: "c1"})
+	err = s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: "c1/"})
 	s.assert.NoError(err)
 
 	err = s.s3Storage.storage.SetPrefixPath(s.s3Storage.stConfig.prefixPath)
@@ -811,18 +809,22 @@ func (s *s3StorageTestSuite) TestRenameDir() {
 	for _, input := range inputs {
 		s.Run(input.src+"->"+input.dst, func() {
 			// Setup
-			// We don't keep track of empty directories, so let's create an object with the src prefix
-			_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: common.JoinUnixFilepath(input.src, generateFileName())})
+			err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: input.src})
+			s.assert.NoError(err)
+
+			_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: common.JoinUnixFilepath(input.src, generateFileName())})
 			s.assert.NoError(err)
 
 			err = s.s3Storage.RenameDir(internal.RenameDirOptions{Src: input.src, Dst: input.dst})
 			s.assert.NoError(err)
 
 			// Src should not be in the account
+			input.src = internal.ExtendDirName(input.src)
 			_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: input.src})
 			s.assert.Error(err)
 
 			// Dst should be in the account
+			input.dst = internal.ExtendDirName(input.dst)
 			_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: input.dst})
 			s.assert.NoError(err)
 		})
@@ -875,7 +877,7 @@ func (s *s3StorageTestSuite) TestRenameDirSubDirPrefixPath() {
 	// Test rename directory with prefix set
 	err := s.s3Storage.storage.SetPrefixPath(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, baseSrc))
 	s.assert.NoError(err)
-	err = s.s3Storage.RenameDir(internal.RenameDirOptions{Src: "c1", Dst: baseDst})
+	err = s.s3Storage.RenameDir(internal.RenameDirOptions{Src: "c1/", Dst: baseDst})
 	s.assert.NoError(err)
 
 	// remove extra prefix to check results
@@ -885,7 +887,7 @@ func (s *s3StorageTestSuite) TestRenameDirSubDirPrefixPath() {
 	for p := aSrc.Front(); p != nil; p = p.Next() {
 		path := p.Value.(string)
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: path})
-		if strings.HasPrefix(path, baseSrc+"/c1") {
+		if strings.HasPrefix(path, baseSrc+"c1/") {
 			s.assert.Error(err)
 		} else {
 			s.assert.NoError(err)
@@ -899,9 +901,9 @@ func (s *s3StorageTestSuite) TestRenameDirSubDirPrefixPath() {
 	}
 	// Destination
 	// aDst paths should exist -> aDst and aDst/gc1
-	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + "/" + baseDst})
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + baseDst})
 	s.assert.NoError(err)
-	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + "/" + baseDst + "/gc1"})
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + baseDst + "gc1"})
 	s.assert.NoError(err)
 }
 

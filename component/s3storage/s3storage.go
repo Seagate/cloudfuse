@@ -196,7 +196,7 @@ func formatListDirName(path string) string {
 
 func (s3 *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	log.Trace("S3Storage::IsDirEmpty : %s", options.Name)
-	list, _, err := s3.storage.List(formatListDirName(options.Name), nil, 1)
+	list, _, err := s3.storage.List(formatListDirName(options.Name), nil, 2)
 	if err != nil {
 		log.Err("S3Storage::IsDirEmpty : error listing [%s]", err)
 		return false
@@ -264,10 +264,7 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 
 func (s3 *S3Storage) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("S3Storage::RenameDir : %s to %s", options.Src, options.Dst)
-	options.Src = internal.TruncateDirName(options.Src)
-	options.Dst = internal.TruncateDirName(options.Dst)
-
-	err := s3.storage.RenameDirectory(options.Src, options.Dst)
+	err := s3.storage.RenameDirectory(internal.ExtendDirName(options.Src), internal.ExtendDirName(options.Dst))
 
 	if err == nil {
 		s3StatsCollector.PushEvents(renameDir, options.Src, map[string]interface{}{src: options.Src, dest: options.Dst})

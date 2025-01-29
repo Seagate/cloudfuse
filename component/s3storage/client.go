@@ -36,7 +36,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -190,7 +189,6 @@ func (cl *Client) Configure(cfg Config) error {
 			if ae.ErrorCode() == "SignatureDoesNotMatch" {
 				return errInvalidSecretKey
 			}
-			fmt.Println(ae.Error())
 		}
 		return err
 	}
@@ -307,7 +305,7 @@ func (cl *Client) CreateDirectory(name string) error {
 	// So, let's make it clear: we expect the OS to call GetAttr() on the directory
 	// to make sure it doesn't exist before trying to create it.
 
-	err := cl.putObject(name, nil, 0, false)
+	err := cl.putObject(name, nil, 0, false, true)
 	if err != nil {
 		log.Err("Client::CreateDirectory : putObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -368,10 +366,7 @@ func (cl *Client) DeleteDirectory(name string) error {
 
 	// Include deleting the current directory
 	var objectsToDelete []*internal.ObjAttr
-	objectsToDelete = append(objectsToDelete, &internal.ObjAttr{
-		Path: name,
-		Name: filepath.Base(name),
-	})
+	objectsToDelete = append(objectsToDelete, createObjAttrDir(name))
 
 	for !done {
 
@@ -396,6 +391,7 @@ func (cl *Client) DeleteDirectory(name string) error {
 		// 	To make one call, we need to make a list of objects to delete first.
 		for _, object := range objects {
 			if object.IsDir() {
+				fmt.Println("Delete path: ", object.Path)
 				err = cl.DeleteDirectory(object.Path)
 				if err != nil {
 					log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", object.Path, err)
@@ -478,7 +474,7 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 			done = true
 		}
 	}
-	return nil
+	return cl.RenameFile(source, target, false)
 }
 
 // GetAttr : Get attributes for a given file or folder.
@@ -653,7 +649,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]*string, fi *os
 	}
 
 	// upload file data
-	err = cl.putObject(name, fi, stat.Size(), isSymlink)
+	err = cl.putObject(name, fi, stat.Size(), isSymlink, false)
 	if err != nil {
 		log.Err("Client::WriteFromFile : putObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -685,7 +681,7 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]*string, data
 	dataReader := bytes.NewReader(data)
 	// upload data to object
 	// TODO: handle metadata with S3
-	err := cl.putObject(name, dataReader, int64(len(data)), isSymlink)
+	err := cl.putObject(name, dataReader, int64(len(data)), isSymlink, false)
 	if err != nil {
 		log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
 	}
@@ -772,7 +768,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	}
 	// overwrite the object with the truncated data
 	truncatedDataReader := bytes.NewReader(objectData)
-	err = cl.putObject(name, truncatedDataReader, int64(len(objectData)), false)
+	err = cl.putObject(name, truncatedDataReader, int64(len(objectData)), false, false)
 	if err != nil {
 		log.Err("Client::TruncateFile : Failed to write truncated data to object %s", name)
 	}
