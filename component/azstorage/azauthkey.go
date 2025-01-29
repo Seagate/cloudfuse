@@ -60,7 +60,7 @@ func (azkey *azAuthBlobKey) getServiceClient(stConfig *AzStorageConfig) (interfa
 		return nil, errors.New("unable to decrypt passphrase key")
 	}
 	defer buff.Destroy()
-	var key []byte
+	key := make([]byte, buff.Size())
 	copy(key, buff.Bytes())
 
 	cred, err := azblob.NewSharedKeyCredential(azkey.config.AccountName, string(key))
@@ -100,7 +100,7 @@ func (azkey *azAuthDatalakeKey) getServiceClient(stConfig *AzStorageConfig) (int
 		return nil, errors.New("unable to decrypt passphrase key")
 	}
 	defer buff.Destroy()
-	var key []byte
+	key := make([]byte, buff.Size())
 	copy(key, buff.Bytes())
 
 	cred, err := azdatalake.NewSharedKeyCredential(azkey.config.AccountName, buff.String())
