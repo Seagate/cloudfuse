@@ -92,25 +92,25 @@ var installCmd = &cobra.Command{
 		//create the new user and set permissions
 		err = setUser(serviceUser, mountPath, configPath)
 		if err != nil {
-			fmt.Println("Error setting permissions for user:", err)
+			fmt.Println("could not set up service user ", err)
 			return err
 		}
 
 		serviceName, err := newService(mountPath, configPath, serviceUser)
 		if err != nil {
-			return fmt.Errorf("error when attempting to create service file: [%s]", err.Error())
+			return fmt.Errorf("unable to create service file: [%s]", err.Error())
 		}
 		// run systemctl daemon-reload
 		systemctlDaemonReloadCmd := exec.Command("systemctl", "daemon-reload")
 		err = systemctlDaemonReloadCmd.Run()
 		if err != nil {
-			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
+			return fmt.Errorf("failed to run 'systemctl daemon-reload' command [%s]", err.Error())
 		}
 		// Enable the service to start at system boot
 		systemctlEnableCmd := exec.Command("systemctl", "enable", serviceName)
 		err = systemctlEnableCmd.Run()
 		if err != nil {
-			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
+			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following [%s]", err.Error())
 		}
 		return nil
 	},
@@ -135,16 +135,16 @@ var uninstallCmd = &cobra.Command{
 			removeFileCmd := exec.Command("rm", serviceFilePath)
 			err := removeFileCmd.Run()
 			if err != nil {
-				return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system due to following error: [%s]", err.Error())
+				return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system [%s]", err.Error())
 			}
 		} else if os.IsNotExist(err) {
-			return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system due to following error: [%s]", err.Error())
+			return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system [%s]", err.Error())
 		}
 		// reload daemon
 		systemctlDaemonReloadCmd := exec.Command("systemctl", "daemon-reload")
 		err = systemctlDaemonReloadCmd.Run()
 		if err != nil {
-			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following error: [%s]", err.Error())
+			return fmt.Errorf("failed to run 'systemctl daemon-reload' command [%s]", err.Error())
 		}
 		return nil
 	},
@@ -179,23 +179,23 @@ WantedBy=multi-user.target
 
 	tmpl, err := template.New("service").Parse(serviceTemplate)
 	if err != nil {
-		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
+		return "", fmt.Errorf("could not create a new service file: [%s]", err.Error())
 	}
 	serviceName, serviceFilePath := getService(mountPath)
 	err = os.Remove(serviceFilePath)
 	if err != nil && !os.IsNotExist(err) {
-		return "", fmt.Errorf("failed to replace the service file due to the following error: [%s]", err.Error())
+		return "", fmt.Errorf("failed to replace the service file [%s]", err.Error())
 	}
 
 	var newFile *os.File
 	newFile, err = os.Create(serviceFilePath)
 	if err != nil {
-		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
+		return "", fmt.Errorf("could not create new service file: [%s]", err.Error())
 	}
 
 	err = tmpl.Execute(newFile, config)
 	if err != nil {
-		return "", fmt.Errorf("error creating new service file: [%s]", err.Error())
+		return "", fmt.Errorf("could not create new service file: [%s]", err.Error())
 	}
 	return serviceName, nil
 }
@@ -208,7 +208,7 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 			userAddCmd := exec.Command("useradd", "-m", serviceUser)
 			err = userAddCmd.Run()
 			if err != nil {
-				return fmt.Errorf("failed to create user due to following error: [%s]", err.Error())
+				return fmt.Errorf("failed to create user [%s]", err.Error())
 			}
 			fmt.Println("user " + serviceUser + " has been created")
 		}
