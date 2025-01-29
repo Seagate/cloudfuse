@@ -64,11 +64,11 @@ func (azkey *azAuthBlobKey) getServiceClient(stConfig *AzStorageConfig) (interfa
 	copy(key, buff.Bytes())
 
 	cred, err := azblob.NewSharedKeyCredential(azkey.config.AccountName, string(key))
+	clear(key)
 	if err != nil {
 		log.Err("azAuthBlobKey::getServiceClient : Failed to create shared key credential [%s]", err.Error())
 		return nil, err
 	}
-	clear(key)
 
 	opts, err := getAzBlobServiceClientOptions(stConfig)
 	if err != nil {
@@ -103,12 +103,12 @@ func (azkey *azAuthDatalakeKey) getServiceClient(stConfig *AzStorageConfig) (int
 	key := make([]byte, buff.Size())
 	copy(key, buff.Bytes())
 
-	cred, err := azdatalake.NewSharedKeyCredential(azkey.config.AccountName, buff.String())
+	cred, err := azdatalake.NewSharedKeyCredential(azkey.config.AccountName, string(key))
+	clear(key)
 	if err != nil {
 		log.Err("azAuthDatalakeKey::getServiceClient : Failed to create shared key credential [%s]", err.Error())
 		return nil, err
 	}
-	clear(key)
 
 	opts, err := getAzDatalakeServiceClientOptions(stConfig)
 	if err != nil {
