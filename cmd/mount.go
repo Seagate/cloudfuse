@@ -357,7 +357,7 @@ var mountCmd = &cobra.Command{
 			containers, err := getBucketListS3()
 			if len(containers) != 0 && err == nil {
 				pipeline = append(pipeline, "s3storage")
-			} else if containers, err := getContainerListAzure(); err == nil {
+			} else if containers, err = getContainerListAzure(); err == nil {
 				if len(containers) != 0 && err == nil {
 					pipeline = append(pipeline, "azstorage")
 				}
