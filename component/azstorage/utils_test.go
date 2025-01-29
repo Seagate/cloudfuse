@@ -310,10 +310,12 @@ func (s *utilsTestSuite) TestSanitizeSASKey() {
 
 	sanitizedKey = sanitizeSASKey("?abcd")
 	key, _ := sanitizedKey.Open()
+	defer key.Destroy()
 	assert.EqualValues("?abcd", key.String())
 
 	sanitizedKey = sanitizeSASKey("abcd")
 	key, _ = sanitizedKey.Open()
+	defer key.Destroy()
 	assert.EqualValues("?abcd", key.String())
 }
 

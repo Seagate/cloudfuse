@@ -59,14 +59,16 @@ func (azkey *azAuthBlobKey) getServiceClient(stConfig *AzStorageConfig) (interfa
 	if err != nil || buff == nil {
 		return nil, errors.New("unable to decrypt passphrase key")
 	}
-	// TODO: Deferring the destruction of the buffer causes a segfault later in the code in some cases.
-	// defer buff.Destroy()
+	defer buff.Destroy()
+	var key []byte
+	copy(key, buff.Bytes())
 
-	cred, err := azblob.NewSharedKeyCredential(azkey.config.AccountName, buff.String())
+	cred, err := azblob.NewSharedKeyCredential(azkey.config.AccountName, string(key))
 	if err != nil {
 		log.Err("azAuthBlobKey::getServiceClient : Failed to create shared key credential [%s]", err.Error())
 		return nil, err
 	}
+	clear(key)
 
 	opts, err := getAzBlobServiceClientOptions(stConfig)
 	if err != nil {
@@ -97,14 +99,16 @@ func (azkey *azAuthDatalakeKey) getServiceClient(stConfig *AzStorageConfig) (int
 	if err != nil || buff == nil {
 		return nil, errors.New("unable to decrypt passphrase key")
 	}
-	// TODO: Deferring the destruction of the buffer causes a segfault later in the code in some cases.
-	// defer buff.Destroy()
+	defer buff.Destroy()
+	var key []byte
+	copy(key, buff.Bytes())
 
 	cred, err := azdatalake.NewSharedKeyCredential(azkey.config.AccountName, buff.String())
 	if err != nil {
 		log.Err("azAuthDatalakeKey::getServiceClient : Failed to create shared key credential [%s]", err.Error())
 		return nil, err
 	}
+	clear(key)
 
 	opts, err := getAzDatalakeServiceClientOptions(stConfig)
 	if err != nil {

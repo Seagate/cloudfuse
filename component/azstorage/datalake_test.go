@@ -145,6 +145,7 @@ func (s *datalakeTestSuite) TestDefault() {
 	s.assert.Equal(EAccountType.ADLS(), s.az.stConfig.authConfig.AccountType)
 	s.assert.False(s.az.stConfig.authConfig.UseHTTP)
 	accountKey, _ := s.az.stConfig.authConfig.AccountKey.Open()
+	defer accountKey.Destroy()
 	s.assert.Equal(accountKey.String(), storageTestConfigurationParameters.AdlsKey)
 	s.assert.Empty(s.az.stConfig.authConfig.SASKey)
 	s.assert.Empty(s.az.stConfig.authConfig.ApplicationID)

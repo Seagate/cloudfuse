@@ -263,6 +263,7 @@ func (s *configTestSuite) TestAuthModeKey() {
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
 	accountKey, _ := az.stConfig.authConfig.AccountKey.Open()
+	defer accountKey.Destroy()
 	assert.Equal(opt.AccountKey, accountKey.String())
 }
 

@@ -286,6 +286,7 @@ func (s *blockBlobTestSuite) TestDefault() {
 	s.assert.Equal(EAccountType.BLOCK(), s.az.stConfig.authConfig.AccountType)
 	s.assert.False(s.az.stConfig.authConfig.UseHTTP)
 	accountKey, _ := s.az.stConfig.authConfig.AccountKey.Open()
+	defer accountKey.Destroy()
 	s.assert.Equal(storageTestConfigurationParameters.BlockKey, accountKey.String())
 	s.assert.Empty(s.az.stConfig.authConfig.SASKey)
 	s.assert.Empty(s.az.stConfig.authConfig.ApplicationID)
