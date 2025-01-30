@@ -128,7 +128,7 @@ var uninstallCmd = &cobra.Command{
 
 		mountPath, err := filepath.Abs(mountPath)
 		if err != nil {
-			return fmt.Errorf("couldn't couldn't determine absolute path from string [%s]", err.Error())
+			return fmt.Errorf("couldn't determine absolute path from string [%s]", err.Error())
 		}
 		serviceName, serviceFilePath := getService(mountPath)
 		if _, err := os.Stat(serviceFilePath); err == nil {
