@@ -125,7 +125,7 @@ func (st *SizeTracker) Configure(_ bool) error {
 		}
 	}
 
-	_, err = CreateSizeJournal(journalName)
+	st.mountSize, err = CreateSizeJournal(journalName)
 	return err
 }
 
