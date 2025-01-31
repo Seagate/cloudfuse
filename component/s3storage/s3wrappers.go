@@ -342,10 +342,6 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 
 	// combine the configured prefix and the prefix being given to List to get a full listPath
 	listPath := cl.getKey(prefix, false)
-	// replace any trailing forward slash stripped by common.JoinUnixFilepath
-	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
-		listPath += "/"
-	}
 
 	// Only look for CommonPrefixes (subdirectories) if List was called with a prefix ending in a slash.
 	// If prefix does not end in a slash, CommonPrefixes would find unwanted results.
