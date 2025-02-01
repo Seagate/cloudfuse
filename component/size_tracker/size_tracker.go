@@ -132,10 +132,7 @@ func (st *SizeTracker) CreateFile(options internal.CreateFileOptions) (*handlema
 
 	// File already exists but create succeeded so remove old file size
 	if err == nil && getAttrErr == nil {
-		_, journalErr := st.mountSize.Subtract(uint64(attr.Size))
-		if journalErr != nil {
-			log.Err("SizeTracker::CreateFile : Unable to journal size. Error: %v", journalErr)
-		}
+		st.mountSize.Subtract(uint64(attr.Size))
 	}
 
 	return handle, err
@@ -148,10 +145,7 @@ func (st *SizeTracker) DeleteFile(options internal.DeleteFileOptions) error {
 
 	// If the file is a symlink then it has no size so don't change the size
 	if err == nil && getAttrErr == nil && !attr.IsSymlink() {
-		_, journalErr := st.mountSize.Subtract(uint64(attr.Size))
-		if journalErr != nil {
-			log.Err("SizeTracker::DeleteFile : Unable to journal size. Error: %v", journalErr)
-		}
+		st.mountSize.Subtract(uint64(attr.Size))
 	}
 
 	return err
@@ -164,10 +158,7 @@ func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
 
 	// If dst already exists and rename succeeds, remove overwritten dst size
 	if dstErr == nil && err == nil {
-		_, journalErr := st.mountSize.Subtract(uint64(dstAttr.Size))
-		if journalErr != nil {
-			log.Err("SizeTracker::RenameFile : Unable to journal size. Error: %v", journalErr)
-		}
+		st.mountSize.Subtract(uint64(dstAttr.Size))
 	}
 
 	return err
@@ -193,9 +184,10 @@ func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error)
 	var journalErr error
 	// File already exists and WriteFile succeeded subtract difference in file size
 	if diff < 0 {
-		_, journalErr = st.mountSize.Subtract(uint64(-diff))
+		// diff is negative, so change it back to positive before converting to a uint64
+		st.mountSize.Subtract(uint64(-diff))
 	} else {
-		_, journalErr = st.mountSize.Add(uint64(diff))
+		st.mountSize.Add(uint64(diff))
 	}
 	if journalErr != nil {
 		log.Err("SizeTracker::WriteFile : Unable to journal size. Error: %v", journalErr)
@@ -217,9 +209,9 @@ func (st *SizeTracker) TruncateFile(options internal.TruncateFileOptions) error 
 	var journalErr error
 	// File already exists and truncate succeeded subtract difference in file size
 	if err == nil && getAttrErr == nil && newSize < 0 {
-		_, journalErr = st.mountSize.Subtract(uint64(-newSize))
+		st.mountSize.Subtract(uint64(-newSize))
 	} else if err == nil && getAttrErr == nil && newSize >= 0 {
-		_, journalErr = st.mountSize.Add(uint64(newSize))
+		st.mountSize.Add(uint64(newSize))
 	}
 	if journalErr != nil {
 		log.Err("SizeTracker::TruncateFile : Unable to journal size. Error: %v", journalErr)
@@ -248,9 +240,9 @@ func (st *SizeTracker) CopyFromFile(options internal.CopyFromFileOptions) error 
 	var journalErr error
 	// File already exists and CopyFromFile succeeded subtract difference in file size
 	if newSize < 0 {
-		_, journalErr = st.mountSize.Subtract(uint64(-newSize))
+		st.mountSize.Subtract(uint64(-newSize))
 	} else {
-		_, journalErr = st.mountSize.Add(uint64(newSize))
+		st.mountSize.Add(uint64(newSize))
 	}
 	if journalErr != nil {
 		log.Err("SizeTracker::CopyFromFile : Unable to journal size. Error: %v", journalErr)
@@ -290,9 +282,9 @@ func (st *SizeTracker) FlushFile(options internal.FlushFileOptions) error {
 	var journalErr error
 	// File already exists and CopyFromFile succeeded subtract difference in file size
 	if diff < 0 {
-		_, journalErr = st.mountSize.Subtract(uint64(-diff))
+		st.mountSize.Subtract(uint64(-diff))
 	} else {
-		_, journalErr = st.mountSize.Add(uint64(diff))
+		st.mountSize.Add(uint64(diff))
 	}
 	if journalErr != nil {
 		log.Err("SizeTracker::FlushFile : Unable to journal size. Error: %v", journalErr)
@@ -350,9 +342,9 @@ func (st *SizeTracker) CommitData(opt internal.CommitDataOptions) error {
 	var journalErr error
 	// File already exists and CopyFromFile succeeded subtract difference in file size
 	if diff < 0 {
-		_, journalErr = st.mountSize.Subtract(uint64(-diff))
+		st.mountSize.Subtract(uint64(-diff))
 	} else {
-		_, journalErr = st.mountSize.Add(uint64(diff))
+		st.mountSize.Add(uint64(diff))
 	}
 	if journalErr != nil {
 		log.Err("SizeTracker::CommitData : Unable to journal size. Error: %v", journalErr)
