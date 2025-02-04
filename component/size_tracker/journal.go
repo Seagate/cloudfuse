@@ -30,16 +30,21 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 )
 
 var journalFile string
 
 type MountSize struct {
-	size uint64
-	file *os.File
-	mu   sync.Mutex
+	size        atomic.Uint64
+	file        *os.File
+	flushTicker *time.Ticker
+	stopCh      chan struct{}
+	wg          sync.WaitGroup
 }
 
 func CreateSizeJournal(filename string) (*MountSize, error) {
@@ -59,7 +64,7 @@ func CreateSizeJournal(filename string) (*MountSize, error) {
 		return nil, err
 	}
 
-	var size uint64
+	var initialSize uint64
 
 	if fileInfo.Size() >= 8 {
 		buf := make([]byte, 8)
@@ -67,47 +72,78 @@ func CreateSizeJournal(filename string) (*MountSize, error) {
 			return nil, err
 		}
 
-		size = binary.BigEndian.Uint64(buf)
+		initialSize = binary.BigEndian.Uint64(buf)
 	}
 
-	return &MountSize{size: size, file: f, mu: sync.Mutex{}}, nil
+	ms := &MountSize{
+		file:        f,
+		flushTicker: time.NewTicker(10 * time.Second),
+		stopCh:      make(chan struct{}),
+	}
+	ms.size.Store(initialSize)
+
+	// Use a wait group to ensure that the background close finishes before the go routine ends
+	ms.wg.Add(1)
+	go ms.runJournalWriter()
+
+	return ms, nil
 }
 
-func (s *MountSize) GetSize() uint64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.size
+func (ms *MountSize) runJournalWriter() {
+	defer ms.wg.Done()
+	for {
+		select {
+		case <-ms.flushTicker.C:
+			if err := ms.writeSizeToFile(); err != nil {
+				log.Err("SizeTracker::runJournalWriter : Unable to journal size. Error: %v", err)
+			}
+		case <-ms.stopCh:
+			if err := ms.writeSizeToFile(); err != nil {
+				log.Err("SizeTracker::runJournalWriter : Unable to journal final size before closing channel. Error: %v", err)
+			}
+			return
+		}
+	}
 }
 
-func (s *MountSize) Add(delta uint64) (uint64, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.size += delta
-	err := s.writeSizeToFile()
-	return s.size, err
+func (ms *MountSize) GetSize() uint64 {
+	return ms.size.Load()
 }
 
-func (s *MountSize) Subtract(delta uint64) (uint64, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.size -= delta
-	err := s.writeSizeToFile()
-	return s.size, err
+func (ms *MountSize) Add(delta uint64) uint64 {
+	return ms.size.Add(delta)
 }
 
-func (s *MountSize) CloseFile() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.file.Close()
+func (ms *MountSize) Subtract(delta uint64) uint64 {
+	for {
+		old := ms.size.Load()
+		var newVal uint64
+		if old < delta {
+			newVal = 0
+		} else {
+			newVal = old - delta
+		}
+		if ms.size.CompareAndSwap(old, newVal) {
+			return newVal
+		}
+	}
 }
 
-func (s *MountSize) writeSizeToFile() error {
+func (ms *MountSize) CloseFile() error {
+	close(ms.stopCh)
+	ms.flushTicker.Stop()
+	ms.wg.Wait()
+	return ms.file.Close()
+}
+
+func (ms *MountSize) writeSizeToFile() error {
 	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, s.size)
+	currentSize := ms.size.Load()
+	binary.BigEndian.PutUint64(buf, currentSize)
 
-	if _, err := s.file.WriteAt(buf, 0); err != nil {
+	if _, err := ms.file.WriteAt(buf, 0); err != nil {
 		return err
 	}
 
-	return s.file.Sync()
+	return ms.file.Sync()
 }
