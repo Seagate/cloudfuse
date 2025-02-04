@@ -369,3 +369,18 @@ func IsDriveLetter(path string) bool {
 	match, _ := regexp.MatchString(pattern, path)
 	return match
 }
+
+func CreateDefaultDirectory() error {
+	dir, err := os.Stat(ExpandPath(DefaultWorkDir))
+	if err == nil && !dir.IsDir() {
+		return err
+	}
+
+	if err != nil && os.IsNotExist(err) {
+		// create the default work dir
+		if err = os.MkdirAll(ExpandPath(DefaultWorkDir), 0755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
