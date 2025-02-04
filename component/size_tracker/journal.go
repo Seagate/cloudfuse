@@ -115,7 +115,18 @@ func (ms *MountSize) Add(delta uint64) uint64 {
 }
 
 func (ms *MountSize) Subtract(delta uint64) uint64 {
-	return ms.size.Add(^uint64(delta - 1))
+	for {
+		old := ms.size.Load()
+		var newVal uint64
+		if old < delta {
+			newVal = 0
+		} else {
+			newVal = old - delta
+		}
+		if ms.size.CompareAndSwap(old, newVal) {
+			return newVal
+		}
+	}
 }
 
 func (ms *MountSize) CloseFile() error {

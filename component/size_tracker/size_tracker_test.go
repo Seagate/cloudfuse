@@ -233,6 +233,30 @@ func (suite *sizeTrackerTestSuite) TestDeleteFile() {
 	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 }
 
+func (suite *sizeTrackerTestSuite) TestDeleteFileNegative() {
+	defer suite.cleanupTest()
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
+	path := generateFileName()
+
+	// Create a file in loopback that we will delete in sizeTracker to mimic a user that accidently has done
+	// a write outside of cloudfuse
+	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
+	suite.assert.NoError(err)
+	testData := "test data"
+	data := []byte(testData)
+	_, err = suite.loopback.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.assert.NoError(err)
+
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
+	err = suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: path})
+	suite.assert.NoError(err)
+
+	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
+}
+
 func (suite *sizeTrackerTestSuite) TestDeleteFileError() {
 	defer suite.cleanupTest()
 	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
