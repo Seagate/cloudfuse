@@ -238,7 +238,7 @@ func (suite *sizeTrackerTestSuite) TestDeleteFileNegative() {
 	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 	path := generateFileName()
 
-	// Create a file in loopback that we will delete in sizeTracker to mimic a user that accidently has done
+	// Create a file in loopback that we will delete in sizeTracker to mimic a user that accidentally has done
 	// a write outside of cloudfuse
 	handle, err := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0644})
 	suite.assert.NoError(err)
