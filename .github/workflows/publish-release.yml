@@ -187,6 +187,8 @@ jobs:
     env:
       go: "1.23"
       zig: 0.13.0
+    permissions:
+      contents: write
 
     steps:
       # libfuse-dev is required to build our command-line program
