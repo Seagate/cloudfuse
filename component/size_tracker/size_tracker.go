@@ -27,10 +27,13 @@ package size_tracker
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/component/azstorage"
+	"github.com/Seagate/cloudfuse/component/s3storage"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 )
@@ -101,13 +104,34 @@ func (st *SizeTracker) Configure(_ bool) error {
 		return fmt.Errorf("SizeTracker: config error [invalid config attributes]")
 	}
 
+	journalName := default_journal_name
 	if config.IsSet(compName + ".journal-name") {
-		st.mountSize, err = CreateSizeJournal(conf.JournalName)
+		journalName = conf.JournalName
 	} else {
-		st.mountSize, err = CreateSizeJournal(default_journal_name)
+		s3conf := s3storage.Options{}
+		if err := config.UnmarshalKey("s3storage", &s3conf); err == nil {
+			sanitizedName := sanitizeFileName(s3conf.BucketName + "-" + s3conf.PrefixPath)
+			if sanitizedName != "" {
+				journalName = sanitizedName + ".dat"
+			}
+		} else {
+			azconf := azstorage.AzStorageOptions{}
+			if err := config.UnmarshalKey("azstorage", &azconf); err == nil {
+				sanitizedName := sanitizeFileName(azconf.Container + "-" + azconf.PrefixPath)
+				if sanitizedName != "" {
+					journalName = sanitizedName + ".dat"
+				}
+			}
+		}
 	}
 
+	st.mountSize, err = CreateSizeJournal(journalName)
 	return err
+}
+
+func sanitizeFileName(filename string) string {
+	replacer := strings.NewReplacer("\\", "_", "/", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_")
+	return replacer.Replace(filename)
 }
 
 func (st *SizeTracker) Priority() internal.ComponentPriority {

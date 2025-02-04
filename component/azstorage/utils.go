@@ -276,6 +276,8 @@ func storeDatalakeErrToErr(err error) uint16 {
 			return BlobIsUnderLease
 		case datalakeerror.AuthorizationPermissionMismatch:
 			return InvalidPermission
+		case datalakeerror.BlobNotFound:
+			return ErrFileNotFound
 		default:
 			return ErrUnknown
 		}
