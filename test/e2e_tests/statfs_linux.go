@@ -1,4 +1,4 @@
-//go:build windows
+//go:build linux
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -25,15 +25,14 @@
    SOFTWARE
 */
 
-package cmd
+package e2e_tests
 
 import (
-	_ "github.com/Seagate/cloudfuse/component/attr_cache"
-	_ "github.com/Seagate/cloudfuse/component/azstorage"
-	_ "github.com/Seagate/cloudfuse/component/file_cache"
-	_ "github.com/Seagate/cloudfuse/component/libfuse"
-	_ "github.com/Seagate/cloudfuse/component/loopback"
-	_ "github.com/Seagate/cloudfuse/component/s3storage"
-	_ "github.com/Seagate/cloudfuse/component/size_tracker"
-	_ "github.com/Seagate/cloudfuse/component/stream"
+	"golang.org/x/sys/unix"
 )
+
+func DiskSize(path string) int {
+	buf := &unix.Statfs_t{}
+	_ = unix.Statfs(path, buf)
+	return int((buf.Blocks - buf.Bavail) * uint64(buf.Bsize))
+}

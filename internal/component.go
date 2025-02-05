@@ -49,7 +49,7 @@ func (ComponentPriority) Consumer() ComponentPriority {
 }
 
 func (ComponentPriority) LevelOne() ComponentPriority {
-	return ComponentPriority(700)
+	return ComponentPriority(400)
 }
 
 func (ComponentPriority) LevelTwo() ComponentPriority {
