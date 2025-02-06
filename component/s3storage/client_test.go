@@ -837,6 +837,22 @@ func (s *clientTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
 	// setup
 	dirName := generateDirectoryName()
+
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(dirName + "/"),
+	})
+	s.assert.NoError(err)
+
+	attr, err := s.client.GetAttr(dirName)
+	s.assert.NoError(err)
+	s.assert.NotNil(attr)
+	s.assert.True(attr.IsDir())
+}
+func (s *clientTestSuite) TestGetAttrDirWithOnlyFile() {
+	defer s.cleanupTest()
+	// setup
+	dirName := generateDirectoryName()
 	filename := dirName + "/" + generateFileName()
 
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{

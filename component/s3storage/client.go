@@ -486,14 +486,8 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 // If name is a directory, the trailing slash is optional.
 func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::GetAttr : name %s", name)
-	// if name ends in trailing slash then is a directory
-	if len(name) > 0 && name[len(name)-1] == '/' {
-		return cl.headDir(name)
-	}
 
 	// first let's suppose the caller is looking for a file
-	// there are no objects with trailing slashes (MinIO doesn't support them)
-	// 	and trailing slashes aren't allowed in filenames
 	// so if this was called with a trailing slash, don't look for an object
 	if len(name) > 0 && name[len(name)-1] != '/' {
 		attr, err := cl.getFileAttr(name)
@@ -528,7 +522,14 @@ func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
-	// to do this, accept anything that comes back from List()
+	// Try seartching for the object directly, assuming a supported S3 cloud allows
+	// trailing slashes for directory markers
+	attr, err := cl.headDir(dirName)
+	if err == nil {
+		return attr, err
+	}
+
+	// Otherwise, the cloud does not support directory markers, so use list
 	objects, _, err := cl.List(dirName, nil, 1)
 	if err != nil {
 		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, err)

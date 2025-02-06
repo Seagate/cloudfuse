@@ -449,12 +449,12 @@ func generateNestedDirectory(path string) (*list.List, *list.List, *list.List) {
 	aPaths := list.New()
 	aPaths.PushBack(path + "/")
 
-	aPaths.PushBack(path + "/c1/")
+	aPaths.PushBack(path + "/c1")
 	aPaths.PushBack(path + "/c2")
 	aPaths.PushBack(path + "/c1" + "/gc1")
 
 	abPaths := list.New()
-	abPaths.PushBack(path + "b/")
+	abPaths.PushBack(path + "b")
 	abPaths.PushBack(path + "b" + "/c1")
 
 	acPaths := list.New()
@@ -848,8 +848,6 @@ func (s *s3StorageTestSuite) TestRenameDirHierarchy() {
 	for p := aSrc.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
 		s.assert.Error(err)
-		fmt.Println(p.Value.(string))
-		fmt.Println(err)
 	}
 	abSrc.PushBackList(acSrc) // abSrc and acSrc paths should exist
 	for p := abSrc.Front(); p != nil; p = p.Next() {
@@ -2102,7 +2100,6 @@ func (s *s3StorageTestSuite) TestStreamDirSmallCountNoDuplicates() {
 		objectList = append(objectList, newList...)
 		marker = nextMarker
 		iteration++
-		fmt.Println(newList[0].Path)
 
 		log.Debug("s3StorageTestSuite::TestStreamDirSmallCountNoDuplicates : So far retrieved %d objects in %d iterations", len(objectList), iteration)
 		if nextMarker == "" {
@@ -2299,7 +2296,6 @@ func (s *s3StorageTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
 	// Setup
 	dirName := generateDirectoryName() + "/"
-	fmt.Println(dirName)
 	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: dirName})
 	s.assert.NoError(err)
 	// Now we should be able to see the directory
