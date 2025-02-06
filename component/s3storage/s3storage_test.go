@@ -446,8 +446,9 @@ func (s *s3StorageTestSuite) TestDeleteDir() {
 //
 // ac
 func generateNestedDirectory(path string) (*list.List, *list.List, *list.List) {
+	path = internal.TruncateDirName(path)
 	aPaths := list.New()
-	aPaths.PushBack(path + "/")
+	aPaths.PushBack(path)
 
 	aPaths.PushBack(path + "/c1")
 	aPaths.PushBack(path + "/c2")
@@ -543,12 +544,12 @@ func (s *s3StorageTestSuite) TestDeleteSubDirPrefixPath() {
 	err := s.s3Storage.storage.SetPrefixPath(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, base))
 	s.assert.NoError(err)
 
-	attr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: "c1/"})
+	attr, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: "c1"})
 	s.assert.NoError(err)
 	s.assert.NotNil(attr)
 	s.assert.True(attr.IsDir())
 
-	err = s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: "c1/"})
+	err = s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: "c1"})
 	s.assert.NoError(err)
 
 	err = s.s3Storage.storage.SetPrefixPath(s.s3Storage.stConfig.prefixPath)
@@ -901,7 +902,7 @@ func (s *s3StorageTestSuite) TestRenameDirSubDirPrefixPath() {
 	}
 	// Destination
 	// aDst paths should exist -> aDst and aDst/gc1
-	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + "/" + baseDst + "/"})
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + "/" + baseDst})
 	s.assert.NoError(err)
 	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + "/" + baseDst + "/gc1"})
 	s.assert.NoError(err)
@@ -2295,7 +2296,7 @@ func (s *s3StorageTestSuite) TestReadLinkDisabled() {
 func (s *s3StorageTestSuite) TestGetAttrDir() {
 	defer s.cleanupTest()
 	// Setup
-	dirName := generateDirectoryName() + "/"
+	dirName := generateDirectoryName()
 	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: dirName})
 	s.assert.NoError(err)
 	// Now we should be able to see the directory
