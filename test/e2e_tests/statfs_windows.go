@@ -25,15 +25,24 @@
    SOFTWARE
 */
 
-package cmd
+package e2e_tests
 
 import (
-	_ "github.com/Seagate/cloudfuse/component/attr_cache"
-	_ "github.com/Seagate/cloudfuse/component/azstorage"
-	_ "github.com/Seagate/cloudfuse/component/file_cache"
-	_ "github.com/Seagate/cloudfuse/component/libfuse"
-	_ "github.com/Seagate/cloudfuse/component/loopback"
-	_ "github.com/Seagate/cloudfuse/component/s3storage"
-	_ "github.com/Seagate/cloudfuse/component/size_tracker"
-	_ "github.com/Seagate/cloudfuse/component/stream"
+	"golang.org/x/sys/windows"
 )
+
+func DiskSize(path string) int {
+	var free, total, avail uint64
+
+	// Get path to the cache
+	pathPtr, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return 0
+	}
+	err = windows.GetDiskFreeSpaceEx(pathPtr, &free, &total, &avail)
+	if err != nil {
+		return 0
+	}
+
+	return int(total - free)
+}

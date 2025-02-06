@@ -1,8 +1,18 @@
 # Cloudfuse Changelog #
 
+## **1.8.0** ##
+
+February 4th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#423](https://github.com/Seagate/cloudfuse/pull/423) Add a new component size_track which tracks the total number of bytes in the cloud
+- [#338](https://github.com/Seagate/cloudfuse/pull/338) The service command now works on Linux to install cloudfuse as a service
+
 ## **1.7.4** ##
 
-January 15th 2024
+January 15th 2025
 This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
 
 ### Bug Fixes ###
@@ -11,7 +21,7 @@ This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storag
 
 ## **1.7.3** ##
 
-January 13th 2024
+January 13th 2025
 This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
 
 ### Bug Fixes ###
