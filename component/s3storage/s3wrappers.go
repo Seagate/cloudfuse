@@ -446,6 +446,9 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 				continue
 			}
 			path := split(cl.Config.prefixPath, dirName)
+			if path[0] == '/' {
+				path = path[1:]
+			}
 			attr := internal.CreateObjAttrDir(path)
 			objectAttrList = append(objectAttrList, attr)
 		}
@@ -489,7 +492,10 @@ func createObjAttr(path string, size int64, lastModified time.Time, isSymLink bo
 }
 
 // create an object attributes struct for a directory
-func createObjAttrDir(path string) (attr *internal.ObjAttr) { //nolint
+func createObjAttrDir(path string) (attr *internal.ObjAttr) {
+	// strip any trailing slash
+	path = internal.TruncateDirName(path)
+
 	// For these dirs we get only the name and no other properties so hardcoding time to current time
 	currentTime := time.Now()
 

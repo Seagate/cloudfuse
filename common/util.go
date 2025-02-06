@@ -225,7 +225,9 @@ func GetCurrentUser() (uint32, uint32, error) {
 // path only uses unix path delimiters.
 func JoinUnixFilepath(elem ...string) string {
 	last := elem[len(elem)-1]
-	if last[len(last)-1] == '/' {
+	if last == "" {
+		return NormalizeObjectName(path.Join(elem...))
+	} else if last[len(last)-1] == '/' {
 		return NormalizeObjectName(path.Join(elem...)) + "/"
 	}
 	return NormalizeObjectName(path.Join(elem...))

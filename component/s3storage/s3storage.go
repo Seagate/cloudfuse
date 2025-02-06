@@ -186,8 +186,8 @@ func (s3 *S3Storage) DeleteDir(options internal.DeleteDirOptions) error {
 func formatListDirName(path string) string {
 	// If we check the root directory, make sure we pass "" instead of "/"
 	// If we aren't checking the root directory, then we want to extend the directory name so List returns all children and does not include the path itself.
-	if path == "/" {
-		path = ""
+	if path == "" {
+		path = "/"
 	} else if path != "" {
 		path = internal.ExtendDirName(path)
 	}

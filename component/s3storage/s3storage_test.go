@@ -848,6 +848,8 @@ func (s *s3StorageTestSuite) TestRenameDirHierarchy() {
 	for p := aSrc.Front(); p != nil; p = p.Next() {
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: p.Value.(string)})
 		s.assert.Error(err)
+		fmt.Println(p.Value.(string))
+		fmt.Println(err)
 	}
 	abSrc.PushBackList(acSrc) // abSrc and acSrc paths should exist
 	for p := abSrc.Front(); p != nil; p = p.Next() {
@@ -877,7 +879,7 @@ func (s *s3StorageTestSuite) TestRenameDirSubDirPrefixPath() {
 	// Test rename directory with prefix set
 	err := s.s3Storage.storage.SetPrefixPath(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, baseSrc))
 	s.assert.NoError(err)
-	err = s.s3Storage.RenameDir(internal.RenameDirOptions{Src: "c1/", Dst: baseDst})
+	err = s.s3Storage.RenameDir(internal.RenameDirOptions{Src: "c1", Dst: baseDst})
 	s.assert.NoError(err)
 
 	// remove extra prefix to check results
@@ -887,7 +889,7 @@ func (s *s3StorageTestSuite) TestRenameDirSubDirPrefixPath() {
 	for p := aSrc.Front(); p != nil; p = p.Next() {
 		path := p.Value.(string)
 		_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: path})
-		if strings.HasPrefix(path, baseSrc+"c1/") {
+		if strings.HasPrefix(path, baseSrc+"/c1") {
 			s.assert.Error(err)
 		} else {
 			s.assert.NoError(err)
@@ -901,9 +903,9 @@ func (s *s3StorageTestSuite) TestRenameDirSubDirPrefixPath() {
 	}
 	// Destination
 	// aDst paths should exist -> aDst and aDst/gc1
-	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + baseDst})
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + "/" + baseDst + "/"})
 	s.assert.NoError(err)
-	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + baseDst + "gc1"})
+	_, err = s.s3Storage.GetAttr(internal.GetAttrOptions{Name: baseSrc + "/" + baseDst + "/gc1"})
 	s.assert.NoError(err)
 }
 

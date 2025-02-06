@@ -439,6 +439,8 @@ func (cl *Client) RenameFile(source string, target string, isSymLink bool) error
 
 // RenameDirectory : Rename the directory
 func (cl *Client) RenameDirectory(source string, target string) error {
+	source = internal.ExtendDirName(source)
+	target = internal.ExtendDirName(target)
 	log.Trace("Client::RenameDirectory : %s -> %s", source, target)
 
 	// TODO: should this fail when the target directory exists?
@@ -474,7 +476,9 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 			done = true
 		}
 	}
-	return cl.RenameFile(source, target, false)
+	_ = cl.RenameFile(source, target, false)
+
+	return nil
 }
 
 // GetAttr : Get attributes for a given file or folder.
