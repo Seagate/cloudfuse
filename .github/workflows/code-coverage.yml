@@ -132,7 +132,7 @@ jobs:
           if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
             go test -coverpkg="./..." -covermode=count -c -o cloudfuse.test
           else
-            go test -coverpkg="./..." --tags=fuse3 -covermode=count -c -o cloudfuse.test
+            go test -coverpkg="./..." -tags=fuse3 -covermode=count -c -o cloudfuse.test
           fi
 
       - name: Create Config File - Block Blob
