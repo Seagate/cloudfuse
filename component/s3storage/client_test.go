@@ -136,13 +136,14 @@ func (s *clientTestSuite) setupTestHelper(configuration string, create bool) err
 	if storageTestConfigurationParameters.UploadCutoffMb == 0 {
 		storageTestConfigurationParameters.UploadCutoffMb = 5
 	}
+	storageTestConfigurationParameters.EnableDirMarker = true
 	if configuration == "" {
 		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s\n  part-size-mb: %d\n"+
-			"  upload-cutoff-mb: %d\n  use-path-style: %t\n",
+			"  upload-cutoff-mb: %d\n  use-path-style: %t\n  enable-dir-marker: %t\n",
 			storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
 			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region,
 			storageTestConfigurationParameters.PartSizeMb, storageTestConfigurationParameters.UploadCutoffMb,
-			storageTestConfigurationParameters.UsePathStyle)
+			storageTestConfigurationParameters.UsePathStyle, storageTestConfigurationParameters.EnableDirMarker)
 	}
 	s.config = configuration
 

@@ -297,19 +297,18 @@ func (cl *Client) CreateDirectory(name string) error {
 	name = internal.ExtendDirName(name)
 
 	log.Trace("Client::CreateDirectory : name %s", name)
-	// MinIO does not support creating an empty file to indicate a directory
-	// directories will be represented only as object prefixes
-	// we have no way of representing an empty directory, so do nothing.
-	// Note: we could try to list the directory and return EEXIST if it has contents,
-	// but that would be a performance penalty for a check that the OS already does.
+
+	// If the S3 endpoint does not support directory markers then we can do nothing here.
 	// So, let's make it clear: we expect the OS to call GetAttr() on the directory
 	// to make sure it doesn't exist before trying to create it.
-
-	err := cl.putObject(name, nil, 0, false, true)
-	if err != nil {
-		log.Err("Client::CreateDirectory : putObject(%s) failed. Here's why: %v", name, err)
-		return err
+	if cl.Config.enableDirMarker {
+		err := cl.putObject(name, nil, 0, false, true)
+		if err != nil {
+			log.Err("Client::CreateDirectory : putObject(%s) failed. Here's why: %v", name, err)
+			return err
+		}
 	}
+
 	return nil
 }
 
@@ -522,14 +521,17 @@ func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
-	// Try seartching for the object directly, assuming a supported S3 cloud allows
-	// trailing slashes for directory markers
-	attr, err := cl.headDir(dirName)
-	if err == nil {
-		return attr, err
+	// Try seartching for the object directly if supported
+	if cl.Config.enableDirMarker {
+		attr, err := cl.headDir(dirName)
+		if err == nil {
+			return attr, err
+		}
 	}
 
 	// Otherwise, the cloud does not support directory markers, so use list
+	// or the directory does exist but there is no marker for it, so look for an object
+	// in the directory
 	objects, _, err := cl.List(dirName, nil, 1)
 	if err != nil {
 		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, err)
