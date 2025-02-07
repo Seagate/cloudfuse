@@ -57,7 +57,7 @@ jobs:
 
       - name: Install libfuse
         run: |-
-          sudo apt-get install ${{ matrix.fuselib }}
+          sudo apt-get install fuse3 ${{ matrix.fuselib }} -y
 
       - name: Create Directory Structure
         run: |-
