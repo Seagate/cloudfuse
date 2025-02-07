@@ -71,7 +71,7 @@ jobs:
       - name: Build
         run: |
           if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
-            ./build.sh -fuse2
+            ./build.sh fuse2
           else
             ./build.sh
           fi

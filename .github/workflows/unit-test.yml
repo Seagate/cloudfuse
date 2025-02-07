@@ -76,7 +76,7 @@ jobs:
       - name: Build
         run: |
           if [[ "${{ matrix.job_name }}" == "linux-fuse2" ]]; then
-            ./build.sh -fuse2;
+            ./build.sh fuse2;
           else
             ./build.sh;
           fi
@@ -198,7 +198,7 @@ jobs:
       - name: Install libfuse on Linux
         shell: bash
         run: |
-          sudo apt-get install fuse3 libfuse3-dev
+          sudo apt-get install fuse3 libfuse3-dev libfuse-dev
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6

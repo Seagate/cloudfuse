@@ -1,7 +1,6 @@
 #!/bin/bash
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    if [ "$1" == "fuse2" ]
-    then
+    if [[ "$1" == "fuse2" ]]; then
         rm -rf cloudfuse
         # Build cloudfuse with fuse2
         go build -o cloudfuse
