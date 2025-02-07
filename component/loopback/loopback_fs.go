@@ -182,6 +182,7 @@ func (lfs *LoopbackFS) CreateFile(options internal.CreateFileOptions) (*handlema
 	}
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetFileObject(f)
+	handlemap.Add(handle)
 
 	return handle, nil
 }
@@ -212,6 +213,7 @@ func (lfs *LoopbackFS) OpenFile(options internal.OpenFileOptions) (*handlemap.Ha
 	}
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetFileObject(f)
+	handlemap.Add(handle)
 	return handle, nil
 }
 
@@ -224,6 +226,7 @@ func (lfs *LoopbackFS) CloseFile(options internal.CloseFileOptions) error {
 		return syscall.EBADF
 	}
 
+	handlemap.Delete(options.Handle.ID)
 	return f.Close()
 }
 
@@ -231,7 +234,15 @@ func (lfs *LoopbackFS) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("LoopbackFS::RenameFile : %s -> %s", options.Src, options.Dst)
 	oldPath := filepath.Join(lfs.path, options.Src)
 	newPath := filepath.Join(lfs.path, options.Dst)
-	return os.Rename(oldPath, newPath)
+	err := os.Rename(oldPath, newPath)
+	handlemap.GetHandles().Range(func(key, value any) bool {
+		handle := value.(*handlemap.Handle)
+		if handle.Path == options.Src {
+			handle.Path = options.Dst
+		}
+		return true
+	})
+	return err
 }
 
 func (lfs *LoopbackFS) ReadLink(options internal.ReadLinkOptions) (string, error) {
@@ -266,10 +277,6 @@ func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, 
 	options.Handle.RLock()
 	defer options.Handle.RUnlock()
 
-	if f == nil {
-		log.Err("LoopbackFS::ReadInBuffer : error [invalid file object]")
-		return 0, os.ErrInvalid
-	}
 	return f.ReadAt(options.Data, options.Offset)
 }
 
