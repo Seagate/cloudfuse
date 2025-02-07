@@ -189,7 +189,6 @@ func (cl *Client) Configure(cfg Config) error {
 			if ae.ErrorCode() == "SignatureDoesNotMatch" {
 				return errInvalidSecretKey
 			}
-			fmt.Println(ae.Error())
 		}
 		return err
 	}
@@ -294,14 +293,22 @@ func (cl *Client) CreateFile(name string, mode os.FileMode) error {
 
 // CreateDirectory : Create a new directory in the bucket/virtual directory
 func (cl *Client) CreateDirectory(name string) error {
+	// make sure name has a trailing slash
+	name = internal.ExtendDirName(name)
+
 	log.Trace("Client::CreateDirectory : name %s", name)
-	// MinIO does not support creating an empty file to indicate a directory
-	// directories will be represented only as object prefixes
-	// we have no way of representing an empty directory, so do nothing.
-	// Note: we could try to list the directory and return EEXIST if it has contents,
-	// but that would be a performance penalty for a check that the OS already does.
+
+	// If the S3 endpoint does not support directory markers then we can do nothing here.
 	// So, let's make it clear: we expect the OS to call GetAttr() on the directory
 	// to make sure it doesn't exist before trying to create it.
+	if cl.Config.enableDirMarker {
+		err := cl.putObject(name, nil, 0, false, true)
+		if err != nil {
+			log.Err("Client::CreateDirectory : putObject(%s) failed. Here's why: %v", name, err)
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -355,6 +362,11 @@ func (cl *Client) DeleteDirectory(name string) error {
 	done := false
 	var marker *string
 	var err error
+
+	// Include deleting the current directory
+	var objectsToDelete []*internal.ObjAttr
+	objectsToDelete = append(objectsToDelete, createObjAttrDir(name))
+
 	for !done {
 
 		// list all objects with the prefix
@@ -376,13 +388,14 @@ func (cl *Client) DeleteDirectory(name string) error {
 		// Delete all found objects *and prefixes ("directories")*.
 		// For improved performance, we'll use one call to delete all objects in this directory.
 		// 	To make one call, we need to make a list of objects to delete first.
-		var objectsToDelete []*internal.ObjAttr
 		for _, object := range objects {
 			if object.IsDir() {
+				fmt.Println("Delete path: ", object.Path)
 				err = cl.DeleteDirectory(object.Path)
 				if err != nil {
 					log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", object.Path, err)
 				}
+				objectsToDelete = append(objectsToDelete, object)
 			} else {
 				objectsToDelete = append(objectsToDelete, object) //consider just object instead of object.path to pass down attributes that come from list.
 			}
@@ -397,6 +410,7 @@ func (cl *Client) DeleteDirectory(name string) error {
 			done = true
 		}
 
+		objectsToDelete = []*internal.ObjAttr{}
 	}
 
 	return err
@@ -424,6 +438,8 @@ func (cl *Client) RenameFile(source string, target string, isSymLink bool) error
 
 // RenameDirectory : Rename the directory
 func (cl *Client) RenameDirectory(source string, target string) error {
+	source = internal.ExtendDirName(source)
+	target = internal.ExtendDirName(target)
 	log.Trace("Client::RenameDirectory : %s -> %s", source, target)
 
 	// TODO: should this fail when the target directory exists?
@@ -459,6 +475,8 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 			done = true
 		}
 	}
+	_ = cl.RenameFile(source, target, false)
+
 	return nil
 }
 
@@ -469,8 +487,6 @@ func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::GetAttr : name %s", name)
 
 	// first let's suppose the caller is looking for a file
-	// there are no objects with trailing slashes (MinIO doesn't support them)
-	// 	and trailing slashes aren't allowed in filenames
 	// so if this was called with a trailing slash, don't look for an object
 	if len(name) > 0 && name[len(name)-1] != '/' {
 		attr, err := cl.getFileAttr(name)
@@ -505,7 +521,17 @@ func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
-	// to do this, accept anything that comes back from List()
+	// Try seartching for the object directly if supported
+	if cl.Config.enableDirMarker {
+		attr, err := cl.headDir(dirName)
+		if err == nil {
+			return attr, err
+		}
+	}
+
+	// Otherwise, the cloud does not support directory markers, so use list
+	// or the directory does exist but there is no marker for it, so look for an object
+	// in the directory
 	objects, _, err := cl.List(dirName, nil, 1)
 	if err != nil {
 		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, err)
@@ -630,7 +656,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]*string, fi *os
 	}
 
 	// upload file data
-	err = cl.putObject(name, fi, stat.Size(), isSymlink)
+	err = cl.putObject(name, fi, stat.Size(), isSymlink, false)
 	if err != nil {
 		log.Err("Client::WriteFromFile : putObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -662,7 +688,7 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]*string, data
 	dataReader := bytes.NewReader(data)
 	// upload data to object
 	// TODO: handle metadata with S3
-	err := cl.putObject(name, dataReader, int64(len(data)), isSymlink)
+	err := cl.putObject(name, dataReader, int64(len(data)), isSymlink, false)
 	if err != nil {
 		log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
 	}
@@ -749,7 +775,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	}
 	// overwrite the object with the truncated data
 	truncatedDataReader := bytes.NewReader(objectData)
-	err = cl.putObject(name, truncatedDataReader, int64(len(objectData)), false)
+	err = cl.putObject(name, truncatedDataReader, int64(len(objectData)), false, false)
 	if err != nil {
 		log.Err("Client::TruncateFile : Failed to write truncated data to object %s", name)
 	}

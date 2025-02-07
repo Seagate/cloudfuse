@@ -115,8 +115,11 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 // Wrapper for awsS3Client.PutObject.
 // Pass in the name of the file, an io.Reader with the object data, the size of the upload,
 // and whether the object is a symbolic link or not.
-func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSymLink bool) error {
+func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSymLink bool, isDir bool) error {
 	key := cl.getKey(name, isSymLink)
+	if isDir {
+		key = internal.ExtendDirName(key)
+	}
 	log.Trace("Client::putObject : putting object %s", key)
 	ctx := context.Background()
 	var err error
@@ -175,6 +178,9 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 	keyList := make([]types.ObjectIdentifier, len(objects))
 	for i, object := range objects {
 		key := cl.getKey(object.Path, object.IsSymlink())
+		if object.IsDir() {
+			key = internal.ExtendDirName(key)
+		}
 		keyList[i] = types.ObjectIdentifier{
 			Key: &key,
 		}
@@ -216,6 +222,28 @@ func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, er
 
 	object := createObjAttr(name, *result.ContentLength, *result.LastModified, isSymlink)
 	return object, nil
+}
+
+// Wrapper for awsS3Client.HeadObject.
+// HeadObject() acts just like GetObject, except no contents are returned.
+// So this is used to get metadata / attributes for a directory.
+// name is the path to the directory.
+func (cl *Client) headDir(name string) (*internal.ObjAttr, error) {
+	key := cl.getKey(name, false)
+	key = internal.ExtendDirName(key)
+	log.Trace("Client::headDir : object %s", key)
+
+	_, err := cl.awsS3Client.HeadObject(context.Background(), &s3.HeadObjectInput{
+		Bucket: aws.String(cl.Config.authConfig.BucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		attemptedAction := fmt.Sprintf("HeadObject(%s)", name)
+		return nil, parseS3Err(err, attemptedAction)
+	}
+
+	attr := createObjAttrDir(name)
+	return attr, nil
 }
 
 // Wrapper for awsS3Client.HeadBucket
@@ -314,10 +342,6 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 
 	// combine the configured prefix and the prefix being given to List to get a full listPath
 	listPath := cl.getKey(prefix, false)
-	// replace any trailing forward slash stripped by common.JoinUnixFilepath
-	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
-		listPath += "/"
-	}
 
 	// Only look for CommonPrefixes (subdirectories) if List was called with a prefix ending in a slash.
 	// If prefix does not end in a slash, CommonPrefixes would find unwanted results.
@@ -367,6 +391,9 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// documentation for this S3 data structure:
 	// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
 	for _, value := range output.Contents {
+		if *value.Key == listPath {
+			continue
+		}
 		// push object info into the list
 		name, isSymLink := cl.getFile(*value.Key)
 
@@ -419,6 +446,9 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 				continue
 			}
 			path := split(cl.Config.prefixPath, dirName)
+			if path[0] == '/' {
+				path = path[1:]
+			}
 			attr := internal.CreateObjAttrDir(path)
 			objectAttrList = append(objectAttrList, attr)
 		}
@@ -449,7 +479,6 @@ func createObjAttr(path string, size int64, lastModified time.Time, isSymLink bo
 		Flags:  internal.NewFileBitMap(),
 	}
 	// set flags
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	attr.Metadata = make(map[string]*string)
@@ -463,9 +492,10 @@ func createObjAttr(path string, size int64, lastModified time.Time, isSymLink bo
 }
 
 // create an object attributes struct for a directory
-func createObjAttrDir(path string) (attr *internal.ObjAttr) { //nolint
+func createObjAttrDir(path string) (attr *internal.ObjAttr) {
 	// strip any trailing slash
 	path = internal.TruncateDirName(path)
+
 	// For these dirs we get only the name and no other properties so hardcoding time to current time
 	currentTime := time.Now()
 
@@ -474,7 +504,6 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) { //nolint
 	attr.Mode = os.ModeDir
 	// set flags
 	attr.Flags = internal.NewDirBitMap()
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	return attr

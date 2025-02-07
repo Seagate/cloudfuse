@@ -58,6 +58,7 @@ func CreateObjAttr(objectPath string, size int64, lastModified time.Time) (attr 
 func CreateObjAttrDir(path string) (attr *ObjAttr) {
 	// strip any trailing slash
 	path = TruncateDirName(path)
+
 	// For these dirs we get only the name and no other properties so hardcoding time to current time
 	currentTime := time.Now()
 
