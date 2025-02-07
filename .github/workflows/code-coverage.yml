@@ -125,9 +125,6 @@ jobs:
           fi
 
       - name: Build coverage binary
-        run: go test -coverpkg="./..." -covermode=count -c -o cloudfuse.test
-
-      - name: Build coverage binary
         run: |
           if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
             go test -coverpkg="./..." -covermode=count -c -o cloudfuse.test
