@@ -41,7 +41,7 @@ import (
 type secureOptions struct {
 	Operation  string
 	ConfigFile string
-	PassPhrase []byte
+	PassPhrase string
 	OutputFile string
 	Key        string
 	Value      string
@@ -118,9 +118,9 @@ var decryptCmd = &cobra.Command{
 //--------------- command section ends
 
 func validateOptions() error {
-	if secOpts.PassPhrase == nil || string(secOpts.PassPhrase) == "" {
-		secOpts.PassPhrase = []byte(os.Getenv(SecureConfigEnvName))
-		if secOpts.PassPhrase == nil || string(secOpts.PassPhrase) == "" {
+	if secOpts.PassPhrase == "" {
+		secOpts.PassPhrase = os.Getenv(SecureConfigEnvName)
+		if secOpts.PassPhrase == "" {
 			return errors.New("provide the passphrase as a cli parameter or configure the CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
 		}
 	}
@@ -130,7 +130,7 @@ func validateOptions() error {
 		return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
 	}
 
-	encryptedPassphrase = memguard.NewEnclave(secOpts.PassPhrase)
+	encryptedPassphrase = memguard.NewEnclave([]byte(secOpts.PassPhrase))
 
 	if secOpts.ConfigFile == "" {
 		return errors.New("config file not provided, check usage")
@@ -234,7 +234,7 @@ func init() {
 	secureCmd.PersistentFlags().StringVar(&secOpts.ConfigFile, "config-file", "",
 		"Configuration file to be encrypted / decrypted")
 
-	secureCmd.PersistentFlags().BytesBase64Var(&secOpts.PassPhrase, "passphrase", []byte(""),
+	secureCmd.PersistentFlags().StringVar(&secOpts.PassPhrase, "passphrase", "",
 		"Base64 encoded key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\n Decoded key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 
 	secureCmd.PersistentFlags().StringVar(&secOpts.OutputFile, "output-file", "",

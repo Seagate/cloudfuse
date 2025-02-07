@@ -74,7 +74,7 @@ type mountOptions struct {
 	DefaultWorkingDir string         `config:"default-working-dir"`
 	CPUProfile        string         `config:"cpu-profile"`
 	MemProfile        string         `config:"mem-profile"`
-	PassPhrase        []byte         `config:"passphrase"`
+	PassPhrase        string         `config:"passphrase"`
 	SecureConfig      bool           `config:"secure-config"`
 	DynamicProfiler   bool           `config:"dynamic-profile"`
 	ProfilerPort      int            `config:"profiler-port"`
@@ -220,9 +220,9 @@ func parseConfig() error {
 		filepath.Ext(options.ConfigFile) == SecureConfigExtension {
 
 		// Validate config is to be secured on write or not
-		if options.PassPhrase == nil || string(options.PassPhrase) == "" {
-			options.PassPhrase = []byte(os.Getenv(SecureConfigEnvName))
-			if options.PassPhrase == nil || string(options.PassPhrase) == "" {
+		if options.PassPhrase == "" {
+			options.PassPhrase = os.Getenv(SecureConfigEnvName)
+			if options.PassPhrase == "" {
 				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
 			}
 
@@ -232,7 +232,7 @@ func parseConfig() error {
 			}
 		}
 
-		encryptedPassphrase = memguard.NewEnclave(options.PassPhrase)
+		encryptedPassphrase = memguard.NewEnclave([]byte(options.PassPhrase))
 
 		cipherText, err := os.ReadFile(options.ConfigFile)
 		if err != nil {
@@ -682,7 +682,7 @@ func init() {
 	mountCmd.PersistentFlags().BoolVar(&options.SecureConfig, "secure-config", false,
 		"Encrypt auto generated config file for each container")
 
-	mountCmd.PersistentFlags().BytesBase64Var(&options.PassPhrase, "passphrase", []byte(""),
+	mountCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
 		"Base64 encoded key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\n Decoded key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 
 	mountCmd.PersistentFlags().String("log-type", "syslog", "Type of logger to be used by the system. Set to syslog by default. Allowed values are silent|syslog|base.")

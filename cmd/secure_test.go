@@ -113,7 +113,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncrypt() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
-	passphrase := base64.StdEncoding.EncodeToString([]byte("12312312312312312312312312312312"))
+	passphrase := "12312312312312312312312312312312"
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
@@ -134,7 +134,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncryptNoOutfile() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile := confFile.Name() + SecureConfigExtension
-	passphrase := base64.StdEncoding.EncodeToString([]byte("12312312312312312312312312312312"))
+	passphrase := "12312312312312312312312312312312"
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile)
@@ -157,7 +157,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncryptNoOutfile() {
 func (suite *secureConfigTestSuite) TestSecureConfigEncryptNotExistent() {
 	defer suite.cleanupTest()
 	confFile := "abcd.yaml"
-	passphrase := base64.StdEncoding.EncodeToString([]byte("12312312312312312312312312312312"))
+	passphrase := "12312312312312312312312312312312"
 	_, err := executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile), fmt.Sprintf("--passphrase=%s", passphrase))
 	suite.assert.Error(err)
 }
@@ -207,7 +207,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigDecrypt() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
-	passphrase := base64.StdEncoding.EncodeToString([]byte("12312312312312312312312312312312"))
+	passphrase := "12312312312312312312312312312312"
 	fmt.Println(passphrase)
 
 	defer os.Remove(confFile.Name())
@@ -241,7 +241,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigDecryptNoOutputFile() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile := confFile.Name() + SecureConfigExtension
-	passphrase := base64.StdEncoding.EncodeToString([]byte("12312312312312312312312312312312"))
+	passphrase := "12312312312312312312312312312312"
 
 	defer os.Remove(confFile.Name())
 
@@ -298,7 +298,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigGet() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
-	passphrase := base64.StdEncoding.EncodeToString([]byte("12312312312312312312312312312312"))
+	passphrase := "12312312312312312312312312312312"
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
@@ -320,7 +320,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigGetInvalidKey() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
-	passphrase := base64.StdEncoding.EncodeToString([]byte("12312312312312312312312312312312"))
+	passphrase := "12312312312312312312312312312312"
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
@@ -342,7 +342,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigSet() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
-	passphrase := base64.StdEncoding.EncodeToString([]byte("12312312312312312312312312312312"))
+	passphrase := "12312312312312312312312312312312"
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())

@@ -41,7 +41,7 @@ type configGenOptions struct {
 	outputConfigPath string
 	containerName    string
 	tempDirPath      string
-	passphrase       []byte
+	passphrase       string
 }
 
 var opts configGenOptions
@@ -113,7 +113,7 @@ var generateConfig = &cobra.Command{
 		var templateConfig []byte
 		var err error
 
-		encryptedPassphrase = memguard.NewEnclave(opts.passphrase)
+		encryptedPassphrase = memguard.NewEnclave([]byte(opts.passphrase))
 
 		templateConfig, err = os.ReadFile(opts.configFilePath)
 		if err != nil {
@@ -163,6 +163,6 @@ func init() {
 	generateConfig.Flags().StringVar(&opts.configFilePath, "config-file", "", "Input config file.")
 	generateConfig.Flags().StringVar(&opts.outputConfigPath, "output-file", "", "Output config file path.")
 	generateConfig.Flags().StringVar(&opts.tempDirPath, "temp-path", "", "Temporary file path.")
-	generateConfig.Flags().BytesBase64Var(&opts.passphrase, "passphrase", nil,
+	generateConfig.Flags().StringVar(&opts.passphrase, "passphrase", "",
 		"Key to be used for encryption / decryption. Key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 }

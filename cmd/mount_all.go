@@ -162,9 +162,9 @@ func processCommand() error {
 		filepath.Ext(options.ConfigFile) == SecureConfigExtension {
 
 		// Validate config is to be secured on write or not
-		if options.PassPhrase == nil || string(options.PassPhrase) == "" {
-			options.PassPhrase = []byte(os.Getenv(SecureConfigEnvName))
-			if options.PassPhrase == nil || string(options.PassPhrase) == "" {
+		if options.PassPhrase == "" {
+			options.PassPhrase = os.Getenv(SecureConfigEnvName)
+			if options.PassPhrase == "" {
 				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
 			}
 
@@ -174,7 +174,7 @@ func processCommand() error {
 			}
 		}
 
-		encryptedPassphrase = memguard.NewEnclave(options.PassPhrase)
+		encryptedPassphrase = memguard.NewEnclave([]byte(options.PassPhrase))
 	}
 
 	var containerList []string
