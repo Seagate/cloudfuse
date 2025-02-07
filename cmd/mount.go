@@ -28,6 +28,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -46,6 +47,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
+	"github.com/awnumar/memguard"
 
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"
@@ -220,24 +222,30 @@ func parseConfig() error {
 		// Validate config is to be secured on write or not
 		if options.PassPhrase == "" {
 			options.PassPhrase = os.Getenv(SecureConfigEnvName)
+			if options.PassPhrase == "" {
+				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+			}
+
+			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
+			if err != nil {
+				return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
+			}
 		}
 
-		if options.PassPhrase == "" {
-			return fmt.Errorf("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
-		}
+		encryptedPassphrase = memguard.NewEnclave([]byte(options.PassPhrase))
 
 		cipherText, err := os.ReadFile(options.ConfigFile)
 		if err != nil {
 			return fmt.Errorf("failed to read encrypted config file %s [%s]", options.ConfigFile, err.Error())
 		}
 
-		plainText, err := common.DecryptData(cipherText, options.PassPhrase)
+		plainText, err := common.DecryptData(cipherText, encryptedPassphrase)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt config file %s [%s]", options.ConfigFile, err.Error())
 		}
 
 		config.SetConfigFile(options.ConfigFile)
-		config.SetSecureConfigOptions(options.PassPhrase)
+		config.SetSecureConfigOptions(encryptedPassphrase)
 		err = config.ReadFromConfigBuffer(plainText)
 		if err != nil {
 			return fmt.Errorf("invalid decrypted config file [%s]", err.Error())

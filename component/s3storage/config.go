@@ -32,6 +32,7 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -40,8 +41,6 @@ var errInvalidConfigField = errors.New("config field is invalid")
 
 type Options struct {
 	BucketName                string                  `config:"bucket-name" yaml:"bucket-name,omitempty"`
-	KeyID                     string                  `config:"key-id" yaml:"key-id,omitempty"`
-	SecretKey                 string                  `config:"secret-key" yaml:"secret-key,omitempty"`
 	Region                    string                  `config:"region" yaml:"region,omitempty"`
 	Profile                   string                  `config:"profile" yaml:"region,omitempty"`
 	Endpoint                  string                  `config:"endpoint" yaml:"endpoint,omitempty"`
@@ -57,8 +56,13 @@ type Options struct {
 	DisableUsage              bool                    `config:"disable-usage" yaml:"disable-usage,omitempty"`
 }
 
+type ConfigSecrets struct {
+	KeyID     *memguard.Enclave
+	SecretKey *memguard.Enclave
+}
+
 // ParseAndValidateConfig : Parse and validate config
-func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
+func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) error {
 	log.Trace("ParseAndValidateConfig : Parsing config")
 
 	// Validate bucket name
@@ -68,8 +72,8 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 
 	// Set authentication config
 	s3.stConfig.authConfig.BucketName = opt.BucketName
-	s3.stConfig.authConfig.KeyID = opt.KeyID
-	s3.stConfig.authConfig.SecretKey = opt.SecretKey
+	s3.stConfig.authConfig.KeyID = secrets.KeyID
+	s3.stConfig.authConfig.SecretKey = secrets.SecretKey
 	s3.stConfig.authConfig.Region = opt.Region
 	s3.stConfig.authConfig.Profile = opt.Profile
 	s3.stConfig.authConfig.Endpoint = opt.Endpoint
