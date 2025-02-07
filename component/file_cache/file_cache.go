@@ -518,33 +518,29 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	} else {
 		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name), nil)
 	}
-	// is the cloud connection down?
-	if errors.Is(err, &common.CloudUnreachableError{}) {
-		// if offline access is disabled, do not touch the local file cache
-		if !fc.offlineAccess {
-			return err
-		}
-		// offline access is enabled
+	// is the cloud connection down? Is offline access enabled?
+	if errors.Is(err, &common.CloudUnreachableError{}) && fc.offlineAccess {
 		// to prevent consistency issues: if this is not a local directory, don't delete it locally
-		attr, getAttrErr := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
-		// is the directory in cloud storage?
-		if getAttrErr == nil || attr != nil {
-			// directory exists in cloud storage - so do nothing
-			return err
+		if fc.notInCloud(options.Name) {
+			// this is a local directory
+			// remove it from the deferred cloud operations
+			// TODO: protect this with a semaphore (probably flock)
+			fc.offlineOps.Delete(options.Name)
+			// delete it locally
+			fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name), nil)
+			// clear the error
+			err = nil
 		}
-		// do we *know* that the directory does not exist in cloud storage?
-		if !errors.Is(getAttrErr, os.ErrNotExist) || errors.Is(getAttrErr, &common.NoCachedDataError{}) {
-			// directory *might* exist in cloud storage (we do not know) - so do nothing
-			return err
-		}
-		// we're pretty sure the directory does not exist in cloud storage
-		// so it was a local directory, and we need to remove it from the deferred cloud operations
-		fc.offlineOps.Delete(options.Name)
-		// and delete it locally
-		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name), nil)
 	}
 
 	return err
+}
+
+// returns true if we *know* that this entity does not exist in cloud storage
+// otherwise returns false (including ambiguous cases)
+func (fc *FileCache) notInCloud(name string) bool {
+	_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+	return errors.Is(err, os.ErrNotExist)
 }
 
 // StreamDir : Add local files to the list retrieved from storage container
