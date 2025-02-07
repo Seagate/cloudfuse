@@ -669,19 +669,32 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("FileCache::RenameDir : src=%s, dst=%s", options.Src, options.Dst)
 
-	// get a list of source objects form both cloud and cache
-	objectNames, err := fc.listAllObjects(options.Src)
+	// build a list of ojbects affected by this rename so we can lock them all
+	// first list cloud objects
+	var cloudObjects []string
+	cloudObjects, err := fc.listCloudObjects(options.Src)
 	if err != nil {
-		log.Err("FileCache::RenameDir : %s listAllObjects failed. Here's why: %v", options.Src, err)
+		log.Err("FileCache::RenameDir : %s listCloudObjects failed. Here's why: %v", options.Src, err)
 		return err
 	}
-
-	// add object destinations, and sort the result
-	for _, srcName := range objectNames {
-		dstName := strings.Replace(srcName, options.Src, options.Dst, 1)
-		objectNames = append(objectNames, dstName)
+	// local / cached
+	var localObjects []string
+	localObjects, err = fc.listCachedObjects(options.Src)
+	if err != nil {
+		log.Err("FileCache::RenameDir : %s listCachedObjects failed. Here's why: %v", options.Src, err)
+		return err
 	}
-	sort.Strings(objectNames)
+	// combine cloud and local source objects
+	srcObjects := combineLists(cloudObjects, localObjects)
+
+	// add destinations
+	var dstObjects []string
+	for _, srcName := range srcObjects {
+		dstName := strings.Replace(srcName, options.Src, options.Dst, 1)
+		dstObjects = append(dstObjects, dstName)
+	}
+	// combine sources and destinations
+	objectNames := combineLists(srcObjects, dstObjects)
 
 	// acquire a file lock on each entry (and defer unlock)
 	var flocks []*common.LockMapItem
@@ -694,8 +707,11 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 
 	// rename the directory in the cloud
 	err = fc.NextComponent().RenameDir(options)
-	if err != nil {
-		log.Err("FileCache::RenameDir : error %s [%s]", options.Src, err.Error())
+	// if we are offline, and offline access is enabled, allow local directories to be renamed
+	if fc.offlineAccess && errors.Is(err, &common.CloudUnreachableError{}) && fc.notInCloud(options.Src) && fc.notInCloud(options.Dst) {
+		log.Debug("FileCache::RenameDir : %s -> %s Cloud is unreachable but neither directory is in cloud storage. Proceeding with offline rename.", options.Src, options.Dst)
+	} else if err != nil {
+		log.Err("FileCache::RenameDir : %s -> %s Cloud rename failed. Here's why: %v", options.Src, options.Dst, err)
 		return err
 	}
 
@@ -751,25 +767,6 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	return nil
 }
 
-func (fc *FileCache) listAllObjects(prefix string) (objectNames []string, err error) {
-	// get cloud objects
-	var cloudObjects []string
-	cloudObjects, err = fc.listCloudObjects(prefix)
-	if err != nil {
-		return
-	}
-	// get local / cached objects
-	var localObjects []string
-	localObjects, err = fc.listCachedObjects(prefix)
-	if err != nil {
-		return
-	}
-	// combine the lists
-	objectNames = combineLists(cloudObjects, localObjects)
-
-	return
-}
-
 // recursively list all objects in the container at the given prefix / directory
 func (fc *FileCache) listCloudObjects(prefix string) (objectNames []string, err error) {
 	var done bool
@@ -777,9 +774,15 @@ func (fc *FileCache) listCloudObjects(prefix string) (objectNames []string, err 
 	for !done {
 		var attrSlice []*internal.ObjAttr
 		attrSlice, token, err = fc.NextComponent().StreamDir(internal.StreamDirOptions{Name: prefix, Token: token})
+		// if we have offline data, and offline access is enabled, clear the offline error
+		if fc.offlineAccess && errors.Is(err, &common.CloudUnreachableError{}) && !errors.Is(err, &common.NoCachedDataError{}) {
+			err = nil
+		}
+		// in any other case, fail on error
 		if err != nil {
 			return
 		}
+		// collect the object names
 		for i := len(attrSlice) - 1; i >= 0; i-- {
 			attr := attrSlice[i]
 			if !attr.IsDir() {
@@ -830,26 +833,27 @@ func (fc *FileCache) listCachedObjects(directory string) (objectNames []string, 
 
 func combineLists(listA, listB []string) []string {
 	// since both lists are sorted, we can combine the two lists using a double-indexed for loop
-	combinedList := listA
+	var combinedList []string
 	i := 0 // Index for listA
 	j := 0 // Index for listB
-	// Iterate through both lists, adding entries from B that are missing from A
+	// Iterate through both lists, adding entries in order
 	for i < len(listA) && j < len(listB) {
 		itemA := listA[i]
 		itemB := listB[j]
 		if itemA < itemB {
+			combinedList = append(combinedList, itemA)
 			i++
 		} else if itemA > itemB {
-			// we could insert here, but it's probably better to just sort later
 			combinedList = append(combinedList, itemB)
 			j++
 		} else {
+			// the items are the same - just add one
+			combinedList = append(combinedList, itemA)
 			i++
 			j++
 		}
 	}
-	// sort and return
-	sort.Strings(combinedList)
+
 	return combinedList
 }
 
