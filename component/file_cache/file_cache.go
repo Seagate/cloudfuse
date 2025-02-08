@@ -622,11 +622,14 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 			newPath := strings.Replace(path, localSrcPath, localDstPath, 1)
 			if !d.IsDir() {
 				log.Debug("FileCache::RenameDir : Renaming local file %s -> %s", path, newPath)
+				// get object names
+				srcName := fc.getObjectName(path)
+				dstName := fc.getObjectName(newPath)
 				// get locks
-				sflock := fc.fileLocks.Get(fc.getObjectName(path))
-				dflock := fc.fileLocks.Get(fc.getObjectName(newPath))
+				sflock := fc.fileLocks.Get(srcName)
+				dflock := fc.fileLocks.Get(dstName)
 				// complete local rename
-				err := fc.renameCachedFile(path, newPath, sflock, dflock)
+				err := fc.renameCachedFile(srcName, dstName, sflock, dflock)
 				if err != nil {
 					// there's really not much we can do to handle the error, so just log it
 					log.Err("FileCache::RenameDir : %s file rename failed. Directory state is inconsistent!", path)
@@ -1538,14 +1541,11 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 		return err
 	}
 
-	localSrcPath := filepath.Join(fc.tmpPath, options.Src)
-	localDstPath := filepath.Join(fc.tmpPath, options.Dst)
-
 	// in case of git clone multiple rename requests come for which destination files already exists in system
 	// if we do not perform rename operation locally and those destination files are cached then next time they are read
 	// we will be serving the wrong content (as we did not rename locally, we still be having older destination files with
 	// stale content). We either need to remove dest file as well from cache or just run rename to replace the content.
-	localRenameErr := fc.renameCachedFile(localSrcPath, localDstPath, sflock, dflock)
+	localRenameErr := fc.renameCachedFile(options.Src, options.Dst, sflock, dflock)
 	if localRenameErr != nil {
 		// renameCachedFile only returns an error when we are at risk for data loss
 		if !localOnly {
@@ -1563,26 +1563,15 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 		return localRenameErr
 	}
 
-	if sflock.Count() > 0 {
-		// update any open handles to the file with its new name
-		handlemap.GetHandles().Range(func(key, value any) bool {
-			handle := value.(*handlemap.Handle)
-			if handle.Path == options.Src {
-				handle.Path = options.Dst
-			}
-			return true
-		})
-		// copy the number of open handles to the new name
-		for sflock.Count() > 0 {
-			sflock.Dec()
-			dflock.Inc()
-		}
-	}
-
 	return nil
 }
 
-func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock, dflock *common.LockMapItem) error {
+func (fc *FileCache) renameCachedFile(srcName, dstName string, sflock, dflock *common.LockMapItem) error {
+	// get local path
+	localSrcPath := filepath.Join(fc.tmpPath, srcName)
+	localDstPath := filepath.Join(fc.tmpPath, dstName)
+
+	// rename local file
 	err := os.Rename(localSrcPath, localDstPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -1601,9 +1590,27 @@ func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock,
 		log.Debug("FileCache::renameCachedFile : %s -> %s Successfully renamed local file", localSrcPath, localDstPath)
 		fc.policy.CacheValid(localDstPath)
 	}
+
 	// delete the source from our cache policy
 	// this will also delete the source file from local storage (if rename failed)
 	fc.policy.CachePurge(localSrcPath, sflock)
+
+	// update handles
+	if sflock.Count() > 0 {
+		// update any open handles to the file with its new name
+		handlemap.GetHandles().Range(func(key, value any) bool {
+			handle := value.(*handlemap.Handle)
+			if handle.Path == srcName {
+				handle.Path = dstName
+			}
+			return true
+		})
+		// copy the number of open handles to the new name
+		for sflock.Count() > 0 {
+			sflock.Dec()
+			dflock.Inc()
+		}
+	}
 
 	return nil
 }
