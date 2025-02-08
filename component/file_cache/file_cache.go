@@ -629,7 +629,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				sflock := fc.fileLocks.Get(srcName)
 				dflock := fc.fileLocks.Get(dstName)
 				// complete local rename
-				err := fc.renameCachedFile(srcName, dstName, sflock, dflock)
+				err := fc.renameCachedFile(path, newPath, sflock, dflock)
 				if err != nil {
 					// there's really not much we can do to handle the error, so just log it
 					log.Err("FileCache::RenameDir : %s file rename failed. Directory state is inconsistent!", path)
