@@ -38,6 +38,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -882,6 +883,7 @@ func unlockAll(flocks []*common.LockMapItem) {
 func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	//defer exectime.StatTimeCurrentBlock("FileCache::CreateFile")()
 	log.Trace("FileCache::CreateFile : name=%s, mode=%d", options.Name, options.Mode)
+	var offline bool
 
 	flock := fc.fileLocks.Get(options.Name)
 	flock.Lock()
@@ -890,11 +892,20 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	// createEmptyFile was added to optionally support immutable containers. If customers do not care about immutability they can set this to true.
 	if fc.createEmptyFile {
 		newF, err := fc.NextComponent().CreateFile(options)
+		if err == nil {
+			newF.GetFileObject().Close()
+		}
+		// are we offline?
+		if fc.offlineAccess && errors.Is(err, &common.CloudUnreachableError{}) && fc.notInCloud(options.Name) {
+			// remember that we're offline
+			offline = true
+			// clear the error
+			err = nil
+		}
 		if err != nil {
 			log.Err("FileCache::CreateFile : Failed to create file %s", options.Name)
 			return nil, err
 		}
-		newF.GetFileObject().Close()
 	}
 
 	// Create the file in local cache
@@ -938,6 +949,11 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 
 	// update state
 	flock.LazyOpen = false
+
+	// if we're offline, record this operation as pending
+	if offline {
+		fc.offlineOps.Store(options.Name, internal.CreateObjAttr(options.Name, 0, time.Now()))
+	}
 
 	return handle, nil
 }
