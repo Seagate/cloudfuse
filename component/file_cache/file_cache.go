@@ -744,6 +744,12 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				}
 				// remember to delete the src directory later (after its contents are deleted)
 				directoriesToPurge = append(directoriesToPurge, path)
+				// update pending cloud ops
+				_, operationPending := fc.offlineOps.LoadAndDelete(fc.getObjectName(path))
+				if operationPending {
+					newObjectName := fc.getObjectName(newPath)
+					fc.offlineOps.Store(newObjectName, internal.CreateObjAttrDir(newObjectName))
+				}
 			}
 		} else {
 			// stat(localPath) failed. err is the one returned by stat
@@ -1718,6 +1724,15 @@ func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock,
 	// delete the source from our cache policy
 	// this will also delete the source file from local storage (if rename failed)
 	fc.policy.CachePurge(localSrcPath, sflock)
+	// update pending cloud ops
+	pendingOp, operationPending := fc.offlineOps.LoadAndDelete(fc.getObjectName(localSrcPath))
+	if operationPending {
+		attr, ok := pendingOp.(internal.ObjAttr)
+		if ok {
+			newObjectName := fc.getObjectName(localDstPath)
+			fc.offlineOps.Store(newObjectName, internal.CreateObjAttr(newObjectName, attr.Size, attr.Mtime))
+		}
+	}
 
 	return nil
 }
