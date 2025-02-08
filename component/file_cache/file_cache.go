@@ -1543,7 +1543,6 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 		return err
 	}
 
-	// get local path
 	localSrcPath := filepath.Join(fc.tmpPath, options.Src)
 	localDstPath := filepath.Join(fc.tmpPath, options.Dst)
 
@@ -1576,7 +1575,6 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 }
 
 func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock, dflock *common.LockMapItem) error {
-	// rename local file
 	err := os.Rename(localSrcPath, localDstPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -1595,7 +1593,6 @@ func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock,
 		log.Debug("FileCache::renameCachedFile : %s -> %s Successfully renamed local file", localSrcPath, localDstPath)
 		fc.policy.CacheValid(localDstPath)
 	}
-
 	// delete the source from our cache policy
 	// this will also delete the source file from local storage (if rename failed)
 	fc.policy.CachePurge(localSrcPath, sflock)
