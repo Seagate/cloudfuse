@@ -1,4 +1,6 @@
 name: Code_Coverage
+permissions: {}
+
 on:
   push:
     branches:
@@ -14,7 +16,7 @@ jobs:
   BuildAndTest-Coverage:
     strategy:
       matrix:
-        go: ["1.23.2"]
+        go: ["1.23"]
         job_name: ["linux"]
 
         include:
@@ -248,6 +250,37 @@ jobs:
           ps -aux | grep cloudfuse
           cd test/e2e_tests
           go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
+          cd -
+          sudo fusermount -u ${{ env.MOUNT_DIR }}
+          sleep 5
+
+      - name: Cleanup S3 Storage before size tracker test
+        run: go test -timeout 120m -v test/s3cleanup/s3cleanup_test.go
+        env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+          AWS_REGION: "${{ secrets.S3TEST_REGION }}"
+          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
+          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
+
+      - name: Create Config File - S3 with Size Tracker
+        env:
+          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
+          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
+          S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
+          S3_REGION: "${{ secrets.S3TEST_REGION }}"
+          S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+        run: "./cloudfuse.test gen-test-config --config-file=s3_key_size_tracker.yaml --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
+
+      - name: S3 Coverage with Size Tracker
+        run: |-
+          rm -rf ${{ env.MOUNT_DIR }}/*
+          rm -rf ${{ env.TEMP_DIR }}/*
+          ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
+          sleep 10
+          ps -aux | grep cloudfuse
+          cd test/e2e_tests
+          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -size-tracker=true
           cd -
           sudo fusermount -u ${{ env.MOUNT_DIR }}
           sleep 5
@@ -523,7 +556,7 @@ jobs:
   BuildAndTest-Coverage-Windows:
     strategy:
       matrix:
-        go: ["1.23.2"]
+        go: ["1.23"]
         job_name: ["windows"]
 
         include:
@@ -780,6 +813,39 @@ jobs:
           kill $pid
           sleep 5
 
+      - name: Cleanup S3 Storage before size tracker test
+        run: go test -timeout 120m -v test/s3cleanup/s3cleanup_test.go
+        env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+          AWS_REGION: "${{ secrets.S3TEST_REGION }}"
+          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
+          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
+
+      - name: Create Config File - S3 with Size Tracker
+        shell: bash
+        env:
+          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
+          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
+          S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
+          S3_REGION: "${{ secrets.S3TEST_REGION }}"
+          S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+        run: "./cloudfuse.test gen-test-config --config-file=s3_key_size_tracker.yaml --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
+
+      - name: S3 Coverage with Size Tracker
+        shell: bash
+        run: |-
+          rm -rf ${{ env.MOUNT_DIR }}/*
+          rm -rf ${{ env.TEMP_DIR }}/*
+          ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
+          sleep 10
+          pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
+          cd test/e2e_tests
+          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true -size-tracker=true
+          cd -
+          kill $pid
+          sleep 5
+
       - name: Create Config File - Stream
         shell: bash
         env:
@@ -1007,7 +1073,7 @@ jobs:
       - BuildAndTest-Coverage-Windows
     strategy:
       matrix:
-        go: ["1.23.2"]
+        go: ["1.23"]
         job_name: ["linux"]
 
         include:
@@ -1048,3 +1114,12 @@ jobs:
         env:
           STORAGE_ACCOUNT_NAME: "${{ secrets.AZTEST_ADLS_ACC_NAME }}"
           STORAGE_ACCOUNT_Key: "${{ secrets.AZTEST_ADLS_KEY }}"
+
+      - name: Cleanup S3 Storage
+        run: go test -timeout 120m -v test/s3cleanup/s3cleanup_test.go
+        env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+          AWS_REGION: "${{ secrets.S3TEST_REGION }}"
+          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
+          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
