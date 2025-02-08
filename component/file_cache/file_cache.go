@@ -633,9 +633,9 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				if err != nil {
 					// there's really not much we can do to handle the error, so just log it
 					log.Err("FileCache::RenameDir : %s file rename failed. Directory state is inconsistent!", path)
-				} else {
-					fc.renameOpenHandles(srcName, dstName, sflock, dflock)
 				}
+				// handle should be updated regardless, for consistency on upload
+				fc.renameOpenHandles(srcName, dstName, sflock, dflock)
 			} else {
 				log.Debug("FileCache::RenameDir : Creating local destination directory %s", newPath)
 				// create the new directory
