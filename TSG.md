@@ -254,13 +254,6 @@ For non-HNS accounts Cloudfuse expects special directory marker files to exist i
 
 If user is observing that list or stat call to file shows updated time or size but contents are not reflecting accordingly, first confirm with Cloudfuse logs that file was indeed downloaded afresh. If file-cache-timeout has not expired then Cloudfuse will keep using the current version of file persisted on temp cache and contents will not be refreshed. If Cloudfuse has downloaded the latest file and user still observes stale contents then clear the kernel page-cache manually using ```sysctl -w vm.drop_caches=3``` command.
 
-If your workflow involves updating the file directly on container (not using Cloudfuse) and you wish to get latest contents on Cloudfuse mount then do the following (for fuse3 compliant linux distro only):
-
-    - set all timeouts in libfuse section to 0 (entry, attribute, negative)
-    - remove attr_cache from your pipeline section in config
-    - set file-cache-timeout to 0
-    - in libfuse section of you config file add "disable-writeback-cache: true"
-
 ## Problems with build
 
 Make sure you have correctly setup your GO dev environment. Ensure you have installed fuse3 for example:
