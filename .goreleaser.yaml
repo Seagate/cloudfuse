@@ -64,14 +64,16 @@ builds:
       - amd64
     env:
       - CGO_ENABLED=1
-      - CC=zig cc -target x86_64-linux-gnu
-      - CXX=zig c++ -target x86_64-linux-gnu
+      - CGO_LDFLAGS=-L/usr/lib/x86_64-linux-gnu
+      - CC=zig cc -target x86_64-linux-gnu -isystem /usr/lib/x86_64-linux-gnu -iwithsysroot /usr/include
+      - CXX=zig c++ -target x86_64-linux-gnu -isystem /usr/lib/x86_64-linux-gnu -iwithsysroot /usr/include
     flags:
       - -trimpath
       - -buildmode=pie
+      - -tags=fuse3
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
+      - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }} -L /usr/lib/x86_64-linux-gnu
 
   - id: linux-amd64-health-monitor
     main: ./tools/health-monitor/main.go
@@ -96,11 +98,13 @@ builds:
       - arm64
     env:
       - CGO_ENABLED=1
-      - CC=zig cc -target aarch64-linux-gnu
-      - CXX=zig c++ -target aarch64-linux-gnu
+      - CGO_LDFLAGS=-L/usr/lib/aarch64-linux-gnu
+      - CC=zig cc -target aarch64-linux-gnu -isystem /usr/lib/aarch64-linux-gnu -iwithsysroot /usr/include
+      - CXX=zig c++ -target aarch64-linux-gnu  -isystem /usr/lib/aarch64-linux-gnu -iwithsysroot /usr/include
     flags:
       - -trimpath
       - -buildmode=pie
+      - -tags=fuse3
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
@@ -182,6 +186,8 @@ archives:
       - LICENSE
       - README.md
       - NOTICE
+      - src: ./gui/dist/cloudfuseGUI_Windows/*
+        dst: ./
       - src: setup/baseConfig.yaml
         dst: ./samples/baseConfig.yaml
       - src: sample_configs/*
@@ -249,11 +255,11 @@ nfpms:
     overrides:
       deb:
         dependencies:
-          - libfuse-dev
+          - libfuse3-dev
 
       rpm:
         dependencies:
-          - fuse-devel
+          - fuse3-devel
 
   - id: linux_no_gui
     package_name: cloudfuse
@@ -298,11 +304,11 @@ nfpms:
     overrides:
       deb:
         dependencies:
-          - libfuse-dev
+          - libfuse3-dev
 
       rpm:
         dependencies:
-          - fuse-devel
+          - fuse3-devel
 
 metadata:
   mod_timestamp: "{{ .CommitTimestamp }}"
