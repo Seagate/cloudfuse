@@ -623,8 +623,8 @@ func (suite *fileCacheTestSuite) TestRenameDirOpenFile() {
 	case1src := srcDir + "/fileCase1"
 	case1dst := dstDir + "/fileCase1"
 	// create file in cloud
-	tempHandle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: case1src, Mode: 0777})
-	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: tempHandle})
+	tempHandle, _ := suite.nextComponent.CreateFile(internal.CreateFileOptions{Name: case1src, Mode: 0777})
+	suite.nextComponent.CloseFile(internal.CloseFileOptions{Handle: tempHandle})
 	// open file for writing
 	handle1, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: case1src, Flags: os.O_RDWR, Mode: 0777})
 	suite.assert.NoError(err)
