@@ -601,159 +601,152 @@ func (suite *fileCacheTestSuite) TestRenameDir() {
 	}
 }
 
-func (suite *fileCacheTestSuite) TestRenameDirOpenFileCase1() {
+// Combined test for all three cases
+func (suite *fileCacheTestSuite) TestRenameDirOpenFile() {
 	defer suite.cleanupTest()
 
 	// Setup
 	srcDir := "src"
 	dstDir := "dst"
 	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: srcDir, Mode: 0777})
-	src := srcDir + "/file"
-	dst := dstDir + "/file"
+	//
+	// Case 1
+	case1src := srcDir + "/fileCase1"
+	case1dst := dstDir + "/fileCase1"
 	// create file in cloud
-	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0777})
-	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	tempHandle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: case1src, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: tempHandle})
 	// open file for writing
-	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: src, Flags: os.O_RDWR, Mode: 0777})
+	handle1, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: case1src, Flags: os.O_RDWR, Mode: 0777})
 	suite.assert.NoError(err)
-	handlemap.Add(handle)
+	handlemap.Add(handle1)
 	// Path should not be in the file cache (lazy open)
-	suite.assert.NoFileExists(suite.cache_path + "/" + src)
+	suite.assert.NoFileExists(suite.cache_path + "/" + case1src)
+	//
+	// Case 2
+	case2src := srcDir + "/fileCase2"
+	case2dst := dstDir + "/fileCase2"
+	// create source file
+	handle2, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: case2src, Mode: 0666})
+	suite.assert.NoError(err)
+	handlemap.Add(handle2)
+	// Path should only be in the file cache
+	suite.assert.FileExists(suite.cache_path + "/" + case2src)
+	suite.assert.NoFileExists(suite.fake_storage_path + "/" + case2src)
+	//
+	// Case 3
+	case3src := srcDir + "/fileCase3"
+	case3dst := dstDir + "/fileCase3"
+	// create source file
+	handle3, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: case3src, Mode: 0666})
+	handlemap.Add(handle3)
+	// Path should be in the file cache
+	suite.assert.FileExists(suite.cache_path + "/" + case3src)
+	// write and flush to cloud
+	initialData := []byte("initialData")
+	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{
+		Handle: handle3,
+		Data:   initialData,
+	})
+	suite.assert.NoError(err)
+	suite.assert.Equal(len(initialData), n)
+	err = suite.fileCache.FlushFile(internal.FlushFileOptions{
+		Handle: handle3,
+	})
+	suite.assert.NoError(err)
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, case3src))
 
-	// Rename the directory
+	// Test: Rename the directory
 	err = suite.fileCache.RenameDir(internal.RenameDirOptions{Src: srcDir, Dst: dstDir})
 	suite.assert.NoError(err)
-
+	//
+	// Case 1
 	// rename succeeded in cloud
-	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, src))
-	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, dst))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, case1src))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, case1dst))
 	// still in lazy open state
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, src))
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, dst))
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, case1src))
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, case1dst))
+	//
+	// Case 2
+	// local rename succeeded
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, case2src))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, case2dst))
+	// file still in case 2
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, case2src))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, case2dst))
+	//
+	// Case 3
+	// local rename succeeded
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, case3src))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, case3dst))
+	// cloud rename succeeded
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, case3src))
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, case3dst))
 
-	// write to file handle
+	// Test: write new data
 	data := []byte("newdata")
-	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{
-		Handle: handle,
+	//
+	// Case 1
+	// write to file handle
+	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+		Handle: handle1,
 		Data:   data,
 	})
 	suite.assert.NoError(err)
 	suite.assert.Equal(len(data), n)
 	// open is completed (file is downloaded), and writes go to the correct file
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, src))
-	suite.assert.FileExists(filepath.Join(suite.cache_path, dst))
-
-	// Close file handle
-	err = suite.fileCache.CloseFile(internal.CloseFileOptions{
-		Handle: handle,
-	})
-	suite.assert.NoError(err)
-
-	// Check cloud storage
-	suite.assert.NoFileExists(path.Join(suite.fake_storage_path, src)) // Src does not exist
-	suite.assert.FileExists(path.Join(suite.fake_storage_path, dst))   // Dst does exist
-	dstData, err := os.ReadFile(path.Join(suite.fake_storage_path, dst))
-	suite.assert.NoError(err)
-	suite.assert.Equal(data, dstData)
-}
-
-func (suite *fileCacheTestSuite) TestRenameDirOpenFileCase2() {
-	defer suite.cleanupTest()
-
-	// Setup
-	srcDir := "src"
-	dstDir := "dst"
-	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: srcDir, Mode: 0777})
-	src := srcDir + "/file"
-	dst := dstDir + "/file"
-	// create source file
-	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
-	suite.assert.NoError(err)
-	handlemap.Add(handle)
-	// Path should be in the file cache
-	suite.assert.FileExists(suite.cache_path + "/" + src)
-
-	// Rename the directory
-	err = suite.fileCache.RenameDir(internal.RenameDirOptions{Src: srcDir, Dst: dstDir})
-	suite.assert.NoError(err)
-
-	// write to file handle
-	data := []byte("newdata")
-	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{
-		Handle: handle,
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, case1src))
+	suite.assert.FileExists(filepath.Join(suite.cache_path, case1dst))
+	//
+	// Case 2
+	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+		Handle: handle2,
 		Data:   data,
 	})
 	suite.assert.NoError(err)
 	suite.assert.Equal(len(data), n)
-
-	// Close file handle
-	err = suite.fileCache.CloseFile(internal.CloseFileOptions{
-		Handle: handle,
-	})
-	suite.assert.NoError(err)
-
-	// Check cloud storage
-	suite.assert.NoFileExists(path.Join(suite.fake_storage_path, src)) // Src does not exist
-	suite.assert.FileExists(path.Join(suite.fake_storage_path, dst))   // Dst does exist
-	dstData, err := os.ReadFile(path.Join(suite.fake_storage_path, dst))
-	suite.assert.NoError(err)
-	suite.assert.Equal(data, dstData)
-}
-
-func (suite *fileCacheTestSuite) TestRenameDirOpenFileCase3() {
-	defer suite.cleanupTest()
-
-	// Setup
-	srcDir := "src"
-	dstDir := "dst"
-	suite.fileCache.CreateDir(internal.CreateDirOptions{Name: srcDir, Mode: 0777})
-	src := srcDir + "/file"
-	dst := dstDir + "/file"
-	// create source file
-	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: src, Mode: 0666})
-	handlemap.Add(handle)
-	// Path should be in the file cache
-	suite.assert.FileExists(suite.cache_path + "/" + src)
-	// write to file handle
-	initialData := []byte("initialData")
-	n, err := suite.fileCache.WriteFile(internal.WriteFileOptions{
-		Handle: handle,
-		Data:   initialData,
-	})
-	suite.assert.NoError(err)
-	suite.assert.Equal(len(initialData), n)
-	// flush to cloud
-	err = suite.fileCache.FlushFile(internal.FlushFileOptions{
-		Handle: handle,
-	})
-	suite.assert.NoError(err)
-	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, src))
-
-	// Rename the directory
-	err = suite.fileCache.RenameDir(internal.RenameDirOptions{Src: srcDir, Dst: dstDir})
-	suite.assert.NoError(err)
-
-	// write to file handle
-	newData := []byte("newData")
+	//
+	// Case 3
 	n, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
-		Handle: handle,
-		Data:   newData,
+		Handle: handle3,
+		Data:   data,
 		Offset: int64(len(initialData)),
 	})
 	suite.assert.NoError(err)
-	suite.assert.Equal(len(newData), n)
-	// Close file handle
+	suite.assert.Equal(len(data), n)
+
+	// Test: Close handle
+	//
+	// Case 1
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{
-		Handle: handle,
+		Handle: handle1,
 	})
 	suite.assert.NoError(err)
-
-	// Check that cloud storage got all data and file was renamed properly
-	suite.assert.NoFileExists(path.Join(suite.fake_storage_path, src)) // Src does not exist
-	suite.assert.FileExists(path.Join(suite.fake_storage_path, dst))   // Dst does exist
-	dstData, err := os.ReadFile(path.Join(suite.fake_storage_path, dst))
+	// check cloud data
+	dstData, err := os.ReadFile(path.Join(suite.fake_storage_path, case1dst))
 	suite.assert.NoError(err)
-	suite.assert.Equal(append(initialData, newData...), dstData)
+	suite.assert.Equal(data, dstData)
+	//
+	// Case 2
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{
+		Handle: handle2,
+	})
+	suite.assert.NoError(err)
+	// check cloud data
+	dstData, err = os.ReadFile(path.Join(suite.fake_storage_path, case2dst))
+	suite.assert.NoError(err)
+	suite.assert.Equal(data, dstData)
+	//
+	// Case 3
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{
+		Handle: handle3,
+	})
+	suite.assert.NoError(err)
+	// check cloud data
+	dstData, err = os.ReadFile(path.Join(suite.fake_storage_path, case3dst))
+	suite.assert.NoError(err)
+	suite.assert.Equal(append(initialData, data...), dstData)
 }
 
 func (suite *fileCacheTestSuite) TestCreateFile() {
