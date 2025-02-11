@@ -33,6 +33,7 @@ import (
 
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 
@@ -429,7 +430,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		if opt.AccountKey == "" {
 			return errors.New("storage key not provided")
 		}
-		az.stConfig.authConfig.AccountKey = opt.AccountKey
+		az.stConfig.authConfig.AccountKey = memguard.NewEnclave([]byte(opt.AccountKey))
 	case EAuthType.SAS():
 		az.stConfig.authConfig.AuthMode = EAuthType.SAS()
 		if opt.SaSKey == "" {
@@ -451,7 +452,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 			return errors.New("Client ID, Tenant ID or Client Secret not provided")
 		}
 		az.stConfig.authConfig.ClientID = opt.ClientID
-		az.stConfig.authConfig.ClientSecret = opt.ClientSecret
+		az.stConfig.authConfig.ClientSecret = memguard.NewEnclave([]byte(opt.ClientSecret))
 		az.stConfig.authConfig.TenantID = opt.TenantID
 		az.stConfig.authConfig.OAuthTokenFilePath = opt.OAuthTokenFilePath
 	case EAuthType.AZCLI():
@@ -590,9 +591,21 @@ func ParseAndReadDynamicConfig(az *AzStorage, opt AzStorageOptions, reload bool)
 		if reload {
 			log.Info("ParseAndReadDynamicConfig : SAS Key updated")
 
-			if err := az.storage.UpdateServiceClient("saskey", az.stConfig.authConfig.SASKey); err != nil {
+			var sasKey *memguard.LockedBuffer
+			var err error
+			if az.stConfig.authConfig.SASKey != nil {
+				sasKey, err = az.stConfig.authConfig.SASKey.Open()
+				if err != nil || sasKey == nil {
+					return err
+				}
+				defer sasKey.Destroy()
+			} else {
+				return errors.New("SAS key update failure")
+			}
+
+			if err := az.storage.UpdateServiceClient("saskey", sasKey.String()); err != nil {
 				az.stConfig.authConfig.SASKey = oldSas
-				_ = az.storage.UpdateServiceClient("saskey", az.stConfig.authConfig.SASKey)
+				_ = az.storage.UpdateServiceClient("saskey", sasKey.String())
 				return errors.New("SAS key update failure")
 			}
 		}

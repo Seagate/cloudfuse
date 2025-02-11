@@ -27,13 +27,13 @@ package common
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 
+	"github.com/awnumar/memguard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -82,10 +82,12 @@ func (suite *typesTestSuite) TestEncryptBadKey() {
 	key := make([]byte, 20)
 	rand.Read(key)
 
+	encryptedPassphrase := memguard.NewEnclave(key)
+
 	data := make([]byte, 1024)
 	rand.Read(data)
 
-	_, err := EncryptData(data, string(key))
+	_, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.Error(err)
 }
 
@@ -94,60 +96,65 @@ func (suite *typesTestSuite) TestDecryptBadKey() {
 	key := make([]byte, 20)
 	rand.Read(key)
 
+	encryptedPassphrase := memguard.NewEnclave(key)
+
 	data := make([]byte, 1024)
 	rand.Read(data)
 
-	_, err := DecryptData(data, string(key))
+	_, err := DecryptData(data, encryptedPassphrase)
 	suite.assert.Error(err)
 }
 
 func (suite *typesTestSuite) TestEncryptDecrypt16() {
 	// Generate a random key
-	binaryKey := make([]byte, 16)
-	rand.Read(binaryKey)
-	key := base64.StdEncoding.EncodeToString(binaryKey)
+	key := make([]byte, 16)
+	rand.Read(key)
+
+	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
 	rand.Read(data)
 
-	cipher, err := EncryptData(data, key)
+	cipher, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.NoError(err)
 
-	d, err := DecryptData(cipher, key)
+	d, err := DecryptData(cipher, encryptedPassphrase)
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(data, d)
 }
 
 func (suite *typesTestSuite) TestEncryptDecrypt24() {
 	// Generate a random key
-	binaryKey := make([]byte, 24)
-	rand.Read(binaryKey)
-	key := base64.StdEncoding.EncodeToString(binaryKey)
+	key := make([]byte, 24)
+	rand.Read(key)
+
+	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
 	rand.Read(data)
 
-	cipher, err := EncryptData(data, key)
+	cipher, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.NoError(err)
 
-	d, err := DecryptData(cipher, key)
+	d, err := DecryptData(cipher, encryptedPassphrase)
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(data, d)
 }
 
 func (suite *typesTestSuite) TestEncryptDecrypt32() {
 	// Generate a random key
-	binaryKey := make([]byte, 32)
-	rand.Read(binaryKey)
-	key := base64.StdEncoding.EncodeToString(binaryKey)
+	key := make([]byte, 32)
+	rand.Read(key)
+
+	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
 	rand.Read(data)
 
-	cipher, err := EncryptData(data, key)
+	cipher, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.NoError(err)
 
-	d, err := DecryptData(cipher, key)
+	d, err := DecryptData(cipher, encryptedPassphrase)
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(data, d)
 }
