@@ -19,7 +19,7 @@ jobs:
     name: Build and Test on Linux
     runs-on: ubuntu-latest
     env:
-      go: "1.23"
+      go: "1.24"
       cgo: ""
       containerName: "test-cnt-ubn"
 
@@ -121,7 +121,7 @@ jobs:
     name: Build and Test on Windows
     runs-on: windows-latest
     env:
-      go: "1.23"
+      go: "1.24"
       cgo: "0"
       containerName: "test-cnt-win"
 
@@ -155,7 +155,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     env:
-      go: "1.23"
+      go: "1.24"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
