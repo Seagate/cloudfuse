@@ -274,7 +274,10 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             return ('', '', -1, False)
         # run command
         try:
-            process = subprocess.run(commandParts, capture_output=True)
+            process = subprocess.run(
+                commandParts, 
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             stdOut = process.stdout.decode().strip()
             stdErr = process.stderr.decode().strip()
             exitCode = process.returncode
