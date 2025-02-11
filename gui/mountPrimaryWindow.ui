@@ -134,14 +134,6 @@
      <height>22</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menu_Debug">
-    <property name="title">
-     <string>Debug</string>
-    </property>
-    <addaction name="action_debugLogging"/>
-    <addaction name="action_debugHealthMonitor"/>
-    <addaction name="action_debugTesting"/>
-   </widget>
    <widget class="QMenu" name="menu_Help">
     <property name="title">
      <string>Help</string>
@@ -149,7 +141,6 @@
     <addaction name="actionAbout_Qt"/>
     <addaction name="actionAbout_CloudFuse"/>
    </widget>
-   <addaction name="menu_Debug"/>
    <addaction name="menu_Help"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -161,21 +152,6 @@
   <action name="advancedSettings_action">
    <property name="text">
     <string>Advanced</string>
-   </property>
-  </action>
-  <action name="action_debugLogging">
-   <property name="text">
-    <string>Logging</string>
-   </property>
-  </action>
-  <action name="action_debugHealthMonitor">
-   <property name="text">
-    <string>Health Monitor</string>
-   </property>
-  </action>
-  <action name="action_debugTesting">
-   <property name="text">
-    <string>Testing</string>
    </property>
   </action>
   <action name="setup_action">
