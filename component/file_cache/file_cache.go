@@ -670,24 +670,24 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("FileCache::RenameDir : src=%s, dst=%s", options.Src, options.Dst)
 
-	// build a list of ojbects affected by this rename so we can lock them all
-	// first list cloud objects
+	// first we need to lock all the files involved
+	// get a list of source objects form both cloud and cache
+	// cloud
 	var cloudObjects []string
 	cloudObjects, err := fc.listCloudObjects(options.Src)
 	if err != nil {
 		log.Err("FileCache::RenameDir : %s listCloudObjects failed. Here's why: %v", options.Src, err)
 		return err
 	}
-	// local / cached
+	// cache
 	var localObjects []string
 	localObjects, err = fc.listCachedObjects(options.Src)
 	if err != nil {
 		log.Err("FileCache::RenameDir : %s listCachedObjects failed. Here's why: %v", options.Src, err)
 		return err
 	}
-	// combine cloud and local source objects
+	// combine the lists
 	srcObjects := combineLists(cloudObjects, localObjects)
-
 	// add destinations
 	var dstObjects []string
 	for _, srcName := range srcObjects {
@@ -726,15 +726,20 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 			newPath := strings.Replace(path, localSrcPath, localDstPath, 1)
 			if !d.IsDir() {
 				log.Debug("FileCache::RenameDir : Renaming local file %s -> %s", path, newPath)
+				// get object names
+				srcName := fc.getObjectName(path)
+				dstName := fc.getObjectName(newPath)
 				// get locks
-				sflock := fc.fileLocks.Get(fc.getObjectName(path))
-				dflock := fc.fileLocks.Get(fc.getObjectName(newPath))
+				sflock := fc.fileLocks.Get(srcName)
+				dflock := fc.fileLocks.Get(dstName)
 				// complete local rename
 				err := fc.renameCachedFile(path, newPath, sflock, dflock)
 				if err != nil {
 					// there's really not much we can do to handle the error, so just log it
 					log.Err("FileCache::RenameDir : %s file rename failed. Directory state is inconsistent!", path)
 				}
+				// handle should be updated regardless, for consistency on upload
+				fc.renameOpenHandles(srcName, dstName, sflock, dflock)
 			} else {
 				log.Debug("FileCache::RenameDir : Creating local destination directory %s", newPath)
 				// create the new directory
@@ -769,6 +774,16 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	for i := len(directoriesToPurge) - 1; i >= 0; i-- {
 		log.Debug("FileCache::RenameDir : Removing local directory %s", directoriesToPurge[i])
 		fc.policy.CachePurge(directoriesToPurge[i], nil)
+	}
+
+	// update any lazy open handles (which are not in the local listing)
+	for _, srcName := range cloudObjects {
+		dstName := strings.Replace(srcName, options.Src, options.Dst, 1)
+		// get locks
+		sflock := fc.fileLocks.Get(srcName)
+		dflock := fc.fileLocks.Get(dstName)
+		// update any remaining open handles
+		fc.renameOpenHandles(srcName, dstName, sflock, dflock)
 	}
 
 	return nil
@@ -1694,21 +1709,8 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 		return localRenameErr
 	}
 
-	if sflock.Count() > 0 {
-		// update any open handles to the file with its new name
-		handlemap.GetHandles().Range(func(key, value any) bool {
-			handle := value.(*handlemap.Handle)
-			if handle.Path == options.Src {
-				handle.Path = options.Dst
-			}
-			return true
-		})
-		// copy the number of open handles to the new name
-		for sflock.Count() > 0 {
-			sflock.Dec()
-			dflock.Inc()
-		}
-	}
+	// rename open handles
+	fc.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
 
 	return nil
 }
@@ -1751,6 +1753,25 @@ func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock,
 	}
 
 	return nil
+}
+
+func (fc *FileCache) renameOpenHandles(srcName, dstName string, sflock, dflock *common.LockMapItem) {
+	// update open handles
+	if sflock.Count() > 0 {
+		// update any open handles to the file with its new name
+		handlemap.GetHandles().Range(func(key, value any) bool {
+			handle := value.(*handlemap.Handle)
+			if handle.Path == srcName {
+				handle.Path = dstName
+			}
+			return true
+		})
+		// copy the number of open handles to the new name
+		for sflock.Count() > 0 {
+			sflock.Dec()
+			dflock.Inc()
+		}
+	}
 }
 
 // TruncateFile: Update the file with its new size.
