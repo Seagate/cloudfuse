@@ -1,5 +1,3 @@
-package libfuse
-
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
@@ -24,6 +22,8 @@ package libfuse
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE
 */
+
+package libfuse
 
 import (
 	"errors"
@@ -126,36 +126,8 @@ func (lf *Libfuse) initFuse() error {
 		options += ",FileSecurity=D:P(A;;FA;;;WD)"
 	}
 
-	// While reading a file let kernel do readahead for better perf
-	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)
-
-	// Max background thread on the fuse layer for high parallelism
-	options += fmt.Sprintf(",max_background=%d", lf.maxFuseThreads)
-
-	if lf.allowOther {
-		options += ",allow_other"
-	}
-	if lf.allowRoot {
-		options += ",allow_root"
-	}
-	if lf.readOnly {
-		options += ",ro"
-	}
-	if lf.nonEmptyMount {
-		options += ",nonempty"
-	}
-
-	if lf.umask != 0 {
-		options += fmt.Sprintf(",umask=%04d", lf.umask)
-	}
-
-	// direct_io option is used to bypass the kernel cache. It disables the use of
-	// page cache (file content cache) in the kernel for the filesystem.
-	if fuseFS.directIO {
-		options += ",direct_io"
-	} else {
-		options += ",kernel_cache"
-	}
+	fuse_options := createFuseOptions(lf.host, lf.allowOther, lf.allowRoot, lf.readOnly, lf.nonEmptyMount, lf.maxFuseThreads, lf.umask)
+	options += fuse_options
 
 	// Setup options as a slice
 	opts := []string{"-o", options}

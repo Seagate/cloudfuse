@@ -58,7 +58,6 @@ FUSE allows mounting filesystem in user space, and is only accessible by the use
 You try to unmount the blob storage, but the recommended command is not found. Whilst `umount` may work instead, fusermount is the recommended method, so install the fuse package, for example on Ubuntu 20+:
 
     sudo apt install fuse3
-please note the fuse version (2 or 3) is dependent on the linux distribution you're using. Refer to fuse version for your distro.
 
 ### 8. Hangs while mounting to private link storage account
 
@@ -253,27 +252,10 @@ For non-HNS accounts Cloudfuse expects special directory marker files to exist i
 
 ### 10. File size and LMT are updated but file contents are not refreshed
 
-Cloudfuse supports fuse2 compatible linux distros. In all linux distros kernel cached contents of file in its page-cache. As long as cache is valid read/write are served from cache and calls will not reach to file-system drivers (Cloudfuse in our case). This page-cache is invalidated when page is swapped-out, manually cleared by user through cli or file-system driver requests for it.
-
-In case of fuse2 compliant distros, libfuse does not support invalidating the page cache. Contents once cached will remain with kernel until user manually clears the page-cache or kernel decides to swap it out. This means even if the file size or LMT has changed and Cloudfuse decided to refresh the content by redownloading the file, on read user will still get the stale contents.
-
-<!-- Uncomment when cgofuse supports fuse3
-In case of fuse3 compliant distros, Cloudfuse configures libfuse to invalidate the page cache on file size or LMT change so this issue will not be hit.
--->
-
 If user is observing that list or stat call to file shows updated time or size but contents are not reflecting accordingly, first confirm with Cloudfuse logs that file was indeed downloaded afresh. If file-cache-timeout has not expired then Cloudfuse will keep using the current version of file persisted on temp cache and contents will not be refreshed. If Cloudfuse has downloaded the latest file and user still observes stale contents then clear the kernel page-cache manually using ```sysctl -w vm.drop_caches=3``` command.
-
-<!-- Uncomment when cgofuse supports fuse3
-If your workflow involves updating the file directly on container (not using Cloudfuse) and you wish to get latest contents on Cloudfuse mount then do the following (for fuse3 compliant linux distro only):
-
-    - set all timeouts in libfuse section to 0 (entry, attribute, negative)
-    - remove attr_cache from your pipeline section in config
-    - set file-cache-timeout to 0
-    - in libfuse section of you config file add "disable-writeback-cache: true"
--->
 
 ## Problems with build
 
-Make sure you have correctly setup your GO dev environment. Ensure you have installed fuse2 for example:
+Make sure you have correctly setup your GO dev environment. Ensure you have installed fuse3 for example:
 
-    sudo apt-get install fuse libfuse-dev -y
+    sudo apt-get install fuse3 libfuse3-dev -y
