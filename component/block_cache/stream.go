@@ -115,14 +115,16 @@ func (st *Stream) Configure(_ bool) error {
 
 // On init register this component to pipeline and supply your constructor
 func init() {
-	blockSizeMb := config.AddUint64Flag("block-size-mb", 0, "Size (in MB) of a block to be downloaded during streaming.")
-	config.BindPFlag(compStream+".block-size-mb", blockSizeMb)
+	// TODO: These are duplicated from Stream component. Leave these uncommented until we remove the stream component, or v1 command flags
 
-	maxBlocksMb := config.AddIntFlag("max-blocks-per-file", 0, "Maximum number of blocks to be cached in memory for streaming.")
-	config.BindPFlag(compStream+".max-blocks-per-file", maxBlocksMb)
-	maxBlocksMb.Hidden = true
+	// blockSizeMb := config.AddUint64Flag("block-size-mb", 0, "Size (in MB) of a block to be downloaded during streaming.")
+	// config.BindPFlag(compStream+".block-size-mb", blockSizeMb)
 
-	streamCacheSize := config.AddUint64Flag("stream-cache-mb", 0, "Limit total amount of data being cached in memory to conserve memory footprint of cloudfuse.")
-	config.BindPFlag(compStream+".stream-cache-mb", streamCacheSize)
-	streamCacheSize.Hidden = true
+	// maxBlocksMb := config.AddIntFlag("max-blocks-per-file", 0, "Maximum number of blocks to be cached in memory for streaming.")
+	// config.BindPFlag(compStream+".max-blocks-per-file", maxBlocksMb)
+	// maxBlocksMb.Hidden = true
+
+	// streamCacheSize := config.AddUint64Flag("stream-cache-mb", 0, "Limit total amount of data being cached in memory to conserve memory footprint of cloudfuse.")
+	// config.BindPFlag(compStream+".stream-cache-mb", streamCacheSize)
+	// streamCacheSize.Hidden = true
 }
