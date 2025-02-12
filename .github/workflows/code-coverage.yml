@@ -17,14 +17,17 @@ jobs:
     strategy:
       matrix:
         go: ["1.23"]
-        job_name: ["linux"]
+        job_name: ["linux-fuse3", "linux-fuse2"]
 
         include:
-          - job_name: linux
+          - job_name: linux-fuse3
+            os: ubuntu-latest
+            containerName: "test-cnt-ubn"
+            fuselib: libfuse3-dev
+          - job_name: linux-fuse2
             os: ubuntu-latest
             containerName: "test-cnt-ubn"
             fuselib: libfuse-dev
-            fuselib2: fuse
 
     runs-on: ${{ matrix.os }}
     env:
@@ -54,8 +57,7 @@ jobs:
 
       - name: Install libfuse
         run: |-
-          sudo apt-get update --fix-missing -o Dpkg::Options::="--force-confnew"
-          sudo apt-get install make cmake gcc g++ parallel ${{ matrix.fuselib }} ${{ matrix.fuselib2 }} -y -o Dpkg::Options::="--force-confnew"
+          sudo apt-get install fuse3 ${{ matrix.fuselib }} -y
 
       - name: Create Directory Structure
         run: |-
@@ -68,7 +70,11 @@ jobs:
 
       - name: Build
         run: |
-          ./build.sh
+          if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
+            ./build.sh fuse2
+          else
+            ./build.sh
+          fi
 
       - name: Create Azure Configuration File
         run: |-
@@ -111,10 +117,20 @@ jobs:
           echo "}" >> $cnfFile
 
       - name: UT Code Coverage
-        run: go test -v -timeout=1h ./... --tags=unittest,storagetest -covermode count -coverprofile ./cloudfuse_ut.cov
+        run: |
+          if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
+            go test -v -timeout=1h ./... --tags=unittest,storagetest -covermode count -coverprofile ./cloudfuse_ut.cov
+          else
+            go test -v -timeout=1h ./... --tags=unittest,storagetest,fuse3 -covermode count -coverprofile ./cloudfuse_ut.cov
+          fi
 
       - name: Build coverage binary
-        run: go test -coverpkg="./..." -covermode=count -c -o cloudfuse.test
+        run: |
+          if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
+            go test -coverpkg="./..." -covermode=count -c -o cloudfuse.test
+          else
+            go test -coverpkg="./..." -tags=fuse3 -covermode=count -c -o cloudfuse.test
+          fi
 
       - name: Create Config File - Block Blob
         env:
@@ -1080,8 +1096,8 @@ jobs:
           - job_name: linux
             os: ubuntu-latest
             containerName: "test-cnt-ubn"
-            fuselib: libfuse-dev
-            fuselib2: fuse
+            fuselib: libfuse3-dev
+            fuselib2: fuse3
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -1100,8 +1116,7 @@ jobs:
 
       - name: Install dependency
         run: |-
-          sudo apt-get update --fix-missing -o Dpkg::Options::="--force-confnew"
-          sudo apt-get install make cmake gcc g++ parallel ${{ matrix.fuselib }} ${{ matrix.fuselib2 }} -y -o Dpkg::Options::="--force-confnew"
+          sudo apt-get install ${{ matrix.fuselib }} ${{ matrix.fuselib2 }}
 
       - name: Cleanup Blob Storage
         run: go test -timeout 120m -v test/accoutcleanup/accountcleanup_test.go
