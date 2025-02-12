@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -67,7 +67,7 @@ func (suite *docTestSuite) TestDocsGeneration() {
 	suite.assert.NoError(err)
 	files, err := os.ReadDir(opDir)
 	suite.assert.NoError(err)
-	suite.assert.NotZero(len(files))
+	suite.assert.NotEmpty(files)
 }
 
 func (suite *docTestSuite) TestOutputDirCreationError() {

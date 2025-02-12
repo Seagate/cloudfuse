@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -43,10 +43,11 @@ const InvalidHandleID HandleID = 0
 
 // Flags represented in BitMap for various flags in the handle
 const (
-	HandleFlagUnknown uint16 = iota
-	HandleFlagDirty          // File has been modified with write operation or is a new file
-	HandleFlagFSynced        // User has called fsync on the file explicitly
-	HandleFlagCached         // File is cached in the local system by cloudfuse
+	HandleFlagUnknown  uint16 = iota
+	HandleFlagDirty           // File has been modified with write operation or is a new file
+	HandleFlagFSynced         // User has called fsync on the file explicitly
+	HandleFlagCached          // File is cached in the local system by cloudfuse
+	HandleOpenedAppend        // File is opened for Append
 )
 
 // Structure to hold in memory cache for streaming layer
@@ -74,7 +75,7 @@ type Handle struct {
 	UnixFD   uint64                 // Unix FD created by create/open syscall
 	OptCnt   uint64                 // Number of operations done on this file
 	Flags    common.BitMap16        // Various states of the file
-	Path     string                 // Always holds path relative to mount dir
+	Path     string                 // Always holds path relative to mount dir, same as object name (uses common.JoinUnixFilepath)
 	values   map[string]interface{} // Map to hold other info if application wants to store
 }
 
@@ -164,6 +165,15 @@ func Add(handle *Handle) HandleID {
 // Delete : Remove handle object from map
 func Delete(key HandleID) {
 	defaultHandleMap.Delete(key)
+}
+
+// Delete : Remove handle object from map, and return the entry (if any)
+func LoadAndDelete(key HandleID) (*Handle, bool) {
+	val, found := defaultHandleMap.LoadAndDelete(key)
+	if !found {
+		return nil, false
+	}
+	return val.(*Handle), true
 }
 
 func CreateCacheObject(capacity int64, handle *Handle) {

@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -32,6 +32,7 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/internal"
 
+	"github.com/awnumar/memguard"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
@@ -52,6 +53,7 @@ type Config struct {
 	checksumAlgorithm         types.ChecksumAlgorithm
 	usePathStyle              bool
 	disableSymlink            bool
+	disableUsage              bool
 }
 
 // TODO: move s3AuthConfig to s3auth.go
@@ -61,8 +63,8 @@ type Config struct {
 // s3AuthConfig : Config to authenticate to storage
 type s3AuthConfig struct {
 	BucketName string
-	KeyID      string
-	SecretKey  string
+	KeyID      *memguard.Enclave
+	SecretKey  *memguard.Enclave
 	Region     string
 	Profile    string
 	Endpoint   string
@@ -103,8 +105,8 @@ type S3Connection interface {
 	ReadBuffer(name string, offset int64, length int64, isSymlink bool) ([]byte, error)
 	ReadInBuffer(name string, offset int64, length int64, data []byte) error
 
-	WriteFromFile(name string, metadata map[string]string, fi *os.File) error
-	WriteFromBuffer(name string, metadata map[string]string, data []byte) error
+	WriteFromFile(name string, metadata map[string]*string, fi *os.File) error
+	WriteFromBuffer(name string, metadata map[string]*string, data []byte) error
 	Write(options internal.WriteFileOptions) error
 	GetFileBlockOffsets(name string) (*common.BlockOffsetList, error)
 
@@ -112,4 +114,5 @@ type S3Connection interface {
 	StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 	NewCredentialKey(_, _ string) error
+	GetUsedSize() (uint64, error)
 }

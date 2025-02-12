@@ -4,7 +4,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -133,10 +133,9 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 1)
 
-	_, err = os.Stat(fileName)
-	suite.NoError(err)
+	suite.FileExists(fileName)
 
 	files, err := os.ReadDir(suite.testPath)
 	suite.NoError(err)
@@ -161,10 +160,9 @@ func (suite *fileTestSuite) TestFileCreateEncodeChar() {
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 1)
 
-	_, err = os.Stat(fileName)
-	suite.NoError(err)
+	suite.FileExists(fileName)
 
 	files, err := os.ReadDir(suite.testPath)
 	suite.NoError(err)
@@ -202,10 +200,9 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 	srcFile, err = os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 1)
 
-	_, err = os.Stat(fileName)
-	suite.NoError(err)
+	suite.FileExists(fileName)
 
 	files, err := os.ReadDir(speclDirName)
 	suite.NoError(err)
@@ -253,6 +250,34 @@ func (suite *fileTestSuite) TestFileCreateLabel() {
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
+
+	suite.fileTestCleanup([]string{fileName})
+}
+
+func (suite *fileTestSuite) TestFileAppend() {
+	fileName := filepath.Join(suite.testPath, "append_test.txt")
+	initialContent := []byte("Initial content\n")
+	appendContent := []byte("Appended content\n")
+
+	// Create and write initial content to the file
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0777)
+	suite.NoError(err)
+	_, err = srcFile.Write(initialContent)
+	suite.NoError(err)
+	srcFile.Close()
+
+	// Open the file with O_APPEND and append new content
+	appendFile, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0777)
+	suite.NoError(err)
+	_, err = appendFile.Write(appendContent)
+	suite.NoError(err)
+	appendFile.Close()
+
+	// Read the file and verify the content
+	data, err := os.ReadFile(fileName)
+	suite.NoError(err)
+	expectedContent := append(initialContent, appendContent...)
+	suite.Equal(expectedContent, data)
 
 	suite.fileTestCleanup([]string{fileName})
 }
@@ -364,11 +389,11 @@ func (suite *fileTestSuite) TestFileGetStat() {
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 1)
 
 	stat, err := os.Stat(fileName)
 	suite.NoError(err)
-	modTineDiff := time.Now().Sub(stat.ModTime())
+	modTineDiff := time.Since(stat.ModTime())
 
 	suite.False(stat.IsDir())
 	suite.Equal("test", stat.Name())
@@ -497,7 +522,7 @@ func (suite *fileTestSuite) TestLinkWrite() {
 	suite.NoError(err)
 
 	stat, err := os.Stat(targetName)
-	modTineDiff := time.Now().Sub(stat.ModTime())
+	modTineDiff := time.Since(stat.ModTime())
 	suite.NoError(err)
 	suite.LessOrEqual(modTineDiff.Minutes(), float64(1))
 	suite.fileTestCleanup([]string{targetName})

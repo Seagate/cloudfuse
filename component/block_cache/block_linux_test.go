@@ -12,7 +12,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -143,7 +143,7 @@ func (suite *blockTestSuite) TestReady() {
 	b.ReUse()
 	suite.assert.NotNil(b.state)
 
-	b.Ready()
+	b.Ready(BlockStatusDownloaded)
 	suite.assert.Len(b.state, 1)
 
 	<-b.state
@@ -167,7 +167,7 @@ func (suite *blockTestSuite) TestUnBlock() {
 	suite.assert.NotNil(b.state)
 	suite.assert.Nil(b.node)
 
-	b.Ready()
+	b.Ready(BlockStatusDownloaded)
 	suite.assert.Len(b.state, 1)
 
 	<-b.state
@@ -201,7 +201,7 @@ func (suite *blockTestSuite) TestWriter() {
 	suite.assert.Equal(b.id, int64(-1))
 	suite.assert.False(b.IsDirty())
 
-	b.Ready()
+	b.Ready(BlockStatusDownloaded)
 	suite.assert.Len(b.state, 1)
 
 	<-b.state
@@ -223,7 +223,7 @@ func (suite *blockTestSuite) TestWriter() {
 	b.NoMoreDirty()
 	suite.assert.False(b.IsDirty())
 
-	b.Ready()
+	b.Ready(BlockStatusUploaded)
 	suite.assert.Len(b.state, 1)
 
 	<-b.state

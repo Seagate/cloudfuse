@@ -4,7 +4,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -37,6 +37,7 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -114,13 +115,14 @@ func generateEndpoint(useHttp bool, accountName string, accountType AccountType)
 
 func (suite *authTestSuite) TestBlockInvalidAuth() {
 	defer suite.cleanupTest()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.BlockKey))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.BlockContainer,
 		authConfig: azAuthConfig{
 			AuthMode:    EAuthType.INVALID_AUTH(),
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
-			AccountKey:  storageTestConfigurationParameters.BlockKey,
+			AccountKey:  encryptedKey,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
 		},
 	}
@@ -136,13 +138,14 @@ func (suite *authTestSuite) TestBlockInvalidAuth() {
 
 func (suite *authTestSuite) TestAdlsInvalidAuth() {
 	defer suite.cleanupTest()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.BlockKey))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.AdlsContainer,
 		authConfig: azAuthConfig{
 			AuthMode:    EAuthType.INVALID_AUTH(),
 			AccountType: EAccountType.ADLS(),
 			AccountName: storageTestConfigurationParameters.AdlsAccount,
-			AccountKey:  storageTestConfigurationParameters.AdlsKey,
+			AccountKey:  encryptedKey,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
 		},
 	}
@@ -158,13 +161,14 @@ func (suite *authTestSuite) TestAdlsInvalidAuth() {
 
 func (suite *authTestSuite) TestInvalidAccountType() {
 	defer suite.cleanupTest()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.BlockKey))
 	stgConfig := AzStorageConfig{
-		container: storageTestConfigurationParameters.BlockContainer,
+		container: storageTestConfigurationParameters.AdlsContainer,
 		authConfig: azAuthConfig{
 			AuthMode:    EAuthType.KEY(),
 			AccountType: EAccountType.INVALID_ACC(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
-			AccountKey:  storageTestConfigurationParameters.BlockKey,
+			AccountKey:  encryptedKey,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
 		},
 	}
@@ -183,7 +187,7 @@ func (suite *authTestSuite) TestBlockInvalidSharedKey() {
 			AuthMode:    EAuthType.KEY(),
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
-			AccountKey:  "",
+			AccountKey:  nil,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
 		},
 	}
@@ -199,13 +203,14 @@ func (suite *authTestSuite) TestBlockInvalidSharedKey() {
 
 func (suite *authTestSuite) TestBlockInvalidSharedKey2() {
 	defer suite.cleanupTest()
+	encryptedKey := memguard.NewEnclave([]byte("abcd>="))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.BlockContainer,
 		authConfig: azAuthConfig{
 			AuthMode:    EAuthType.KEY(),
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
-			AccountKey:  "abcd>=", // string that will fail to base64 decode
+			AccountKey:  encryptedKey, // string that will fail to base64 decode
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
 		},
 	}
@@ -221,13 +226,14 @@ func (suite *authTestSuite) TestBlockInvalidSharedKey2() {
 
 func (suite *authTestSuite) TestBlockSharedKey() {
 	defer suite.cleanupTest()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.BlockKey))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.BlockContainer,
 		authConfig: azAuthConfig{
 			AuthMode:    EAuthType.KEY(),
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
-			AccountKey:  storageTestConfigurationParameters.BlockKey,
+			AccountKey:  encryptedKey,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
 		},
 	}
@@ -258,7 +264,7 @@ func (suite *authTestSuite) TestAdlsInvalidSharedKey() {
 			AuthMode:    EAuthType.KEY(),
 			AccountType: EAccountType.ADLS(),
 			AccountName: storageTestConfigurationParameters.AdlsAccount,
-			AccountKey:  "",
+			AccountKey:  nil,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
 		},
 	}
@@ -274,13 +280,14 @@ func (suite *authTestSuite) TestAdlsInvalidSharedKey() {
 
 func (suite *authTestSuite) TestAdlsSharedKey() {
 	defer suite.cleanupTest()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.AdlsKey))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.AdlsContainer,
 		authConfig: azAuthConfig{
 			AuthMode:    EAuthType.KEY(),
 			AccountType: EAccountType.ADLS(),
 			AccountName: storageTestConfigurationParameters.AdlsAccount,
-			AccountKey:  storageTestConfigurationParameters.AdlsKey,
+			AccountKey:  encryptedKey,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
 		},
 	}
@@ -311,7 +318,7 @@ func (suite *authTestSuite) TestBlockInvalidSasKey() {
 			AuthMode:    EAuthType.SAS(),
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
-			SASKey:      "",
+			SASKey:      nil,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
 		},
 	}
@@ -422,7 +429,7 @@ func (suite *authTestSuite) TestBlockInvalidSasKey() {
 // 		assert.Fail("TestBlockSasKeySetOption : Failed to create Storage object")
 // 	}
 // 	stg.SetupPipeline()
-// 	stg.NewCredentialKey("saskey", storageTestConfigurationParameters.BlockSas)
+// 	stg.UpdateServiceClient("saskey", storageTestConfigurationParameters.BlockSas)
 // 	if err := stg.SetupPipeline(); err != nil {
 // 		assert.Fail("TestBlockSasKeySetOption : Failed to setup pipeline")
 // 	}
@@ -440,7 +447,7 @@ func (suite *authTestSuite) TestAdlsInvalidSasKey() {
 			AuthMode:    EAuthType.SAS(),
 			AccountType: EAccountType.ADLS(),
 			AccountName: storageTestConfigurationParameters.AdlsAccount,
-			SASKey:      "",
+			SASKey:      nil,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
 		},
 	}
@@ -555,7 +562,7 @@ func (suite *authTestSuite) TestAdlsInvalidSasKey() {
 // 		assert.Fail("TestBlockSasKeySetOption : Failed to create Storage object")
 // 	}
 // 	stg.SetupPipeline()
-// 	stg.NewCredentialKey("saskey", storageTestConfigurationParameters.AdlsSas)
+// 	stg.UpdateServiceClient("saskey", storageTestConfigurationParameters.AdlsSas)
 // 	if err := stg.SetupPipeline(); err != nil {
 // 		assert.Fail("TestBlockSasKeySetOption : Failed to setup pipeline")
 // 	}
@@ -650,113 +657,60 @@ func (suite *authTestSuite) TestAdlsInvalidSasKey() {
 // 	}
 // }
 
-func (suite *authTestSuite) TestBlockInvalidSpn() {
-	defer suite.cleanupTest()
-	stgConfig := AzStorageConfig{
-		container: storageTestConfigurationParameters.BlockContainer,
-		authConfig: azAuthConfig{
-			AuthMode:     EAuthType.SPN(),
-			AccountType:  EAccountType.BLOCK(),
-			AccountName:  storageTestConfigurationParameters.BlockAccount,
-			ClientID:     storageTestConfigurationParameters.SpnClientId,
-			TenantID:     storageTestConfigurationParameters.SpnTenantId,
-			ClientSecret: "",
-			Endpoint:     generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
-		},
-	}
-	assert := assert.New(suite.T())
-	stg := NewAzStorageConnection(stgConfig)
-	if stg == nil {
-		assert.Fail("TestBlockInvalidSpn : Failed to create Storage object")
-	}
-	if err := stg.SetupPipeline(); err == nil {
-		assert.Fail("TestBlockInvalidSpn : Setup pipeline even though spn is invalid")
-	}
-}
-
-func (suite *authTestSuite) TestBlockInvalidTokenPathSpn() {
-	defer suite.cleanupTest()
-
-	_ = os.WriteFile("newtoken.txt", []byte("abcdef"), 0777)
-	defer os.Remove("newtoken.txt")
-
-	stgConfig := AzStorageConfig{
-		container: storageTestConfigurationParameters.BlockContainer,
-		authConfig: azAuthConfig{
-			AuthMode:           EAuthType.SPN(),
-			AccountType:        EAccountType.BLOCK(),
-			AccountName:        storageTestConfigurationParameters.BlockAccount,
-			ClientID:           storageTestConfigurationParameters.SpnClientId,
-			TenantID:           storageTestConfigurationParameters.SpnTenantId,
-			ClientSecret:       "",
-			Endpoint:           generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
-			OAuthTokenFilePath: "newtoken.txt",
-		},
-	}
-	assert := assert.New(suite.T())
-	stg := NewAzStorageConnection(stgConfig)
-	if stg == nil {
-		assert.Fail("TestBlockInvalidSpn : Failed to create Storage object")
-	}
-	_ = stg.SetupPipeline()
-}
-
-// func (suite *authTestSuite) TestBlockSpn() {
+// func (suite *authTestSuite) TestBlockAzCLI() {
 // 	defer suite.cleanupTest()
 // 	stgConfig := AzStorageConfig{
 // 		container: storageTestConfigurationParameters.BlockContainer,
 // 		authConfig: azAuthConfig{
-// 			AuthMode:     EAuthType.SPN(),
-// 			AccountType:  EAccountType.BLOCK(),
-// 			AccountName:  storageTestConfigurationParameters.BlockAccount,
-// 			ClientID:     storageTestConfigurationParameters.SpnClientId,
-// 			TenantID:     storageTestConfigurationParameters.SpnTenantId,
-// 			ClientSecret: storageTestConfigurationParameters.SpnClientSecret,
-// 			Endpoint:     generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
+// 			AuthMode:    EAuthType.AZCLI(),
+// 			AccountType: EAccountType.BLOCK(),
+// 			AccountName: storageTestConfigurationParameters.BlockAccount,
+// 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
 // 		},
 // 	}
-// 	suite.validateStorageTest("TestBlockSpn", stgConfig)
+
+// 	assert := assert.New(suite.T())
+// 	stg := NewAzStorageConnection(stgConfig)
+// 	assert.NotNil(stg)
+
+// 	err := stg.SetupPipeline()
+// 	assert.Nil(err)
+
+// 	err = stg.TestPipeline()
+// 	if storageTestConfigurationParameters.SkipAzCLI {
+// 		// error is returned when azcli is not installed or logged out
+// 		assert.NotNil(err)
+// 	} else {
+// 		assert.Nil(err)
+// 	}
 // }
 
-func (suite *authTestSuite) TestAdlsInvalidSpn() {
-	defer suite.cleanupTest()
-	stgConfig := AzStorageConfig{
-		container: storageTestConfigurationParameters.AdlsContainer,
-		authConfig: azAuthConfig{
-			AuthMode:     EAuthType.SPN(),
-			AccountType:  EAccountType.ADLS(),
-			AccountName:  storageTestConfigurationParameters.AdlsAccount,
-			ClientID:     storageTestConfigurationParameters.SpnClientId,
-			TenantID:     storageTestConfigurationParameters.SpnTenantId,
-			ClientSecret: "",
-			Endpoint:     generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
-		},
-	}
-	assert := assert.New(suite.T())
-	stg := NewAzStorageConnection(stgConfig)
-	if stg == nil {
-		assert.Fail("TestAdlsInvalidSpn : Failed to create Storage object")
-	}
-	if err := stg.SetupPipeline(); err == nil {
-		assert.Fail("TestAdlsInvalidSpn : Setup pipeline even though spn is invalid")
-	}
-}
-
-// func (suite *authTestSuite) TestAdlsSpn() {
+// func (suite *authTestSuite) TestAdlsAzCLI() {
 // 	defer suite.cleanupTest()
 // 	stgConfig := AzStorageConfig{
 // 		container: storageTestConfigurationParameters.AdlsContainer,
 // 		authConfig: azAuthConfig{
-// 			AuthMode:     EAuthType.SPN(),
-// 			AccountType:  EAccountType.ADLS(),
-// 			AccountName:  storageTestConfigurationParameters.AdlsAccount,
-// 			ClientID:     storageTestConfigurationParameters.SpnClientId,
-// 			TenantID:     storageTestConfigurationParameters.SpnTenantId,
-// 			ClientSecret: storageTestConfigurationParameters.SpnClientSecret,
-// 			Endpoint:     generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
+// 			AuthMode:    EAuthType.AZCLI(),
+// 			AccountType: EAccountType.ADLS(),
+// 			AccountName: storageTestConfigurationParameters.AdlsAccount,
+// 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
 // 		},
 // 	}
-// 	suite.validateStorageTest("TestAdlsSpn", stgConfig)
+
+// 	assert := assert.New(suite.T())
+// 	stg := NewAzStorageConnection(stgConfig)
+// 	assert.NotNil(stg)
+
+// 	err := stg.SetupPipeline()
+// 	assert.Nil(err)
+
+// 	err = stg.TestPipeline()
+// 	if storageTestConfigurationParameters.SkipAzCLI {
+// 		// error is returned when azcli is not installed or logged out
+// 		assert.NotNil(err)
+// 	} else {
+// 		assert.Nil(err)
+// 	}
 // }
 
 func (suite *authTestSuite) cleanupTest() {

@@ -9,6 +9,13 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      aws-sdk:
+        patterns:
+          - github.com/aws/*
+      azure-sdk:
+        patterns:
+          - github.com/Azure/*
   - package-ecosystem: "github-actions"
     # Workflow files stored in the default location of `.github/workflows`. (You don't need to specify `/.github/workflows` for `directory`. You can use `directory: "/"`.)
     directory: "/"

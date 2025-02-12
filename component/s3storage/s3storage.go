@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,6 +27,7 @@ package s3storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"syscall"
@@ -38,6 +39,8 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
+	"github.com/awnumar/memguard"
+	"github.com/spf13/viper"
 )
 
 // S3Storage Wrapper type around aws-sdk-go-v2/service/s3
@@ -79,11 +82,35 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 
 	err = config.UnmarshalKey("restricted-characters-windows", &conf.RestrictedCharsWin)
 	if err != nil {
-		log.Err("AzStorage::Configure : config error [unable to obtain restricted-characters-windows]")
+		log.Err("S3Storage::Configure : config error [unable to obtain restricted-characters-windows]")
 		return err
 	}
 
-	err = ParseAndValidateConfig(s3, conf)
+	secrets := ConfigSecrets{}
+	// Securely store key-id and secret-key in enclave
+	if viper.GetString("s3storage.key-id") != "" {
+		encryptedKeyID := memguard.NewEnclave([]byte(viper.GetString("s3storage.key-id")))
+
+		if encryptedKeyID == nil {
+			err := errors.New("unable to store key-id securely")
+			log.Err("S3Storage::Configure : ", err.Error())
+			return err
+		}
+		secrets.KeyID = encryptedKeyID
+	}
+
+	if viper.GetString("s3storage.secret-key") != "" {
+		encryptedSecretKey := memguard.NewEnclave([]byte(viper.GetString("s3storage.secret-key")))
+
+		if encryptedSecretKey == nil {
+			err := errors.New("unable to store secret-key securely")
+			log.Err("S3Storage::Configure : ", err.Error())
+			return err
+		}
+		secrets.SecretKey = encryptedSecretKey
+	}
+
+	err = ParseAndValidateConfig(s3, conf, secrets)
 	if err != nil {
 		log.Err("S3Storage::Configure : Config validation failed [%s]", err.Error())
 		return fmt.Errorf("config error in %s [%s]", s3.Name(), err.Error())
@@ -360,12 +387,6 @@ func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 	return err
 }
 
-// Read and return file data as a buffer.
-func (s3 *S3Storage) ReadFile(options internal.ReadFileOptions) ([]byte, error) {
-	//log.Trace("S3Storage::ReadFile : Read %s", h.Path)
-	return s3.storage.ReadBuffer(options.Handle.Path, 0, 0, false)
-}
-
 // Read file data into the buffer given in options.Data.
 func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
 	//log.Trace("S3Storage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
@@ -482,11 +503,45 @@ func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 	return s3.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
 }
 
+const blockSize = 4096
+
+func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
+	if s3.stConfig.disableUsage {
+		return nil, false, nil
+	}
+
+	log.Trace("S3Storage::StatFs")
+	// cache_size = f_blocks * f_frsize/1024
+	// cache_size - used = f_frsize * f_bavail/1024
+	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
+	// if cache size is set to 0 then we have the root mount usage
+	sizeUsed, err := s3.storage.GetUsedSize()
+	if err != nil {
+		// TODO: will returning EIO break any applications that depend on StatFs?
+		return nil, true, err
+	}
+
+	stat := common.Statfs_t{
+		Blocks: sizeUsed / blockSize,
+		// there is no set capacity limit in cloud storage
+		// so we use zero for free and avail
+		// this zero value is used in the libfuse component to recognize that cloud storage responded
+		Bavail:  0,
+		Bfree:   0,
+		Bsize:   blockSize,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  blockSize,
+		Namemax: 255,
+	}
+
+	log.Debug("S3Storage::StatFs : responding with free=%d avail=%d blocks=%d (bsize=%d)", stat.Bfree, stat.Bavail, stat.Blocks, stat.Bsize)
+
+	return &stat, true, nil
+}
+
 // TODO: decide if the TODO below is relevant and delete if not
 // TODO : Below methods are pending to be implemented
-// SetAttr(string, internal.ObjAttr) error
-// UnlinkFile(string) error
-// ReleaseFile(*handlemap.Handle) error
 // FlushFile(*handlemap.Handle) error
 
 // ------------------------- Factory methods to create objects -------------------------------------------
@@ -508,6 +563,4 @@ func News3storageComponent() internal.Component {
 // On init register this component to pipeline and supply your constructor
 func init() {
 	internal.AddComponent(compName, News3storageComponent)
-	// TODO: add config flags to customize AWS S3 SDK behavior and register them here
-	// 	(see how this is done in azstorage for reference).
 }

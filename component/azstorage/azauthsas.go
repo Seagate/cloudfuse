@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -26,60 +26,92 @@
 package azstorage
 
 import (
-	"fmt"
+	"errors"
+	"strings"
 
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
-	"github.com/Azure/azure-storage-azcopy/v10/azbfs"
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
+	serviceBfs "github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake/service"
 )
 
 // Verify that the Auth implement the correct AzAuth interfaces
 var _ azAuth = &azAuthBlobSAS{}
-var _ azAuth = &azAuthBfsSAS{}
+var _ azAuth = &azAuthDatalakeSAS{}
 
 type azAuthSAS struct {
 	azAuthBase
 }
 
-// GetEndpoint : Gets the SAS endpoint
-func (azsas *azAuthSAS) getEndpoint() string {
-	return fmt.Sprintf("%s%s",
-		azsas.config.Endpoint,
-		azsas.config.SASKey)
-}
-
 // SetOption : Sets the sas key information for the SAS auth.
 func (azsas *azAuthSAS) setOption(key, value string) {
 	if key == "saskey" {
-		azsas.config.SASKey = value
+		azsas.config.SASKey = memguard.NewEnclave([]byte(value))
 	}
+}
+
+// GetEndpoint : Gets the SAS endpoint
+func (azsas *azAuthSAS) getEndpoint() string {
+	if azsas.config.SASKey != nil {
+		buff, err := azsas.config.SASKey.Open()
+		if err != nil || buff == nil {
+			return ""
+		}
+		defer buff.Destroy()
+		endpoint := azsas.config.Endpoint + "?" + strings.TrimLeft(buff.String(), "?")
+		return endpoint
+	}
+
+	return ""
 }
 
 type azAuthBlobSAS struct {
 	azAuthSAS
 }
 
-// GetCredential : Gets SAS based credentials for blob
-func (azsas *azAuthBlobSAS) getCredential() interface{} {
-	if azsas.config.SASKey == "" {
-		log.Err("azAuthBlobSAS::getCredential : SAS key for account is empty, cannot authenticate user")
-		return nil
+// getServiceClient : returns SAS based service client for blob
+func (azsas *azAuthBlobSAS) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
+	if azsas.config.SASKey == nil {
+		log.Err("azAuthBlobSAS::getServiceClient : SAS key for account is empty, cannot authenticate user")
+		return nil, errors.New("sas key for account is empty, cannot authenticate user")
 	}
 
-	return azblob.NewAnonymousCredential()
+	opts, err := getAzBlobServiceClientOptions(stConfig)
+	if err != nil {
+		log.Err("azAuthBlobSAS::getServiceClient : Failed to create client options [%s]", err.Error())
+		return nil, err
+	}
+
+	svcClient, err := service.NewClientWithNoCredential(azsas.getEndpoint(), opts)
+	if err != nil {
+		log.Err("azAuthBlobSAS::getServiceClient : Failed to create service client [%s]", err.Error())
+	}
+
+	return svcClient, err
 }
 
-type azAuthBfsSAS struct {
+type azAuthDatalakeSAS struct {
 	azAuthSAS
 }
 
-// GetCredential : Gets SAS based credentials for datralake
-func (azsas *azAuthBfsSAS) getCredential() interface{} {
-	if azsas.config.SASKey == "" {
-		log.Err("azAuthBfsSAS::getCredential : SAS key for account is empty, cannot authenticate user")
-		return nil
+// getServiceClient : returns SAS based service client for datalake
+func (azsas *azAuthDatalakeSAS) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
+	if azsas.config.SASKey == nil {
+		log.Err("azAuthDatalakeSAS::getServiceClient : SAS key for account is empty, cannot authenticate user")
+		return nil, errors.New("sas key for account is empty, cannot authenticate user")
 	}
 
-	return azbfs.NewAnonymousCredential()
+	opts, err := getAzDatalakeServiceClientOptions(stConfig)
+	if err != nil {
+		log.Err("azAuthDatalakeSAS::getServiceClient : Failed to create client options [%s]", err.Error())
+		return nil, err
+	}
+
+	svcClient, err := serviceBfs.NewClientWithNoCredential(azsas.getEndpoint(), opts)
+	if err != nil {
+		log.Err("azAuthDatalakeSAS::getServiceClient : Failed to create service client [%s]", err.Error())
+	}
+
+	return svcClient, err
 }

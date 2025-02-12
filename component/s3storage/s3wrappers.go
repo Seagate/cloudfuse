@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -38,6 +38,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
@@ -215,6 +216,14 @@ func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, er
 
 	object := createObjAttr(name, *result.ContentLength, *result.LastModified, isSymlink)
 	return object, nil
+}
+
+// Wrapper for awsS3Client.HeadBucket
+func (cl *Client) headBucket() (*s3.HeadBucketOutput, error) {
+	headBucketOutput, err := cl.awsS3Client.HeadBucket(context.Background(), &s3.HeadBucketInput{
+		Bucket: aws.String(cl.Config.authConfig.BucketName),
+	})
+	return headBucketOutput, parseS3Err(err, "HeadBucket "+cl.Config.authConfig.BucketName)
 }
 
 // Wrapper for awsS3Client.CopyObject
@@ -443,11 +452,11 @@ func createObjAttr(path string, size int64, lastModified time.Time, isSymLink bo
 	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
-	attr.Metadata = make(map[string]string)
+	attr.Metadata = make(map[string]*string)
 
 	if isSymLink {
 		attr.Flags.Set(internal.PropFlagSymlink)
-		attr.Metadata[symlinkKey] = "true"
+		attr.Metadata[symlinkKey] = to.Ptr("true")
 	}
 
 	return attr

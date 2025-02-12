@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -40,7 +40,7 @@ import (
 
 // Standard config default values
 const (
-	cloudfuseVersion_ = "1.1.3"
+	cloudfuseVersion_ = "1.8.0"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
@@ -56,12 +56,17 @@ const (
 	DefaultDirectoryPermissionBits  os.FileMode = 0775
 	DefaultAllowOtherPermissionBits os.FileMode = 0777
 
-	MbToBytes  = 1024 * 1024
-	GbToBytes  = 1024 * 1024 * 1024
-	PbToBytes  = 1024 * 1024 * 1024 * 1024 * 1024
-	CfuseStats = "cloudfuse_stats"
+	MbToBytes         = 1024 * 1024
+	GbToBytes         = 1024 * 1024 * 1024
+	TbToBytes         = 1024 * 1024 * 1024 * 1024
+	DefaultCapacityMb = TbToBytes / MbToBytes
+	CfuseStats        = "cloudfuse_stats"
 
 	FuseAllowedFlags = "invalid FUSE options. Allowed FUSE configurations are: `-o attr_timeout=TIMEOUT`, `-o negative_timeout=TIMEOUT`, `-o entry_timeout=TIMEOUT` `-o allow_other`, `-o allow_root`, `-o umask=PERMISSIONS -o default_permissions`, `-o ro`"
+
+	UserAgentHeader = "User-Agent"
+
+	BlockCacheRWErrMsg = "Notice: The random write flow using block cache is temporarily blocked due to potential data integrity issues. This is a precautionary measure. \nIf you see this message, contact blobfusedev@microsoft.com or create a GitHub issue. We're working on a fix. More details: https://aka.ms/blobfuse2warnings."
 )
 
 var GitCommit = "**local_build**"
@@ -93,6 +98,8 @@ func GetDefaultWorkDir() string {
 	}
 	return val
 }
+
+var MountPath string
 
 // LogLevel enum
 type LogLevel int

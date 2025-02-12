@@ -1,5 +1,157 @@
 # Cloudfuse Changelog #
 
+## **1.8.0** ##
+
+February 4th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#423](https://github.com/Seagate/cloudfuse/pull/423) Add a new component size_track which tracks the total number of bytes in the cloud
+- [#338](https://github.com/Seagate/cloudfuse/pull/338) The service command now works on Linux to install cloudfuse as a service
+
+## **1.7.4** ##
+
+January 15th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#374](https://github.com/Seagate/cloudfuse/pull/374) Fix issue with items remaining in cache and remove race conditions
+
+## **1.7.3** ##
+
+January 13th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#404](https://github.com/Seagate/cloudfuse/pull/404) Fix error with open file handles when renaming files
+- [#397](https://github.com/Seagate/cloudfuse/pull/370) Add man pages and follow best practices for RHEL and Debian builds
+
+## **1.7.2** ##
+
+December 11th 2024
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#379](https://github.com/Seagate/cloudfuse/pull/379) Fix race conditions in file cache
+- [#370](https://github.com/Seagate/cloudfuse/pull/370) Fix writing file with append flag
+
+## **1.7.1** ##
+
+November 8th 2024
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#364](https://github.com/Seagate/cloudfuse/pull/364) Fix daemon issue on builds with golang 1.23.2
+
+## **1.7.0** ##
+
+November 6th 2024
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#358](https://github.com/Seagate/cloudfuse/pull/358) Use Lyve Cloud bucket size by default for StatFs
+
+### Bug Fixes ###
+
+- [#358](https://github.com/Seagate/cloudfuse/pull/358) Fix StatFs used capacity math bug in file cache
+
+## **1.6.1** ##
+
+October 31st 2024
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#354](https://github.com/Seagate/cloudfuse/pull/354) Fix cloudfuse naming in gui to be consistent
+- [#352](https://github.com/Seagate/cloudfuse/pull/352) Properly pass settings and default use in get configs when config file does not exist
+- [#349](https://github.com/Seagate/cloudfuse/pull/349) Bump pyside6 from 6.8.0 to 6.8.0.2 to fix GUI issues for Ubuntu 24.04
+- [#343](https://github.com/Seagate/cloudfuse/pull/343) Change save button behavior in widgets
+
+## **1.6.0** ##
+
+October 22nd 2024
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#312](https://github.com/Seagate/cloudfuse/pull/312) Add option to set mount display capacity
+- [#342](https://github.com/Seagate/cloudfuse/pull/342) Update default endpoint to LC2 (sv15.lyve) and improve error handling when connecting to Lyve Cloud
+
+### Bug Fixes ###
+
+- [#323](https://github.com/Seagate/cloudfuse/pull/323) Don't evict open files
+- [#317](https://github.com/Seagate/cloudfuse/pull/317) When renaming a directory, don't delete the local copy of its contents
+
+## **1.5.0** ##
+
+August 28th 2024
+This version is based on [blobfuse2 2.3.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.0) (upstream).
+
+### Changes ###
+
+- [#307](https://github.com/Seagate/cloudfuse/pull/307) Allow all users to write to the mount by default (Windows only)
+- [#309](https://github.com/Seagate/cloudfuse/pull/309) Uninstaller now removes WinFSP (Windows only)
+
+## **1.4.0** ##
+
+August 7th 2024
+This version is based on [blobfuse2 2.3.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.0) (upstream).
+
+### Changes ###
+
+- [#297](https://github.com/Seagate/cloudfuse/pull/297) Add installation without GUI front-end
+
+## **1.3.2** ##
+
+July 23th 2024
+This version is based on [blobfuse2 2.3.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.0) (upstream).
+
+### Bug Fixes ###
+
+- [#294](https://github.com/Seagate/cloudfuse/pull/294) Fix setting system path on Windows install
+
+## **1.3.1** ##
+
+July 11th 2024
+This version is based on [blobfuse2 2.3.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.0) (upstream).
+
+### Changes ###
+
+- [#263](https://github.com/Seagate/cloudfuse/pull/263) When mounting to a Windows drive letter with network-share true, set volume name to container name
+- [#273](https://github.com/Seagate/cloudfuse/pull/273) Default cloud component to s3storage when config has no components section
+
+## **1.3.0** ##
+
+July 3rd 2024
+This version is based on [blobfuse2 2.3.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.0) (upstream).
+
+### Changes ###
+
+- [#219](https://github.com/Seagate/cloudfuse/pull/219) Improve performance with Windows Explorer
+- [#212](https://github.com/Seagate/cloudfuse/pull/212) Detect region from endpoint by default
+- [#237](https://github.com/Seagate/cloudfuse/pull/237) Allow empty bucket-name and default to the first accessible s3 bucket
+- [#238](https://github.com/Seagate/cloudfuse/pull/238) Use base64 encoding for config passphrase
+
+## **1.2.0** ##
+
+May 7th 2024
+This version is based on [blobfuse2 2.2.1](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.2.1) (upstream).
+
+### Changes ###
+
+- [#197](https://github.com/Seagate/cloudfuse/pull/197) Disable symlinks by default
+- [#188](https://github.com/Seagate/cloudfuse/pull/188) Update file size when writing to a file
+
+### Bug Fixes ###
+
+- [#199](https://github.com/Seagate/cloudfuse/pull/199) Make Cloudfuse CLI run on other flavors and version of Linux - tested on CentOS
+
 ## **1.1.3** ##
 
 April 10th 2024
@@ -54,7 +206,6 @@ This version is based on [blobfuse2 2.2.0](https://github.com/Azure/azure-storag
 - improved performance of directory listing
 - merged upstream version 2.2.0
 
-
 ## **1.0.1** ##
 
 January 19th 2024
@@ -92,7 +243,7 @@ This version is based on [blobfuse2 2.1.2](https://github.com/Azure/azure-storag
 ### Changes ###
 
 - Windows mount no longer requires admin rights
-- Replaced service dedicated to restart mounts on bootup, with a new Windows startup tool that restarts mounts on login.
+- Replaced service dedicated to restart mounts on boot up, with a new Windows startup tool that restarts mounts on login.
 - Persistent mounts are now stored in AppData on Windows rather than the registry.
 - Add --dry-run option
 - Bump golang.org/x/crypto from 0.15.0 to 0.17.0

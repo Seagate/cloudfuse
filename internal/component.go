@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -49,7 +49,7 @@ func (ComponentPriority) Consumer() ComponentPriority {
 }
 
 func (ComponentPriority) LevelOne() ComponentPriority {
-	return ComponentPriority(700)
+	return ComponentPriority(400)
 }
 
 func (ComponentPriority) LevelTwo() ComponentPriority {
@@ -93,7 +93,6 @@ type Component interface {
 
 	RenameFile(RenameFileOptions) error
 
-	ReadFile(ReadFileOptions) ([]byte, error)
 	ReadInBuffer(ReadInBufferOptions) (int, error)
 
 	WriteFile(WriteFileOptions) (int, error)
@@ -105,8 +104,6 @@ type Component interface {
 	SyncDir(SyncDirOptions) error
 	SyncFile(SyncFileOptions) error
 	FlushFile(FlushFileOptions) error
-	ReleaseFile(ReleaseFileOptions) error
-	UnlinkFile(UnlinkFileOptions) error // TODO: What does this do? Not used anywhere
 
 	// Symlink operations
 	CreateLink(CreateLinkOptions) error
@@ -115,9 +112,8 @@ type Component interface {
 	// Filesystem level operations
 	//GetAttr: Implementation expectations:
 	//1. must return ErrNotExist for absence of a file/directory/symlink
-	//2. must return valid nodeID that was passed with any create/update operations for eg: SetAttr, CreateFile, CreateDir etc
+	//2. must return valid nodeID that was passed with any create/update operations for eg: CreateFile, CreateDir etc
 	GetAttr(GetAttrOptions) (*ObjAttr, error)
-	SetAttr(SetAttrOptions) error
 
 	Chmod(ChmodOptions) error
 	Chown(ChownOptions) error

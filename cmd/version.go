@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -36,8 +36,8 @@ import (
 var check bool
 
 var versionCmd = &cobra.Command{
-	Use:               "version [--check]",
-	Short:             "Command to print the current version along with optional check for latest version",
+	Use:               "version",
+	Short:             "Print the current version and optionally check for latest version",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("cloudfuse version:", common.CloudfuseVersion)

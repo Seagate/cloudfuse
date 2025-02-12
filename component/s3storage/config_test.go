@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -31,6 +31,7 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
@@ -39,9 +40,10 @@ import (
 
 type configTestSuite struct {
 	suite.Suite
-	assert *assert.Assertions
-	s3     *S3Storage
-	opt    Options
+	assert  *assert.Assertions
+	s3      *S3Storage
+	opt     Options
+	secrets ConfigSecrets
 }
 
 func (s *configTestSuite) SetupTest() {
@@ -57,13 +59,19 @@ func (s *configTestSuite) SetupTest() {
 	// Set Options
 	s.opt = Options{
 		BucketName:         "testBucketName",
-		KeyID:              "testKeyId",
-		SecretKey:          "testSecretKey",
 		Region:             "testRegion",
 		Profile:            "testProfile",
 		Endpoint:           "testEndpoint",
 		RestrictedCharsWin: true,
 		PrefixPath:         "testPrefixPath",
+	}
+
+	encryptedKeyID := memguard.NewEnclave([]byte("testKeyId"))
+	encryptedSecretKey := memguard.NewEnclave([]byte("testKeyId"))
+
+	s.secrets = ConfigSecrets{
+		KeyID:     encryptedKeyID,
+		SecretKey: encryptedSecretKey,
 	}
 
 	// Create assertions
@@ -75,21 +83,19 @@ func (s *configTestSuite) TestEmptyBucketName() {
 	s.opt.BucketName = ""
 
 	// Then
-	err := ParseAndValidateConfig(s.s3, s.opt)
-	s.assert.ErrorIs(err, errConfigFieldEmpty)
+	err := ParseAndValidateConfig(s.s3, s.opt, s.secrets)
+	s.assert.NoError(err)
 }
 
 // TODO: make errors from the default aws credentials provider visible to the user somehow
 
 func (s *configTestSuite) TestConfigParse() {
 	// When
-	err := ParseAndValidateConfig(s.s3, s.opt)
+	err := ParseAndValidateConfig(s.s3, s.opt, s.secrets)
 
 	// Then
 	s.assert.NoError(err)
 	s.assert.Equal(s.opt.BucketName, s.s3.stConfig.authConfig.BucketName)
-	s.assert.Equal(s.opt.KeyID, s.s3.stConfig.authConfig.KeyID)
-	s.assert.Equal(s.opt.SecretKey, s.s3.stConfig.authConfig.SecretKey)
 	s.assert.Equal(s.opt.Region, s.s3.stConfig.authConfig.Region)
 	s.assert.Equal(s.opt.Profile, s.s3.stConfig.authConfig.Profile)
 	s.assert.Equal(s.opt.Endpoint, s.s3.stConfig.authConfig.Endpoint)
@@ -102,7 +108,7 @@ func (s *configTestSuite) TestPrefixPath() {
 	s.opt.PrefixPath = "/testPrefixPath"
 
 	// Then
-	err := ParseAndValidateConfig(s.s3, s.opt)
+	err := ParseAndValidateConfig(s.s3, s.opt, s.secrets)
 	s.assert.NoError(err)
 	s.assert.Equal("testPrefixPath", s.s3.stConfig.prefixPath)
 }
@@ -113,7 +119,7 @@ func (s *configTestSuite) TestValidChecksum() {
 
 	// Then
 	// Default should be SHA1 if user does not provide checksum algorithm
-	err := ParseAndValidateConfig(s.s3, s.opt)
+	err := ParseAndValidateConfig(s.s3, s.opt, s.secrets)
 	s.assert.NoError(err)
 	s.assert.True(s.s3.stConfig.enableChecksum)
 	s.assert.Equal(types.ChecksumAlgorithm("SHA1"), s.s3.stConfig.checksumAlgorithm)
@@ -123,7 +129,7 @@ func (s *configTestSuite) TestValidChecksum() {
 	s.opt.ChecksumAlgorithm = "SHA1"
 
 	// Then
-	err = ParseAndValidateConfig(s.s3, s.opt)
+	err = ParseAndValidateConfig(s.s3, s.opt, s.secrets)
 	s.assert.NoError(err)
 	s.assert.True(s.s3.stConfig.enableChecksum)
 	s.assert.Equal(types.ChecksumAlgorithm("SHA1"), s.s3.stConfig.checksumAlgorithm)
@@ -132,7 +138,7 @@ func (s *configTestSuite) TestValidChecksum() {
 	s.opt.ChecksumAlgorithm = "SHA256"
 
 	// Then
-	err = ParseAndValidateConfig(s.s3, s.opt)
+	err = ParseAndValidateConfig(s.s3, s.opt, s.secrets)
 	s.assert.NoError(err)
 	s.assert.Equal(types.ChecksumAlgorithm("SHA256"), s.s3.stConfig.checksumAlgorithm)
 
@@ -140,7 +146,7 @@ func (s *configTestSuite) TestValidChecksum() {
 	s.opt.ChecksumAlgorithm = "CRC32"
 
 	// Then
-	err = ParseAndValidateConfig(s.s3, s.opt)
+	err = ParseAndValidateConfig(s.s3, s.opt, s.secrets)
 	s.assert.NoError(err)
 	s.assert.Equal(types.ChecksumAlgorithm("CRC32"), s.s3.stConfig.checksumAlgorithm)
 
@@ -148,7 +154,7 @@ func (s *configTestSuite) TestValidChecksum() {
 	s.opt.ChecksumAlgorithm = "CRC32C"
 
 	// Then
-	err = ParseAndValidateConfig(s.s3, s.opt)
+	err = ParseAndValidateConfig(s.s3, s.opt, s.secrets)
 	s.assert.NoError(err)
 	s.assert.Equal(types.ChecksumAlgorithm("CRC32C"), s.s3.stConfig.checksumAlgorithm)
 }
@@ -159,7 +165,7 @@ func (s *configTestSuite) TestInvalidChecksum() {
 	s.opt.ChecksumAlgorithm = "invalid"
 
 	// Then
-	err := ParseAndValidateConfig(s.s3, s.opt)
+	err := ParseAndValidateConfig(s.s3, s.opt, s.secrets)
 	s.assert.Error(err)
 	s.assert.ErrorIs(err, errInvalidConfigField)
 }

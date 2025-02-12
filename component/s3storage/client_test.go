@@ -4,7 +4,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -47,6 +47,8 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/awnumar/memguard"
+	"github.com/spf13/viper"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -73,12 +75,31 @@ func newTestClient(configuration string) (*Client, error) {
 		log.Err("ClientTest::newTestClient : config error [invalid config attributes]")
 		return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, err.Error())
 	}
+
+	// Secure keyID in enclave
+	var encryptedKeyID *memguard.Enclave
+	if viper.GetString("s3storage.key-id") != "" {
+		encryptedKeyID = memguard.NewEnclave([]byte(viper.GetString("s3storage.key-id")))
+		if encryptedKeyID == nil {
+			return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, "Error storing key ID securely")
+		}
+	}
+
+	// Secure secretKey in enclave
+	var encryptedSecretKey *memguard.Enclave
+	if viper.GetString("s3storage.secret-key") != "" {
+		encryptedSecretKey = memguard.NewEnclave([]byte(viper.GetString("s3storage.secret-key")))
+		if encryptedSecretKey == nil {
+			return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, "Error storing secret key securely")
+		}
+	}
+
 	// now push Options data into an Config
 	configForS3Client := Config{
 		authConfig: s3AuthConfig{
 			BucketName: conf.BucketName,
-			KeyID:      conf.KeyID,
-			SecretKey:  conf.SecretKey,
+			KeyID:      encryptedKeyID,
+			SecretKey:  encryptedSecretKey,
 			Region:     conf.Region,
 			Profile:    conf.Profile,
 			Endpoint:   conf.Endpoint,
@@ -88,6 +109,7 @@ func newTestClient(configuration string) (*Client, error) {
 		partSize:                  conf.PartSizeMb * common.MbToBytes,
 		uploadCutoff:              conf.UploadCutoffMb * common.MbToBytes,
 		usePathStyle:              conf.UsePathStyle,
+		disableUsage:              conf.DisableUsage,
 	}
 	// create a Client
 	client, err := NewConnection(configForS3Client)
@@ -163,15 +185,99 @@ func (s *clientTestSuite) cleanupTest() {
 	_ = log.Destroy()
 }
 
-func (s *clientTestSuite) TestCredentialsError() {
+func (s *clientTestSuite) TestCredentialsErrorInvalidKeyID() {
 	defer s.cleanupTest()
 	// setup
-	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
-		"WRONGSECRETKEY")
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s",
+		storageTestConfigurationParameters.BucketName, "WRONGKEYID",
+		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint)
 	// S3 connection creation should fail
 	err := s.setupTestHelper(config, false)
 	s.assert.Error(err)
+}
+
+func (s *clientTestSuite) TestCredentialsErrorInvalidSecretKey() {
+	// TODO Fix this test for localstack
+	if storageTestConfigurationParameters.BucketName == "test" {
+		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
+		return
+	}
+
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
+		"WRONGSECRETKEY", storageTestConfigurationParameters.Endpoint)
+	// S3 connection creation should fail
+	err := s.setupTestHelper(config, false)
+	s.assert.Equal(errInvalidSecretKey, err)
+}
+
+func (s *clientTestSuite) TestCredentialsErrorInvalidBucket() {
+	// TODO Fix this test for localstack
+	if storageTestConfigurationParameters.BucketName == "test" {
+		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
+		return
+	}
+
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s",
+		"WRONGBUCKET", storageTestConfigurationParameters.KeyID,
+		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint)
+	// S3 connection creation should fail
+	err := s.setupTestHelper(config, false)
+	s.assert.Error(err)
+}
+
+func (s *clientTestSuite) TestCredentialsErrorIncorrectEndpoint() {
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
+		storageTestConfigurationParameters.SecretKey, "https://s3.us-west-1.lyvecloud.seagate.com")
+	// S3 connection creation should fail
+	err := s.setupTestHelper(config, false)
+	s.assert.Equal(errInvalidCredential, err)
+}
+
+func (s *clientTestSuite) TestCredentialsErrorInvalidEndpoint() {
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s",
+		"WRONGBUCKETNAME", "WRONGKEYID",
+		"WRONGSECRETKEY", "https://google.com", "us-east-1")
+	// S3 connection creation should fail
+	err := s.setupTestHelper(config, false)
+	s.assert.Equal(errInvalidEndpoint, err)
+}
+
+func (s *clientTestSuite) TestCredentialsErrorInvalidEndpoint2() {
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s",
+		"WRONGBUCKETNAME", "WRONGKEYID",
+		"WRONGSECRETKEY", "https://invalid.seagate.com")
+	// S3 connection creation should fail as this address does not exist
+	err := s.setupTestHelper(config, false)
+	s.assert.Equal(errInvalidEndpoint, err)
+}
+
+func (s *clientTestSuite) TestCredentialsIncorrectRegion() {
+	// This test needs to be skipped for LocalStack, does not use region
+	if storageTestConfigurationParameters.BucketName == "test" {
+		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
+		return
+	}
+
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  region: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
+		storageTestConfigurationParameters.SecretKey, "ap-southeast-1")
+	// S3 connection creation should fail as this address does not exist
+	err := s.setupTestHelper(config, false)
+	s.assert.Equal(errInvalidEndpoint, err)
 }
 
 func (s *clientTestSuite) TestEnvVarCredentials() {
@@ -186,24 +292,230 @@ func (s *clientTestSuite) TestEnvVarCredentials() {
 	// setup
 	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
+	os.Setenv("AWS_REGION", storageTestConfigurationParameters.Region)
 	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  endpoint: %s", storageTestConfigurationParameters.BucketName,
 		storageTestConfigurationParameters.Endpoint)
 	// S3 connection should find credentials from environment variables
 	err := s.setupTestHelper(config, false)
 	s.assert.NoError(err)
+
+	os.Unsetenv("AWS_ACCESS_KEY_ID")
+	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+	os.Unsetenv("AWS_REGION")
 }
 
-func (s *clientTestSuite) TestCredentialPrecedence() {
+func (s *clientTestSuite) TestEnvVarCredentialsErr() {
+	// TODO: Fix this test for LocalStack
+	// This test needs to be skipped for LocalStack
+	if storageTestConfigurationParameters.BucketName == "test" {
+		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
+		return
+	}
+
+	defer s.cleanupTest()
+	// setup
+	os.Setenv("AWS_ACCESS_KEY_ID", "WRONGACCESSKEY")
+	os.Setenv("AWS_SECRET_ACCESS_KEY", "WRONGSECRETKEY")
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  endpoint: %s", storageTestConfigurationParameters.BucketName,
+		storageTestConfigurationParameters.Endpoint)
+	// S3 connection should find credentials from environment variables
+	err := s.setupTestHelper(config, false)
+	s.assert.Equal(errInvalidCredential, err)
+
+	os.Unsetenv("AWS_ACCESS_KEY_ID")
+	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+}
+
+func (s *clientTestSuite) TestEnvVarCredentialsErrRegion() {
+	// TODO: Fix this test for LocalStack
+	// This test needs to be skipped for LocalStack
+	if storageTestConfigurationParameters.BucketName == "test" {
+		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
+		return
+	}
+
 	defer s.cleanupTest()
 	// setup
 	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
-	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s",
-		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
+	// Use wrong, but a valid region
+	os.Setenv("AWS_REGION", "ap-southeast-1")
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n", storageTestConfigurationParameters.BucketName)
+	// S3 connection should find credentials from environment variables
+	err := s.setupTestHelper(config, false)
+	s.assert.Equal(errInvalidEndpoint, err)
+
+	os.Unsetenv("AWS_ACCESS_KEY_ID")
+	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+	os.Unsetenv("AWS_REGION")
+}
+
+func (s *clientTestSuite) TestDefaultConfig() {
+	defer s.cleanupTest()
+	// setup
+	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
+	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s",
+		storageTestConfigurationParameters.BucketName)
+	// Test using default region, and default endpoint
+	// Ignore error because in unit tests this will fail since some unit tests use localstack
+	// so we can't use default endpoint
+	_ = s.setupTestHelper(config, false)
+
+	s.assert.Equal("https://s3.us-east-1.sv15.lyve.seagate.com", s.client.Config.authConfig.Endpoint)
+	s.assert.Equal("us-east-1", s.client.Config.authConfig.Region)
+
+	os.Unsetenv("AWS_ACCESS_KEY_ID")
+	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+}
+
+func (s *clientTestSuite) TestCredentialPrecedenceEnvOverConfig() {
+	// TODO Fix this test for localstack
+	// This test needs to be skipped for LocalStack as it doesn't use a region
+	if storageTestConfigurationParameters.BucketName == "test" {
+		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
+		return
+	}
+
+	defer s.cleanupTest()
+	// setup
+	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
+	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  endpoint: %s\n  key-id: %s\n  secret-key: %s",
+		storageTestConfigurationParameters.BucketName, s.client.Config.authConfig.Endpoint, storageTestConfigurationParameters.KeyID,
 		"WRONGSECRETKEY")
 	// Wrong credentials should take precedence, so S3 connection should fail
 	err := s.setupTestHelper(config, false)
 	s.assert.Error(err)
+
+	os.Unsetenv("AWS_ACCESS_KEY_ID")
+	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+}
+
+func (s *clientTestSuite) TestCredentialPrecedenceEnvOverProfile() {
+	// TODO Fix this test for localstack
+	if storageTestConfigurationParameters.BucketName == "test" {
+		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
+		return
+	}
+
+	defer s.cleanupTest()
+	// setup
+	os.Setenv("AWS_ACCESS_KEY_ID", storageTestConfigurationParameters.KeyID)
+	os.Setenv("AWS_SECRET_ACCESS_KEY", storageTestConfigurationParameters.SecretKey)
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  endpoint: %s\n  profile: %s",
+		storageTestConfigurationParameters.BucketName, s.client.Config.authConfig.Endpoint, "NoProfile")
+	// Invalid profile, but environment variables should take precedence
+	err := s.setupTestHelper(config, false)
+	s.assert.NoError(err)
+
+	os.Unsetenv("AWS_ACCESS_KEY_ID")
+	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+}
+
+func (s *clientTestSuite) TestCredentialPrecedenceConfigOverProfile() {
+	// TODO Fix this test for localstack
+	if storageTestConfigurationParameters.BucketName == "test" {
+		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
+		return
+	}
+
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  endpoint: %s\n  key-id: %s\n  secret-key: %s\n  profile: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.Endpoint,
+		storageTestConfigurationParameters.KeyID, storageTestConfigurationParameters.SecretKey,
+		"NoProfile")
+	// Invalid profile, but config should take precedence
+	err := s.setupTestHelper(config, false)
+	s.assert.NoError(err)
+}
+
+func (s *clientTestSuite) TestCredentialPrecedenceRegion() {
+	// This test needs to be skipped for LocalStack as it doesn't use a region
+	if storageTestConfigurationParameters.BucketName == "test" {
+		fmt.Println("Skipping TestEnvVarCredentials using LocalStack.")
+		return
+	}
+
+	defer s.cleanupTest()
+	// setup
+	os.Setenv("AWS_REGION", storageTestConfigurationParameters.Region)
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  region: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
+		storageTestConfigurationParameters.SecretKey, "ap-southeast-1")
+	// Wrong region should take precedence, so S3 connection should fail
+	err := s.setupTestHelper(config, false)
+	s.assert.Error(err)
+
+	os.Unsetenv("AWS_REGION")
+}
+
+func (s *clientTestSuite) TestSetEndpointFromRegion() {
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  region: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
+		storageTestConfigurationParameters.SecretKey, "us-west-2")
+	// Should set endpoint based on lyve cloud if the region is provided and no endpoint is provided
+	err := s.setupTestHelper(config, false)
+	// Connection should fail since this is a different endpoint
+	s.assert.Error(err)
+	s.assert.Equal("https://s3.us-west-2.sv15.lyve.seagate.com", s.client.Config.authConfig.Endpoint)
+}
+
+func (s *clientTestSuite) TestSetRegionFromEndpoint() {
+	// This test needs to be skipped for LocalStack as endpoint does not have a region
+	if storageTestConfigurationParameters.BucketName == "test" {
+		fmt.Println("Skipping TestSetRegionFromEndpoint using LocalStack.")
+		return
+	}
+
+	defer s.cleanupTest()
+	// setup
+	config := fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s",
+		storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
+		storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint)
+	// Should set region automatically from endpoint
+	err := s.setupTestHelper(config, false)
+	s.assert.NoError(err)
+	s.assert.NotNil(s.client.Config.authConfig.Region)
+}
+
+func (s *clientTestSuite) TestGetRegionEndpoint() {
+	defer s.cleanupTest()
+
+	region, err := getRegionFromEndpoint("https://s3.us-east-1.lyvecloud.seagate.com")
+	s.assert.NoError(err)
+	s.assert.Equal("us-east-1", region)
+
+	region, err = getRegionFromEndpoint("https://s3.eu-west-1.sv15.lyve.seagate.com")
+	s.assert.NoError(err)
+	s.assert.Equal("eu-west-1", region)
+
+	region, err = getRegionFromEndpoint("https://s3.us-east-2.amazonaws.com")
+	s.assert.NoError(err)
+	s.assert.Equal("us-east-2", region)
+
+	region, err = getRegionFromEndpoint("http://s3.us-east-2.amazonaws.com")
+	s.assert.NoError(err)
+	s.assert.Equal("us-east-2", region)
+
+	region, err = getRegionFromEndpoint("https://s3.dualstack.us-east-2.amazonaws.com")
+	s.assert.NoError(err)
+	s.assert.Equal("us-east-2", region)
+
+	region, err = getRegionFromEndpoint("https://s3-fips.us-east-2.amazonaws.com")
+	s.assert.NoError(err)
+	s.assert.Equal("us-east-2", region)
+
+	region, err = getRegionFromEndpoint("https://s3.us-west-1.wasabisys.com")
+	s.assert.NoError(err)
+	s.assert.Equal("us-west-1", region)
+
+	region, err = getRegionFromEndpoint("")
+	s.assert.Error(err)
+	s.assert.Equal("", region)
 }
 
 func (s *clientTestSuite) TestListBuckets() {
@@ -213,6 +525,21 @@ func (s *clientTestSuite) TestListBuckets() {
 	s.assert.NoError(err)
 	s.assert.Contains(buckets, storageTestConfigurationParameters.BucketName)
 }
+
+// TODO: Cannot run this test in current test account with buckets we don't have permission for
+// func (s *clientTestSuite) TestDefaultBucketName() {
+// 	defer s.cleanupTest()
+// 	// write config with no bucket name
+// 	config := fmt.Sprintf("s3storage:\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s\n  use-path-style: %t\n",
+// 		storageTestConfigurationParameters.KeyID, storageTestConfigurationParameters.SecretKey,
+// 		storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region,
+// 		storageTestConfigurationParameters.UsePathStyle)
+// 	err := s.setupTestHelper(config, false)
+// 	s.assert.NoError(err)
+// 	buckets, _ := s.client.ListBuckets()
+// 	s.assert.Contains(buckets, s.client.Config.authConfig.BucketName)
+// }
+
 func (s *clientTestSuite) TestSetPrefixPath() {
 	defer s.cleanupTest()
 	// setup
@@ -573,7 +900,7 @@ func (s *clientTestSuite) TestGetAttrFile() {
 	// file time
 	s.assert.NotNil(before.Mtime)
 
-	time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
+	time.Sleep(1 * time.Second) // Wait and then modify the file again
 
 	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),

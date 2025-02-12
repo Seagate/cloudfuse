@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -31,6 +31,7 @@ import (
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/awnumar/memguard"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -155,6 +156,7 @@ func (suite *ConfigTestSuite) TestOverlapShadowConfigReader() {
 	templAppFlag.Changed = true
 	BindPFlag("template.metadata.labels.app", templAppFlag)
 	err = os.Setenv("CF_TEST_TEMPLABELS_APP", "somethingthatshouldnotshowup")
+	assert.NoError(err)
 	BindEnv("template.metadata.labels.app", "CF_TEST_TEMPLABELS_APP")
 
 	err = ReadConfigFromReader(strings.NewReader(specconf))
@@ -306,6 +308,7 @@ func (suite *ConfigTestSuite) TestPlainConfig1Reader() {
 	}{}
 
 	err = Unmarshal(&randOpts)
+	assert.NoError(err)
 	assert.Empty(randOpts)
 }
 
@@ -464,12 +467,14 @@ func (suite *ConfigTestSuite) TestConfigFileDescryption() {
 	assert.NoError(err)
 	assert.NotNil(plaintext)
 
-	cipherText, err := common.EncryptData(plaintext, []byte("123123123123123123123123"))
+	encryptedPassphrase := memguard.NewEnclave([]byte("12312312312312312312312312312312"))
+
+	cipherText, err := common.EncryptData(plaintext, encryptedPassphrase)
 	assert.NoError(err)
 	err = os.WriteFile("test_enc.yaml", cipherText, 0644)
 	assert.NoError(err)
 
-	err = DecryptConfigFile("test_enc.yaml", "123123123123123123123123")
+	err = DecryptConfigFile("test_enc.yaml", encryptedPassphrase)
 	assert.NoError(err)
 
 	_ = os.Remove("test.yaml")

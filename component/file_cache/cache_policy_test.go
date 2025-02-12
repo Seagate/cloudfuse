@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -76,6 +76,7 @@ func (suite *cachePolicyTestSuite) TestGetUsageSizeOnDisk() {
 	f, _ := os.Create(cache_path + "/test")
 	data := make([]byte, 4097)
 	f.Write(data)
+	f.Close()
 	result, err := common.GetUsage(cache_path)
 	suite.assert.NoError(err)
 

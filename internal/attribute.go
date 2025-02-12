@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -49,7 +49,7 @@ func CreateObjAttr(objectPath string, size int64, lastModified time.Time) (attr 
 	// set flags
 	attr.Flags.Set(PropFlagMetadataRetrieved)
 	attr.Flags.Set(PropFlagModeDefault)
-	attr.Metadata = make(map[string]string)
+	attr.Metadata = make(map[string]*string)
 
 	return attr
 }
@@ -112,7 +112,7 @@ type ObjAttr struct {
 	Path     string          // full path
 	Name     string          // base name of the path
 	MD5      []byte
-	Metadata map[string]string // extra information to preserve
+	Metadata map[string]*string // extra information to preserve
 }
 
 // IsDir : Test blob is a directory or not

@@ -3,7 +3,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -114,7 +114,7 @@ func getSyslogLevel(lvl common.LogLevel) syslog.Priority {
 func (l *SysLogger) write(lvl string, format string, args ...interface{}) {
 	_, fn, ln, _ := runtime.Caller(3)
 	msg := fmt.Sprintf(format, args...)
-	l.logger.Print(lvl, " [", filepath.Base(fn), " (", ln, ")]: ", msg)
+	l.logger.Print("[", common.MountPath, "] ", lvl, " [", filepath.Base(fn), " (", ln, ")]: ", msg)
 }
 
 func (l *SysLogger) Debug(format string, args ...interface{}) {

@@ -13,17 +13,17 @@ int main(int argc, char *argv[]) {
    file = creat("/usr/blob_mnt/fsync.txt", S_IWUSR | S_IRUSR);
    if (file < -1) {
       perror("creat()");
-      exit(1); 
+      exit(1);
    }
 
    r = write(file, data, strlen(data));
    if(r < -1) {
       perror("write()");
-      exit(1); 
+      exit(1);
    }
-   
+
    fsync(file);
    close(file);
-   
+
    return 0;
 }

@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -37,7 +37,7 @@ import (
 const DefaultEvictTime = 10
 
 type cachePolicyConfig struct {
-	tmpPath      string
+	tmpPath      string // uses os.Separator (filepath.Join)
 	cacheTimeout uint32
 	maxEviction  uint32
 
@@ -45,7 +45,7 @@ type cachePolicyConfig struct {
 	highThreshold float64
 	lowThreshold  float64
 
-	fileLocks *common.LockMap
+	fileLocks *common.LockMap // uses object name (common.JoinUnixFilepath)
 
 	policyTrace bool
 }
@@ -56,9 +56,8 @@ type cachePolicy interface {
 
 	UpdateConfig(cachePolicyConfig) error
 
-	CacheValid(name string)      // Mark the file as hit
-	CacheInvalidate(name string) // Invalidate the file
-	CachePurge(name string)      // Schedule the file for deletion
+	CacheValid(name string)                            // Mark the file as hit
+	CachePurge(name string, flock *common.LockMapItem) // Delete the file from cache
 
 	IsCached(name string) bool // Whether or not the cache policy considers this file cached
 

@@ -21,7 +21,7 @@ file_cache:
   max-size-mb: 2048
   allow-non-empty-temp: true
   cleanup-on-start: true
-  
+
 azstorage:
   type: { ACCOUNT_TYPE }
   endpoint: { ACCOUNT_ENDPOINT }
@@ -31,4 +31,3 @@ azstorage:
   mode: key
   container: { 0 }
   tier: hot
-  sdk-trace: { VERBOSE_LOG }

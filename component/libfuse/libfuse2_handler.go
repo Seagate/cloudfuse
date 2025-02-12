@@ -1,9 +1,7 @@
-package libfuse
-
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -25,6 +23,8 @@ package libfuse
    SOFTWARE
 */
 
+package libfuse
+
 import (
 	"errors"
 	"fmt"
@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
@@ -104,7 +105,6 @@ func (lf *Libfuse) initFuse() error {
 
 	// With WinFSP this will present all files as owned by the Authenticated Users group
 	if runtime.GOOS == "windows" {
-		// TODO: add SDDL file security option: https://github.com/rclone/rclone/issues/4717
 		// if uid & gid were not specified, pass -1 for both (which will cause WinFSP to look up the current user)
 		uid := int64(-1)
 		gid := int64(-1)
@@ -120,38 +120,14 @@ func (lf *Libfuse) initFuse() error {
 			lf.entryExpiration,
 			lf.attributeExpiration,
 			lf.negativeTimeout)
+
+		// Using SSDL file security option: https://github.com/rclone/rclone/issues/4717
+		// Enables everyone on system to have access to mount
+		options += ",FileSecurity=D:P(A;;FA;;;WD)"
 	}
 
-	// While reading a file let kernel do readahead for better perf
-	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)
-
-	// Max background thread on the fuse layer for high parallelism
-	options += fmt.Sprintf(",max_background=%d", lf.maxFuseThreads)
-
-	if lf.allowOther {
-		options += ",allow_other"
-	}
-	if lf.allowRoot {
-		options += ",allow_root"
-	}
-	if lf.readOnly {
-		options += ",ro"
-	}
-	if lf.nonEmptyMount {
-		options += ",nonempty"
-	}
-
-	if lf.umask != 0 {
-		options += fmt.Sprintf(",umask=%04d", lf.umask)
-	}
-
-	// direct_io option is used to bypass the kernel cache. It disables the use of
-	// page cache (file content cache) in the kernel for the filesystem.
-	if fuseFS.directIO {
-		options += ",direct_io"
-	} else {
-		options += ",kernel_cache"
-	}
+	fuse_options := createFuseOptions(lf.host, lf.allowOther, lf.allowRoot, lf.readOnly, lf.nonEmptyMount, lf.maxFuseThreads, lf.umask)
+	options += fuse_options
 
 	// Setup options as a slice
 	opts := []string{"-o", options}
@@ -160,7 +136,32 @@ func (lf *Libfuse) initFuse() error {
 	if runtime.GOOS == "windows" && lf.networkShare && common.IsDriveLetter(lf.mountPath) {
 		// TODO: We can support any type of valid network share path so this path could
 		// be configurable for the config file. But this is a good default.
-		opts = append(opts, "--VolumePrefix=\\server\\share")
+
+		// by default nameStorage will be blank
+		nameStorage := "default"
+		kindStorage := "cloud"
+		// Borrow bucket-name string from attribute cache
+		if config.IsSet("s3storage.bucket-name") {
+
+			err := config.UnmarshalKey("s3storage.bucket-name", &nameStorage)
+			if err != nil {
+				nameStorage = "default"
+				log.Err("initFuse : Failed to unmarshal s3storage.bucket-name")
+			} else {
+				kindStorage = "bucket"
+			}
+		} else if config.IsSet("azstorage.container") {
+			err := config.UnmarshalKey("azstorage.container", &nameStorage)
+			if err != nil {
+				nameStorage = "default"
+				log.Err("initFuse : Failed to unmarshal s3storage.bucket-name")
+			} else {
+				kindStorage = "container"
+			}
+		}
+
+		volumePrefix := fmt.Sprintf("--VolumePrefix=\\%s\\%s", kindStorage, nameStorage)
+		opts = append(opts, volumePrefix)
 	}
 
 	// Enabling trace is done by using -d rather than setting an option in fuse
@@ -304,23 +305,32 @@ func (cf *CgofuseFS) Statfs(path string, stat *fuse.Statfs_t) int {
 	if populated {
 		stat.Bsize = uint64(attr.Bsize)
 		stat.Frsize = uint64(attr.Frsize)
-		stat.Blocks = attr.Blocks
-		stat.Bavail = attr.Bavail
-		stat.Bfree = attr.Bfree
+		// cloud storage always sets free and avail to zero
+		statsFromCloudStorage := attr.Bfree == 0 && attr.Bavail == 0
+		// calculate blocks used from attr
+		blocksUnavailable := attr.Blocks - attr.Bavail
+		blocksUsed := attr.Blocks - attr.Bfree
+		// we only use displayCapacity to complement used size from cloud storage
+		if statsFromCloudStorage {
+			displayCapacityBlocks := fuseFS.displayCapacityMb * common.MbToBytes / uint64(attr.Bsize)
+			// if used > displayCapacity, then report used and show that we are out of space
+			stat.Blocks = max(displayCapacityBlocks, blocksUnavailable)
+		} else {
+			stat.Blocks = attr.Blocks
+		}
+		// adjust avail and free to make sure we display used space correctly
+		stat.Bavail = stat.Blocks - blocksUnavailable
+		stat.Bfree = stat.Blocks - blocksUsed
 		stat.Files = attr.Files
 		stat.Ffree = attr.Ffree
 		stat.Namemax = attr.Namemax
 	} else {
-		var free, total, avail uint64
-		total = common.PbToBytes
-		avail = total
-		free = total
-
 		stat.Bsize = blockSize
 		stat.Frsize = blockSize
-		stat.Blocks = total / blockSize
-		stat.Bavail = avail / blockSize
-		stat.Bfree = free / blockSize
+		displayCapacityBlocks := fuseFS.displayCapacityMb * common.MbToBytes / blockSize
+		stat.Blocks = displayCapacityBlocks
+		stat.Bavail = displayCapacityBlocks
+		stat.Bfree = displayCapacityBlocks
 		stat.Files = 1e9
 		stat.Ffree = 1e9
 		stat.Namemax = maxNameSize
@@ -396,7 +406,7 @@ func (cf *CgofuseFS) Opendir(path string) (int, uint64) {
 // Releasedir opens the handle for the directory at the path.
 func (cf *CgofuseFS) Releasedir(path string, fh uint64) int {
 	// Get the filehandle
-	handle, exists := handlemap.Load(handlemap.HandleID(fh))
+	handle, exists := handlemap.LoadAndDelete(handlemap.HandleID(fh))
 	if !exists {
 		log.Trace("Libfuse::Releasedir : Failed to release %s, handle: %d", path, fh)
 		return -fuse.EBADF
@@ -405,7 +415,6 @@ func (cf *CgofuseFS) Releasedir(path string, fh uint64) int {
 	log.Trace("Libfuse::Releasedir : %s, handle: %d", handle.Path, handle.ID)
 
 	handle.Cleanup()
-	handlemap.Delete(handle.ID)
 	return 0
 }
 
@@ -579,6 +588,8 @@ func (cf *CgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
 		log.Err("Libfuse::Create : Failed to create %s [%s]", name, err.Error())
 		if os.IsExist(err) {
 			return -fuse.EEXIST, 0
+		} else if os.IsPermission(err) {
+			return -fuse.EACCES, 0
 		}
 
 		return -fuse.EIO, 0
@@ -642,6 +653,8 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 
 // Read reads data from a file into the buffer with the given offset.
 func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
+	//skipping the logging to avoid creating log noise and the performance costs from huge number of calls.
+	//log.Debug("Libfuse::Read : reading path %s, handle: %d", path, fh)
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
@@ -680,6 +693,8 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 
 // Write writes data to a file from the buffer with the given offset.
 func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int {
+	//skipping the logging to avoid creating log noise and the performance costs from huge number of calls
+	//log.Debug("Libfuse::Write : Writing path %s, handle: %d", path, fh)
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {

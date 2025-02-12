@@ -1,6 +1,6 @@
 # Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 #
-# Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+# Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -24,8 +24,6 @@
 import subprocess
 from sys import platform
 import os
-import time
-import yaml
 from shutil import which
 
 # Import QT libraries
@@ -38,8 +36,7 @@ from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
 from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
 from aboutPage import aboutPage
-from under_Construction import underConstruction
-from common_qt_functions import widgetCustomFunctions as widgetFuncs
+from common_qt_functions import defaultSettingsManager as settingsManager, customConfigFunctions as configFuncs
 
 bucketOptions = ['s3storage', 'azstorage']
 mountTargetComponent = 3
@@ -55,15 +52,17 @@ if platform == 'win32':
 if which(cloudfuseCli) is None:
     cloudfuseCli = './' + cloudfuseCli
 
-class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
+class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.setWindowTitle("Cloud FUSE")
-        self.settings = QSettings(QSettings.Format.IniFormat,QSettings.Scope.UserScope,"CloudFUSE", "primaryWindow")
+        self.setWindowTitle('Cloudfuse')
+        self.myWindow = QSettings('Cloudfuse', 'Mainwindow')
         self.initMountPoint()
         self.checkConfigDirectory()
         self.textEdit_output.setReadOnly(True)
+        self.settings = self.allMountSettings
+        self.initSettingsFromConfig(self.settings)
 
         if platform == 'win32':
             # Windows directory and filename conventions:
@@ -82,20 +81,17 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.button_unmount.clicked.connect(self.unmountBucket)
         self.actionAbout_Qt.triggered.connect(self.showAboutQtPage)
         self.actionAbout_CloudFuse.triggered.connect(self.showAboutCloudFusePage)
-        self.action_debugHealthMonitor.triggered.connect(self.showUnderConstructionPage)
-        self.action_debugLogging.triggered.connect(self.showUnderConstructionPage)
-        self.action_debugTesting.triggered.connect(self.showUnderConstructionPage)
         self.lineEdit_mountPoint.editingFinished.connect(self.updateMountPointInSettings)
         self.dropDown_bucketSelect.currentIndexChanged.connect(self.modifyPipeline)
-        if platform == "win32":
-            self.lineEdit_mountPoint.setToolTip("Designate a new location to mount the bucket, do not create the directory")
+        if platform == 'win32':
+            self.lineEdit_mountPoint.setToolTip('Designate a new location to mount the bucket, do not create the directory')
             self.button_browse.setToolTip("Browse to a new location but don't create a new directory")
         else:
-            self.lineEdit_mountPoint.setToolTip("Designate a location to mount the bucket - the directory must already exist")
-            self.button_browse.setToolTip("Browse to a pre-existing directory")
+            self.lineEdit_mountPoint.setToolTip('Designate a location to mount the bucket - the directory must already exist')
+            self.button_browse.setToolTip('Browse to a pre-existing directory')
 
     def checkConfigDirectory(self):
-        workingDir = widgetFuncs.getWorkingDir(self)
+        workingDir = self.getWorkingDir()
         if not os.path.isdir(workingDir):
             try:
                 os.mkdir(workingDir)
@@ -104,7 +100,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
     def initMountPoint(self):
         try:
-            directory = self.settings.value("mountPoint")
+            directory = self.myWindow.value('mountPoint')
             self.lineEdit_mountPoint.setText(directory)
         except:
             # Nothing in the settings for mountDir, leave mountPoint blank
@@ -113,7 +109,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def updateMountPointInSettings(self):
         try:
             directory = str(self.lineEdit_mountPoint.text())
-            self.settings.setValue("mountPoint", directory)
+            self.myWindow.setValue('mountPoint',directory)
         except:
             # Couldn't update the settings
             return
@@ -125,11 +121,11 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
     def showSettingsWidget(self):
         targetIndex = self.dropDown_bucketSelect.currentIndex()
         if bucketOptions[targetIndex] == 's3storage':
-            self.settings = s3SettingsWidget()
+            self.setConfigs = s3SettingsWidget(self.settings)
         else:
-            self.settings = azureSettingsWidget()
-        self.settings.setWindowModality(Qt.ApplicationModal)
-        self.settings.show()
+            self.setConfigs = azureSettingsWidget(self.settings)
+        self.setConfigs.setWindowModality(Qt.ApplicationModal)
+        self.setConfigs.show()
 
     def getFileDirInput(self):
         directory = str(QtWidgets.QFileDialog.getExistingDirectory())
@@ -142,7 +138,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
     # Display the pre-baked about QT messagebox
     def showAboutQtPage(self):
-        QtWidgets.QMessageBox.aboutQt(self, "About QT")
+        QtWidgets.QMessageBox.aboutQt(self, 'About QT')
 
     # Display the custom dialog box for the cloudfuse 'about' page.
     def showAboutCloudFusePage(self):
@@ -151,16 +147,12 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
         if not executableFound:
             cloudfuseVersion = 'Cloudfuse program not present'
-        elif stdOut != "":
+        elif stdOut != '':
             cloudfuseVersion = stdOut
         else:
             cloudfuseVersion = 'Cloudfuse version not found'
 
         self.page = aboutPage(cloudfuseVersion)
-        self.page.show()
-
-    def showUnderConstructionPage(self):
-        self.page = underConstruction()
         self.page.show()
 
     def mountBucket(self):
@@ -172,10 +164,10 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             return
         directory = os.path.join(directory, mountDirSuffix)
         # get config path
-        configPath = os.path.join(widgetFuncs.getWorkingDir(self), 'config.yaml')
+        configPath = os.path.join(self.getWorkingDir(), 'config.yaml')
 
         # on Windows, the mount directory should not exist (yet)
-        if platform == "win32":
+        if platform == 'win32':
             if os.path.exists(directory):
                 self.addOutputText(f"Directory {directory} already exists! Aborting new mount.")
                 self.errorMessageBox(f"Error: Cloudfuse needs to create the directory {directory}, but it already exists!")
@@ -185,39 +177,39 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         commandParts = [cloudfuseCli, 'mount', directory, f'--config-file={configPath}', '--dry-run']
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
-            self.addOutputText("cloudfuse.exe not found! Is it installed?")
-            self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
+            self.addOutputText('cloudfuse.exe not found! Is it installed?')
+            self.errorMessageBox('Error running cloudfuse CLI - Please re-install Cloudfuse.')
             return
 
         if exitCode != 0:
             self.addOutputText(stdErr)
-            self.errorMessageBox("Mount failed: " + stdErr)
+            self.errorMessageBox('Mount failed: ' + stdErr)
             return
 
-        if stdOut != "":
+        if stdOut != '':
             self.addOutputText(stdOut)
 
         # now actually mount
         commandParts = [cloudfuseCli, 'mount', directory, f'--config-file={configPath}']
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
-            self.addOutputText("cloudfuse.exe not found! Is it installed?")
-            self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
+            self.addOutputText('cloudfuse.exe not found! Is it installed?')
+            self.errorMessageBox('Error running cloudfuse CLI - Please re-install Cloudfuse.')
             return
 
         if exitCode != 0:
             self.addOutputText(f"Error mounting container: {stdErr}")
-            if stdErr.find("mount path exists") != -1:
-                self.errorMessageBox("This container is already mounted at this directory.")
+            if stdErr.find('mount path exists') != -1:
+                self.errorMessageBox('This container is already mounted at this directory.')
             else:
                 self.errorMessageBox(f"Error mounting container - check the settings and try again\n{stdErr}")
             return
 
-        if stdOut != "":
+        if stdOut != '':
             self.addOutputText(stdOut)
 
         # wait for mount, then check that mount succeeded by verifying that the mount directory exists
-        self.addOutputText("Verifying mount success...")
+        self.addOutputText('Verifying mount success...')
         def verifyMountSuccess():
             if platform == 'win32':
                 success = os.path.exists(directory)
@@ -225,9 +217,9 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
                 success = os.path.ismount(directory)
             if not success:
                 self.addOutputText(f"Failed to create mount directory {directory}")
-                self.errorMessageBox("Mount failed. Please check error logs.")
+                self.errorMessageBox('Mount failed. Please check error logs.')
             else:
-                self.addOutputText("Successfully mounted container")
+                self.addOutputText('Successfully mounted container')
         QtCore.QTimer.singleShot(4000, verifyMountSuccess)
 
     def unmountBucket(self):
@@ -235,14 +227,14 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         commandParts = []
         # TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
         directory = os.path.join(directory, mountDirSuffix)
-        commandParts = [cloudfuseCli, "unmount", directory]
-        if platform != "win32":
-            commandParts.append("--lazy")
+        commandParts = [cloudfuseCli, 'unmount', directory]
+        if platform != 'win32':
+            commandParts.append('--lazy')
 
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
-            self.addOutputText("cloudfuse.exe not found! Is it installed?")
-            self.errorMessageBox("Error running cloudfuse CLI - Please re-install Cloudfuse.")
+            self.addOutputText('cloudfuse.exe not found! Is it installed?')
+            self.errorMessageBox('Error running cloudfuse CLI - Please re-install Cloudfuse.')
         elif exitCode != 0:
             self.addOutputText(f"Failed to unmount container: {stdErr}")
             self.errorMessageBox(f"Failed to unmount container: {stdErr}")
@@ -251,43 +243,20 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
 
     # This function reads in the config file, modifies the components section, then writes the config file back
     def modifyPipeline(self):
-
-        self.addOutputText("Validating configuration...")
+        self.addOutputText('Validating configuration...')
         # Update the pipeline/components before mounting the target
-
         targetBucket = bucketOptions[self.dropDown_bucketSelect.currentIndex()]
-        workingDir = widgetFuncs.getWorkingDir(self)
-
-        # Read in the configs as a dictionary. Notify user if failed
-        try:
-            with open(workingDir+'/config.yaml', 'r') as file:
-                configs = yaml.safe_load(file)
-        except:
-            self.errorMessageBox(
-                f"Could not read the config file in {workingDir}. Consider going through the settings for selected target.",
-                "Could not read config file")
-            return
-
-        # Modify the components (pipeline) in the config file.
-        #   If the components are not present, there's a chance the configs are wrong. Notify user.
-
-        components = configs.get('components')
+        components = self.settings.get('components')
         if components != None:
             components[mountTargetComponent] = targetBucket
-            configs['components'] = components
+            self.settings['components'] = components
         else:
+            workingDir = self.getWorkingDir()
             self.errorMessageBox(
                 f"The components is missing in {workingDir}/config.yaml. Consider Going through the settings to create one.",
-                "Components in config missing")
+                'Components in config missing')
             return
-
-        # Write the config file with the modified components
-        try:
-            with open(workingDir+'/config.yaml','w') as file:
-                yaml.safe_dump(configs,file)
-        except:
-            self.errorMessageBox(f"Could not modify {workingDir}/config.yaml.", "Could not modify config file")
-            return
+        self.writeConfigFile(self.settings)
 
     # run command and return tuple:
     # (stdOut, stdErr, exitCode, executableFound)
@@ -297,7 +266,10 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
             return ('', '', -1, False)
         # run command
         try:
-            process = subprocess.run(commandParts, capture_output=True)
+            process = subprocess.run(
+                commandParts, 
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             stdOut = process.stdout.decode().strip()
             stdErr = process.stderr.decode().strip()
             exitCode = process.returncode
@@ -312,7 +284,7 @@ class FUSEWindow(QMainWindow, Ui_primaryFUSEwindow):
         self.textEdit_output.repaint()
         self.textEdit_output.moveCursor(QtGui.QTextCursor.End)
 
-    def errorMessageBox(self, messageString, titleString="Error"):
+    def errorMessageBox(self, messageString, titleString='Error'):
         msg = QtWidgets.QMessageBox()
         # Get the user's attention by popping open a new window
         msg.setWindowTitle(titleString)

@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -49,6 +49,7 @@ func (suite *libfuseTestSuite) TestDefault() {
 	suite.assert.Equal(uint32(120), suite.libfuse.entryExpiration)
 	suite.assert.Equal(uint32(120), suite.libfuse.attributeExpiration)
 	suite.assert.Equal(uint32(120), suite.libfuse.negativeTimeout)
+	suite.assert.Equal(uint64(1024*1024), suite.libfuse.displayCapacityMb)
 	suite.assert.False(suite.libfuse.disableWritebackCache)
 	suite.assert.True(suite.libfuse.ignoreOpenFlags)
 	suite.assert.False(suite.libfuse.directIO)
@@ -57,7 +58,7 @@ func (suite *libfuseTestSuite) TestDefault() {
 func (suite *libfuseTestSuite) TestConfig() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default libfuse generated
-	config := "allow-other: true\nread-only: true\nlibfuse:\n  attribute-expiration-sec: 60\n  entry-expiration-sec: 60\n  negative-entry-expiration-sec: 60\n  fuse-trace: true\n  disable-writeback-cache: true\n  ignore-open-flags: false\n  direct-io: true\n  network-share: true\n"
+	config := "allow-other: true\nread-only: true\nlibfuse:\n  attribute-expiration-sec: 60\n  entry-expiration-sec: 60\n  negative-entry-expiration-sec: 60\n  fuse-trace: true\n  disable-writeback-cache: true\n  ignore-open-flags: false\n  direct-io: true\n  network-share: true\n  display-capacity-mb: 262144\n"
 	suite.setupTestHelper(config) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal("libfuse", suite.libfuse.Name())
@@ -74,13 +75,14 @@ func (suite *libfuseTestSuite) TestConfig() {
 	suite.assert.Equal(uint32(60), suite.libfuse.entryExpiration)
 	suite.assert.Equal(uint32(60), suite.libfuse.attributeExpiration)
 	suite.assert.Equal(uint32(60), suite.libfuse.negativeTimeout)
+	suite.assert.Equal(uint64(262144), suite.libfuse.displayCapacityMb)
 	suite.assert.True(suite.libfuse.directIO)
 }
 
 func (suite *libfuseTestSuite) TestConfigZero() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default libfuse generated
-	config := "read-only: true\nlibfuse:\n  attribute-expiration-sec: 0\n  entry-expiration-sec: 0\n  negative-entry-expiration-sec: 0\n  fuse-trace: true\n  direct-io: false\n"
+	config := "read-only: true\nlibfuse:\n  attribute-expiration-sec: 0\n  entry-expiration-sec: 0\n  negative-entry-expiration-sec: 0\n  fuse-trace: true\n  direct-io: false\n  display-capacity-mb: 0\n"
 	suite.setupTestHelper(config) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal("libfuse", suite.libfuse.Name())
@@ -95,6 +97,7 @@ func (suite *libfuseTestSuite) TestConfigZero() {
 	suite.assert.Equal(uint32(0), suite.libfuse.entryExpiration)
 	suite.assert.Equal(uint32(0), suite.libfuse.attributeExpiration)
 	suite.assert.Equal(uint32(0), suite.libfuse.negativeTimeout)
+	suite.assert.Equal(uint64(1024*1024), suite.libfuse.displayCapacityMb)
 	suite.assert.False(suite.libfuse.directIO)
 }
 

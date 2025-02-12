@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -28,6 +28,8 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -38,6 +40,7 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"github.com/Seagate/cloudfuse/component/azstorage"
 	"github.com/Seagate/cloudfuse/component/s3storage"
@@ -56,7 +59,7 @@ type containerListingOptions struct {
 var mountAllOpts containerListingOptions
 
 var mountAllCmd = &cobra.Command{
-	Use:               "all [path] <flags>",
+	Use:               "all <mount path>",
 	Short:             "Mounts all containers for a given cloud account as a filesystem",
 	Long:              "Mounts all containers for a given cloud account as a filesystem",
 	SuggestFor:        []string{"mnta", "mout"},
@@ -155,12 +158,23 @@ func processCommand() error {
 	}
 
 	// Validate config is to be secured on write or not
-	if options.PassPhrase == "" {
-		options.PassPhrase = os.Getenv(SecureConfigEnvName)
-	}
+	if options.SecureConfig ||
+		filepath.Ext(options.ConfigFile) == SecureConfigExtension {
 
-	if options.SecureConfig && options.PassPhrase == "" {
-		return fmt.Errorf("key not provided to decrypt config file")
+		// Validate config is to be secured on write or not
+		if options.PassPhrase == "" {
+			options.PassPhrase = os.Getenv(SecureConfigEnvName)
+			if options.PassPhrase == "" {
+				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+			}
+
+			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
+			if err != nil {
+				return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
+			}
+		}
+
+		encryptedPassphrase = memguard.NewEnclave([]byte(options.PassPhrase))
 	}
 
 	var containerList []string
@@ -395,7 +409,7 @@ func writeConfigFile(contConfigFile string) error {
 			return fmt.Errorf("failed to marshall yaml content")
 		}
 
-		cipherText, err := common.EncryptData(confStream, []byte(options.PassPhrase))
+		cipherText, err := common.EncryptData(confStream, encryptedPassphrase)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt yaml content [%s]", err.Error())
 		}

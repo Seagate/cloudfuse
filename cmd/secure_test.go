@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,6 +27,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"testing"
@@ -90,7 +91,7 @@ foreground: false
 read-only: true
 allow-other: true
 
-logging:  
+logging:
   type: base
   level: log_debug
   file-path: /home/cloudfuse.log
@@ -112,6 +113,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncrypt() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
+	passphrase := "12312312312312312312312312312312"
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
@@ -121,18 +123,18 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncrypt() {
 
 	confFile.Close()
 
-	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123123123123123123123123", fmt.Sprintf("--output-file=%s", outFile.Name()))
+	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile.Name()))
 	suite.assert.NoError(err)
 
 	// Config file should be deleted
-	_, err = os.Stat(confFile.Name())
-	suite.assert.Error(err)
+	suite.assert.NoFileExists(confFile.Name())
 }
 
 func (suite *secureConfigTestSuite) TestSecureConfigEncryptNoOutfile() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile := confFile.Name() + SecureConfigExtension
+	passphrase := "12312312312312312312312312312312"
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile)
@@ -142,22 +144,21 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncryptNoOutfile() {
 
 	confFile.Close()
 
-	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123123123123123123123123")
+	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase))
 	suite.assert.NoError(err)
 
 	// Config file should be deleted
-	_, err = os.Stat(confFile.Name())
-	suite.assert.Error(err)
+	suite.assert.NoFileExists(confFile.Name())
 
 	// Outfile should exist with proper extension
-	_, err = os.Stat(outFile)
-	suite.assert.NoError(err)
+	suite.assert.FileExists(outFile)
 }
 
 func (suite *secureConfigTestSuite) TestSecureConfigEncryptNotExistent() {
 	defer suite.cleanupTest()
 	confFile := "abcd.yaml"
-	_, err := executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile), "--passphrase=123123123123123123123123")
+	passphrase := "12312312312312312312312312312312"
+	_, err := executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile), fmt.Sprintf("--passphrase=%s", passphrase))
 	suite.assert.Error(err)
 }
 
@@ -187,6 +188,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncryptInvalidKey() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
+	passphrase := base64.StdEncoding.EncodeToString([]byte("123"))
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
@@ -197,7 +199,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncryptInvalidKey() {
 	confFile.Close()
 	outFile.Close()
 
-	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123", fmt.Sprintf("--output-file=%s", outFile.Name()))
+	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile.Name()))
 	suite.assert.Error(err)
 }
 
@@ -205,6 +207,8 @@ func (suite *secureConfigTestSuite) TestSecureConfigDecrypt() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
+	passphrase := "12312312312312312312312312312312"
+	fmt.Println(passphrase)
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
@@ -215,14 +219,13 @@ func (suite *secureConfigTestSuite) TestSecureConfigDecrypt() {
 	confFile.Close()
 	outFile.Close()
 
-	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123123123123123123123123", fmt.Sprintf("--output-file=%s", outFile.Name()))
+	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile.Name()))
 	suite.assert.NoError(err)
 
 	// Config file should be deleted
-	_, err = os.Stat(confFile.Name())
-	suite.assert.Error(err)
+	suite.assert.NoFileExists(confFile.Name())
 
-	_, err = executeCommandSecure(rootCmd, "secure", "decrypt", fmt.Sprintf("--config-file=%s", outFile.Name()), "--passphrase=123123123123123123123123", fmt.Sprintf("--output-file=./tmp.yaml"))
+	_, err = executeCommandSecure(rootCmd, "secure", "decrypt", fmt.Sprintf("--config-file=%s", outFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=./tmp.yaml"))
 	suite.assert.NoError(err)
 
 	data, err := os.ReadFile("./tmp.yaml")
@@ -238,6 +241,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigDecryptNoOutputFile() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile := confFile.Name() + SecureConfigExtension
+	passphrase := "12312312312312312312312312312312"
 
 	defer os.Remove(confFile.Name())
 
@@ -246,27 +250,23 @@ func (suite *secureConfigTestSuite) TestSecureConfigDecryptNoOutputFile() {
 
 	confFile.Close()
 
-	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123123123123123123123123")
+	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase))
 	suite.assert.NoError(err)
 
 	// Config file should be deleted
-	_, err = os.Stat(confFile.Name())
-	suite.assert.Error(err)
+	suite.assert.NoFileExists(confFile.Name())
 
 	// Encrypted file should exist
-	_, err = os.Stat(outFile)
-	suite.assert.NoError(err)
+	suite.assert.FileExists(outFile)
 
-	_, err = executeCommandSecure(rootCmd, "secure", "decrypt", fmt.Sprintf("--config-file=%s", outFile), "--passphrase=123123123123123123123123")
+	_, err = executeCommandSecure(rootCmd, "secure", "decrypt", fmt.Sprintf("--config-file=%s", outFile), fmt.Sprintf("--passphrase=%s", passphrase))
 	suite.assert.NoError(err)
 
 	// Config file should exist
-	_, err = os.Stat(confFile.Name())
-	suite.assert.NoError(err)
+	suite.assert.FileExists(confFile.Name())
 
 	// Encrypted file should be deleted
-	_, err = os.Stat(outFile)
-	suite.assert.Error(err)
+	suite.assert.NoFileExists(outFile)
 
 	data, err := os.ReadFile(confFile.Name())
 	suite.assert.NoError(err)
@@ -298,6 +298,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigGet() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
+	passphrase := "12312312312312312312312312312312"
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
@@ -308,10 +309,10 @@ func (suite *secureConfigTestSuite) TestSecureConfigGet() {
 	confFile.Close()
 	outFile.Close()
 
-	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123123123123123123123123", fmt.Sprintf("--output-file=%s", outFile.Name()))
+	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile.Name()))
 	suite.assert.NoError(err)
 
-	_, err = executeCommandSecure(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile.Name()), "--passphrase=123123123123123123123123", "--key=logging.level")
+	_, err = executeCommandSecure(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), "--key=logging.level")
 	suite.assert.NoError(err)
 }
 
@@ -319,6 +320,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigGetInvalidKey() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
+	passphrase := "12312312312312312312312312312312"
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
@@ -329,10 +331,10 @@ func (suite *secureConfigTestSuite) TestSecureConfigGetInvalidKey() {
 	confFile.Close()
 	outFile.Close()
 
-	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123123123123123123123123", fmt.Sprintf("--output-file=%s", outFile.Name()))
+	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile.Name()))
 	suite.assert.NoError(err)
 
-	_, err = executeCommandSecure(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile.Name()), "--passphrase=123123123123123123123123", "--key=abcd.efg")
+	_, err = executeCommandSecure(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), "--key=abcd.efg")
 	suite.assert.Error(err)
 }
 
@@ -340,6 +342,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigSet() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
+	passphrase := "12312312312312312312312312312312"
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
@@ -350,15 +353,15 @@ func (suite *secureConfigTestSuite) TestSecureConfigSet() {
 	confFile.Close()
 	outFile.Close()
 
-	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), "--passphrase=123123123123123123123123", fmt.Sprintf("--output-file=%s", outFile.Name()))
+	_, err = executeCommandSecure(rootCmd, "secure", "encrypt", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile.Name()))
 	suite.assert.NoError(err)
 
-	_, err = executeCommandSecure(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile.Name()), "--passphrase=123123123123123123123123", "--key=logging.level")
+	_, err = executeCommandSecure(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), "--key=logging.level")
 	suite.assert.NoError(err)
 
-	_, err = executeCommandSecure(rootCmd, "secure", "set", fmt.Sprintf("--config-file=%s", outFile.Name()), "--passphrase=123123123123123123123123", "--key=logging.level", "--value=log_err")
+	_, err = executeCommandSecure(rootCmd, "secure", "set", fmt.Sprintf("--config-file=%s", outFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), "--key=logging.level", "--value=log_err")
 	suite.assert.NoError(err)
 
-	_, err = executeCommandSecure(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile.Name()), "--passphrase=123123123123123123123123", "--key=logging.level")
+	_, err = executeCommandSecure(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), "--key=logging.level")
 	suite.assert.NoError(err)
 }

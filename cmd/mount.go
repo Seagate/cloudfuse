@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -28,6 +28,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -46,6 +47,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
+	"github.com/awnumar/memguard"
 
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"
@@ -79,6 +81,7 @@ type mountOptions struct {
 	ProfilerIP        string         `config:"profiler-ip"`
 	MonitorOpt        monitorOptions `config:"health_monitor"`
 	WaitForMount      time.Duration  `config:"wait-for-mount"`
+	LazyWrite         bool           `config:"lazy-write"`
 
 	// v1 support
 	Streaming      bool     `config:"streaming"`
@@ -108,12 +111,37 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 		} else if !skipNonEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
 			return fmt.Errorf("mount directory is not empty")
 		}
-	}
 
-	if common.IsDirectoryMounted(opt.MountPath) {
-		return fmt.Errorf("directory is already mounted")
-	} else if runtime.GOOS != "windows" && !skipNonEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
-		return fmt.Errorf("mount directory is not empty")
+		if common.IsDirectoryMounted(opt.MountPath) {
+			// Try to cleanup the stale mount
+			log.Info("Mount::validate : Mount directory is already mounted, trying to cleanup")
+			active, err := common.IsMountActive(opt.MountPath)
+			if active || err != nil {
+				// Previous mount is still active so we need to fail this mount
+				return fmt.Errorf("directory is already mounted")
+			} else {
+				// Previous mount is in stale state so lets cleanup the state
+				log.Info("Mount::validate : Cleaning up stale mount")
+				if err = unmountCloudfuse(opt.MountPath, true); err != nil {
+					return fmt.Errorf("directory is already mounted, unmount manually before remount [%v]", err.Error())
+				}
+
+				// Clean up the file-cache temp directory if any
+				var tempCachePath string
+				_ = config.UnmarshalKey("file_cache.path", &tempCachePath)
+
+				var cleanupOnStart bool
+				_ = config.UnmarshalKey("file_cache.cleanup-on-start", &cleanupOnStart)
+
+				if tempCachePath != "" && !cleanupOnStart {
+					if err = common.TempCacheCleanup(tempCachePath); err != nil {
+						return fmt.Errorf("failed to cleanup file cache [%s]", err.Error())
+					}
+				}
+			}
+		} else if !skipNonEmptyMount && !common.IsDirectoryEmpty(opt.MountPath) {
+			return fmt.Errorf("mount directory is not empty")
+		}
 	}
 
 	if err := common.ELogLevel.Parse(opt.Logging.LogLevel); err != nil {
@@ -132,16 +160,9 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 		common.DefaultLogFilePath = common.JoinUnixFilepath(common.DefaultWorkDir, "cloudfuse.log")
 	}
 
-	f, err := os.Stat(common.ExpandPath(common.DefaultWorkDir))
-	if err == nil && !f.IsDir() {
-		return fmt.Errorf("default work dir '%s' is not a directory", common.DefaultWorkDir)
-	}
-
-	if err != nil && os.IsNotExist(err) {
-		// create the default work dir
-		if err = os.MkdirAll(common.ExpandPath(common.DefaultWorkDir), 0777); err != nil {
-			return fmt.Errorf("failed to create default work dir [%s]", err.Error())
-		}
+	err := common.CreateDefaultDirectory()
+	if err != nil {
+		return fmt.Errorf("Failed to create default work dir [%s]", err.Error())
 	}
 
 	opt.Logging.LogFilePath = common.ExpandPath(opt.Logging.LogFilePath)
@@ -201,24 +222,30 @@ func parseConfig() error {
 		// Validate config is to be secured on write or not
 		if options.PassPhrase == "" {
 			options.PassPhrase = os.Getenv(SecureConfigEnvName)
+			if options.PassPhrase == "" {
+				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+			}
+
+			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
+			if err != nil {
+				return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
+			}
 		}
 
-		if options.PassPhrase == "" {
-			return fmt.Errorf("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
-		}
+		encryptedPassphrase = memguard.NewEnclave([]byte(options.PassPhrase))
 
 		cipherText, err := os.ReadFile(options.ConfigFile)
 		if err != nil {
 			return fmt.Errorf("failed to read encrypted config file %s [%s]", options.ConfigFile, err.Error())
 		}
 
-		plainText, err := common.DecryptData(cipherText, []byte(options.PassPhrase))
+		plainText, err := common.DecryptData(cipherText, encryptedPassphrase)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt config file %s [%s]", options.ConfigFile, err.Error())
 		}
 
 		config.SetConfigFile(options.ConfigFile)
-		config.SetSecureConfigOptions(options.PassPhrase)
+		config.SetSecureConfigOptions(encryptedPassphrase)
 		err = config.ReadFromConfigBuffer(plainText)
 		if err != nil {
 			return fmt.Errorf("invalid decrypted config file [%s]", err.Error())
@@ -237,15 +264,17 @@ func parseConfig() error {
 // We use the cobra library to provide a CLI for Cloudfuse.
 // Look at https://cobra.dev/ for more information
 var mountCmd = &cobra.Command{
-	Use:               "mount [path]",
-	Short:             "Mounts the container as a filesystem",
-	Long:              "Mounts the container as a filesystem",
+	Use:               "mount <mount path>",
+	Short:             "Mount the container as a filesystem",
+	Long:              "Mount the container as a filesystem",
 	SuggestFor:        []string{"mnt", "mout"},
 	Args:              cobra.ExactArgs(1),
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, args []string) error {
 		options.MountPath = common.ExpandPath(args[0])
 		configFileProvided := options.ConfigFile != ""
+		common.MountPath = options.MountPath
+
 		configFileExists := true
 
 		if options.ConfigFile == "" {
@@ -324,7 +353,7 @@ var mountCmd = &cobra.Command{
 				pipeline = append(pipeline, "attr_cache")
 			}
 
-			pipeline = append(pipeline, "azstorage")
+			pipeline = append(pipeline, "s3storage")
 			options.Components = pipeline
 		}
 
@@ -446,6 +475,7 @@ var mountCmd = &cobra.Command{
 		var pipeline *internal.Pipeline
 
 		log.Crit("Starting Cloudfuse Mount : %s on [%s]", common.CloudfuseVersion, common.GetCurrentDistro())
+		log.Info("Mount Command: %s", os.Args)
 		log.Crit("Logging level set to : %s", logLevel.String())
 		log.Debug("Mount allowed on nonempty path : %v", options.NonEmpty)
 
@@ -458,6 +488,11 @@ var mountCmd = &cobra.Command{
 		}
 
 		if err != nil {
+			if err.Error() == "Azure CLI not found on path" {
+				log.Err("mount : failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%v]", err)
+				return Destroy(fmt.Sprintf("failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%s]", err.Error()))
+			}
+
 			errorMessage := ""
 			if !configFileProvided {
 				errorMessage += "Config file not provided."
@@ -482,11 +517,18 @@ var mountCmd = &cobra.Command{
 			pidFile := strings.Replace(options.MountPath, "/", "_", -1) + ".pid"
 			pidFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), pidFile)
 
+			// Delete the pidFile if it already exists which prevents a failed to daemonize error
+			// See https://github.com/sevlyar/go-daemon/issues/37
+			err := os.Remove(pidFileName)
+			if err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return fmt.Errorf("mount: failed to remove pidFile [%v]", err.Error())
+			}
+
 			pid := os.Getpid()
 			fname := fmt.Sprintf("/tmp/cloudfuse.%v", pid)
 
-			ctx, _ := context.WithCancel(context.Background()) //nolint
-			err := createDaemon(pipeline, ctx, pidFileName, 0644, 027, fname)
+			ctx := context.Background()
+			err = createDaemon(pipeline, ctx, pidFileName, 0644, 022, fname)
 			if err != nil {
 				return fmt.Errorf("mount: failed to create daemon [%v]", err.Error())
 			}
@@ -641,7 +683,7 @@ func init() {
 		"Encrypt auto generated config file for each container")
 
 	mountCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
-		"Key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\nKey length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+		"Base64 encoded key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\n Decoded key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 
 	mountCmd.PersistentFlags().String("log-type", "syslog", "Type of logger to be used by the system. Set to syslog by default. Allowed values are silent|syslog|base.")
 	config.BindPFlag("logging.type", mountCmd.PersistentFlags().Lookup("log-type"))
@@ -670,6 +712,9 @@ func init() {
 	mountCmd.Flags().BoolVar(&options.DryRun, "dry-run", false,
 		"Test mount configuration, credentials, etc., but don't make any changes to the container or the local file system. Implies foreground.")
 	config.BindPFlag("dry-run", mountCmd.Flags().Lookup("dry-run"))
+
+	mountCmd.PersistentFlags().Bool("lazy-write", false, "Async write to storage container after file handle is closed.")
+	config.BindPFlag("lazy-write", mountCmd.PersistentFlags().Lookup("lazy-write"))
 
 	mountCmd.PersistentFlags().String("default-working-dir", "", "Default working directory for storing log files and other cloudfuse information")
 	mountCmd.PersistentFlags().Lookup("default-working-dir").Hidden = true
@@ -713,5 +758,5 @@ func init() {
 
 func Destroy(message string) error {
 	_ = log.Destroy()
-	return fmt.Errorf(message)
+	return fmt.Errorf("%s", message)
 }

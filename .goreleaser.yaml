@@ -1,15 +1,14 @@
-# This is an example .goreleaser.yml file with some sensible defaults.
-# Make sure to check the documentation at https://goreleaser.com
-
-# The lines bellow are called `modelines`. See `:help modeline`
-# Feel free to remove those if you don't want/need to use them.
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
 
+version: 2
+
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod tidy
+    - sh ./scripts/gen_manpages.sh
+    - go install github.com/goreleaser/chglog/cmd/chglog@latest
+    - chglog init
 
 builds:
   - id: windows
@@ -21,10 +20,11 @@ builds:
       - CGO_ENABLED=0
     flags:
       - -trimpath
-    mod_timestamp: '{{ .CommitTimestamp }}'
+      - -buildmode=pie
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
-    
+
   - id: windows-startup
     main: ./tools/windows-startup/main.go
     binary: windows-startup
@@ -36,10 +36,11 @@ builds:
       - CGO_ENABLED=0
     flags:
       - -trimpath
-    mod_timestamp: '{{ .CommitTimestamp }}'
+      - -buildmode=pie
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
-    
+
   - id: windows-health-monitor
     main: ./tools/health-monitor/main.go
     binary: cfusemon
@@ -51,7 +52,8 @@ builds:
       - CGO_ENABLED=0
     flags:
       - -trimpath
-    mod_timestamp: '{{ .CommitTimestamp }}'
+      - -buildmode=pie
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
 
@@ -62,11 +64,16 @@ builds:
       - amd64
     env:
       - CGO_ENABLED=1
+      - CGO_LDFLAGS=-L/usr/lib/x86_64-linux-gnu
+      - CC=zig cc -target x86_64-linux-gnu -isystem /usr/lib/x86_64-linux-gnu -iwithsysroot /usr/include
+      - CXX=zig c++ -target x86_64-linux-gnu -isystem /usr/lib/x86_64-linux-gnu -iwithsysroot /usr/include
     flags:
       - -trimpath
-    mod_timestamp: '{{ .CommitTimestamp }}'
+      - -buildmode=pie
+      - -tags=fuse3
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
+      - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }} -L /usr/lib/x86_64-linux-gnu
 
   - id: linux-amd64-health-monitor
     main: ./tools/health-monitor/main.go
@@ -76,13 +83,14 @@ builds:
     goarch:
       - amd64
     env:
-      - CGO_ENABLED=1
+      - CGO_ENABLED=0
     flags:
       - -trimpath
-    mod_timestamp: '{{ .CommitTimestamp }}'
+      - -buildmode=pie
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
-  
+
   - id: linux-arm64
     goos:
       - linux
@@ -90,11 +98,14 @@ builds:
       - arm64
     env:
       - CGO_ENABLED=1
-      - CC=aarch64-linux-gnu-gcc
-      - CXX=aarch64-linux-gnu-g++
+      - CGO_LDFLAGS=-L/usr/lib/aarch64-linux-gnu
+      - CC=zig cc -target aarch64-linux-gnu -isystem /usr/lib/aarch64-linux-gnu -iwithsysroot /usr/include
+      - CXX=zig c++ -target aarch64-linux-gnu  -isystem /usr/lib/aarch64-linux-gnu -iwithsysroot /usr/include
     flags:
       - -trimpath
-    mod_timestamp: '{{ .CommitTimestamp }}'
+      - -buildmode=pie
+      - -tags=fuse3
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
 
@@ -106,12 +117,11 @@ builds:
     goarch:
       - arm64
     env:
-      - CGO_ENABLED=1
-      - CC=aarch64-linux-gnu-gcc
-      - CXX=aarch64-linux-gnu-g++
+      - CGO_ENABLED=0
     flags:
       - -trimpath
-    mod_timestamp: '{{ .CommitTimestamp }}'
+      - -buildmode=pie
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
 
@@ -125,47 +135,46 @@ archives:
       - linux-amd64
       - linux-amd64-health-monitor
     format: tar.gz
-
     files:
       - LICENSE
       - README.md
       - NOTICE
-      - src: "./gui/dist/cloudfuseGUI_Linux/*"
-        dst: "./"
-      - src: "setup/baseConfig.yaml"
-        dst: "./samples/baseConfig.yaml"
-      - src: "sampleFileCacheConfigAzure.yaml"
-        dst: "./samples/sampleFileCacheConfigAzure.yaml"
-      - src: "sampleFileCacheWithSASConfigAzure.yaml"
-        dst: "./samples/sampleFileCacheWithSASConfigAzure.yaml"
-      - src: "sampleFileCacheConfigS3.yaml"
-        dst: "./samples/sampleFileCacheConfigS3.yaml"
-      - src: "sampleStreamingConfigS3.yaml"
-        dst: "./samples/sampleStreamingConfigS3.yaml"
-      - src: "sampleStreamingConfigAzure.yaml"
-        dst: "./samples/sampleStreamingConfigAzure.yaml"
+      - src: ./gui/dist/cloudfuseGUI_Linux/*
+        dst: ./
+      - src: setup/baseConfig.yaml
+        dst: ./samples/baseConfig.yaml
+      - src: sample_configs/*
+        dst: ./samples/
 
-  - id: linux-arm64
+  - id: linux-amd64_no_gui
+    builds:
+      - linux-amd64
+      - linux-amd64-health-monitor
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - NOTICE
+      - src: setup/baseConfig.yaml
+        dst: ./samples/baseConfig.yaml
+      - src: sample_configs/*
+        dst: ./samples/
+
+  - id: linux-arm64_no_gui
     builds:
       - linux-arm64
       - linux-arm64-health-monitor
     format: tar.gz
+    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md
       - NOTICE
-      - src: "setup/baseConfig.yaml"
-        dst: "./samples/baseConfig.yaml"
-      - src: "sampleFileCacheConfigAzure.yaml"
-        dst: "./samples/sampleFileCacheConfigAzure.yaml"
-      - src: "sampleFileCacheWithSASConfigAzure.yaml"
-        dst: "./samples/sampleFileCacheWithSASConfigAzure.yaml"
-      - src: "sampleFileCacheConfigS3.yaml"
-        dst: "./samples/sampleFileCacheConfigS3.yaml"
-      - src: "sampleStreamingConfigS3.yaml"
-        dst: "./samples/sampleStreamingConfigS3.yaml"
-      - src: "sampleStreamingConfigAzure.yaml"
-        dst: "./samples/sampleStreamingConfigAzure.yaml"
+      - src: setup/baseConfig.yaml
+        dst: ./samples/baseConfig.yaml
+      - src: sample_configs/*
+        dst: ./samples/
 
   - id: windows
     builds:
@@ -177,91 +186,129 @@ archives:
       - LICENSE
       - README.md
       - NOTICE
-      - src: "./gui/dist/cloudfuseGUI_Windows/*"
-        dst: "./"
-      - src: "setup/baseConfig.yaml"
-        dst: "./samples/baseConfig.yaml"
-      - src: "sampleFileCacheConfigAzure.yaml"
-        dst: "./samples/sampleFileCacheConfigAzure.yaml"
-      - src: "sampleFileCacheWithSASConfigAzure.yaml"
-        dst: "./samples/sampleFileCacheWithSASConfigAzure.yaml"
-      - src: "sampleFileCacheConfigS3.yaml"
-        dst: "./samples/sampleFileCacheConfigS3.yaml"
-      - src: "sampleStreamingConfigS3.yaml"
-        dst: "./samples/sampleStreamingConfigS3.yaml"
-      - src: "sampleStreamingConfigAzure.yaml"
-        dst: "./samples/sampleStreamingConfigAzure.yaml"
+      - src: ./gui/dist/cloudfuseGUI_Windows/*
+        dst: ./
+      - src: setup/baseConfig.yaml
+        dst: ./samples/baseConfig.yaml
+      - src: sample_configs/*
+        dst: ./samples/
+
+  - id: windows_no_gui
+    builds:
+      - windows
+      - windows-health-monitor
+    format: zip
+    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - NOTICE
+      - src: setup/baseConfig.yaml
+        dst: ./samples/baseConfig.yaml
+      - src: sample_configs/*
+        dst: ./samples/
 
 release:
-  extra_files: 
+  extra_files:
     - glob: ./build/Output/cloudfuse_{{.Version}}_windows_amd64.exe
+    - glob: ./build/Output/cloudfuse_no_gui_{{.Version}}_windows_amd64.exe
 
 nfpms:
-  - id: default
-
-    # Name of the package.
+  - id: linux
     package_name: cloudfuse
+    builds:
+      - linux-amd64
+    vendor: Seagate Technology
+    homepage: https://github.com/Seagate/cloudfuse
+    maintainer: https://github.com/Seagate/cloudfuse
+    description: |-
+      FUSE file system for interacting with S3 and Azure storage
+    license: MIT
+    changelog: "changelog.yml"
+    formats:
+      - deb
+      - rpm
+    section: utils
 
-    # Build IDs for the builds you want to create NFPM packages for.
-    # Defaults empty, which means no filtering.
+    # Contents to add to the package.
+    # GoReleaser will automatically add the binaries.
+    contents:
+      - src: './dist/linux-{{ .Arch }}-health-monitor_linux_{{ .Arch }}{{- if eq .Arch "amd64" }}_{{ .Amd64 }}{{- else }}_{{ .Arm64 }}{{ end }}/cfusemon'
+        dst: /usr/bin/cfusemon
+        file_info:
+          mode: 0755
+      - src: NOTICE
+        dst: /usr/share/doc/cloudfuse/NOTICE
+      - src: LICENSE
+        dst: /usr/share/doc/cloudfuse/LICENSE
+      - src: copyright
+        dst: /usr/share/doc/cloudfuse/copyright
+      - src: setup/baseConfig.yaml
+        dst: /usr/share/doc/cloudfuse/examples/baseConfig.yaml
+      - src: sample_configs/*
+        dst: /usr/share/doc/cloudfuse/examples/
+      - src: ./manpages/*
+        dst: /usr/share/man/man1/
+        file_info:
+          mode: 0644
+
+    overrides:
+      deb:
+        dependencies:
+          - libfuse3-dev
+
+      rpm:
+        dependencies:
+          - fuse3-devel
+
+  - id: linux_no_gui
+    package_name: cloudfuse
     builds:
       - linux-amd64
       - linux-arm64
+    file_name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
     vendor: Seagate Technology
     homepage: https://github.com/Seagate/cloudfuse
     maintainer: https://github.com/Seagate/cloudfuse
     description: |-
-      A FUSE filesystem for interacting with S3 and Azure storage.
+      FUSE file system for interacting with S3 and Azure storage
     license: MIT
-
-    # Formats to be generated.
+    changelog: "changelog.yml"
     formats:
       - deb
       - rpm
-
-    section: default
-
-    provides:
-      - cloudfuse
-      - cfusemon
-
-    # Contents to add to the package.
-    # GoReleaser will automatically add the binaries.
+    section: utils
     contents:
-      # Basic file that applies to all packagers
-      - src: './dist/linux-{{ .Arch }}-health-monitor_linux_{{ .Arch }}{{- if eq .Arch "amd64" }}_{{ .Amd64 }}{{- else }}{{ end }}/cfusemon'
+      - src: './dist/linux-{{ .Arch }}-health-monitor_linux_{{ .Arch }}{{- if eq .Arch "amd64" }}_{{ .Amd64 }}{{- else }}_{{ .Arm64 }}{{ end }}/cfusemon'
         dst: /usr/bin/cfusemon
+        file_info:
+          mode: 0755
       - src: NOTICE
         dst: /usr/share/doc/cloudfuse/NOTICE
       - src: LICENSE
         dst: /usr/share/doc/cloudfuse/LICENSE
+      - src: README.md
+        dst: /usr/share/doc/cloudfuse/README
+      - src: copyright
+        dst: /usr/share/doc/cloudfuse/copyright
       - src: setup/baseConfig.yaml
         dst: /usr/share/doc/cloudfuse/examples/baseConfig.yaml
-      - src: sampleFileCacheConfigAzure.yaml
-        dst: /usr/share/doc/cloudfuse/examples/sampleFileCacheConfigAzure.yaml
-      - src: sampleFileCacheConfigS3.yaml
-        dst: /usr/share/doc/cloudfuse/examples/sampleFileCacheConfigS3.yaml
-      - src: sampleFileCacheWithSASConfigAzure.yaml
-        dst: /usr/share/doc/cloudfuse/examples/sampleFileCacheWithSASConfigAzure.yaml
-      - src: sampleStreamingConfigS3.yaml
-        dst: /usr/share/doc/cloudfuse/examples/sampleStreamingConfigS3.yaml
-      - src: sampleStreamingConfigAzure.yaml
-        dst: /usr/share/doc/cloudfuse/examples/sampleStreamingConfigAzure.yaml
+      - src: sample_configs/*
+        dst: /usr/share/doc/cloudfuse/examples/
+      - src: ./manpages/*
+        dst: /usr/share/man/man1/
+        file_info:
+          mode: 0644
 
-      - src: ./gui/cloudfuse.desktop
-        dst: /usr/share/applications/cloudfuse.desktop
-      - src: "./gui/dist/cloudfuseGUI_Linux/*"
-        dst: "/opt/cloudfuse"
-  
     overrides:
       deb:
         dependencies:
-          - libfuse-dev
+          - libfuse3-dev
 
       rpm:
         dependencies:
-          - fuse-devel
+          - fuse3-devel
 
 metadata:
   mod_timestamp: "{{ .CommitTimestamp }}"

@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -33,7 +33,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -123,7 +123,7 @@ func (s *configTestSuite) TestBlockSize() {
 	assert.Error(err)
 	assert.Equal(az.stConfig.blockSize, opt.BlockSize*1024*1024)
 
-	opt.BlockSize = azblob.BlockBlobMaxStageBlockBytes + 1
+	opt.BlockSize = blockblob.MaxStageBlockBytes + 1
 	err = ParseAndValidateConfig(az, opt)
 	assert.Error(err)
 	assert.Contains(err.Error(), "block size is too large")
@@ -166,26 +166,51 @@ func (s *configTestSuite) TestProxyConfig() {
 	opt.HttpsProxyAddress = "127.0.0.1"
 	err := ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.proxyAddress, opt.HttpsProxyAddress)
+	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
 
-	opt.HttpProxyAddress = "128.0.0.1"
+	opt.HttpsProxyAddress = "https://128.0.0.1:8080/"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.proxyAddress, opt.HttpProxyAddress)
+	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
+
+	opt.HttpsProxyAddress = "http://129.0.0.1:8080/"
+	err = ParseAndValidateConfig(az, opt)
+	assert.NoError(err)
+	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
+
+	opt.HttpProxyAddress = "130.0.0.1"
+	err = ParseAndValidateConfig(az, opt)
+	assert.NoError(err)
+	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpProxyAddress, !opt.UseHTTPS))
+
+	opt.HttpProxyAddress = "http://131.0.0.1:8080/"
+	err = ParseAndValidateConfig(az, opt)
+	assert.NoError(err)
+	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpProxyAddress, !opt.UseHTTPS))
 
 	config.SetBool(compName+".use-https", true)
 	opt.UseHTTPS = true
 	opt.HttpsProxyAddress = ""
 
-	opt.HttpProxyAddress = "127.0.0.1"
+	opt.HttpProxyAddress = "132.0.0.1"
 	err = ParseAndValidateConfig(az, opt)
 	assert.Error(err)
 	assert.Contains(err.Error(), "`http-proxy` Invalid : must set `use-http: true`")
 
-	opt.HttpsProxyAddress = "128.0.0.1"
+	opt.HttpsProxyAddress = "133.0.0.1"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.proxyAddress, opt.HttpsProxyAddress)
+	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
+
+	opt.HttpsProxyAddress = "http://134.0.0.1:8080/"
+	err = ParseAndValidateConfig(az, opt)
+	assert.NoError(err)
+	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
+
+	opt.HttpsProxyAddress = "https://135.0.0.1:8080/"
+	err = ParseAndValidateConfig(az, opt)
+	assert.NoError(err)
+	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
 }
 
 func (s *configTestSuite) TestMaxResultsForList() {
@@ -237,7 +262,9 @@ func (s *configTestSuite) TestAuthModeKey() {
 	opt.AccountKey = "abc"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.authConfig.AccountKey, opt.AccountKey)
+	accountKey, _ := az.stConfig.authConfig.AccountKey.Open()
+	defer accountKey.Destroy()
+	assert.Equal(opt.AccountKey, accountKey.String())
 }
 
 func (s *configTestSuite) TestAuthModeSAS() {
@@ -321,9 +348,10 @@ func (s *configTestSuite) TestAuthModeSPN() {
 	opt.TenantID = "xyz"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.authConfig.ClientID, opt.ClientID)
-	assert.Equal(az.stConfig.authConfig.ClientSecret, opt.ClientSecret)
-	assert.Equal(az.stConfig.authConfig.TenantID, opt.TenantID)
+	clientSecret, _ := az.stConfig.authConfig.ClientSecret.Open()
+	assert.Equal(opt.ClientID, az.stConfig.authConfig.ClientID)
+	assert.Equal(opt.ClientSecret, clientSecret.String())
+	assert.Equal(opt.TenantID, az.stConfig.authConfig.TenantID)
 }
 
 func (s *configTestSuite) TestOtherFlags() {
@@ -379,7 +407,7 @@ func (s *configTestSuite) TestCompressionType() {
 
 }
 
-func (s *configTestSuite) TestInvalidSASRefresh() {
+func (s *configTestSuite) TestSASRefresh() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
 	az := &AzStorage{}
@@ -403,8 +431,7 @@ func (s *configTestSuite) TestInvalidSASRefresh() {
 
 	az.storage = &BlockBlob{Auth: &azAuthBlobSAS{azAuthSAS: azAuthSAS{azAuthBase: azAuthBase{config: azAuthConfig{Endpoint: "abcd:://qreq!@#$%^&*()_)(*&^%$#"}}}}}
 	err := ParseAndReadDynamicConfig(az, opt, true)
-	assert.Error(err)
-	assert.Equal("SAS key update failure", err.Error())
+	assert.NoError(err)
 }
 
 func TestConfigTestSuite(t *testing.T) {

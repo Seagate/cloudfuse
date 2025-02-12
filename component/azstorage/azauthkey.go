@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -26,15 +26,19 @@
 package azstorage
 
 import (
+	"errors"
+
 	"github.com/Seagate/cloudfuse/common/log"
 
-	"github.com/Azure/azure-storage-azcopy/v10/azbfs"
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake"
+	serviceBfs "github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake/service"
 )
 
 // Verify that the Auth implement the correct AzAuth interfaces
 var _ azAuth = &azAuthBlobKey{}
-var _ azAuth = &azAuthBfsKey{}
+var _ azAuth = &azAuthDatalakeKey{}
 
 type azAuthKey struct {
 	azAuthBase
@@ -44,38 +48,78 @@ type azAuthBlobKey struct {
 	azAuthKey
 }
 
-// GetCredential : Gets shared key based storage credentials for blob
-func (azkey *azAuthBlobKey) getCredential() interface{} {
-	if azkey.config.AccountKey == "" {
-		log.Err("azAuthBlobKey::getCredential : Shared key for account is empty, cannot authenticate user")
-		return nil
+// getServiceClient : returns shared key based service client for blob
+func (azkey *azAuthBlobKey) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
+	if azkey.config.AccountKey == nil {
+		log.Err("azAuthBlobKey::getServiceClient : Shared key for account is empty, cannot authenticate user")
+		return nil, errors.New("shared key for account is empty, cannot authenticate user")
 	}
 
-	credential, err := azblob.NewSharedKeyCredential(
-		azkey.config.AccountName,
-		azkey.config.AccountKey)
+	buff, err := azkey.config.AccountKey.Open()
+	if err != nil || buff == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	defer buff.Destroy()
+	key := make([]byte, buff.Size())
+	copy(key, buff.Bytes())
+
+	cred, err := azblob.NewSharedKeyCredential(azkey.config.AccountName, string(key))
+	clear(key)
 	if err != nil {
-		log.Err("azAuthBlobKey::getCredential : Failed to create shared key credentials")
-		return nil
+		log.Err("azAuthBlobKey::getServiceClient : Failed to create shared key credential [%s]", err.Error())
+		return nil, err
 	}
 
-	return credential
+	opts, err := getAzBlobServiceClientOptions(stConfig)
+	if err != nil {
+		log.Err("azAuthBlobKey::getServiceClient : Failed to create client options [%s]", err.Error())
+		return nil, err
+	}
+
+	svcClient, err := service.NewClientWithSharedKeyCredential(azkey.config.Endpoint, cred, opts)
+	if err != nil {
+		log.Err("azAuthBlobKey::getServiceClient : Failed to create service client [%s]", err.Error())
+	}
+
+	return svcClient, err
 }
 
-type azAuthBfsKey struct {
+type azAuthDatalakeKey struct {
 	azAuthKey
 }
 
-// GetCredential : Gets shared key based storage credentials for datalake
-func (azkey *azAuthBfsKey) getCredential() interface{} {
-	if azkey.config.AccountKey == "" {
-		log.Err("azAuthBfsKey::getCredential : Shared key for account is empty, cannot authenticate user")
-		return nil
+// getServiceClient : returns shared key based service client for datalake
+func (azkey *azAuthDatalakeKey) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
+	if azkey.config.AccountKey == nil {
+		log.Err("azAuthDatalakeKey::getServiceClient : Shared key for account is empty, cannot authenticate user")
+		return nil, errors.New("shared key for account is empty, cannot authenticate user")
 	}
 
-	credential := azbfs.NewSharedKeyCredential(
-		azkey.config.AccountName,
-		azkey.config.AccountKey)
+	buff, err := azkey.config.AccountKey.Open()
+	if err != nil || buff == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	defer buff.Destroy()
+	key := make([]byte, buff.Size())
+	copy(key, buff.Bytes())
 
-	return credential
+	cred, err := azdatalake.NewSharedKeyCredential(azkey.config.AccountName, string(key))
+	clear(key)
+	if err != nil {
+		log.Err("azAuthDatalakeKey::getServiceClient : Failed to create shared key credential [%s]", err.Error())
+		return nil, err
+	}
+
+	opts, err := getAzDatalakeServiceClientOptions(stConfig)
+	if err != nil {
+		log.Err("azAuthDatalakeKey::getServiceClient : Failed to create client options [%s]", err.Error())
+		return nil, err
+	}
+
+	svcClient, err := serviceBfs.NewClientWithSharedKeyCredential(azkey.config.Endpoint, cred, opts)
+	if err != nil {
+		log.Err("azAuthDatalakeKey::getServiceClient : Failed to create service client [%s]", err.Error())
+	}
+
+	return svcClient, err
 }

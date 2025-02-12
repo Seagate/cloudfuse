@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -36,6 +36,7 @@ import (
 )
 
 type lruNode struct {
+	sync.RWMutex
 	next    *lruNode
 	prev    *lruNode
 	usage   int
@@ -57,9 +58,6 @@ type lruPolicy struct {
 	closeSignal         chan int
 	closeSignalValidate chan int
 
-	// Channel to contain files that needs to be deleted immediately
-	deleteEvent chan string
-
 	// Channel to contain files that are in use so push them up in lru list
 	validateChan chan string
 
@@ -74,9 +72,6 @@ type lruPolicy struct {
 }
 
 const (
-	// Check for file expiry in below number of seconds
-	CacheTimeoutCheckInterval = 5
-
 	// Check for disk usage in below number of minutes
 	DiskUsageCheckInterval = 1
 )
@@ -111,8 +106,6 @@ func (p *lruPolicy) StartPolicy() error {
 
 	p.closeSignal = make(chan int)
 	p.closeSignalValidate = make(chan int)
-
-	p.deleteEvent = make(chan string, 1000)
 	p.validateChan = make(chan string, 10000)
 
 	_, err := common.GetUsage(p.tmpPath)
@@ -126,13 +119,10 @@ func (p *lruPolicy) StartPolicy() error {
 		p.diskUsageMonitor = time.Tick(time.Duration(DiskUsageCheckInterval * time.Minute))
 	}
 
-	// Only start the timeoutMonitor if evictTime is non-zero.
-	// If evictTime=0, we delete on invalidate so there is no need for a timeout monitor signal to be sent.
 	log.Info("lruPolicy::StartPolicy : Policy set with %v timeout", p.cacheTimeout)
 
-	if p.cacheTimeout != 0 {
-		p.cacheTimeoutMonitor = time.Tick(time.Duration(time.Duration(p.cacheTimeout) * time.Second))
-	}
+	// start the timeout monitor
+	p.cacheTimeoutMonitor = time.Tick(time.Duration(p.cacheTimeout) * time.Second)
 
 	go p.clearCache()
 	go p.asyncCacheValid()
@@ -167,26 +157,14 @@ func (p *lruPolicy) CacheValid(name string) {
 	}
 }
 
-func (p *lruPolicy) CacheInvalidate(name string) {
-	log.Trace("lruPolicy::CacheInvalidate : %s", name)
-
-	// We check if the file is not in the nodeMap to deal with the case
-	// where timeout is 0 and there are multiple handles open to the file.
-	// When the first close comes, we will remove the entry from the map
-	// and attempt to delete the file. This deletion will fail (and be skipped)
-	// since there are other open handles. When the last close comes in, the map
-	// will be clean so we we need to try deleting the file.
-	_, found := p.nodeMap.Load(name)
-	if p.cacheTimeout == 0 || !found {
-		p.CachePurge(name)
-	}
-}
-
-func (p *lruPolicy) CachePurge(name string) {
+func (p *lruPolicy) CachePurge(name string, flock *common.LockMapItem) {
 	log.Trace("lruPolicy::CachePurge : %s", name)
 
 	p.removeNode(name)
-	p.deleteEvent <- name
+	err := deleteFile(name)
+	if err != nil && !os.IsNotExist(err) {
+		log.Err("lruPolicy::CachePurge : failed to delete local file %s. Here's why: %v", name, err)
+	}
 }
 
 func (p *lruPolicy) IsCached(name string) bool {
@@ -195,6 +173,8 @@ func (p *lruPolicy) IsCached(name string) bool {
 	val, found := p.nodeMap.Load(name)
 	if found {
 		node := val.(*lruNode)
+		node.RLock()
+		defer node.RUnlock()
 		log.Debug("lruPolicy::IsCached : %s, deleted:%t", name, node.deleted)
 		if !node.deleted {
 			return true
@@ -213,7 +193,13 @@ func (p *lruPolicy) asyncCacheValid() {
 	for {
 		select {
 		case name := <-p.validateChan:
-			p.cacheValidate(name)
+			// validateChan only gets names that are already cached
+			// if the file is not in the map anymore, then it was deleted,
+			// which means calling cacheValidate now would be a bug
+			_, found := p.nodeMap.Load(name)
+			if found {
+				p.cacheValidate(name)
+			}
 
 		case <-p.closeSignalValidate:
 			return
@@ -222,45 +208,34 @@ func (p *lruPolicy) asyncCacheValid() {
 }
 
 func (p *lruPolicy) cacheValidate(name string) {
-	var node *lruNode = nil
 
-	val, found := p.nodeMap.Load(name)
-	if !found {
-		node = &lruNode{
-			name:    name,
-			next:    nil,
-			prev:    nil,
-			usage:   0,
-			deleted: false,
-		}
-		p.nodeMap.Store(name, node)
-	} else {
-		node = val.(*lruNode)
-	}
+	// get existing entry, or if it doesn't exist then
+	//  write a new one and return it
+	val, _ := p.nodeMap.LoadOrStore(name, &lruNode{
+		name:    name,
+		next:    nil,
+		prev:    nil,
+		usage:   0,
+		deleted: false,
+	})
+	node := val.(*lruNode)
 
+	// protect node data
+	node.Lock()
+	node.deleted = false
+	node.usage++
+	node.Unlock()
+
+	// protect the LRU
 	p.Lock()
 	defer p.Unlock()
-
-	node.deleted = false
 
 	// put node at head of linked list
 	if node == p.head {
 		return
 	}
-	// remove node from its current position
-	if node.next != nil {
-		node.next.prev = node.prev
-	}
-	if node.prev != nil {
-		node.prev.next = node.next
-	}
-	// set node as head
-	node.prev = nil
-	node.next = p.head
-	p.head.prev = node
-	p.head = node
-
-	node.usage++
+	p.extractNode(node)
+	p.setHead(node)
 }
 
 // For all other timer based activities we check the stuff here
@@ -269,11 +244,6 @@ func (p *lruPolicy) clearCache() {
 
 	for {
 		select {
-		case name := <-p.deleteEvent:
-			log.Trace("lruPolicy::Clear-delete")
-			// we are asked to delete file explicitly
-			p.deleteItem(name)
-
 		case <-p.cacheTimeoutMonitor:
 			log.Trace("lruPolicy::Clear-timeout monitor")
 			// File cache timeout has hit so delete all unused files for past N seconds
@@ -314,58 +284,61 @@ func (p *lruPolicy) removeNode(name string) {
 
 	var node *lruNode = nil
 
-	val, found := p.nodeMap.Load(name)
+	val, found := p.nodeMap.LoadAndDelete(name)
 	if !found || val == nil {
 		return
 	}
-
-	p.nodeMap.Delete(name)
 
 	p.Lock()
 	defer p.Unlock()
 
 	node = val.(*lruNode)
+	node.Lock()
 	node.deleted = true
+	node.Unlock()
 
-	if node == p.head {
-		p.head = node.next
-		p.head.prev = nil
-		node.next = nil
-		return
-	}
-
-	if node.next != nil {
-		node.next.prev = node.prev
-	}
-
-	if node.prev != nil {
-		node.prev.next = node.next
-	}
-	node.prev = nil
-	node.next = nil
+	p.extractNode(node)
 }
 
 func (p *lruPolicy) updateMarker() {
 	log.Trace("lruPolicy::updateMarker")
 
 	p.Lock()
-	node := p.lastMarker
+	p.extractNode(p.lastMarker)
+	p.setHead(p.lastMarker)
+	// swap lastMarker with currMarker
+	swap := p.lastMarker
+	p.lastMarker = p.currMarker
+	p.currMarker = swap
+
+	p.Unlock()
+}
+
+func (p *lruPolicy) extractNode(node *lruNode) {
+	// remove the node from its position in the list
+
+	// head case
+	if node == p.head {
+		p.head = node.next
+	}
+
 	if node.next != nil {
 		node.next.prev = node.prev
 	}
-
 	if node.prev != nil {
 		node.prev.next = node.next
 	}
+
+	node.prev = nil
+	node.next = nil
+}
+
+func (p *lruPolicy) setHead(node *lruNode) {
+	// insert node at the head
 	node.prev = nil
 	node.next = p.head
 	p.head.prev = node
 	p.head = node
-
-	p.lastMarker = p.currMarker
-	p.currMarker = node
-
-	p.Unlock()
 }
 
 func (p *lruPolicy) deleteExpiredNodes() {
@@ -388,7 +361,9 @@ func (p *lruPolicy) deleteExpiredNodes() {
 
 	for ; node != nil && count < p.maxEviction; node = node.next {
 		delItems = append(delItems, node)
+		node.Lock()
 		node.deleted = true
+		node.Unlock()
 		count++
 	}
 
@@ -405,7 +380,10 @@ func (p *lruPolicy) deleteExpiredNodes() {
 	log.Debug("lruPolicy::deleteExpiredNodes : List generated %d items", count)
 
 	for _, item := range delItems {
-		if item.deleted {
+		item.RLock()
+		restored := !item.deleted
+		item.RUnlock()
+		if !restored {
 			p.removeNode(item.name)
 			p.deleteItem(item.name)
 		}
@@ -417,7 +395,7 @@ func (p *lruPolicy) deleteExpiredNodes() {
 func (p *lruPolicy) deleteItem(name string) {
 	log.Trace("lruPolicy::deleteItem : Deleting %s", name)
 
-	azPath := strings.TrimPrefix(name, p.tmpPath)
+	azPath := common.NormalizeObjectName(strings.TrimPrefix(name, p.tmpPath))
 	if azPath == "" {
 		log.Err("lruPolicy::DeleteItem : Empty file name formed name : %s, tmpPath : %s", name, p.tmpPath)
 		return
@@ -428,14 +406,15 @@ func (p *lruPolicy) deleteItem(name string) {
 	}
 
 	flock := p.fileLocks.Get(azPath)
-	if p.fileLocks.Locked(azPath) {
-		log.Warn("lruPolicy::DeleteItem : File in under download %s", azPath)
-		p.CacheValid(name)
-		return
-	}
-
 	flock.Lock()
 	defer flock.Unlock()
+
+	// check if the file has been marked valid again after removeNode was called
+	_, found := p.nodeMap.Load(name)
+	if found {
+		log.Warn("lruPolicy::DeleteItem : File marked valid %s", azPath)
+		return
+	}
 
 	// Check if there are any open handles to this file or not
 	if flock.Count() > 0 {
@@ -444,7 +423,7 @@ func (p *lruPolicy) deleteItem(name string) {
 		return
 	}
 
-	// There are no open handles for this file so its safe to remove this
+	// There are no open handles for this file so it's safe to remove this
 	// Check if the file exists first, since this is often the second time we're calling deleteFile
 	_, err := os.Stat(name)
 	if err != nil && os.IsNotExist(err) {

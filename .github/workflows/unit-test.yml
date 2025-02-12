@@ -1,4 +1,6 @@
 name: Unit-Tests
+permissions: {}
+
 on:
   push:
     branches:
@@ -7,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       manual:
-        description: 'Manual Run'
+        description: "Manual Run"
         type: boolean
         required: true
         default: true
@@ -15,11 +17,23 @@ on:
 jobs:
   linux-unit-test:
     name: Build and Test on Linux
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.23"]
+        job_name: ["linux-fuse3", "linux-fuse2"]
+        include:
+          - job_name: linux-fuse3
+            os: ubuntu-latest
+            containerName: "test-cnt-ubn"
+            fuselib: libfuse3-dev
+          - job_name: linux-fuse2
+            os: ubuntu-latest
+            fuselib: libfuse-dev
+
+    runs-on: ${{ matrix.os }}
     env:
-      go: '1.22'
-      cgo: ''
-      containerName: 'test-cnt-ubn'
+      cgo: "1"
+      containerName: "test-cnt-ubn"
 
       AWS_ENDPOINT: http://localhost:4566
       AWS_REGION: us-east-1
@@ -34,6 +48,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Go
         uses: actions/setup-go@v5
@@ -45,7 +61,7 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' 
+          python-version: "3.10"
 
       - name: Set CGO
         shell: bash
@@ -55,11 +71,15 @@ jobs:
       - name: Install libfuse on Linux
         shell: bash
         run: |
-          sudo apt-get install fuse3 libfuse-dev rpm pkg-config
+          sudo apt-get install fuse3 ${{ matrix.fuselib }}
 
       - name: Build
         run: |
-          ./build.sh
+          if [[ "${{ matrix.job_name }}" == "linux-fuse2" ]]; then
+            ./build.sh fuse2;
+          else
+            ./build.sh;
+          fi
 
       - name: Create Azure Configuration File on Linux
         run: |-
@@ -71,9 +91,10 @@ jobs:
           echo "\"block-key\"": "\"${{ env.BLOB_KEY }}\"", >> $cnfFile
           echo "\"endpoint\"": "\"${{ env.BLOB_ENDPOINT }}\"", >> $cnfFile
           echo "\"skip-msi\"": "true", >> $cnfFile
+          echo "\"skip-azcli\"": "true", >> $cnfFile
           echo "\"proxy-address\"": "\"\"" >> $cnfFile
           echo "}" >> $cnfFile
-      
+
       - name: Create S3 Configuration File on Linux
         run: |-
           cnfFile=$HOME/s3test.json
@@ -93,36 +114,43 @@ jobs:
           pip install localstack awscli-local[ver1] # install LocalStack cli and awslocal
           docker pull localstack/localstack         # Make sure to pull the latest version of the image
           localstack start -d                       # Start LocalStack in the background
-          
+
           echo "Waiting for LocalStack startup..."  # Wait 20 seconds for the LocalStack container
-          localstack wait -t 20                     # to become ready before timing out 
+          localstack wait -t 20                     # to become ready before timing out
           echo "Startup complete"
-          
+
       - name: Install Azurite
         run: npm install -g azurite
-    
+
       - name: Start Azurite
         run: azurite --silent &
-      
+
       - name: Run some Tests against LocalStack
         run: |
           awslocal s3 mb s3://test
           awslocal s3 ls
-          
+
       - name: Run unit tests
-        run: go test -v -timeout=1h ./... --tags=unittest,azurite
+        run: |
+          if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
+            go test -v -timeout=1h ./... --tags=unittest,azurite
+          else
+            go test -v -timeout=1h ./... --tags=unittest,azurite,fuse3
+          fi
 
   test:
     name: Build and Test on Windows
     runs-on: windows-latest
     env:
-      go: '1.22'
-      cgo: '0'
-      containerName: 'test-cnt-win'
+      go: "1.23"
+      cgo: "0"
+      containerName: "test-cnt-win"
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Go
         uses: actions/setup-go@v5
@@ -143,15 +171,17 @@ jobs:
 
       - name: Run unit tests
         run: go test -v -timeout=1h ./... --tags=unittest,authtest
-    
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
     env:
-      go: '1.22'
+      go: "1.23"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install Go
         uses: actions/setup-go@v5
@@ -168,10 +198,10 @@ jobs:
       - name: Install libfuse on Linux
         shell: bash
         run: |
-          sudo apt-get install libfuse-dev
+          sudo apt-get install fuse3 libfuse3-dev libfuse-dev
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v5
+        uses: golangci/golangci-lint-action@v6
         with:
           # Require: The version of golangci-lint to use.
           # When `install-mode` is `binary` (default) the value can be v1.2 or v1.2.3 or `latest` to use the latest version.
@@ -179,14 +209,14 @@ jobs:
           version: latest
 
           # Optional: golangci-lint command line arguments.
-          args: --tests=false --timeout=5m --skip-dirs test,common/stats_collector,common/stats_monitor --skip-files component/libfuse/libfuse2_handler_test_wrapper.go --out-format=github-actions
+          args: --tests=false --timeout=5m --exclude-dirs test,common/stats_collector,common/stats_monitor --exclude-files component/libfuse/libfuse2_handler_test_wrapper.go --out-format=github-actions
 
       - name: Notice file check
         run: |
-          ./notices_fix.sh
+          ./scripts/notices_fix.sh
           result=$(git diff NOTICE | wc -l)
           if [ $result -ne 0 ]; then
-            echo "Notices needs a fix. Run ./notices_fix.sh and commit NOTICE file."
+            echo "Notices needs a fix. Run ./scripts/notices_fix.sh and commit NOTICE file."
             exit 1
           else
             echo "Notices are up to date."

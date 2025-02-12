@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -33,6 +33,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/awnumar/memguard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -81,10 +82,12 @@ func (suite *typesTestSuite) TestEncryptBadKey() {
 	key := make([]byte, 20)
 	rand.Read(key)
 
+	encryptedPassphrase := memguard.NewEnclave(key)
+
 	data := make([]byte, 1024)
 	rand.Read(data)
 
-	_, err := EncryptData(data, key)
+	_, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.Error(err)
 }
 
@@ -93,25 +96,65 @@ func (suite *typesTestSuite) TestDecryptBadKey() {
 	key := make([]byte, 20)
 	rand.Read(key)
 
+	encryptedPassphrase := memguard.NewEnclave(key)
+
 	data := make([]byte, 1024)
 	rand.Read(data)
 
-	_, err := DecryptData(data, key)
+	_, err := DecryptData(data, encryptedPassphrase)
 	suite.assert.Error(err)
 }
 
-func (suite *typesTestSuite) TestEncryptDecrypt() {
+func (suite *typesTestSuite) TestEncryptDecrypt16() {
 	// Generate a random key
 	key := make([]byte, 16)
 	rand.Read(key)
 
+	encryptedPassphrase := memguard.NewEnclave(key)
+
 	data := make([]byte, 1024)
 	rand.Read(data)
 
-	cipher, err := EncryptData(data, key)
+	cipher, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.NoError(err)
 
-	d, err := DecryptData(cipher, key)
+	d, err := DecryptData(cipher, encryptedPassphrase)
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(data, d)
+}
+
+func (suite *typesTestSuite) TestEncryptDecrypt24() {
+	// Generate a random key
+	key := make([]byte, 24)
+	rand.Read(key)
+
+	encryptedPassphrase := memguard.NewEnclave(key)
+
+	data := make([]byte, 1024)
+	rand.Read(data)
+
+	cipher, err := EncryptData(data, encryptedPassphrase)
+	suite.assert.NoError(err)
+
+	d, err := DecryptData(cipher, encryptedPassphrase)
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(data, d)
+}
+
+func (suite *typesTestSuite) TestEncryptDecrypt32() {
+	// Generate a random key
+	key := make([]byte, 32)
+	rand.Read(key)
+
+	encryptedPassphrase := memguard.NewEnclave(key)
+
+	data := make([]byte, 1024)
+	rand.Read(data)
+
+	cipher, err := EncryptData(data, encryptedPassphrase)
+	suite.assert.NoError(err)
+
+	d, err := DecryptData(cipher, encryptedPassphrase)
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(data, d)
 }
@@ -255,4 +298,39 @@ func (suite *utilTestSuite) TestGetDiskUsage() {
 	suite.assert.NotEqual(0, usagePercent)
 	suite.assert.NotEqual(100, usagePercent)
 	_ = os.RemoveAll(filepath.Join(pwd, "util_test"))
+}
+
+func (suite *utilTestSuite) TestDirectoryCleanup() {
+	dirName := "./TestDirectoryCleanup"
+
+	// Directory does not exists
+	exists := DirectoryExists(dirName)
+	suite.assert.False(exists)
+
+	err := TempCacheCleanup(dirName)
+	suite.assert.NoError(err)
+
+	// Directory exists but is empty
+	_ = os.MkdirAll(dirName, 0777)
+	exists = DirectoryExists(dirName)
+	suite.assert.True(exists)
+
+	empty := IsDirectoryEmpty(dirName)
+	suite.assert.True(empty)
+
+	err = TempCacheCleanup(dirName)
+	suite.assert.NoError(err)
+
+	// Directory exists and is not empty
+	_ = os.MkdirAll(dirName+"/A", 0777)
+	exists = DirectoryExists(dirName)
+	suite.assert.True(exists)
+
+	empty = IsDirectoryEmpty(dirName)
+	suite.assert.False(empty)
+
+	err = TempCacheCleanup(dirName)
+	suite.assert.NoError(err)
+
+	os.Remove(dirName)
 }

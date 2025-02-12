@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -56,8 +56,8 @@ var disableVersionCheck bool
 
 var rootCmd = &cobra.Command{
 	Use:               "cloudfuse",
-	Short:             "Cloudfuse is an open source project developed to provide a virtual filesystem backed by S3 or Azure storage.",
-	Long:              "Cloudfuse is an open source project developed to provide a virtual filesystem backed by S3 or Azure storage.",
+	Short:             "Cloudfuse is an open source project developed to provide a virtual filesystem backed by cloud storage.",
+	Long:              "Cloudfuse is an open source project developed to provide a virtual filesystem backed by cloud storage. It uses the FUSE protocol to communicate with the operating system, and implements filesystem operations using Azure or S3 cloud storage REST APIs.",
 	Version:           common.CloudfuseVersion,
 	FlagErrorHandling: cobra.ExitOnError,
 	SilenceUsage:      true,

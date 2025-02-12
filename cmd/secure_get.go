@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -65,14 +65,14 @@ var getKeyCmd = &cobra.Command{
 
 		valType := reflect.TypeOf(value)
 		if strings.HasPrefix(valType.String(), "map") {
-			fmt.Println("Fetching group level configuration")
+			cmd.Println("Fetching group level configuration")
 		} else if strings.HasPrefix(valType.String(), "[]") {
-			fmt.Println("Fetching options level configuration")
+			cmd.Println("Fetching options level configuration")
 		} else {
-			fmt.Println("Fetching scalar configuration")
+			cmd.Println("Fetching scalar configuration")
 		}
 
-		fmt.Println(secOpts.Key, "=", value)
+		cmd.Println(secOpts.Key, "=", value)
 		return nil
 	},
 }

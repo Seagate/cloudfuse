@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -26,9 +26,11 @@
 package common
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -42,6 +44,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/awnumar/memguard"
 	"gopkg.in/ini.v1"
 )
 
@@ -80,21 +83,80 @@ func IsDirectoryMounted(path string) bool {
 	return false
 }
 
+func IsMountActive(path string) (bool, error) {
+	// Get the process details for this path using ps -aux
+	var out bytes.Buffer
+	cmd := exec.Command("pidof", "cloudfuse")
+	cmd.Stdout = &out
+
+	err := cmd.Run()
+	if err != nil {
+		if err.Error() == "exit status 1" {
+			return false, nil
+		} else {
+			return true, fmt.Errorf("failed to get pid of cloudfuse [%v]", err.Error())
+		}
+	}
+
+	// out contains the list of pids of the processes that are running
+	pidString := strings.Replace(out.String(), "\n", " ", -1)
+	pids := strings.Split(pidString, " ")
+	for _, pid := range pids {
+		// Get the mount path for this pid
+		// For this we need to check the command line arguments given to this command
+		// If the path is same then we need to return true
+		if pid == "" {
+			continue
+		}
+
+		cmd = exec.Command("ps", "-o", "args=", "-p", pid)
+		out.Reset()
+		cmd.Stdout = &out
+
+		err := cmd.Run()
+		if err != nil {
+			return true, fmt.Errorf("failed to get command line arguments for pid %s [%v]", pid, err.Error())
+		}
+
+		if strings.Contains(out.String(), path) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // IsDirectoryEmpty is a utility function that returns true if the directory at that path is empty or not
 func IsDirectoryEmpty(path string) bool {
+	if !DirectoryExists(path) {
+		// Directory does not exists so safe to assume its empty
+		return true
+	}
+
 	f, _ := os.Open(path)
 	defer f.Close()
 
 	_, err := f.Readdirnames(1)
-	if err == io.EOF {
-		return true
+	// If there is nothing in the directory then it is empty
+	return err == io.EOF
+}
+
+func TempCacheCleanup(path string) error {
+	if !IsDirectoryEmpty(path) {
+		// List the first level children of the directory
+		dirents, err := os.ReadDir(path)
+		if err != nil {
+			// Failed to list, return back error
+			return fmt.Errorf("failed to list directory contents : %s", err.Error())
+		}
+
+		// Delete all first level children with their hierarchy
+		for _, entry := range dirents {
+			os.RemoveAll(filepath.Join(path, entry.Name()))
+		}
 	}
 
-	if err != nil && err.Error() == "invalid argument" {
-		fmt.Println("Broken Mount : First Unmount ", path)
-	}
-
-	return false
+	return nil
 }
 
 // DirectoryExists is a utility function that returns true if the directory at that path exists and returns false if it does not exist.
@@ -172,8 +234,18 @@ func NormalizeObjectName(name string) string {
 }
 
 // Encrypt given data using the key provided
-func EncryptData(plainData []byte, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
+func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
+	if key == nil {
+		return nil, errors.New("provided passphrase key is empty")
+	}
+
+	secretKey, err := key.Open()
+	if err != nil || secretKey == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	defer secretKey.Destroy()
+
+	block, err := aes.NewCipher(secretKey.Data())
 	if err != nil {
 		return nil, err
 	}
@@ -193,8 +265,18 @@ func EncryptData(plainData []byte, key []byte) ([]byte, error) {
 }
 
 // Decrypt given data using the key provided
-func DecryptData(cipherData []byte, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
+func DecryptData(cipherData []byte, key *memguard.Enclave) ([]byte, error) {
+	if key == nil {
+		return nil, errors.New("provided passphrase key is empty")
+	}
+
+	secretKey, err := key.Open()
+	if err != nil || secretKey == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	defer secretKey.Destroy()
+
+	block, err := aes.NewCipher(secretKey.Data())
 	if err != nil {
 		return nil, err
 	}
@@ -297,4 +379,19 @@ func IsDriveLetter(path string) bool {
 	pattern := `^[A-Za-z]:$`
 	match, _ := regexp.MatchString(pattern, path)
 	return match
+}
+
+func CreateDefaultDirectory() error {
+	dir, err := os.Stat(ExpandPath(DefaultWorkDir))
+	if err == nil && !dir.IsDir() {
+		return err
+	}
+
+	if err != nil && os.IsNotExist(err) {
+		// create the default work dir
+		if err = os.MkdirAll(ExpandPath(DefaultWorkDir), 0755); err != nil {
+			return err
+		}
+	}
+	return nil
 }

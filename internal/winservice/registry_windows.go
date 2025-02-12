@@ -3,7 +3,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -56,12 +56,13 @@ type KeyData struct {
 }
 
 // Specific mount command used in cloudfuse. This is the command that is executed when WinFsp launches our service.
-// %1-%4 are strings that are added when mounting where:
+// %1-%5 are strings that are added when mounting where:
 // %1 is the mount directory
 // %2 is the location of the config file
 // %3 is the current user's Windows user ID
 // %4 is the current user's Windows group ID
-const mountCmd = `mount %1 --config-file=%2 -o uid=%3,gid=%4 --foreground=true`
+// %5 is the passphrase if the config file is encrypted
+const mountCmd = `mount %1 --config-file=%2 -o uid=%3,gid=%4 --passphrase=%5 --foreground=true`
 
 func ReadRegistryInstanceEntry(name string) (KeyData, error) {
 	registryPath := instanceRegistry + name

@@ -4,7 +4,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -105,7 +105,7 @@ func (suite *mountSuite) TestMountCmd() {
 	suite.NoError(err)
 
 	// wait for mount
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// validate mount
 	cliOut = listCloudfuseMounts(suite)
@@ -203,7 +203,7 @@ func (suite *mountSuite) TestMountDirNotEmptySuccess() {
 	suite.NoError(err)
 
 	// wait for mount
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// validate mount
 	cliOut = listCloudfuseMounts(suite)
@@ -316,7 +316,7 @@ func (suite *mountSuite) TestEnvVarMount() {
 	suite.NoError(err)
 
 	// wait for mount
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// list cloudfuse mounted directories
 	cliOut = listCloudfuseMounts(suite)
@@ -333,7 +333,7 @@ func (suite *mountSuite) TestEnvVarMount() {
 	suite.NoError(err)
 
 	// wait for mount
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// list cloudfuse mounted directories
 	cliOut = listCloudfuseMounts(suite)
@@ -389,7 +389,7 @@ func (suite *mountSuite) TestEnvVarMount() {
 // 	suite.Equal(nil, err)
 
 // 	// wait for mount
-// 	time.Sleep(10 * time.Second)
+// 	time.Sleep(5 * time.Second)
 
 // 	// list cloudfuse mounted directories
 // 	cliOut = listCloudfuseMounts(suite)
@@ -416,7 +416,7 @@ func mountAndValidate(suite *mountSuite, args ...string) {
 	suite.NoError(err)
 
 	// wait for mount
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// validate mount
 	cliOut = listCloudfuseMounts(suite)
@@ -454,7 +454,7 @@ func (suite *mountSuite) TestWriteBackCacheAndIgnoreOpenFlags() {
 	suite.NoError(err)
 	suite.NotNil(f)
 	f.Close()
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 	cloudfuseUnmount(suite, mntDir)
 
 	mountAndValidate(suite, "--disable-writeback-cache=false", "--ignore-open-flags=true")
@@ -462,7 +462,7 @@ func (suite *mountSuite) TestWriteBackCacheAndIgnoreOpenFlags() {
 	suite.NoError(err)
 	suite.NotNil(f)
 	f.Close()
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 	cloudfuseUnmount(suite, mntDir)
 
 	mountAndValidate(suite)
@@ -470,7 +470,7 @@ func (suite *mountSuite) TestWriteBackCacheAndIgnoreOpenFlags() {
 	suite.NoError(err)
 	suite.NotNil(f)
 	f.Close()
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	err = os.RemoveAll(remoteFilePath)
 	suite.NoError(err)

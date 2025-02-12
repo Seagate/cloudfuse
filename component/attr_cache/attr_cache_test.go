@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -104,6 +104,8 @@ func (suite *attrCacheTestSuite) assertCacheEmpty() bool {
 }
 
 func (suite *attrCacheTestSuite) assertNotInCache(path string) {
+	suite.T().Helper()
+
 	_, found := suite.attrCache.cache.get(path)
 	suite.assert.False(found)
 }
@@ -123,6 +125,8 @@ func (suite *attrCacheTestSuite) addPathToCache(path string, metadata bool) {
 }
 
 func (suite *attrCacheTestSuite) assertDeleted(path string) {
+	suite.T().Helper()
+
 	cacheItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
 	suite.assert.True(cacheItem.valid())
@@ -130,12 +134,16 @@ func (suite *attrCacheTestSuite) assertDeleted(path string) {
 }
 
 func (suite *attrCacheTestSuite) assertInvalid(path string) {
+	suite.T().Helper()
+
 	cacheItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
 	suite.assert.False(cacheItem.valid())
 }
 
 func (suite *attrCacheTestSuite) assertUntouched(path string) {
+	suite.T().Helper()
+
 	cacheItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
 	suite.assert.EqualValues(defaultSize, cacheItem.attr.Size)
@@ -145,6 +153,8 @@ func (suite *attrCacheTestSuite) assertUntouched(path string) {
 }
 
 func (suite *attrCacheTestSuite) assertExists(path string) {
+	suite.T().Helper()
+
 	checkItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
 	suite.assert.True(checkItem.valid())
@@ -152,6 +162,8 @@ func (suite *attrCacheTestSuite) assertExists(path string) {
 }
 
 func (suite *attrCacheTestSuite) assertInCloud(path string) {
+	suite.T().Helper()
+
 	checkItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
 	suite.assert.True(checkItem.valid())
@@ -160,6 +172,8 @@ func (suite *attrCacheTestSuite) assertInCloud(path string) {
 }
 
 func (suite *attrCacheTestSuite) assertNotInCloud(path string) {
+	suite.T().Helper()
+
 	checkItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
 	suite.assert.True(checkItem.valid())
@@ -287,6 +301,17 @@ func (suite *attrCacheTestSuite) TestConfig() {
 	suite.assert.False(suite.attrCache.cacheOnList)
 	suite.assert.True(suite.attrCache.enableSymlinks)
 	suite.assert.False(suite.attrCache.cacheDirs)
+}
+
+// Tests backward compatibility
+func (suite *attrCacheTestSuite) TestOldConfig() {
+	defer suite.cleanupTest()
+	suite.cleanupTest() // clean up the default attr cache generated
+	config := "attr_cache:\n    no-symlinks: false"
+	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
+
+	suite.assert.Equal("attr_cache", suite.attrCache.Name())
+	suite.assert.True(suite.attrCache.enableSymlinks)
 }
 
 // Tests max files config

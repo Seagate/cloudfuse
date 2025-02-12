@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -215,10 +215,11 @@ func (l *BaseLogger) logEvent(lvl string, format string, args ...interface{}) {
 	// Only log if the log level matches the log request
 	_, fn, ln, _ := runtime.Caller(3)
 	msg := fmt.Sprintf(format, args...)
-	msg = fmt.Sprintf("%s : %s[%d] : %s [%s (%d)]: %s",
+	msg = fmt.Sprintf("%s : %s[%d] : [%s] %s [%s (%d)]: %s",
 		time.Now().Format(unixDateMilli),
 		l.fileConfig.LogTag,
 		l.procPID,
+		common.MountPath,
 		lvl,
 		filepath.Base(fn), ln,
 		msg)

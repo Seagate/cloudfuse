@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -75,6 +75,8 @@ func newTestStream(next internal.Component, configuration string, ro bool) (*Str
 }
 
 func (suite *streamTestSuite) setupTestHelper(config string, ro bool) {
+	suite.T().Helper()
+
 	var err error
 	suite.assert = assert.New(suite.T())
 	suite.mockCtrl = gomock.NewController(suite.T())

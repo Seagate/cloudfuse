@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -33,8 +33,10 @@ import (
 
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
+
 	"github.com/JeffreyRichter/enum/enum"
 )
 
@@ -61,6 +63,10 @@ func (AuthType) SPN() AuthType {
 
 func (AuthType) MSI() AuthType {
 	return AuthType(4)
+}
+
+func (AuthType) AZCLI() AuthType {
+	return AuthType(5)
 }
 
 func (a AuthType) String() string {
@@ -126,8 +132,6 @@ const (
 	EnvAzStorageAadEndpoint            = "AZURE_STORAGE_AAD_ENDPOINT"
 	EnvAzStorageAuthType               = "AZURE_STORAGE_AUTH_TYPE"
 	EnvAzStorageBlobEndpoint           = "AZURE_STORAGE_BLOB_ENDPOINT"
-	EnvHttpProxy                       = "http_proxy"
-	EnvHttpsProxy                      = "https_proxy"
 	EnvAzStorageAccountContainer       = "AZURE_STORAGE_ACCOUNT_CONTAINER"
 	EnvAzAuthResource                  = "AZURE_STORAGE_AUTH_RESOURCE"
 	EnvAzStorageCpkEncryptionKey       = "AZURE_STORAGE_CPK_ENCRYPTION_KEY"
@@ -162,7 +166,6 @@ type AzStorageOptions struct {
 	MaxRetryDelay           int32  `config:"max-retry-delay-sec" yaml:"max-retry-delay-sec,omitempty"`
 	HttpProxyAddress        string `config:"http-proxy" yaml:"http-proxy,omitempty"`
 	HttpsProxyAddress       string `config:"https-proxy" yaml:"https-proxy,omitempty"`
-	SdkTrace                bool   `config:"sdk-trace" yaml:"sdk-trace,omitempty"`
 	FailUnsupportedOp       bool   `config:"fail-unsupported-op" yaml:"fail-unsupported-op,omitempty"`
 	AuthResourceString      string `config:"auth-resource" yaml:"auth-resource,omitempty"`
 	UpdateMD5               bool   `config:"update-md5" yaml:"update-md5"`
@@ -208,9 +211,6 @@ func RegisterEnvVariables() {
 	config.BindEnv("azstorage.endpoint", EnvAzStorageBlobEndpoint)
 
 	config.BindEnv("azstorage.mode", EnvAzStorageAuthType)
-
-	config.BindEnv("azstorage.http-proxy", EnvHttpProxy)
-	config.BindEnv("azstorage.https-proxy", EnvHttpsProxy)
 
 	config.BindEnv("azstorage.container", EnvAzStorageAccountContainer)
 
@@ -319,8 +319,8 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	}
 
 	if opt.BlockSize != 0 {
-		if opt.BlockSize > azblob.BlockBlobMaxStageBlockBytes {
-			log.Err("ParseAndValidateConfig : Block size is too large. Block size has to be smaller than %s Bytes", azblob.BlockBlobMaxStageBlockBytes)
+		if opt.BlockSize > blockblob.MaxStageBlockBytes {
+			log.Err("ParseAndValidateConfig : Block size is too large. Block size has to be smaller than %s Bytes", blockblob.MaxStageBlockBytes)
 			return errors.New("block size is too large")
 		}
 		az.stConfig.blockSize = opt.BlockSize * 1024 * 1024
@@ -399,11 +399,8 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 			}
 		}
 	}
+	az.stConfig.proxyAddress = formatEndpointProtocol(az.stConfig.proxyAddress, opt.UseHTTP)
 	log.Info("ParseAndValidateConfig : using the following proxy address from the config file: %s", az.stConfig.proxyAddress)
-
-	az.stConfig.sdkTrace = opt.SdkTrace
-
-	log.Info("ParseAndValidateConfig : sdk logging from the config file: %t", az.stConfig.sdkTrace)
 
 	err = ParseAndReadDynamicConfig(az, opt, false)
 	if err != nil {
@@ -433,7 +430,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		if opt.AccountKey == "" {
 			return errors.New("storage key not provided")
 		}
-		az.stConfig.authConfig.AccountKey = opt.AccountKey
+		az.stConfig.authConfig.AccountKey = memguard.NewEnclave([]byte(opt.AccountKey))
 	case EAuthType.SAS():
 		az.stConfig.authConfig.AuthMode = EAuthType.SAS()
 		if opt.SaSKey == "" {
@@ -455,9 +452,11 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 			return errors.New("Client ID, Tenant ID or Client Secret not provided")
 		}
 		az.stConfig.authConfig.ClientID = opt.ClientID
-		az.stConfig.authConfig.ClientSecret = opt.ClientSecret
+		az.stConfig.authConfig.ClientSecret = memguard.NewEnclave([]byte(opt.ClientSecret))
 		az.stConfig.authConfig.TenantID = opt.TenantID
 		az.stConfig.authConfig.OAuthTokenFilePath = opt.OAuthTokenFilePath
+	case EAuthType.AZCLI():
+		az.stConfig.authConfig.AuthMode = EAuthType.AZCLI()
 
 	default:
 		log.Err("ParseAndValidateConfig : Invalid auth mode %s", opt.AuthMode)
@@ -592,9 +591,21 @@ func ParseAndReadDynamicConfig(az *AzStorage, opt AzStorageOptions, reload bool)
 		if reload {
 			log.Info("ParseAndReadDynamicConfig : SAS Key updated")
 
-			if err := az.storage.NewCredentialKey("saskey", az.stConfig.authConfig.SASKey); err != nil {
+			var sasKey *memguard.LockedBuffer
+			var err error
+			if az.stConfig.authConfig.SASKey != nil {
+				sasKey, err = az.stConfig.authConfig.SASKey.Open()
+				if err != nil || sasKey == nil {
+					return err
+				}
+				defer sasKey.Destroy()
+			} else {
+				return errors.New("SAS key update failure")
+			}
+
+			if err := az.storage.UpdateServiceClient("saskey", sasKey.String()); err != nil {
 				az.stConfig.authConfig.SASKey = oldSas
-				_ = az.storage.NewCredentialKey("saskey", az.stConfig.authConfig.SASKey)
+				_ = az.storage.UpdateServiceClient("saskey", sasKey.String())
 				return errors.New("SAS key update failure")
 			}
 		}

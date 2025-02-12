@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -33,25 +33,34 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/middleware"
+	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
+	smithyHttp "github.com/aws/smithy-go/transport/http"
 )
 
 const (
-	symlinkKey = "is_symlink"
+	symlinkKey    = "is_symlink"
+	defaultRegion = "us-east-1"
 )
 
 type Client struct {
@@ -63,92 +72,200 @@ type Client struct {
 // Verify that Client implements S3Connection interface
 var _ S3Connection = &Client{}
 
+// The text before the : symbol is a magic keyword
+// It cannot change as it is parsed by our plugin for network optix to provide more clear errors to the user
+var (
+	errBucketDoesNotExist = errors.New("Bucket Error: S3 bucket does not exist or you do not have permission to access it. Please check your bucket name and endpoint are correct.")
+	errInvalidEndpoint    = errors.New("Endpoint Error: Provided S3 endpoint is invalid. Please check endpoint is correct.")
+	errInvalidCredential  = errors.New("Credential or Endpoint Error: S3 credentials or endpoint are invalid. Please check your credentials and endpoint are correct.")
+	errInvalidSecretKey   = errors.New("Secret Error: S3 secret key is not valid. Please check that the secret key and endpoint are correct.")
+	errNoBucketInAccount  = errors.New("Bucket Error: No bucket exists in S3 account. Please create a bucket in your account.")
+)
+
+// getSymlinkBool returns true if the symlink flag is set in the metadata map, false otherwise.
+func getSymlinkBool(metadata map[string]*string) bool {
+	isSymlink := false
+	sym, ok := metadata[symlinkKey]
+	if ok && sym != nil {
+		isSymlink = (*sym == "true")
+	}
+	return isSymlink
+}
+
 // Configure : Initialize the awsS3Client
 func (cl *Client) Configure(cfg Config) error {
 	log.Trace("Client::Configure : initialize awsS3Client")
 	cl.Config = cfg
 
-	// Set the endpoint supplied in the config file
-	endpointResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-		if service == s3.ServiceID {
-			// resolve region
-			if cl.Config.authConfig.Region == "" && region == "" {
-				region = "us-east-1"
-				// write region back to config struct
-				cl.Config.authConfig.Region = region
-			}
-			// resolve endpoint URL
-			if cl.Config.authConfig.Endpoint == "" {
-				var url string
-				switch region {
-				case "us-east-1":
-					url = "https://s3.us-east-1.lyvecloud.seagate.com"
-				case "us-west-1":
-					url = "https://s3.us-west-1.lyvecloud.seagate.com"
-				case "ap-southeast-1":
-					url = "https://s3.ap-southeast-1.lyvecloud.seagate.com"
-				case "us-central-1":
-					url = "https://s3.us-central-1.lyvecloud.seagate.com"
-				case "eu-west-1":
-					url = "https://s3.eu-west-1.lyvecloud.seagate.com"
-				case "us-central-2":
-					url = "https://s3.us-central-2.lyvecloud.seagate.com"
-				default:
-					errMsg := fmt.Sprintf("unrecognized region \"%s\"", region)
-					log.Err("Client::Configure : %s", errMsg)
-					return aws.Endpoint{}, fmt.Errorf("%s", errMsg)
-				}
-				// on success, write back to config struct
-				cl.Config.authConfig.Region = region
-				cl.Config.authConfig.Endpoint = url
-			}
-			// create the endpoint
-			return aws.Endpoint{
-				PartitionID:   "aws",
-				URL:           cl.Config.authConfig.Endpoint,
-				SigningRegion: cl.Config.authConfig.Region,
-			}, nil
-		}
-		return aws.Endpoint{}, fmt.Errorf("unknown endpoint requested")
-	})
-
 	var credentialsProvider aws.CredentialsProvider
-	credentialsInConfig := cl.Config.authConfig.KeyID != "" && cl.Config.authConfig.SecretKey != ""
-	if credentialsInConfig {
-		credentialsProvider = credentials.NewStaticCredentialsProvider(
-			cl.Config.authConfig.KeyID,
-			cl.Config.authConfig.SecretKey,
-			"",
-		)
+	if cl.Config.authConfig.KeyID != nil && cl.Config.authConfig.SecretKey != nil {
+		keyID, err := cl.Config.authConfig.KeyID.Open()
+		if err != nil || keyID == nil {
+			return errors.New("unable to decrypt key id")
+		}
+		defer keyID.Destroy()
+		secretKey, err := cl.Config.authConfig.SecretKey.Open()
+		if err != nil || secretKey == nil {
+			return errors.New("unable to decrypt secret key")
+		}
+		defer secretKey.Destroy()
+		credentialsInConfig := keyID.String() != "" && secretKey.String() != ""
+		if credentialsInConfig {
+			credentialsProvider = credentials.NewStaticCredentialsProvider(
+				strings.Clone(keyID.String()),
+				strings.Clone(secretKey.String()),
+				"",
+			)
+		}
 	}
+
+	var err error
+	if cl.Config.authConfig.Region == "" {
+		region, exists := os.LookupEnv("AWS_REGION")
+		if !exists {
+			cl.Config.authConfig.Region, err = getRegionFromEndpoint(cl.Config.authConfig.Endpoint)
+			if err != nil {
+				cl.Config.authConfig.Region = defaultRegion
+			}
+		} else {
+			cl.Config.authConfig.Region = region
+		}
+	}
+
+	if cl.Config.authConfig.Endpoint == "" {
+		cl.Config.authConfig.Endpoint = fmt.Sprintf("https://s3.%s.sv15.lyve.seagate.com", cl.Config.authConfig.Region)
+	}
+
 	defaultConfig, err := config.LoadDefaultConfig(
 		context.Background(),
 		config.WithSharedConfigProfile(cl.Config.authConfig.Profile),
 		config.WithCredentialsProvider(credentialsProvider),
-		config.WithEndpointResolverWithOptions(endpointResolver),
 		config.WithAppID(UserAgent()),
-		config.WithRegion("auto"),
+		config.WithRegion(cl.Config.authConfig.Region),
 	)
+
 	if err != nil {
-		log.Err("Client::Configure : config.LoadDefaultConfig() failed. Here's why: %v", err)
-		return err
+		var e config.SharedConfigProfileNotExistError
+		if errors.As(err, &e) {
+			// If a config profile is provided the sdk checks that it exists, otherwise it fails and
+			// does not try other credentials. So try the other ones here if the profile does not exist
+			defaultConfig, err = config.LoadDefaultConfig(
+				context.Background(),
+				config.WithCredentialsProvider(credentialsProvider),
+				config.WithAppID(UserAgent()),
+				config.WithRegion(cl.Config.authConfig.Region),
+			)
+		}
+		if err != nil {
+			log.Err("Client::Configure : config.LoadDefaultConfig() failed. Here's why: %v", err)
+			return err
+		}
 	}
 
 	// Create an Amazon S3 service client
 	if cl.Config.usePathStyle {
 		cl.awsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
 			o.UsePathStyle = true
+			o.BaseEndpoint = aws.String(cl.Config.authConfig.Endpoint)
 		})
 	} else {
-		cl.awsS3Client = s3.NewFromConfig(defaultConfig)
+		cl.awsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(cl.Config.authConfig.Endpoint)
+		})
 	}
 
-	// ListBuckets here to test connection
-	_, err = cl.ListBuckets()
+	// ListBuckets here to test connection to S3 backend
+	bucketList, err := cl.ListBuckets()
 	if err != nil {
 		log.Err("Client::Configure : listing buckets failed. Here's why: %v", err)
+
+		var oe *smithy.OperationError
+		if errors.As(err, &oe) {
+			var re *awsHttp.ResponseError
+			if errors.As(err, &re) {
+				// Endpoint is invalid or could not connect to endpoint
+				if re.HTTPStatusCode() == http.StatusMovedPermanently || re.HTTPStatusCode() == 0 {
+					log.Err("Client::Configure : Error trying to connect to endpoint. Invalid endpoint. : %v", err)
+					return errInvalidEndpoint
+				}
+			}
+		}
+
+		var ae smithy.APIError
+		if errors.As(err, &ae) {
+			// If error is forbidden, then credentials were incorrect
+			if ae.ErrorCode() == "Forbidden" || ae.ErrorCode() == "AccessDenied" {
+				return errInvalidCredential
+			}
+			// If error is forbidden, then access key is correct but secret key is incorrect
+			if ae.ErrorCode() == "SignatureDoesNotMatch" {
+				return errInvalidSecretKey
+			}
+			fmt.Println(ae.Error())
+		}
+		return err
 	}
-	return err
+
+	// if no bucket-name was set, default to the first bucket in the list
+	if cl.Config.authConfig.BucketName == "" {
+		if len(bucketList) > 0 {
+			cl.Config.authConfig.BucketName = bucketList[0]
+			log.Warn("Client::Configure : Bucket defaulted to first listed bucket: %s", bucketList[0])
+		} else {
+			log.Err("Client::Configure : Error no bucket exists in account: %v", err)
+			return errNoBucketInAccount
+		}
+	}
+
+	// Check that the provided bucket exists and that user has access to bucket
+	exists, err := cl.bucketExists()
+	if err != nil || !exists {
+		// From the aws-sdk-go-v2 documentation
+		// If the bucket does not exist or you do not have permission to access it,
+		// the HEAD request returns a generic 400 Bad Request , 403 Forbidden or 404 Not Found code.
+		// We can't use the above information to reliably determine more of the issue
+		log.Err("Client::Configure : Error finding bucket. Here's why: %v", err)
+		return errBucketDoesNotExist
+	}
+
+	// Use list objects validate user can list objects
+	_, _, err = cl.List("/", nil, 1)
+	if err != nil {
+		log.Err("Client::Configure : listing objects failed. Here's why: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func getRegionFromEndpoint(endpoint string) (string, error) {
+	if endpoint == "" {
+		return "", errors.New("Endpoint is empty")
+	}
+
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", err
+	}
+
+	hostParts := strings.Split(u.Hostname(), ".")
+	if len(hostParts) < 2 {
+		return "", errors.New("Invalid Endpoint")
+	}
+
+	// the second host part is usually the region
+	regionPartIndex := 1
+	// but skip "dualstack"
+	if hostParts[1] == "dualstack" {
+		regionPartIndex = 2
+	}
+	// reserve two hostparts after the region for the domain
+	if len(hostParts)-regionPartIndex < 3 {
+		return "", errors.New("Endpoint does not include a region")
+	}
+
+	region := hostParts[regionPartIndex]
+	return region, nil
 }
 
 // For dynamic configuration, update the config here.
@@ -173,6 +290,11 @@ func (cl *Client) SetPrefixPath(path string) error {
 	log.Trace("Client::SetPrefixPath : path %s", path)
 	cl.Config.prefixPath = path
 	return nil
+}
+
+func (cl *Client) bucketExists() (bool, error) {
+	_, err := cl.headBucket()
+	return err != syscall.ENOENT, err
 }
 
 // CreateFile : Create a new file in the bucket/virtual directory
@@ -200,9 +322,9 @@ func (cl *Client) CreateLink(source string, target string, isSymlink bool) error
 	log.Trace("Client::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
 
-	symlinkMap := map[string]string{symlinkKey: "false"}
+	symlinkMap := map[string]*string{symlinkKey: to.Ptr("false")}
 	if isSymlink {
-		symlinkMap[symlinkKey] = "true"
+		symlinkMap[symlinkKey] = to.Ptr("true")
 	}
 	return cl.WriteFromBuffer(source, symlinkMap, data)
 }
@@ -498,8 +620,9 @@ func (cl *Client) ReadInBuffer(name string, offset int64, length int64, data []b
 
 // Upload from a file handle to an object.
 // The metadata parameter is not used.
-func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.File) error {
-	isSymlink := metadata[symlinkKey] == "true"
+func (cl *Client) WriteFromFile(name string, metadata map[string]*string, fi *os.File) error {
+	isSymlink := getSymlinkBool(metadata)
+
 	log.Trace("Client::WriteFromFile : file %s -> name %s", fi.Name(), name)
 	// track time for performance testing
 	defer log.TimeTrack(time.Now(), "Client::WriteFromFile", name)
@@ -543,9 +666,9 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]string, fi *os.
 
 // WriteFromBuffer : Upload from a buffer to an object.
 // name is the file path.
-func (cl *Client) WriteFromBuffer(name string, metadata map[string]string, data []byte) error {
+func (cl *Client) WriteFromBuffer(name string, metadata map[string]*string, data []byte) error {
 	log.Trace("Client::WriteFromBuffer : name %s", name)
-	isSymlink := metadata[symlinkKey] == "true"
+	isSymlink := getSymlinkBool(metadata)
 
 	// convert byte array to io.Reader
 	dataReader := bytes.NewReader(data)
@@ -667,7 +790,8 @@ func (cl *Client) Write(options internal.WriteFileOptions) error {
 		// case 1: file consists of no parts (small file)
 
 		// get the existing object data
-		isSymlink := options.Metadata[symlinkKey] == "true"
+		isSymlink := getSymlinkBool(options.Metadata)
+
 		oldData, _ := cl.ReadBuffer(name, 0, 0, isSymlink)
 		// update the data with the new data
 		// if we're only overwriting existing data
@@ -1017,4 +1141,31 @@ func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]
 		}
 	}
 	return newBlockList, nil
+}
+
+func (cl *Client) GetUsedSize() (uint64, error) {
+	headBucketOutput, err := cl.headBucket()
+	if err != nil {
+		return 0, err
+	}
+
+	response, ok := middleware.GetRawResponse(headBucketOutput.ResultMetadata).(*smithyHttp.Response)
+	if !ok || response == nil {
+		return 0, fmt.Errorf("Failed GetRawResponse from HeadBucketOutput")
+	}
+
+	headerValue, ok := response.Header["X-Rstor-Size"]
+	if !ok {
+		headerValue, ok = response.Header["X-Lyve-Size"]
+	}
+	if !ok || len(headerValue) == 0 {
+		return 0, fmt.Errorf("HeadBucket response has no size header (is the endpoint not Lyve Cloud?)")
+	}
+
+	bucketSizeBytes, err := strconv.ParseUint(headerValue[0], 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return bucketSizeBytes, nil
 }

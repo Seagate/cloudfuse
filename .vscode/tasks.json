@@ -1,0 +1,21 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Unmount",
+        "type": "shell",
+        "command": "sudo fusermount3 -u ~/mycontainer -z",
+        "windows": {
+            // TODO: what do we do on Windows?
+          "command": ".\\scripts\\test.cmd"
+        },
+        "group": "test",
+        "presentation": {
+          "reveal": "always",
+          "panel": "new"
+        }
+      }
+    ]
+  }
