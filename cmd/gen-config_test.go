@@ -67,7 +67,7 @@ func executeCommandGen(root *cobra.Command, args ...string) (output string, err 
 }
 
 func (suite *genConfig) getDefaultLogLocation() string {
-	return "./config.yaml"
+	return "./cloudfuse.yaml"
 }
 
 func (suite *genConfig) TestHelp() {
@@ -156,7 +156,7 @@ func (suite *genConfig) TestNoTempPath() {
 	defer suite.cleanupTest()
 
 	_, err := executeCommandC(rootCmd, "gen-config")
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 }
 
 func (suite *genConfig) TestFileCacheConfigGen() {
@@ -170,6 +170,7 @@ func (suite *genConfig) TestFileCacheConfigGen() {
 	suite.assert.Nil(err)
 
 	logFilePath := suite.getDefaultLogLocation()
+	defer os.Remove(logFilePath)
 
 	//Check if a file is generated named generatedConfig.yaml
 	suite.assert.FileExists(logFilePath)
@@ -197,6 +198,7 @@ func (suite *genConfig) TestBlockCacheConfigGen() {
 	suite.assert.Nil(err)
 
 	logFilePath := suite.getDefaultLogLocation()
+	defer os.Remove(logFilePath)
 
 	//Check if a file is generated named generatedConfig.yaml
 	suite.assert.FileExists(logFilePath)
@@ -225,6 +227,7 @@ func (suite *genConfig) TestBlockCacheConfigGen1() {
 	suite.assert.Nil(err)
 
 	logFilePath := suite.getDefaultLogLocation()
+	defer os.Remove(logFilePath)
 
 	//Check if a file is generated named generatedConfig.yaml
 	suite.assert.FileExists(logFilePath)
@@ -250,6 +253,8 @@ func (suite *genConfig) TestDirectIOConfigGen() {
 	suite.assert.Nil(err)
 
 	logFilePath := suite.getDefaultLogLocation()
+	defer os.Remove(logFilePath)
+
 	suite.assert.FileExists(logFilePath)
 
 	//check if the generated file is not empty

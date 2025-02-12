@@ -28,20 +28,27 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/internal"
+	"github.com/awnumar/memguard"
 	"github.com/spf13/cobra"
 )
 
 type genConfigParams struct {
-	blockCache bool   `config:"block-cache" yaml:"block-cache,omitempty"`
-	directIO   bool   `config:"direct-io" yaml:"direct-io,omitempty"`
-	readOnly   bool   `config:"ro" yaml:"ro,omitempty"`
-	tmpPath    string `config:"tmp-path" yaml:"tmp-path,omitempty"`
-	outputFile string `config:"o" yaml:"o,omitempty"`
+	blockCache       bool   `config:"block-cache" yaml:"block-cache,omitempty"`
+	directIO         bool   `config:"direct-io" yaml:"direct-io,omitempty"`
+	readOnly         bool   `config:"ro" yaml:"ro,omitempty"`
+	tmpPath          string `config:"tmp-path" yaml:"tmp-path,omitempty"`
+	outputFile       string `config:"o" yaml:"o,omitempty"`
+	configFilePath   string
+	outputConfigPath string
+	containerName    string
+	tempDirPath      string
+	passphrase       string
 }
 
 var optsGenCfg genConfigParams
@@ -55,6 +62,49 @@ var generatedConfig = &cobra.Command{
 	Args:              cobra.ExactArgs(0),
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
+
+		// If the user passes a config file path, then use that as a template to generate a config
+		if optsGenCfg.configFilePath != "" {
+			var templateConfig []byte
+			var err error
+
+			encryptedPassphrase = memguard.NewEnclave([]byte(optsGenCfg.passphrase))
+
+			templateConfig, err = os.ReadFile(optsGenCfg.configFilePath)
+			if err != nil {
+				return fmt.Errorf("failed to read file [%s]", err.Error())
+			}
+
+			// match all parameters in { }
+			re := regexp.MustCompile("{.*?}")
+			templateParams := re.FindAll(templateConfig, -1)
+			newConfig := string(templateConfig)
+
+			for _, param := range templateParams {
+				// { 0 } -> temp path
+				if string(param) == "{ 0 }" {
+					re := regexp.MustCompile(string(param))
+					newConfig = re.ReplaceAllString(newConfig, optsGenCfg.tempDirPath)
+				} else {
+					envVar := os.Getenv(string(param)[2 : len(string(param))-2])
+					re := regexp.MustCompile(string(param))
+					newConfig = re.ReplaceAllString(newConfig, envVar)
+				}
+			}
+
+			cipherText, err := common.EncryptData([]byte(newConfig), encryptedPassphrase)
+			if err != nil {
+				return err
+			}
+
+			// write the config with the params to the output file
+			err = os.WriteFile(optsGenCfg.outputConfigPath, cipherText, 0700)
+			if err != nil {
+				return fmt.Errorf("failed to write file [%s]", err.Error())
+			}
+
+			return nil
+		}
 
 		// Check if configTmp is not provided when component is fc
 		if (!optsGenCfg.blockCache) && optsGenCfg.tmpPath == "" {
@@ -141,4 +191,10 @@ func init() {
 	generatedConfig.Flags().BoolVar(&optsGenCfg.readOnly, "ro", false, "Mount in read-only mode")
 	generatedConfig.Flags().StringVar(&optsGenCfg.tmpPath, "tmp-path", "", "Temp cache path to be used")
 	generatedConfig.Flags().StringVar(&optsGenCfg.outputFile, "o", "", "Output file location")
+
+	generatedConfig.Flags().StringVar(&optsGenCfg.configFilePath, "config-file", "", "Input config file.")
+	generatedConfig.Flags().StringVar(&optsGenCfg.outputConfigPath, "output-file", "", "Output config file path.")
+	generatedConfig.Flags().StringVar(&optsGenCfg.tempDirPath, "temp-path", "", "Temporary file path.")
+	generatedConfig.Flags().StringVar(&optsGenCfg.passphrase, "passphrase", "",
+		"Key to be used for encryption / decryption. Key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 }
