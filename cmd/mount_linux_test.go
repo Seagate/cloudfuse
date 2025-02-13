@@ -69,6 +69,34 @@ health_monitor:
     - cloudfuse_stats
 `
 
+var configMountTestNonempty string = `
+nonempty: true
+logging:
+  type: syslog
+default-working-dir: /tmp/cloudfuse
+file_cache:
+  path: /tmp/fileCachePath
+libfuse:
+  attribute-expiration-sec: 120
+  entry-expiration-sec: 60
+azstorage:
+  account-name: myAccountName
+  account-key: myAccountKey
+  mode: key
+  endpoint: myEndpoint
+  container: myContainer
+  max-retries: 1
+components:
+  - libfuse
+  - file_cache
+  - attr_cache
+  - azstorage
+health_monitor:
+  monitor-disable-list:
+    - network_profiler
+    - cloudfuse_stats
+`
+
 var configPriorityTest string = `
 logging:
   type: syslog
@@ -146,7 +174,16 @@ func (suite *mountTestSuite) TestMountDirNotEmpty() {
 	suite.assert.Error(err)
 	suite.assert.Contains(op, "mount directory is not empty")
 
-	op, err = executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "-o", "nonempty")
+	confFile, err := os.CreateTemp("", "conf*.yaml")
+	suite.assert.NoError(err)
+	confNonEmpty := confFile.Name()
+	defer os.Remove(confNonEmpty)
+
+	_, err = confFile.WriteString(configMountTestNonempty)
+	suite.assert.NoError(err)
+	confFile.Close()
+
+	op, err = executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confNonEmpty))
 	suite.assert.Error(err)
 	suite.assert.Contains(op, "failed to initialize new pipeline")
 }
@@ -276,86 +313,6 @@ func (suite *mountTestSuite) TestInvalidLogLevel() {
 	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "--log-level=debug")
 	suite.assert.Error(err)
 	suite.assert.Contains(op, "invalid log level")
-}
-
-func (suite *mountTestSuite) TestCliParamsV1() {
-	defer suite.cleanupTest()
-
-	mntDir, err := os.MkdirTemp("", "mntdir")
-	suite.assert.NoError(err)
-	defer os.RemoveAll(mntDir)
-
-	tempLogDir := "/tmp/templogs_" + randomString(6)
-	defer os.RemoveAll(tempLogDir)
-
-	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest),
-		fmt.Sprintf("--log-file-path=%s", tempLogDir+"/cloudfuse.log"), "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check")
-	suite.assert.Error(err)
-	suite.assert.Contains(op, "failed to initialize new pipeline")
-}
-
-func (suite *mountTestSuite) TestStreamAttrCacheOptionsV1() {
-	defer suite.cleanupTest()
-
-	mntDir, err := os.MkdirTemp("", "mntdir")
-	suite.assert.NoError(err)
-	defer os.RemoveAll(mntDir)
-
-	tempLogDir := "/tmp/templogs_" + randomString(6)
-	defer os.RemoveAll(tempLogDir)
-
-	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--log-file-path=%s", tempLogDir+"/cloudfuse.log"),
-		"--streaming", "--use-attr-cache", "--invalidate-on-sync", "--pre-mount-validate", "--basic-remount-check")
-	suite.assert.Error(err)
-	suite.assert.Contains(op, "failed to initialize new pipeline")
-}
-
-// mount failure test where a libfuse option is incorrect
-func (suite *mountTestSuite) TestInvalidLibfuseOption() {
-	defer suite.cleanupTest()
-
-	mntDir, err := os.MkdirTemp("", "mntdir")
-	suite.assert.NoError(err)
-	defer os.RemoveAll(mntDir)
-
-	// incorrect option
-	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest),
-		"-o allow_other", "-o attr_timeout=120", "-o entry_timeout=120", "-o negative_timeout=120",
-		"-o ro", "-o default_permissions", "-o umask=755", "-o a=b=c")
-	suite.assert.Error(err)
-	suite.assert.Contains(op, "invalid FUSE options")
-}
-
-// mount failure test where a libfuse option is undefined
-func (suite *mountTestSuite) TestUndefinedLibfuseOption() {
-	defer suite.cleanupTest()
-
-	mntDir, err := os.MkdirTemp("", "mntdir")
-	suite.assert.NoError(err)
-	defer os.RemoveAll(mntDir)
-
-	// undefined option
-	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest),
-		"-o allow_other", "-o attr_timeout=120", "-o entry_timeout=120", "-o negative_timeout=120",
-		"-o ro", "-o allow_root", "-o umask=755", "-o random_option")
-	suite.assert.Error(err)
-	suite.assert.Contains(op, "invalid FUSE options")
-}
-
-// mount failure test where umask value is invalid
-func (suite *mountTestSuite) TestInvalidUmaskValue() {
-	defer suite.cleanupTest()
-
-	mntDir, err := os.MkdirTemp("", "mntdir")
-	suite.assert.NoError(err)
-	defer os.RemoveAll(mntDir)
-
-	// incorrect umask value
-	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest),
-		"-o allow_other", "-o attr_timeout=120", "-o entry_timeout=120", "-o negative_timeout=120",
-		"-o ro", "-o allow_root", "-o default_permissions", "-o umask=abcd")
-	suite.assert.Error(err)
-	suite.assert.Contains(op, "failed to parse umask")
 }
 
 // fuse option parsing validation

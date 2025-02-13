@@ -39,7 +39,6 @@ import (
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
-	"strconv"
 	"strings"
 	"time"
 
@@ -82,12 +81,6 @@ type mountOptions struct {
 	MonitorOpt        monitorOptions `config:"health_monitor"`
 	WaitForMount      time.Duration  `config:"wait-for-mount"`
 	LazyWrite         bool           `config:"lazy-write"`
-
-	// v1 support
-	Streaming      bool     `config:"streaming"`
-	AttrCache      bool     `config:"use-attr-cache"`
-	LibfuseOptions []string `config:"libfuse-options"`
-	BlockCache     bool     `config:"block-cache"`
 }
 
 var options mountOptions
@@ -339,76 +332,10 @@ var mountCmd = &cobra.Command{
 		if !configFileExists || len(options.Components) == 0 {
 			pipeline := []string{"libfuse"}
 
-			if config.IsSet("streaming") && options.Streaming {
-				pipeline = append(pipeline, "stream")
-			} else if config.IsSet("block-cache") && options.BlockCache {
-				pipeline = append(pipeline, "block_cache")
-			} else {
-				pipeline = append(pipeline, "file_cache")
-			}
-
-			// by default attr-cache is enable in v2
-			// only way to disable is to pass cli param and set it to false
-			if options.AttrCache {
-				pipeline = append(pipeline, "attr_cache")
-			}
-
+			pipeline = append(pipeline, "file_cache")
+			pipeline = append(pipeline, "attr_cache")
 			pipeline = append(pipeline, "s3storage")
 			options.Components = pipeline
-		}
-
-		if config.IsSet("libfuse-options") {
-			for _, v := range options.LibfuseOptions {
-				parameter := strings.Split(v, "=")
-				if len(parameter) > 2 || len(parameter) <= 0 {
-					return errors.New(common.FuseAllowedFlags)
-				}
-
-				v = strings.TrimSpace(v)
-				if ignoreFuseOptions(v) {
-					continue
-				} else if v == "allow_other" || v == "allow_other=true" {
-					config.Set("allow-other", "true")
-				} else if strings.HasPrefix(v, "attr_timeout=") {
-					config.Set("lfuse.attribute-expiration-sec", parameter[1])
-				} else if strings.HasPrefix(v, "entry_timeout=") {
-					config.Set("lfuse.entry-expiration-sec", parameter[1])
-				} else if strings.HasPrefix(v, "negative_timeout=") {
-					config.Set("lfuse.negative-entry-expiration-sec", parameter[1])
-				} else if v == "ro" || v == "ro=true" {
-					config.Set("read-only", "true")
-				} else if v == "allow_root" || v == "allow_root=true" {
-					config.Set("allow-root", "true")
-				} else if v == "nonempty" || v == "nonempty=true" {
-					// For fuse3, -o nonempty mount option has been removed and
-					// mounting over non-empty directories is now always allowed.
-					// For fuse2, this option is supported.
-					options.NonEmpty = true
-					config.Set("nonempty", "true")
-				} else if strings.HasPrefix(v, "umask=") {
-					umask, err := strconv.ParseUint(parameter[1], 10, 32)
-					if err != nil {
-						return fmt.Errorf("failed to parse umask [%s]", err.Error())
-					}
-					config.Set("lfuse.umask", fmt.Sprint(umask))
-				} else if strings.HasPrefix(v, "uid=") {
-					val, err := strconv.ParseUint(parameter[1], 10, 32)
-					if err != nil {
-						return fmt.Errorf("failed to parse uid [%s]", err.Error())
-					}
-					config.Set("lfuse.uid", fmt.Sprint(val))
-				} else if strings.HasPrefix(v, "gid=") {
-					val, err := strconv.ParseUint(parameter[1], 10, 32)
-					if err != nil {
-						return fmt.Errorf("failed to parse gid [%s]", err.Error())
-					}
-					config.Set("lfuse.gid", fmt.Sprint(val))
-				} else if v == "direct_io" || v == "direct_io=true" {
-					config.Set("lfuse.direct-io", "true")
-				} else {
-					return errors.New(common.FuseAllowedFlags)
-				}
-			}
 		}
 
 		if !config.IsSet("logging.file-path") {
@@ -447,17 +374,6 @@ var mountCmd = &cobra.Command{
 			if err != nil {
 				log.Err(err.Error())
 			}
-		}
-
-		// TODO: remove v1 switches, which were never used as part of cloudfuse.
-		if config.IsSet("invalidate-on-sync") {
-			log.Warn("mount: unsupported v1 CLI parameter: invalidate-on-sync is always true in cloudfuse.")
-		}
-		if config.IsSet("pre-mount-validate") {
-			log.Warn("mount: unsupported v1 CLI parameter: pre-mount-validate is always true in cloudfuse.")
-		}
-		if config.IsSet("basic-remount-check") {
-			log.Warn("mount: unsupported v1 CLI parameter: basic-remount-check is always true in cloudfuse.")
 		}
 
 		common.EnableMonitoring = options.MonitorOpt.EnableMon
@@ -721,18 +637,6 @@ func init() {
 	config.BindPFlag("default-working-dir", mountCmd.PersistentFlags().Lookup("default-working-dir"))
 	_ = mountCmd.MarkPersistentFlagDirname("default-working-dir")
 
-	mountCmd.Flags().BoolVar(&options.Streaming, "streaming", false, "Enable Streaming.")
-	config.BindPFlag("streaming", mountCmd.Flags().Lookup("streaming"))
-	mountCmd.Flags().Lookup("streaming").Hidden = true
-
-	mountCmd.Flags().BoolVar(&options.BlockCache, "block-cache", false, "Enable Block-Cache.")
-	config.BindPFlag("block-cache", mountCmd.Flags().Lookup("block-cache"))
-	mountCmd.Flags().Lookup("block-cache").Hidden = true
-
-	mountCmd.Flags().BoolVar(&options.AttrCache, "use-attr-cache", true, "Use attribute caching.")
-	config.BindPFlag("use-attr-cache", mountCmd.Flags().Lookup("use-attr-cache"))
-	mountCmd.Flags().Lookup("use-attr-cache").Hidden = true
-
 	mountCmd.Flags().Bool("invalidate-on-sync", true, "Invalidate file/dir on sync/fsync.")
 	config.BindPFlag("invalidate-on-sync", mountCmd.Flags().Lookup("invalidate-on-sync"))
 	mountCmd.Flags().Lookup("invalidate-on-sync").Hidden = true
@@ -744,10 +648,6 @@ func init() {
 	mountCmd.Flags().Bool("basic-remount-check", true, "Validate cloudfuse is mounted by reading /etc/mtab.")
 	config.BindPFlag("basic-remount-check", mountCmd.Flags().Lookup("basic-remount-check"))
 	mountCmd.Flags().Lookup("basic-remount-check").Hidden = true
-
-	mountCmd.PersistentFlags().StringSliceVarP(&options.LibfuseOptions, "o", "o", []string{}, "FUSE options.")
-	config.BindPFlag("libfuse-options", mountCmd.PersistentFlags().ShorthandLookup("o"))
-	mountCmd.PersistentFlags().ShorthandLookup("o").Hidden = true
 
 	mountCmd.PersistentFlags().DurationVar(&options.WaitForMount, "wait-for-mount", 5*time.Second, "Let parent process wait for given timeout before exit")
 

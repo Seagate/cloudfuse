@@ -179,12 +179,6 @@ type AzStorageOptions struct {
 	CPKEnabled              bool   `config:"cpk-enabled" yaml:"cpk-enabled"`
 	CPKEncryptionKey        string `config:"cpk-encryption-key" yaml:"cpk-encryption-key"`
 	CPKEncryptionKeySha256  string `config:"cpk-encryption-key-sha256" yaml:"cpk-encryption-key-sha256"`
-
-	// v1 support
-	UseAdls        bool   `config:"use-adls" yaml:"-"`
-	UseHTTPS       bool   `config:"use-https" yaml:"-"`
-	SetContentType bool   `config:"set-content-type" yaml:"-"`
-	CaCertFile     string `config:"ca-cert-file" yaml:"-"`
 }
 
 // RegisterEnvVariables : Register environment variables
@@ -296,27 +290,19 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		opt.AccountType = "block"
 	}
 
-	if config.IsSet(compName + ".use-adls") {
-		if opt.UseAdls {
-			az.stConfig.authConfig.AccountType = az.stConfig.authConfig.AccountType.ADLS()
-		} else {
-			az.stConfig.authConfig.AccountType = az.stConfig.authConfig.AccountType.BLOCK()
-		}
-	} else {
-		var accountType AccountType
-		err := accountType.Parse(opt.AccountType)
-		if err != nil {
-			log.Err("ParseAndValidateConfig : Failed to parse account type %s", opt.AccountType)
-			return errors.New("invalid account type")
-		}
-
-		if accountType == EAccountType.INVALID_ACC() {
-			log.Err("ParseAndValidateConfig : Invalid account type %s", opt.AccountType)
-			return errors.New("invalid account type")
-		}
-
-		az.stConfig.authConfig.AccountType = accountType
+	var accountType AccountType
+	err := accountType.Parse(opt.AccountType)
+	if err != nil {
+		log.Err("ParseAndValidateConfig : Failed to parse account type %s", opt.AccountType)
+		return errors.New("invalid account type")
 	}
+
+	if accountType == EAccountType.INVALID_ACC() {
+		log.Err("ParseAndValidateConfig : Invalid account type %s", opt.AccountType)
+		return errors.New("invalid account type")
+	}
+
+	az.stConfig.authConfig.AccountType = accountType
 
 	if opt.BlockSize != 0 {
 		if opt.BlockSize > blockblob.MaxStageBlockBytes {
@@ -327,7 +313,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	}
 
 	// Validate container name is present or not
-	err := config.UnmarshalKey("mount-all-containers", &az.stConfig.mountAllContainers)
+	err = config.UnmarshalKey("mount-all-containers", &az.stConfig.mountAllContainers)
 	if err != nil {
 		log.Err("ParseAndValidateConfig : Failed to detect mount-all-container")
 	}
@@ -337,10 +323,6 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	}
 
 	az.stConfig.container = opt.Container
-
-	if config.IsSet(compName + ".use-https") {
-		opt.UseHTTP = !opt.UseHTTPS
-	}
 
 	az.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
 
@@ -496,16 +478,6 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		}
 	}
 	az.stConfig.disableSymlink = !enableSymlinks
-
-	if config.IsSet(compName + ".set-content-type") {
-		log.Warn("unsupported v1 CLI parameter: set-content-type is always true in cloudfuse.")
-	}
-	if config.IsSet(compName + ".ca-cert-file") {
-		log.Warn("unsupported v1 CLI parameter: ca-cert-file is not supported in cloudfuse. Use the default ca cert path for your environment.")
-	}
-	if config.IsSet(compName + ".debug-libcurl") {
-		log.Warn("unsupported v1 CLI parameter: debug-libcurl is not applicable in cloudfuse.")
-	}
 
 	log.Info("ParseAndValidateConfig : account %s, container %s, account-type %s, auth %s, prefix %s, endpoint %s, MD5 %v %v, virtual-directory %v, disable-compression %v, CPK %v", "restricted-characters-windows %v",
 		az.stConfig.authConfig.AccountName, az.stConfig.container, az.stConfig.authConfig.AccountType, az.stConfig.authConfig.AuthMode,
