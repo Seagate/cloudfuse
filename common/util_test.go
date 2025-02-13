@@ -420,9 +420,9 @@ func (suite *utilTestSuite) TestWriteToFile() {
 		fmt.Println("Error getting home directory:", err)
 		return
 	}
-	filePath := fmt.Sprintf(".cloudfuse/test_%s.txt", randomString(8))
+	filePath := fmt.Sprintf("test_%s.txt", randomString(8))
 	content := "Hello World"
-	filePath = homeDir + "/" + filePath
+	filePath = filepath.Join(homeDir, filePath)
 
 	defer os.Remove(filePath)
 
@@ -436,5 +436,4 @@ func (suite *utilTestSuite) TestWriteToFile() {
 	data, err := os.ReadFile(filePath)
 	suite.assert.NoError(err)
 	suite.assert.Equal(content, string(data))
-
 }

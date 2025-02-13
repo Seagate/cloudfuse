@@ -403,9 +403,9 @@ type WriteToFileOptions struct {
 
 func WriteToFile(filename string, data string, options WriteToFileOptions) error {
 	// Open the file with the provided flags, create it if it doesn't exist
-	//check if options.Permission is 0 if so then assign 0777
+	//check if options.Permission is 0 if so then assign 0644
 	if options.Permission == 0 {
-		options.Permission = 0777
+		options.Permission = 0644
 	}
 	file, err := os.OpenFile(filename, options.Flags|os.O_CREATE|os.O_WRONLY, options.Permission)
 	if err != nil {
