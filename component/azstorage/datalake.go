@@ -435,9 +435,6 @@ func (dl *Datalake) List(prefix string, marker *string, count int32) ([]*interna
 	}
 
 	prefixPath := dl.getFormattedPath(prefix)
-	if prefix != "" && prefix[len(prefix)-1] == '/' {
-		prefixPath += "/"
-	}
 
 	// Get a result segment starting with the path indicated by the current Marker.
 	pager := dl.Filesystem.NewListPathsPager(false, &filesystem.ListPathsOptions{

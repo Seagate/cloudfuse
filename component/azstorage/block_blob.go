@@ -528,9 +528,12 @@ func (bb *BlockBlob) List(prefix string, marker *string, count int32) ([]*intern
 	if count == 0 {
 		count = common.MaxDirListCount
 	}
+	fmt.Println("Prefix: ", prefix)
 
 	listPath := bb.getFormattedPath(prefix)
-	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && bb.Config.prefixPath != "") {
+	fmt.Println("listPath: ", listPath)
+	fmt.Println("bb.Config.prefixPath: ", bb.Config.prefixPath)
+	if prefix == "" && bb.Config.prefixPath != "" {
 		listPath += "/"
 	}
 
@@ -610,6 +613,7 @@ func (bb *BlockBlob) List(prefix string, marker *string, count int32) ([]*intern
 	// cases we manually call GetAttr to check the existence of the marker file.
 	for _, blobInfo := range listBlob.Segment.BlobPrefixes {
 		blobInfo.Name = bb.getFileName(*blobInfo.Name)
+		*blobInfo.Name = strings.TrimSuffix(*blobInfo.Name, "/")
 
 		if _, ok := dirList[*blobInfo.Name]; ok {
 			// marker file found in current iteration, skip adding the directory

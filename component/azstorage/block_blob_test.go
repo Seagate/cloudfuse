@@ -840,6 +840,7 @@ func (s *blockBlobTestSuite) TestStreamDirSmallCountNoDuplicates() {
 	for {
 		new_list, new_marker, err := s.az.StreamDir(internal.StreamDirOptions{Name: "/", Token: marker, Count: 1})
 		s.assert.NoError(err)
+		fmt.Println(new_list[0].Name)
 		blobList = append(blobList, new_list...)
 		marker = new_marker
 		iteration++
