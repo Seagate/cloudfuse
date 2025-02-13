@@ -80,9 +80,14 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             # Allow anything BUT Nul
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
             self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
+            
+            self.button_browse = QtWidgets.QPushButton("Browse")
+            self.button_browse.setToolTip("Browse to a pre-existing directory to mount")
+
+            self.horizontalLayout_3.addWidget(self.button_browse)
+            self.button_browse.clicked.connect(self.getFileDirInput)
 
         # Set up the signals for all the interactive entities
-        self.button_browse.clicked.connect(self.getFileDirInput)
         self.button_config.clicked.connect(self.showSettingsWidget)
         self.button_mount.clicked.connect(self.mountBucket)
         self.button_unmount.clicked.connect(self.unmountBucket)
@@ -91,11 +96,9 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         self.lineEdit_mountPoint.editingFinished.connect(self.updateMountPointInSettings)
         self.dropDown_bucketSelect.currentIndexChanged.connect(self.modifyPipeline)
         if platform == 'win32':
-            self.lineEdit_mountPoint.setToolTip('Designate a new location to mount the bucket, do not create the directory')
-            self.button_browse.setToolTip("Browse to a new location but don't create a new directory")
+            self.lineEdit_mountPoint.setToolTip('Designate a drive letter to mount to')
         else:
             self.lineEdit_mountPoint.setToolTip('Designate a location to mount the bucket - the directory must already exist')
-            self.button_browse.setToolTip('Browse to a pre-existing directory')
 
     def checkConfigDirectory(self):
         workingDir = self.getWorkingDir()
