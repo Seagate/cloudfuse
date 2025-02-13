@@ -110,6 +110,7 @@ func newTestClient(configuration string) (*Client, error) {
 		uploadCutoff:              conf.UploadCutoffMb * common.MbToBytes,
 		usePathStyle:              conf.UsePathStyle,
 		disableUsage:              conf.DisableUsage,
+		enableDirMarker:           conf.EnableDirMarker,
 	}
 	// create a Client
 	client, err := NewConnection(configForS3Client)
@@ -166,6 +167,7 @@ func (s *clientTestSuite) setupTestHelper(configuration string, create bool) err
 			storageTestConfigurationParameters.PartSizeMb, storageTestConfigurationParameters.UploadCutoffMb,
 			storageTestConfigurationParameters.UsePathStyle, storageTestConfigurationParameters.EnableDirMarker)
 	}
+
 	s.config = configuration
 
 	s.assert = assert.New(s.T())
