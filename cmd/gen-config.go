@@ -46,7 +46,6 @@ type genConfigParams struct {
 	outputFile       string `config:"o" yaml:"o,omitempty"`
 	configFilePath   string
 	outputConfigPath string
-	containerName    string
 	tempDirPath      string
 	passphrase       string
 }
