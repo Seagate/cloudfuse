@@ -25,13 +25,10 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -48,22 +45,7 @@ func (suite *genConfig) SetupTest() {
 func (suite *genConfig) cleanupTest() {
 	os.Remove(suite.getDefaultLogLocation())
 	optsGenCfg = genConfigParams{}
-}
-
-func executeCommandGen(root *cobra.Command, args ...string) (output string, err error) {
-	buf := new(bytes.Buffer)
-	root.SetOut(buf)
-	root.SetErr(buf)
-	root.SetArgs(args)
-
-	err = root.Execute()
-
-	out, readErr := io.ReadAll(buf)
-	if readErr != nil {
-		panic(fmt.Sprintf("Unable to read buffer: %v", readErr))
-	}
-
-	return string(out), err
+	resetCLIFlags(*generatedConfig)
 }
 
 func (suite *genConfig) getDefaultLogLocation() string {
@@ -119,7 +101,7 @@ func (suite *genConfig) TestGenConfigPassphrase() {
 
 	confFile.Close()
 
-	_, err = executeCommandGen(rootCmd, "gen-config", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile), "--temp-path=/tmp")
+	_, err = executeCommandC(rootCmd, "gen-config", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile), "--temp-path=/tmp")
 	suite.assert.NoError(err)
 
 	// Out file should exist
@@ -140,14 +122,14 @@ func (suite *genConfig) TestGenConfigGet() {
 
 	confFile.Close()
 
-	_, err = executeCommandGen(rootCmd, "gen-config", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile), "--temp-path=/tmp")
+	_, err = executeCommandC(rootCmd, "gen-config", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile), "--temp-path=/tmp")
 	suite.assert.NoError(err)
 
 	// Out file should exist
 	suite.assert.FileExists(outFile)
 
 	// Gen-config should correctly set the temp path for the file_cache
-	path, err := executeCommandGen(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile), fmt.Sprintf("--passphrase=%s", passphrase), "--key=file_cache.path")
+	path, err := executeCommandC(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile), fmt.Sprintf("--passphrase=%s", passphrase), "--key=file_cache.path")
 	suite.assert.NoError(err)
 	suite.assert.Equal("Fetching scalar configuration\nfile_cache.path = /tmp\n", path)
 }
