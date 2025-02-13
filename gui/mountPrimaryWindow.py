@@ -25,6 +25,8 @@ import subprocess
 from sys import platform
 import os
 from shutil import which
+import ctypes
+import string
 
 # Import QT libraries
 from PySide6.QtCore import Qt, QSettings
@@ -69,6 +71,11 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
             # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
             self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
+            self.button_driveLetter = QtWidgets.QPushButton("Drive Letter")
+            self.button_driveLetter.setToolTip("Select an unused drive letter for mounting")
+
+            self.horizontalLayout_3.addWidget(self.button_driveLetter)
+            self.button_driveLetter.clicked.connect(self.chooseDriveLetter)
         else:
             # Allow anything BUT Nul
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
@@ -162,12 +169,16 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         except ValueError as e:
             self.addOutputText(f"Invalid mount path: {str(e)}")
             return
-        directory = os.path.join(directory, mountDirSuffix)
         # get config path
         configPath = os.path.join(self.getWorkingDir(), 'config.yaml')
 
         # on Windows, the mount directory should not exist (yet)
         if platform == 'win32':
+            drive, tail = os.path.splitdrive(directory)
+            # Only append the cloudfuse suffix if not mounting to a drive letter
+            if not(drive and (tail == "" or tail in ["\\", "/"])):
+                directory = os.path.join(directory, mountDirSuffix)
+            
             if os.path.exists(directory):
                 self.addOutputText(f"Directory {directory} already exists! Aborting new mount.")
                 self.errorMessageBox(f"Error: Cloudfuse needs to create the directory {directory}, but it already exists!")
@@ -226,7 +237,10 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         directory = str(self.lineEdit_mountPoint.text())
         commandParts = []
         # TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
-        directory = os.path.join(directory, mountDirSuffix)
+        drive, tail = os.path.splitdrive(directory)
+        # Only append the cloudfuse suffix if not mounting to a drive letter
+        if not(drive and (tail == "" or tail in ["\\", "/"])):
+            directory = os.path.join(directory, mountDirSuffix)
         commandParts = [cloudfuseCli, 'unmount', directory]
         if platform != 'win32':
             commandParts.append('--lazy')
@@ -291,3 +305,30 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         msg.setText(messageString)
         # Show the message box
         msg.exec()
+
+    def chooseDriveLetter(self):
+        unused_letters = get_unused_driver_letters()
+        if not unused_letters:
+            QtWidgets.QMessageBox.warning(self, "No Drive Letters", "No unused drive letters available.")
+            return
+
+        drive, ok = QtWidgets.QInputDialog.getItem(
+            self,
+            "Select Drive Letter",
+            "Available drive letters:",
+            unused_letters,
+            0,
+            False
+        )
+        if ok and drive:
+            self.lineEdit_mountPoint.setText(f"{drive}")
+            self.updateMountPointInSettings()
+
+def get_unused_driver_letters():
+    bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+    unused = []
+    for letter in string.ascii_uppercase:
+        if not ((bitmask & 1) or (letter == "A" or letter == "B")):
+            unused.append(letter + ":")
+        bitmask >>=1
+    return unused
