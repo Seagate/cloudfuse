@@ -36,7 +36,6 @@ from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
 from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
 from aboutPage import aboutPage
-from under_Construction import underConstruction
 from common_qt_functions import defaultSettingsManager as settingsManager, customConfigFunctions as configFuncs
 
 bucketOptions = ['s3storage', 'azstorage']
@@ -82,9 +81,6 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         self.button_unmount.clicked.connect(self.unmountBucket)
         self.actionAbout_Qt.triggered.connect(self.showAboutQtPage)
         self.actionAbout_CloudFuse.triggered.connect(self.showAboutCloudFusePage)
-        self.action_debugHealthMonitor.triggered.connect(self.showUnderConstructionPage)
-        self.action_debugLogging.triggered.connect(self.showUnderConstructionPage)
-        self.action_debugTesting.triggered.connect(self.showUnderConstructionPage)
         self.lineEdit_mountPoint.editingFinished.connect(self.updateMountPointInSettings)
         self.dropDown_bucketSelect.currentIndexChanged.connect(self.modifyPipeline)
         if platform == 'win32':
@@ -157,10 +153,6 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             cloudfuseVersion = 'Cloudfuse version not found'
 
         self.page = aboutPage(cloudfuseVersion)
-        self.page.show()
-
-    def showUnderConstructionPage(self):
-        self.page = underConstruction()
         self.page.show()
 
     def mountBucket(self):
@@ -274,7 +266,10 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             return ('', '', -1, False)
         # run command
         try:
-            process = subprocess.run(commandParts, capture_output=True)
+            process = subprocess.run(
+                commandParts, 
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             stdOut = process.stdout.decode().strip()
             stdErr = process.stderr.decode().strip()
             exitCode = process.returncode

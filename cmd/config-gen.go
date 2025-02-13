@@ -32,6 +32,7 @@ import (
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/awnumar/memguard"
 	"github.com/spf13/cobra"
 )
 
@@ -112,6 +113,8 @@ var generateConfig = &cobra.Command{
 		var templateConfig []byte
 		var err error
 
+		encryptedPassphrase = memguard.NewEnclave([]byte(opts.passphrase))
+
 		templateConfig, err = os.ReadFile(opts.configFilePath)
 		if err != nil {
 			return fmt.Errorf("failed to read file [%s]", err.Error())
@@ -134,7 +137,7 @@ var generateConfig = &cobra.Command{
 			}
 		}
 
-		cipherText, err := common.EncryptData([]byte(newConfig), opts.passphrase)
+		cipherText, err := common.EncryptData([]byte(newConfig), encryptedPassphrase)
 		if err != nil {
 			return err
 		}

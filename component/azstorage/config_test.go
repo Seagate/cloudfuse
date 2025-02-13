@@ -262,7 +262,9 @@ func (s *configTestSuite) TestAuthModeKey() {
 	opt.AccountKey = "abc"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.authConfig.AccountKey, opt.AccountKey)
+	accountKey, _ := az.stConfig.authConfig.AccountKey.Open()
+	defer accountKey.Destroy()
+	assert.Equal(opt.AccountKey, accountKey.String())
 }
 
 func (s *configTestSuite) TestAuthModeSAS() {
@@ -346,9 +348,10 @@ func (s *configTestSuite) TestAuthModeSPN() {
 	opt.TenantID = "xyz"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.authConfig.ClientID, opt.ClientID)
-	assert.Equal(az.stConfig.authConfig.ClientSecret, opt.ClientSecret)
-	assert.Equal(az.stConfig.authConfig.TenantID, opt.TenantID)
+	clientSecret, _ := az.stConfig.authConfig.ClientSecret.Open()
+	assert.Equal(opt.ClientID, az.stConfig.authConfig.ClientID)
+	assert.Equal(opt.ClientSecret, clientSecret.String())
+	assert.Equal(opt.TenantID, az.stConfig.authConfig.TenantID)
 }
 
 func (s *configTestSuite) TestOtherFlags() {

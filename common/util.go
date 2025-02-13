@@ -30,7 +30,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -44,6 +44,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/awnumar/memguard"
 	"gopkg.in/ini.v1"
 )
 
@@ -239,13 +240,18 @@ func NormalizeObjectName(name string) string {
 }
 
 // Encrypt given data using the key provided
-func EncryptData(plainData []byte, key string) ([]byte, error) {
-	binaryKey, err := base64.StdEncoding.DecodeString(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
+func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
+	if key == nil {
+		return nil, errors.New("provided passphrase key is empty")
 	}
 
-	block, err := aes.NewCipher(binaryKey)
+	secretKey, err := key.Open()
+	if err != nil || secretKey == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	defer secretKey.Destroy()
+
+	block, err := aes.NewCipher(secretKey.Data())
 	if err != nil {
 		return nil, err
 	}
@@ -265,13 +271,18 @@ func EncryptData(plainData []byte, key string) ([]byte, error) {
 }
 
 // Decrypt given data using the key provided
-func DecryptData(cipherData []byte, key string) ([]byte, error) {
-	binaryKey, err := base64.StdEncoding.DecodeString(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
+func DecryptData(cipherData []byte, key *memguard.Enclave) ([]byte, error) {
+	if key == nil {
+		return nil, errors.New("provided passphrase key is empty")
 	}
 
-	block, err := aes.NewCipher(binaryKey)
+	secretKey, err := key.Open()
+	if err != nil || secretKey == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	defer secretKey.Destroy()
+
+	block, err := aes.NewCipher(secretKey.Data())
 	if err != nil {
 		return nil, err
 	}

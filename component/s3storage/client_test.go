@@ -47,6 +47,8 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/awnumar/memguard"
+	"github.com/spf13/viper"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -73,12 +75,31 @@ func newTestClient(configuration string) (*Client, error) {
 		log.Err("ClientTest::newTestClient : config error [invalid config attributes]")
 		return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, err.Error())
 	}
+
+	// Secure keyID in enclave
+	var encryptedKeyID *memguard.Enclave
+	if viper.GetString("s3storage.key-id") != "" {
+		encryptedKeyID = memguard.NewEnclave([]byte(viper.GetString("s3storage.key-id")))
+		if encryptedKeyID == nil {
+			return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, "Error storing key ID securely")
+		}
+	}
+
+	// Secure secretKey in enclave
+	var encryptedSecretKey *memguard.Enclave
+	if viper.GetString("s3storage.secret-key") != "" {
+		encryptedSecretKey = memguard.NewEnclave([]byte(viper.GetString("s3storage.secret-key")))
+		if encryptedSecretKey == nil {
+			return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, "Error storing secret key securely")
+		}
+	}
+
 	// now push Options data into an Config
 	configForS3Client := Config{
 		authConfig: s3AuthConfig{
 			BucketName: conf.BucketName,
-			KeyID:      conf.KeyID,
-			SecretKey:  conf.SecretKey,
+			KeyID:      encryptedKeyID,
+			SecretKey:  encryptedSecretKey,
 			Region:     conf.Region,
 			Profile:    conf.Profile,
 			Endpoint:   conf.Endpoint,

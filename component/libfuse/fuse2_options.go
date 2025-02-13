@@ -1,9 +1,10 @@
-//go:build windows
+//go:build !fuse3
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,33 +25,45 @@
    SOFTWARE
 */
 
-package cmd
+package libfuse
 
 import (
-	"context"
 	"fmt"
-	"os"
 
-	"github.com/Seagate/cloudfuse/internal"
-	"github.com/Seagate/cloudfuse/internal/winservice"
+	"github.com/winfsp/cgofuse/fuse"
 )
 
-// Create dummy function so that mount.go code can compile
-// This function is used only on Linux, so it creates an empty context here
-func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName string, pidFilePerm os.FileMode, umask int, fname string) error {
-	return nil
-}
+func createFuseOptions(host *fuse.FileSystemHost, allowOther bool, allowRoot bool, readOnly bool, nonEmptyMount bool, maxFuseThreads uint32, umask uint32) string {
+	var options string
+	// While reading a file let kernel do readahead for better perf
+	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)
 
-// Use WinFSP to mount and if successful, add instance to persistent mount list
-func createMountInstance() error {
-	err := winservice.StartMount(options.MountPath, options.ConfigFile, encryptedPassphrase)
-	if err != nil {
-		return err
+	// Max background thread on the fuse layer for high parallelism
+	options += fmt.Sprintf(",max_background=%d", maxFuseThreads)
+
+	if allowOther {
+		options += ",allow_other"
 	}
-	// Add the mount to the JSON file so it persists on restart.
-	err = winservice.AddMountJSON(options.MountPath, options.ConfigFile)
-	if err != nil {
-		return fmt.Errorf("failed to add entry to json file [%s]", err.Error())
+	if allowRoot {
+		options += ",allow_root"
 	}
-	return nil
+	if readOnly {
+		options += ",ro"
+	}
+	if nonEmptyMount {
+		options += ",nonempty"
+	}
+
+	if umask != 0 {
+		options += fmt.Sprintf(",umask=%04d", umask)
+	}
+
+	// direct_io option is used to bypass the kernel cache. It disables the use of
+	// page cache (file content cache) in the kernel for the filesystem.
+	if fuseFS.directIO {
+		options += ",direct_io"
+	} else {
+		options += ",kernel_cache"
+	}
+	return options
 }
