@@ -990,6 +990,23 @@ func (suite *fileCacheTestSuite) TestDeleteFileError() {
 	suite.assert.EqualValues(syscall.ENOENT, err)
 }
 
+func (suite *fileCacheTestSuite) TestDeleteOpenFileError() {
+	defer suite.cleanupTest()
+	path := "file"
+
+	// setup
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.assert.NoError(err)
+
+	// Test
+	err = suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
+	suite.assert.Error(err)
+	suite.assert.Equal(syscall.EPERM, err)
+
+	// cleanup
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+}
+
 func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 	defer suite.cleanupTest()
 	path := "file7"
