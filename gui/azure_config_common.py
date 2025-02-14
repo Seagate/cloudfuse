@@ -139,9 +139,9 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         """
         Open the advanced settings window.
         """
-        more_settings = AzureAdvancedSettingsWidget(self.settings)
-        more_settings.setWindowModality(Qt.ApplicationModal)
-        more_settings.show()
+        self.more_settings = AzureAdvancedSettingsWidget(self.settings)
+        self.more_settings.setWindowModality(Qt.ApplicationModal)
+        self.more_settings.show()
 
     # ShowModeSettings will switch which groupbox is visiible: stream or file_cache
     #   the function also updates the internal components settings through QSettings

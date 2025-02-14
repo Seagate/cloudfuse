@@ -27,7 +27,7 @@ import sys
 from PySide6.QtWidgets import QApplication
 
 # Main FUSE window
-from gui.mount_primary_window import FUSEWindow
+from mount_primary_window import FUSEWindow
 
 def main():
     """

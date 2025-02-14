@@ -40,8 +40,8 @@ from common_qt_functions import (
     DefaultSettingsManager as settings_manager,
 )
 from s3_config_common import S3SettingsWidget
-from gui.about_page import AboutPage
-from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
+from about_page import AboutPage
+from ui_mount_primary_window import Ui_primaryFUSEwindow
 
 bucket_options = ['s3storage', 'azstorage']
 MOUNT_TARGET_COMPONENT = 3
@@ -77,7 +77,7 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         self.init_mount_point()
         self.check_config_directory()
         self.textEdit_output.setReadOnly(True)
-        self.settings = self.allMountSettings
+        self.settings = self.all_mount_settings
         self.init_settings_from_config(self.settings)
 
         if platform == 'win32':
@@ -100,7 +100,7 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         self.button_mount.clicked.connect(self.mount_bucket)
         self.button_unmount.clicked.connect(self.unmount_bucket)
         self.actionAbout_Qt.triggered.connect(
-            QMessageBox.aboutQt(self, 'About QT'))
+            self.show_about_qt_page)
         self.actionAbout_CloudFuse.triggered.connect(
             self.show_about_cloudfuse_page)
         self.lineEdit_mountPoint.editingFinished.connect(
@@ -157,11 +157,11 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         """Show the S3 or Azure settings."""
         target_index = self.dropDown_bucketSelect.currentIndex()
         if bucket_options[target_index] == 's3storage':
-            set_configs = S3SettingsWidget(self.settings)
+            self.set_configs = S3SettingsWidget(self.settings)
         else:
-            set_configs = AzureSettingsWidget(self.settings)
-        set_configs.setWindowModality(Qt.ApplicationModal)
-        set_configs.show()
+            self.set_configs = AzureSettingsWidget(self.settings)
+        self.set_configs.setWindowModality(Qt.ApplicationModal)
+        self.set_configs.show()
 
     def get_file_dir_input(self):
         """Open a file dialog to select a directory."""
@@ -171,6 +171,10 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         if directory != '':
             self.lineEdit_mountPoint.setText(f'{directory}')
             self.update_mount_point_in_settings()
+            
+    def show_about_qt_page(self):
+        """Display the about Qt page."""
+        QMessageBox.aboutQt(self, 'About QT')
 
     # Display the custom dialog box for the cloudfuse 'about' page.
     def show_about_cloudfuse_page(self):
@@ -185,7 +189,8 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         else:
             cloudfuse_version = 'Cloudfuse version not found'
 
-        AboutPage(cloudfuse_version).show()
+        self.page = AboutPage(cloudfuse_version)
+        self.page.show()
 
     def mount_bucket(self):
         """Mount the selected bucket to the specified directory."""

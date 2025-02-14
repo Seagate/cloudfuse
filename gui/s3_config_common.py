@@ -92,7 +92,7 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.lineEdit_accessKey.setEchoMode(
             QLineEdit.EchoMode.Password)
         self.lineEdit_secretKey.setEchoMode(
-            QQLineEdit.EchoMode.Password)
+            QLineEdit.EchoMode.Password)
 
         # Set up signals for buttons
         self.dropDown_pipeline.currentIndexChanged.connect(
@@ -110,9 +110,9 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
         """
         Open the advanced settings widget.
         """
-        more_settings = S3AdvancedSettingsWidget(self.settings)
-        more_settings.setWindowModality(Qt.ApplicationModal)
-        more_settings.show()
+        self.more_settings = S3AdvancedSettingsWidget(self.settings)
+        self.more_settings.setWindowModality(Qt.ApplicationModal)
+        self.more_settings.show()
 
     # ShowModeSettings will switch which groupbox is visiible: stream or file_cache
     #   the function also updates the internal components settings through QSettings
