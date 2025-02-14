@@ -360,10 +360,7 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         Args:
             text (str): The text to add.
         """
-        self.textEdit_output.setText(
-            f"{self.textEdit_output.toPlainText()}{text}\n"
-        )
-        self.textEdit_output.repaint()
+        self.textEdit_output.append(text)
         self.textEdit_output.moveCursor(QTextCursor.End)
 
     def error_msg_box(self, message: str, title='Error'):
@@ -375,8 +372,7 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
             title_string (str): The title of the message box.
         """
         msg = QMessageBox()
-        # Get the user's attention by popping open a new window
+        msg.setIcon(QMessageBox.Critical)
         msg.setWindowTitle(title)
         msg.setText(message)
-        # Show the message box
         msg.exec()
