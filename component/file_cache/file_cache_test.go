@@ -995,11 +995,13 @@ func (suite *fileCacheTestSuite) TestDeleteOpenFileError() {
 	path := "file"
 
 	// setup
-	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.assert.NoError(err)
+	// Create file directly in "fake_storage" and open in case 1 (lazy open)
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
 
 	// Test
-	err = suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
+	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
 	suite.assert.Error(err)
 	suite.assert.Equal(syscall.EPERM, err)
 
