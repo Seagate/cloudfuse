@@ -964,6 +964,25 @@ func (suite *fileCacheTestSuite) TestDeleteFile() {
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
+func (suite *fileCacheTestSuite) TestDeleteOpenFileCase1() {
+	defer suite.cleanupTest()
+	path := "file"
+
+	// setup
+	// Create file directly in "fake_storage" and open in case 1 (lazy open)
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+
+	// Test
+	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
+	suite.assert.Error(err)
+	suite.assert.Equal(syscall.EPERM, err)
+
+	// cleanup
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+}
+
 // Case 2 Test cover when the file does not exist in cloud storage but it exists in the local cache.
 // This can happen if createEmptyFile is false and the file hasn't been flushed yet.
 func (suite *fileCacheTestSuite) TestDeleteOpenFileCase2() {
@@ -988,25 +1007,6 @@ func (suite *fileCacheTestSuite) TestDeleteFileError() {
 	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
 	suite.assert.Error(err)
 	suite.assert.EqualValues(syscall.ENOENT, err)
-}
-
-func (suite *fileCacheTestSuite) TestDeleteOpenFileCase1() {
-	defer suite.cleanupTest()
-	path := "file"
-
-	// setup
-	// Create file directly in "fake_storage" and open in case 1 (lazy open)
-	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
-	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
-
-	// Test
-	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
-	suite.assert.Error(err)
-	suite.assert.Equal(syscall.EPERM, err)
-
-	// cleanup
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 }
 
 func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
