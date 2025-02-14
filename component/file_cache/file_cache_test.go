@@ -982,6 +982,34 @@ func (suite *fileCacheTestSuite) TestDeleteFileCase2() {
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
+func (suite *fileCacheTestSuite) TestDeleteFileEIO() {
+	defer suite.cleanupTest()
+	// setup - create file directly in cache
+	path := "file"
+	os.WriteFile(suite.cache_path+"/"+path, []byte(""), 0777)
+	// test
+	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
+	suite.assert.Error(err)
+	suite.assert.EqualValues(syscall.EIO, err)
+}
+
+func (suite *fileCacheTestSuite) TestDeleteFileCase2CreateEmptyFileTrue() {
+	suite.cleanupTest()
+	// set CEF true
+	createEmptyFile := true
+	configuration := fmt.Sprintf("file_cache:\n  path: %s\n  create-empty-file: %t\n\nloopbackfs:\n  path: %s",
+		suite.cache_path, createEmptyFile, suite.fake_storage_path)
+	suite.setupTestHelper(configuration)
+	defer suite.cleanupTest()
+	// setup - create file directly in cache
+	path := "file"
+	os.WriteFile(suite.cache_path+"/"+path, []byte(""), 0777)
+	// test
+	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
+	suite.assert.Error(err)
+	suite.assert.True(os.IsNotExist(err))
+}
+
 func (suite *fileCacheTestSuite) TestDeleteFileError() {
 	defer suite.cleanupTest()
 	path := "file6"
