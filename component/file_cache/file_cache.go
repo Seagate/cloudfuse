@@ -860,7 +860,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 func (fc *FileCache) validateStorageError(path string, err error, method string, recoverable bool) error {
 	// For methods that take in file name, the goal is to update the path in cloud storage and the local cache.
 	// See comments in GetAttr for the different situations we can run into. This specifically handles case 2.
-	if !fc.createEmptyFile && os.IsNotExist(err) {
+	if os.IsNotExist(err) {
 		log.Debug("FileCache::%s : %s does not exist in cloud storage", method, path)
 		// Check if the file exists in the local cache
 		localPath := filepath.Join(fc.tmpPath, path)
@@ -868,7 +868,7 @@ func (fc *FileCache) validateStorageError(path string, err error, method string,
 			log.Err("FileCache::%s : %s does not exist in local cache", method, path)
 			return syscall.ENOENT
 		} else {
-			if !recoverable {
+			if !recoverable || fc.createEmptyFile {
 				log.Err("FileCache::%s : %s has not been closed/flushed yet, unable to recover this operation on close", method, path)
 				return syscall.EIO
 			} else {

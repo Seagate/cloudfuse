@@ -1007,7 +1007,7 @@ func (suite *fileCacheTestSuite) TestDeleteFileCase2CreateEmptyFileTrue() {
 	// test
 	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
 	suite.assert.Error(err)
-	suite.assert.True(os.IsNotExist(err))
+	suite.assert.EqualValues(syscall.EIO, err)
 }
 
 func (suite *fileCacheTestSuite) TestDeleteFileError() {
