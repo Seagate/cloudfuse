@@ -1,3 +1,7 @@
+"""
+Defines the S3SettingsWidget class for configuring S3 settings.
+"""
+
 # Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 #
 # Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
@@ -22,110 +26,146 @@
 
 from sys import platform
 from PySide6.QtCore import Qt, QSettings
-from PySide6 import QtWidgets, QtGui
+from PySide6.QtGui import QRegularExpressionValidator
+from PySide6.QtWidgets import QLineEdit, QFileDialog, QMessageBox
 
 # import the custom class made from QtDesigner
 from ui_s3_config_common import Ui_Form
-from s3_config_advanced import s3AdvancedSettingsWidget
-from common_qt_functions import widgetCustomFunctions, defaultSettingsManager
+from s3_config_advanced import S3AdvancedSettingsWidget
+from common_qt_functions import WidgetCustomFunctions, DefaultSettingsManager
 
 pipelineChoices = ['file_cache', 'stream', 'block_cache']
 libfusePermissions = [0o777, 0o666, 0o644, 0o444]
 
 
-class s3SettingsWidget(widgetCustomFunctions, Ui_Form):
-    def __init__(self, configSettings):
+class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
+    """
+    A widget for configuring S3 settings.
+
+    Attributes:
+        settings (dict): Configuration settings for S3.
+        my_window (QSettings): QSettings object for storing window state.
+        save_button_clicked (bool): Flag to indicate if the save button was clicked.
+    """
+    def __init__(self, configSettings: dict):
+        """
+        Initialize the S3SettingsWidget with the given configuration settings.
+
+        Args:
+            configSettings (dict): Configuration settings for S3.
+        """
         super().__init__()
         self.setupUi(self)
-        self.myWindow = QSettings('Cloudfuse', 's3Window')
-        self.initWindowSizePos()
+        self.my_window = QSettings('Cloudfuse', 's3Window')
+        self.init_window_size_pos()
         self.setWindowTitle('S3Cloud Config Settings')
         self.settings = configSettings
-        self.populateOptions()
-        self.showModeSettings()
-        self.saveButtonClicked = False
+        self.populate_options()
+        self.show_mode_settings()
+        self.save_button_clicked = False
 
         # S3 naming conventions:
         #   https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
         # Allow lowercase alphanumeric characters plus [.,-]
         self.lineEdit_bucketName.setValidator(
-            QtGui.QRegularExpressionValidator(r'^[a-z0-9-.]*$', self)
+            QRegularExpressionValidator(r'^[a-z0-9-.]*$', self)
         )
         # Allow alphanumeric characters plus [-,_]
         self.lineEdit_region.setValidator(
-            QtGui.QRegularExpressionValidator(r'^[a-zA-Z0-9-_]*$', self)
+            QRegularExpressionValidator(r'^[a-zA-Z0-9-_]*$', self)
         )
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
             # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
             self.lineEdit_fileCache_path.setValidator(
-                QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$', self)
+                QRegularExpressionValidator(r'^[^<>."|?\0*]*$', self)
             )
         else:
             # Allow anything BUT Nul
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
             self.lineEdit_fileCache_path.setValidator(
-                QtGui.QRegularExpressionValidator(r'^[^\0]*$', self)
+                QRegularExpressionValidator(r'^[^\0]*$', self)
             )
 
-        # Hide sensitive data QtWidgets.QLineEdit.EchoMode.PasswordEchoOnEdit
-        self.lineEdit_accessKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
-        self.lineEdit_secretKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+        # Hide sensitive data QLineEdit.EchoMode.PasswordEchoOnEdit
+        self.lineEdit_accessKey.setEchoMode(
+            QLineEdit.EchoMode.Password)
+        self.lineEdit_secretKey.setEchoMode(
+            QQLineEdit.EchoMode.Password)
 
         # Set up signals for buttons
-        self.dropDown_pipeline.currentIndexChanged.connect(self.showModeSettings)
-        self.button_browse.clicked.connect(self.getFileDirInput)
-        self.button_okay.clicked.connect(self.exitWindow)
-        self.button_advancedSettings.clicked.connect(self.openAdvanced)
-        self.button_resetDefaultSettings.clicked.connect(self.resetDefaults)
+        self.dropDown_pipeline.currentIndexChanged.connect(
+            self.show_mode_settings)
+        self.button_browse.clicked.connect(self.get_file_dir_input)
+        self.button_okay.clicked.connect(self.exit_window)
+        self.button_advancedSettings.clicked.connect(self.open_advanced)
+        self.button_resetDefaultSettings.clicked.connect(self.reset_defaults)
 
     # Set up slots for the signals:
 
     # To open the advanced widget, make an instance, so self.moresettings was chosen.
     #   self.moresettings does not have anything to do with the QSettings package that is seen throughout this code
-    def openAdvanced(self):
-        self.moreSettings = s3AdvancedSettingsWidget(self.settings)
-        self.moreSettings.setWindowModality(Qt.ApplicationModal)
-        self.moreSettings.show()
+    def open_advanced(self):
+        """
+        Open the advanced settings widget.
+        """
+        more_settings = S3AdvancedSettingsWidget(self.settings)
+        more_settings.setWindowModality(Qt.ApplicationModal)
+        more_settings.show()
 
     # ShowModeSettings will switch which groupbox is visiible: stream or file_cache
     #   the function also updates the internal components settings through QSettings
     #   There is one slot for the signal to be pointed at which is why showmodesettings is used.
-    def showModeSettings(self):
-        self.hideModeBoxes()
+    def show_mode_settings(self):
+        """
+        Show the appropriate mode settings based on the selected pipeline.
+        """
+        self.hide_mode_boxes()
         components = self.settings['components']
-        pipelineIndex = self.dropDown_pipeline.currentIndex()
-        components[1] = pipelineChoices[pipelineIndex]
-        if pipelineChoices[pipelineIndex] == 'file_cache':
+        pipeline_index = self.dropDown_pipeline.currentIndex()
+        components[1] = pipelineChoices[pipeline_index]
+        if pipelineChoices[pipeline_index] == 'file_cache':
             self.groupbox_fileCache.setVisible(True)
-        elif pipelineChoices[pipelineIndex] == 'stream':
+        elif pipelineChoices[pipeline_index] == 'stream':
             self.groupbox_streaming.setVisible(True)
         self.settings['components'] = components
 
-    def getFileDirInput(self):
-        directory = str(QtWidgets.QFileDialog.getExistingDirectory())
-        self.lineEdit_fileCache_path.setText('{}'.format(directory))
+    def get_file_dir_input(self):
+        """
+        Open a file dialog to select a directory.
+        """
+        directory = str(QFileDialog.getExistingDirectory())
+        self.lineEdit_fileCache_path.setText(f'{directory}')
 
-    def hideModeBoxes(self):
+    def hide_mode_boxes(self):
+        """
+        Hide all mode group boxes.
+        """
         self.groupbox_fileCache.setVisible(False)
         self.groupbox_streaming.setVisible(False)
 
         # Update S3Storage re-writes everything in the S3Storage dictionary for the same reason update libfuse does.
 
-    def updateS3Storage(self):
-        s3Storage = self.settings['s3storage']
-        s3Storage['bucket-name'] = self.lineEdit_bucketName.text()
-        s3Storage['key-id'] = self.lineEdit_accessKey.text()
-        s3Storage['secret-key'] = self.lineEdit_secretKey.text()
-        s3Storage['endpoint'] = self.lineEdit_endpoint.text()
-        s3Storage['region'] = self.lineEdit_region.text()
-        self.settings['s3storage'] = s3Storage
+    def update_s3_storage(self):
+        """
+        Update the S3 storage settings from the UI choices.
+        """
+        s3_storage = self.settings['s3storage']
+        s3_storage['bucket-name'] = self.lineEdit_bucketName.text()
+        s3_storage['key-id'] = self.lineEdit_accessKey.text()
+        s3_storage['secret-key'] = self.lineEdit_secretKey.text()
+        s3_storage['endpoint'] = self.lineEdit_endpoint.text()
+        s3_storage['region'] = self.lineEdit_region.text()
+        self.settings['s3storage'] = s3_storage
 
     # This widget will not display all the options in settings, only the ones written in the UI file.
-    def populateOptions(self):
-        fileCache = self.settings['file_cache']
-        s3storage = self.settings['s3storage']
+    def populate_options(self):
+        """
+        Populate the UI with the current configuration settings.
+        """
+        file_cache = self.settings['file_cache']
+        s3_storage = self.settings['s3storage']
         libfuse = self.settings['libfuse']
         stream = self.settings['stream']
 
@@ -138,25 +178,27 @@ class s3SettingsWidget(widgetCustomFunctions, Ui_Form):
             libfusePermissions.index(libfuse['default-permission'])
         )
 
-        self.setCheckboxFromSetting(
+        self.set_checkbox_from_setting(
             self.checkBox_multiUser, self.settings['allow-other']
         )
-        self.setCheckboxFromSetting(
+        self.set_checkbox_from_setting(
             self.checkBox_nonEmptyDir, self.settings['nonempty']
         )
-        self.setCheckboxFromSetting(
+        self.set_checkbox_from_setting(
             self.checkBox_daemonForeground, self.settings['foreground']
         )
-        self.setCheckboxFromSetting(self.checkBox_readOnly, self.settings['read-only'])
-        self.setCheckboxFromSetting(
+        self.set_checkbox_from_setting(
+            self.checkBox_readOnly, self.settings['read-only'])
+        self.set_checkbox_from_setting(
             self.checkBox_streaming_fileCachingLevel, stream['file-caching']
         )
-        self.setCheckboxFromSetting(
+        self.set_checkbox_from_setting(
             self.checkBox_libfuse_ignoreAppend, libfuse['ignore-open-flags']
         )
 
         # Spinbox automatically sanitizes inputs for decimal values only, so no need to check for the appropriate data type.
-        self.spinBox_libfuse_attExp.setValue(libfuse['attribute-expiration-sec'])
+        self.spinBox_libfuse_attExp.setValue(
+            libfuse['attribute-expiration-sec'])
         self.spinBox_libfuse_entExp.setValue(libfuse['entry-expiration-sec'])
         self.spinBox_libfuse_negEntryExp.setValue(
             libfuse['negative-entry-expiration-sec']
@@ -166,27 +208,33 @@ class s3SettingsWidget(widgetCustomFunctions, Ui_Form):
         self.spinBox_streaming_maxBuff.setValue(stream['max-buffers'])
         # TODO:
         # There is no sanitizing for lineEdit at the moment, the GUI depends on the user being correct.
-        self.lineEdit_bucketName.setText(s3storage['bucket-name'])
-        self.lineEdit_endpoint.setText(s3storage['endpoint'])
-        self.lineEdit_secretKey.setText(s3storage['secret-key'])
-        self.lineEdit_accessKey.setText(s3storage['key-id'])
-        self.lineEdit_region.setText(s3storage['region'])
-        self.lineEdit_fileCache_path.setText(fileCache['path'])
+        self.lineEdit_bucketName.setText(s3_storage['bucket-name'])
+        self.lineEdit_endpoint.setText(s3_storage['endpoint'])
+        self.lineEdit_secretKey.setText(s3_storage['secret-key'])
+        self.lineEdit_accessKey.setText(s3_storage['key-id'])
+        self.lineEdit_region.setText(s3_storage['region'])
+        self.lineEdit_fileCache_path.setText(file_cache['path'])
 
-    def resetDefaults(self):
+    def reset_defaults(self):
+        """
+        Reset the settings to their default values.
+        """
         # Reset these defaults
-        checkChoice = self.popupDoubleCheckReset()
-        if checkChoice == QtWidgets.QMessageBox.Yes:
-            defaultSettingsManager.setS3Settings(self, self.settings)
-            defaultSettingsManager.setComponentSettings(self, self.settings)
-            self.populateOptions()
+        check_choice = self.popup_double_check_reset()
+        if check_choice == QMessageBox.Yes:
+            DefaultSettingsManager.set_s3_settings(self, self.settings)
+            DefaultSettingsManager.set_component_settings(self, self.settings)
+            self.populate_options()
 
-    def updateSettingsFromUIChoices(self):
-        self.updateFileCachePath()
-        self.updateLibfuse()
-        self.updateReadOnly()
-        self.updateDaemonForeground()
-        self.updateMultiUser()
-        self.updateNonEmtpyDir()
-        self.updateStream()
-        self.updateS3Storage()
+    def update_settings_from_ui_choices(self):
+        """
+        Update all settings from the UI choices.
+        """
+        self.update_file_cache_path()
+        self.update_libfuse()
+        self.update_read_only()
+        self.update_daemon_foreground()
+        self.update_multi_user()
+        self.update_non_emtpy_dir()
+        self.update_stream()
+        self.update_s3_storage()

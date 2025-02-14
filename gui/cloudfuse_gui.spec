@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['FuseGUI.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
     datas=[],

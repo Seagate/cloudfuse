@@ -1,3 +1,5 @@
+""" Defines the AboutPage class for displaying information about Cloudfuse.
+"""
 # Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 #
 # Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
@@ -24,8 +26,14 @@ from PySide6.QtWidgets import QMessageBox
 from PySide6.QtCore import Qt
 
 
-class aboutPage(QMessageBox):
+class AboutPage(QMessageBox):
+    """A QMessageBox subclass to display information about Cloudfuse."""
     def __init__(self, cloudfuseVersion: str):
+        """Initialize the AboutPage with the installed Cloudfuse version.
+
+        Args:
+            cloudfuseVersion (str): The version of Cloudfuse being used.
+        """
         super().__init__()
         self.setWindowTitle('About Cloudfuse')
         self.setTextFormat(Qt.RichText)

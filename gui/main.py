@@ -1,3 +1,6 @@
+""" Initializes and runs the main window.
+"""
+
 # Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 #
 # Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
@@ -21,20 +24,27 @@
 # SOFTWARE
 
 import sys
-from PySide6 import QtWidgets
+from PySide6.QtWidgets import QApplication
 
 # Main FUSE window
-from mountPrimaryWindow import FUSEWindow
+from gui.mount_primary_window import FUSEWindow
 
-# Define the application to run from the Qt library
-app = QtWidgets.QApplication(sys.argv)
+def main():
+    """
+    Initialize and run the main window.
+    """
+    # Define the application to run from the Qt library
+    app = QApplication(sys.argv)
 
-# Load the main window for the GUI - the very first window the user will see
-primaryWindow = FUSEWindow()
+    # Load the main window for the GUI - the very first window the user will see
+    primary_window = FUSEWindow()
 
-# The user won't see a window until we explicitly show it. This can also happen in the FUSE class
-# which will probably happen later down the line, but this is for getting things to work right now
-primaryWindow.show()
+    # The user won't see a window until we explicitly show it. This can also happen in the FUSE class
+    # which will probably happen later down the line, but this is for getting things to work right now
+    primary_window.show()
 
-# Start the app
-app.exec()
+    # Start the app
+    app.exec()
+
+if __name__ == '__main__':
+    main()

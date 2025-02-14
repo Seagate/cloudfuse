@@ -1,3 +1,7 @@
+"""
+Defines the S3AdvancedSettingsWidget class for configuring advanced S3 settings.
+"""
+
 # Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 #
 # Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
@@ -22,88 +26,109 @@
 
 from sys import platform
 from PySide6.QtCore import QSettings
-from PySide6 import QtGui
+from PySide6.QtGui import QRegularExpressionValidator
 
 # import the custom class made from QtDesigner
 from ui_s3_config_advanced import Ui_Form
-from common_qt_functions import widgetCustomFunctions
+from common_qt_functions import WidgetCustomFunctions
 
 file_cache_eviction_choices = ['lru', 'lfu']
 
 
-class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
-    def __init__(self, configSettings):
+class S3AdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
+    """
+    A widget for configuring advanced S3 settings.
+
+    Attributes:
+        settings (dict): Configuration settings for S3.
+        my_window (QSettings): QSettings object for storing window state.
+        save_button_clicked (bool): Flag to indicate if the save button was clicked.
+    """
+    def __init__(self, configSettings: dict):
+        """
+        Initialize the S3AdvancedSettingsWidget with the given configuration settings.
+
+        Args:
+            configSettings (dict): Configuration settings for S3.
+        """
         super().__init__()
         self.setupUi(self)
-        self.myWindow = QSettings('Cloudfuse', 'S3AdvancedWindow')
+        self.my_window = QSettings('Cloudfuse', 'S3AdvancedWindow')
         self.settings = configSettings
-        self.initWindowSizePos()
+        self.init_window_size_pos()
         self.setWindowTitle('Advanced S3Cloud Config Settings')
-        self.populateOptions()
-        self.saveButtonClicked = False
+        self.populate_options()
+        self.save_button_clicked = False
 
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
             # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
             self.lineEdit_subdirectory.setValidator(
-                QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$', self)
+                QRegularExpressionValidator(r'^[^<>."|?\0*]*$', self)
             )
         else:
             # Allow anything BUT Nul
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
             self.lineEdit_subdirectory.setValidator(
-                QtGui.QRegularExpressionValidator(r'^[^\0]*$', self)
+                QRegularExpressionValidator(r'^[^\0]*$', self)
             )
 
         # Set up the signals
-        self.button_okay.clicked.connect(self.exitWindow)
-        self.button_resetDefaultSettings.clicked.connect(self.populateOptions)
+        self.button_okay.clicked.connect(self.exit_window)
+        self.button_resetDefaultSettings.clicked.connect(self.populate_options)
 
-    def populateOptions(self):
-        fileCache = self.settings['file_cache']
+    def populate_options(self):
+        """
+        Populate the UI with the current configuration settings.
+        """
+        file_cache = self.settings['file_cache']
         libfuse = self.settings['libfuse']
-        s3Storage = self.settings['s3storage']
+        s3_storage = self.settings['s3storage']
 
         # The index of file_cache_eviction is matched with the default
         #   index values in the ui code, so translate the value from settings to index number
-        policyIndex = file_cache_eviction_choices.index(fileCache['policy'])
-        self.dropDown_fileCache_evictionPolicy.setCurrentIndex(policyIndex)
+        policy_index = file_cache_eviction_choices.index(file_cache['policy'])
+        self.dropDown_fileCache_evictionPolicy.setCurrentIndex(policy_index)
 
-        self.setCheckboxFromSetting(
+        self.set_checkbox_from_setting(
             self.checkBox_libfuse_disableWriteback, libfuse['disable-writeback-cache']
         )
-        self.setCheckboxFromSetting(
+        self.set_checkbox_from_setting(
             self.checkBox_libfuse_networkshare, libfuse['network-share']
         )
-        self.setCheckboxFromSetting(
-            self.checkBox_fileCache_allowNonEmptyTmp, fileCache['allow-non-empty-temp']
+        self.set_checkbox_from_setting(
+            self.checkBox_fileCache_allowNonEmptyTmp, file_cache['allow-non-empty-temp']
         )
-        self.setCheckboxFromSetting(
-            self.checkBox_fileCache_policyLogs, fileCache['policy-trace']
+        self.set_checkbox_from_setting(
+            self.checkBox_fileCache_policyLogs, file_cache['policy-trace']
         )
-        self.setCheckboxFromSetting(
-            self.checkBox_fileCache_createEmptyFile, fileCache['create-empty-file']
+        self.set_checkbox_from_setting(
+            self.checkBox_fileCache_createEmptyFile, file_cache['create-empty-file']
         )
-        self.setCheckboxFromSetting(
-            self.checkBox_fileCache_cleanupStart, fileCache['cleanup-on-start']
+        self.set_checkbox_from_setting(
+            self.checkBox_fileCache_cleanupStart, file_cache['cleanup-on-start']
         )
-        self.setCheckboxFromSetting(
-            self.checkBox_fileCache_offloadIO, fileCache['offload-io']
+        self.set_checkbox_from_setting(
+            self.checkBox_fileCache_offloadIO, file_cache['offload-io']
         )
-        self.setCheckboxFromSetting(
-            self.checkBox_fileCache_syncToFlush, fileCache['sync-to-flush']
+        self.set_checkbox_from_setting(
+            self.checkBox_fileCache_syncToFlush, file_cache['sync-to-flush']
         )
 
-        self.spinBox_fileCache_evictionTimeout.setValue(fileCache['timeout-sec'])
-        self.spinBox_fileCache_maxEviction.setValue(fileCache['max-eviction'])
-        self.spinBox_fileCache_maxCacheSize.setValue(fileCache['max-size-mb'])
-        self.spinBox_fileCache_evictMaxThresh.setValue(fileCache['high-threshold'])
-        self.spinBox_fileCache_evictMinThresh.setValue(fileCache['low-threshold'])
-        self.spinBox_fileCache_refreshSec.setValue(fileCache['refresh-sec'])
-        self.spinBox_libfuse_maxFuseThreads.setValue(libfuse['max-fuse-threads'])
+        self.spinBox_fileCache_evictionTimeout.setValue(
+            file_cache['timeout-sec'])
+        self.spinBox_fileCache_maxEviction.setValue(file_cache['max-eviction'])
+        self.spinBox_fileCache_maxCacheSize.setValue(file_cache['max-size-mb'])
+        self.spinBox_fileCache_evictMaxThresh.setValue(
+            file_cache['high-threshold'])
+        self.spinBox_fileCache_evictMinThresh.setValue(
+            file_cache['low-threshold'])
+        self.spinBox_fileCache_refreshSec.setValue(file_cache['refresh-sec'])
+        self.spinBox_libfuse_maxFuseThreads.setValue(
+            libfuse['max-fuse-threads'])
 
-        self.lineEdit_subdirectory.setText(s3Storage['subdirectory'])
+        self.lineEdit_subdirectory.setText(s3_storage['subdirectory'])
 
         if platform == 'win32':
             self.checkBox_libfuse_networkshare.setToolTip(
@@ -115,12 +140,18 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
                 'Network share is only supported on Windows'
             )
 
-    def updateOptionalS3Storage(self):
-        s3Storage = self.settings['s3storage']
-        s3Storage['subdirectory'] = self.lineEdit_subdirectory.text()
-        self.settings['s3storage'] = s3Storage
+    def update_optional_s3_storage(self):
+        """
+        Update the optional S3 storage settings from the UI values.
+        """
+        s3_storage = self.settings['s3storage']
+        s3_storage['subdirectory'] = self.lineEdit_subdirectory.text()
+        self.settings['s3storage'] = s3_storage
 
-    def updateSettingsFromUIChoices(self):
-        self.updateOptionalFileCache()
-        self.updateOptionalLibfuse()
-        self.updateOptionalS3Storage()
+    def update_settings_from_ui_choices(self):
+        """
+        Update all settings from the UI values.
+        """
+        self.update_optional_file_cache()
+        self.update_optional_libfuse()
+        self.update_optional_s3_storage()
