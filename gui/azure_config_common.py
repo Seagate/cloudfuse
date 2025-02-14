@@ -29,13 +29,14 @@ from ui_azure_config_common import Ui_Form
 from azure_config_advanced import azureAdvancedSettingsWidget
 from common_qt_functions import widgetCustomFunctions, defaultSettingsManager
 
-pipelineChoices = ['file_cache','stream','block_cache']
+pipelineChoices = ['file_cache', 'stream', 'block_cache']
 bucketModeChoices = ['key', 'sas', 'spn', 'msi']
 azStorageType = ['block', 'adls']
-libfusePermissions = [0o777,0o666,0o644,0o444]
+libfusePermissions = [0o777, 0o666, 0o644, 0o444]
+
 
 class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
-    def __init__(self,configSettings):
+    def __init__(self, configSettings):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle('Azure Config Settings')
@@ -50,32 +51,45 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
 
         # Set up signals
         self.dropDown_pipeline.currentIndexChanged.connect(self.showModeSettings)
-        self.dropDown_azure_modeSetting.currentIndexChanged.connect(self.showAzureModeSettings)
+        self.dropDown_azure_modeSetting.currentIndexChanged.connect(
+            self.showAzureModeSettings
+        )
         self.button_browse.clicked.connect(self.getFileDirInput)
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_advancedSettings.clicked.connect(self.openAdvanced)
         self.button_resetDefaultSettings.clicked.connect(self.resetDefaults)
 
-
         # Documentation for the allowed characters for azure:
         #   https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftstorage
         # Allow lowercase alphanumeric characters plus [-]
-        self.lineEdit_azure_container.setValidator(QtGui.QRegularExpressionValidator(r'^[a-z0-9-]*$',self))
+        self.lineEdit_azure_container.setValidator(
+            QtGui.QRegularExpressionValidator(r'^[a-z0-9-]*$', self)
+        )
         # Allow alphanumeric characters plus [.,-,_]
-        self.lineEdit_azure_accountName.setValidator(QtGui.QRegularExpressionValidator(r'^[a-zA-Z0-9-._]*$',self))
+        self.lineEdit_azure_accountName.setValidator(
+            QtGui.QRegularExpressionValidator(r'^[a-zA-Z0-9-._]*$', self)
+        )
 
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
             # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
+            self.lineEdit_fileCache_path.setValidator(
+                QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$', self)
+            )
         else:
             # Allow anything BUT Nul
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
-            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
+            self.lineEdit_fileCache_path.setValidator(
+                QtGui.QRegularExpressionValidator(r'^[^\0]*$', self)
+            )
 
-        self.lineEdit_azure_accountKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
-        self.lineEdit_azure_spnClientSecret.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+        self.lineEdit_azure_accountKey.setEchoMode(
+            QtWidgets.QLineEdit.EchoMode.Password
+        )
+        self.lineEdit_azure_spnClientSecret.setEchoMode(
+            QtWidgets.QLineEdit.EchoMode.Password
+        )
 
     # Set up slots
 
@@ -92,8 +106,12 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         azStorage['tenantid'] = self.lineEdit_azure_spnTenantID.text()
         azStorage['clientid'] = self.lineEdit_azure_spnClientID.text()
         azStorage['clientsecret'] = self.lineEdit_azure_spnClientSecret.text()
-        azStorage['type'] = azStorageType[self.dropDown_azure_storageType.currentIndex()]
-        azStorage['mode'] = bucketModeChoices[self.dropDown_azure_modeSetting.currentIndex()]
+        azStorage['type'] = azStorageType[
+            self.dropDown_azure_storageType.currentIndex()
+        ]
+        azStorage['mode'] = bucketModeChoices[
+            self.dropDown_azure_modeSetting.currentIndex()
+        ]
         self.settings['azstorage'] = azStorage
 
     def openAdvanced(self):
@@ -128,7 +146,7 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         elif bucketModeChoices[modeSelectionIndex] == 'msi':
             self.groupbox_msi.setVisible(True)
 
-# This widget will not display all the options in settings, only the ones written in the UI file.
+    # This widget will not display all the options in settings, only the ones written in the UI file.
     def populateOptions(self):
         fileCache = self.settings['file_cache']
         azStorage = self.settings['azstorage']
@@ -138,22 +156,42 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
         # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices, libfusePermissions, azStorage and bucketMode
         #   reflect the index choices in human words without having to reference the UI.
         #   Get the value in the settings and translate that to the equivalent index in the lists.
-        self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings['components'][1]))
-        self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(self.settings['libfuse']['default-permission']))
-        self.dropDown_azure_storageType.setCurrentIndex(azStorageType.index(self.settings['azstorage']['type']))
-        self.dropDown_azure_modeSetting.setCurrentIndex(bucketModeChoices.index(self.settings['azstorage']['mode']))
+        self.dropDown_pipeline.setCurrentIndex(
+            pipelineChoices.index(self.settings['components'][1])
+        )
+        self.dropDown_libfuse_permissions.setCurrentIndex(
+            libfusePermissions.index(self.settings['libfuse']['default-permission'])
+        )
+        self.dropDown_azure_storageType.setCurrentIndex(
+            azStorageType.index(self.settings['azstorage']['type'])
+        )
+        self.dropDown_azure_modeSetting.setCurrentIndex(
+            bucketModeChoices.index(self.settings['azstorage']['mode'])
+        )
 
-        self.setCheckboxFromSetting(self.checkBox_multiUser,self.settings['allow-other'])
-        self.setCheckboxFromSetting(self.checkBox_nonEmptyDir,self.settings['nonempty'])
-        self.setCheckboxFromSetting(self.checkBox_daemonForeground,self.settings['foreground'])
-        self.setCheckboxFromSetting(self.checkBox_readOnly,self.settings['read-only'])
-        self.setCheckboxFromSetting(self.checkBox_streaming_fileCachingLevel,stream['file-caching'])
-        self.setCheckboxFromSetting(self.checkBox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
+        self.setCheckboxFromSetting(
+            self.checkBox_multiUser, self.settings['allow-other']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_nonEmptyDir, self.settings['nonempty']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_daemonForeground, self.settings['foreground']
+        )
+        self.setCheckboxFromSetting(self.checkBox_readOnly, self.settings['read-only'])
+        self.setCheckboxFromSetting(
+            self.checkBox_streaming_fileCachingLevel, stream['file-caching']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_libfuse_ignoreAppend, libfuse['ignore-open-flags']
+        )
 
         # Spinbox automatically sanitizes inputs for decimal values only, so no need to check for the appropriate data type.
         self.spinBox_libfuse_attExp.setValue(libfuse['attribute-expiration-sec'])
         self.spinBox_libfuse_entExp.setValue(libfuse['entry-expiration-sec'])
-        self.spinBox_libfuse_negEntryExp.setValue(libfuse['negative-entry-expiration-sec'])
+        self.spinBox_libfuse_negEntryExp.setValue(
+            libfuse['negative-entry-expiration-sec']
+        )
         self.spinBox_streaming_blockSize.setValue(stream['block-size-mb'])
         self.spinBox_streaming_buffSize.setValue(stream['buffer-size-mb'])
         self.spinBox_streaming_maxBuff.setValue(stream['max-buffers'])
@@ -182,7 +220,6 @@ class azureSettingsWidget(widgetCustomFunctions, Ui_Form):
     def hideModeBoxes(self):
         self.groupbox_fileCache.setVisible(False)
         self.groupbox_streaming.setVisible(False)
-
 
     def hideAzureBoxes(self):
         self.groupbox_accountKey.setVisible(False)

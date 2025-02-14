@@ -23,15 +23,17 @@
 from sys import platform
 from PySide6.QtCore import QSettings
 from PySide6 import QtGui
+
 # import the custom class made from QtDesigner
 from ui_azure_config_advanced import Ui_Form
 from common_qt_functions import widgetCustomFunctions
 
-file_cache_eviction_choices = ['lru','lfu']
-az_blob_tier = ['none','hot','cool','archive']
+file_cache_eviction_choices = ['lru', 'lfu']
+az_blob_tier = ['none', 'hot', 'cool', 'archive']
+
 
 class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
-    def __init__(self,configSettings):
+    def __init__(self, configSettings):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle('Advanced Azure Config Settings')
@@ -45,37 +47,68 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
             # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_azure_subDirectory.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
+            self.lineEdit_azure_subDirectory.setValidator(
+                QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$', self)
+            )
         else:
             # Allow anything BUT Nul
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
-            self.lineEdit_azure_subDirectory.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
+            self.lineEdit_azure_subDirectory.setValidator(
+                QtGui.QRegularExpressionValidator(r'^[^\0]*$', self)
+            )
 
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)
         self.button_resetDefaultSettings.clicked.connect(self.populateOptions)
-
 
     def populateOptions(self):
         fileCache = self.settings['file_cache']
         azStorage = self.settings['azstorage']
         libfuse = self.settings['libfuse']
 
-        self.setCheckboxFromSetting(self.checkBox_libfuse_disableWriteback,libfuse['disable-writeback-cache'])
-        self.setCheckboxFromSetting(self.checkBox_libfuse_networkshare, libfuse['network-share'])
-        self.setCheckboxFromSetting(self.checkBox_fileCache_allowNonEmptyTmp,fileCache['allow-non-empty-temp'])
-        self.setCheckboxFromSetting(self.checkBox_fileCache_policyLogs,fileCache['policy-trace'])
-        self.setCheckboxFromSetting(self.checkBox_fileCache_createEmptyFile,fileCache['create-empty-file'])
-        self.setCheckboxFromSetting(self.checkBox_fileCache_cleanupStart,fileCache['cleanup-on-start'])
-        self.setCheckboxFromSetting(self.checkBox_fileCache_offloadIO,fileCache['offload-io'])
-        self.setCheckboxFromSetting(self.checkBox_fileCache_syncToFlush, fileCache['sync-to-flush'])
-        self.setCheckboxFromSetting(self.checkBox_azure_useHttp,azStorage['use-http'])
-        self.setCheckboxFromSetting(self.checkBox_azure_validateMd5,azStorage['validate-md5'])
-        self.setCheckboxFromSetting(self.checkBox_azure_updateMd5,azStorage['update-md5'])
-        self.setCheckboxFromSetting(self.checkBox_azure_failUnsupportedOps, azStorage['fail-unsupported-op'])
-        self.setCheckboxFromSetting(self.checkBox_azure_sdkTrace,azStorage['sdk-trace'])
-        self.setCheckboxFromSetting(self.checkBox_azure_virtualDirectory,azStorage['virtual-directory'])
-        self.setCheckboxFromSetting(self.checkBox_azure_disableCompression,azStorage['disable-compression'])
+        self.setCheckboxFromSetting(
+            self.checkBox_libfuse_disableWriteback, libfuse['disable-writeback-cache']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_libfuse_networkshare, libfuse['network-share']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_fileCache_allowNonEmptyTmp, fileCache['allow-non-empty-temp']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_fileCache_policyLogs, fileCache['policy-trace']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_fileCache_createEmptyFile, fileCache['create-empty-file']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_fileCache_cleanupStart, fileCache['cleanup-on-start']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_fileCache_offloadIO, fileCache['offload-io']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_fileCache_syncToFlush, fileCache['sync-to-flush']
+        )
+        self.setCheckboxFromSetting(self.checkBox_azure_useHttp, azStorage['use-http'])
+        self.setCheckboxFromSetting(
+            self.checkBox_azure_validateMd5, azStorage['validate-md5']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_azure_updateMd5, azStorage['update-md5']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_azure_failUnsupportedOps, azStorage['fail-unsupported-op']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_azure_sdkTrace, azStorage['sdk-trace']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_azure_virtualDirectory, azStorage['virtual-directory']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_azure_disableCompression, azStorage['disable-compression']
+        )
 
         self.spinBox_fileCache_evictionTimeout.setValue(fileCache['timeout-sec'])
         self.spinBox_fileCache_maxEviction.setValue(fileCache['max-eviction'])
@@ -98,14 +131,22 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.lineEdit_azure_httpsProxy.setText(azStorage['https-proxy'])
         self.lineEdit_azure_authResource.setText(azStorage['auth-resource'])
 
-        self.dropDown_azure_blobTier.setCurrentIndex(az_blob_tier.index(azStorage['tier']))
-        self.dropDown_fileCache_evictionPolicy.setCurrentIndex(file_cache_eviction_choices.index(fileCache['policy']))
+        self.dropDown_azure_blobTier.setCurrentIndex(
+            az_blob_tier.index(azStorage['tier'])
+        )
+        self.dropDown_fileCache_evictionPolicy.setCurrentIndex(
+            file_cache_eviction_choices.index(fileCache['policy'])
+        )
 
         if platform == 'win32':
-            self.checkBox_libfuse_networkshare.setToolTip('Runs as a network share - may improve performance when latency to cloud is high.')
+            self.checkBox_libfuse_networkshare.setToolTip(
+                'Runs as a network share - may improve performance when latency to cloud is high.'
+            )
         else:
             self.checkBox_libfuse_networkshare.setEnabled(False)
-            self.checkBox_libfuse_networkshare.setToolTip('Network share is only supported on Windows')
+            self.checkBox_libfuse_networkshare.setToolTip(
+                'Network share is only supported on Windows'
+            )
 
     def updateOptionalAzStorage(self):
         azStorage = self.settings['azstorage']
@@ -120,10 +161,16 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         azStorage['use-http'] = self.checkBox_azure_useHttp.isChecked()
         azStorage['validate-md5'] = self.checkBox_azure_validateMd5.isChecked()
         azStorage['update-md5'] = self.checkBox_azure_updateMd5.isChecked()
-        azStorage['fail-unsupported-op'] = self.checkBox_azure_failUnsupportedOps.isChecked()
+        azStorage['fail-unsupported-op'] = (
+            self.checkBox_azure_failUnsupportedOps.isChecked()
+        )
         azStorage['sdk-trace'] = self.checkBox_azure_sdkTrace.isChecked()
-        azStorage['virtual-directory'] = self.checkBox_azure_virtualDirectory.isChecked()
-        azStorage['disable-compression'] = self.checkBox_azure_disableCompression.isChecked()
+        azStorage['virtual-directory'] = (
+            self.checkBox_azure_virtualDirectory.isChecked()
+        )
+        azStorage['disable-compression'] = (
+            self.checkBox_azure_disableCompression.isChecked()
+        )
 
         azStorage['aadendpoint'] = self.lineEdit_azure_aadEndpoint.text()
         azStorage['subdirectory'] = self.lineEdit_azure_subDirectory.text()

@@ -23,14 +23,16 @@
 from sys import platform
 from PySide6.QtCore import QSettings
 from PySide6 import QtGui
+
 # import the custom class made from QtDesigner
 from ui_s3_config_advanced import Ui_Form
 from common_qt_functions import widgetCustomFunctions
 
-file_cache_eviction_choices = ['lru','lfu']
+file_cache_eviction_choices = ['lru', 'lfu']
+
 
 class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
-    def __init__(self,configSettings):
+    def __init__(self, configSettings):
         super().__init__()
         self.setupUi(self)
         self.myWindow = QSettings('Cloudfuse', 'S3AdvancedWindow')
@@ -44,12 +46,15 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
             # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
+            self.lineEdit_subdirectory.setValidator(
+                QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$', self)
+            )
         else:
             # Allow anything BUT Nul
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
-            self.lineEdit_subdirectory.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
-
+            self.lineEdit_subdirectory.setValidator(
+                QtGui.QRegularExpressionValidator(r'^[^\0]*$', self)
+            )
 
         # Set up the signals
         self.button_okay.clicked.connect(self.exitWindow)
@@ -65,14 +70,30 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         policyIndex = file_cache_eviction_choices.index(fileCache['policy'])
         self.dropDown_fileCache_evictionPolicy.setCurrentIndex(policyIndex)
 
-        self.setCheckboxFromSetting(self.checkBox_libfuse_disableWriteback, libfuse['disable-writeback-cache'])
-        self.setCheckboxFromSetting(self.checkBox_libfuse_networkshare, libfuse['network-share'])
-        self.setCheckboxFromSetting(self.checkBox_fileCache_allowNonEmptyTmp,fileCache['allow-non-empty-temp'])
-        self.setCheckboxFromSetting(self.checkBox_fileCache_policyLogs,fileCache['policy-trace'])
-        self.setCheckboxFromSetting(self.checkBox_fileCache_createEmptyFile,fileCache['create-empty-file'])
-        self.setCheckboxFromSetting(self.checkBox_fileCache_cleanupStart,fileCache['cleanup-on-start'])
-        self.setCheckboxFromSetting(self.checkBox_fileCache_offloadIO,fileCache['offload-io'])
-        self.setCheckboxFromSetting(self.checkBox_fileCache_syncToFlush, fileCache['sync-to-flush'])
+        self.setCheckboxFromSetting(
+            self.checkBox_libfuse_disableWriteback, libfuse['disable-writeback-cache']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_libfuse_networkshare, libfuse['network-share']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_fileCache_allowNonEmptyTmp, fileCache['allow-non-empty-temp']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_fileCache_policyLogs, fileCache['policy-trace']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_fileCache_createEmptyFile, fileCache['create-empty-file']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_fileCache_cleanupStart, fileCache['cleanup-on-start']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_fileCache_offloadIO, fileCache['offload-io']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_fileCache_syncToFlush, fileCache['sync-to-flush']
+        )
 
         self.spinBox_fileCache_evictionTimeout.setValue(fileCache['timeout-sec'])
         self.spinBox_fileCache_maxEviction.setValue(fileCache['max-eviction'])
@@ -85,10 +106,14 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.lineEdit_subdirectory.setText(s3Storage['subdirectory'])
 
         if platform == 'win32':
-            self.checkBox_libfuse_networkshare.setToolTip('Runs as a network share - may improve performance when latency to cloud is high.')
+            self.checkBox_libfuse_networkshare.setToolTip(
+                'Runs as a network share - may improve performance when latency to cloud is high.'
+            )
         else:
             self.checkBox_libfuse_networkshare.setEnabled(False)
-            self.checkBox_libfuse_networkshare.setToolTip('Network share is only supported on Windows')
+            self.checkBox_libfuse_networkshare.setToolTip(
+                'Network share is only supported on Windows'
+            )
 
     def updateOptionalS3Storage(self):
         s3Storage = self.settings['s3storage']

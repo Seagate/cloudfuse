@@ -23,12 +23,14 @@
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtCore import Qt
 
+
 class aboutPage(QMessageBox):
     def __init__(self, cloudfuseVersion: str):
         super().__init__()
         self.setWindowTitle('About Cloudfuse')
         self.setTextFormat(Qt.RichText)
-        self.setText(f"""
+        self.setText(
+            f"""
             <p><strong><h3>About Cloudfuse</h3></strong></p>
             <p>This program is using Cloudfuse version {cloudfuseVersion}</p>
             <p>Cloudfuse provides a virtual filesystem backed by either S3 or Azure Storage for mounting the cloud to a local system.</p>
@@ -43,4 +45,5 @@ class aboutPage(QMessageBox):
             <p>WinSFP - Windows File System Proxy, Copyright Bill Zissimopoulos <a href="https://github.com/winfsp/winfsp">details</a>.</p>
             <p><h4>License</h4></p>
             <p>This project is licensed under MIT.</p>
-        """)
+        """
+        )

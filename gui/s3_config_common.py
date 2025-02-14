@@ -29,10 +29,11 @@ from ui_s3_config_common import Ui_Form
 from s3_config_advanced import s3AdvancedSettingsWidget
 from common_qt_functions import widgetCustomFunctions, defaultSettingsManager
 
-pipelineChoices = ['file_cache','stream','block_cache']
-libfusePermissions = [0o777,0o666,0o644,0o444]
+pipelineChoices = ['file_cache', 'stream', 'block_cache']
+libfusePermissions = [0o777, 0o666, 0o644, 0o444]
 
-class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
+
+class s3SettingsWidget(widgetCustomFunctions, Ui_Form):
     def __init__(self, configSettings):
         super().__init__()
         self.setupUi(self)
@@ -47,18 +48,26 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
         # S3 naming conventions:
         #   https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
         # Allow lowercase alphanumeric characters plus [.,-]
-        self.lineEdit_bucketName.setValidator(QtGui.QRegularExpressionValidator(r'^[a-z0-9-.]*$',self))
+        self.lineEdit_bucketName.setValidator(
+            QtGui.QRegularExpressionValidator(r'^[a-z0-9-.]*$', self)
+        )
         # Allow alphanumeric characters plus [-,_]
-        self.lineEdit_region.setValidator(QtGui.QRegularExpressionValidator(r'^[a-zA-Z0-9-_]*$',self))
+        self.lineEdit_region.setValidator(
+            QtGui.QRegularExpressionValidator(r'^[a-zA-Z0-9-_]*$', self)
+        )
         if platform == 'win32':
             # Windows directory and filename conventions:
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
             # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
+            self.lineEdit_fileCache_path.setValidator(
+                QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$', self)
+            )
         else:
             # Allow anything BUT Nul
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
-            self.lineEdit_fileCache_path.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
+            self.lineEdit_fileCache_path.setValidator(
+                QtGui.QRegularExpressionValidator(r'^[^\0]*$', self)
+            )
 
         # Hide sensitive data QtWidgets.QLineEdit.EchoMode.PasswordEchoOnEdit
         self.lineEdit_accessKey.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
@@ -103,6 +112,7 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
         self.groupbox_streaming.setVisible(False)
 
         # Update S3Storage re-writes everything in the S3Storage dictionary for the same reason update libfuse does.
+
     def updateS3Storage(self):
         s3Storage = self.settings['s3storage']
         s3Storage['bucket-name'] = self.lineEdit_bucketName.text()
@@ -121,20 +131,36 @@ class s3SettingsWidget(widgetCustomFunctions,Ui_Form):
 
         # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices and libfusePermissions reflect the
         #   index choices in human words without having to reference the UI. Get the value in the settings and translate that to the equivalent index in the lists.
-        self.dropDown_pipeline.setCurrentIndex(pipelineChoices.index(self.settings['components'][1]))
-        self.dropDown_libfuse_permissions.setCurrentIndex(libfusePermissions.index(libfuse['default-permission']))
+        self.dropDown_pipeline.setCurrentIndex(
+            pipelineChoices.index(self.settings['components'][1])
+        )
+        self.dropDown_libfuse_permissions.setCurrentIndex(
+            libfusePermissions.index(libfuse['default-permission'])
+        )
 
-        self.setCheckboxFromSetting(self.checkBox_multiUser, self.settings['allow-other'])
-        self.setCheckboxFromSetting(self.checkBox_nonEmptyDir,self.settings['nonempty'])
-        self.setCheckboxFromSetting(self.checkBox_daemonForeground,self.settings['foreground'])
-        self.setCheckboxFromSetting(self.checkBox_readOnly,self.settings['read-only'])
-        self.setCheckboxFromSetting(self.checkBox_streaming_fileCachingLevel,stream['file-caching'])
-        self.setCheckboxFromSetting(self.checkBox_libfuse_ignoreAppend,libfuse['ignore-open-flags'])
+        self.setCheckboxFromSetting(
+            self.checkBox_multiUser, self.settings['allow-other']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_nonEmptyDir, self.settings['nonempty']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_daemonForeground, self.settings['foreground']
+        )
+        self.setCheckboxFromSetting(self.checkBox_readOnly, self.settings['read-only'])
+        self.setCheckboxFromSetting(
+            self.checkBox_streaming_fileCachingLevel, stream['file-caching']
+        )
+        self.setCheckboxFromSetting(
+            self.checkBox_libfuse_ignoreAppend, libfuse['ignore-open-flags']
+        )
 
         # Spinbox automatically sanitizes inputs for decimal values only, so no need to check for the appropriate data type.
         self.spinBox_libfuse_attExp.setValue(libfuse['attribute-expiration-sec'])
         self.spinBox_libfuse_entExp.setValue(libfuse['entry-expiration-sec'])
-        self.spinBox_libfuse_negEntryExp.setValue(libfuse['negative-entry-expiration-sec'])
+        self.spinBox_libfuse_negEntryExp.setValue(
+            libfuse['negative-entry-expiration-sec']
+        )
         self.spinBox_streaming_blockSize.setValue(stream['block-size-mb'])
         self.spinBox_streaming_buffSize.setValue(stream['buffer-size-mb'])
         self.spinBox_streaming_maxBuff.setValue(stream['max-buffers'])
