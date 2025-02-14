@@ -23,12 +23,12 @@ Defines the AzureSettingsWidget class for configuring Azure settings.
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE
 
-from sys import platform
 from PySide6.QtCore import Qt, QSettings
-from PySide6.QtWidgets import QLineEdit, QFileDialog
+from PySide6.QtWidgets import QLineEdit, QFileDialog, QMessageBox
 from PySide6.QtGui import QRegularExpressionValidator
 
 # import the custom class made from QtDesigner
+from utils import set_path_validator, update_settings_from_widgets, populate_widgets_from_settings
 from ui_azure_config_common import Ui_Form
 from azure_config_advanced import AzureAdvancedSettingsWidget
 from common_qt_functions import WidgetCustomFunctions, DefaultSettingsManager
@@ -46,7 +46,6 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
     Attributes:
         settings (dict): Configuration settings for Azure.
         my_window (QSettings): QSettings object for storing window state.
-        save_button_clicked (bool): Flag to indicate if the save button was clicked.
     """
     def __init__(self, config_settings: dict):
         """
@@ -60,12 +59,51 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.setWindowTitle('Azure Config Settings')
         self.my_window = QSettings('Cloudfuse', 'AzcWindow')
         self.settings = config_settings
+
+        self._az_storage_mapping = {
+            'account-key': self.lineEdit_azure_accountKey,
+            'sas': self.lineEdit_azure_sasStorage,
+            'account-name': self.lineEdit_azure_accountName,
+            'container': self.lineEdit_azure_container,
+            'endpoint': self.lineEdit_azure_endpoint,
+            'appid': self.lineEdit_azure_msiAppID,
+            'resid': self.lineEdit_azure_msiResourceID,
+            'objid': self.lineEdit_azure_msiObjectID,
+            'tenantid': self.lineEdit_azure_spnTenantID,
+            'clientid': self.lineEdit_azure_spnClientID,
+            'clientsecret': self.lineEdit_azure_spnClientSecret,
+            'mode': self.dropDown_azure_modeSetting,
+            'type': self.dropDown_azure_storageType,
+        }
+        self._libfuse_mapping = {
+            'attribute-expiration-sec': self.spinBox_libfuse_attExp,
+            'entry-expiration-sec': self.spinBox_libfuse_entExp,
+            'negative-entry-expiration-sec': self.spinBox_libfuse_negEntryExp,
+            'ignore-open-flags': self.checkBox_libfuse_ignoreAppend,
+            'default-permission': self.dropDown_libfuse_permissions,
+        }
+        self._stream_mapping = {
+            'file-caching': self.checkBox_streaming_fileCachingLevel,
+            'block-size-mb': self.spinBox_streaming_blockSize,
+            'buffer-size-mb': self.spinBox_streaming_buffSize,
+            'max-buffers': self.spinBox_streaming_maxBuff,
+        }
+        self._file_cache_mapping = {
+            'path': self.lineEdit_fileCache_path,
+        }
+        self._settings_mapping = {
+            'allow-other': self.checkBox_multiUser,
+            'nonempty': self.checkBox_nonEmptyDir,
+            'foreground': self.checkBox_daemonForeground,
+            'read-only': self.checkBox_readOnly,
+        }
+        
         self.init_window_size_pos()
         # Hide the pipeline mode groupbox depending on the default select is
         self.show_azure_mode_settings()
         self.show_mode_settings()
         self.populate_options()
-        self.save_button_clicked = False
+        self._save_button_clicked = False
 
         # Set up signals
         self.dropDown_pipeline.currentIndexChanged.connect(self.show_mode_settings)
@@ -78,7 +116,7 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.button_resetDefaultSettings.clicked.connect(self.reset_defaults)
 
         # Documentation for the allowed characters for azure:
-        #   https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftstorage
+        # https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftstorage
         # Allow lowercase alphanumeric characters plus [-]
         self.lineEdit_azure_container.setValidator(
             QRegularExpressionValidator(r'^[a-z0-9-]*$', self)
@@ -88,19 +126,7 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
             QRegularExpressionValidator(r'^[a-zA-Z0-9-._]*$', self)
         )
 
-        if platform == 'win32':
-            # Windows directory and filename conventions:
-            #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
-            # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_fileCache_path.setValidator(
-                QRegularExpressionValidator(r'^[^<>."|?\0*]*$', self)
-            )
-        else:
-            # Allow anything BUT Nul
-            # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
-            self.lineEdit_fileCache_path.setValidator(
-                QRegularExpressionValidator(r'^[^\0]*$', self)
-            )
+        set_path_validator(self.lineEdit_fileCache_path)
 
         self.lineEdit_azure_accountKey.setEchoMode(
             QLineEdit.EchoMode.Password
@@ -109,30 +135,12 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
             QLineEdit.EchoMode.Password
         )
 
-    # Set up slots
-
     def update_az_storage(self):
         """
         Update the Azure storage settings from the UI choices.
         """
         az_storage = self.settings['azstorage']
-        az_storage['account-key'] = self.lineEdit_azure_accountKey.text()
-        az_storage['sas'] = self.lineEdit_azure_sasStorage.text()
-        az_storage['account-name'] = self.lineEdit_azure_accountName.text()
-        az_storage['container'] = self.lineEdit_azure_container.text()
-        az_storage['endpoint'] = self.lineEdit_azure_endpoint.text()
-        az_storage['appid'] = self.lineEdit_azure_msiAppID.text()
-        az_storage['resid'] = self.lineEdit_azure_msiResourceID.text()
-        az_storage['objid'] = self.lineEdit_azure_msiObjectID.text()
-        az_storage['tenantid'] = self.lineEdit_azure_spnTenantID.text()
-        az_storage['clientid'] = self.lineEdit_azure_spnClientID.text()
-        az_storage['clientsecret'] = self.lineEdit_azure_spnClientSecret.text()
-        az_storage['type'] = azStorageType[
-            self.dropDown_azure_storageType.currentIndex()
-        ]
-        az_storage['mode'] = bucketModeChoices[
-            self.dropDown_azure_modeSetting.currentIndex()
-        ]
+        update_settings_from_widgets(self._az_storage_mapping, az_storage)
         self.settings['azstorage'] = az_storage
 
     def open_advanced(self):
@@ -143,12 +151,9 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.more_settings.setWindowModality(Qt.ApplicationModal)
         self.more_settings.show()
 
-    # ShowModeSettings will switch which groupbox is visiible: stream or file_cache
-    #   the function also updates the internal components settings through QSettings
-    #   There is one slot for the signal to be pointed at which is why showmodesettings is used.
     def show_mode_settings(self):
         """
-        Show the appropriate mode settings based on the selected pipeline.
+        Show file_cache or stream settings based on the selected pipeline.
         """
         self.hide_mode_boxes()
         components = self.settings['components']
@@ -187,8 +192,8 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         stream = self.settings['stream']
 
         # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices, libfusePermissions, azStorage and bucketMode
-        #   reflect the index choices in human words without having to reference the UI.
-        #   Get the value in the settings and translate that to the equivalent index in the lists.
+        # reflect the index choices in human words without having to reference the UI.
+        # Get the value in the settings and translate that to the equivalent index in the lists.
         self.dropDown_pipeline.setCurrentIndex(
             pipelineChoices.index(self.settings['components'][1])
         )
@@ -201,48 +206,12 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.dropDown_azure_modeSetting.setCurrentIndex(
             bucketModeChoices.index(self.settings['azstorage']['mode'])
         )
-
-        self.set_checkbox_from_setting(
-            self.checkBox_multiUser, self.settings['allow-other']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_nonEmptyDir, self.settings['nonempty']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_daemonForeground, self.settings['foreground']
-        )
-        self.set_checkbox_from_setting(self.checkBox_readOnly, self.settings['read-only'])
-        self.set_checkbox_from_setting(
-            self.checkBox_streaming_fileCachingLevel, stream['file-caching']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_libfuse_ignoreAppend, libfuse['ignore-open-flags']
-        )
-
-        # Spinbox automatically sanitizes inputs for decimal values only, so no need to check for the appropriate data type.
-        self.spinBox_libfuse_attExp.setValue(libfuse['attribute-expiration-sec'])
-        self.spinBox_libfuse_entExp.setValue(libfuse['entry-expiration-sec'])
-        self.spinBox_libfuse_negEntryExp.setValue(
-            libfuse['negative-entry-expiration-sec']
-        )
-        self.spinBox_streaming_blockSize.setValue(stream['block-size-mb'])
-        self.spinBox_streaming_buffSize.setValue(stream['buffer-size-mb'])
-        self.spinBox_streaming_maxBuff.setValue(stream['max-buffers'])
-
-        # There is no sanitizing for lineEdit at the moment, the GUI depends on the user being correct.
-
-        self.lineEdit_azure_accountKey.setText(az_storage['account-key'])
-        self.lineEdit_azure_sasStorage.setText(az_storage['sas'])
-        self.lineEdit_azure_accountName.setText(az_storage['account-name'])
-        self.lineEdit_azure_container.setText(az_storage['container'])
-        self.lineEdit_azure_endpoint.setText(az_storage['endpoint'])
-        self.lineEdit_azure_msiAppID.setText(az_storage['appid'])
-        self.lineEdit_azure_msiResourceID.setText(az_storage['resid'])
-        self.lineEdit_azure_msiObjectID.setText(az_storage['objid'])
-        self.lineEdit_azure_spnTenantID.setText(az_storage['tenantid'])
-        self.lineEdit_azure_spnClientID.setText(az_storage['clientid'])
-        self.lineEdit_azure_spnClientSecret.setText(az_storage['clientsecret'])
-        self.lineEdit_fileCache_path.setText(file_cache['path'])
+        
+        populate_widgets_from_settings(self._file_cache_mapping, file_cache)
+        populate_widgets_from_settings(self._az_storage_mapping, az_storage)
+        populate_widgets_from_settings(self._libfuse_mapping, libfuse)
+        populate_widgets_from_settings(self._stream_mapping, stream)
+        populate_widgets_from_settings(self._settings_mapping, self.settings)
 
     def get_file_dir_input(self):
         """
@@ -275,7 +244,7 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         """
         # Reset these defaults
         check_choice = self.popup_double_check_reset()
-        if check_choice == QtWidgets.QMessageBox.Yes:
+        if check_choice == QMessageBox.Yes:
             DefaultSettingsManager.set_azure_settings(self, self.settings)
             DefaultSettingsManager.set_component_settings(self, self.settings)
             self.populate_options()

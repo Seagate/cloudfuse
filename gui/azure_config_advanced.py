@@ -27,9 +27,9 @@ advanced Azure settings.
 
 from sys import platform
 from PySide6.QtCore import QSettings
-from PySide6.QtGui import QRegularExpressionValidator
 
 # import the custom class made from QtDesigner
+from utils import set_path_validator, populate_widgets_from_settings, update_settings_from_widgets
 from ui_azure_config_advanced import Ui_Form
 from common_qt_functions import WidgetCustomFunctions
 
@@ -58,23 +58,55 @@ class AzureAdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.setWindowTitle('Advanced Azure Config Settings')
         self.settings = config_settings
         self.my_window = QSettings('Cloudfuse', 'AzAdvancedWindow')
+        
+        self._az_storage_mapping = {
+            'use-http': self.checkBox_azure_useHttp,
+            'validate-md5': self.checkBox_azure_validateMd5,
+            'update-md5': self.checkBox_azure_updateMd5,
+            'fail-unsupported-op': self.checkBox_azure_failUnsupportedOps,
+            'sdk-trace': self.checkBox_azure_sdkTrace,
+            'virtual-directory': self.checkBox_azure_virtualDirectory,
+            'disable-compression': self.checkBox_azure_disableCompression,
+            'block-size-mb': self.spinBox_azure_blockSize,
+            'max-concurrency': self.spinBox_azure_maxConcurrency,
+            'block-list-on-mount-sec': self.spinBox_azure_blockOnMount,
+            'max-retries': self.spinBox_azure_maxRetries,
+            'max-retry-timeout-sec': self.spinBox_azure_maxRetryTimeout,
+            'retry-backoff-sec': self.spinBox_azure_retryBackoff,
+            'max-retry-delay-sec': self.spinBox_azure_maxRetryDelay,
+            'aadendpoint': self.lineEdit_azure_aadEndpoint,
+            'subdirectory': self.lineEdit_azure_subDirectory,
+            'http-proxy': self.lineEdit_azure_httpProxy,
+            'https-proxy': self.lineEdit_azure_httpsProxy,
+            'auth-resource': self.lineEdit_azure_authResource,
+            'tier': self.dropDown_azure_blobTier,
+        }
+        self._libfuse_mapping = {
+            'disable-writeback-cache': self.checkBox_libfuse_disableWriteback,
+            'network-share': self.checkBox_libfuse_networkshare,
+            'max-fuse-threads': self.spinBox_libfuse_maxFuseThreads,
+        }
+        self._file_cache_mapping = {
+            'allow-non-empty-temp': self.checkBox_fileCache_allowNonEmptyTmp,
+            'policy-trace': self.checkBox_fileCache_policyLogs,
+            'create-empty-file': self.checkBox_fileCache_createEmptyFile,
+            'cleanup-on-start': self.checkBox_fileCache_cleanupStart,
+            'offload-io': self.checkBox_fileCache_offloadIO,
+            'sync-to-flush': self.checkBox_fileCache_syncToFlush,
+            'timeout-sec': self.spinBox_fileCache_evictionTimeout,
+            'max-eviction': self.spinBox_fileCache_maxEviction,
+            'max-size-mb': self.spinBox_fileCache_maxCacheSize,
+            'high-threshold': self.spinBox_fileCache_evictMaxThresh,
+            'low-threshold': self.spinBox_fileCache_evictMinThresh,
+            'refresh-sec': self.spinBox_fileCache_refreshSec,
+            'policy': self.dropDown_fileCache_evictionPolicy,
+        }
+        
         self.init_window_size_pos()
         self.populate_options()
-        self.save_button_clicked = False
+        self._save_button_clicked = False
 
-        if platform == 'win32':
-            # Windows directory and filename conventions:
-            #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
-            # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_azure_subDirectory.setValidator(
-                QRegularExpressionValidator(r'^[^<>."|?\0*]*$', self)
-            )
-        else:
-            # Allow anything BUT Nul
-            # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
-            self.lineEdit_azure_subDirectory.setValidator(
-                QRegularExpressionValidator(r'^[^\0]*$', self)
-            )
+        set_path_validator(self.lineEdit_azure_subDirectory)
 
         # Set up the signals
         self.button_okay.clicked.connect(self.exit_window)
@@ -87,81 +119,10 @@ class AzureAdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         file_cache = self.settings['file_cache']
         az_storage = self.settings['azstorage']
         libfuse = self.settings['libfuse']
-
-        self.set_checkbox_from_setting(
-            self.checkBox_libfuse_disableWriteback, libfuse['disable-writeback-cache']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_libfuse_networkshare, libfuse['network-share']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_fileCache_allowNonEmptyTmp, file_cache['allow-non-empty-temp']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_fileCache_policyLogs, file_cache['policy-trace']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_fileCache_createEmptyFile, file_cache['create-empty-file']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_fileCache_cleanupStart, file_cache['cleanup-on-start']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_fileCache_offloadIO, file_cache['offload-io']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_fileCache_syncToFlush, file_cache['sync-to-flush']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_azure_useHttp, az_storage['use-http'])
-        self.set_checkbox_from_setting(
-            self.checkBox_azure_validateMd5, az_storage['validate-md5']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_azure_updateMd5, az_storage['update-md5']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_azure_failUnsupportedOps, az_storage['fail-unsupported-op']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_azure_sdkTrace, az_storage['sdk-trace']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_azure_virtualDirectory, az_storage['virtual-directory']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_azure_disableCompression, az_storage['disable-compression']
-        )
-
-        self.spinBox_fileCache_evictionTimeout.setValue(
-            file_cache['timeout-sec'])
-        self.spinBox_fileCache_maxEviction.setValue(file_cache['max-eviction'])
-        self.spinBox_fileCache_maxCacheSize.setValue(file_cache['max-size-mb'])
-        self.spinBox_fileCache_evictMaxThresh.setValue(
-            file_cache['high-threshold'])
-        self.spinBox_fileCache_evictMinThresh.setValue(
-            file_cache['low-threshold'])
-        self.spinBox_fileCache_refreshSec.setValue(file_cache['refresh-sec'])
-        self.spinBox_azure_blockSize.setValue(az_storage['block-size-mb'])
-        self.spinBox_azure_maxConcurrency.setValue(
-            az_storage['max-concurrency'])
-        self.spinBox_azure_blockOnMount.setValue(
-            az_storage['block-list-on-mount-sec'])
-        self.spinBox_azure_maxRetries.setValue(az_storage['max-retries'])
-        self.spinBox_azure_maxRetryTimeout.setValue(
-            az_storage['max-retry-timeout-sec'])
-        self.spinBox_azure_retryBackoff.setValue(
-            az_storage['retry-backoff-sec'])
-        self.spinBox_azure_maxRetryDelay.setValue(
-            az_storage['max-retry-delay-sec'])
-        self.spinBox_libfuse_maxFuseThreads.setValue(
-            libfuse['max-fuse-threads'])
-
-        self.lineEdit_azure_aadEndpoint.setText(az_storage['aadendpoint'])
-        self.lineEdit_azure_subDirectory.setText(az_storage['subdirectory'])
-        self.lineEdit_azure_httpProxy.setText(az_storage['http-proxy'])
-        self.lineEdit_azure_httpsProxy.setText(az_storage['https-proxy'])
-        self.lineEdit_azure_authResource.setText(az_storage['auth-resource'])
+        
+        populate_widgets_from_settings(self._file_cache_mapping, file_cache)
+        populate_widgets_from_settings(self._az_storage_mapping, az_storage)
+        populate_widgets_from_settings(self._libfuse_mapping, libfuse)
 
         self.dropDown_azure_blobTier.setCurrentIndex(
             az_blob_tier.index(az_storage['tier'])
@@ -184,36 +145,8 @@ class AzureAdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         """
         Update the Azure storage settings from the UI values.
         """
-        az_storage = self.settings['azstorage']
-        az_storage['block-size-mb'] = self.spinBox_azure_blockSize.value()
-        az_storage['max-concurrency'] = self.spinBox_azure_maxConcurrency.value()
-        az_storage['block-list-on-mount-sec'] = self.spinBox_azure_blockOnMount.value()
-        az_storage['max-retries'] = self.spinBox_azure_maxRetries.value()
-        az_storage['max-retry-timeout-sec'] = self.spinBox_azure_maxRetryTimeout.value()
-        az_storage['retry-backoff-sec'] = self.spinBox_azure_retryBackoff.value()
-        az_storage['max-retry-delay-sec'] = self.spinBox_azure_maxRetryDelay.value()
-
-        az_storage['use-http'] = self.checkBox_azure_useHttp.isChecked()
-        az_storage['validate-md5'] = self.checkBox_azure_validateMd5.isChecked()
-        az_storage['update-md5'] = self.checkBox_azure_updateMd5.isChecked()
-        az_storage['fail-unsupported-op'] = (
-            self.checkBox_azure_failUnsupportedOps.isChecked()
-        )
-        az_storage['sdk-trace'] = self.checkBox_azure_sdkTrace.isChecked()
-        az_storage['virtual-directory'] = (
-            self.checkBox_azure_virtualDirectory.isChecked()
-        )
-        az_storage['disable-compression'] = (
-            self.checkBox_azure_disableCompression.isChecked()
-        )
-
-        az_storage['aadendpoint'] = self.lineEdit_azure_aadEndpoint.text()
-        az_storage['subdirectory'] = self.lineEdit_azure_subDirectory.text()
-        az_storage['http-proxy'] = self.lineEdit_azure_httpProxy.text()
-        az_storage['https-proxy'] = self.lineEdit_azure_httpsProxy.text()
-        az_storage['auth-resource'] = self.lineEdit_azure_authResource.text()
-
-        az_storage['tier'] = az_blob_tier[self.dropDown_azure_blobTier.currentIndex()]
+        az_storage = self.settings['azstorage']        
+        update_settings_from_widgets(self._az_storage_mapping, az_storage)
         self.settings['azstorage'] = az_storage
 
     def update_settings_from_ui_choices(self):

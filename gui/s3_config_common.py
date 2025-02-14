@@ -24,12 +24,12 @@ Defines the S3SettingsWidget class for configuring S3 settings.
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE
 
-from sys import platform
 from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import QLineEdit, QFileDialog, QMessageBox
 
 # import the custom class made from QtDesigner
+from utils import set_path_validator, populate_widgets_from_settings, update_settings_from_widgets
 from ui_s3_config_common import Ui_Form
 from s3_config_advanced import S3AdvancedSettingsWidget
 from common_qt_functions import WidgetCustomFunctions, DefaultSettingsManager
@@ -45,7 +45,6 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
     Attributes:
         settings (dict): Configuration settings for S3.
         my_window (QSettings): QSettings object for storing window state.
-        save_button_clicked (bool): Flag to indicate if the save button was clicked.
     """
     def __init__(self, configSettings: dict):
         """
@@ -58,11 +57,43 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.setupUi(self)
         self.my_window = QSettings('Cloudfuse', 's3Window')
         self.init_window_size_pos()
-        self.setWindowTitle('S3Cloud Config Settings')
+        self.setWindowTitle('S3 Config Settings')
         self.settings = configSettings
+        
+        self._s3_storage_mapping = {
+            'bucket-name': self.lineEdit_bucketName,
+            'endpoint': self.lineEdit_endpoint,
+            'secret-key': self.lineEdit_secretKey,
+            'key-id': self.lineEdit_accessKey,
+            'region': self.lineEdit_region,
+            'path': self.lineEdit_fileCache_path,
+        }
+        self._libfuse_mapping = {
+            'attribute-expiration-sec': self.spinBox_libfuse_attExp,
+            'entry-expiration-sec': self.spinBox_libfuse_entExp,
+            'negative-entry-expiration-sec': self.spinBox_libfuse_negEntryExp,
+            'ignore-open-flags': self.checkBox_libfuse_ignoreAppend,
+            'default-permission': self.dropDown_libfuse_permissions,
+        }
+        self._stream_mapping = {
+            'file-caching': self.checkBox_streaming_fileCachingLevel,
+            'block-size-mb': self.spinBox_streaming_blockSize,
+            'buffer-size-mb': self.spinBox_streaming_buffSize,
+            'max-buffers': self.spinBox_streaming_maxBuff,
+        }
+        self._file_cache_mapping = {
+            'path': self.lineEdit_fileCache_path,
+        }
+        self._settings_mapping = {
+            'allow-other': self.checkBox_multiUser,
+            'nonempty': self.checkBox_nonEmptyDir,
+            'foreground': self.checkBox_daemonForeground,
+            'read-only': self.checkBox_readOnly,
+        }
+        
         self.populate_options()
         self.show_mode_settings()
-        self.save_button_clicked = False
+        self._save_button_clicked = False
 
         # S3 naming conventions:
         #   https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
@@ -74,19 +105,8 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.lineEdit_region.setValidator(
             QRegularExpressionValidator(r'^[a-zA-Z0-9-_]*$', self)
         )
-        if platform == 'win32':
-            # Windows directory and filename conventions:
-            #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
-            # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_fileCache_path.setValidator(
-                QRegularExpressionValidator(r'^[^<>."|?\0*]*$', self)
-            )
-        else:
-            # Allow anything BUT Nul
-            # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
-            self.lineEdit_fileCache_path.setValidator(
-                QRegularExpressionValidator(r'^[^\0]*$', self)
-            )
+        
+        set_path_validator(self.lineEdit_fileCache_path)
 
         # Hide sensitive data QLineEdit.EchoMode.PasswordEchoOnEdit
         self.lineEdit_accessKey.setEchoMode(
@@ -152,11 +172,7 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
         Update the S3 storage settings from the UI choices.
         """
         s3_storage = self.settings['s3storage']
-        s3_storage['bucket-name'] = self.lineEdit_bucketName.text()
-        s3_storage['key-id'] = self.lineEdit_accessKey.text()
-        s3_storage['secret-key'] = self.lineEdit_secretKey.text()
-        s3_storage['endpoint'] = self.lineEdit_endpoint.text()
-        s3_storage['region'] = self.lineEdit_region.text()
+        update_settings_from_widgets(self._s3_storage_mapping, s3_storage)
         self.settings['s3storage'] = s3_storage
 
     # This widget will not display all the options in settings, only the ones written in the UI file.
@@ -178,42 +194,11 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
             libfusePermissions.index(libfuse['default-permission'])
         )
 
-        self.set_checkbox_from_setting(
-            self.checkBox_multiUser, self.settings['allow-other']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_nonEmptyDir, self.settings['nonempty']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_daemonForeground, self.settings['foreground']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_readOnly, self.settings['read-only'])
-        self.set_checkbox_from_setting(
-            self.checkBox_streaming_fileCachingLevel, stream['file-caching']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_libfuse_ignoreAppend, libfuse['ignore-open-flags']
-        )
-
-        # Spinbox automatically sanitizes inputs for decimal values only, so no need to check for the appropriate data type.
-        self.spinBox_libfuse_attExp.setValue(
-            libfuse['attribute-expiration-sec'])
-        self.spinBox_libfuse_entExp.setValue(libfuse['entry-expiration-sec'])
-        self.spinBox_libfuse_negEntryExp.setValue(
-            libfuse['negative-entry-expiration-sec']
-        )
-        self.spinBox_streaming_blockSize.setValue(stream['block-size-mb'])
-        self.spinBox_streaming_buffSize.setValue(stream['buffer-size-mb'])
-        self.spinBox_streaming_maxBuff.setValue(stream['max-buffers'])
-        # TODO:
-        # There is no sanitizing for lineEdit at the moment, the GUI depends on the user being correct.
-        self.lineEdit_bucketName.setText(s3_storage['bucket-name'])
-        self.lineEdit_endpoint.setText(s3_storage['endpoint'])
-        self.lineEdit_secretKey.setText(s3_storage['secret-key'])
-        self.lineEdit_accessKey.setText(s3_storage['key-id'])
-        self.lineEdit_region.setText(s3_storage['region'])
-        self.lineEdit_fileCache_path.setText(file_cache['path'])
+        populate_widgets_from_settings(self._file_cache_mapping, file_cache)
+        populate_widgets_from_settings(self._s3_storage_mapping, s3_storage)
+        populate_widgets_from_settings(self._libfuse_mapping, libfuse)
+        populate_widgets_from_settings(self._stream_mapping, stream)
+        populate_widgets_from_settings(self._settings_mapping, self.settings)
 
     def reset_defaults(self):
         """

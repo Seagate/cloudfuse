@@ -371,22 +371,19 @@ class CustomConfigFunctions:
 class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
     """
     A class to manage custom widget functions.
-
-    Attributes:
-        save_button_clicked (bool): Flag to indicate if the save button was clicked.
     """
     def __init__(self):
         """
         Initialize the WidgetCustomFunctions class.
         """
         super().__init__()
-        self.save_button_clicked = False
+        self._save_button_clicked = False
 
     def exit_window(self):
         """
         Exit the window and set the save button clicked flag.
         """
-        self.save_button_clicked = True
+        self._save_button_clicked = True
         self.close()
 
     def exit_window_cleanup(self):
@@ -394,8 +391,8 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
         Save the window size and position before exiting.
         """
         # Save this specific window's size and position
-        self.myWindow.setValue('window size', self.size())
-        self.myWindow.setValue('window position', self.pos())
+        self.my_window.setValue('window size', self.size())
+        self.my_window.setValue('window position', self.pos())
 
     def popup_double_check_reset(self) -> int:
         """
@@ -437,7 +434,7 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
         )
         msg.setDefaultButton(QMessageBox.Cancel)
 
-        if self.save_button_clicked:
+        if self._save_button_clicked:
             # Insert all settings to yaml file
             self.exit_window_cleanup()
             self.update_settings_from_ui_choices()
@@ -473,8 +470,8 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
         Initialize the window size and position.
         """
         try:
-            self.resize(self.myWindow.value('window size'))
-            self.move(self.myWindow.value('window position'))
+            self.resize(self.my_window.value('window size'))
+            self.move(self.my_window.value('window position'))
         except:
             desktop_center = QScreen.availableGeometry(
                 QApplication.primaryScreen()

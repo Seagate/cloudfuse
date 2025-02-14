@@ -30,7 +30,7 @@ from shutil import which
 from sys import platform
 
 # Import QT libraries
-from PySide6.QtGui import QRegularExpressionValidator, QTextCursor
+from PySide6.QtGui import QTextCursor
 from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtWidgets import QFileDialog, QMainWindow, QMessageBox
 
@@ -41,6 +41,7 @@ from common_qt_functions import (
 )
 from s3_config_common import S3SettingsWidget
 from about_page import AboutPage
+from utils import set_path_validator
 from ui_mount_primary_window import Ui_primaryFUSEwindow
 
 bucket_options = ['s3storage', 'azstorage']
@@ -80,19 +81,7 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         self.settings = self.all_mount_settings
         self.init_settings_from_config(self.settings)
 
-        if platform == 'win32':
-            # Windows directory and filename conventions:
-            # https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
-            # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_mountPoint.setValidator(
-                QRegularExpressionValidator(r'^[^<>."|?\0*]*$', self)
-            )
-        else:
-            # Allow anything BUT Nul
-            # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
-            self.lineEdit_mountPoint.setValidator(
-                QRegularExpressionValidator(r'^[^\0]*$', self)
-            )
+        set_path_validator(self.lineEdit_mountPoint)
 
         # Set up the signals for all the interactive entities
         self.button_browse.clicked.connect(self.get_file_dir_input)

@@ -26,9 +26,9 @@ Defines the S3AdvancedSettingsWidget class for configuring advanced S3 settings.
 
 from sys import platform
 from PySide6.QtCore import QSettings
-from PySide6.QtGui import QRegularExpressionValidator
 
 # import the custom class made from QtDesigner
+from utils import set_path_validator, populate_widgets_from_settings, update_settings_from_widgets
 from ui_s3_config_advanced import Ui_Form
 from common_qt_functions import WidgetCustomFunctions
 
@@ -42,7 +42,6 @@ class S3AdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
     Attributes:
         settings (dict): Configuration settings for S3.
         my_window (QSettings): QSettings object for storing window state.
-        save_button_clicked (bool): Flag to indicate if the save button was clicked.
     """
     def __init__(self, configSettings: dict):
         """
@@ -55,24 +54,37 @@ class S3AdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.setupUi(self)
         self.my_window = QSettings('Cloudfuse', 'S3AdvancedWindow')
         self.settings = configSettings
-        self.init_window_size_pos()
-        self.setWindowTitle('Advanced S3Cloud Config Settings')
-        self.populate_options()
-        self.save_button_clicked = False
+        
+        self._s3_storage_mapping = {
+            'subdirectory': self.lineEdit_subdirectory,
+        }
+        self._libfuse_mapping = {
+            'disable-writeback-cache': self.checkBox_libfuse_disableWriteback,
+            'network-share': self.checkBox_libfuse_networkshare,
+            'max-fuse-threads': self.spinBox_libfuse_maxFuseThreads,
+        }
+        self._file_cache_mapping = {
+            'allow-non-empty-temp': self.checkBox_fileCache_allowNonEmptyTmp,
+            'policy-trace': self.checkBox_fileCache_policyLogs,
+            'create-empty-file': self.checkBox_fileCache_createEmptyFile,
+            'cleanup-on-start': self.checkBox_fileCache_cleanupStart,
+            'offload-io': self.checkBox_fileCache_offloadIO,
+            'sync-to-flush': self.checkBox_fileCache_syncToFlush,
+            'timeout-sec': self.spinBox_fileCache_evictionTimeout,
+            'max-eviction': self.spinBox_fileCache_maxEviction,
+            'max-size-mb': self.spinBox_fileCache_maxCacheSize,
+            'high-threshold': self.spinBox_fileCache_evictMaxThresh,
+            'low-threshold': self.spinBox_fileCache_evictMinThresh,
+            'refresh-sec': self.spinBox_fileCache_refreshSec,
+            'policy': self.dropDown_fileCache_evictionPolicy,
+        }
 
-        if platform == 'win32':
-            # Windows directory and filename conventions:
-            #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
-            # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
-            self.lineEdit_subdirectory.setValidator(
-                QRegularExpressionValidator(r'^[^<>."|?\0*]*$', self)
-            )
-        else:
-            # Allow anything BUT Nul
-            # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
-            self.lineEdit_subdirectory.setValidator(
-                QRegularExpressionValidator(r'^[^\0]*$', self)
-            )
+        self.init_window_size_pos()
+        self.setWindowTitle('Advanced S3 Config Settings')
+        self.populate_options()
+        self._save_button_clicked = False
+
+        set_path_validator(self.lineEdit_subdirectory)
 
         # Set up the signals
         self.button_okay.clicked.connect(self.exit_window)
@@ -86,49 +98,13 @@ class S3AdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         libfuse = self.settings['libfuse']
         s3_storage = self.settings['s3storage']
 
-        # The index of file_cache_eviction is matched with the default
-        #   index values in the ui code, so translate the value from settings to index number
-        policy_index = file_cache_eviction_choices.index(file_cache['policy'])
-        self.dropDown_fileCache_evictionPolicy.setCurrentIndex(policy_index)
-
-        self.set_checkbox_from_setting(
-            self.checkBox_libfuse_disableWriteback, libfuse['disable-writeback-cache']
+        populate_widgets_from_settings(self._file_cache_mapping, file_cache)
+        populate_widgets_from_settings(self._s3_storage_mapping, s3_storage)
+        populate_widgets_from_settings(self._libfuse_mapping, libfuse)
+        
+        self.dropDown_fileCache_evictionPolicy.setCurrentIndex(
+            file_cache_eviction_choices.index(file_cache['policy'])
         )
-        self.set_checkbox_from_setting(
-            self.checkBox_libfuse_networkshare, libfuse['network-share']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_fileCache_allowNonEmptyTmp, file_cache['allow-non-empty-temp']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_fileCache_policyLogs, file_cache['policy-trace']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_fileCache_createEmptyFile, file_cache['create-empty-file']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_fileCache_cleanupStart, file_cache['cleanup-on-start']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_fileCache_offloadIO, file_cache['offload-io']
-        )
-        self.set_checkbox_from_setting(
-            self.checkBox_fileCache_syncToFlush, file_cache['sync-to-flush']
-        )
-
-        self.spinBox_fileCache_evictionTimeout.setValue(
-            file_cache['timeout-sec'])
-        self.spinBox_fileCache_maxEviction.setValue(file_cache['max-eviction'])
-        self.spinBox_fileCache_maxCacheSize.setValue(file_cache['max-size-mb'])
-        self.spinBox_fileCache_evictMaxThresh.setValue(
-            file_cache['high-threshold'])
-        self.spinBox_fileCache_evictMinThresh.setValue(
-            file_cache['low-threshold'])
-        self.spinBox_fileCache_refreshSec.setValue(file_cache['refresh-sec'])
-        self.spinBox_libfuse_maxFuseThreads.setValue(
-            libfuse['max-fuse-threads'])
-
-        self.lineEdit_subdirectory.setText(s3_storage['subdirectory'])
 
         if platform == 'win32':
             self.checkBox_libfuse_networkshare.setToolTip(
@@ -145,7 +121,7 @@ class S3AdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         Update the optional S3 storage settings from the UI values.
         """
         s3_storage = self.settings['s3storage']
-        s3_storage['subdirectory'] = self.lineEdit_subdirectory.text()
+        update_settings_from_widgets(self._s3_storage_mapping, s3_storage)
         self.settings['s3storage'] = s3_storage
 
     def update_settings_from_ui_choices(self):
