@@ -1012,20 +1012,20 @@ func (fc *FileCache) validateStorageError(path string, err error, method string,
 func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("FileCache::DeleteFile : name=%s", options.Name)
 	localPath := filepath.Join(fc.tmpPath, options.Name)
-	var offline bool
 
 	flock := fc.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
 
 	err := fc.NextComponent().DeleteFile(options)
-	// recoverable is false because (currently) we don't allow open files to be deleted
 	err = fc.validateStorageError(options.Name, err, "DeleteFile", false)
-	//
 	if fc.offlineAccess && errors.Is(err, &common.CloudUnreachableError{}) && fc.notInCloud(options.Name) {
-		if _, statErr := os.Stat(localPath); statErr == nil {
-			offline = true
+		// we are offline and the file is local only, so handle deletion locally
+		_, statErr := os.Stat(localPath)
+		if statErr == nil {
 			err = nil
+		} else {
+			return statErr
 		}
 	}
 	if err != nil {
@@ -1038,9 +1038,7 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	// update file state
 	flock.LazyOpen = false
 	// remove deleted file from async upload map
-	if offline {
-		fc.offlineOps.Delete(options.Name)
-	}
+	fc.offlineOps.Delete(options.Name)
 
 	return nil
 }
