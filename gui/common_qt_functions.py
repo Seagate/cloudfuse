@@ -34,6 +34,10 @@ from PySide6.QtGui import QCloseEvent, QScreen
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QMessageBox, QApplication, QCheckBox
 
+# noinspection PyUnresolvedReferences
+from __feature__ import snake_case, true_property
+
+
 file_cache_eviction_choices = ['lru', 'lfu']
 libfusePermissions = [0o777, 0o666, 0o644, 0o444]
 
@@ -360,8 +364,8 @@ class CustomConfigFunctions:
                 return True
         except:
             msg = QMessageBox()
-            msg.setWindowTitle('Write Failed')
-            msg.setInformativeText(
+            msg.set_window_title('Write Failed')
+            msg.set_informative_text(
                 'Writing the config file failed. Check file permissions and try again.'
             )
             msg.exec()
@@ -391,8 +395,8 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
         Save the window size and position before exiting.
         """
         # Save this specific window's size and position
-        self.my_window.setValue('window size', self.size())
-        self.my_window.setValue('window position', self.pos())
+        self.my_window.set_value('window size', self.size())
+        self.my_window.set_value('window position', self.pos())
 
     def popup_double_check_reset(self) -> int:
         """
@@ -402,14 +406,14 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
             int: The user's choice from the dialog.
         """
         check_msg = QMessageBox()
-        check_msg.setWindowTitle('Are you sure?')
-        check_msg.setInformativeText(
+        check_msg.set_window_title('Are you sure?')
+        check_msg.set_informative_text(
             'ResetDefault settings will reset all settings for this target.'
         )
-        check_msg.setStandardButtons(
+        check_msg.set_standard_buttons(
             QMessageBox.Cancel | QMessageBox.Yes
         )
-        check_msg.setDefaultButton(QMessageBox.Cancel)
+        check_msg.set_default_button(QMessageBox.Cancel)
         choice = check_msg.exec()
         return choice
 
@@ -424,15 +428,15 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
             event (QCloseEvent): The close event.
         """
         msg = QMessageBox()
-        msg.setWindowTitle('Are you sure?')
-        msg.setInformativeText('Do you want to save you changes?')
-        msg.setText('The settings have been modified.')
-        msg.setStandardButtons(
+        msg.set_window_title('Are you sure?')
+        msg.set_informative_text('Do you want to save you changes?')
+        msg.set_text('The settings have been modified.')
+        msg.set_standard_buttons(
             QMessageBox.Discard
             | QMessageBox.Cancel
             | QMessageBox.Save
         )
-        msg.setDefaultButton(QMessageBox.Cancel)
+        msg.set_default_button(QMessageBox.Cancel)
 
         if self._save_button_clicked:
             # Insert all settings to yaml file
@@ -473,12 +477,12 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
             self.resize(self.my_window.value('window size'))
             self.move(self.my_window.value('window position'))
         except:
-            desktop_center = QScreen.availableGeometry(
-                QApplication.primaryScreen()
+            desktop_center = QScreen.available_geometry(
+                QApplication.primary_screen()
             ).center()
-            my_window_geometry = self.frameGeometry()
-            my_window_geometry.moveCenter(desktop_center)
-            self.move(my_window_geometry.topLeft())
+            my_window_geometry = self.frame_geometry()
+            my_window_geometry.move_center(desktop_center)
+            self.move(my_window_geometry.top_left())
 
     # Check for a true/false setting and set the checkbox state as appropriate.
     #   Note, Checked/UnChecked are NOT True/False data types, hence the need to check what the values are.
@@ -493,35 +497,35 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
             setting_name (bool): The setting value.
         """
         if setting_name:
-            checkbox.setCheckState(Qt.Checked)
+            checkbox.set_check_state(Qt.Checked)
         else:
-            checkbox.setCheckState(Qt.Unchecked)
+            checkbox.set_check_state(Qt.Unchecked)
 
     def update_multi_user(self):
         """
         Update the multi-user setting.
         """
-        self.settings['allow-other'] = self.checkBox_multiUser.isChecked()
+        self.settings['allow-other'] = self.checkBox_multiUser.is_checked()
 
     def update_non_emtpy_dir(self):
         """
         Update the non-empty directory setting.
         """
-        self.settings['nonempty'] = self.checkBox_nonEmptyDir.isChecked()
+        self.settings['nonempty'] = self.checkBox_nonEmptyDir.is_checked()
 
     def update_daemon_foreground(self):
         """
         Update the daemon foreground setting.
         """
-        self.settings['foreground'] = self.checkBox_daemonForeground.isChecked()
+        self.settings['foreground'] = self.checkBox_daemonForeground.is_checked()
 
     def update_read_only(self):
         """
         Update the read-only setting.
         """
-        self.settings['read-only'] = self.checkBox_readOnly.isChecked()
+        self.settings['read-only'] = self.checkBox_readOnly.is_checked()
 
-    # Update Libfuse re-writes everything in the Libfuse because of how setting.setValue works -
+    # Update Libfuse re-writes everything in the Libfuse because of how setting.set_value works -
     # it will not append, so the code makes a copy of the dictionary and updates the sub-keys.
     # When the user updates the sub-option through the GUI, it will trigger Libfuse to update;
     # it's written this way to save on lines of code.
@@ -531,9 +535,9 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
         """
         libfuse = self.settings['libfuse']
         libfuse['default-permission'] = libfusePermissions[
-            self.dropDown_libfuse_permissions.currentIndex()
+            self.dropDown_libfuse_permissions.current_index()
         ]
-        libfuse['ignore-open-flags'] = self.checkBox_libfuse_ignoreAppend.isChecked()
+        libfuse['ignore-open-flags'] = self.checkBox_libfuse_ignoreAppend.is_checked()
         libfuse['attribute-expiration-sec'] = self.spinBox_libfuse_attExp.value()
         libfuse['entry-expiration-sec'] = self.spinBox_libfuse_entExp.value()
         libfuse['negative-entry-expiration-sec'] = (
@@ -547,9 +551,9 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
         """
         libfuse = self.settings['libfuse']
         libfuse['disable-writeback-cache'] = (
-            self.checkBox_libfuse_disableWriteback.isChecked()
+            self.checkBox_libfuse_disableWriteback.is_checked()
         )
-        libfuse['network-share'] = self.checkBox_libfuse_networkshare.isChecked()
+        libfuse['network-share'] = self.checkBox_libfuse_networkshare.is_checked()
         libfuse['max-fuse-threads'] = self.spinBox_libfuse_maxFuseThreads.value()
         self.settings['libfuse'] = libfuse
 
@@ -559,7 +563,7 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
         Update the stream settings from the UI choices.
         """
         stream = self.settings['stream']
-        stream['file-caching'] = self.checkBox_streaming_fileCachingLevel.isChecked()
+        stream['file-caching'] = self.checkBox_streaming_fileCachingLevel.is_checked()
         stream['block-size-mb'] = self.spinBox_streaming_blockSize.value()
         stream['buffer-size-mb'] = self.spinBox_streaming_buffSize.value()
         stream['max-buffers'] = self.spinBox_streaming_maxBuff.value()
@@ -579,15 +583,15 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
         """
         file_cache = self.settings['file_cache']
         file_cache['allow-non-empty-temp'] = (
-            self.checkBox_fileCache_allowNonEmptyTmp.isChecked()
+            self.checkBox_fileCache_allowNonEmptyTmp.is_checked()
         )
-        file_cache['policy-trace'] = self.checkBox_fileCache_policyLogs.isChecked()
+        file_cache['policy-trace'] = self.checkBox_fileCache_policyLogs.is_checked()
         file_cache['create-empty-file'] = (
-            self.checkBox_fileCache_createEmptyFile.isChecked()
+            self.checkBox_fileCache_createEmptyFile.is_checked()
         )
-        file_cache['cleanup-on-start'] = self.checkBox_fileCache_cleanupStart.isChecked()
-        file_cache['offload-io'] = self.checkBox_fileCache_offloadIO.isChecked()
-        file_cache['sync-to-flush'] = self.checkBox_fileCache_syncToFlush.isChecked()
+        file_cache['cleanup-on-start'] = self.checkBox_fileCache_cleanupStart.is_checked()
+        file_cache['offload-io'] = self.checkBox_fileCache_offloadIO.is_checked()
+        file_cache['sync-to-flush'] = self.checkBox_fileCache_syncToFlush.is_checked()
 
         file_cache['timeout-sec'] = self.spinBox_fileCache_evictionTimeout.value()
         file_cache['max-eviction'] = self.spinBox_fileCache_maxEviction.value()
@@ -597,6 +601,6 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
         file_cache['refresh-sec'] = self.spinBox_fileCache_refreshSec.value()
 
         file_cache['policy'] = file_cache_eviction_choices[
-            self.dropDown_fileCache_evictionPolicy.currentIndex()
+            self.dropDown_fileCache_evictionPolicy.current_index()
         ]
         self.settings['file_cache'] = file_cache

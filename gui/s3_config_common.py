@@ -28,6 +28,10 @@ from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import QLineEdit, QFileDialog, QMessageBox
 
+# noinspection PyUnresolvedReferences
+from __feature__ import snake_case, true_property
+
+
 # import the custom class made from QtDesigner
 from utils import set_path_validator, populate_widgets_from_settings, update_settings_from_widgets
 from ui_s3_config_common import Ui_Form
@@ -54,12 +58,12 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
             configSettings (dict): Configuration settings for S3.
         """
         super().__init__()
-        self.setupUi(self)
+        self.setup_ui(self)
         self.my_window = QSettings('Cloudfuse', 's3Window')
         self.init_window_size_pos()
-        self.setWindowTitle('S3 Config Settings')
+        self.set_window_title('S3 Config Settings')
         self.settings = configSettings
-        
+
         self._s3_storage_mapping = {
             'bucket-name': self.lineEdit_bucketName,
             'endpoint': self.lineEdit_endpoint,
@@ -90,7 +94,7 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
             'foreground': self.checkBox_daemonForeground,
             'read-only': self.checkBox_readOnly,
         }
-        
+
         self.populate_options()
         self.show_mode_settings()
         self._save_button_clicked = False
@@ -98,20 +102,20 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
         # S3 naming conventions:
         #   https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
         # Allow lowercase alphanumeric characters plus [.,-]
-        self.lineEdit_bucketName.setValidator(
+        self.lineEdit_bucketName.set_validator(
             QRegularExpressionValidator(r'^[a-z0-9-.]*$', self)
         )
         # Allow alphanumeric characters plus [-,_]
-        self.lineEdit_region.setValidator(
+        self.lineEdit_region.set_validator(
             QRegularExpressionValidator(r'^[a-zA-Z0-9-_]*$', self)
         )
-        
+
         set_path_validator(self.lineEdit_fileCache_path)
 
         # Hide sensitive data QLineEdit.EchoMode.PasswordEchoOnEdit
-        self.lineEdit_accessKey.setEchoMode(
+        self.lineEdit_accessKey.set_echo_mode(
             QLineEdit.EchoMode.Password)
-        self.lineEdit_secretKey.setEchoMode(
+        self.lineEdit_secretKey.set_echo_mode(
             QLineEdit.EchoMode.Password)
 
         # Set up signals for buttons
@@ -131,7 +135,7 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
         Open the advanced settings widget.
         """
         self.more_settings = S3AdvancedSettingsWidget(self.settings)
-        self.more_settings.setWindowModality(Qt.ApplicationModal)
+        self.more_settings.set_window_modality(Qt.ApplicationModal)
         self.more_settings.show()
 
     # ShowModeSettings will switch which groupbox is visiible: stream or file_cache
@@ -143,27 +147,27 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
         """
         self.hide_mode_boxes()
         components = self.settings['components']
-        pipeline_index = self.dropDown_pipeline.currentIndex()
+        pipeline_index = self.dropDown_pipeline.current_index()
         components[1] = pipelineChoices[pipeline_index]
         if pipelineChoices[pipeline_index] == 'file_cache':
-            self.groupbox_fileCache.setVisible(True)
+            self.groupbox_fileCache.set_visible(True)
         elif pipelineChoices[pipeline_index] == 'stream':
-            self.groupbox_streaming.setVisible(True)
+            self.groupbox_streaming.set_visible(True)
         self.settings['components'] = components
 
     def get_file_dir_input(self):
         """
         Open a file dialog to select a directory.
         """
-        directory = str(QFileDialog.getExistingDirectory())
-        self.lineEdit_fileCache_path.setText(f'{directory}')
+        directory = str(QFileDialog.get_existing_directory())
+        self.lineEdit_fileCache_path.set_text(f'{directory}')
 
     def hide_mode_boxes(self):
         """
         Hide all mode group boxes.
         """
-        self.groupbox_fileCache.setVisible(False)
-        self.groupbox_streaming.setVisible(False)
+        self.groupbox_fileCache.set_visible(False)
+        self.groupbox_streaming.set_visible(False)
 
         # Update S3Storage re-writes everything in the S3Storage dictionary for the same reason update libfuse does.
 
@@ -187,10 +191,10 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
 
         # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices and libfusePermissions reflect the
         #   index choices in human words without having to reference the UI. Get the value in the settings and translate that to the equivalent index in the lists.
-        self.dropDown_pipeline.setCurrentIndex(
+        self.dropDown_pipeline.set_current_index(
             pipelineChoices.index(self.settings['components'][1])
         )
-        self.dropDown_libfuse_permissions.setCurrentIndex(
+        self.dropDown_libfuse_permissions.set_current_index(
             libfusePermissions.index(libfuse['default-permission'])
         )
 

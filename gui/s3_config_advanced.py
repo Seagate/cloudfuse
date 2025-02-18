@@ -27,6 +27,10 @@ Defines the S3AdvancedSettingsWidget class for configuring advanced S3 settings.
 from sys import platform
 from PySide6.QtCore import QSettings
 
+# noinspection PyUnresolvedReferences
+from __feature__ import snake_case, true_property
+
+
 # import the custom class made from QtDesigner
 from utils import set_path_validator, populate_widgets_from_settings, update_settings_from_widgets
 from ui_s3_config_advanced import Ui_Form
@@ -51,10 +55,10 @@ class S3AdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
             configSettings (dict): Configuration settings for S3.
         """
         super().__init__()
-        self.setupUi(self)
+        self.setup_ui(self)
         self.my_window = QSettings('Cloudfuse', 'S3AdvancedWindow')
         self.settings = configSettings
-        
+
         self._s3_storage_mapping = {
             'subdirectory': self.lineEdit_subdirectory,
         }
@@ -80,7 +84,7 @@ class S3AdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         }
 
         self.init_window_size_pos()
-        self.setWindowTitle('Advanced S3 Config Settings')
+        self.set_window_title('Advanced S3 Config Settings')
         self.populate_options()
         self._save_button_clicked = False
 
@@ -101,18 +105,18 @@ class S3AdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         populate_widgets_from_settings(self._file_cache_mapping, file_cache)
         populate_widgets_from_settings(self._s3_storage_mapping, s3_storage)
         populate_widgets_from_settings(self._libfuse_mapping, libfuse)
-        
-        self.dropDown_fileCache_evictionPolicy.setCurrentIndex(
+
+        self.dropDown_fileCache_evictionPolicy.set_current_index(
             file_cache_eviction_choices.index(file_cache['policy'])
         )
 
         if platform == 'win32':
-            self.checkBox_libfuse_networkshare.setToolTip(
+            self.checkBox_libfuse_networkshare.set_tool_tip(
                 'Runs as a network share - may improve performance when latency to cloud is high.'
             )
         else:
-            self.checkBox_libfuse_networkshare.setEnabled(False)
-            self.checkBox_libfuse_networkshare.setToolTip(
+            self.checkBox_libfuse_networkshare.set_enabled(False)
+            self.checkBox_libfuse_networkshare.set_tool_tip(
                 'Network share is only supported on Windows'
             )
 

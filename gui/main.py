@@ -26,6 +26,10 @@
 import sys
 from PySide6.QtWidgets import QApplication
 
+# noinspection PyUnresolvedReferences
+from __feature__ import snake_case, true_property
+
+
 # Main FUSE window
 from mount_primary_window import FUSEWindow
 

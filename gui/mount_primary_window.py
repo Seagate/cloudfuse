@@ -34,6 +34,10 @@ from PySide6.QtGui import QTextCursor
 from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtWidgets import QFileDialog, QMainWindow, QMessageBox
 
+# noinspection PyUnresolvedReferences
+from __feature__ import snake_case, true_property
+
+
 from azure_config_common import AzureSettingsWidget
 from common_qt_functions import (
     CustomConfigFunctions as config_funcs,
@@ -72,12 +76,12 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
     def __init__(self):
         """Initialize the FUSEWindow class."""
         super().__init__()
-        self.setupUi(self)
-        self.setWindowTitle('Cloudfuse')
+        self.setup_ui(self)
+        self.set_window_title('Cloudfuse')
         self.my_window = QSettings('Cloudfuse', 'Mainwindow')
         self.init_mount_point()
         self.check_config_directory()
-        self.textEdit_output.setReadOnly(True)
+        self.textEdit_output.set_read_only(True)
         self.settings = self.all_mount_settings
         self.init_settings_from_config(self.settings)
 
@@ -99,17 +103,17 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
             self.modify_pipeline)
 
         if platform == 'win32':
-            self.lineEdit_mountPoint.setToolTip(
+            self.lineEdit_mountPoint.set_tool_tip(
                 'Designate a new location to mount the bucket, do not create the directory'
             )
-            self.button_browse.setToolTip(
+            self.button_browse.set_tool_tip(
                 "Browse to a new location but don't create a new directory"
             )
         else:
-            self.lineEdit_mountPoint.setToolTip(
+            self.lineEdit_mountPoint.set_tool_tip(
                 'Designate a location to mount the bucket - the directory must already exist'
             )
-            self.button_browse.setToolTip('Browse to a pre-existing directory')
+            self.button_browse.set_tool_tip('Browse to a pre-existing directory')
 
     def check_config_directory(self):
         """Create config directory if it doesn't exist."""
@@ -124,7 +128,7 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         """Initialize the mount point."""
         try:
             directory = self.my_window.value('mountPoint')
-            self.lineEdit_mountPoint.setText(directory)
+            self.lineEdit_mountPoint.set_text(directory)
         except:
             # Nothing in the settings for mountDir, leave mountPoint blank
             return
@@ -133,7 +137,7 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         """Update the mount point in the settings."""
         try:
             directory = str(self.lineEdit_mountPoint.text())
-            self.my_window.setValue('mountPoint', directory)
+            self.my_window.set_value('mountPoint', directory)
         except:
             # Couldn't update the settings
             return
@@ -144,26 +148,26 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
     # so we must use different widgets to show the different settings
     def show_settings_widget(self):
         """Show the S3 or Azure settings."""
-        target_index = self.dropDown_bucketSelect.currentIndex()
+        target_index = self.dropDown_bucketSelect.current_index()
         if bucket_options[target_index] == 's3storage':
             self.set_configs = S3SettingsWidget(self.settings)
         else:
             self.set_configs = AzureSettingsWidget(self.settings)
-        self.set_configs.setWindowModality(Qt.ApplicationModal)
+        self.set_configs.set_window_modality(Qt.ApplicationModal)
         self.set_configs.show()
 
     def get_file_dir_input(self):
         """Open a file dialog to select a directory."""
-        directory = str(QFileDialog.getExistingDirectory())
-        # getExistingDirectory() returns a null string when cancel is selected
+        directory = str(QFileDialog.get_existing_directory())
+        # get_existing_directory() returns a null string when cancel is selected
         # don't update the lineEdit and settings if cancelled
         if directory != '':
-            self.lineEdit_mountPoint.setText(f'{directory}')
+            self.lineEdit_mountPoint.set_text(f'{directory}')
             self.update_mount_point_in_settings()
-            
+
     def show_about_qt_page(self):
         """Display the about Qt page."""
-        QMessageBox.aboutQt(self, 'About QT')
+        QMessageBox.about_qt(self, 'About QT')
 
     # Display the custom dialog box for the cloudfuse 'about' page.
     def show_about_cloudfuse_page(self):
@@ -304,7 +308,7 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         """Modify the pipeline configuration based on the selected bucket."""
         self.add_output_text('Validating configuration...')
         # Update the pipeline/components before mounting the target
-        target_bucket = bucket_options[self.dropDown_bucketSelect.currentIndex(
+        target_bucket = bucket_options[self.dropDown_bucketSelect.current_index(
         )]
         components = self.settings.get('components')
         if components is not None:
@@ -361,7 +365,7 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
             text (str): The text to add.
         """
         self.textEdit_output.append(text)
-        self.textEdit_output.moveCursor(QTextCursor.End)
+        self.textEdit_output.move_cursor(QTextCursor.End)
 
     def error_msg_box(self, message: str, title='Error'):
         """
@@ -372,7 +376,7 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
             title_string (str): The title of the message box.
         """
         msg = QMessageBox()
-        msg.setIcon(QMessageBox.Critical)
-        msg.setWindowTitle(title)
-        msg.setText(message)
+        msg.set_icon(QMessageBox.Critical)
+        msg.set_window_title(title)
+        msg.set_text(message)
         msg.exec()

@@ -25,6 +25,10 @@
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtCore import Qt
 
+# noinspection PyUnresolvedReferences
+from __feature__ import snake_case, true_property
+
+
 
 class AboutPage(QMessageBox):
     """A QMessageBox subclass to display information about Cloudfuse."""
@@ -35,9 +39,9 @@ class AboutPage(QMessageBox):
             cloudfuseVersion (str): The version of Cloudfuse being used.
         """
         super().__init__()
-        self.setWindowTitle('About Cloudfuse')
-        self.setTextFormat(Qt.RichText)
-        self.setText(
+        self.set_window_title('About Cloudfuse')
+        self.set_text_format(Qt.RichText)
+        self.set_text(
             f"""
             <p><strong><h3>About Cloudfuse</h3></strong></p>
             <p>This program is using Cloudfuse version {cloudfuseVersion}</p>
