@@ -29,10 +29,6 @@ from sys import platform
 from PySide6.QtGui import QRegularExpressionValidator
 from PySide6 import QtWidgets
 
-# noinspection PyUnresolvedReferences
-from __feature__ import snake_case, true_property
-
-
 def set_path_validator(widget: QtWidgets):
     """
     Set regex for path validators for the current operating system.
@@ -49,7 +45,7 @@ def set_path_validator(widget: QtWidgets):
         # Allow anything BUT Nul
         # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
         regex = r'^[^\0]*$'
-    widget.set_validator(QRegularExpressionValidator(regex, widget))
+    widget.setValidator(QRegularExpressionValidator(regex, widget))
 
 def populate_widgets_from_settings(mapping: dict, settings: dict):
     """
@@ -61,13 +57,13 @@ def populate_widgets_from_settings(mapping: dict, settings: dict):
     """
     for key, widget in mapping.items():
         value = settings.get(key)
-        if hasattr(widget, 'setChecked'):
-            widget.set_checked(bool(value))
-        elif hasattr(widget, 'setText'):
-            widget.set_text(str(value))
-        elif hasattr(widget, 'setValue'):
-            widget.set_value(int(value))
-
+        if hasattr(widget, "setChecked"):
+            widget.setChecked(bool(value))
+        elif hasattr(widget, "setText"):
+            widget.setText(str(value))
+        elif hasattr(widget, "setValue"):
+            widget.setValue(int(value))
+            
 def update_settings_from_widgets(mapping: dict, settings: dict):
     """
     Set the values in settings from the values the user selected in the ui.
@@ -77,11 +73,11 @@ def update_settings_from_widgets(mapping: dict, settings: dict):
         settings (dict): mapping from setting name to the current value.
     """
     for key, widget in mapping.items():
-        if hasattr(widget, 'isChecked'):
-            settings[key] = widget.is_checked()
-        elif hasattr(widget, 'currentIndex'):
-            settings[key] = widget.current_index()
-        elif hasattr(widget, 'text'):
+        if hasattr(widget, "isChecked"):
+            settings[key] = widget.isChecked()
+        elif hasattr(widget, "currentIndex"):
+            settings[key] = widget.currentIndex()
+        elif hasattr(widget, "text"):
             settings[key] = widget.text()
-        elif hasattr(widget, 'value'):
+        elif hasattr(widget, "value"):
             settings[key] = widget.value()

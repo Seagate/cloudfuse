@@ -28,10 +28,6 @@ advanced Azure settings.
 from sys import platform
 from PySide6.QtCore import QSettings
 
-# noinspection PyUnresolvedReferences
-from __feature__ import snake_case, true_property
-
-
 # import the custom class made from QtDesigner
 from utils import set_path_validator, populate_widgets_from_settings, update_settings_from_widgets
 from ui_azure_config_advanced import Ui_Form
@@ -58,11 +54,11 @@ class AzureAdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
             config_settings (dict): Configuration settings for Azure.
         """
         super().__init__()
-        self.setup_ui(self)
-        self.set_window_title('Advanced Azure Config Settings')
+        self.setupUi(self)
+        self.setWindowTitle('Advanced Azure Config Settings')
         self.settings = config_settings
         self.my_window = QSettings('Cloudfuse', 'AzAdvancedWindow')
-
+        
         self._az_storage_mapping = {
             'use-http': self.checkBox_azure_useHttp,
             'validate-md5': self.checkBox_azure_validateMd5,
@@ -105,7 +101,7 @@ class AzureAdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
             'refresh-sec': self.spinBox_fileCache_refreshSec,
             'policy': self.dropDown_fileCache_evictionPolicy,
         }
-
+        
         self.init_window_size_pos()
         self.populate_options()
         self._save_button_clicked = False
@@ -123,25 +119,25 @@ class AzureAdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         file_cache = self.settings['file_cache']
         az_storage = self.settings['azstorage']
         libfuse = self.settings['libfuse']
-
+        
         populate_widgets_from_settings(self._file_cache_mapping, file_cache)
         populate_widgets_from_settings(self._az_storage_mapping, az_storage)
         populate_widgets_from_settings(self._libfuse_mapping, libfuse)
 
-        self.dropDown_azure_blobTier.set_current_index(
+        self.dropDown_azure_blobTier.setCurrentIndex(
             az_blob_tier.index(az_storage['tier'])
         )
-        self.dropDown_fileCache_evictionPolicy.set_current_index(
+        self.dropDown_fileCache_evictionPolicy.setCurrentIndex(
             file_cache_eviction_choices.index(file_cache['policy'])
         )
 
         if platform == 'win32':
-            self.checkBox_libfuse_networkshare.set_tool_tip(
+            self.checkBox_libfuse_networkshare.setToolTip(
                 'Runs as a network share - may improve performance when latency to cloud is high.'
             )
         else:
-            self.checkBox_libfuse_networkshare.set_enabled(False)
-            self.checkBox_libfuse_networkshare.set_tool_tip(
+            self.checkBox_libfuse_networkshare.setEnabled(False)
+            self.checkBox_libfuse_networkshare.setToolTip(
                 'Network share is only supported on Windows'
             )
 
@@ -149,7 +145,7 @@ class AzureAdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         """
         Update the Azure storage settings from the UI values.
         """
-        az_storage = self.settings['azstorage']
+        az_storage = self.settings['azstorage']        
         update_settings_from_widgets(self._az_storage_mapping, az_storage)
         self.settings['azstorage'] = az_storage
 

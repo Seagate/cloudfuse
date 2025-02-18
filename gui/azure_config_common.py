@@ -27,10 +27,6 @@ from PySide6.QtCore import Qt, QSettings
 from PySide6.QtWidgets import QLineEdit, QFileDialog, QMessageBox
 from PySide6.QtGui import QRegularExpressionValidator
 
-# noinspection PyUnresolvedReferences
-from __feature__ import snake_case, true_property
-
-
 # import the custom class made from QtDesigner
 from utils import set_path_validator, update_settings_from_widgets, populate_widgets_from_settings
 from ui_azure_config_common import Ui_Form
@@ -59,8 +55,8 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
             configSettings (dict): Configuration settings for Azure.
         """
         super().__init__()
-        self.setup_ui(self)
-        self.set_window_title('Azure Config Settings')
+        self.setupUi(self)
+        self.setWindowTitle('Azure Config Settings')
         self.my_window = QSettings('Cloudfuse', 'AzcWindow')
         self.settings = config_settings
 
@@ -101,7 +97,7 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
             'foreground': self.checkBox_daemonForeground,
             'read-only': self.checkBox_readOnly,
         }
-
+        
         self.init_window_size_pos()
         # Hide the pipeline mode groupbox depending on the default select is
         self.show_azure_mode_settings()
@@ -122,20 +118,20 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         # Documentation for the allowed characters for azure:
         # https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftstorage
         # Allow lowercase alphanumeric characters plus [-]
-        self.lineEdit_azure_container.set_validator(
+        self.lineEdit_azure_container.setValidator(
             QRegularExpressionValidator(r'^[a-z0-9-]*$', self)
         )
         # Allow alphanumeric characters plus [.,-,_]
-        self.lineEdit_azure_accountName.set_validator(
+        self.lineEdit_azure_accountName.setValidator(
             QRegularExpressionValidator(r'^[a-zA-Z0-9-._]*$', self)
         )
 
         set_path_validator(self.lineEdit_fileCache_path)
 
-        self.lineEdit_azure_accountKey.set_echo_mode(
+        self.lineEdit_azure_accountKey.setEchoMode(
             QLineEdit.EchoMode.Password
         )
-        self.lineEdit_azure_spnClientSecret.set_echo_mode(
+        self.lineEdit_azure_spnClientSecret.setEchoMode(
             QLineEdit.EchoMode.Password
         )
 
@@ -152,7 +148,7 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         Open the advanced settings window.
         """
         self.more_settings = AzureAdvancedSettingsWidget(self.settings)
-        self.more_settings.set_window_modality(Qt.ApplicationModal)
+        self.more_settings.setWindowModality(Qt.ApplicationModal)
         self.more_settings.show()
 
     def show_mode_settings(self):
@@ -161,12 +157,12 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         """
         self.hide_mode_boxes()
         components = self.settings['components']
-        pipeline_index = self.dropDown_pipeline.current_index()
+        pipeline_index = self.dropDown_pipeline.currentIndex()
         components[1] = pipelineChoices[pipeline_index]
         if pipelineChoices[pipeline_index] == 'file_cache':
-            self.groupbox_fileCache.set_visible(True)
+            self.groupbox_fileCache.setVisible(True)
         elif pipelineChoices[pipeline_index] == 'stream':
-            self.groupbox_streaming.set_visible(True)
+            self.groupbox_streaming.setVisible(True)
         self.settings['components'] = components
 
     def show_azure_mode_settings(self):
@@ -174,16 +170,16 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         Show the appropriate Azure mode settings based on the selected mode.
         """
         self.hide_azure_boxes()
-        mode_selection_index = self.dropDown_azure_modeSetting.current_index()
+        mode_selection_index = self.dropDown_azure_modeSetting.currentIndex()
         # Azure mode group boxes
         if bucketModeChoices[mode_selection_index] == 'key':
-            self.groupbox_accountKey.set_visible(True)
+            self.groupbox_accountKey.setVisible(True)
         elif bucketModeChoices[mode_selection_index] == 'sas':
-            self.groupbox_sasStorage.set_visible(True)
+            self.groupbox_sasStorage.setVisible(True)
         elif bucketModeChoices[mode_selection_index] == 'spn':
-            self.groupbox_spn.set_visible(True)
+            self.groupbox_spn.setVisible(True)
         elif bucketModeChoices[mode_selection_index] == 'msi':
-            self.groupbox_msi.set_visible(True)
+            self.groupbox_msi.setVisible(True)
 
     # This widget will not display all the options in settings, only the ones written in the UI file.
     def populate_options(self):
@@ -198,19 +194,19 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices, libfusePermissions, azStorage and bucketMode
         # reflect the index choices in human words without having to reference the UI.
         # Get the value in the settings and translate that to the equivalent index in the lists.
-        self.dropDown_pipeline.set_current_index(
+        self.dropDown_pipeline.setCurrentIndex(
             pipelineChoices.index(self.settings['components'][1])
         )
-        self.dropDown_libfuse_permissions.set_current_index(
+        self.dropDown_libfuse_permissions.setCurrentIndex(
             libfusePermissions.index(self.settings['libfuse']['default-permission'])
         )
-        self.dropDown_azure_storageType.set_current_index(
+        self.dropDown_azure_storageType.setCurrentIndex(
             azStorageType.index(self.settings['azstorage']['type'])
         )
-        self.dropDown_azure_modeSetting.set_current_index(
+        self.dropDown_azure_modeSetting.setCurrentIndex(
             bucketModeChoices.index(self.settings['azstorage']['mode'])
         )
-
+        
         populate_widgets_from_settings(self._file_cache_mapping, file_cache)
         populate_widgets_from_settings(self._az_storage_mapping, az_storage)
         populate_widgets_from_settings(self._libfuse_mapping, libfuse)
@@ -221,8 +217,8 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         """
         Open a file dialog to select a directory and update the file cache path.
         """
-        directory = str(QFileDialog.get_existing_directory())
-        self.lineEdit_fileCache_path.set_text(f'{directory}')
+        directory = str(QFileDialog.getExistingDirectory())
+        self.lineEdit_fileCache_path.setText(f'{directory}')
         # Update the settings
         self.update_file_cache_path()
 
@@ -230,17 +226,17 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         """
         Hide all mode group boxes.
         """
-        self.groupbox_fileCache.set_visible(False)
-        self.groupbox_streaming.set_visible(False)
+        self.groupbox_fileCache.setVisible(False)
+        self.groupbox_streaming.setVisible(False)
 
     def hide_azure_boxes(self):
         """
         Hide all Azure mode group boxes.
         """
-        self.groupbox_accountKey.set_visible(False)
-        self.groupbox_sasStorage.set_visible(False)
-        self.groupbox_spn.set_visible(False)
-        self.groupbox_msi.set_visible(False)
+        self.groupbox_accountKey.setVisible(False)
+        self.groupbox_sasStorage.setVisible(False)
+        self.groupbox_spn.setVisible(False)
+        self.groupbox_msi.setVisible(False)
 
     def reset_defaults(self):
         """
