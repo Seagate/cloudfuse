@@ -160,7 +160,7 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         if directory != '':
             self.lineEdit_mountPoint.setText(f'{directory}')
             self.update_mount_point_in_settings()
-            
+
     def show_about_qt_page(self):
         """Display the about Qt page."""
         QMessageBox.aboutQt(self, 'About QT')

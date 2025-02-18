@@ -97,13 +97,13 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
             'foreground': self.checkBox_daemonForeground,
             'read-only': self.checkBox_readOnly,
         }
-        
+
         self.init_window_size_pos()
         # Hide the pipeline mode groupbox depending on the default select is
         self.show_azure_mode_settings()
         self.show_mode_settings()
         self.populate_options()
-        self._save_button_clicked = False
+        self.save_button_clicked = False
 
         # Set up signals
         self.dropDown_pipeline.currentIndexChanged.connect(self.show_mode_settings)
@@ -191,9 +191,7 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         libfuse = self.settings['libfuse']
         stream = self.settings['stream']
 
-        # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices, libfusePermissions, azStorage and bucketMode
-        # reflect the index choices in human words without having to reference the UI.
-        # Get the value in the settings and translate that to the equivalent index in the lists.
+        # Must populate the group boxes since those don't populate above.
         self.dropDown_pipeline.setCurrentIndex(
             pipelineChoices.index(self.settings['components'][1])
         )
@@ -206,7 +204,7 @@ class AzureSettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.dropDown_azure_modeSetting.setCurrentIndex(
             bucketModeChoices.index(self.settings['azstorage']['mode'])
         )
-        
+
         populate_widgets_from_settings(self._file_cache_mapping, file_cache)
         populate_widgets_from_settings(self._az_storage_mapping, az_storage)
         populate_widgets_from_settings(self._libfuse_mapping, libfuse)

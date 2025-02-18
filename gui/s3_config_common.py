@@ -59,7 +59,7 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.init_window_size_pos()
         self.setWindowTitle('S3 Config Settings')
         self.settings = configSettings
-        
+
         self._s3_storage_mapping = {
             'bucket-name': self.lineEdit_bucketName,
             'endpoint': self.lineEdit_endpoint,
@@ -90,10 +90,10 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
             'foreground': self.checkBox_daemonForeground,
             'read-only': self.checkBox_readOnly,
         }
-        
+
         self.populate_options()
         self.show_mode_settings()
-        self._save_button_clicked = False
+        self.save_button_clicked = False
 
         # S3 naming conventions:
         #   https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
@@ -105,7 +105,7 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.lineEdit_region.setValidator(
             QRegularExpressionValidator(r'^[a-zA-Z0-9-_]*$', self)
         )
-        
+
         set_path_validator(self.lineEdit_fileCache_path)
 
         # Hide sensitive data QLineEdit.EchoMode.PasswordEchoOnEdit
@@ -185,20 +185,19 @@ class S3SettingsWidget(WidgetCustomFunctions, Ui_Form):
         libfuse = self.settings['libfuse']
         stream = self.settings['stream']
 
-        # The QCombo (dropdown selection) uses indices to determine the value to show the user. The pipelineChoices and libfusePermissions reflect the
-        #   index choices in human words without having to reference the UI. Get the value in the settings and translate that to the equivalent index in the lists.
+        populate_widgets_from_settings(self._file_cache_mapping, file_cache)
+        populate_widgets_from_settings(self._s3_storage_mapping, s3_storage)
+        populate_widgets_from_settings(self._libfuse_mapping, libfuse)
+        populate_widgets_from_settings(self._stream_mapping, stream)
+        populate_widgets_from_settings(self._settings_mapping, self.settings)
+
+        # Must populate the group boxes since those don't populate above.
         self.dropDown_pipeline.setCurrentIndex(
             pipelineChoices.index(self.settings['components'][1])
         )
         self.dropDown_libfuse_permissions.setCurrentIndex(
             libfusePermissions.index(libfuse['default-permission'])
         )
-
-        populate_widgets_from_settings(self._file_cache_mapping, file_cache)
-        populate_widgets_from_settings(self._s3_storage_mapping, s3_storage)
-        populate_widgets_from_settings(self._libfuse_mapping, libfuse)
-        populate_widgets_from_settings(self._stream_mapping, stream)
-        populate_widgets_from_settings(self._settings_mapping, self.settings)
 
     def reset_defaults(self):
         """

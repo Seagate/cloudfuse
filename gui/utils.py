@@ -49,7 +49,8 @@ def set_path_validator(widget: QtWidgets):
 
 def populate_widgets_from_settings(mapping: dict, settings: dict):
     """
-    Set the appropriate widget corresponding to each setting
+    Set the appropriate widget corresponding to each setting. Works on check boxes, text boxes,
+    and number boxes.
 
     Args:
         mapping (dict): mapping from setting name to the corresponding widget.
@@ -57,27 +58,28 @@ def populate_widgets_from_settings(mapping: dict, settings: dict):
     """
     for key, widget in mapping.items():
         value = settings.get(key)
-        if hasattr(widget, "setChecked"):
+        if hasattr(widget, 'setChecked'):
             widget.setChecked(bool(value))
-        elif hasattr(widget, "setText"):
+        elif hasattr(widget, 'setText'):
             widget.setText(str(value))
-        elif hasattr(widget, "setValue"):
+        elif hasattr(widget, 'setValue'):
             widget.setValue(int(value))
-            
+
 def update_settings_from_widgets(mapping: dict, settings: dict):
     """
-    Set the values in settings from the values the user selected in the ui.
+    Set the values in settings from the values the user selected in the ui. Works on check boxes,
+    text boxes, number boxes, and group boxes.
 
     Args:
         mapping (dict): mapping from setting name to the corresponding widget.
         settings (dict): mapping from setting name to the current value.
     """
     for key, widget in mapping.items():
-        if hasattr(widget, "isChecked"):
+        if hasattr(widget, 'isChecked'):
             settings[key] = widget.isChecked()
-        elif hasattr(widget, "currentIndex"):
+        elif hasattr(widget, 'currentIndex'):
             settings[key] = widget.currentIndex()
-        elif hasattr(widget, "text"):
+        elif hasattr(widget, 'text'):
             settings[key] = widget.text()
-        elif hasattr(widget, "value"):
+        elif hasattr(widget, 'value'):
             settings[key] = widget.value()

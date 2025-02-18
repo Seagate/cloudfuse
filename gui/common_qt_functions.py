@@ -377,13 +377,13 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
         Initialize the WidgetCustomFunctions class.
         """
         super().__init__()
-        self._save_button_clicked = False
+        self.save_button_clicked = False
 
     def exit_window(self):
         """
         Exit the window and set the save button clicked flag.
         """
-        self._save_button_clicked = True
+        self.save_button_clicked = True
         self.close()
 
     def exit_window_cleanup(self):
@@ -434,7 +434,7 @@ class WidgetCustomFunctions(CustomConfigFunctions, QWidget):
         )
         msg.setDefaultButton(QMessageBox.Cancel)
 
-        if self._save_button_clicked:
+        if self.save_button_clicked:
             # Insert all settings to yaml file
             self.exit_window_cleanup()
             self.update_settings_from_ui_choices()

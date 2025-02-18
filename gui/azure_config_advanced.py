@@ -58,7 +58,7 @@ class AzureAdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.setWindowTitle('Advanced Azure Config Settings')
         self.settings = config_settings
         self.my_window = QSettings('Cloudfuse', 'AzAdvancedWindow')
-        
+
         self._az_storage_mapping = {
             'use-http': self.checkBox_azure_useHttp,
             'validate-md5': self.checkBox_azure_validateMd5,
@@ -101,10 +101,10 @@ class AzureAdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
             'refresh-sec': self.spinBox_fileCache_refreshSec,
             'policy': self.dropDown_fileCache_evictionPolicy,
         }
-        
+
         self.init_window_size_pos()
         self.populate_options()
-        self._save_button_clicked = False
+        self.save_button_clicked = False
 
         set_path_validator(self.lineEdit_azure_subDirectory)
 
@@ -119,11 +119,12 @@ class AzureAdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         file_cache = self.settings['file_cache']
         az_storage = self.settings['azstorage']
         libfuse = self.settings['libfuse']
-        
+
         populate_widgets_from_settings(self._file_cache_mapping, file_cache)
         populate_widgets_from_settings(self._az_storage_mapping, az_storage)
         populate_widgets_from_settings(self._libfuse_mapping, libfuse)
 
+        # Must populate the group boxes since those don't populate above.
         self.dropDown_azure_blobTier.setCurrentIndex(
             az_blob_tier.index(az_storage['tier'])
         )
@@ -145,7 +146,7 @@ class AzureAdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         """
         Update the Azure storage settings from the UI values.
         """
-        az_storage = self.settings['azstorage']        
+        az_storage = self.settings['azstorage']
         update_settings_from_widgets(self._az_storage_mapping, az_storage)
         self.settings['azstorage'] = az_storage
 

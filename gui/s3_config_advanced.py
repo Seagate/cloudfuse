@@ -54,7 +54,7 @@ class S3AdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.setupUi(self)
         self.my_window = QSettings('Cloudfuse', 'S3AdvancedWindow')
         self.settings = configSettings
-        
+
         self._s3_storage_mapping = {
             'subdirectory': self.lineEdit_subdirectory,
         }
@@ -82,7 +82,7 @@ class S3AdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         self.init_window_size_pos()
         self.setWindowTitle('Advanced S3 Config Settings')
         self.populate_options()
-        self._save_button_clicked = False
+        self.save_button_clicked = False
 
         set_path_validator(self.lineEdit_subdirectory)
 
@@ -101,7 +101,8 @@ class S3AdvancedSettingsWidget(WidgetCustomFunctions, Ui_Form):
         populate_widgets_from_settings(self._file_cache_mapping, file_cache)
         populate_widgets_from_settings(self._s3_storage_mapping, s3_storage)
         populate_widgets_from_settings(self._libfuse_mapping, libfuse)
-        
+
+        # Must populate the group boxes since those don't populate above.
         self.dropDown_fileCache_evictionPolicy.setCurrentIndex(
             file_cache_eviction_choices.index(file_cache['policy'])
         )
