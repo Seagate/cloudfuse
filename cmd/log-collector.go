@@ -28,17 +28,12 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"html/template"
-	"io/fs"
-	"os"
-	"os/exec"
-	"os/user"
 	"path/filepath"
-	"strings"
 
-	"github.com/Seagate/cloudfuse/common"
 	"github.com/spf13/cobra"
 )
+
+var dumpPath string
 
 // Section defining all the command that we have in secure feature
 var logCmd = &cobra.Command{
@@ -54,35 +49,66 @@ var logCmd = &cobra.Command{
 }
 
 var collectCmd = &cobra.Command{
-	Use:   				"collect",
-	Short: 				"Collect and archive relevant cloudfuse logs",
-	Long:  				"Collect and archive relevant cloudfuse logs",
-	SuggestFor: 		[]string{"col", "coll"},
-	Example:			"cloudfuse log collect",
-	FlagErrorHandling: 	cobra.ExitOnError,
+	Use:               "collect",
+	Short:             "Collect and archive relevant cloudfuse logs",
+	Long:              "Collect and archive relevant cloudfuse logs",
+	SuggestFor:        []string{"col", "coll"},
+	Example:           "cloudfuse log collect",
+	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		
+
+		var err error
 		// require path flag to dump archive
+		dumpPath, err = filepath.Abs(dumpPath)
+		if err != nil {
+			return fmt.Errorf("couldn't determine absolute path from string [%s]", err.Error())
+		}
 
-		// check config file for log type
+		foundConfig := false
+		configPath = options.ConfigFile
+		if configPath == "" {
+			fmt.Printf("could not locate config file for log details")
+		} else {
+			configPath, err = filepath.Abs(configPath)
+			if err != nil {
+				return fmt.Errorf("couldn't determine absolute path from string [%s]", err.Error())
+			}
+			foundConfig = true
+		}
 
-		// if syslog grep cloudfuse /var/log/syslog > logs
+		logBase := false
+		if foundConfig {
 
-		// if base, get log output directory provided.
+			/*
+				// check config file for the log type being set to "base" and get the directory where the log files are stored.
+				// if "base" is set in config for log, logBase = true
 
+				// if logtype is set to "syslog," then   grep cloudfuse /var/log/syslog > logs
 
-		//once all logs are collected. create archive. OS dependant: what archive format should I use?  
-		// windows: zip 
-		// linux: tar 
+				// if base, get log output from directory provided.
+			*/
+
+		} else if !logBase {
+
+			// check everywhere possible for logs
+
+		}
+
+		// are any 'base' logging or syslog filters being used to redirect to a separate file?
+		// check for /etc/rsyslog.d and /etc/logrotate.d files
+
+		//once all logs are collected. create archive. OS dependant: what archive format should I use?
+		// windows: zip
+		// linux: tar
 
 		return err
-	}
+	},
 }
-
 
 func init() {
 	rootCmd.AddCommand(logCmd)
-	logCmd.AddCommand(collect)
-	logCmd.Flags().StringVar(&path, "dump-path", "", "Input archive creation path")
+	logCmd.AddCommand(collectCmd)
+	logCmd.Flags().StringVar(&dumpPath, "dump-path", "", "Input archive creation path")
 	markFlagErrorChk(logCmd, "dump-path")
+	logCmd.Flags().StringVar(&configPath, "config-file", "", "Input archive creation path")
 }
