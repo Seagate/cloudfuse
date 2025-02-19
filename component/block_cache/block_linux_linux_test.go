@@ -2,14 +2,6 @@
 // +build linux,!authtest
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
@@ -197,7 +189,6 @@ func (suite *blockTestSuite) TestWriter() {
 	suite.assert.NotNil(b.state)
 	suite.assert.Nil(b.node)
 	suite.assert.Zero(b.offset)
-	suite.assert.Zero(b.endIndex)
 	suite.assert.Equal(b.id, int64(-1))
 	suite.assert.False(b.IsDirty())
 

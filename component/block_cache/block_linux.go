@@ -1,14 +1,6 @@
 //go:build linux
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
@@ -63,13 +55,12 @@ const (
 
 // Block is a memory mapped buffer with its state to hold data
 type Block struct {
-	offset   uint64          // Start offset of the data this block holds
-	id       int64           // Id of the block i.e. (offset / block size)
-	endIndex uint64          // Length of the data this block holds
-	state    chan int        // Channel depicting data has been read for this block or not
-	flags    common.BitMap16 // Various states of the block
-	data     []byte          // Data read from blob
-	node     *list.Element   // node representation of this block in the list inside handle
+	offset uint64          // Start offset of the data this block holds
+	id     int64           // Id of the block i.e. (offset / block size)
+	state  chan int        // Channel depicting data has been read for this block or not
+	flags  common.BitMap16 // Various states of the block
+	data   []byte          // Data read from blob
+	node   *list.Element   // node representation of this block in the list inside handle
 }
 
 type blockInfo struct {
@@ -125,7 +116,6 @@ func (b *Block) Delete() error {
 func (b *Block) ReUse() {
 	b.id = -1
 	b.offset = 0
-	b.endIndex = 0
 	b.flags.Reset()
 	b.flags.Set(BlockFlagFresh)
 	b.state = make(chan int, 1)
