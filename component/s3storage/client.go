@@ -411,13 +411,15 @@ func (cl *Client) DeleteDirectory(name string) error {
 
 		if marker == nil {
 			done = true
-			// Deleting the current directory
-			err = cl.DeleteDirectory(name)
-			if err != nil {
-				log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", name, err)
-			}
 		}
+	}
 
+	// Delete the current directory
+	if cl.Config.enableDirMarker {
+		err = cl.deleteObject(name, false, true)
+		if err != nil {
+			log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", name, err)
+		}
 	}
 
 	return err

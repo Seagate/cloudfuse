@@ -391,6 +391,10 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// documentation for this S3 data structure:
 	// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
 	for _, value := range output.Contents {
+		if *value.Key == listPath {
+			continue
+		}
+
 		// push object info into the list
 		name, isSymLink := cl.getFile(*value.Key)
 
