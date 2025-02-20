@@ -56,6 +56,13 @@
         </property>
        </widget>
       </item>
+      <item>
+       <widget class="QPushButton" name="button_browse">
+        <property name="text">
+         <string>Browse</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </item>
     <item row="1" column="0" colspan="2">
