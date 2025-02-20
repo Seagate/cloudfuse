@@ -56,7 +56,7 @@ const maxResultsPerListCall = 1000
 // getObjectMultipartDownload downloads an object to a file using multipart download
 // which can be much faster for large objects.
 func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
-	key := cl.getKey(name, false)
+	key := cl.getKey(name, false, false)
 	log.Trace("Client::getObjectMultipartDownload : get object %s", key)
 	downloader := manager.NewDownloader(cl.awsS3Client, func(u *manager.Downloader) {
 		u.PartSize = cl.Config.partSize
@@ -78,8 +78,8 @@ func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
 // name is the path to the file.
-func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bool) (io.ReadCloser, error) {
-	key := cl.getKey(name, isSymLink)
+func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bool, isDir bool) (io.ReadCloser, error) {
+	key := cl.getKey(name, isSymLink, isDir)
 	log.Trace("Client::getObject : get object %s (%d+%d)", key, offset, count)
 
 	// deal with the range
@@ -115,8 +115,8 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 // Wrapper for awsS3Client.PutObject.
 // Pass in the name of the file, an io.Reader with the object data, the size of the upload,
 // and whether the object is a symbolic link or not.
-func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSymLink bool) error {
-	key := cl.getKey(name, isSymLink)
+func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSymLink bool, isDir bool) error {
+	key := cl.getKey(name, isSymLink, isDir)
 	log.Trace("Client::putObject : putting object %s", key)
 	ctx := context.Background()
 	var err error
@@ -151,8 +151,8 @@ func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSym
 
 // Wrapper for awsS3Client.DeleteObject.
 // name is the path to the file.
-func (cl *Client) deleteObject(name string, isSymLink bool) error {
-	key := cl.getKey(name, isSymLink)
+func (cl *Client) deleteObject(name string, isSymLink bool, isDir bool) error {
+	key := cl.getKey(name, isSymLink, isDir)
 	log.Trace("Client::deleteObject : deleting object %s", key)
 
 	_, err := cl.awsS3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
@@ -174,7 +174,7 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 	// build list to send to DeleteObjects
 	keyList := make([]types.ObjectIdentifier, len(objects))
 	for i, object := range objects {
-		key := cl.getKey(object.Path, object.IsSymlink())
+		key := cl.getKey(object.Path, object.IsSymlink(), object.IsDir())
 		keyList[i] = types.ObjectIdentifier{
 			Key: &key,
 		}
@@ -201,8 +201,8 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 // HeadObject() acts just like GetObject, except no contents are returned.
 // So this is used to get metadata / attributes for an object.
 // name is the path to the file.
-func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, error) {
-	key := cl.getKey(name, isSymlink)
+func (cl *Client) headObject(name string, isSymlink bool, isDir bool) (*internal.ObjAttr, error) {
+	key := cl.getKey(name, isSymlink, isDir)
 	log.Trace("Client::headObject : object %s", key)
 
 	result, err := cl.awsS3Client.HeadObject(context.Background(), &s3.HeadObjectInput{
@@ -214,7 +214,14 @@ func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, er
 		return nil, parseS3Err(err, attemptedAction)
 	}
 
-	object := createObjAttr(name, *result.ContentLength, *result.LastModified, isSymlink)
+	var object *internal.ObjAttr
+
+	if isDir {
+		object = createObjAttrDir(name)
+	} else {
+		object = createObjAttr(name, *result.ContentLength, *result.LastModified, isSymlink)
+	}
+
 	return object, nil
 }
 
@@ -227,10 +234,10 @@ func (cl *Client) headBucket() (*s3.HeadBucketOutput, error) {
 }
 
 // Wrapper for awsS3Client.CopyObject
-func (cl *Client) copyObject(source string, target string, isSymLink bool) error {
+func (cl *Client) copyObject(source string, target string, isSymLink bool, isDir bool) error {
 	// copy the object to its new key
-	sourceKey := cl.getKey(source, isSymLink)
-	targetKey := cl.getKey(target, isSymLink)
+	sourceKey := cl.getKey(source, isSymLink, isDir)
+	targetKey := cl.getKey(target, isSymLink, isDir)
 	_, err := cl.awsS3Client.CopyObject(context.Background(), &s3.CopyObjectInput{
 		Bucket:     aws.String(cl.Config.authConfig.BucketName),
 		CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, url.PathEscape(sourceKey))),
@@ -240,6 +247,23 @@ func (cl *Client) copyObject(source string, target string, isSymLink bool) error
 	if err != nil {
 		attemptedAction := fmt.Sprintf("copy %s to %s", sourceKey, targetKey)
 		return parseS3Err(err, attemptedAction)
+	}
+
+	return err
+}
+
+func (cl *Client) renameObject(source string, target string, isSymLink bool, isDir bool) error {
+	err := cl.copyObject(source, target, isSymLink, isDir)
+	if err != nil {
+		log.Err("Client::renameObject : copyObject(%s->%s) failed. Here's why: %v", source, target, err)
+		return err
+	}
+	// Copy of the file is done so now delete the older file
+	// in this case we don't need to check if the file exists, so we use deleteObject, not DeleteFile
+	// this is what S3's DeleteObject spec is meant for: to make sure the object doesn't exist anymore
+	err = cl.deleteObject(source, isSymLink, isDir)
+	if err != nil {
+		log.Err("Client::renameObject : deleteObject(%s) failed. Here's why: %v", source, err)
 	}
 
 	return err
@@ -313,7 +337,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	}
 
 	// combine the configured prefix and the prefix being given to List to get a full listPath
-	listPath := cl.getKey(prefix, false)
+	listPath := cl.getKey(prefix, false, false)
 	// replace any trailing forward slash stripped by common.JoinUnixFilepath
 	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
 		listPath += "/"
@@ -483,7 +507,7 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) { //nolint
 // getKey converts a file name to an object name. If it is a symlink it prepends
 // .rclonelink. If it is set to convert names from Linux to Windows then it allows
 // special characters like "*:<>?| to be displayed on Windows.
-func (cl *Client) getKey(name string, isSymLink bool) string {
+func (cl *Client) getKey(name string, isSymLink bool, isDir bool) string {
 	if isSymLink {
 		name = name + symlinkStr
 	}
@@ -491,6 +515,11 @@ func (cl *Client) getKey(name string, isSymLink bool) string {
 	name = common.JoinUnixFilepath(cl.Config.prefixPath, name)
 	if runtime.GOOS == "windows" && cl.Config.restrictedCharsWin {
 		name = convertname.WindowsFileToCloud(name)
+	}
+
+	// Directories in S3 end in a trailing slash
+	if isDir {
+		name = internal.ExtendDirName(name)
 	}
 	return name
 }
