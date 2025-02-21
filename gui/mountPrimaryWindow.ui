@@ -52,15 +52,12 @@
       <item>
        <widget class="QLineEdit" name="lineEdit_mountPoint">
         <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Designate a location to mount the bucket - the directory must exist on Linux, but not on Windows&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Designate a location to mount the bucket&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QPushButton" name="button_browse">
-        <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Choose a location to mount the bucket - the directory must exist on Linux, but not on Windows&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
         <property name="text">
          <string>Browse</string>
         </property>
