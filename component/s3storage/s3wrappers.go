@@ -283,7 +283,7 @@ func (cl *Client) copyObject(options copyObjectOptions) error {
 }
 
 func (cl *Client) renameObject(options renameObjectOptions) error {
-	err := cl.copyObject(copyObjectOptions{source: options.source, target: options.target, isSymLink: options.isSymLink, isDir: options.isDir})
+	err := cl.copyObject(copyObjectOptions{source: options.source, target: options.target, isSymLink: options.isSymLink, isDir: options.isDir}) //nolint
 	if err != nil {
 		log.Err("Client::renameObject : copyObject(%s->%s) failed. Here's why: %v", options.source, options.target, err)
 		return err
