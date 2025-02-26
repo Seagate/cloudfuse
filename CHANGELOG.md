@@ -1,5 +1,22 @@
 # Cloudfuse Changelog #
 
+## **1.8.1** ##
+
+February 20th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#286](https://github.com/Seagate/cloudfuse/pull/286) Prevent heap inspection of stored secrets
+- [#445](https://github.com/Seagate/cloudfuse/pull/445) Cleanup and remove unused debug info in GUI
+- [#338](https://github.com/Seagate/cloudfuse/pull/338) The service command now works on Linux to install cloudfuse as a service
+
+### Bug Fixes ###
+
+- [#444](https://github.com/Seagate/cloudfuse/pull/444) Fix issue when renaming directories
+- [#455](https://github.com/Seagate/cloudfuse/pull/455) Network share on Windows now correctly uses the hostname
+
+
 ## **1.8.0** ##
 
 February 4th 2025
