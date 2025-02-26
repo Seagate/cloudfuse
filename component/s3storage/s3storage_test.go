@@ -621,6 +621,30 @@ func (s *s3StorageTestSuite) TestIsDirEmpty() {
 	}
 }
 
+func (s *s3StorageTestSuite) TestIsDirEmptyNoDirectoryMarker() {
+	// Setup
+	storageTestConfigurationParameters.EnableDirMarker = false
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
+	defer s.cleanupTest()
+
+	// Setup
+	name := generateDirectoryName()
+	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: name})
+	s.assert.NoError(err)
+
+	// Testing dir and dir/
+	var paths = []string{name, name + "/"}
+	for _, obj_path := range paths {
+		log.Debug(obj_path)
+		s.Run(obj_path, func() {
+			empty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
+
+			s.assert.True(empty)
+		})
+	}
+}
+
 func (s *s3StorageTestSuite) TestIsDirEmptyFalse() {
 	defer s.cleanupTest()
 	// Setup
