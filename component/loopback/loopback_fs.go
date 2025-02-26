@@ -146,7 +146,6 @@ func (lfs *LoopbackFS) StreamDir(options internal.StreamDirOptions) ([]*internal
 			Mode:  info.Mode(),
 			Mtime: info.ModTime(),
 		}
-		attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 		attr.Flags.Set(internal.PropFlagModeDefault)
 
 		if file.IsDir() {
@@ -370,7 +369,6 @@ func (lfs *LoopbackFS) GetAttr(options internal.GetAttrOptions) (*internal.ObjAt
 		Mode:  info.Mode(),
 		Mtime: info.ModTime(),
 	}
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	if info.Mode()&os.ModeSymlink != 0 {
