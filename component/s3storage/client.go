@@ -312,7 +312,7 @@ func (cl *Client) CreateDirectory(name string) error {
 	// So, let's make it clear: we expect the OS to call GetAttr() on the directory
 	// to make sure it doesn't exist before trying to create it.
 	if cl.Config.enableDirMarker {
-		err := cl.putObject(name, nil, 0, false, true)
+		err := cl.putObject(putObjectOptions{name: name, isDir: true})
 		if err != nil {
 			log.Err("Client::CreateDirectory : putObject(%s) failed. Here's why: %v", name, err)
 			return err
@@ -429,7 +429,7 @@ func (cl *Client) DeleteDirectory(name string) error {
 func (cl *Client) RenameFile(source string, target string, isSymLink bool) error {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
-	err := cl.renameObject(source, target, isSymLink, false)
+	err := cl.renameObject(renameObjectOptions{source: source, target: target, isSymLink: isSymLink})
 	if err != nil {
 		log.Err("Client::RenameFile : copyObject(%s->%s) failed. Here's why: %v", source, target, err)
 	}
@@ -475,7 +475,7 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 
 			// Rename the current directory
 			if cl.Config.enableDirMarker {
-				err := cl.renameObject(source, target, false, true)
+				err := cl.renameObject(renameObjectOptions{source: source, target: target, isDir: true})
 				if err != nil {
 					log.Err("Client::RenameDirectory : Failed to rename %s -> %s. Here's why: %v", source, target, err)
 				}
@@ -569,7 +569,7 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 	}
 
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, count, false, false)
+	objectDataReader, err := cl.getObject(getObjectOptions{name: name, offset: offset, count: count})
 	if err != nil {
 		log.Err("Client::ReadToFile : getObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -598,7 +598,7 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 func (cl *Client) ReadBuffer(name string, offset int64, length int64, isSymlink bool) ([]byte, error) {
 	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, length)
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, length, isSymlink, false)
+	objectDataReader, err := cl.getObject(getObjectOptions{name: name, offset: offset, count: length, isSymLink: isSymlink})
 	if err != nil {
 		log.Err("Client::ReadBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return nil, err
@@ -621,7 +621,7 @@ func (cl *Client) ReadBuffer(name string, offset int64, length int64, isSymlink 
 func (cl *Client) ReadInBuffer(name string, offset int64, length int64, data []byte) error {
 	log.Trace("Client::ReadInBuffer : name %s offset %d len %d", name, offset, length)
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, length, false, false)
+	objectDataReader, err := cl.getObject(getObjectOptions{name: name, offset: offset, count: length})
 	if err != nil {
 		log.Err("Client::ReadInBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -661,7 +661,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]*string, fi *os
 	}
 
 	// upload file data
-	err = cl.putObject(name, fi, stat.Size(), isSymlink, false)
+	err = cl.putObject(putObjectOptions{name: name, objectData: fi, size: stat.Size(), isSymLink: isSymlink})
 	if err != nil {
 		log.Err("Client::WriteFromFile : putObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -693,7 +693,7 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]*string, data
 	dataReader := bytes.NewReader(data)
 	// upload data to object
 	// TODO: handle metadata with S3
-	err := cl.putObject(name, dataReader, int64(len(data)), isSymlink, false)
+	err := cl.putObject(putObjectOptions{name: name, objectData: dataReader, size: int64(len(data)), isSymLink: isSymlink})
 	if err != nil {
 		log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
 	}
@@ -754,7 +754,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	log.Trace("Client::TruncateFile : Truncating %s to %dB.", name, size)
 
 	// get object data
-	objectDataReader, err := cl.getObject(name, 0, 0, false, false)
+	objectDataReader, err := cl.getObject(getObjectOptions{name: name})
 	if err != nil {
 		log.Err("Client::TruncateFile : getObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -780,7 +780,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	}
 	// overwrite the object with the truncated data
 	truncatedDataReader := bytes.NewReader(objectData)
-	err = cl.putObject(name, truncatedDataReader, int64(len(objectData)), false, false)
+	err = cl.putObject(putObjectOptions{name: name, objectData: truncatedDataReader, size: int64(len(objectData))})
 	if err != nil {
 		log.Err("Client::TruncateFile : Failed to write truncated data to object %s", name)
 	}
@@ -1131,7 +1131,7 @@ func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]
 			var addData []byte
 			// If there is no data in the block and it is not truncated, we need to get it from the cloud. Otherwise we can just copy it.
 			if len(blk.Data) == 0 && !blk.Truncated() {
-				result, err := cl.getObject(name, blk.StartIndex, blk.EndIndex-blk.StartIndex, false, false)
+				result, err := cl.getObject(getObjectOptions{name: name, offset: blk.StartIndex, count: blk.EndIndex - blk.StartIndex})
 				if err != nil {
 					log.Err("Client::combineSmallBlocks : Unable to get object with error: ", err.Error())
 					return nil, err
