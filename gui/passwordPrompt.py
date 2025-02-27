@@ -33,7 +33,7 @@ class passwordPrompt(QtWidgets.QMainWindow,Ui_Form):
         super().__init__()
         self.setupUi(self)
         self.myWindow = QSettings('Cloudfuse', 'passwordPrompt')
-        self.initWindowSizePos()
+        #self.initWindowSizePos()
         self.setWindowTitle('File Encrypted')
 
         ################################################################
