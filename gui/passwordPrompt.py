@@ -54,8 +54,10 @@ class passwordPrompt(QtWidgets.QMainWindow,Ui_Form):
     def toggleIcon(self):
         if self.eyeClick.icon().cacheKey() == self.eye_icon.cacheKey():
             self.eyeClick.setIcon(self.eye_open_icon)
+            self.lineEdit_password.setEchoMode(QtWidgets.QLineEdit.EchoMode.Normal)
         else:
             self.eyeClick.setIcon(self.eye_icon)
+            self.lineEdit_password.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
 
     def exitWindow(self):
         self.close()
