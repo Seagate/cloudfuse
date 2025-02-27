@@ -37,6 +37,7 @@ from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
 from aboutPage import aboutPage
 from common_qt_functions import defaultSettingsManager as settingsManager, customConfigFunctions as configFuncs
+from passwordPrompt import passwordPrompt
 
 bucketOptions = ['s3storage', 'azstorage']
 mountTargetComponent = 3
@@ -90,6 +91,7 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             self.lineEdit_mountPoint.setToolTip('Designate a location to mount the bucket - the directory must already exist')
             self.button_browse.setToolTip('Browse to a pre-existing directory')
 
+
     def checkConfigDirectory(self):
         workingDir = self.getWorkingDir()
         if not os.path.isdir(workingDir):
@@ -120,6 +122,13 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
     #   so we must use different widgets to show the different settings
     def showSettingsWidget(self):
         targetIndex = self.dropDown_bucketSelect.currentIndex()
+
+        self.passwordWindow = passwordPrompt()
+        self.passwordWindow.setWindowModality(Qt.ApplicationModal)
+        self.passwordWindow.show()
+
+        
+
         if bucketOptions[targetIndex] == 's3storage':
             self.setConfigs = s3SettingsWidget(self.settings)
         else:
