@@ -54,6 +54,7 @@ type Config struct {
 	usePathStyle              bool
 	disableSymlink            bool
 	disableUsage              bool
+	enableDirMarker           bool
 }
 
 // TODO: move s3AuthConfig to s3auth.go
