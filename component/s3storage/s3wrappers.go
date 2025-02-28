@@ -267,7 +267,7 @@ func (cl *Client) headBucket() (*s3.HeadBucketOutput, error) {
 func (cl *Client) copyObject(options copyObjectOptions) error {
 	// copy the object to its new key
 	sourceKey := cl.getKey(options.source, options.isSymLink, options.isDir)
-	targetKey := cl.getKey(target, options.isSymLink, options.isDir)
+	targetKey := cl.getKey(options.target, options.isSymLink, options.isDir)
 	_, err := cl.awsS3Client.CopyObject(context.Background(), &s3.CopyObjectInput{
 		Bucket:     aws.String(cl.Config.authConfig.BucketName),
 		CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, url.PathEscape(sourceKey))),
