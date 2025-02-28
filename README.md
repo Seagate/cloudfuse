@@ -197,12 +197,6 @@ Kindly avoid using this feature for write while we investigate and resolve it.
     `docker run -it --rm --cap-add=SYS_ADMIN --device=/dev/fuse --security-opt
     apparmor:unconfined <environment variables> <docker image>`
 
-### Syslog security warning
-
-By default, Cloudfuse will log to syslog. The default settings will, in some
-cases, log relevant file paths to syslog. If this is sensitive information, turn
-off logging or set log-level to LOG_ERR.
-
 ## License
 
 The Cloudfuse project is licensed under MIT.
