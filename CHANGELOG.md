@@ -1,5 +1,16 @@
 # Cloudfuse Changelog #
 
+## **1.8.2** ##
+
+March 3rd 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#445](https://github.com/Seagate/cloudfuse/pull/462) Support custom SDDL strings on Windows to customize mount permissions
+- [#464](https://github.com/Seagate/cloudfuse/pull/464) No_gui installer now is able to restart mounts on restart if the user installs cloudfuse as a service
+- [#445](https://github.com/Seagate/cloudfuse/pull/450) GUI is able to mount as a drive letter on Windows
+
 ## **1.8.1** ##
 
 February 20th 2025
@@ -15,7 +26,6 @@ This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storag
 
 - [#444](https://github.com/Seagate/cloudfuse/pull/444) Fix issue when renaming directories
 - [#455](https://github.com/Seagate/cloudfuse/pull/455) Network share on Windows now correctly uses the hostname
-
 
 ## **1.8.0** ##
 
