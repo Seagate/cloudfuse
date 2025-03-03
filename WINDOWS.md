@@ -43,8 +43,9 @@ generate SDDL strings to change permissions.
 
    If you used the standard cloudfuse installer on Windows, then WinFsp is already installed on your system.
 
-2. Find Your Account's SID and UID Use the fsptool utility to discover your account's SID and UID. Open a command prompt
-and run:
+2. Find Your Account's SID and UID:
+
+   Use the fsptool utility to discover your account's SID and UID. Open a command prompt and run:
 
         'C:\Program Files (x86)\WinFsp\bin\fsptool-x64.exe' id
 
