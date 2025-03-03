@@ -7,6 +7,7 @@ This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storag
 
 ### Changes ###
 
+- [#445](https://github.com/Seagate/cloudfuse/pull/462) Support custom SDDL strings on Windows to customize mount permissions
 - [#464](https://github.com/Seagate/cloudfuse/pull/464) No_gui installer now is able to restart mounts on restart if the user installs cloudfuse as a service
 - [#445](https://github.com/Seagate/cloudfuse/pull/450) GUI is able to mount as a drive letter on Windows
 
