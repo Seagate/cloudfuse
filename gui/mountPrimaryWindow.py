@@ -187,8 +187,6 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
 
         # do a dry run to validate options and credentials
         commandParts = [cloudfuseCli, 'mount', directory, f'--config-file={configPath}', '--dry-run']
-        if platform == "win32" and self.checkBox_remount.isChecked():
-            commandParts.append('--enable-remount')
         
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
@@ -206,6 +204,8 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
 
         # now actually mount
         commandParts = [cloudfuseCli, 'mount', directory, f'--config-file={configPath}']
+        if platform == "win32" and self.checkBox_remount.isChecked():
+            commandParts.append('--enable-remount')
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
             self.addOutputText('cloudfuse.exe not found! Is it installed?')
