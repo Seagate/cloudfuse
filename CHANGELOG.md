@@ -1,5 +1,15 @@
 # Cloudfuse Changelog #
 
+## **1.9.0** ##
+
+March 4th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#469](https://github.com/Seagate/cloudfuse/pull/469) Add enable-remount and disable-remount flags to CLI for Windows to better enable customizability on which mounts should remount on restart
+- [#467](https://github.com/Seagate/cloudfuse/pull/467) Fixed bug with creation of windows startup utility
+
 ## **1.8.2** ##
 
 March 3rd 2025
