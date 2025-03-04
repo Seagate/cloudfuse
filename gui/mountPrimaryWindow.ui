@@ -63,6 +63,19 @@
         </property>
        </widget>
       </item>
+      <item>
+      <widget class="QCheckBox" name="checkBox_remount">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remount mount on server restart&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="text">
+        <string>Remount on restart</string>
+       </property>
+        <property name="checked">
+        <bool>false</bool>
+       </property>
+      </widget>
+      </item>
      </layout>
     </item>
     <item row="1" column="0" colspan="2">

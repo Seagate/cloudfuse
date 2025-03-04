@@ -329,6 +329,7 @@ var mountCmd = &cobra.Command{
 				return errors.New("config file does not exist")
 			}
 			// mount using WinFSP, and persist on reboot
+			fmt.Println(options.EnableRemount)
 			err = createMountInstance(options.EnableRemount)
 			if err != nil {
 				return fmt.Errorf("failed to mount instance [%s]", err.Error())
@@ -747,7 +748,7 @@ func init() {
 	mountCmd.Flags().Lookup("basic-remount-check").Hidden = true
 
 	if runtime.GOOS == "windows" {
-		mountCmd.Flags().Bool("enable-remount", true, "Remount mount on server restart.")
+		mountCmd.Flags().BoolVar(&options.EnableRemount, "enable-remount", true, "Remount mount on server restart.")
 		config.BindPFlag("enable-remount", mountCmd.Flags().Lookup("enable-remount"))
 	}
 

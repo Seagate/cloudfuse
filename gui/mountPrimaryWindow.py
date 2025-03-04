@@ -82,6 +82,9 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             self.button_browse.setToolTip('Browse to a pre-existing directory to mount')
             self.button_browse.clicked.connect(self.getFileDirInput)
 
+            # The remount option is not supported on Linux
+            self.checkBox_remount.hide()
+
         # Set up the signals for all the interactive entities
         self.button_config.clicked.connect(self.showSettingsWidget)
         self.button_mount.clicked.connect(self.mountBucket)
@@ -184,6 +187,9 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
 
         # do a dry run to validate options and credentials
         commandParts = [cloudfuseCli, 'mount', directory, f'--config-file={configPath}', '--dry-run']
+        if platform == "win32" and self.checkBox_remount.isChecked():
+            commandParts.append('--enable-remount')
+        
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
             self.addOutputText('cloudfuse.exe not found! Is it installed?')
@@ -242,6 +248,8 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         commandParts = [cloudfuseCli, 'unmount', directory]
         if platform != 'win32':
             commandParts.append('--lazy')
+        if platform == "win32" and not self.checkBox_remount.isChecked():
+            commandParts.append('--disable-remount')
 
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
