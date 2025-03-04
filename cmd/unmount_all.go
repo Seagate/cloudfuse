@@ -56,7 +56,7 @@ var umntAllCmd = &cobra.Command{
 			mountfound += 1
 			var err error
 			if runtime.GOOS == "windows" {
-				err = unmountCloudfuseWindows(mntPath)
+				err = unmountCloudfuseWindows(mntPath, false)
 			} else {
 				err = unmountCloudfuse(mntPath, lazy)
 			}
