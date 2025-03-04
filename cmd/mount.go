@@ -329,7 +329,6 @@ var mountCmd = &cobra.Command{
 				return errors.New("config file does not exist")
 			}
 			// mount using WinFSP, and persist on reboot
-			fmt.Println(options.EnableRemount)
 			err = createMountInstance(options.EnableRemount)
 			if err != nil {
 				return fmt.Errorf("failed to mount instance [%s]", err.Error())
