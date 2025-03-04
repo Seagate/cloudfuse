@@ -12,14 +12,22 @@ To run in foreground mode, you must pass the option `--foreground=true` when usi
 
 ## Running in background mode (recommended)
 
-Cloudfuse runs in the background by default. It uses the WinFSP launcher to run the mount in the background. Cloudfuse
-will also automatically restart existing mounts on user login.
+Cloudfuse runs in the background by default. It uses the WinFSP launcher to run the mount in the background.
 
         cloudfuse.exe mount <mount path> --config-file=<config file>
 
-To unmount a specific instance, use the unmount command. This will also prevent this mount from persisting on restarts.
+Cloudfuse can also automatically restart existing mounts on user login. To do so, pass the --enable-remount flag
+when mounting
+
+        cloudfuse.exe mount <mount path> --config-file=<config file> --enable-remount
+
+To unmount a specific instance, use the unmount command.
 
         cloudfuse.exe unmount <mount path>
+
+To unmount and also prevent this mount from persisting on restarts pass the --disable-remount flag.
+
+        cloudfuse.exe unmount <mount path> --disable-remount.
 
 Cloudfuse supports mounting any number of buckets.
 
