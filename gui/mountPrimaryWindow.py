@@ -122,10 +122,10 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
     #   so we must use different widgets to show the different settings
     def showSettingsWidget(self):
         targetIndex = self.dropDown_bucketSelect.currentIndex()
-
-        self.passwordWindow = passwordPrompt()
-        self.passwordWindow.setWindowModality(Qt.ApplicationModal)
-        self.passwordWindow.show()
+        # Move to appropriate place later
+        # self.passwordWindow = passwordPrompt()
+        # self.passwordWindow.setWindowModality(Qt.ApplicationModal)
+        # self.passwordWindow.show()
 
         
 
