@@ -40,8 +40,8 @@ class passwordPrompt(QtWidgets.QMainWindow,Ui_Form):
         #Template for future reference
 
         # Hide sensitive data QtWidgets.QLineEdit.EchoMode.PasswordEchoOnEdit
-        self.eye_icon = QIcon(QPixmap("hideEye.jpg"))
-        self.eye_open_icon= QIcon(QPixmap("openEye.jpg"))
+        self.eye_icon = QIcon(QPixmap("gui/hideEye.jpg"))
+        self.eye_open_icon= QIcon(QPixmap("gui/openEye.jpg"))
         self.eyeClick = self.lineEdit_password.addAction(self.eye_icon,QtWidgets.QLineEdit.TrailingPosition)
         self.lineEdit_password.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.eyeClick.triggered.connect(self.toggleIcon)
