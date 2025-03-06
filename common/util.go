@@ -246,12 +246,17 @@ func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
 	}
 	defer secretKey.Destroy()
 
-	binaryKey, err := base64.StdEncoding.DecodeString(secretKey.String())
-
-	block, err := aes.NewCipher(binaryKey)
+	decodedKey := make([]byte, 32)
+	_, err = base64.StdEncoding.Decode(decodedKey, secretKey.Bytes())
 	if err != nil {
 		return nil, err
 	}
+
+	block, err := aes.NewCipher(decodedKey)
+	if err != nil {
+		return nil, err
+	}
+	clear(decodedKey)
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
@@ -279,12 +284,17 @@ func DecryptData(cipherData []byte, key *memguard.Enclave) ([]byte, error) {
 	}
 	defer secretKey.Destroy()
 
-	binaryKey, err := base64.StdEncoding.DecodeString(secretKey.String())
-
-	block, err := aes.NewCipher(binaryKey)
+	decodedKey := make([]byte, 32)
+	_, err = base64.StdEncoding.Decode(decodedKey, secretKey.Bytes())
 	if err != nil {
 		return nil, err
 	}
+
+	block, err := aes.NewCipher(decodedKey)
+	if err != nil {
+		return nil, err
+	}
+	clear(decodedKey)
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
