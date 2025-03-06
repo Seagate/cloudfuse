@@ -220,9 +220,12 @@ nfpms:
       - linux-amd64
     vendor: Seagate Technology
     homepage: https://github.com/Seagate/cloudfuse
-    maintainer: https://github.com/Seagate/cloudfuse
+    maintainer: Seagate <cloudfuse@seagate.com>
     description: |-
-      FUSE file system for interacting with S3 and Azure storage
+      FUSE file system for interacting with S3 and Azure storage.
+      Cloudfuse provides the ability to mount a cloud bucket in your local file
+      system. You can easily read and write to the cloud, and connect programs
+      on your computer to the cloud even if they're not cloud-aware.
     license: MIT
     changelog: "changelog.yml"
     formats:
@@ -239,14 +242,24 @@ nfpms:
           mode: 0755
       - src: NOTICE
         dst: /usr/share/doc/cloudfuse/NOTICE
+        file_info:
+          mode: 0644
       - src: LICENSE
         dst: /usr/share/doc/cloudfuse/LICENSE
+        file_info:
+          mode: 0644
       - src: copyright
         dst: /usr/share/doc/cloudfuse/copyright
+        file_info:
+          mode: 0644
       - src: setup/baseConfig.yaml
         dst: /usr/share/doc/cloudfuse/examples/baseConfig.yaml
+        file_info:
+          mode: 0644
       - src: sample_configs/*
         dst: /usr/share/doc/cloudfuse/examples/
+        file_info:
+          mode: 0644
       - src: ./manpages/*
         dst: /usr/share/man/man1/
         file_info:
@@ -256,6 +269,7 @@ nfpms:
       deb:
         dependencies:
           - libfuse3-dev
+          - libc6 (>= 2.24)
 
       rpm:
         dependencies:
@@ -270,9 +284,12 @@ nfpms:
 
     vendor: Seagate Technology
     homepage: https://github.com/Seagate/cloudfuse
-    maintainer: https://github.com/Seagate/cloudfuse
+    maintainer: Seagate <cloudfuse@seagate.com>
     description: |-
-      FUSE file system for interacting with S3 and Azure storage
+      FUSE file system for interacting with S3 and Azure storage.
+      Cloudfuse provides the ability to mount a cloud bucket in your local file
+      system. You can easily read and write to the cloud, and connect programs
+      on your computer to the cloud even if they're not cloud-aware.
     license: MIT
     changelog: "changelog.yml"
     formats:
@@ -286,16 +303,28 @@ nfpms:
           mode: 0755
       - src: NOTICE
         dst: /usr/share/doc/cloudfuse/NOTICE
+        file_info:
+          mode: 0644
       - src: LICENSE
         dst: /usr/share/doc/cloudfuse/LICENSE
+        file_info:
+          mode: 0644
       - src: README.md
         dst: /usr/share/doc/cloudfuse/README
+        file_info:
+          mode: 0644
       - src: copyright
         dst: /usr/share/doc/cloudfuse/copyright
+        file_info:
+          mode: 0644
       - src: setup/baseConfig.yaml
         dst: /usr/share/doc/cloudfuse/examples/baseConfig.yaml
+        file_info:
+          mode: 0644
       - src: sample_configs/*
         dst: /usr/share/doc/cloudfuse/examples/
+        file_info:
+          mode: 0644
       - src: ./manpages/*
         dst: /usr/share/man/man1/
         file_info:
@@ -305,6 +334,7 @@ nfpms:
       deb:
         dependencies:
           - libfuse3-dev
+          - libc6 (>= 2.24)
 
       rpm:
         dependencies:
