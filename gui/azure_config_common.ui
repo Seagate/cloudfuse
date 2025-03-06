@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>993</width>
-    <height>395</height>
+    <height>407</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -724,6 +724,13 @@
      </property>
      <property name="default">
       <bool>false</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="3" alignment="Qt::AlignRight">
+    <widget class="QCheckBox" name="checkBox_encryptConfig">
+     <property name="text">
+      <string>Encrypt config file</string>
      </property>
     </widget>
    </item>

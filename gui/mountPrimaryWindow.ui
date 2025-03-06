@@ -123,6 +123,13 @@
       </property>
      </widget>
     </item>
+    <item row="1" column="2">
+     <widget class="QCheckBox" name="checkBox_encryptConfig">
+      <property name="text">
+       <string>Config file encrypted</string>
+      </property>
+     </widget>
+    </item>
    </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
@@ -131,7 +138,7 @@
      <x>0</x>
      <y>0</y>
      <width>622</width>
-     <height>22</height>
+     <height>23</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu_Help">
