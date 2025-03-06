@@ -1,5 +1,14 @@
 # Cloudfuse Changelog #
 
+## **1.9.1** ##
+
+March 6th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#471](https://github.com/Seagate/cloudfuse/pull/471) Fix bug where passphrase for secure encryption was not properly decoded as base64
+
 ## **1.9.0** ##
 
 March 4th 2025
