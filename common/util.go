@@ -246,11 +246,18 @@ func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
 	}
 	defer secretKey.Destroy()
 
-	decodedKey := make([]byte, 32)
+	// A base64 encode of a key of length 32 will be at maximum a length of 44 bytes
+	if len(secretKey.Bytes()) > 44 {
+		return nil, errors.New("Provided decoded base64 key is longer than 32 bytes. Decoded key " +
+			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+	}
+
+	decodedKey := make([]byte, 32) // Valid key can't be longer than 32 bytes
 	_, err = base64.StdEncoding.Decode(decodedKey, secretKey.Bytes())
 	if err != nil {
 		return nil, err
 	}
+	decodedKey = bytes.Trim(decodedKey, "\x00") // trim any null bytes if key is 16, or 24 bytes
 
 	block, err := aes.NewCipher(decodedKey)
 	if err != nil {
@@ -284,11 +291,18 @@ func DecryptData(cipherData []byte, key *memguard.Enclave) ([]byte, error) {
 	}
 	defer secretKey.Destroy()
 
-	decodedKey := make([]byte, 32)
+	// A base64 encode of a key of length 32 will be at maximum a length of 44 bytes
+	if len(secretKey.Bytes()) > 44 {
+		return nil, errors.New("Provided decoded base64 key is longer than 32 bytes. Decoded key " +
+			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+	}
+
+	decodedKey := make([]byte, 32) // Valid key can't be longer than 32 bytes
 	_, err = base64.StdEncoding.Decode(decodedKey, secretKey.Bytes())
 	if err != nil {
 		return nil, err
 	}
+	decodedKey = bytes.Trim(decodedKey, "\x00") // trim any null bytes if key is 16, or 24 bytes
 
 	block, err := aes.NewCipher(decodedKey)
 	if err != nil {
