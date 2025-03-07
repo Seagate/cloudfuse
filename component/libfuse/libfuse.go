@@ -74,6 +74,7 @@ type Libfuse struct {
 	directIO              bool
 	umask                 uint32
 	displayCapacityMb     uint64
+	windowsSDDL           string
 }
 
 // To support pagination in readdir calls this structure holds a block of items for a given directory
@@ -108,6 +109,7 @@ type LibfuseOptions struct {
 	DirectIO                bool   `config:"direct-io" yaml:"direct-io,omitempty"`
 	Umask                   uint32 `config:"umask" yaml:"umask,omitempty"`
 	DisplayCapacityMb       uint64 `config:"display-capacity-mb" yaml:"display-capacity-mb,omitempty"`
+	WindowsSSDL             string `config:"windows-sddl" yaml:"windows-sddl,omitempty"`
 }
 
 const compName = "libfuse"
@@ -203,6 +205,7 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 	lf.ownerGID = opt.Gid
 	lf.ownerUID = opt.Uid
 	lf.umask = opt.Umask
+	lf.windowsSDDL = opt.WindowsSSDL
 
 	if opt.allowOther {
 		lf.dirPermission = uint(common.DefaultAllowOtherPermissionBits)
