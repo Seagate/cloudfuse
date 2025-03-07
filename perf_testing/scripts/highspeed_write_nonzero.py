@@ -14,7 +14,6 @@ def create_file_dd(file_index, folder, source_file, timestamp):
     block_size = 1  # in GB
     count = 36
     file_size_gb = (block_size * count)
-
     command = f"dd if={source_file} of={filename} bs={block_size}G count={count} oflag=direct"
 
     start_time = time.time()
@@ -57,7 +56,6 @@ def main(folder, num_files, source_file):
     total_time = end_time - start_time
     total_data_written = sum(r[3] for r in results)  # in GB
     speed_gbps = (total_data_written *8 ) / total_time # Convert GB to Gigabits (1 GB = 8 Gb)
-
     throughput = (total_data_written * 1024) / total_time
     print(f"Number of files written: {num_files}")
     print(f"Total amount of data written: {total_data_written:.2f} GB")
