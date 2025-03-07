@@ -1,18 +1,21 @@
-## ✅ What
+### What type of Pull Request is this? (check all applicable)
 
-<!-- A brief description of the changes in this PR. -->
+- [ ] Refactor
+- [ ] Feature
+- [ ] Bug Fix
+- [ ] Optimization
+- [ ] Documentation Update
 
-## 🤔 Why
+### Describe your changes in brief
 
-<!-- A brief description of the reason for these changes. -->
+### Checklist
 
-## 👩‍🔬 How to validate if applicable
+- [ ] Tested locally
+- [ ] Added new dependencies
+- [ ] Updated documentation
+- [ ] Added tests
 
-<!-- Step-by-step instructions for how reviewers can verify these changes work as expected. -->
+### Related Issues
 
-## 🔖 Related links
-
-- [Issues](<link>)
-- [Team thread](<link>)
-- [Documents](<link>)
-- [Email Subject]
+- Related Issue #
+- Closes #
