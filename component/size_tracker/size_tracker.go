@@ -48,15 +48,15 @@ import (
 // Common structure for Component
 type SizeTracker struct {
 	internal.BaseComponent
-	mountSize              *MountSize
-	bucketCapacityFallback bool
-	displayCapacityMb      uint64
+	mountSize           *MountSize
+	displayCapacityMb   uint64
+	totalBucketCapacity uint64
 }
 
 // Structure defining your config parameters
 type SizeTrackerOptions struct {
-	JournalName            string `config:"journal-name" yaml:"journal-name,omitempty"`
-	BucketCapacityFallback bool   `config:"bucket-capacity-fallback" yaml:"bucket-capacity-fallback,omitempty"`
+	JournalName         string `config:"journal-name" yaml:"journal-name,omitempty"`
+	TotalBucketCapacity uint64 `config:"bucket-capacity-fallback" yaml:"bucket-capacity-fallback,omitempty"`
 }
 
 const compName = "size_tracker"
@@ -108,14 +108,14 @@ func (st *SizeTracker) Configure(_ bool) error {
 		return fmt.Errorf("SizeTracker: config error [invalid config attributes]")
 	}
 
-	st.bucketCapacityFallback = conf.BucketCapacityFallback
+	st.totalBucketCapacity = conf.TotalBucketCapacity
 
-	if st.bucketCapacityFallback {
+	if st.totalBucketCapacity != 0 {
 		// Borrow enable-symlinks flag from attribute cache
 		if config.IsSet("libfuse.display-capacity-mb") {
 			err := config.UnmarshalKey("libfuse.display-capacity-mb", &st.displayCapacityMb)
 			if err != nil {
-				st.bucketCapacityFallback = false
+				st.totalBucketCapacity = 0
 				log.Err("Configure : Failed to unmarshal libfuse.display-capacity-mb. Attempting to use" +
 					" bucket capacity fallback without setting display capacity.")
 			}
@@ -322,7 +322,7 @@ func (st *SizeTracker) FlushFile(options internal.FlushFileOptions) error {
 	diff := newSize - origSize
 
 	var journalErr error
-	// File already exists and CopyFromFile succeeded subtract difference in file size
+	// File already exists and FlushFile succeeded subtract difference in file size
 	if diff < 0 {
 		st.mountSize.Subtract(uint64(-diff))
 	} else {
@@ -341,7 +341,7 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 
 	blocks := st.mountSize.GetSize() / uint64(blockSize)
 
-	if st.bucketCapacityFallback {
+	if st.totalBucketCapacity != 0 {
 		stat, ret, err := st.NextComponent().StatFs()
 
 		if err == nil && ret {
@@ -349,7 +349,7 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 			// If the user is over the capacity limit set by Nx, then we need to prevent them from
 			// accidental overuse of their bucket. So we change our reporting to instead report
 			// the used capacity of the bucket to enable the VMS to start eviction
-			if evictionThreshold*float64(stat.Blocks) > float64(st.displayCapacityMb) {
+			if float64(stat.Blocks*uint64(blockSize)) > evictionThreshold*float64(st.totalBucketCapacity) {
 				log.Warn("SizeTracker::StatFs : changing from size_tracker size to S3 bucket size due to overuse of bucket")
 				blocks = stat.Blocks
 			}
@@ -400,7 +400,7 @@ func (st *SizeTracker) CommitData(opt internal.CommitDataOptions) error {
 	diff := newSize - origSize
 
 	var journalErr error
-	// File already exists and CopyFromFile succeeded subtract difference in file size
+	// File already exists and CommitData succeeded subtract difference in file size
 	if diff < 0 {
 		st.mountSize.Subtract(uint64(-diff))
 	} else {
