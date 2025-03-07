@@ -27,7 +27,10 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"testing"
+
+	"github.com/Seagate/cloudfuse/common"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -166,10 +169,14 @@ func (suite *genConfig) TestFileCacheConfigGen() {
 	suite.assert.Contains(string(file), "file_cache")
 
 	//check if the generated file has the correct temp path
-	suite.assert.Contains(string(file), tempDir)
+	suite.assert.Contains(string(file), common.JoinUnixFilepath(tempDir))
 }
 
 func (suite *genConfig) TestBlockCacheConfigGen() {
+	// TODO: Skip this test on Windows until block cache supported
+	if runtime.GOOS == "windows" {
+		return
+	}
 	defer suite.cleanupTest()
 
 	tempDir, _ := os.MkdirTemp("", "TestTempDir")
@@ -199,6 +206,10 @@ func (suite *genConfig) TestBlockCacheConfigGen() {
 }
 
 func (suite *genConfig) TestBlockCacheConfigGen1() {
+	// TODO: Skip this test on Windows until block cache supported
+	if runtime.GOOS == "windows" {
+		return
+	}
 	defer suite.cleanupTest()
 
 	tempDir, _ := os.MkdirTemp("", "TestTempDir")
@@ -229,6 +240,10 @@ func (suite *genConfig) TestBlockCacheConfigGen1() {
 
 // test direct io flag
 func (suite *genConfig) TestDirectIOConfigGen() {
+	// TODO: Skip this test on Windows until block cache supported
+	if runtime.GOOS == "windows" {
+		return
+	}
 	defer suite.cleanupTest()
 
 	_, err := executeCommandC(rootCmd, "gen-config", "--block-cache", "--direct-io")
@@ -252,7 +267,7 @@ func (suite *genConfig) TestDirectIOConfigGen() {
 func (suite *genConfig) TestOutputFile() {
 	defer suite.cleanupTest()
 
-	_, err := executeCommandC(rootCmd, "gen-config", "--block-cache", "--direct-io", "--o", "1.yaml")
+	_, err := executeCommandC(rootCmd, "gen-config", "--direct-io", "--o", "1.yaml", "--tmp-path=/tmp")
 	suite.assert.Nil(err)
 
 	//check if the generated file is not empty
@@ -262,14 +277,14 @@ func (suite *genConfig) TestOutputFile() {
 
 	//check if the generated file has the correct direct io flag
 	suite.assert.Contains(string(file), "direct-io: true")
-	suite.assert.NotContains(string(file), " path: ")
+	suite.assert.Contains(string(file), " path: ")
 	_ = os.Remove("1.yaml")
 }
 
 func (suite *genConfig) TestConsoleOutput() {
 	defer suite.cleanupTest()
 
-	op, err := executeCommandC(rootCmd, "gen-config", "--block-cache", "--direct-io", "--o", "console")
+	op, err := executeCommandC(rootCmd, "gen-config", "--direct-io", "--o", "console", "--tmp-path=/tmp")
 	suite.assert.Nil(err)
 
 	//check if the generated file has the correct direct io flag
