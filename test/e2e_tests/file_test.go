@@ -5,7 +5,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -108,6 +108,44 @@ func (suite *fileTestSuite) TestFileCreate() {
 	srcFile.Close()
 
 	suite.fileTestCleanup([]string{fileName})
+}
+
+func (suite *fileTestSuite) TestOpenFlag_O_TRUNC() {
+	fileName := suite.testPath + "/test_on_open"
+	buf := "foo"
+	tempbuf := make([]byte, 4096)
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	suite.Nil(err)
+	bytesWritten, err := srcFile.Write([]byte(buf))
+	suite.Equal(len(buf), bytesWritten)
+	suite.Nil(err)
+	err = srcFile.Close()
+	suite.Nil(err)
+
+	srcFile, err = os.OpenFile(fileName, os.O_WRONLY, 0666)
+	suite.Nil(err)
+	err = srcFile.Close()
+	suite.Nil(err)
+
+	fileInfo, err := os.Stat(fileName)
+	suite.Equal(int64(len(buf)), fileInfo.Size())
+	suite.Nil(err)
+
+	srcFile, err = os.OpenFile(fileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	suite.Nil(err)
+	read, _ := srcFile.Read(tempbuf)
+	suite.Equal(0, read)
+	err = srcFile.Close()
+	suite.Nil(err)
+
+	fileInfo, err = os.Stat(fileName)
+	suite.Equal(int64(0), fileInfo.Size())
+	suite.Nil(err)
+
+	srcFile, err = os.OpenFile(fileName, os.O_RDONLY, 0666)
+	suite.Nil(err)
+	read, _ = srcFile.Read(tempbuf)
+	suite.Equal(0, read)
 }
 
 func (suite *fileTestSuite) TestFileCreateUtf8Char() {

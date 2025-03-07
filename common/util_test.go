@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -479,4 +479,14 @@ func (suite *utilTestSuite) TestWriteToFile() {
 	data, err := os.ReadFile(filePath)
 	suite.assert.NoError(err)
 	suite.assert.Equal(content, string(data))
+}
+
+func (suite *utilTestSuite) TestCRC64() {
+	data := []byte("Hello World")
+	crc := GetCRC64(data, len(data))
+
+	data = []byte("Hello World!")
+	crc1 := GetCRC64(data, len(data))
+
+	suite.assert.NotEqual(crc, crc1)
 }

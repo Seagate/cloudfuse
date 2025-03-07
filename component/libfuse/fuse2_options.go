@@ -4,7 +4,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -53,6 +53,12 @@ func createFuseOptions(host *fuse.FileSystemHost, allowOther bool, allowRoot boo
 	if nonEmptyMount {
 		options += ",nonempty"
 	}
+
+	// force the fuse library to always pass O_TRUNC flag on open call
+	// Not checking the options since we don't allow user to configure this flag.
+	// This is the default behaviour for the fuse3 hence we don't pass this flag there.
+	// ref: https://github.com/libfuse/libfuse/blob/7f86f3be7148b15b71b63357813c66dd32177cf6/lib/fuse_lowlevel.c#L2161C2-L2161C16
+	options += ",atomic_o_trunc"
 
 	if umask != 0 {
 		options += fmt.Sprintf(",umask=%04d", umask)

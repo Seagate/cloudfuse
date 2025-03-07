@@ -4,7 +4,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -63,7 +63,17 @@ type workItem struct {
 	failCnt  int32             // How many times this item has failed to download
 	upload   bool              // Flag marking this is a upload request or not
 	blockId  string            // BlockId of the block
+	ETag     string            // Etag of the file before scheduling.
 }
+
+// Reason for storing Etag in workitem struct:
+// here getting the value of ETag inside upload/download methods
+// from the handle is somewhat tricker.
+// firstly we need to acquire a lock to read it from the handle.
+// In these methods the handle may/maynot be locked by
+// other go routine hence acquiring it again would cause a deadlock.
+// It is already locked if the call came from the readInBuffer.
+// It is may be locked if the call come from the prefetch.
 
 // newThreadPool creates a new thread pool
 func newThreadPool(count uint32, reader func(*workItem), writer func(*workItem)) *ThreadPool {

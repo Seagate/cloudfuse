@@ -4,7 +4,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -29,12 +29,14 @@ package azstorage
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 
@@ -104,7 +106,7 @@ func (s *utilsTestSuite) TestPrefixPathRemoval() {
 
 	for _, i := range inputs {
 		s.Run(common.JoinUnixFilepath(i.prefix, i.path), func() {
-			output := split(i.prefix, i.path)
+			output := removePrefixPath(i.prefix, i.path)
 			assert.EqualValues(i.result, output)
 		})
 	}
@@ -319,6 +321,18 @@ func (s *utilsTestSuite) TestSanitizeSASKey() {
 	assert.EqualValues("?abcd", key.String())
 }
 
+func (s *utilsTestSuite) TestSanitizeEtag() {
+	assert := assert.New(s.T())
+
+	etagValue := azcore.ETag("\"abcd\"")
+	etag := sanitizeEtag(&etagValue)
+	assert.EqualValues(etag, "abcd")
+
+	etagValue = azcore.ETag("abcd")
+	etag = sanitizeEtag(&etagValue)
+	assert.EqualValues(etag, "abcd")
+}
+
 func (s *utilsTestSuite) TestBlockNonProxyOptions() {
 	assert := assert.New(s.T())
 	opt, err := getAzBlobServiceClientOptions(&AzStorageConfig{})
@@ -529,6 +543,33 @@ func (s *utilsTestSuite) TestRemoveLeadingSlashes() {
 
 	for _, i := range inputs {
 		assert.Equal(i.result, removeLeadingSlashes(i.subdirectory))
+	}
+}
+
+func (suite *utilsTestSuite) TestRemovePrefixPath() {
+	assert := assert.New(suite.T())
+
+	var inputs = []struct {
+		prefixPath string
+		path       string
+		result     string
+	}{
+		{prefixPath: "", path: "abc.txt", result: "abc.txt"},
+		{prefixPath: "", path: "ABC/DEF/abc.txt", result: "ABC/DEF/abc.txt"},
+		{prefixPath: "ABC", path: "ABC/DEF/1.txt", result: "DEF/1.txt"},
+		{prefixPath: "ABC/", path: "ABC/DEF/1.txt", result: "DEF/1.txt"},
+		{prefixPath: "ABC/DEF", path: "ABC/DEF/1.txt", result: "1.txt"},
+		{prefixPath: "ABC/DEF/", path: "ABC/DEF/1.txt", result: "1.txt"},
+		{prefixPath: "ABC", path: "ABC/ABC.txt", result: "ABC.txt"},
+		{prefixPath: "A/B/C/D/E/", path: "A/B/C/D/E/F/G/H/I/j.txt", result: "F/G/H/I/j.txt"},
+		{prefixPath: "A/B/C/D/E/", path: "A/B/C/D/E/F/G/H/I/j.txt", result: "F/G/H/I/j.txt"},
+	}
+
+	for _, i := range inputs {
+		suite.Run(filepath.Join(i.prefixPath, i.path), func() {
+			output := removePrefixPath(i.prefixPath, i.path)
+			assert.EqualValues(i.result, output)
+		})
 	}
 }
 

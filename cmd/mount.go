@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -135,7 +135,7 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 				var cleanupOnStart bool
 				_ = config.UnmarshalKey("file_cache.cleanup-on-start", &cleanupOnStart)
 
-				if tempCachePath != "" && !cleanupOnStart {
+				if tempCachePath != "" && cleanupOnStart {
 					if err = common.TempCacheCleanup(tempCachePath); err != nil {
 						return fmt.Errorf("failed to cleanup file cache [%s]", err.Error())
 					}
@@ -282,7 +282,7 @@ var mountCmd = &cobra.Command{
 		if options.ConfigFile == "" {
 			// Config file is not set in cli parameters
 			// Cloudfuse defaults to config.yaml in current directory
-			// If the file does not exists then user might have configured required things in env variables
+			// If the file does not exist then user might have configured required things in env variables
 			// Fall back to defaults and let components fail if all required env variables are not set.
 			_, err := os.Stat(common.DefaultConfigFilePath)
 			if err != nil && os.IsNotExist(err) {

@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -88,13 +88,16 @@ type CloseFileOptions struct {
 }
 
 type RenameFileOptions struct {
-	Src string
-	Dst string
+	Src     string
+	Dst     string
+	SrcAttr *ObjAttr
+	DstAttr *ObjAttr
 }
 
 type ReadInBufferOptions struct {
 	Handle *handlemap.Handle
 	Offset int64
+	Etag   *string
 	Data   []byte
 }
 
@@ -177,6 +180,7 @@ type CommitDataOptions struct {
 	Name      string
 	List      []string
 	BlockSize uint64
+	NewETag   *string
 }
 
 type CommittedBlock struct {
