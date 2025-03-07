@@ -82,6 +82,7 @@ type mountOptions struct {
 	MonitorOpt        monitorOptions `config:"health_monitor"`
 	WaitForMount      time.Duration  `config:"wait-for-mount"`
 	LazyWrite         bool           `config:"lazy-write"`
+	EnableRemount     bool
 
 	// v1 support
 	Streaming      bool     `config:"streaming"`
@@ -328,7 +329,7 @@ var mountCmd = &cobra.Command{
 				return errors.New("config file does not exist")
 			}
 			// mount using WinFSP, and persist on reboot
-			err = createMountInstance()
+			err = createMountInstance(options.EnableRemount)
 			if err != nil {
 				return fmt.Errorf("failed to mount instance [%s]", err.Error())
 			}
@@ -744,6 +745,11 @@ func init() {
 	mountCmd.Flags().Bool("basic-remount-check", true, "Validate cloudfuse is mounted by reading /etc/mtab.")
 	config.BindPFlag("basic-remount-check", mountCmd.Flags().Lookup("basic-remount-check"))
 	mountCmd.Flags().Lookup("basic-remount-check").Hidden = true
+
+	if runtime.GOOS == "windows" {
+		mountCmd.Flags().BoolVar(&options.EnableRemount, "enable-remount", true, "Remount mount on server restart.")
+		config.BindPFlag("enable-remount", mountCmd.Flags().Lookup("enable-remount"))
+	}
 
 	mountCmd.PersistentFlags().StringSliceVarP(&options.LibfuseOptions, "o", "o", []string{}, "FUSE options.")
 	config.BindPFlag("libfuse-options", mountCmd.PersistentFlags().ShorthandLookup("o"))
