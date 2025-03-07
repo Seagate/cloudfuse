@@ -70,6 +70,7 @@ libfuse:
   direct-io: true|false <enable to bypass the kernel cache>
   network-share: true|false <runs as a network share. may improve performance when latency to cloud is high. only supported on Windows. Known issue - only one Cloudfuse network share can be mounted at a time>
   display-capacity-mb: <number of MB to display as the mounted storage capacity. Default - 1TB (1048576 MB)>
+  windows-sddl: <windows file security and permissions setting in SDDL syntax. Default - D:P(A;;FA;;;WD) corresponding to every user having read/write access>
 
   # Streaming configuration
 stream:
