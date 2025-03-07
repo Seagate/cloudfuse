@@ -26,6 +26,8 @@
 package cmd
 
 import (
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -65,7 +67,11 @@ var generatedConfig = &cobra.Command{
 		// If the user passes a config file path, then use that as a template to generate a config
 		if optsGenCfg.configFilePath != "" {
 			var templateConfig []byte
-			var err error
+
+			err := validateGenConfigOptions()
+			if err != nil {
+				return fmt.Errorf("failed to validate options [%s]", err.Error())
+			}
 
 			encryptedPassphrase = memguard.NewEnclave([]byte(optsGenCfg.passphrase))
 
@@ -180,6 +186,24 @@ var generatedConfig = &cobra.Command{
 
 		return err
 	},
+}
+
+func validateGenConfigOptions() error {
+	if optsGenCfg.passphrase == "" {
+		optsGenCfg.passphrase = os.Getenv(SecureConfigEnvName)
+		if optsGenCfg.passphrase == "" {
+			return errors.New("provide the passphrase as a cli parameter or configure the CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+		}
+	}
+
+	_, err := base64.StdEncoding.DecodeString(string(optsGenCfg.passphrase))
+	if err != nil {
+		return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
+	}
+
+	encryptedPassphrase = memguard.NewEnclave([]byte(optsGenCfg.passphrase))
+
+	return nil
 }
 
 func init() {
