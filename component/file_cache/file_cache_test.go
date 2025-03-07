@@ -1991,8 +1991,9 @@ func (suite *fileCacheTestSuite) TestDeleteEmptyDirsNegative() {
 	defer suite.cleanupTest()
 
 	suite.createDirectoryStructure()
-	_, err := os.Create(filepath.Join(suite.cache_path, "h", "l", "m", "n", "file.txt"))
+	file, err := os.Create(filepath.Join(suite.cache_path, "h", "l", "m", "n", "file.txt"))
 	suite.assert.NoError(err)
+	file.Close()
 
 	val, err := suite.fileCache.DeleteEmptyDirs(internal.DeleteDirOptions{Name: suite.cache_path})
 	suite.assert.Error(err)
