@@ -96,6 +96,7 @@ type storageTestConfiguration struct {
 	DisableConcurrentDownload bool   `json:"disable-concurrent-download"`
 	UsePathStyle              bool   `json:"use-path-style"`
 	DisableUsage              bool   `json:"disable-usage"`
+	EnableDirMarker           bool   `json:"enable-dir-marker"`
 }
 
 var storageTestConfigurationParameters storageTestConfiguration
@@ -291,6 +292,7 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, bucket string
 		bucket = generateBucketName()
 	}
 	s.bucket = bucket
+	storageTestConfigurationParameters.EnableDirMarker = true
 	if configuration == "" {
 		configuration = generateConfigYaml(storageTestConfigurationParameters)
 	}
@@ -326,10 +328,12 @@ func (s *s3StorageTestSuite) setupTestHelper(configuration string, bucket string
 func generateConfigYaml(testParams storageTestConfiguration) string {
 	return fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n"+
 		"  region: %s\n  profile: %s\n  endpoint: %s\n  subdirectory: %s\n  restricted-characters-windows: %t\n"+
-		"  part-size-mb: %d\n  upload-cutoff-mb: %d\n  disable-concurrent-download: %t\n  use-path-style: %t\n  disable-usage: %t\n",
+		"  part-size-mb: %d\n  upload-cutoff-mb: %d\n  disable-concurrent-download: %t\n  use-path-style: %t\n  disable-usage: %t\n"+
+		"  enable-dir-marker: %t\n",
 		testParams.BucketName, testParams.KeyID, testParams.SecretKey,
 		testParams.Region, testParams.Profile, testParams.Endpoint, testParams.Prefix, testParams.RestrictedCharsWin, testParams.PartSizeMb,
-		testParams.UploadCutoffMb, testParams.DisableConcurrentDownload, testParams.UsePathStyle, testParams.DisableUsage)
+		testParams.UploadCutoffMb, testParams.DisableConcurrentDownload, testParams.UsePathStyle, testParams.DisableUsage,
+		testParams.EnableDirMarker)
 }
 
 func (s *s3StorageTestSuite) tearDownTestHelper(delete bool) {
@@ -386,12 +390,22 @@ func (s *s3StorageTestSuite) TestCreateDir() {
 	defer s.cleanupTest()
 	// Testing dir and dir/
 	var paths = []string{generateDirectoryName(), generateDirectoryName() + "/"}
-	for _, path := range paths {
-		log.Debug(path)
-		s.Run(path, func() {
-			err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: path})
-			// this does nothing, so just make sure it doesn't return an error
+	for _, obj_path := range paths {
+		log.Debug(obj_path)
+		s.Run(obj_path, func() {
+			err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: obj_path})
+
 			s.assert.NoError(err)
+
+			// Directory should be in the account
+			key := internal.ExtendDirName(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, obj_path))
+			result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+				Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+				Key:    aws.String(key),
+			})
+			s.assert.NoError(err)
+			s.assert.NotNil(result)
+			s.assert.EqualValues(0, *result.ContentLength)
 		})
 	}
 }
@@ -399,18 +413,40 @@ func (s *s3StorageTestSuite) TestCreateDir() {
 func (s *s3StorageTestSuite) TestDeleteDir() {
 	defer s.cleanupTest()
 	// Setup
-	dirName := generateDirectoryName()
-	// A directory isn't created unless there is a file in that directory, therefore create a file with
-	// 		the directory prefix instead of s.s3Storage.CreateDir(internal.CreateDirOptions{Name: name})
-	_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: path.Join(dirName, generateFileName())})
-	s.assert.NoError(err)
+	// Testing dir and dir/
+	var paths = []string{generateDirectoryName(), generateDirectoryName() + "/"}
+	for _, obj_path := range paths {
+		log.Debug(obj_path)
+		s.Run(obj_path, func() {
+			err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: obj_path})
+			s.assert.NoError(err)
+			_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: path.Join(obj_path, generateFileName())})
+			s.assert.NoError(err)
 
-	err = s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: dirName})
-	s.assert.NoError(err)
+			// Directory should be in the account
+			key := internal.ExtendDirName(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, obj_path))
+			_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+				Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+				Key:    aws.String(key),
+			})
+			s.assert.NoError(err)
+			err = s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: obj_path})
+			s.assert.NoError(err)
 
-	// Directory should not be in the account
-	dirEmpty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: dirName})
-	s.assert.True(dirEmpty)
+			s.assert.NoError(err)
+			// Directory should not be in the account
+			key = internal.ExtendDirName(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, obj_path))
+			_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+				Bucket: aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
+				Key:    aws.String(key),
+			})
+			s.assert.Error(err)
+
+			// Directory be empty
+			dirEmpty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: obj_path})
+			s.assert.True(dirEmpty)
+		})
+	}
 }
 
 // Directory structure
@@ -575,9 +611,33 @@ func (s *s3StorageTestSuite) TestIsDirEmpty() {
 
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
-	for _, path := range paths {
-		log.Debug(path)
-		s.Run(path, func() {
+	for _, obj_path := range paths {
+		log.Debug(obj_path)
+		s.Run(obj_path, func() {
+			empty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
+
+			s.assert.True(empty)
+		})
+	}
+}
+
+func (s *s3StorageTestSuite) TestIsDirEmptyNoDirectoryMarker() {
+	// Setup
+	storageTestConfigurationParameters.EnableDirMarker = false
+	config := generateConfigYaml(storageTestConfigurationParameters)
+	s.setupTestHelper(config, s.bucket, true)
+	defer s.cleanupTest()
+
+	// Setup
+	name := generateDirectoryName()
+	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: name})
+	s.assert.NoError(err)
+
+	// Testing dir and dir/
+	var paths = []string{name, name + "/"}
+	for _, obj_path := range paths {
+		log.Debug(obj_path)
+		s.Run(obj_path, func() {
 			empty := s.s3Storage.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 
 			s.assert.True(empty)
@@ -621,10 +681,10 @@ func (s *s3StorageTestSuite) TestStreamDirNoVirtualDirectory() {
 
 	// Testing dir and dir/
 	var paths = []string{"", "/"}
-	for _, path := range paths {
-		log.Debug(path)
-		s.Run(path, func() {
-			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: path})
+	for _, obj_path := range paths {
+		log.Debug(obj_path)
+		s.Run(obj_path, func() {
+			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: obj_path})
 			// this only works if the test can create an empty test bucket
 			s.assert.NoError(err)
 			s.assert.Len(entries, 1)
@@ -669,11 +729,11 @@ func (s *s3StorageTestSuite) TestStreamDirRoot() {
 
 	// Testing dir and dir/
 	var paths = []string{"", "/"}
-	for _, path := range paths {
-		log.Debug(path)
-		s.Run(path, func() {
+	for _, obj_path := range paths {
+		log.Debug(obj_path)
+		s.Run(obj_path, func() {
 			// ReadDir only reads the first level of the hierarchy
-			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: path})
+			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: obj_path})
 			s.assert.NoError(err)
 			s.assert.Len(entries, 3)
 			// Check the base dir
@@ -758,10 +818,10 @@ func (s *s3StorageTestSuite) TestStreamDirWindowsNameConvert() {
 
 	// Testing dir and dir/
 	var paths = []string{windowsDirName, windowsDirName + "/"}
-	for _, path := range paths {
-		log.Debug(path)
-		s.Run(path, func() {
-			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: path})
+	for _, obj_path := range paths {
+		log.Debug(obj_path)
+		s.Run(obj_path, func() {
+			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: obj_path})
 			s.assert.NoError(err)
 			s.assert.Len(entries, 1)
 			s.assert.Equal(windowsChildName, entries[0].Path)
@@ -799,8 +859,10 @@ func (s *s3StorageTestSuite) TestRenameDir() {
 	for _, input := range inputs {
 		s.Run(input.src+"->"+input.dst, func() {
 			// Setup
-			// We don't keep track of empty directories, so let's create an object with the src prefix
-			_, err := s.s3Storage.CreateFile(internal.CreateFileOptions{Name: common.JoinUnixFilepath(input.src, generateFileName())})
+			err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: input.src})
+			s.assert.NoError(err)
+
+			_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: common.JoinUnixFilepath(input.src, generateFileName())})
 			s.assert.NoError(err)
 
 			err = s.s3Storage.RenameDir(internal.RenameDirOptions{Src: input.src, Dst: input.dst})
@@ -2048,10 +2110,10 @@ func (s *s3StorageTestSuite) TestStreamDir() {
 
 	// Testing dir and dir/
 	var paths = []string{name, name + "/"}
-	for _, path := range paths {
-		log.Debug(path)
-		s.Run(path, func() {
-			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: path})
+	for _, obj_path := range paths {
+		log.Debug(obj_path)
+		s.Run(obj_path, func() {
+			entries, _, err := s.s3Storage.StreamDir(internal.StreamDirOptions{Name: obj_path})
 			s.assert.NoError(err)
 			s.assert.Len(entries, 1)
 		})
@@ -2284,13 +2346,9 @@ func (s *s3StorageTestSuite) TestGetAttrDir() {
 	dirName := generateDirectoryName()
 	err := s.s3Storage.CreateDir(internal.CreateDirOptions{Name: dirName})
 	s.assert.NoError(err)
-	// since CreateDir doesn't do anything, let's put an object with that prefix
-	filename := dirName + "/" + generateFileName()
-	_, err = s.s3Storage.CreateFile(internal.CreateFileOptions{Name: filename})
-	s.assert.NoError(err)
 	// Now we should be able to see the directory
 	props, err := s.s3Storage.GetAttr(internal.GetAttrOptions{Name: dirName})
-	deleteError := s.s3Storage.DeleteFile(internal.DeleteFileOptions{Name: filename})
+	deleteError := s.s3Storage.DeleteDir(internal.DeleteDirOptions{Name: dirName})
 	s.assert.NoError(err)
 	s.assert.NotNil(props)
 	s.assert.True(props.IsDir())
