@@ -72,6 +72,7 @@ libfuse:
   max-fuse-threads: <number of threads allowed at libfuse layer for highly parallel operations, Default is 128>
   direct-io: true|false <enable to bypass the kernel cache>
   network-share: true|false <runs as a network share. may improve performance when latency to cloud is high. only supported on Windows. Known issue - only one Cloudfuse network share can be mounted at a time>
+  windows-sddl: <windows file security and permissions setting in SDDL syntax. Default - D:P(A;;FA;;;WD) corresponding to every user having read/write access>
 
 # Streaming configuration – remove and redirect to block-cache
 stream:
@@ -188,6 +189,7 @@ s3storage:
   enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
   checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - SHA1>
   usePathStyle: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
+  enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
 
 # Mount all configuration
 mountall:

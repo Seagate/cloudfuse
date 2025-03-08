@@ -115,7 +115,7 @@ func (s *s3wrapperTestSuite) TestGetKeySymlink() {
 	fileName := "test"
 	expectedName := "test" + symlinkStr
 	isSymLink := true
-	newName := s.client.getKey(fileName, isSymLink)
+	newName := s.client.getKey(fileName, isSymLink, false)
 	s.assert.Equal(expectedName, newName)
 }
 
@@ -124,7 +124,7 @@ func (s *s3wrapperTestSuite) TestGetKeySymlinkDisabled() {
 	fileName := "test"
 	expectedName := "test" + symlinkStr
 	isSymLink := true
-	newName := s.client.getKey(fileName, isSymLink)
+	newName := s.client.getKey(fileName, isSymLink, false)
 	s.assert.Equal(expectedName, newName)
 }
 
@@ -150,7 +150,7 @@ func (s *s3wrapperTestSuite) TestGetKeyWindowsNameConvert() {
 	fileName := "test＂＊：＜＞？｜"
 	expectedName := "test\"*:<>?|"
 	isSymLink := false
-	newName := s.client.getKey(fileName, isSymLink)
+	newName := s.client.getKey(fileName, isSymLink, false)
 	s.assert.Equal(expectedName, newName)
 }
 

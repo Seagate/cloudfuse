@@ -68,6 +68,8 @@ type CgofuseFS struct {
 	gid uint32
 }
 
+const windowsDefaultSDDL = "D:P(A;;FA;;;WD)" // Enables everyone on system to have access to mount
+
 // Note: libfuse prepends "/" to the path.
 // TODO: Not sure if this is needed for cgofuse, will need to check
 // trimFusePath trims the first character from the path provided by libfuse
@@ -122,8 +124,11 @@ func (lf *Libfuse) initFuse() error {
 			lf.negativeTimeout)
 
 		// Using SSDL file security option: https://github.com/rclone/rclone/issues/4717
-		// Enables everyone on system to have access to mount
-		options += ",FileSecurity=D:P(A;;FA;;;WD)"
+		windowsSDDL := windowsDefaultSDDL
+		if lf.windowsSDDL != "" {
+			windowsSDDL = lf.windowsSDDL
+		}
+		options += ",FileSecurity=" + windowsSDDL
 	}
 
 	fuse_options := createFuseOptions(lf.host, lf.allowOther, lf.allowRoot, lf.readOnly, lf.nonEmptyMount, lf.maxFuseThreads, lf.umask)
