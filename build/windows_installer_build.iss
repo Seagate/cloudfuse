@@ -3,7 +3,7 @@
 ; https://jrsoftware.org/ishelp/index.php
 
 #define MyAppName "Cloudfuse"
-#define MyAppVersion "1.8.0"
+#define MyAppVersion "1.9.1"
 #define MyAppPublisher "SEAGATE TECHNOLOGY LLC"
 #define MyAppURL "https://github.com/Seagate/cloudfuse"
 #define MyAppExeName "cloudfuseGUI.exe"
@@ -51,6 +51,7 @@ Source: "..\gui\dist\cloudfuseGUI_Windows\_internal\*"; DestDir: "{app}\_interna
 Source: "..\cloudfuse.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\cfusemon.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\windows-startup.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\NOTICE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\setup\baseConfig.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion

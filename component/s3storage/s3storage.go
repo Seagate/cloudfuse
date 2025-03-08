@@ -223,7 +223,8 @@ func formatListDirName(path string) string {
 
 func (s3 *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	log.Trace("S3Storage::IsDirEmpty : %s", options.Name)
-	list, _, err := s3.storage.List(formatListDirName(options.Name), nil, 1)
+	// List up to two objects, since one could be the directory with a trailing slash
+	list, _, err := s3.storage.List(formatListDirName(options.Name), nil, 2)
 	if err != nil {
 		log.Err("S3Storage::IsDirEmpty : error listing [%s]", err)
 		return false
