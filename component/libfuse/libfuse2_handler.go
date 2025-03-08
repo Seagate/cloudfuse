@@ -68,6 +68,8 @@ type CgofuseFS struct {
 	gid uint32
 }
 
+const windowsDefaultSDDL = "D:P(A;;FA;;;WD)" // Enables everyone on system to have access to mount
+
 // Note: libfuse prepends "/" to the path.
 // TODO: Not sure if this is needed for cgofuse, will need to check
 // trimFusePath trims the first character from the path provided by libfuse
@@ -122,8 +124,11 @@ func (lf *Libfuse) initFuse() error {
 			lf.negativeTimeout)
 
 		// Using SSDL file security option: https://github.com/rclone/rclone/issues/4717
-		// Enables everyone on system to have access to mount
-		options += ",FileSecurity=D:P(A;;FA;;;WD)"
+		windowsSDDL := windowsDefaultSDDL
+		if lf.windowsSDDL != "" {
+			windowsSDDL = lf.windowsSDDL
+		}
+		options += ",FileSecurity=" + windowsSDDL
 	}
 
 	fuse_options := createFuseOptions(lf.host, lf.allowOther, lf.allowRoot, lf.readOnly, lf.nonEmptyMount, lf.maxFuseThreads, lf.umask)
@@ -134,33 +139,29 @@ func (lf *Libfuse) initFuse() error {
 
 	// Runs as network file share on Windows only when mounting to drive letter.
 	if runtime.GOOS == "windows" && lf.networkShare && common.IsDriveLetter(lf.mountPath) {
-		// TODO: We can support any type of valid network share path so this path could
-		// be configurable for the config file. But this is a good default.
+		var nameStorage string
 
-		// by default nameStorage will be blank
-		nameStorage := "default"
-		kindStorage := "cloud"
+		serverName, err := os.Hostname()
+		if err != nil {
+			log.Err("Libfuse::initFuse : failed to mount fuse. unable to determine server host name.")
+			return errors.New("failed to mount fuse. unable to determine server host name")
+		}
 		// Borrow bucket-name string from attribute cache
 		if config.IsSet("s3storage.bucket-name") {
-
 			err := config.UnmarshalKey("s3storage.bucket-name", &nameStorage)
 			if err != nil {
-				nameStorage = "default"
+				nameStorage = "s3"
 				log.Err("initFuse : Failed to unmarshal s3storage.bucket-name")
-			} else {
-				kindStorage = "bucket"
 			}
 		} else if config.IsSet("azstorage.container") {
 			err := config.UnmarshalKey("azstorage.container", &nameStorage)
 			if err != nil {
-				nameStorage = "default"
+				nameStorage = "azure"
 				log.Err("initFuse : Failed to unmarshal s3storage.bucket-name")
-			} else {
-				kindStorage = "container"
 			}
 		}
 
-		volumePrefix := fmt.Sprintf("--VolumePrefix=\\%s\\%s", kindStorage, nameStorage)
+		volumePrefix := fmt.Sprintf("--VolumePrefix=\\%s\\%s", serverName, nameStorage)
 		opts = append(opts, volumePrefix)
 	}
 

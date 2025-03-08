@@ -81,6 +81,7 @@ type mountOptions struct {
 	MonitorOpt        monitorOptions `config:"health_monitor"`
 	WaitForMount      time.Duration  `config:"wait-for-mount"`
 	LazyWrite         bool           `config:"lazy-write"`
+	EnableRemount     bool
 }
 
 var options mountOptions
@@ -321,7 +322,7 @@ var mountCmd = &cobra.Command{
 				return errors.New("config file does not exist")
 			}
 			// mount using WinFSP, and persist on reboot
-			err = createMountInstance()
+			err = createMountInstance(options.EnableRemount)
 			if err != nil {
 				return fmt.Errorf("failed to mount instance [%s]", err.Error())
 			}

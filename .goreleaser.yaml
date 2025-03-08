@@ -70,7 +70,7 @@ builds:
     flags:
       - -trimpath
       - -buildmode=pie
-      - -tags=fuse3
+      # - -tags=fuse3
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }} -L /usr/lib/x86_64-linux-gnu
@@ -104,7 +104,7 @@ builds:
     flags:
       - -trimpath
       - -buildmode=pie
-      - -tags=fuse3
+      # - -tags=fuse3
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
@@ -134,7 +134,7 @@ archives:
     builds:
       - linux-amd64
       - linux-amd64-health-monitor
-    format: tar.gz
+    formats: ["tar.gz"]
     files:
       - LICENSE
       - README.md
@@ -150,7 +150,7 @@ archives:
     builds:
       - linux-amd64
       - linux-amd64-health-monitor
-    format: tar.gz
+    formats: ["tar.gz"]
     name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
@@ -165,7 +165,7 @@ archives:
     builds:
       - linux-arm64
       - linux-arm64-health-monitor
-    format: tar.gz
+    formats: ["tar.gz"]
     name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
@@ -181,7 +181,7 @@ archives:
       - windows
       - windows-startup
       - windows-health-monitor
-    format: zip
+    formats: ["zip"]
     files:
       - LICENSE
       - README.md
@@ -197,7 +197,7 @@ archives:
     builds:
       - windows
       - windows-health-monitor
-    format: zip
+    formats: ["zip"]
     name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
