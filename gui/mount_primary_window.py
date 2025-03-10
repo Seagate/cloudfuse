@@ -28,11 +28,13 @@ import os
 import subprocess
 from shutil import which
 from sys import platform
+import ctypes
+import string
 
 # Import QT libraries
 from PySide6.QtGui import QTextCursor
 from PySide6.QtCore import QSettings, Qt, QTimer
-from PySide6.QtWidgets import QFileDialog, QMainWindow, QMessageBox
+from PySide6.QtWidgets import QFileDialog, QInputDialog, QMainWindow, QMessageBox
 
 from azure_config_common import AzureSettingsWidget
 from common_qt_functions import (
@@ -69,6 +71,7 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         my_window (QSettings): QSettings object for storing window state.
         settings (dict): Configuration settings for Cloudfuse.
     """
+
     def __init__(self):
         """Initialize the FUSEWindow class."""
         super().__init__()
@@ -84,7 +87,6 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         set_path_validator(self.lineEdit_mountPoint)
 
         # Set up the signals for all the interactive entities
-        self.button_browse.clicked.connect(self.get_file_dir_input)
         self.button_config.clicked.connect(self.show_settings_widget)
         self.button_mount.clicked.connect(self.mount_bucket)
         self.button_unmount.clicked.connect(self.unmount_bucket)
@@ -100,16 +102,22 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
 
         if platform == 'win32':
             self.lineEdit_mountPoint.setToolTip(
-                'Designate a new location to mount the bucket, do not create the directory'
-            )
+                'Designate a drive letter to mount to')
+            self.button_browse.setText('Drive Letter')
             self.button_browse.setToolTip(
-                "Browse to a new location but don't create a new directory"
-            )
+                'Select an unused drive letter for mounting')
+            self.button_browse.clicked.connect(self.choose_drive_letter)
         else:
             self.lineEdit_mountPoint.setToolTip(
                 'Designate a location to mount the bucket - the directory must already exist'
             )
-            self.button_browse.setToolTip('Browse to a pre-existing directory')
+            self.button_browse.setText('Browse')
+            self.button_browse.setToolTip(
+                'Browse to a pre-existing directory to mount')
+            self.button_browse.clicked.connect(self.get_file_dir_input)
+
+            # The remount option is not supported on Linux
+            self.checkBox_remount.hide()
 
     def check_config_directory(self):
         """Create config directory if it doesn't exist."""
@@ -189,12 +197,16 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         except ValueError as e:
             self.add_output_text(f"Invalid mount path: {str(e)}")
             return
-        directory = os.path.join(directory, MOUNT_DIR_SUFFIX)
         # get config path
         config_path = os.path.join(self.get_working_dir(), 'config.yaml')
 
         # on Windows, the mount directory should not exist (yet)
         if platform == 'win32':
+            drive, tail = os.path.splitdrive(directory)
+            # Only append the cloudfuse suffix if not mounting to a drive letter
+            if not (drive and (tail == '' or tail in ['\\', '/'])):
+                directory = os.path.join(directory, MOUNT_DIR_SUFFIX)
+
             if os.path.exists(directory):
                 self.add_output_text(
                     f"Directory {directory} already exists! Aborting new mount."
@@ -236,6 +248,8 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
             directory,
             f"--config-file={config_path}",
         ]
+        if platform == 'win32' and self.checkBox_remount.isChecked():
+            command_parts.append('--enable-remount')
         std_out, std_err, exit_code, executable_found = self.run_command(
             command_parts)
         if not executable_found:
@@ -281,10 +295,15 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         """Unmount the selected bucket from the specified directory."""
         directory = str(self.lineEdit_mountPoint.text())
         # TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
-        directory = os.path.join(directory, MOUNT_DIR_SUFFIX)
+        drive, tail = os.path.splitdrive(directory)
+        # Only append the cloudfuse suffix if not mounting to a drive letter
+        if not (drive and (tail == '' or tail in ['\\', '/'])):
+            directory = os.path.join(directory, MOUNT_DIR_SUFFIX)
         command_parts = [CLOUDFUSE_CLI, 'unmount', directory]
         if platform != 'win32':
             command_parts.append('--lazy')
+        if platform == 'win32' and not self.checkBox_remount.isChecked():
+            command_parts.append('--disable-remount')
 
         _, std_err, exit_code, executable_found = self.run_command(
             command_parts)
@@ -376,3 +395,39 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         msg.setWindowTitle(title)
         msg.setText(message)
         msg.exec()
+
+    def choose_drive_letter(self):
+        """Create a dropdown menu of available drive lettes for the user to select."""
+        unused_letters = get_unused_driver_letters()
+        if not unused_letters:
+            QMessageBox.warning(self, 'No Drive Letters',
+                                'No unused drive letters available.')
+            return
+
+        drive, ok = QInputDialog.getItem(
+            self,
+            'Select Drive Letter',
+            'Available drive letters:',
+            unused_letters,
+            0,
+            False
+        )
+        if ok and drive:
+            self.lineEdit_mountPoint.setText(f"{drive}")
+            self.update_mount_point_in_settings()
+
+
+def get_unused_driver_letters():
+    """
+    Create a dropdown menu of available drive lettes for the user to select.
+
+    Returns:
+        list: Unused drive letters
+    """
+    bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+    unused = []
+    for letter in string.ascii_uppercase:
+        if not ((bitmask & 1) or (letter == 'A' or letter == 'B')):
+            unused.append(letter + ':')
+        bitmask >>= 1
+    return unused
