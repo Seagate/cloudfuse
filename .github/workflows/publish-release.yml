@@ -191,14 +191,11 @@ jobs:
       contents: write
 
     steps:
-      # libfuse-dev is required to build our command-line program
+      # libfuse-dev is required to build our command-line program and enable GoReleaser to build for ARM64
       - name: Install Libfuse
         run: |
-          sudo apt-get install -y libfuse-dev
-      # enable GoReleaser to build for ARM64
-      - name: Install ARM64 compilers
-        run: |
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu libfuse-dev
       # Get code and Go ready
       - name: Checkout code
         uses: actions/checkout@v4
