@@ -64,17 +64,17 @@
        </widget>
       </item>
       <item>
-      <widget class="QCheckBox" name="checkBox_remount">
-       <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remount mount on server restart. If checked, mount will automatically restart when system restarts. If unchecked, then when you unmount the mount it will not automatically restart.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-       </property>
-       <property name="text">
-        <string>Remount on restart</string>
-       </property>
+       <widget class="QCheckBox" name="checkBox_remount">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remount mount on server restart. If checked, mount will automatically restart when system restarts. If unchecked, then when you unmount the mount it will not automatically restart.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+        <property name="text">
+         <string>Remount on restart</string>
+        </property>
         <property name="checked">
-        <bool>false</bool>
-       </property>
-      </widget>
+         <bool>false</bool>
+        </property>
+       </widget>
       </item>
      </layout>
     </item>
@@ -136,7 +136,7 @@
     <item row="1" column="2">
      <widget class="QCheckBox" name="checkBox_encryptConfig">
       <property name="text">
-       <string>Config file encrypted</string>
+       <string>Encrypt Config File</string>
       </property>
      </widget>
     </item>
