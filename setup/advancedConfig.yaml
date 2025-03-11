@@ -27,7 +27,7 @@
 #  10. 'sdk-trace' has been removed and setting log level to log_debug will auto enable these logs.
 # -----------------------------------------------------------------------------------------------------------------------
 
-# for compatibility, include the config version number. The current version is:
+# the config version number is required in every config file. The current version is:
 config-version: 1.0.0
 
 # Daemon configuration
