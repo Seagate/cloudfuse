@@ -25,6 +25,8 @@ import subprocess
 from sys import platform
 import os
 from shutil import which
+import ctypes
+import string
 
 # Import QT libraries
 from PySide6.QtCore import Qt, QSettings
@@ -72,13 +74,21 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             #   https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#file-and-directory-names
             # Disallow the following [<,>,.,",|,?,*] - note, we still need directory characters to declare a path
             self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator(r'^[^<>."|?\0*]*$',self))
+            self.button_browse.setText('Drive Letter')
+            self.button_browse.setToolTip('Select an unused drive letter for mounting')
+            self.button_browse.clicked.connect(self.chooseDriveLetter)
         else:
             # Allow anything BUT Nul
             # Note: Different versions of Python don't like the embedded null character, send in the raw string instead
             self.lineEdit_mountPoint.setValidator(QtGui.QRegularExpressionValidator(r'^[^\0]*$',self))
+            self.button_browse.setText('Browse')
+            self.button_browse.setToolTip('Browse to a pre-existing directory to mount')
+            self.button_browse.clicked.connect(self.getFileDirInput)
+
+            # The remount option is not supported on Linux
+            self.checkBox_remount.hide()
 
         # Set up the signals for all the interactive entities
-        self.button_browse.clicked.connect(self.getFileDirInput)
         self.button_config.clicked.connect(self.showSettingsWidget)
         self.button_mount.clicked.connect(self.mountBucket)
         self.button_unmount.clicked.connect(self.unmountBucket)
@@ -87,11 +97,9 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         self.lineEdit_mountPoint.editingFinished.connect(self.updateMountPointInSettings)
         self.dropDown_bucketSelect.currentIndexChanged.connect(self.modifyPipeline)
         if platform == 'win32':
-            self.lineEdit_mountPoint.setToolTip('Designate a new location to mount the bucket, do not create the directory')
-            self.button_browse.setToolTip("Browse to a new location but don't create a new directory")
+            self.lineEdit_mountPoint.setToolTip('Designate a drive letter to mount to')
         else:
             self.lineEdit_mountPoint.setToolTip('Designate a location to mount the bucket - the directory must already exist')
-            self.button_browse.setToolTip('Browse to a pre-existing directory')
 
 
     def checkConfigDirectory(self):
@@ -167,12 +175,16 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         except ValueError as e:
             self.addOutputText(f"Invalid mount path: {str(e)}")
             return
-        directory = os.path.join(directory, mountDirSuffix)
         # get config path
         configPath = os.path.join(self.getWorkingDir(), 'config.yaml')
 
         # on Windows, the mount directory should not exist (yet)
         if platform == 'win32':
+            drive, tail = os.path.splitdrive(directory)
+            # Only append the cloudfuse suffix if not mounting to a drive letter
+            if not(drive and (tail == '' or tail in ['\\', '/'])):
+                directory = os.path.join(directory, mountDirSuffix)
+
             if os.path.exists(directory):
                 self.addOutputText(f"Directory {directory} already exists! Aborting new mount.")
                 self.errorMessageBox(f"Error: Cloudfuse needs to create the directory {directory}, but it already exists!")
@@ -180,6 +192,7 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
 
         # do a dry run to validate options and credentials
         commandParts = [cloudfuseCli, 'mount', directory, f'--config-file={configPath}', '--dry-run']
+        
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
             self.addOutputText('cloudfuse.exe not found! Is it installed?')
@@ -196,6 +209,8 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
 
         # now actually mount
         commandParts = [cloudfuseCli, 'mount', directory, f'--config-file={configPath}']
+        if platform == "win32" and self.checkBox_remount.isChecked():
+            commandParts.append('--enable-remount')
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
             self.addOutputText('cloudfuse.exe not found! Is it installed?')
@@ -231,10 +246,15 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         directory = str(self.lineEdit_mountPoint.text())
         commandParts = []
         # TODO: properly handle unmount. This is relying on the line_edit not being changed by the user.
-        directory = os.path.join(directory, mountDirSuffix)
+        drive, tail = os.path.splitdrive(directory)
+        # Only append the cloudfuse suffix if not mounting to a drive letter
+        if not(drive and (tail == '' or tail in ['\\', '/'])):
+            directory = os.path.join(directory, mountDirSuffix)
         commandParts = [cloudfuseCli, 'unmount', directory]
         if platform != 'win32':
             commandParts.append('--lazy')
+        if platform == "win32" and not self.checkBox_remount.isChecked():
+            commandParts.append('--disable-remount')
 
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
@@ -334,7 +354,7 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         # run command
         try:
             process = subprocess.run(
-                commandParts, 
+                commandParts,
                 capture_output=True,
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             stdOut = process.stdout.decode().strip()
@@ -358,3 +378,30 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         msg.setText(messageString)
         # Show the message box
         msg.exec()
+
+    def chooseDriveLetter(self):
+        unused_letters = get_unused_driver_letters()
+        if not unused_letters:
+            QtWidgets.QMessageBox.warning(self, 'No Drive Letters', 'No unused drive letters available.')
+            return
+
+        drive, ok = QtWidgets.QInputDialog.getItem(
+            self,
+            'Select Drive Letter',
+            'Available drive letters:',
+            unused_letters,
+            0,
+            False
+        )
+        if ok and drive:
+            self.lineEdit_mountPoint.setText(f"{drive}")
+            self.updateMountPointInSettings()
+
+def get_unused_driver_letters():
+    bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+    unused = []
+    for letter in string.ascii_uppercase:
+        if not ((bitmask & 1) or (letter == 'A' or letter == 'B')):
+            unused.append(letter + ':')
+        bitmask >>=1
+    return unused

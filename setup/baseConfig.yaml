@@ -27,7 +27,6 @@
 #  10. 'sdk-trace' has been removed and setting log level to log_debug will auto enable these logs.
 # -----------------------------------------------------------------------------------------------------------------------
 
-
 # Daemon configuration
 foreground: true|false <run cloudfuse in foreground or background>
 
@@ -71,6 +70,7 @@ libfuse:
   direct-io: true|false <enable to bypass the kernel cache>
   network-share: true|false <runs as a network share. may improve performance when latency to cloud is high. only supported on Windows. Known issue - only one Cloudfuse network share can be mounted at a time>
   display-capacity-mb: <number of MB to display as the mounted storage capacity. Default - 1TB (1048576 MB)>
+  windows-sddl: <windows file security and permissions setting in SDDL syntax. Default - D:P(A;;FA;;;WD) corresponding to every user having read/write access>
 
   # Streaming configuration
 stream:
@@ -126,7 +126,7 @@ loopbackfs:
 
 # Azure storage configuration
 azstorage:
-# Required
+  # Required
   type: block|adls <type of storage account to be connected. Default - block>
   account-name: <name of the storage account>
   container: <name of the storage container to be mounted>
@@ -165,11 +165,11 @@ azstorage:
   virtual-directory: true|false <support virtual directories without existence of a special marker blob. Default - true>
   disable-compression: true|false <disable transport layer content encoding like gzip, set this flag to true if blobs have content-encoding set in container>
   max-results-for-list: <maximum number of results returned in a single list API call while getting file attributes. Default - 2>
-  telemetry : <additional information that customer want to push in user-agent>
+  telemetry: <additional information that customer want to push in user-agent>
   honour-acl: true|false <honour ACLs on files and directories when mounted using MSI Auth and object-ID is provided in config>
   cpk-enabled: true|false <enable client provided key encryption>
   cpk-encryption-key: <customer provided base64-encoded AES-256 encryption key value>
-  cpk-encryption-key-sha256:  <customer provided base64-encoded sha256 of the encryption key>
+  cpk-encryption-key-sha256: <customer provided base64-encoded sha256 of the encryption key>
 
 # S3 storage configuration
 s3storage:
@@ -188,6 +188,7 @@ s3storage:
   checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - SHA1>
   usePathStyle: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
   disable-usage: true|false <do not use bucket size from Lyve Cloud to report drive size and storage statistics (StatFs). If not using Lyve Cloud, set to true.>
+  enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
 
 # Mount all configuration
 mountall:

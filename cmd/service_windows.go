@@ -70,13 +70,9 @@ var installCmd = &cobra.Command{
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		dir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("unable to determine location of cloudfuse binary [%s]", err.Error())
-		}
-		programPath := filepath.Join(dir, "windows-startup.exe")
+		programPath := filepath.Join("C:", "Program Files", "Cloudfuse", "windows-startup.exe")
 		startupPath := filepath.Join(os.Getenv("APPDATA"), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", StartupName)
-		err = makeLink(programPath, startupPath)
+		err := makeLink(programPath, startupPath)
 		if err != nil {
 			return fmt.Errorf("unable to create startup link [%s]", err.Error())
 		}
