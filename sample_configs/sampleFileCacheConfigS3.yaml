@@ -1,5 +1,7 @@
 # Refer ./setup/baseConfig.yaml for full set of config parameters
 
+config-version: 1.0.0
+
 logging:
   type: syslog
   level: log_warning

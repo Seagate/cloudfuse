@@ -112,6 +112,7 @@ class defaultSettingsManager():
     def setComponentSettings(self, allMountSettings):
         # REFER TO ~/setup/baseConfig.yaml for explanations of what these settings are
 
+        allMountSettings['config-version'] = '1.0.0'
         allMountSettings['foreground'] = False
         # Common
         allMountSettings['allow-other'] = False
