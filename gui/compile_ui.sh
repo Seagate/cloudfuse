@@ -8,3 +8,4 @@ pyside6-uic azure_config_common.ui > ui_azure_config_common.py
 pyside6-uic azure_config_advanced.ui > ui_azure_config_advanced.py
 pyside6-uic s3_config_advanced.ui > ui_s3_config_advanced.py
 pyside6-uic passwordPrompt.ui > ui_passwordPrompt.py
+pyside6-uic passwordDialog.ui > ui_passwordDialog.py

@@ -31,7 +31,7 @@ import string
 # Import QT libraries
 from PySide6.QtCore import Qt, QSettings
 from PySide6 import QtWidgets, QtGui, QtCore
-from PySide6.QtWidgets import QMainWindow
+from PySide6.QtWidgets import (QMainWindow, QDialog)
 
 # Import the custom class created with QtDesigner
 from ui_mountPrimaryWindow import Ui_primaryFUSEwindow
@@ -40,6 +40,8 @@ from azure_config_common import azureSettingsWidget
 from aboutPage import aboutPage
 from common_qt_functions import defaultSettingsManager as settingsManager, customConfigFunctions as configFuncs
 from passwordPrompt import passwordPrompt
+from passwordDialog import customPasswordDialog as PasswdDialog
+
 
 bucketOptions = ['s3storage', 'azstorage']
 mountTargetComponent = 3
@@ -294,13 +296,28 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
 
     def getPassphraseFromUser(self):
 
-        self.passwordWindow = passwordPrompt(self.passphrase)
-        self.passwordWindow.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        self.passwordWindow.setWindowModality(Qt.ApplicationModal)
-        self.passwordWindow.show()
-        loop = QtCore.QEventLoop()
-        self.passwordWindow.destroyed.connect(loop.quit)
-        loop.exec()
+        dialog = PasswdDialog()
+        okayButton = dialog.exec()
+        if okayButton:
+            #check validity of password?
+            self.passphrase = dialog.getPassword()
+            success = True
+        else:
+            success = False
+
+        return success
+        # if button == QDialogButtonBox.Ok:
+        #     print(f"I hit okay")
+        # else:
+        #     print(f"I hit cancel")
+
+        # self.passwordWindow = passwordPrompt(self.passphrase)
+        # self.passwordWindow.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        # self.passwordWindow.setWindowModality(Qt.ApplicationModal)
+        # self.passwordWindow.show()
+        # loop = QtCore.QEventLoop()
+        # self.passwordWindow.destroyed.connect(loop.quit)
+        # loop.exec()
 
     # Check if the config file is encrypted by looking for the .aes file extension
     def checkForEncryptedConfig(self, workingDir):
