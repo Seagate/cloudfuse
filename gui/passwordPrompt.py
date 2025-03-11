@@ -29,12 +29,13 @@ from PySide6.QtGui import QIcon, QPixmap
 from ui_passwordPrompt import Ui_Form
 
 class passwordPrompt(QtWidgets.QMainWindow,Ui_Form):
-    def __init__(self):
+    def __init__(self, passphrase):
         super().__init__()
         self.setupUi(self)
         self.myWindow = QSettings('Cloudfuse', 'passwordPrompt')
         #self.initWindowSizePos()
         self.setWindowTitle('File Encrypted')
+        self.passphraseCopy = passphrase
 
         ################################################################
         #Template for future reference
@@ -60,4 +61,29 @@ class passwordPrompt(QtWidgets.QMainWindow,Ui_Form):
             self.lineEdit_password.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
 
     def exitWindow(self):
+        password = self.lineEdit_password.text()
+        print(f"password:{password}")
+        if self.passwordIsValid(password):
+            print(f"self.passphrase before password:{self.passphraseCopy}")
+            self.passphraseCopy = password
+            print(f"self.passphrase after password:{self.passphraseCopy}")
+            self.close()
+        else:
+            pass
+            # if accidental maybe empty:
+            #     keep window open
+            # else:
+            #     exit window
+
         self.close()
+
+
+
+    def passwordIsValid(self, password):
+        #check validity, empty password, is it a base64?
+        # pretend it's valid for now
+        if password:
+           pass
+        # if password is empty:
+        #     return badpassword
+        return True

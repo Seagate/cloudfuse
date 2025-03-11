@@ -63,6 +63,8 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         self.checkConfigDirectory()
         self.textEdit_output.setReadOnly(True)
         self.settings = self.allMountSettings
+        self.passphrase = ''
+        self.unlockEncryptedFile(self.passphrase)
         self.initSettingsFromConfig(self.settings)
 
         if platform == 'win32':
@@ -122,12 +124,6 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
     #   so we must use different widgets to show the different settings
     def showSettingsWidget(self):
         targetIndex = self.dropDown_bucketSelect.currentIndex()
-        # Move to appropriate place later
-        # self.passwordWindow = passwordPrompt()
-        # self.passwordWindow.setWindowModality(Qt.ApplicationModal)
-        # self.passwordWindow.show()
-
-        
 
         if bucketOptions[targetIndex] == 's3storage':
             self.setConfigs = s3SettingsWidget(self.settings)
@@ -266,6 +262,68 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
                 'Components in config missing')
             return
         self.writeConfigFile(self.settings)
+
+    def unlockEncryptedFile(self,password):
+        configPath = self.getWorkingDir()
+        if True:#self.checkForEncryptedConfig(configPath):
+            print(f'password before prompt:{self.passphrase}')
+            self.getPassphraseFromUser()
+            print(f'password after prompt:{self.passphrase}')
+            #self.decryptConfigFile(configPath,passphrase)
+            
+
+    def getPassphraseFromUser(self):
+
+        self.passwordWindow = passwordPrompt(self.passphrase)
+        self.passwordWindow.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.passwordWindow.setWindowModality(Qt.ApplicationModal)
+        self.passwordWindow.show()
+        loop = QtCore.QEventLoop()
+        self.passwordWindow.destroyed.connect(loop.quit)
+        loop.exec()
+
+    # Check if the config file is encrypted by looking for the .aes file extension
+    def checkForEncryptedConfig(self, workingDir):
+        foundFile = False
+        for file in os.listdir(workingDir):
+            if file.endswith(".yaml.aes"):
+                # found the encrypted config file
+                foundFile = True
+        return foundFile
+
+    def encryptConfigFile(self, configPath, passphrase):
+        #./cloudfuse.exe secure encrypt --config-file="C:\Users\509655\AppData\Roaming\Cloudfuse\config.yaml" --passphrase="Tm2P0Y4DrMcMPX+ht4RkMQ=="
+        configFile = os.path.join(configPath, "config.yaml")
+        #passphrase = "Tm2P0Y4DrMcMPX+ht4RkMQ=="
+        # now actually mount
+        commandParts = [cloudfuseCli, 'secure', 'encrypt', f'--config-file={configFile}', f'--passphrase={passphrase}']
+        (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
+
+        if not executableFound:
+            self.addOutputText('cloudfuse.exe not found! Is it installed?')
+            self.errorMessageBox('Error running cloudfuse CLI - Please re-install Cloudfuse.')
+            return
+
+        if exitCode != 0:
+            self.addOutputText(f"Error encrypting config file: {stdErr}")
+            return
+
+    def decryptConfigFile(self, configPath, passphrase):
+        # ./cloudfuse.exe secure decrypt --config-file="C:\Users\509655\AppData\Roaming\Cloudfuse\config.yaml.aes" --passphrase="Tm2P0Y4DrMcMPX+ht4RkMQ=="
+        configFile = os.path.join(configPath, "config.yaml.aes")
+        #passphrase = "Tm2P0Y4DrMcMPX+ht4RkMQ=="
+        # now actually mount
+        commandParts = [cloudfuseCli, 'secure', 'decrypt', f'--config-file={configFile}', f'--passphrase={passphrase}']
+        (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
+
+        if not executableFound:
+            self.addOutputText('cloudfuse.exe not found! Is it installed?')
+            self.errorMessageBox('Error running cloudfuse CLI - Please re-install Cloudfuse.')
+            return
+
+        if exitCode != 0:
+            self.addOutputText(f"Error decrypting config file: {stdErr}")
+            return
 
     # run command and return tuple:
     # (stdOut, stdErr, exitCode, executableFound)

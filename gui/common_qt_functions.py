@@ -243,8 +243,6 @@ class customConfigFunctions():
             defaultSettingsManager.setAllDefaultSettings(self,settings)
             configs = settings
         else:
-            # ./cloudfuse.exe secure decrypt --config-file="C:\Users\509655\AppData\Roaming\Cloudfuse\config.yaml.aes" --passphrase="Tm2P0Y4DrMcMPX+ht4RkMQ=="
-            # successfull command above.
             try:
                 with open(workingDir+'/config.yaml', 'r') as file:
                     configs = yaml.safe_load(file)
@@ -255,7 +253,6 @@ class customConfigFunctions():
                 # Could not open or config file does not exist, use default settings
                 configs = self.getConfigs(settings,True)
         return configs
-
 
     def getWorkingDir(self):
         if platform == 'win32':
