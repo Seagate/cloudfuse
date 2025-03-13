@@ -20,9 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE
 
-from PySide6.QtWidgets import (QApplication, QDialog, QVBoxLayout, QLabel,
-                               QLineEdit, QDialogButtonBox)
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import ( QDialog, QLineEdit, QDialogButtonBox)
 from PySide6.QtGui import QIcon, QPixmap
 from ui_passwordDialog import Ui_Dialog
 
@@ -47,8 +45,6 @@ class customPasswordDialog(QDialog,Ui_Dialog):
         self.lineEdit_password.setEchoMode(QLineEdit.EchoMode.Password)
         self.eyeClick.triggered.connect(self.toggleIcon)
 
-
-
     # Set up slots for the signals:
 
     def toggleIcon(self):
@@ -59,7 +55,5 @@ class customPasswordDialog(QDialog,Ui_Dialog):
             self.eyeClick.setIcon(self.eye_icon)
             self.lineEdit_password.setEchoMode(QLineEdit.EchoMode.Password)
 
-
     def getPassword(self):
-        print(self.lineEdit_password.text())
         return self.lineEdit_password.text()

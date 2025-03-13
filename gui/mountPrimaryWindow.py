@@ -39,7 +39,6 @@ from s3_config_common import s3SettingsWidget
 from azure_config_common import azureSettingsWidget
 from aboutPage import aboutPage
 from common_qt_functions import defaultSettingsManager as settingsManager, customConfigFunctions as configFuncs
-from passwordPrompt import passwordPrompt
 from passwordDialog import customPasswordDialog as PasswdDialog
 
 
@@ -68,7 +67,7 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         self.textEdit_output.setReadOnly(True)
         self.settings = self.allMountSettings
         self.passphrase = ''
-        self.unlockEncryptedFile(self.passphrase)
+        self.unlockEncryptedFile()
         self.initSettingsFromConfig(self.settings)
 
         if platform == 'win32':
@@ -98,11 +97,12 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         self.actionAbout_CloudFuse.triggered.connect(self.showAboutCloudFusePage)
         self.lineEdit_mountPoint.editingFinished.connect(self.updateMountPointInSettings)
         self.dropDown_bucketSelect.currentIndexChanged.connect(self.modifyPipeline)
+        self.checkBox_encryptConfig.clicked.connect(self.triggerSecureConfigLogic)
+
         if platform == 'win32':
             self.lineEdit_mountPoint.setToolTip('Designate a drive letter to mount to')
         else:
             self.lineEdit_mountPoint.setToolTip('Designate a location to mount the bucket - the directory must already exist')
-
 
     def checkConfigDirectory(self):
         workingDir = self.getWorkingDir()
@@ -150,7 +150,6 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             self.lineEdit_mountPoint.setText('{}'.format(directory))
             self.updateMountPointInSettings()
 
-
     # Display the pre-baked about QT messagebox
     def showAboutQtPage(self):
         QtWidgets.QMessageBox.aboutQt(self, 'About QT')
@@ -178,7 +177,12 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             self.addOutputText(f"Invalid mount path: {str(e)}")
             return
         # get config path
-        configPath = os.path.join(self.getWorkingDir(), 'config.yaml')
+        if self.checkForEncryptedConfig():
+            fileName = 'config.yaml.aes'
+        else:
+            fileName = 'config.yaml'
+
+        configPath = os.path.join(self.getWorkingDir(), fileName)
 
         # on Windows, the mount directory should not exist (yet)
         if platform == 'win32':
@@ -285,17 +289,14 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             return
         self.writeConfigFile(self.settings)
 
-    def unlockEncryptedFile(self,password):
+    def unlockEncryptedFile(self):
         configPath = self.getWorkingDir()
-        if True:#self.checkForEncryptedConfig(configPath):
-            print(f'password before prompt:{self.passphrase}')
-            self.getPassphraseFromUser()
-            print(f'password after prompt:{self.passphrase}')
-            #self.decryptConfigFile(configPath,passphrase)
-            
+        if self.checkForEncryptedConfig(configPath): 
+            if self.getPassphraseFromUser():
+                #Todo: check valid password?
+                self.decryptConfigFile(configPath)
 
     def getPassphraseFromUser(self):
-
         dialog = PasswdDialog()
         okayButton = dialog.exec()
         if okayButton:
@@ -304,20 +305,7 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             success = True
         else:
             success = False
-
         return success
-        # if button == QDialogButtonBox.Ok:
-        #     print(f"I hit okay")
-        # else:
-        #     print(f"I hit cancel")
-
-        # self.passwordWindow = passwordPrompt(self.passphrase)
-        # self.passwordWindow.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        # self.passwordWindow.setWindowModality(Qt.ApplicationModal)
-        # self.passwordWindow.show()
-        # loop = QtCore.QEventLoop()
-        # self.passwordWindow.destroyed.connect(loop.quit)
-        # loop.exec()
 
     # Check if the config file is encrypted by looking for the .aes file extension
     def checkForEncryptedConfig(self, workingDir):
@@ -328,39 +316,57 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
                 foundFile = True
         return foundFile
 
-    def encryptConfigFile(self, configPath, passphrase):
+    def triggerSecureConfigLogic(self):
+        configPath = self.getWorkingDir()
+        #Note - making a deliberate choice to get password from user every time, just in case password is not correct
+        if self.checkBox_encryptConfig.isChecked():
+            self.getPassphraseFromUser()
+            if self.encryptConfigFile(configPath):
+                self.checkBox_encryptConfig.setCheckState(Qt.CheckState.Unchecked)
+        else:
+            if self.checkForEncryptedConfig(configPath):
+                self.getPassphraseFromUser()
+                if self.decryptConfigFile(configPath):
+                    self.checkBox_encryptConfig.setCheckState(Qt.CheckState.Checked)
+
+    def encryptConfigFile(self, configPath):
         #./cloudfuse.exe secure encrypt --config-file="C:\Users\509655\AppData\Roaming\Cloudfuse\config.yaml" --passphrase="Tm2P0Y4DrMcMPX+ht4RkMQ=="
         configFile = os.path.join(configPath, "config.yaml")
         #passphrase = "Tm2P0Y4DrMcMPX+ht4RkMQ=="
         # now actually mount
-        commandParts = [cloudfuseCli, 'secure', 'encrypt', f'--config-file={configFile}', f'--passphrase={passphrase}']
+        commandParts = [cloudfuseCli, 'secure', 'encrypt', f'--config-file={configFile}', f'--passphrase={self.passphrase}']
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
-
+        failedToEncrypt = False
         if not executableFound:
             self.addOutputText('cloudfuse.exe not found! Is it installed?')
             self.errorMessageBox('Error running cloudfuse CLI - Please re-install Cloudfuse.')
-            return
+            failedToEncrypt = True
+            return failedToEncrypt
 
         if exitCode != 0:
             self.addOutputText(f"Error encrypting config file: {stdErr}")
-            return
+            failedToEncrypt = True
+            return failedToEncrypt
+        
 
-    def decryptConfigFile(self, configPath, passphrase):
+
+    def decryptConfigFile(self, configPath):
         # ./cloudfuse.exe secure decrypt --config-file="C:\Users\509655\AppData\Roaming\Cloudfuse\config.yaml.aes" --passphrase="Tm2P0Y4DrMcMPX+ht4RkMQ=="
         configFile = os.path.join(configPath, "config.yaml.aes")
-        #passphrase = "Tm2P0Y4DrMcMPX+ht4RkMQ=="
         # now actually mount
-        commandParts = [cloudfuseCli, 'secure', 'decrypt', f'--config-file={configFile}', f'--passphrase={passphrase}']
+        commandParts = [cloudfuseCli, 'secure', 'decrypt', f'--config-file={configFile}', f'--passphrase={self.passphrase}']
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
-
+        failedToDecrypt = False
         if not executableFound:
             self.addOutputText('cloudfuse.exe not found! Is it installed?')
             self.errorMessageBox('Error running cloudfuse CLI - Please re-install Cloudfuse.')
-            return
+            failedToDecrypt = True
+            return failedToDecrypt
 
         if exitCode != 0:
             self.addOutputText(f"Error decrypting config file: {stdErr}")
-            return
+            failedToDecrypt = True
+            return failedToDecrypt
 
     # run command and return tuple:
     # (stdOut, stdErr, exitCode, executableFound)
