@@ -49,7 +49,6 @@ import (
 type SizeTracker struct {
 	internal.BaseComponent
 	mountSize           *MountSize
-	displayCapacityMb   uint64
 	totalBucketCapacity uint64
 }
 
@@ -109,18 +108,6 @@ func (st *SizeTracker) Configure(_ bool) error {
 	}
 
 	st.totalBucketCapacity = conf.TotalBucketCapacity
-
-	if st.totalBucketCapacity != 0 {
-		// Borrow enable-symlinks flag from attribute cache
-		if config.IsSet("libfuse.display-capacity-mb") {
-			err := config.UnmarshalKey("libfuse.display-capacity-mb", &st.displayCapacityMb)
-			if err != nil {
-				st.totalBucketCapacity = 0
-				log.Err("Configure : Failed to unmarshal libfuse.display-capacity-mb. Attempting to use" +
-					" bucket capacity fallback without setting display capacity.")
-			}
-		}
-	}
 
 	journalName := defaultJournalName
 	if config.IsSet(compName + ".journal-name") {
