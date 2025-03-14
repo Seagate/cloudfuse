@@ -131,7 +131,7 @@ checksum:
 
 archives:
   - id: linux-amd64
-    builds:
+    ids:
       - linux-amd64
       - linux-amd64-health-monitor
     formats: ["tar.gz"]
@@ -147,7 +147,7 @@ archives:
         dst: ./samples/
 
   - id: linux-amd64_no_gui
-    builds:
+    ids:
       - linux-amd64
       - linux-amd64-health-monitor
     formats: ["tar.gz"]
@@ -162,7 +162,7 @@ archives:
         dst: ./samples/
 
   - id: linux-arm64_no_gui
-    builds:
+    ids:
       - linux-arm64
       - linux-arm64-health-monitor
     formats: ["tar.gz"]
@@ -177,7 +177,7 @@ archives:
         dst: ./samples/
 
   - id: windows
-    builds:
+    ids:
       - windows
       - windows-startup
       - windows-health-monitor
@@ -194,7 +194,7 @@ archives:
         dst: ./samples/
 
   - id: windows_no_gui
-    builds:
+    ids:
       - windows
       - windows-health-monitor
     formats: ["zip"]
@@ -216,13 +216,13 @@ release:
 nfpms:
   - id: linux
     package_name: cloudfuse
-    builds:
+    ids:
       - linux-amd64
     vendor: Seagate Technology
     homepage: https://github.com/Seagate/cloudfuse
-    maintainer: Seagate <cloudfuse@seagate.com>
+    maintainer: Seagate Technology <cloudfuse@seagate.com>
     description: |-
-      FUSE file system for interacting with S3 and Azure storage.
+      FUSE file system for interacting with S3 and Azure storage
       Cloudfuse provides the ability to mount a cloud bucket in your local file
       system. You can easily read and write to the cloud, and connect programs
       on your computer to the cloud even if they're not cloud-aware.
@@ -277,14 +277,14 @@ nfpms:
 
   - id: linux_no_gui
     package_name: cloudfuse
-    builds:
+    ids:
       - linux-amd64
       - linux-arm64
     file_name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
     vendor: Seagate Technology
     homepage: https://github.com/Seagate/cloudfuse
-    maintainer: Seagate <cloudfuse@seagate.com>
+    maintainer: Seagate Technology <cloudfuse@seagate.com>
     description: |-
       FUSE file system for interacting with S3 and Azure storage.
       Cloudfuse provides the ability to mount a cloud bucket in your local file
@@ -339,6 +339,7 @@ nfpms:
       rpm:
         dependencies:
           - fuse3-devel
+          - libc6 >= 2.24
 
 metadata:
   mod_timestamp: "{{ .CommitTimestamp }}"
