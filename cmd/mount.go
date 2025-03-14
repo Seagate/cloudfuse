@@ -357,7 +357,7 @@ var mountCmd = &cobra.Command{
 			} else if containers, err = getContainerListAzure(); err == nil && len(containers) != 0 {
 				pipeline = append(pipeline, "azstorage")
 			} else if err != nil {
-				return fmt.Errorf("failed to mount instance [%s]", err.Error())
+				return fmt.Errorf("config does not specify any pipeline components. failed to determine correct cloud provider [%s]", err.Error())
 			}
 
 			options.Components = pipeline
