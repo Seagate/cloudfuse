@@ -34,6 +34,7 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"golang.org/x/sys/windows"
 )
@@ -51,7 +52,7 @@ const (
 type Cloudfuse struct{}
 
 // StartMount starts the mount if the name exists in our Windows registry.
-func StartMount(mountPath string, configFile string, passphrase string) error {
+func StartMount(mountPath string, configFile string, passphrase *memguard.Enclave) error {
 	// get the current user uid and gid to set file permissions
 	userId, groupId, err := common.GetCurrentUser()
 	if err != nil {
@@ -61,7 +62,19 @@ func StartMount(mountPath string, configFile string, passphrase string) error {
 
 	instanceName := mountPath
 
-	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), passphrase)
+	var passphraseStr string
+	if passphrase != nil {
+		buff, err := passphrase.Open()
+		if err != nil || buff == nil {
+			return errors.New("unable to decrypt passphrase key")
+		}
+
+		// Encode back to base64 when sending passphrase to cloudfuse
+		passphraseStr = buff.String()
+		defer buff.Destroy()
+	}
+
+	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), passphraseStr)
 	_, err = winFspCommand(buf)
 	if err != nil {
 		return err
@@ -114,7 +127,7 @@ func StartMounts() error {
 	}
 
 	for _, inst := range mounts.Mounts {
-		err := StartMount(inst.MountPath, inst.ConfigFile, "")
+		err := StartMount(inst.MountPath, inst.ConfigFile, nil)
 		if err != nil {
 			log.Err("Unable to start mount with mountpath: ", inst.MountPath)
 		}

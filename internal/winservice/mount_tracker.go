@@ -135,7 +135,7 @@ func AddMountJSON(mountPath string, configFile string) error {
 
 	// If a the path to the current mount is already in the mounts.json file
 	// then remove it.
-	removeMount(mounts, mountPath)
+	mounts = removeMount(mounts, mountPath)
 
 	newMount := Mount{MountPath: mountPath, ConfigFile: configFile}
 	mounts.Mounts = append(mounts.Mounts, newMount)

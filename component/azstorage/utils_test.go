@@ -305,14 +305,18 @@ func (s *utilsTestSuite) TestGetMD5() {
 func (s *utilsTestSuite) TestSanitizeSASKey() {
 	assert := assert.New(s.T())
 
-	key := sanitizeSASKey("")
-	assert.EqualValues("", key)
+	sanitizedKey := sanitizeSASKey("")
+	assert.Nil(sanitizedKey)
 
-	key = sanitizeSASKey("?abcd")
-	assert.EqualValues("?abcd", key)
+	sanitizedKey = sanitizeSASKey("?abcd")
+	key, _ := sanitizedKey.Open()
+	defer key.Destroy()
+	assert.EqualValues("?abcd", key.String())
 
-	key = sanitizeSASKey("abcd")
-	assert.EqualValues("?abcd", key)
+	sanitizedKey = sanitizeSASKey("abcd")
+	key, _ = sanitizedKey.Open()
+	defer key.Destroy()
+	assert.EqualValues("?abcd", key.String())
 }
 
 func (s *utilsTestSuite) TestBlockNonProxyOptions() {

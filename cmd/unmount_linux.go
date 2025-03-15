@@ -28,6 +28,6 @@
 package cmd
 
 // stub
-func unmountCloudfuseWindows(mntPath string) error {
+func unmountCloudfuseWindows(string, bool) error {
 	return nil
 }

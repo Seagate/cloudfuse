@@ -1,8 +1,73 @@
 # Cloudfuse Changelog #
 
+## **1.9.2** ##
+
+March 12th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#475](https://github.com/Seagate/cloudfuse/pull/475) Fix bug where cloudfuse mounts with secure config files on Windows without foreground did not start correctly
+
+## **1.9.1** ##
+
+March 6th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#471](https://github.com/Seagate/cloudfuse/pull/471) Fix bug where passphrase for secure encryption was not properly decoded as base64
+
+## **1.9.0** ##
+
+March 4th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#469](https://github.com/Seagate/cloudfuse/pull/469) Add enable-remount and disable-remount flags to CLI for Windows to better enable customizability on which mounts should remount on restart
+- [#467](https://github.com/Seagate/cloudfuse/pull/467) Fixed bug with creation of windows startup utility
+
+## **1.8.2** ##
+
+March 3rd 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#445](https://github.com/Seagate/cloudfuse/pull/462) Support custom SDDL strings on Windows to customize mount permissions
+- [#464](https://github.com/Seagate/cloudfuse/pull/464) No_gui installer now is able to restart mounts on restart if the user installs cloudfuse as a service
+- [#445](https://github.com/Seagate/cloudfuse/pull/450) GUI is able to mount as a drive letter on Windows
+
+## **1.8.1** ##
+
+February 20th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#286](https://github.com/Seagate/cloudfuse/pull/286) Prevent heap inspection of stored secrets
+- [#445](https://github.com/Seagate/cloudfuse/pull/445) Cleanup and remove unused debug info in GUI
+- [#338](https://github.com/Seagate/cloudfuse/pull/338) The service command now works on Linux to install cloudfuse as a service
+
+### Bug Fixes ###
+
+- [#444](https://github.com/Seagate/cloudfuse/pull/444) Fix issue when renaming directories
+- [#455](https://github.com/Seagate/cloudfuse/pull/455) Network share on Windows now correctly uses the hostname
+
+## **1.8.0** ##
+
+February 4th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#423](https://github.com/Seagate/cloudfuse/pull/423) Add a new component size_track which tracks the total number of bytes in the cloud
+- [#338](https://github.com/Seagate/cloudfuse/pull/338) The service command now works on Linux to install cloudfuse as a service
+
 ## **1.7.4** ##
 
-January 15th 2024
+January 15th 2025
 This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
 
 ### Bug Fixes ###
@@ -11,7 +76,7 @@ This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storag
 
 ## **1.7.3** ##
 
-January 13th 2024
+January 13th 2025
 This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
 
 ### Bug Fixes ###

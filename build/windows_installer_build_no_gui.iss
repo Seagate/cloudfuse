@@ -3,7 +3,7 @@
 ; https://jrsoftware.org/ishelp/index.php
 
 #define MyAppName "Cloudfuse"
-#define MyAppVersion "1.7.4"
+#define MyAppVersion "1.9.2"
 #define MyAppPublisher "SEAGATE TECHNOLOGY LLC"
 #define MyAppURL "https://github.com/Seagate/cloudfuse"
 #define MyAppExeCLIName "cloudfuse.exe"
@@ -44,6 +44,8 @@ Name: "{userappdata}\{#MyAppName}"; Flags: uninsalwaysuninstall
 [Files]
 Source: "..\cloudfuse.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\cfusemon.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\windows-startup.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\NOTICE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\setup\baseConfig.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
@@ -99,10 +101,10 @@ begin
       end;
     end;
 
-    // Add Cloudfuse registry
-    if not Exec(ExpandConstant('{app}\{#MyAppExeCLIName}'), 'service add-registry', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    // Install the Cloudfuse Startup Tool
+    if not Exec(ExpandConstant('{app}\{#MyAppExeCLIName}'), 'service install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
-      SuppressibleMsgBox('Failed to add cloudfuse registry. This will prevent cloudfuse from starting.', mbError, MB_OK, IDOK);
+      SuppressibleMsgBox('Failed to install cloudfuse as a service. You may need to do this manually from the command line.', mbError, MB_OK, IDOK);
     end;
   end;
 end;
@@ -113,10 +115,10 @@ var
 begin
   if CurUninstallStep = usUninstall then
   begin
-    // Remove Cloudfuse registry
-    if not Exec(ExpandConstant('{app}\{#MyAppExeCLIName}'), 'service remove-registry', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    // Install the Cloudfuse Startup Tool
+    if not Exec(ExpandConstant('{app}\{#MyAppExeCLIName}'), 'service uninstall', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
-      SuppressibleMsgBox('Failed to remove cloudfuse registry.', mbError, MB_OK, IDOK);
+      SuppressibleMsgBox('Failed to remove cloudfuse as a service.', mbError, MB_OK, IDOK);
     end;
 
     // Ask the user if they would like to also uninstall WinFSP

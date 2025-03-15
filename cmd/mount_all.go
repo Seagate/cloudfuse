@@ -28,6 +28,8 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -38,6 +40,7 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"github.com/Seagate/cloudfuse/component/azstorage"
 	"github.com/Seagate/cloudfuse/component/s3storage"
@@ -155,12 +158,23 @@ func processCommand() error {
 	}
 
 	// Validate config is to be secured on write or not
-	if options.PassPhrase == "" {
-		options.PassPhrase = os.Getenv(SecureConfigEnvName)
-	}
+	if options.SecureConfig ||
+		filepath.Ext(options.ConfigFile) == SecureConfigExtension {
 
-	if options.SecureConfig && options.PassPhrase == "" {
-		return fmt.Errorf("key not provided to decrypt config file")
+		// Validate config is to be secured on write or not
+		if options.PassPhrase == "" {
+			options.PassPhrase = os.Getenv(SecureConfigEnvName)
+			if options.PassPhrase == "" {
+				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+			}
+
+			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
+			if err != nil {
+				return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
+			}
+		}
+
+		encryptedPassphrase = memguard.NewEnclave([]byte(options.PassPhrase))
 	}
 
 	var containerList []string
@@ -395,7 +409,7 @@ func writeConfigFile(contConfigFile string) error {
 			return fmt.Errorf("failed to marshall yaml content")
 		}
 
-		cipherText, err := common.EncryptData(confStream, opts.passphrase)
+		cipherText, err := common.EncryptData(confStream, encryptedPassphrase)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt yaml content [%s]", err.Error())
 		}

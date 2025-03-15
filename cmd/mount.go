@@ -28,6 +28,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -46,6 +47,7 @@ import (
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
+	"github.com/awnumar/memguard"
 
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"
@@ -80,6 +82,7 @@ type mountOptions struct {
 	MonitorOpt        monitorOptions `config:"health_monitor"`
 	WaitForMount      time.Duration  `config:"wait-for-mount"`
 	LazyWrite         bool           `config:"lazy-write"`
+	EnableRemount     bool
 
 	// v1 support
 	Streaming      bool     `config:"streaming"`
@@ -158,16 +161,9 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 		common.DefaultLogFilePath = common.JoinUnixFilepath(common.DefaultWorkDir, "cloudfuse.log")
 	}
 
-	f, err := os.Stat(common.ExpandPath(common.DefaultWorkDir))
-	if err == nil && !f.IsDir() {
-		return fmt.Errorf("default work dir '%s' is not a directory", common.DefaultWorkDir)
-	}
-
-	if err != nil && os.IsNotExist(err) {
-		// create the default work dir
-		if err = os.MkdirAll(common.ExpandPath(common.DefaultWorkDir), 0755); err != nil {
-			return fmt.Errorf("failed to create default work dir [%s]", err.Error())
-		}
+	err := common.CreateDefaultDirectory()
+	if err != nil {
+		return fmt.Errorf("Failed to create default work dir [%s]", err.Error())
 	}
 
 	opt.Logging.LogFilePath = common.ExpandPath(opt.Logging.LogFilePath)
@@ -227,24 +223,30 @@ func parseConfig() error {
 		// Validate config is to be secured on write or not
 		if options.PassPhrase == "" {
 			options.PassPhrase = os.Getenv(SecureConfigEnvName)
+			if options.PassPhrase == "" {
+				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+			}
+
+			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
+			if err != nil {
+				return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
+			}
 		}
 
-		if options.PassPhrase == "" {
-			return fmt.Errorf("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
-		}
+		encryptedPassphrase = memguard.NewEnclave([]byte(options.PassPhrase))
 
 		cipherText, err := os.ReadFile(options.ConfigFile)
 		if err != nil {
 			return fmt.Errorf("failed to read encrypted config file %s [%s]", options.ConfigFile, err.Error())
 		}
 
-		plainText, err := common.DecryptData(cipherText, options.PassPhrase)
+		plainText, err := common.DecryptData(cipherText, encryptedPassphrase)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt config file %s [%s]", options.ConfigFile, err.Error())
 		}
 
 		config.SetConfigFile(options.ConfigFile)
-		config.SetSecureConfigOptions(options.PassPhrase)
+		config.SetSecureConfigOptions(encryptedPassphrase)
 		err = config.ReadFromConfigBuffer(plainText)
 		if err != nil {
 			return fmt.Errorf("invalid decrypted config file [%s]", err.Error())
@@ -327,7 +329,7 @@ var mountCmd = &cobra.Command{
 				return errors.New("config file does not exist")
 			}
 			// mount using WinFSP, and persist on reboot
-			err = createMountInstance()
+			err = createMountInstance(options.EnableRemount)
 			if err != nil {
 				return fmt.Errorf("failed to mount instance [%s]", err.Error())
 			}
@@ -750,6 +752,11 @@ func init() {
 	mountCmd.Flags().Bool("basic-remount-check", true, "Validate cloudfuse is mounted by reading /etc/mtab.")
 	config.BindPFlag("basic-remount-check", mountCmd.Flags().Lookup("basic-remount-check"))
 	mountCmd.Flags().Lookup("basic-remount-check").Hidden = true
+
+	if runtime.GOOS == "windows" {
+		mountCmd.Flags().BoolVar(&options.EnableRemount, "enable-remount", true, "Remount mount on server restart.")
+		config.BindPFlag("enable-remount", mountCmd.Flags().Lookup("enable-remount"))
+	}
 
 	mountCmd.PersistentFlags().StringSliceVarP(&options.LibfuseOptions, "o", "o", []string{}, "FUSE options.")
 	config.BindPFlag("libfuse-options", mountCmd.PersistentFlags().ShorthandLookup("o"))

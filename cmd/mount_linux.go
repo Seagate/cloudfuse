@@ -73,7 +73,12 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 
 	log.Debug("mount: foreground disabled, child = %v", daemon.WasReborn())
 	if child == nil { // execute in child only
-		defer dmnCtx.Release() // nolint
+		defer func() {
+			if err := dmnCtx.Release(); err != nil {
+				log.Err("Unable to release pid-file: %s", err.Error())
+			}
+		}()
+
 		setGOConfig()
 		go startDynamicProfiler()
 
@@ -95,8 +100,11 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 			if err != nil {
 				log.Err("mount: failed to read child [%v] failure logs [%s]", child.Pid, err.Error())
 				return Destroy(fmt.Sprintf("failed to mount, please check logs [%s]", err.Error()))
-			} else {
+			} else if len(buff) > 0 {
 				return Destroy(string(buff))
+			} else {
+				// Nothing was logged, so mount succeeded
+				return nil
 			}
 
 		case <-time.After(options.WaitForMount):
@@ -123,6 +131,6 @@ func sigusrHandler(pipeline *internal.Pipeline, ctx context.Context) daemon.Sign
 }
 
 // stub for compilation
-func createMountInstance() error {
+func createMountInstance(bool) error {
 	return nil
 }

@@ -31,6 +31,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -44,6 +45,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/awnumar/memguard"
 	"gopkg.in/ini.v1"
 )
 
@@ -233,16 +235,35 @@ func NormalizeObjectName(name string) string {
 }
 
 // Encrypt given data using the key provided
-func EncryptData(plainData []byte, key string) ([]byte, error) {
-	binaryKey, err := base64.StdEncoding.DecodeString(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
+func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
+	if key == nil {
+		return nil, errors.New("provided passphrase key is empty")
 	}
 
-	block, err := aes.NewCipher(binaryKey)
+	secretKey, err := key.Open()
+	if err != nil || secretKey == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	defer secretKey.Destroy()
+
+	// A base64 encode of a key of length 32 will be at maximum a length of 44 bytes
+	if len(secretKey.Bytes()) > 44 {
+		return nil, errors.New("Provided decoded base64 key is longer than 32 bytes. Decoded key " +
+			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+	}
+
+	decodedKey := make([]byte, 32) // Valid key can't be longer than 32 bytes
+	_, err = base64.StdEncoding.Decode(decodedKey, secretKey.Bytes())
 	if err != nil {
 		return nil, err
 	}
+	decodedKey = bytes.Trim(decodedKey, "\x00") // trim any null bytes if key is 16, or 24 bytes
+
+	block, err := aes.NewCipher(decodedKey)
+	if err != nil {
+		return nil, err
+	}
+	clear(decodedKey)
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
@@ -259,16 +280,35 @@ func EncryptData(plainData []byte, key string) ([]byte, error) {
 }
 
 // Decrypt given data using the key provided
-func DecryptData(cipherData []byte, key string) ([]byte, error) {
-	binaryKey, err := base64.StdEncoding.DecodeString(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
+func DecryptData(cipherData []byte, key *memguard.Enclave) ([]byte, error) {
+	if key == nil {
+		return nil, errors.New("provided passphrase key is empty")
 	}
 
-	block, err := aes.NewCipher(binaryKey)
+	secretKey, err := key.Open()
+	if err != nil || secretKey == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	defer secretKey.Destroy()
+
+	// A base64 encode of a key of length 32 will be at maximum a length of 44 bytes
+	if len(secretKey.Bytes()) > 44 {
+		return nil, errors.New("Provided decoded base64 key is longer than 32 bytes. Decoded key " +
+			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+	}
+
+	decodedKey := make([]byte, 32) // Valid key can't be longer than 32 bytes
+	_, err = base64.StdEncoding.Decode(decodedKey, secretKey.Bytes())
 	if err != nil {
 		return nil, err
 	}
+	decodedKey = bytes.Trim(decodedKey, "\x00") // trim any null bytes if key is 16, or 24 bytes
+
+	block, err := aes.NewCipher(decodedKey)
+	if err != nil {
+		return nil, err
+	}
+	clear(decodedKey)
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
@@ -368,4 +408,19 @@ func IsDriveLetter(path string) bool {
 	pattern := `^[A-Za-z]:$`
 	match, _ := regexp.MatchString(pattern, path)
 	return match
+}
+
+func CreateDefaultDirectory() error {
+	dir, err := os.Stat(ExpandPath(DefaultWorkDir))
+	if err == nil && !dir.IsDir() {
+		return err
+	}
+
+	if err != nil && os.IsNotExist(err) {
+		// create the default work dir
+		if err = os.MkdirAll(ExpandPath(DefaultWorkDir), 0755); err != nil {
+			return err
+		}
+	}
+	return nil
 }

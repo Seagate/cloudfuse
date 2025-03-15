@@ -26,12 +26,15 @@
 package cmd
 
 import (
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/awnumar/memguard"
 	"github.com/spf13/cobra"
 )
 
@@ -110,7 +113,11 @@ var generateConfig = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var templateConfig []byte
-		var err error
+
+		err := validateGenConfigOptions()
+		if err != nil {
+			return fmt.Errorf("failed to validate options [%s]", err.Error())
+		}
 
 		templateConfig, err = os.ReadFile(opts.configFilePath)
 		if err != nil {
@@ -134,7 +141,7 @@ var generateConfig = &cobra.Command{
 			}
 		}
 
-		cipherText, err := common.EncryptData([]byte(newConfig), opts.passphrase)
+		cipherText, err := common.EncryptData([]byte(newConfig), encryptedPassphrase)
 		if err != nil {
 			return err
 		}
@@ -147,6 +154,24 @@ var generateConfig = &cobra.Command{
 
 		return nil
 	},
+}
+
+func validateGenConfigOptions() error {
+	if opts.passphrase == "" {
+		opts.passphrase = os.Getenv(SecureConfigEnvName)
+		if opts.passphrase == "" {
+			return errors.New("provide the passphrase as a cli parameter or configure the CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+		}
+	}
+
+	_, err := base64.StdEncoding.DecodeString(string(opts.passphrase))
+	if err != nil {
+		return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
+	}
+
+	encryptedPassphrase = memguard.NewEnclave([]byte(opts.passphrase))
+
+	return nil
 }
 
 func init() {

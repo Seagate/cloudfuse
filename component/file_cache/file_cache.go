@@ -38,6 +38,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -583,11 +584,22 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("FileCache::RenameDir : src=%s, dst=%s", options.Src, options.Dst)
 
 	// get a list of source objects form both cloud and cache
-	objectNames, err := fc.listAllObjects(options.Src)
+	// cloud
+	var cloudObjects []string
+	cloudObjects, err := fc.listCloudObjects(options.Src)
 	if err != nil {
-		log.Err("FileCache::RenameDir : %s listAllObjects failed. Here's why: %v", options.Src, err)
+		log.Err("FileCache::RenameDir : %s listCloudObjects failed. Here's why: %v", options.Src, err)
 		return err
 	}
+	// cache
+	var localObjects []string
+	localObjects, err = fc.listCachedObjects(options.Src)
+	if err != nil {
+		log.Err("FileCache::RenameDir : %s listCachedObjects failed. Here's why: %v", options.Src, err)
+		return err
+	}
+	// combine the lists
+	objectNames := combineLists(cloudObjects, localObjects)
 
 	// add object destinations, and sort the result
 	for _, srcName := range objectNames {
@@ -622,15 +634,20 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 			newPath := strings.Replace(path, localSrcPath, localDstPath, 1)
 			if !d.IsDir() {
 				log.Debug("FileCache::RenameDir : Renaming local file %s -> %s", path, newPath)
+				// get object names
+				srcName := fc.getObjectName(path)
+				dstName := fc.getObjectName(newPath)
 				// get locks
-				sflock := fc.fileLocks.Get(fc.getObjectName(path))
-				dflock := fc.fileLocks.Get(fc.getObjectName(newPath))
+				sflock := fc.fileLocks.Get(srcName)
+				dflock := fc.fileLocks.Get(dstName)
 				// complete local rename
 				err := fc.renameCachedFile(path, newPath, sflock, dflock)
 				if err != nil {
 					// there's really not much we can do to handle the error, so just log it
 					log.Err("FileCache::RenameDir : %s file rename failed. Directory state is inconsistent!", path)
 				}
+				// handle should be updated regardless, for consistency on upload
+				fc.renameOpenHandles(srcName, dstName, sflock, dflock)
 			} else {
 				log.Debug("FileCache::RenameDir : Creating local destination directory %s", newPath)
 				// create the new directory
@@ -661,26 +678,17 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 		fc.policy.CachePurge(directoriesToPurge[i], nil)
 	}
 
+	// update any lazy open handles (which are not in the local listing)
+	for _, srcName := range cloudObjects {
+		dstName := strings.Replace(srcName, options.Src, options.Dst, 1)
+		// get locks
+		sflock := fc.fileLocks.Get(srcName)
+		dflock := fc.fileLocks.Get(dstName)
+		// update any remaining open handles
+		fc.renameOpenHandles(srcName, dstName, sflock, dflock)
+	}
+
 	return nil
-}
-
-func (fc *FileCache) listAllObjects(prefix string) (objectNames []string, err error) {
-	// get cloud objects
-	var cloudObjects []string
-	cloudObjects, err = fc.listCloudObjects(prefix)
-	if err != nil {
-		return
-	}
-	// get local / cached objects
-	var localObjects []string
-	localObjects, err = fc.listCachedObjects(prefix)
-	if err != nil {
-		return
-	}
-	// combine the lists
-	objectNames = combineLists(cloudObjects, localObjects)
-
-	return
 }
 
 // recursively list all objects in the container at the given prefix / directory
@@ -1107,6 +1115,70 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	}
 
 	return handle, openErr
+}
+
+// isDownloadRequired: Whether or not the file needs to be downloaded to local cache.
+func (fc *FileCache) isDownloadRequired(localPath string, objectPath string, flock *common.LockMapItem) (bool, bool, *internal.ObjAttr, error) {
+	cached := false
+	downloadRequired := false
+	lmt := time.Time{}
+
+	// check if the file exists locally
+	finfo, statErr := os.Stat(localPath)
+	if statErr == nil {
+		// The file does not need to be downloaded as long as it is in the cache policy
+		fileInPolicyCache := fc.policy.IsCached(localPath)
+		if fileInPolicyCache {
+			cached = true
+		} else {
+			log.Warn("FileCache::isDownloadRequired : %s exists but is not present in local cache policy", localPath)
+		}
+		// gather stat details
+		lmt = finfo.ModTime()
+	} else if os.IsNotExist(statErr) {
+		// The file does not exist in the local cache so it needs to be downloaded
+		log.Debug("FileCache::isDownloadRequired : %s not present in local cache", localPath)
+	} else {
+		// Catch all, the file needs to be downloaded
+		log.Debug("FileCache::isDownloadRequired : error calling stat %s [%s]", localPath, statErr.Error())
+	}
+
+	// check if the file is due for a refresh from cloud storage
+	refreshTimerExpired := fc.refreshSec != 0 && time.Since(flock.DownloadTime()).Seconds() > float64(fc.refreshSec)
+
+	// get cloud attributes
+	cloudAttr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: objectPath})
+	if err != nil && !os.IsNotExist(err) {
+		log.Err("FileCache::isDownloadRequired : Failed to get attr of %s [%s]", objectPath, err.Error())
+	}
+
+	if !cached && cloudAttr != nil {
+		downloadRequired = true
+	}
+
+	if cached && refreshTimerExpired && cloudAttr != nil {
+		// File is not expired, but the user has configured a refresh timer, which has expired.
+		// Does the cloud have a newer copy?
+		cloudHasLatestData := cloudAttr.Mtime.After(lmt) || finfo.Size() != cloudAttr.Size
+		// Is the local file open?
+		fileIsOpen := flock.Count() > 0 && !flock.LazyOpen
+		if cloudHasLatestData && !fileIsOpen {
+			log.Info("FileCache::isDownloadRequired : File is modified in container, so forcing redownload %s [A-%v : L-%v] [A-%v : L-%v]",
+				objectPath, cloudAttr.Mtime, lmt, cloudAttr.Size, finfo.Size())
+			downloadRequired = true
+		} else {
+			// log why we decided not to refresh
+			if !cloudHasLatestData {
+				log.Info("FileCache::isDownloadRequired : File in container is not latest, skip redownload %s [A-%v : L-%v]", objectPath, cloudAttr.Mtime, lmt)
+			} else if fileIsOpen {
+				log.Info("FileCache::isDownloadRequired : Need to re-download %s, but skipping as handle is already open", objectPath)
+			}
+			// As we have decided to continue using old file, we reset the timer to check again after refresh time interval
+			flock.SetDownloadTime()
+		}
+	}
+
+	return downloadRequired, cached, cloudAttr, err
 }
 
 // CloseFile: Flush the file and invalidate it from the cache.
@@ -1563,21 +1635,8 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 		return localRenameErr
 	}
 
-	if sflock.Count() > 0 {
-		// update any open handles to the file with its new name
-		handlemap.GetHandles().Range(func(key, value any) bool {
-			handle := value.(*handlemap.Handle)
-			if handle.Path == options.Src {
-				handle.Path = options.Dst
-			}
-			return true
-		})
-		// copy the number of open handles to the new name
-		for sflock.Count() > 0 {
-			sflock.Dec()
-			dflock.Inc()
-		}
-	}
+	// rename open handles
+	fc.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
 
 	return nil
 }
@@ -1606,6 +1665,25 @@ func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock,
 	fc.policy.CachePurge(localSrcPath, sflock)
 
 	return nil
+}
+
+func (fc *FileCache) renameOpenHandles(srcName, dstName string, sflock, dflock *common.LockMapItem) {
+	// update open handles
+	if sflock.Count() > 0 {
+		// update any open handles to the file with its new name
+		handlemap.GetHandles().Range(func(key, value any) bool {
+			handle := value.(*handlemap.Handle)
+			if handle.Path == srcName {
+				handle.Path = dstName
+			}
+			return true
+		})
+		// copy the number of open handles to the new name
+		for sflock.Count() > 0 {
+			sflock.Dec()
+			dflock.Inc()
+		}
+	}
 }
 
 // TruncateFile: Update the file with its new size.

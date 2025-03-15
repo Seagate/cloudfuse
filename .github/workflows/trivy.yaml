@@ -4,6 +4,7 @@
 # documentation.
 
 name: trivy
+permissions: {}
 
 on:
   push:
@@ -13,8 +14,6 @@ on:
   schedule:
     # every Monday at 7:31pm
     - cron: "31 19 * * 1"
-
-permissions: {}
 
 jobs:
   scan:
