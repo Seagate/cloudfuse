@@ -360,7 +360,7 @@ var mountCmd = &cobra.Command{
 				pipeline = append(pipeline, "s3storage")
 			} else if containers, err = getContainerListAzure(); len(containers) != 0 && err == nil {
 				pipeline = append(pipeline, "azstorage")
-			} else if err != nil {
+			} else {
 				return errors.New("failed to initialize new pipeline :: Config does not specify any pipeline components and couldn't determine the cloud provider: " + err.Error())
 			}
 
