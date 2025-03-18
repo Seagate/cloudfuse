@@ -337,7 +337,9 @@ var mountCmd = &cobra.Command{
 			return nil
 		}
 
-		if !configFileExists || len(options.Components) == 0 {
+		if !configFileExists {
+			return errors.New("Config file not provided")
+		} else if len(options.Components) == 0 {
 			pipeline := []string{"libfuse"}
 
 			if config.IsSet("streaming") && options.Streaming {
