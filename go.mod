@@ -17,8 +17,8 @@ require (
 	github.com/aws/smithy-go v1.22.1
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-ole/go-ole v1.3.0
+	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/golang/mock v1.6.0
-	github.com/mitchellh/mapstructure v1.5.0
 	github.com/montanaflynn/stats v0.7.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/radovskyb/watcher v1.0.7
@@ -55,7 +55,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.5 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
