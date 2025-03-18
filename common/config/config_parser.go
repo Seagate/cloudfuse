@@ -106,6 +106,10 @@ func ReadFromConfigFile(configFilePath string) error {
 }
 
 func loadConfigFromBufferToViper(configData []byte) error {
+	// Set type to be yaml so that viper can parse the config data
+	// and since we only allow yaml formatted config files
+	viper.SetConfigType("yaml")
+
 	err := viper.ReadConfig(strings.NewReader(string(configData)))
 	if err != nil {
 		return err
