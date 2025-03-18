@@ -338,7 +338,7 @@ var mountCmd = &cobra.Command{
 		}
 
 		if !configFileExists {
-			return errors.New("Config file not provided")
+			return errors.New("failed to initialize new pipeline :: Config file not provided")
 		} else if len(options.Components) == 0 {
 			pipeline := []string{"libfuse"}
 
