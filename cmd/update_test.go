@@ -77,6 +77,17 @@ func (suite *updateTestSuite) TestGetRelease() {
 	suite.assert.Error(err)
 }
 
+func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinuxDefault() {
+	if runtime.GOOS != "linux" {
+		return
+	}
+	defer suite.cleanupTest()
+
+	_, err := executeCommandC(rootCmd, "update")
+	suite.assert.Error(err)
+	suite.assert.Equal(err.Error(), ".deb and .rpm requires elevated privileges")
+}
+
 func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinux() {
 	if runtime.GOOS != "linux" {
 		return

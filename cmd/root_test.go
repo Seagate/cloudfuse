@@ -27,6 +27,7 @@ package cmd
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
 	"strings"
 	"testing"
@@ -58,6 +59,12 @@ func resetCLIFlags(cmd cobra.Command) {
 		f.Value.Set(f.DefValue)
 	})
 	viper.Reset()
+}
+
+func randomString(length int) string {
+	b := make([]byte, length)
+	rand.Read(b)
+	return fmt.Sprintf("%x", b)[:length]
 }
 
 // Taken from cobra library's testing https://github.com/spf13/cobra/blob/master/command_test.go#L34

@@ -27,7 +27,6 @@ package cmd
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	_ "embed"
 	"encoding/hex"
@@ -52,7 +51,7 @@ type Options struct {
 	Package string // package format: tar, deb, rpm
 }
 
-var Opt = Options{}
+var opt = Options{}
 
 type asset struct {
 	Name               string `json:"name"`
@@ -71,12 +70,6 @@ type releaseInfo struct {
 	HashURL   string
 }
 
-func randomString(length int) string {
-	b := make([]byte, length)
-	rand.Read(b)
-	return fmt.Sprintf("%x", b)[:length]
-}
-
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update the cloudfuse binary.",
@@ -85,22 +78,27 @@ var updateCmd = &cobra.Command{
 		if runtime.GOOS == "windows" {
 			return errors.New("Update is not supported on Windows")
 		}
-		if Opt.Package == "" {
-			Opt.Package = "tar"
+		if opt.Package == "" {
+			packageFormat, err := determinePackageFormat()
+			if err != nil {
+				return fmt.Errorf("unable to determine package format: %w", err)
+			}
+			opt.Package = packageFormat
 		}
-		if Opt.Output == "" && Opt.Package == "tar" {
-			return errors.New("Need to pass --package with deb or rpm or specify an --output location for Linux")
+		if opt.Output == "" && opt.Package == "tar" {
+			return errors.New("Need to pass parameter --package with deb or rpm or pass parameter --output with location to download to")
 		}
-		if Opt.Package != "tar" && Opt.Package != "deb" && Opt.Package != "rpm" {
+		if opt.Package != "tar" && opt.Package != "deb" && opt.Package != "rpm" {
 			return errors.New("--package should be one of tar|deb|rpm")
 		}
-		if runtime.GOOS != "linux" && (Opt.Package == "deb" || Opt.Package == "rpm") {
+		if runtime.GOOS != "linux" && (opt.Package == "deb" || opt.Package == "rpm") {
 			return errors.New(".deb and .rpm packages are supported only on Linux")
 		}
-		if os.Geteuid() != 0 && Opt.Output == "" && (Opt.Package == "deb" || Opt.Package == "rpm") {
+		if os.Geteuid() != 0 && opt.Output == "" && (opt.Package == "deb" || opt.Package == "rpm") {
 			return errors.New(".deb and .rpm requires elevated privileges")
 		}
-		if err := installUpdate(context.Background(), &Opt); err != nil {
+
+		if err := installUpdate(context.Background(), &opt); err != nil {
 			return fmt.Errorf("Error: %v", err)
 		}
 		return nil
@@ -133,6 +131,21 @@ func installUpdate(ctx context.Context, opt *Options) error {
 	}
 
 	return installPackage(fileName)
+}
+
+func determinePackageFormat() (string, error) {
+	if hasCommand("dpkg") {
+		return "deb", nil
+	} else if hasCommand("rpm") {
+		return "rpm", nil
+	} else {
+		return "", errors.New("Neither dpkg nor rpm found. Cannot determine package format.")
+	}
+}
+
+func hasCommand(command string) bool {
+	_, err := exec.LookPath(command)
+	return err == nil
 }
 
 // installPackage installs the deb or rpm package
@@ -204,7 +217,7 @@ func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
 		return nil, err
 	}
 
-	asset, err := selectPackageAsset(rel.Assets)
+	asset, err := selectPackageAsset(rel.Assets, opt.Package)
 	if err != nil {
 		return nil, err
 	}
@@ -222,10 +235,9 @@ func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
 	}, nil
 }
 
-func selectPackageAsset(assets []asset) (*asset, error) {
+func selectPackageAsset(assets []asset, ext string) (*asset, error) {
 	osName := runtime.GOOS
 	arch := runtime.GOARCH
-	ext := Opt.Package
 
 	if ext == "tar" {
 		ext = "tar.gz"
@@ -305,7 +317,7 @@ func verifyHash(fileName, packageName, hashURL string) error {
 
 func init() {
 	rootCmd.AddCommand(updateCmd)
-	updateCmd.PersistentFlags().StringVar(&Opt.Output, "output", "", "Save the downloaded binary at a given path (default: replace running binary)")
-	updateCmd.PersistentFlags().StringVar(&Opt.Version, "version", "", "Install the given cloudfuse version (default: latest)")
-	updateCmd.PersistentFlags().StringVar(&Opt.Package, "package", "", "Package format: tar|deb|rpm (default: tar)")
+	updateCmd.PersistentFlags().StringVar(&opt.Output, "output", "", "Save the downloaded binary at a given path (default: replace running binary)")
+	updateCmd.PersistentFlags().StringVar(&opt.Version, "version", "", "Install the given cloudfuse version (default: latest)")
+	updateCmd.PersistentFlags().StringVar(&opt.Package, "package", "", "Package format: tar|deb|rpm (default: tar)")
 }
