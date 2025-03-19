@@ -495,7 +495,7 @@ var mountCmd = &cobra.Command{
 
 			errorMessage := ""
 			if !configFileProvided {
-				errorMessage += "Config file not provided."
+				errorMessage += "config file not provided."
 			} else {
 				errorMessage += "Config file " + options.ConfigFile + " not found."
 			}
