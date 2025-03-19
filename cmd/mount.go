@@ -283,7 +283,7 @@ var mountCmd = &cobra.Command{
 			// Fall back to defaults and let components fail if all required env variables are not set.
 			_, err := os.Stat(common.DefaultConfigFilePath)
 			if err != nil && os.IsNotExist(err) {
-				return errors.New("failed to initialize new pipeline :: Config file not provided")
+				return errors.New("failed to initialize new pipeline :: config file not provided")
 			} else {
 				options.ConfigFile = common.DefaultConfigFilePath
 			}
