@@ -496,7 +496,7 @@ var mountCmd = &cobra.Command{
 			errorMessage := ""
 			if !configFileProvided {
 				errorMessage += "Config file not provided."
-			} else if !configFileExists {
+			} else {
 				errorMessage += "Config file " + options.ConfigFile + " not found."
 			}
 			log.Err("mount : "+errorMessage+" failed to initialize new pipeline [%v]", err)
