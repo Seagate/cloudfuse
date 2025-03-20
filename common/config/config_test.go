@@ -458,7 +458,7 @@ func (suite *ConfigTestSuite) TestAddFlags() {
 	BindEnv("abcd", "CF_TEST_ABCD")
 }
 
-func (suite *ConfigTestSuite) TestConfigFileDescryption() {
+func (suite *ConfigTestSuite) TestConfigFileDescription() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
