@@ -39,7 +39,8 @@ import (
 // consider adding a --since flag to specify logs since a given time stamp to be included ex. cloudfuse dumpLogs /path/to/dir --since yyyy/MM/DD:HH:MM:SS
 // consider adding a --last flag to specify logs in the last minutes, hours, days. ex. cloudfuse dumpLogs /path/do/dir --last 30 minutes
 
-var configPath string
+var since string
+var last string
 var dumpLogsCmd = &cobra.Command{
 	Use:               "dumpLogs",
 	Short:             "interface to gather and review cloudfuse logs",
@@ -68,6 +69,7 @@ var dumpLogsCmd = &cobra.Command{
 		} else if configPath != "" {
 			config.SetConfigFile(configPath)
 		} else {
+			// consider checking everywhere and gathering everything at this point
 			return errors.New("config file not provided")
 		}
 
@@ -76,24 +78,19 @@ var dumpLogsCmd = &cobra.Command{
 		if config.IsSet("logging.type") {
 			err := config.UnmarshalKey("logging.type", &logType)
 			if err != nil {
-				fmt.Errorf("failed to parse logging type from config [%s]", err.Error())
+				return fmt.Errorf("failed to parse logging type from config [%s]", err.Error())
+			}
+			err = config.UnmarshalKey("logging.file-path", &logPath)
+			if err != nil {
+				return fmt.Errorf("failed to parse logging file path from config [%s]", err.Error())
 			}
 			if logType == "base" {
-				err := config.UnmarshalKey("logging.file-path", &logPath)
-				if err != nil {
-					fmt.Errorf("failed to parse logging file path from config [%s]", err.Error())
-				}
+				getBaseLogs(logPath)
+			} else if logType == "syslog" {
+				getSysLogs("/var/log/syslog")
 			}
 		} else {
-			logType = "syslog"
-		}
-
-		if logType == "syslog" {
-			//  grep cloudfuse /var/log/syslog > logs
-		} else if logType == "base" {
-			//  get log output from directory provided.
-		} else {
-			// check everywhere that would be applicable for cloudfuse logs
+			getSysLogs("/var/log/syslog")
 		}
 
 		// are any 'base' logging or syslog filters being used to redirect to a separate file?
@@ -107,7 +104,33 @@ var dumpLogsCmd = &cobra.Command{
 	},
 }
 
+func getBaseLogs(logPath string) error {
+	// collect logs
+	if since != "" {
+		// select only the latest logs in the logPath that are no older than the timestamp provided
+	} else if last != "" {
+		// select only the latest logs in the logPath that are no older than $last value provided
+	}
+	var err error
+	return err
+}
+
+func getSysLogs(logPath string) error {
+	// collect logs
+	//  grep cloudfuse /var/log/syslog > logs
+	if since != "" {
+		// select only the latest logs in the logPath that are no older than the timestamp provided
+	} else if last != "" {
+		// select only the latest logs in the logPath that are no older than $last value provided
+	}
+	var err error
+	return err
+}
+
 func init() {
 	rootCmd.AddCommand(dumpLogsCmd)
 	dumpLogsCmd.Flags().StringVar(&configPath, "config-file", "", "Input archive creation path")
+	dumpLogsCmd.Flags().StringVar(&since, "since", "", "specify only log data that took place since a given time stamp")
+	dumpLogsCmd.Flags().StringVar(&last, "last", "", "specify only log data in the last minutes, hours, or days.")
+
 }
