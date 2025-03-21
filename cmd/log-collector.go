@@ -26,7 +26,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -40,32 +39,20 @@ import (
 // consider adding a --since flag to specify logs since a given time stamp to be included ex. cloudfuse dumpLogs /path/to/dir --since yyyy/MM/DD:HH:MM:SS
 // consider adding a --last flag to specify logs in the last minutes, hours, days. ex. cloudfuse dumpLogs /path/do/dir --last 30 minutes
 
-var logCmd = &cobra.Command{
-	Use:               "log",
+var dumpLogsCmd = &cobra.Command{
+	Use:               "dumpLogs",
 	Short:             "interface to gather and review cloudfuse logs",
 	Long:              "interface to gather and review cloudfuse logs",
-	SuggestFor:        []string{"log", "logs"},
-	Example:           "cloudfuse log collect",
-	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("missing command options\n\nDid you mean this?\n\tcloudfuse log collect\n\nRun 'cloudfuse log --help' for usage")
-	},
-}
-
-var collectCmd = &cobra.Command{
-	Use:               "collect",
-	Short:             "Collect and archive relevant cloudfuse logs",
-	Long:              "Collect and archive relevant cloudfuse logs",
-	SuggestFor:        []string{"col", "coll"},
+	SuggestFor:        []string{"dump", "dumpLog", "dumpLogs"},
 	Args:              cobra.ExactArgs(1),
-	Example:           "cloudfuse log collect",
+	Example:           "cloudfuse dumpLogs ",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		dumpPath := common.ExpandPath(args[0])
 		configFileProvided := options.ConfigFile != ""
 
-		// This is assuming a mount has previously taken place. We probably don't want the collect command to entierly on the mount command previously being run.
+		// This is assuming a mount has previously taken place. We probably don't want the collect command to entirely on the mount command previously being run.
 		// TODO: use the config defined from the mount command only when the config file was not supplied
 		var logType string
 		var logPath string
@@ -133,9 +120,8 @@ var collectCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(logCmd)
-	logCmd.AddCommand(collectCmd)
-	logCmd.Flags().StringVar(&dumpPath, "dump-path", "", "Input archive creation path")
-	markFlagErrorChk(logCmd, "dump-path")
-	logCmd.Flags().StringVar(&configPath, "config-file", "", "Input archive creation path")
+	rootCmd.AddCommand(dumpLogsCmd)
+	dumpLogsCmd.Flags().StringVar(&dumpPath, "dump-path", "", "Input archive creation path")
+	markFlagErrorChk(dumpLogsCmd, "dump-path")
+	dumpLogsCmd.Flags().StringVar(&configPath, "config-file", "", "Input archive creation path")
 }
