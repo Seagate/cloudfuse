@@ -31,7 +31,6 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
-	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/spf13/cobra"
 )
 
@@ -50,27 +49,6 @@ var dumpLogsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		dumpPath := common.ExpandPath(args[0])
-		configFileProvided := options.ConfigFile != ""
-
-		// This is assuming a mount has previously taken place. We probably don't want the collect command to entirely on the mount command previously being run.
-		// TODO: use the config defined from the mount command only when the config file was not supplied
-		var logType string
-		var logPath string
-		if configFileProvided {
-			if config.IsSet("logging.type") {
-				err := config.UnmarshalKey("logging.type", &logType)
-				if err != nil {
-					log.Err("Mount::OnConfigChange : Invalid logging options [%s]", err.Error())
-				}
-				if logType == "base" {
-					err := config.UnmarshalKey("logging.file-path", &logPath)
-
-				}
-
-			} else {
-				logType = "syslog"
-			}
-		}
 		var err error
 		// require path flag to dump archive
 		dumpPath, err = filepath.Abs(dumpPath)
@@ -78,34 +56,39 @@ var dumpLogsCmd = &cobra.Command{
 			return fmt.Errorf("couldn't determine absolute path from string [%s]", err.Error())
 		}
 
-		foundConfig := false
-		configPath = options.ConfigFile
-		if configPath == "" {
-			fmt.Printf("could not locate config file for log details")
-		} else {
-			configPath, err = filepath.Abs(configPath)
-			if err != nil {
-				return fmt.Errorf("couldn't determine absolute path from string [%s]", err.Error())
+		configFileProvided := options.ConfigFile != ""
+
+		// This is assuming a mount has previously taken place. We probably don't want the collect command to entirely on the mount command previously being run.
+		// TODO: use the config defined from the mount command only when the config file was not supplied
+		var logType string
+		var logPath string
+
+		//get log type and logpath
+		if configFileProvided {
+			if config.IsSet("logging.type") {
+				err := config.UnmarshalKey("logging.type", &logType)
+				if err != nil {
+					fmt.Errorf("failed to parse logging type from config [%s]", err.Error())
+				}
+				if logType == "base" {
+					err := config.UnmarshalKey("logging.file-path", &logPath)
+					if err != nil {
+						fmt.Errorf("failed to parse logging file path from config [%s]", err.Error())
+					}
+				}
+			} else {
+				logType = "syslog"
 			}
-			foundConfig = true
+		} else {
+			//look for user input for config file path and parse it for the log type and log path
 		}
 
-		logBase := false
-		if foundConfig {
-
-			/*
-				// check config file for the log type being set to "base" and get the directory where the log files are stored.
-				// if "base" is set in config for log, logBase = true
-
-				// if logtype is set to "syslog," then   grep cloudfuse /var/log/syslog > logs
-
-				// if base, get log output from directory provided.
-			*/
-
-		} else if !logBase {
-
-			// check everywhere possible for logs
-
+		if logType == "syslog" {
+			//  grep cloudfuse /var/log/syslog > logs
+		} else if logType == "base" {
+			//  get log output from directory provided.
+		} else {
+			// check everywhere that would be applicable for cloudfuse logs
 		}
 
 		// are any 'base' logging or syslog filters being used to redirect to a separate file?
