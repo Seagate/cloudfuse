@@ -26,6 +26,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -38,6 +39,7 @@ import (
 // consider adding a --since flag to specify logs since a given time stamp to be included ex. cloudfuse dumpLogs /path/to/dir --since yyyy/MM/DD:HH:MM:SS
 // consider adding a --last flag to specify logs in the last minutes, hours, days. ex. cloudfuse dumpLogs /path/do/dir --last 30 minutes
 
+var configPath string
 var dumpLogsCmd = &cobra.Command{
 	Use:               "dumpLogs",
 	Short:             "interface to gather and review cloudfuse logs",
@@ -50,37 +52,40 @@ var dumpLogsCmd = &cobra.Command{
 
 		dumpPath := common.ExpandPath(args[0])
 		var err error
-		// require path flag to dump archive
 		dumpPath, err = filepath.Abs(dumpPath)
 		if err != nil {
-			return fmt.Errorf("couldn't determine absolute path from string [%s]", err.Error())
+			return fmt.Errorf("couldn't determine absolute path for dump path [%s]", err.Error())
 		}
 
-		configFileProvided := options.ConfigFile != ""
+		configPath = common.ExpandPath(configPath)
+		configPath, err := filepath.Abs(configPath)
+		if err != nil {
+			return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
+		}
 
-		// This is assuming a mount has previously taken place. We probably don't want the collect command to entirely on the mount command previously being run.
-		// TODO: use the config defined from the mount command only when the config file was not supplied
+		if options.ConfigFile != "" {
+			config.SetConfigFile(options.ConfigFile)
+		} else if configPath != "" {
+			config.SetConfigFile(configPath)
+		} else {
+			return errors.New("config file not provided")
+		}
+
 		var logType string
 		var logPath string
-
-		//get log type and logpath
-		if configFileProvided {
-			if config.IsSet("logging.type") {
-				err := config.UnmarshalKey("logging.type", &logType)
+		if config.IsSet("logging.type") {
+			err := config.UnmarshalKey("logging.type", &logType)
+			if err != nil {
+				fmt.Errorf("failed to parse logging type from config [%s]", err.Error())
+			}
+			if logType == "base" {
+				err := config.UnmarshalKey("logging.file-path", &logPath)
 				if err != nil {
-					fmt.Errorf("failed to parse logging type from config [%s]", err.Error())
+					fmt.Errorf("failed to parse logging file path from config [%s]", err.Error())
 				}
-				if logType == "base" {
-					err := config.UnmarshalKey("logging.file-path", &logPath)
-					if err != nil {
-						fmt.Errorf("failed to parse logging file path from config [%s]", err.Error())
-					}
-				}
-			} else {
-				logType = "syslog"
 			}
 		} else {
-			//look for user input for config file path and parse it for the log type and log path
+			logType = "syslog"
 		}
 
 		if logType == "syslog" {
@@ -104,7 +109,5 @@ var dumpLogsCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(dumpLogsCmd)
-	dumpLogsCmd.Flags().StringVar(&dumpPath, "dump-path", "", "Input archive creation path")
-	markFlagErrorChk(dumpLogsCmd, "dump-path")
 	dumpLogsCmd.Flags().StringVar(&configPath, "config-file", "", "Input archive creation path")
 }
