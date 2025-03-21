@@ -30,12 +30,16 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/spf13/cobra"
 )
 
-var dumpPath string
+// TODO: rename log command to dumpLogs. followed by a directory to dump logs. ex. cloudfuse dumpLogs /path/to/dir. all logs are gathered by default.
+// consider adding a --since flag to specify logs since a given time stamp to be included ex. cloudfuse dumpLogs /path/to/dir --since yyyy/MM/DD:HH:MM:SS
+// consider adding a --last flag to specify logs in the last minutes, hours, days. ex. cloudfuse dumpLogs /path/do/dir --last 30 minutes
 
-// Section defining all the command that we have in secure feature
 var logCmd = &cobra.Command{
 	Use:               "log",
 	Short:             "interface to gather and review cloudfuse logs",
@@ -53,10 +57,33 @@ var collectCmd = &cobra.Command{
 	Short:             "Collect and archive relevant cloudfuse logs",
 	Long:              "Collect and archive relevant cloudfuse logs",
 	SuggestFor:        []string{"col", "coll"},
+	Args:              cobra.ExactArgs(1),
 	Example:           "cloudfuse log collect",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		dumpPath := common.ExpandPath(args[0])
+		configFileProvided := options.ConfigFile != ""
+
+		// This is assuming a mount has previously taken place. We probably don't want the collect command to entierly on the mount command previously being run.
+		// TODO: use the config defined from the mount command only when the config file was not supplied
+		var logType string
+		var logPath string
+		if configFileProvided {
+			if config.IsSet("logging.type") {
+				err := config.UnmarshalKey("logging.type", &logType)
+				if err != nil {
+					log.Err("Mount::OnConfigChange : Invalid logging options [%s]", err.Error())
+				}
+				if logType == "base" {
+					err := config.UnmarshalKey("logging.file-path", &logPath)
+
+				}
+
+			} else {
+				logType = "syslog"
+			}
+		}
 		var err error
 		// require path flag to dump archive
 		dumpPath, err = filepath.Abs(dumpPath)
