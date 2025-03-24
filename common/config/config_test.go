@@ -307,7 +307,7 @@ func (suite *ConfigTestSuite) TestEnvShadowedConfigReader() {
 
 }
 
-func (suite *ConfigTestSuite) TestConfigFileDescryption() {
+func (suite *ConfigTestSuite) TestConfigFileDescription() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 

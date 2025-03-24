@@ -269,8 +269,6 @@ var mountCmd = &cobra.Command{
 		configFileProvided := options.ConfigFile != ""
 		common.MountPath = options.MountPath
 
-		configFileExists := true
-
 		if options.ConfigFile == "" {
 			// Config file is not set in cli parameters
 			// Cloudfuse defaults to config.yaml in current directory
@@ -278,20 +276,18 @@ var mountCmd = &cobra.Command{
 			// Fall back to defaults and let components fail if all required env variables are not set.
 			_, err := os.Stat(common.DefaultConfigFilePath)
 			if err != nil && os.IsNotExist(err) {
-				configFileExists = false
+				return errors.New("failed to initialize new pipeline :: config file not provided")
 			} else {
 				options.ConfigFile = common.DefaultConfigFilePath
 			}
 		}
 
-		if configFileExists {
-			err := parseConfig()
-			if err != nil {
-				return err
-			}
+		err := parseConfig()
+		if err != nil {
+			return err
 		}
 
-		err := config.Unmarshal(&options)
+		err = config.Unmarshal(&options)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal config [%s]", err.Error())
 		}
@@ -307,10 +303,6 @@ var mountCmd = &cobra.Command{
 			}
 			if _, err := os.Stat(options.MountPath); errors.Is(err, fs.ErrExist) || err == nil {
 				return errors.New("mount path exists")
-			}
-			// Config file
-			if options.ConfigFile == "" {
-				return errors.New("config file not provided")
 			}
 			// Convert the path into a full path so WinFSP can see the config file
 			configPath, err := filepath.Abs(options.ConfigFile)
@@ -330,12 +322,16 @@ var mountCmd = &cobra.Command{
 			return nil
 		}
 
-		if !configFileExists || len(options.Components) == 0 {
-			pipeline := []string{"libfuse"}
+		if len(options.Components) == 0 {
+			pipeline := []string{"libfuse", "file_cache", "attr_cache"}
 
-			pipeline = append(pipeline, "file_cache")
-			pipeline = append(pipeline, "attr_cache")
-			pipeline = append(pipeline, "s3storage")
+			if containers, err := getBucketListS3(); len(containers) != 0 && err == nil {
+				pipeline = append(pipeline, "s3storage")
+			} else if containers, err = getContainerListAzure(); len(containers) != 0 && err == nil {
+				pipeline = append(pipeline, "azstorage")
+			} else {
+				return errors.New("failed to initialize new pipeline :: unable to determine cloud provider. no pipeline components found in the config: " + err.Error())
+			}
 			options.Components = pipeline
 		}
 
@@ -412,8 +408,8 @@ var mountCmd = &cobra.Command{
 
 			errorMessage := ""
 			if !configFileProvided {
-				errorMessage += "Config file not provided."
-			} else if !configFileExists {
+				errorMessage += "config file not provided."
+			} else {
 				errorMessage += "Config file " + options.ConfigFile + " not found."
 			}
 			log.Err("mount : "+errorMessage+" failed to initialize new pipeline [%v]", err)

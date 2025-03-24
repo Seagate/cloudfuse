@@ -167,10 +167,12 @@ func (cl *Client) Configure(cfg Config) error {
 		cl.awsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
 			o.UsePathStyle = true
 			o.BaseEndpoint = aws.String(cl.Config.authConfig.Endpoint)
+			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
 		})
 	} else {
 		cl.awsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
 			o.BaseEndpoint = aws.String(cl.Config.authConfig.Endpoint)
+			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
 		})
 	}
 

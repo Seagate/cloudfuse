@@ -28,7 +28,6 @@ package winservice
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -71,7 +70,7 @@ func StartMount(mountPath string, configFile string, passphrase *memguard.Enclav
 		}
 
 		// Encode back to base64 when sending passphrase to cloudfuse
-		passphraseStr = base64.StdEncoding.EncodeToString(buff.Data())
+		passphraseStr = buff.String()
 		defer buff.Destroy()
 	}
 
