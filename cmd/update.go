@@ -76,7 +76,7 @@ var updateCmd = &cobra.Command{
 	Long:  "Update the cloudfuse binary.",
 	RunE: func(command *cobra.Command, args []string) error {
 		if runtime.GOOS == "windows" {
-			return errors.New("Update is not supported on Windows")
+			return errors.New("Update is not supported on Windows. Download the latest release manually here https://github.com/Seagate/cloudfuse/releases/latest.")
 		}
 		if opt.Package == "" {
 			packageFormat, err := determinePackageFormat()
