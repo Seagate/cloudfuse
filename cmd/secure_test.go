@@ -209,7 +209,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncryptInvalidKey() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
-	passphrase := base64.StdEncoding.EncodeToString([]byte("123"))
+	passphrase := base64.StdEncoding.EncodeToString([]byte(""))
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())

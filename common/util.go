@@ -30,7 +30,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -235,35 +234,28 @@ func NormalizeObjectName(name string) string {
 }
 
 // Encrypt given data using the key provided
-func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
-	if key == nil {
-		return nil, errors.New("provided passphrase key is empty")
+func EncryptData(plainData []byte, password *memguard.Enclave) ([]byte, error) {
+	if password == nil {
+		return nil, errors.New("provided password is empty")
 	}
 
-	secretKey, err := key.Open()
+	secretKey, err := password.Open()
 	if err != nil || secretKey == nil {
-		return nil, errors.New("unable to decrypt passphrase key")
+		return nil, errors.New("unable to decrypt password")
 	}
 	defer secretKey.Destroy()
 
-	// A base64 encode of a key of length 32 will be at maximum a length of 44 bytes
-	if len(secretKey.Bytes()) > 44 {
-		return nil, errors.New("Provided decoded base64 key is longer than 32 bytes. Decoded key " +
-			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+	salt := make([]byte, SaltLength)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return nil, fmt.Errorf("Unable to generate random salt with error: %w", err)
 	}
+	key := deriveKey(secretKey.Bytes(), salt)
 
-	decodedKey := make([]byte, 32) // Valid key can't be longer than 32 bytes
-	_, err = base64.StdEncoding.Decode(decodedKey, secretKey.Bytes())
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
-	decodedKey = bytes.Trim(decodedKey, "\x00") // trim any null bytes if key is 16, or 24 bytes
-
-	block, err := aes.NewCipher(decodedKey)
-	if err != nil {
-		return nil, err
-	}
-	clear(decodedKey)
+	clear(key)
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
@@ -275,48 +267,41 @@ func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
 		return nil, err
 	}
 
-	ciphertext := gcm.Seal(nonce, nonce, plainData, nil)
-	return ciphertext, nil
+	ciphertext := gcm.Seal(nil, nonce, plainData, nil)
+
+	concat := bytes.Join([][]byte{salt, nonce, ciphertext}, nil)
+
+	return concat, nil
 }
 
 // Decrypt given data using the key provided
-func DecryptData(cipherData []byte, key *memguard.Enclave) ([]byte, error) {
-	if key == nil {
-		return nil, errors.New("provided passphrase key is empty")
+func DecryptData(cipherData []byte, password *memguard.Enclave) ([]byte, error) {
+	if password == nil {
+		return nil, errors.New("provided password is empty")
 	}
 
-	secretKey, err := key.Open()
+	secretKey, err := password.Open()
 	if err != nil || secretKey == nil {
-		return nil, errors.New("unable to decrypt passphrase key")
+		return nil, errors.New("unable to decrypt password")
 	}
 	defer secretKey.Destroy()
 
-	// A base64 encode of a key of length 32 will be at maximum a length of 44 bytes
-	if len(secretKey.Bytes()) > 44 {
-		return nil, errors.New("Provided decoded base64 key is longer than 32 bytes. Decoded key " +
-			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
-	}
+	salt := cipherData[:SaltLength]
+	key := deriveKey(secretKey.Bytes(), salt)
 
-	decodedKey := make([]byte, 32) // Valid key can't be longer than 32 bytes
-	_, err = base64.StdEncoding.Decode(decodedKey, secretKey.Bytes())
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
-	decodedKey = bytes.Trim(decodedKey, "\x00") // trim any null bytes if key is 16, or 24 bytes
-
-	block, err := aes.NewCipher(decodedKey)
-	if err != nil {
-		return nil, err
-	}
-	clear(decodedKey)
+	clear(key)
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return nil, err
 	}
 
-	nonce := cipherData[:gcm.NonceSize()]
-	ciphertext := cipherData[gcm.NonceSize():]
+	nonce := cipherData[SaltLength : SaltLength+gcm.NonceSize()]
+	ciphertext := cipherData[SaltLength+gcm.NonceSize():]
 
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
