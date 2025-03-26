@@ -274,7 +274,6 @@ var mountCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, args []string) error {
 		options.MountPath = common.ExpandPath(args[0])
-		configFileProvided := options.ConfigFile != ""
 		common.MountPath = options.MountPath
 
 		if options.ConfigFile == "" {
@@ -493,14 +492,8 @@ var mountCmd = &cobra.Command{
 				return Destroy(fmt.Sprintf("failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%s]", err.Error()))
 			}
 
-			errorMessage := ""
-			if !configFileProvided {
-				errorMessage += "config file not provided."
-			} else {
-				errorMessage += "Config file " + options.ConfigFile + " not found."
-			}
-			log.Err("mount : "+errorMessage+" failed to initialize new pipeline [%v]", err)
-			return Destroy(fmt.Sprintf("%s failed to initialize new pipeline [%s]", errorMessage, err.Error()))
+			log.Err("mount :  failed to initialize new pipeline [%v]", err)
+			return Destroy(fmt.Sprintf("mount : failed to initialize new pipeline [%s]", err.Error()))
 		}
 
 		// Dry run ends here
