@@ -28,7 +28,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 
@@ -70,18 +69,18 @@ var installCmd = &cobra.Command{
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		programPath := filepath.Join("C:", "Program Files", "Cloudfuse", "windows-startup.exe")
-		startupPath := filepath.Join(os.Getenv("APPDATA"), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", StartupName)
-		err := makeLink(programPath, startupPath)
+		// Create the registry for WinFsp
+		err := winservice.CreateWinFspRegistry()
 		if err != nil {
-			return fmt.Errorf("unable to create startup link [%s]", err.Error())
+			return fmt.Errorf("Failed to add Windows registry for WinFSP support. Here's why: [%v]", err)
+		}
+		// Add our startup process to the registry
+		programPath := filepath.Join("C:", "Program Files", "Cloudfuse", "windows-startup.exe")
+		err = winservice.AddRegistryValue(`SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, "Cloudfuse", programPath)
+		if err != nil {
+			return fmt.Errorf("Failed to add startup registry value. Here's why: %v", err)
 		}
 
-		// Create the registry for WinFsp
-		err = winservice.CreateWinFspRegistry()
-		if err != nil {
-			return fmt.Errorf("error adding Windows registry for WinFSP support [%s]", err.Error())
-		}
 		return nil
 	},
 }
@@ -94,16 +93,15 @@ var uninstallCmd = &cobra.Command{
 	Example:           "cloudfuse service uninstall",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startupPath := filepath.Join(os.Getenv("APPDATA"), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", StartupName)
-		err := os.Remove(startupPath)
+		// Remove the cloudfuse startup registry entry
+		err := winservice.RemoveRegistryValue(`SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, "Cloudfuse")
 		if err != nil {
-			return fmt.Errorf("failed to delete startup process [%s]", err.Error())
+			return fmt.Errorf("Failed to remove cloudfuse remount service from Windows startup registry. Here's why: %v", err)
 		}
-
 		// Remove the registry for WinFsp
 		err = winservice.RemoveWinFspRegistry()
 		if err != nil {
-			return fmt.Errorf("error removing Windows registry from WinFSP [%s]", err.Error())
+			return fmt.Errorf("Failed to remove cloudfuse entry from WinFSP registry. Here's why: %v", err)
 		}
 
 		return nil
