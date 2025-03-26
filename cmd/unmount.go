@@ -124,7 +124,6 @@ func init() {
 
 	if runtime.GOOS == "windows" {
 		unmountCmd.Flags().Bool("disable-remount-user", false, "Disable remounting this mount on server restart as user.")
-
 		unmountCmd.Flags().Bool("disable-remount-system", false, "Disable remounting this mount on server restart as system.")
 	}
 }

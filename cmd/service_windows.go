@@ -28,12 +28,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/Seagate/cloudfuse/internal/winservice"
-	"github.com/go-ole/go-ole"
-	"github.com/go-ole/go-ole/oleutil"
+	"golang.org/x/sys/windows/svc/mgr"
 
 	"github.com/spf13/cobra"
 )
@@ -43,7 +42,7 @@ type serviceOptions struct {
 	MountPath  string
 }
 
-const SvcName = "cloudfuse"
+const SvcName = "CloudfuseServiceStartup"
 const StartupName = "CloudfuseStartup.lnk"
 
 var servOpts serviceOptions
@@ -63,8 +62,8 @@ var serviceCmd = &cobra.Command{
 
 var installCmd = &cobra.Command{
 	Use:               "install",
-	Short:             "Installs the startup process for Cloudfuse. Requires running as admin.",
-	Long:              "Installs the startup process for Cloudfuse which remounts any active previously active mounts on startup. Requires running as admin.",
+	Short:             "Installs the startup process for Cloudfuse and Windows service. Requires running as admin.",
+	Long:              "Installs the startup process for Cloudfuse and Windows service which remounts any active previously active mounts on startup. Requires running as admin.",
 	SuggestFor:        []string{"ins", "inst"},
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
@@ -81,14 +80,19 @@ var installCmd = &cobra.Command{
 			return fmt.Errorf("Failed to add startup registry value. Here's why: %v", err)
 		}
 
+		err = installService()
+		if err != nil {
+			return fmt.Errorf("Failed to install as a Windows service. Here's why: %v", err)
+		}
+
 		return nil
 	},
 }
 
 var uninstallCmd = &cobra.Command{
 	Use:               "uninstall",
-	Short:             "Uninstall the startup process for Cloudfuse. Requires running as admin.",
-	Long:              "Uninstall the startup process for Cloudfuse. Requires running as admin.",
+	Short:             "Uninstall the startup process for Cloudfuse and Windows service. Requires running as admin.",
+	Long:              "Uninstall the startup process for Cloudfuse and Windows service. Requires running as admin.",
 	SuggestFor:        []string{"uninst", "uninstal"},
 	Example:           "cloudfuse service uninstall",
 	FlagErrorHandling: cobra.ExitOnError,
@@ -102,6 +106,11 @@ var uninstallCmd = &cobra.Command{
 		err = winservice.RemoveWinFspRegistry()
 		if err != nil {
 			return fmt.Errorf("Failed to remove cloudfuse entry from WinFSP registry. Here's why: %v", err)
+		}
+
+		err = removeService()
+		if err != nil {
+			return fmt.Errorf("Failed to remove as a Windows service. Here's why: %v", err)
 		}
 
 		return nil
@@ -143,34 +152,50 @@ var removeRegistryCmd = &cobra.Command{
 
 //--------------- command section ends
 
-func makeLink(src string, dst string) error {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
+// installService adds cloudfuse as a windows service.
+func installService() error {
+	exepath, err := os.Executable()
+	if err != nil {
+		return err
+	}
 
-	err := ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED|ole.COINIT_SPEED_OVER_MEMORY)
+	scm, err := mgr.Connect()
 	if err != nil {
 		return err
 	}
-	oleShellObject, err := oleutil.CreateObject("WScript.Shell")
+	defer scm.Disconnect() //nolint
+
+	// Don't install the service if it already exists
+	service, err := scm.OpenService(SvcName)
+	if err == nil {
+		service.Close()
+		return fmt.Errorf("%s service already exists", SvcName)
+	}
+
+	service, err = scm.CreateService(SvcName, exepath, mgr.Config{DisplayName: SvcName, StartType: mgr.StartAutomatic})
 	if err != nil {
 		return err
 	}
-	defer oleShellObject.Release()
-	wshell, err := oleShellObject.QueryInterface(ole.IID_IDispatch)
+	defer service.Close()
+
+	return nil
+}
+
+// removeService uninstall the cloudfuse windows service.
+func removeService() error {
+	scm, err := mgr.Connect()
 	if err != nil {
 		return err
 	}
-	defer wshell.Release()
-	cs, err := oleutil.CallMethod(wshell, "CreateShortcut", dst)
+	defer scm.Disconnect() //nolint
+
+	service, err := scm.OpenService(SvcName)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s service is not installed", SvcName)
 	}
-	idispatch := cs.ToIDispatch()
-	_, err = oleutil.PutProperty(idispatch, "TargetPath", src)
-	if err != nil {
-		return err
-	}
-	_, err = oleutil.CallMethod(idispatch, "Save")
+	defer service.Close()
+
+	err = service.Delete()
 	if err != nil {
 		return err
 	}

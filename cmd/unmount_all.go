@@ -85,6 +85,7 @@ var umntAllCmd = &cobra.Command{
 
 func init() {
 	if runtime.GOOS == "windows" {
-		umntAllCmd.Flags().Bool("disable-remount", false, "Disable remounting this mount on server restart.")
+		umntAllCmd.Flags().Bool("disable-remount-user", false, "Disable remounting this mount on server restart as user.")
+		umntAllCmd.Flags().Bool("disable-remount-system", false, "Disable remounting this mount on server restart as system.")
 	}
 }

@@ -47,7 +47,7 @@ const mountFile = "mounts.json"
 func getAppDataFolder(useSystem bool) (string, error) {
 	if useSystem {
 		systemRoot := os.Getenv("SystemRoot")
-		if systemRoot != "" {
+		if systemRoot == "" {
 			return "", errors.New("Could not find system root")
 		}
 		fullPath := filepath.Join(systemRoot, "System32", "config", "systemprofile", "AppData", "Roaming", "Cloudfuse")
