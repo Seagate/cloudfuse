@@ -92,7 +92,7 @@ func main() {
 	}
 
 	if isService {
-		handler := &winservice.Cloudfuse{}
+		handler := &Cloudfuse{}
 		run := svc.Run
 		err = run(cmd.SvcName, handler)
 		if err != nil {
