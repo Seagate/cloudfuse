@@ -87,24 +87,14 @@ func (m *Cloudfuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan
 
 func main() {
 	isService, err := svc.IsWindowsService()
-	if err != nil {
-		log.Err("Unable to determine if running as Windows service: %v", err.Error())
+	if err != nil || !isService {
+		log.Err("Unable to determine if running as Windows service or not running as Windows service: %v", err.Error())
 	}
 
-	if isService {
-		handler := &Cloudfuse{}
-		run := svc.Run
-		err = run(cmd.SvcName, handler)
-		if err != nil {
-			log.Err("Unable to start Windows service: %v", err.Error())
-		}
-	} else {
-		_ = cmd.Execute()
-		defer func() {
-			if panicErr := recover(); panicErr != nil {
-				log.Err("PANIC: %v", panicErr)
-				panic(panicErr)
-			}
-		}()
+	handler := &Cloudfuse{}
+	run := svc.Run
+	err = run(cmd.SvcName, handler)
+	if err != nil {
+		log.Err("Unable to start Windows service: %v", err.Error())
 	}
 }

@@ -49,7 +49,7 @@ func createMountInstance(enableRemountUser bool, enableRemountSystem bool) error
 	}
 	// Add the mount to the JSON file so it persists on restart.
 	if enableRemountUser || enableRemountSystem {
-		err = winservice.AddMountUser(options.MountPath, options.ConfigFile, enableRemountSystem)
+		err = winservice.AddMountJSON(options.MountPath, options.ConfigFile, enableRemountSystem)
 		if err != nil {
 			return fmt.Errorf("failed to add entry to json file [%s]", err.Error())
 		}

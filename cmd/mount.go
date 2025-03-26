@@ -746,10 +746,10 @@ func init() {
 	mountCmd.Flags().Lookup("basic-remount-check").Hidden = true
 
 	if runtime.GOOS == "windows" {
-		mountCmd.Flags().BoolVar(&options.EnableRemountSystem, "enable-remount-system", true, "Remount mount on server restart for system.")
+		mountCmd.Flags().BoolVar(&options.EnableRemountSystem, "enable-remount-system", false, "Remount mount on server restart for system.")
 		config.BindPFlag("enable-remount-system", mountCmd.Flags().Lookup("enable-remount-system"))
 
-		mountCmd.Flags().BoolVar(&options.EnableRemountUser, "enable-remount-user", true, "Remount mount on server restart for current user.")
+		mountCmd.Flags().BoolVar(&options.EnableRemountUser, "enable-remount-user", false, "Remount mount on server restart for current user.")
 		config.BindPFlag("enable-remount-user", mountCmd.Flags().Lookup("enable-remount-user"))
 	}
 

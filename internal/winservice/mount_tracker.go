@@ -135,9 +135,9 @@ func removeMount(mounts Mounts, mountPath string) Mounts {
 	return filteredMounts
 }
 
-// AddMountJSONUser adds an entry to our json file with the mount path and config
+// AddMountJSON adds an entry to our json file with the mount path and config
 // file location.
-func AddMountUser(mountPath string, configFile string, useSystem bool) error {
+func AddMountJSON(mountPath string, configFile string, useSystem bool) error {
 	mounts, err := readMounts(useSystem)
 	if err != nil {
 		return err

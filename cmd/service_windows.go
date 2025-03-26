@@ -74,7 +74,20 @@ var installCmd = &cobra.Command{
 			return fmt.Errorf("Failed to add Windows registry for WinFSP support. Here's why: [%v]", err)
 		}
 		// Add our startup process to the registry
-		programPath := filepath.Join("C:", "Program Files", "Cloudfuse", "windows-startup.exe")
+		var programPath string
+		exepath, err := os.Executable()
+		if err != nil {
+			// If we can't determine our location, use a standard path
+			programFiles := os.Getenv("ProgramFiles")
+			if programFiles == "" {
+				programPath = filepath.Join("C:", "Program Files", "Cloudfuse", "windows-startup.exe")
+			} else {
+				programPath = filepath.Join(programFiles, "Cloudfuse", "windows-startup.exe")
+			}
+		} else {
+			programPath = filepath.Join(filepath.Dir(exepath), "windows-startup.exe")
+		}
+
 		err = winservice.AddRegistryValue(`SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, "Cloudfuse", programPath)
 		if err != nil {
 			return fmt.Errorf("Failed to add startup registry value. Here's why: %v", err)
@@ -154,9 +167,18 @@ var removeRegistryCmd = &cobra.Command{
 
 // installService adds cloudfuse as a windows service.
 func installService() error {
+	// Add our startup process to the registry
 	exepath, err := os.Executable()
 	if err != nil {
-		return err
+		// If we can't determine our location, use a standard path
+		programFiles := os.Getenv("ProgramFiles")
+		if programFiles == "" {
+			exepath = filepath.Join("C:", "Program Files", "Cloudfuse", "windows-service.exe")
+		} else {
+			exepath = filepath.Join(programFiles, "Cloudfuse", "windows-service.exe")
+		}
+	} else {
+		exepath = filepath.Join(filepath.Dir(exepath), "windows-service.exe")
 	}
 
 	scm, err := mgr.Connect()
