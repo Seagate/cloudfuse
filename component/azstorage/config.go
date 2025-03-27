@@ -230,8 +230,7 @@ func formatEndpointProtocol(endpoint string, http bool) string {
 	// If the pvtEndpoint does not have protocol mentioned in front, pvtEndpoint parsing will fail while
 	// creating URI also the string shall end with "/"
 	if correctedEndpoint != "" {
-		if !(strings.HasPrefix(correctedEndpoint, "https://") ||
-			strings.HasPrefix(correctedEndpoint, "http://")) {
+		if !strings.HasPrefix(correctedEndpoint, "https://") && !strings.HasPrefix(correctedEndpoint, "http://") {
 			if http {
 				correctedEndpoint = "http://" + correctedEndpoint
 			} else {

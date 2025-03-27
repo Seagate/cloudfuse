@@ -513,7 +513,7 @@ var mountCmd = &cobra.Command{
 		log.Info("mount: Mounting cloudfuse on %s", options.MountPath)
 		// handle background mount on Linux
 		if !options.Foreground && runtime.GOOS != "windows" {
-			pidFile := strings.Replace(options.MountPath, "/", "_", -1) + ".pid"
+			pidFile := strings.ReplaceAll(options.MountPath, "/", "_") + ".pid"
 			pidFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), pidFile)
 
 			// Delete the pidFile if it already exists which prevents a failed to daemonize error
