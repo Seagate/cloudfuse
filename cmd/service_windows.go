@@ -32,6 +32,8 @@ import (
 	"path/filepath"
 
 	"github.com/Seagate/cloudfuse/internal/winservice"
+	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 
 	"github.com/spf13/cobra"
@@ -42,8 +44,11 @@ type serviceOptions struct {
 	MountPath  string
 }
 
-const SvcName = "CloudfuseServiceStartup"
-const StartupName = "CloudfuseStartup.lnk"
+const (
+	SvcName        = "CloudfuseServiceStartup"
+	SvcDescription = "Cloudfuse Service to start System Mounts on System Start"
+	StartupName    = "CloudfuseStartup.lnk"
+)
 
 var servOpts serviceOptions
 
@@ -121,6 +126,11 @@ var uninstallCmd = &cobra.Command{
 			return fmt.Errorf("Failed to remove cloudfuse entry from WinFSP registry. Here's why: %v", err)
 		}
 
+		err = stopService()
+		if err != nil {
+			fmt.Printf("Attempted to stop service but failed, now attempting to remove service. Here's why: %v", err)
+		}
+
 		err = removeService()
 		if err != nil {
 			return fmt.Errorf("Failed to remove as a Windows service. Here's why: %v", err)
@@ -194,11 +204,42 @@ func installService() error {
 		return fmt.Errorf("%s service already exists", SvcName)
 	}
 
-	service, err = scm.CreateService(SvcName, exepath, mgr.Config{DisplayName: SvcName, StartType: mgr.StartAutomatic})
+	config := mgr.Config{
+		ServiceType:  windows.SERVICE_WIN32_OWN_PROCESS,
+		StartType:    mgr.StartAutomatic,
+		ErrorControl: mgr.ErrorNormal,
+		DisplayName:  SvcName,
+		Description:  SvcDescription,
+		Dependencies: []string{"DnsCache", "WinFsp.Launcher"},
+	}
+
+	service, err = scm.CreateService(SvcName, exepath, config)
 	if err != nil {
 		return err
 	}
 	defer service.Close()
+
+	return nil
+}
+
+// stopService stops the windows service.
+func stopService() error {
+	scm, err := mgr.Connect()
+	if err != nil {
+		return err
+	}
+	defer scm.Disconnect() //nolint
+
+	service, err := scm.OpenService(SvcName)
+	if err != nil {
+		return fmt.Errorf("%s service is not installed", SvcName)
+	}
+	defer service.Close()
+
+	_, err = service.Control(svc.Stop)
+	if err != nil {
+		return fmt.Errorf("%s service could not be stopped: %v", SvcName, err)
+	}
 
 	return nil
 }

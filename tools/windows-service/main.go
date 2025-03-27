@@ -27,6 +27,9 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	"net"
 	"time"
 
 	"github.com/Seagate/cloudfuse/cmd"
@@ -36,8 +39,13 @@ import (
 )
 
 const (
-	SvcName = "CloudfuseServiceStartup"
+	SvcName         = "CloudfuseServiceStartup"
+	maxWaitDuration = 5 * time.Minute
+	checkInterval   = 5 * time.Second
+	dialTimeout     = 5 * time.Second
 )
+
+var networkTargets = []string{"seagate.com:80", "google.com:80", "8.8.8.8:53", "1.1.1.1:53"}
 
 type Cloudfuse struct{}
 
@@ -45,10 +53,22 @@ func (m *Cloudfuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan
 	// Notify the Service Control Manager that the service is starting
 	changes <- svc.Status{State: svc.StartPending}
 	log.Trace("Starting %s service", SvcName)
+
+	log.Trace("Waiting for network")
+	ctx, cancel := context.WithTimeout(context.Background(), maxWaitDuration)
+	defer cancel()
+
+	err := waitForNetwork(ctx, networkTargets, checkInterval, dialTimeout)
+	if err != nil {
+		log.Warn("Failed to access network. Attempting to start mounts")
+	} else {
+		log.Trace("Successfully connected to network.")
+	}
+
 	useSystem := true
 
 	// Send request to WinFSP to start the process
-	err := winservice.StartMounts(useSystem)
+	err = winservice.StartMounts(useSystem)
 	// If unable to start, then stop the service
 	if err != nil {
 		changes <- svc.Status{State: svc.StopPending}
@@ -80,6 +100,26 @@ func (m *Cloudfuse) Execute(_ []string, r <-chan svc.ChangeRequest, changes chan
 					log.Err("Error stopping %s service: %v", SvcName, err.Error())
 				}
 				return
+			}
+		}
+	}
+}
+
+func waitForNetwork(ctx context.Context, targets []string, interval time.Duration, timeout time.Duration) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("Timed out waiting for network: %w", ctx.Err())
+		case <-ticker.C:
+			for _, target := range targets {
+				conn, err := net.DialTimeout("tcp", target, timeout)
+				if err == nil {
+					conn.Close()
+					return nil
+				}
 			}
 		}
 	}
