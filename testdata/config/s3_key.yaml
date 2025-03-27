@@ -33,3 +33,4 @@ s3storage:
   region: { S3_REGION }
   secret-key: { S3_SECRET_KEY }
   enable-dir-marker: true
+  enable-checksum: true

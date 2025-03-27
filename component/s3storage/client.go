@@ -579,9 +579,20 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 	// read object data
 	defer objectDataReader.Close()
 	objectData, err := io.ReadAll(objectDataReader)
+
 	if err != nil {
-		log.Err("Couldn't read object data from %v. Here's why: %v", name, err)
-		return err
+		if strings.Contains(err.Error(), "checksum did not match") {
+			// If count is 0 and offset is 0 then this is a real checksum error
+			// Otherwise, the error only occurs because the checksum is for the whole object and we did not
+			// read the whole object
+			if offset == 0 && count == 0 {
+				log.Err("Checksum validation error reading object data from %v. Here's why: %v", name, err)
+				return err
+			}
+		} else {
+			log.Err("Couldn't read object data from %v. Here's why: %v", name, err)
+			return err
+		}
 	}
 	// write data to file
 	_, err = fi.Write(objectData)
