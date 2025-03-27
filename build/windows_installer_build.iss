@@ -6,7 +6,6 @@
 #define MyAppVersion "1.9.3"
 #define MyAppPublisher "SEAGATE TECHNOLOGY LLC"
 #define MyAppURL "https://github.com/Seagate/cloudfuse"
-#define MyAppExeName "cloudfuseGUI.exe"
 #define MyAppExeCLIName "cloudfuse.exe"
 #define WinFSPInstaller "winfsp-2.0.23075.msi"
 
@@ -38,16 +37,11 @@ ChangesEnvironment=yes
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
-[Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-
 [Dirs]
 ; Create directory in AppData/Roaming
 Name: "{userappdata}\{#MyAppName}"; Flags: uninsalwaysuninstall
 
 [Files]
-Source: "..\gui\dist\cloudfuseGUI_Windows\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\gui\dist\cloudfuseGUI_Windows\_internal\*"; DestDir: "{app}\_internal\"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\cloudfuse.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\cfusemon.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\windows-startup.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -66,17 +60,10 @@ Source: "..\sample_configs\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata
 Source: "..\winfsp-2.0.23075.msi"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
-[Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
-
 [Registry]
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; \
     ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; \
     Check: NeedsAddPath('{app}')
-
-[Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
 function NeedsAddPath(Param: string): boolean;

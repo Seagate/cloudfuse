@@ -7,66 +7,9 @@ on:
       - "v*"
 
 jobs:
-  compile-gui:
-    # Compile the GUI on Windows & Linux, and write the GUI binaries to actions/cache
-    name: Compile GUI
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Fetch cached compiled GUI
-        id: restore-compiled-gui
-        uses: actions/cache/restore@v4
-        with:
-          # enableCrossOsArchive always needs to be set on cached items in Windows jobs
-          # see cache documentation: https://github.com/actions/cache#inputs
-          enableCrossOsArchive: true
-          path: gui/dist/cloudfuseGUI_${{ runner.os }}
-          key: ${{ runner.os }}-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
-
-      - name: Install Python
-        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install pip dependencies
-        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
-        run: pip3 install -r gui/requirements.txt
-        shell: bash
-
-      - name: Install libxcb-cursor0
-        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit && matrix.os == 'ubuntu-latest' }}
-        run: |-
-          sudo apt-get update
-          sudo apt-get install libxcb-cursor0 -y
-
-      - name: Compile GUI
-        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
-        shell: bash
-        run: |
-          cd gui
-          ./create_gui.sh
-          mv dist/cloudfuseGUI dist/cloudfuseGUI_${{ runner.os }}
-
-      - name: Cache compiled GUI
-        if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
-        uses: actions/cache/save@v4
-        with:
-          enableCrossOsArchive: true
-          path: gui/dist/cloudfuseGUI_${{ runner.os }}
-          key: ${{ runner.os }}-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
-
   create-installer:
     # Run Inno Setup to create the Windows app installer, then write it to actions/cache
     name: Create Windows Installer
-    needs: compile-gui
     runs-on: windows-latest
     env:
       go: "1.24"
@@ -123,16 +66,6 @@ jobs:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
 
-      - name: Fetch cached compiled GUI
-        uses: actions/cache/restore@v4
-        with:
-          enableCrossOsArchive: true
-          path: gui/dist/cloudfuseGUI_${{ runner.os }}
-          key: ${{ runner.os }}-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
-          fail-on-cache-miss: true
-        # don't continue if we fail get the compiled GUI for the Windows installer
-        continue-on-error: false
-
       - name: Set Version
         id: get_version
         shell: bash
@@ -153,31 +86,12 @@ jobs:
         run: |
           mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
 
-      - name: Run Inno Setup for No Gui
-        working-directory: ./build
-        shell: bash
-        # Inno Setup is pre-installed on GitHub's windows-latest image
-        # see documentation: https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md
-        run: |
-          "C:/Program Files (x86)/Inno Setup 6/iscc.exe" windows_installer_build_no_gui.iss
-
-      - name: Rename installer No Gui
-        run: |
-          mv build/Output/cloudfuse.exe build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
-
       - name: Cache windows installer
         uses: actions/cache/save@v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
-
-      - name: Cache windows installer No GUi
-        uses: actions/cache/save@v4
-        with:
-          enableCrossOsArchive: true
-          path: build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
-          key: windows-cloudfuse-no-gui-installer-${{ github.sha }}
 
   release:
     # Use GoReleaser to package and publish Linux releases along with the Windows installer
@@ -232,35 +146,6 @@ jobs:
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
           fail-on-cache-miss: true
-
-        # Get cached intermediate build products
-      - name: Restore cached Windows installer No Gui
-        uses: actions/cache/restore@v4
-        with:
-          enableCrossOsArchive: true
-          path: build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
-          key: windows-cloudfuse-no-gui-installer-${{ github.sha }}
-          fail-on-cache-miss: true
-
-      - name: Restore Linux compiled GUI
-        uses: actions/cache/restore@v4
-        with:
-          path: gui/dist/cloudfuseGUI_Linux
-          key: Linux-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
-          fail-on-cache-miss: true
-        continue-on-error: false
-
-      - name: Restore Windows compiled GUI
-        uses: actions/cache/restore@v4
-        with:
-          enableCrossOsArchive: true
-          path: gui/dist/cloudfuseGUI_Windows
-          key: Windows-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
-          # the hash value comes out different on Linux vs Windows
-          # so we need to use restore-keys to match the Windows compiled GUI
-          # see documentation: https://github.com/actions/cache/blob/main/restore/README.md#inputs
-          restore-keys: Windows-compiled-gui-
-        continue-on-error: false
 
         # Run GoReleaser (see .goreleaser.yaml)
       - name: Run GoReleaser

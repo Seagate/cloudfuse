@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=Cloudfuse
-GenericName=Cloudfuse
-Encoding=UTF-8
-Terminal=false
-Type=Application
-Categories=Application
-Exec=/opt/cloudfuse/cloudfuseGUI
