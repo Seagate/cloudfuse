@@ -136,6 +136,11 @@ var uninstallCmd = &cobra.Command{
 			return fmt.Errorf("Failed to remove as a Windows service. Here's why: %v", err)
 		}
 
+		err = deleteMountTracker()
+		if err != nil {
+			return fmt.Errorf("Failed to remove mount.json tracker file. Here's why: %v", err)
+		}
+
 		return nil
 	},
 }
@@ -263,6 +268,10 @@ func removeService() error {
 		return err
 	}
 	return nil
+}
+
+func deleteMountTracker() error {
+	return winservice.DeleteMountJSONFile()
 }
 
 func init() {

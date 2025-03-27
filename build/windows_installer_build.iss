@@ -129,7 +129,7 @@ var
 begin
   if CurUninstallStep = usUninstall then
   begin
-    // Install the Cloudfuse Startup Tool
+    // Uninstall the Cloudfuse Startup Tool
     if not Exec(ExpandConstant('{app}\{#MyAppExeCLIName}'), 'service uninstall', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
       SuppressibleMsgBox('Failed to remove cloudfuse as a service.', mbError, MB_OK, IDOK);

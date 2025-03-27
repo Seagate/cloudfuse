@@ -135,6 +135,27 @@ func removeMount(mounts Mounts, mountPath string) Mounts {
 	return filteredMounts
 }
 
+// DeleteMountJSONFile deletes all the mount.json files on the system
+func DeleteMountJSONFile() error {
+	trackerFile, err := getMountTrackerFile(false)
+	if err != nil {
+		return err
+	}
+
+	err = os.Remove(trackerFile)
+	if err != nil {
+		return err
+	}
+
+	trackerFile, err = getMountTrackerFile(true)
+	if err != nil {
+		return err
+	}
+
+	err = os.Remove(trackerFile)
+	return err
+}
+
 // AddMountJSON adds an entry to our json file with the mount path and config
 // file location.
 func AddMountJSON(mountPath string, configFile string, useSystem bool) error {
