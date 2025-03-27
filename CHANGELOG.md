@@ -1,5 +1,14 @@
 # Cloudfuse Changelog #
 
+## **1.9.3** ##
+
+March 25th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#484](https://github.com/Seagate/cloudfuse/pull/484) Use registry for a more reliable remount on startup
+
 ## **1.9.2** ##
 
 March 12th 2025
