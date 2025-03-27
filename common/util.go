@@ -30,6 +30,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -50,6 +51,7 @@ import (
 
 // Sector size of disk
 const SectorSize = 4096
+const uint16Size = 2
 
 var RootMount bool
 var ForegroundMount bool
@@ -269,12 +271,27 @@ func EncryptData(plainData []byte, password *memguard.Enclave) ([]byte, error) {
 
 	ciphertext := gcm.Seal(nil, nonce, plainData, nil)
 
-	concat := bytes.Join([][]byte{salt, nonce, ciphertext}, nil)
+	// Write out encrypted file with length of salt, salt, length of nonce, nonce, and the ciphertext
+	outputBuffer := new(bytes.Buffer)
 
-	return concat, nil
+	err = binary.Write(outputBuffer, binary.LittleEndian, SaltLength)
+	if err != nil {
+		return nil, err
+	}
+	outputBuffer.Write(salt)
+
+	err = binary.Write(outputBuffer, binary.LittleEndian, uint16(gcm.NonceSize()))
+	if err != nil {
+		return nil, err
+	}
+	outputBuffer.Write(nonce)
+
+	outputBuffer.Write(ciphertext)
+
+	return outputBuffer.Bytes(), nil
 }
 
-// Decrypt given data using the key provided
+// DecryptData decrypts the given data using the provided key.
 func DecryptData(cipherData []byte, password *memguard.Enclave) ([]byte, error) {
 	if password == nil {
 		return nil, errors.New("provided password is empty")
@@ -286,22 +303,28 @@ func DecryptData(cipherData []byte, password *memguard.Enclave) ([]byte, error) 
 	}
 	defer secretKey.Destroy()
 
-	salt := cipherData[:SaltLength]
+	salt, err := extractSalt(cipherData)
+	if err != nil {
+		return nil, err
+	}
+
 	key := deriveKey(secretKey.Bytes(), salt)
+	defer clear(key)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
-	clear(key)
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return nil, err
 	}
 
-	nonce := cipherData[SaltLength : SaltLength+gcm.NonceSize()]
-	ciphertext := cipherData[SaltLength+gcm.NonceSize():]
+	nonce, ciphertext, err := extractNonceAndCiphertext(cipherData)
+	if err != nil {
+		return nil, err
+	}
 
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
@@ -309,6 +332,31 @@ func DecryptData(cipherData []byte, password *memguard.Enclave) ([]byte, error) 
 	}
 
 	return plaintext, nil
+}
+
+func extractSalt(cipherData []byte) ([]byte, error) {
+	saltLength := binary.LittleEndian.Uint16(cipherData[:uint16Size])
+	if len(cipherData) < int(uint16Size+saltLength) {
+		return nil, errors.New("invalid data length")
+	}
+	return cipherData[uint16Size : uint16Size+saltLength], nil
+}
+
+func extractNonceAndCiphertext(cipherData []byte) ([]byte, []byte, error) {
+	saltLength := binary.LittleEndian.Uint16(cipherData[:uint16Size])
+	offset := uint16Size + saltLength
+
+	nonceLength := binary.LittleEndian.Uint16(cipherData[offset : offset+uint16Size])
+	offset += uint16Size
+
+	if len(cipherData) < int(offset+nonceLength) {
+		return nil, nil, errors.New("invalid data length")
+	}
+
+	nonce := cipherData[offset : offset+nonceLength]
+	ciphertext := cipherData[offset+nonceLength:]
+
+	return nonce, ciphertext, nil
 }
 
 func GetCurrentDistro() string {

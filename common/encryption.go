@@ -27,7 +27,7 @@ package common
 import "golang.org/x/crypto/argon2"
 
 const (
-	SaltLength    = 16
+	SaltLength    = uint16(16)
 	KeyLength     = 32
 	Argon2Time    = 1
 	Argon2Memory  = 64 * 1014
