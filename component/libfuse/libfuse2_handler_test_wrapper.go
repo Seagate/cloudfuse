@@ -221,6 +221,7 @@ func testRmDirNotEmpty(suite *libfuseTestSuite) {
 	path := "/" + name
 	isDirEmptyOptions := internal.IsDirEmptyOptions{Name: name}
 	suite.mock.EXPECT().IsDirEmpty(isDirEmptyOptions).Return(false)
+	suite.mock.EXPECT().DeleteEmptyDirs(internal.DeleteDirOptions{Name: name}).Return(false, errors.New("unable to delete directory"))
 
 	err := cfuseFS.Rmdir(path)
 	suite.assert.Equal(-fuse.ENOTEMPTY, err)
@@ -480,6 +481,9 @@ func testReadLink(suite *libfuseTestSuite) {
 	path := "/" + name
 	options := internal.ReadLinkOptions{Name: name}
 	suite.mock.EXPECT().ReadLink(options).Return("target", nil)
+	attr := &internal.ObjAttr{}
+	getAttrOpt := internal.GetAttrOptions{Name: name}
+	suite.mock.EXPECT().GetAttr(getAttrOpt).Return(attr, nil)
 
 	err, target := cfuseFS.Readlink(path)
 	suite.assert.Equal(0, err)
@@ -492,6 +496,9 @@ func testReadLinkNotExists(suite *libfuseTestSuite) {
 	path := "/" + name
 	options := internal.ReadLinkOptions{Name: name}
 	suite.mock.EXPECT().ReadLink(options).Return("", syscall.ENOENT)
+	attr := &internal.ObjAttr{}
+	getAttrOpt := internal.GetAttrOptions{Name: name}
+	suite.mock.EXPECT().GetAttr(getAttrOpt).Return(attr, nil)
 
 	err, target := cfuseFS.Readlink(path)
 	suite.assert.Equal(-fuse.ENOENT, err)
@@ -504,6 +511,8 @@ func testReadLinkError(suite *libfuseTestSuite) {
 	path := "/" + name
 	options := internal.ReadLinkOptions{Name: name}
 	suite.mock.EXPECT().ReadLink(options).Return("", errors.New("failed to read link"))
+	getAttrOpt := internal.GetAttrOptions{Name: name}
+	suite.mock.EXPECT().GetAttr(getAttrOpt).Return(nil, nil)
 
 	err, target := cfuseFS.Readlink(path)
 	suite.assert.Equal(-fuse.EIO, err)
