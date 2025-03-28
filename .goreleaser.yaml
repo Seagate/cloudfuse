@@ -41,6 +41,22 @@ builds:
     ldflags:
       - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
 
+  - id: windows-service
+    main: ./tools/windows-service/main.go
+    binary: windows-service
+    goos:
+      - windows
+    goarch:
+      - amd64
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+      - -buildmode=pie
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X github.com/Seagate/cloudfuse/common.GitCommit={{.Commit}} -X github.com/Seagate/cloudfuse/common.CommitDate={{ .CommitDate }}
+
   - id: windows-health-monitor
     main: ./tools/health-monitor/main.go
     binary: cfusemon
@@ -163,6 +179,7 @@ archives:
       - windows
       - windows-startup
       - windows-health-monitor
+      - windows-service
     formats: ["zip"]
     files:
       - LICENSE
