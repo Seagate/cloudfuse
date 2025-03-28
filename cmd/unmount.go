@@ -48,9 +48,10 @@ var unmountCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if runtime.GOOS == "windows" {
-			disableRemount, _ := cmd.Flags().GetBool("disable-remount")
+			disableRemountUser, _ := cmd.Flags().GetBool("disable-remount-user")
+			disableRemountSystem, _ := cmd.Flags().GetBool("disable-remount-system")
 			options.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
-			return unmountCloudfuseWindows(options.MountPath, disableRemount)
+			return unmountCloudfuseWindows(options.MountPath, disableRemountUser, disableRemountSystem)
 		}
 
 		lazy, _ := cmd.Flags().GetBool("lazy")
@@ -122,6 +123,7 @@ func init() {
 	}
 
 	if runtime.GOOS == "windows" {
-		unmountCmd.Flags().Bool("disable-remount", false, "Disable remounting this mount on server restart.")
+		unmountCmd.Flags().Bool("disable-remount-user", false, "Disable remounting this mount on server restart as user.")
+		unmountCmd.Flags().Bool("disable-remount-system", false, "Disable remounting this mount on server restart as system.")
 	}
 }
