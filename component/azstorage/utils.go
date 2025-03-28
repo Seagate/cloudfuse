@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -529,24 +529,17 @@ func getFileMode(permissions string) (os.FileMode, error) {
 	return mode, nil
 }
 
-// Strips the prefixPath from the path and returns the joined string
-func split(prefixPath string, path string) string {
+// removePrefixPath removes the given prefixPath from the beginning of path,
+// if it exists, and returns the resulting string without leading slashes.
+func removePrefixPath(prefixPath, path string) string {
 	if prefixPath == "" {
 		return path
 	}
-
-	// Remove prefixpath from the given path
-	paths := strings.Split(path, prefixPath)
-	if paths[0] == "" {
-		paths = paths[1:]
+	path = strings.TrimPrefix(path, prefixPath)
+	if path[0] == '/' {
+		return path[1:]
 	}
-
-	// If result starts with "/" then remove that
-	if paths[0][0] == '/' {
-		paths[0] = paths[0][1:]
-	}
-
-	return common.JoinUnixFilepath(paths...)
+	return path
 }
 
 func sanitizeSASKey(key string) *memguard.Enclave {
@@ -593,3 +586,37 @@ func removeLeadingSlashes(s string) string {
 	}
 	return s
 }
+
+func modifyLMTandEtag(attr *internal.ObjAttr, lmt *time.Time, ETag string) {
+	if attr != nil {
+		attr.Atime = *lmt
+		attr.Mtime = *lmt
+		attr.Ctime = *lmt
+		attr.ETag = ETag
+	}
+}
+
+func sanitizeEtag(ETag *azcore.ETag) string {
+	if ETag != nil {
+		return strings.Trim(string(*ETag), `"`)
+	}
+	return ""
+}
+
+// func parseBlobTags(tags *container.BlobTags) map[string]string {
+
+// 	if tags == nil {
+// 		return nil
+// 	}
+
+// 	blobtags := make(map[string]string)
+// 	for _, tag := range tags.BlobTagSet {
+// 		if tag != nil {
+// 			if tag.Key != nil {
+// 				blobtags[*tag.Key] = *tag.Value
+// 			}
+// 		}
+// 	}
+
+// 	return blobtags
+// }

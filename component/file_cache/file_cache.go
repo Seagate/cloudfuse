@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -312,9 +312,9 @@ func (c *FileCache) Configure(_ bool) error {
 	avail, err := c.getAvailableSize()
 	if err != nil {
 		log.Err("FileCache::Configure : config error %s [%s]. Assigning a default value of 4GB or if any value is assigned to .disk-size-mb in config.", c.Name(), err.Error())
-		c.maxCacheSize = 4192 * MB
+		c.maxCacheSize = 4192
 	} else {
-		c.maxCacheSize = 0.8 * float64(avail)
+		c.maxCacheSize = 0.8 * float64(avail) / (MB)
 	}
 
 	if config.IsSet(compName+".max-size-mb") && conf.MaxSizeMB != 0 {
@@ -1114,6 +1114,10 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	if err != nil {
 		log.Err("FileCache::openFileInternal : error opening cached file %s [%s]", handle.Path, err.Error())
 		return err
+	}
+
+	if flags&os.O_TRUNC != 0 {
+		handle.Flags.Set(handlemap.HandleFlagDirty)
 	}
 
 	inf, err := f.Stat()

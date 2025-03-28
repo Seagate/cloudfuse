@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -232,7 +232,7 @@ func (suite *fileCacheTestSuite) TestDefaultCacheSize() {
 		suite.assert.NoError(err)
 	}
 	expected := uint64(0.8 * float64(freeDisk))
-	actual := suite.fileCache.maxCacheSize
+	actual := suite.fileCache.maxCacheSize * MB
 	difference := math.Abs(float64(actual) - float64(expected))
 	tolerance := 0.10 * float64(math.Max(float64(actual), float64(expected)))
 	suite.assert.LessOrEqual(difference, tolerance, "mssg:", actual, expected)

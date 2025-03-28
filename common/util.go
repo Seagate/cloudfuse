@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -31,8 +31,10 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/crc64"
 	"io"
 	"os"
 	"os/exec"
@@ -448,4 +450,15 @@ func WriteToFile(filename string, data string, options WriteToFileOptions) error
 	}
 
 	return nil
+}
+
+func GetCRC64(data []byte, len int) []byte {
+	// Create a CRC64 hash using the ECMA polynomial
+	crc64Table := crc64.MakeTable(crc64.ECMA)
+	checksum := crc64.Checksum(data[:len], crc64Table)
+
+	checksumBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(checksumBytes, checksum)
+
+	return checksumBytes
 }

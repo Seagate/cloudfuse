@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -176,6 +176,23 @@ func (suite *attrCacheTestSuite) assertNotInCloud(path string) {
 	suite.assert.True(checkItem.valid())
 	suite.assert.True(checkItem.exists())
 	suite.assert.False(checkItem.isInCloud())
+}
+
+// This method is used when we transfer the attributes from the src to dst, and mark src as invalid
+func assertAttributesTransferred(suite *attrCacheTestSuite, srcAttr *internal.ObjAttr, dstAttr *internal.ObjAttr) {
+	suite.assert.EqualValues(srcAttr.Size, dstAttr.Size)
+	suite.assert.EqualValues(srcAttr.Mode, dstAttr.Mode)
+	checkItem, found := suite.attrCache.cache.get(dstAttr.Path)
+	suite.assert.True(found)
+	suite.assert.True(checkItem.exists())
+	suite.assert.True(checkItem.valid())
+}
+
+// If next component changes the times of the attribute.
+func assertSrcAttributeTimeChanged(suite *attrCacheTestSuite, srcAttr *internal.ObjAttr, srcAttrCopy internal.ObjAttr) {
+	suite.assert.NotEqualValues(suite, srcAttr.Atime, srcAttrCopy.Atime)
+	suite.assert.NotEqualValues(suite, srcAttr.Mtime, srcAttrCopy.Mtime)
+	suite.assert.NotEqualValues(suite, srcAttr.Ctime, srcAttrCopy.Ctime)
 }
 
 // Directory structure
@@ -1269,11 +1286,51 @@ func (suite *attrCacheTestSuite) TestRenameFile() {
 	// Entry Already Exists
 	suite.addPathToCache(src, false)
 	suite.addPathToCache(dst, false)
-	suite.mock.EXPECT().RenameFile(options).Return(nil)
 
+	attr, found := suite.attrCache.cache.get(src)
+	suite.assert.True(found)
+	options.SrcAttr = attr.attr
+	options.SrcAttr.Size = 1
+	options.SrcAttr.Mode = 2
+	attr, found = suite.attrCache.cache.get(dst)
+	suite.assert.True(found)
+	options.DstAttr = attr.attr
+	options.DstAttr.Size = 3
+	options.DstAttr.Mode = 4
+	srcAttrCopy := *options.SrcAttr
+
+	suite.mock.EXPECT().RenameFile(options).Return(nil)
 	err = suite.attrCache.RenameFile(options)
 	suite.assert.NoError(err)
 	suite.assertDeleted(src)
+	attr, found = suite.attrCache.cache.get(dst)
+	suite.assert.True(found)
+	modifiedDstAttr := attr.attr
+	assertSrcAttributeTimeChanged(suite, options.SrcAttr, srcAttrCopy)
+	// Check the attributes of the dst are same as the src.
+	assertAttributesTransferred(suite, options.SrcAttr, modifiedDstAttr)
+
+	// Src Entry Exist and Dst Entry Don't Exist
+	suite.addPathToCache(src, false)
+	// Add negative entry to cache for Dst
+	suite.attrCache.cache.insert(insertOptions{attr: internal.CreateObjAttrDir(dst), exists: false, cachedAt: time.Now()})
+	attr, found = suite.attrCache.cache.get(src)
+	suite.assert.True(found)
+	options.SrcAttr = attr.attr
+	attr, found = suite.attrCache.cache.get(dst)
+	suite.assert.True(found)
+	options.DstAttr = attr.attr
+	options.SrcAttr.Size = 1
+	options.SrcAttr.Mode = 2
+	suite.mock.EXPECT().RenameFile(options).Return(nil)
+	err = suite.attrCache.RenameFile(options)
+	suite.assert.NoError(err)
+	suite.assertDeleted(src)
+	attr, found = suite.attrCache.cache.get(dst)
+	suite.assert.True(found)
+	modifiedDstAttr = attr.attr
+	assertSrcAttributeTimeChanged(suite, options.SrcAttr, srcAttrCopy)
+	assertAttributesTransferred(suite, options.SrcAttr, modifiedDstAttr)
 }
 
 // Tests Write File
