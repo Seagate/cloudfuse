@@ -51,7 +51,7 @@ func CreateSizeJournal(filename string) (*MountSize, error) {
 	journalFile = filepath.Join(common.ExpandPath(common.DefaultWorkDir), filename)
 	err := common.CreateDefaultDirectory()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create default work dir [%s]", err.Error())
+		return nil, fmt.Errorf("failed to create default work dir [%s]", err.Error())
 	}
 
 	f, err := os.OpenFile(journalFile, os.O_CREATE|os.O_RDWR, 0644)
