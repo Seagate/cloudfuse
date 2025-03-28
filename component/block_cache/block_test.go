@@ -1,14 +1,6 @@
 //go:build !authtest
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
@@ -36,6 +28,7 @@
 package block_cache
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -81,14 +74,18 @@ func (suite *blockTestSuite) TestAllocateBig() {
 	b.Delete()
 }
 
-// func (suite *blockTestSuite) TestAllocateHuge() {
-// 	suite.assert = assert.New(suite.T())
+func (suite *blockTestSuite) TestAllocateHuge() {
+	suite.assert = assert.New(suite.T())
 
-// 	b, err := AllocateBlock(50 * 1024 * 1024 * 1024)
-// 	suite.assert.Nil(b)
-// 	suite.assert.Error(err)
-// 	suite.assert.Contains(err.Error(), "mmap error")
-// }
+	b, err := AllocateBlock(50 * 1024 * 1024 * 1024)
+	suite.assert.Nil(b)
+	suite.assert.Error(err)
+	if runtime.GOOS == "windows" {
+		suite.assert.Contains(err.Error(), "insufficient memory available:")
+	} else {
+	 	suite.assert.Contains(err.Error(), "mmap error")
+	}
+}
 
 func (suite *blockTestSuite) TestFreeNilData() {
 	suite.assert = assert.New(suite.T())

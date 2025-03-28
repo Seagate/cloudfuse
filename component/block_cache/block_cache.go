@@ -1,12 +1,4 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
@@ -103,6 +95,7 @@ type BlockCacheOptions struct {
 const (
 	compName               = "block_cache"
 	defaultTimeout         = 120
+	blockCacheFileSeperator = "_" // Used to separate block ids in the file name for disk cache
 	MAX_POOL_USAGE  uint32 = 80
 	MIN_POOL_USAGE  uint32 = 50
 	MIN_PREFETCH           = 5
@@ -879,7 +872,7 @@ func (bc *BlockCache) lineupDownload(handle *handlemap.Handle, block *Block, pre
 
 // download : Method to download the given amount of data
 func (bc *BlockCache) download(item *workItem) {
-	fileName := fmt.Sprintf("%s::%v", item.handle.Path, item.block.id)
+	fileName := fmt.Sprintf("%s%s%v", item.handle.Path, blockCacheFileSeperator, item.block.id)
 
 	// filename_blockindex is the key for the lock
 	// this ensure that at a given time a block from a file is downloaded only once across all open handles
@@ -1339,7 +1332,7 @@ func (bc *BlockCache) waitAndFreeUploadedBlocks(handle *handlemap.Handle, cnt in
 
 // upload : Method to stage the given amount of data
 func (bc *BlockCache) upload(item *workItem) {
-	fileName := fmt.Sprintf("%s::%v", item.handle.Path, item.block.id)
+	fileName := fmt.Sprintf("%s%s%v", item.handle.Path, blockCacheFileSeperator, item.block.id)
 
 	// filename_blockindex is the key for the lock
 	// this ensure that at a given time a block from a file is downloaded only once across all open handles
@@ -1551,22 +1544,22 @@ func (bc *BlockCache) stageZeroBlock(handle *handlemap.Handle, tryCnt int) (stri
 
 // diskEvict : Callback when a node from disk expires
 func (bc *BlockCache) diskEvict(node *list.Element) {
-	fileName := node.Value.(string)
+	cacheKey := node.Value.(string)
 
 	// If this block is already locked then return otherwise Lock() will hung up
-	if bc.fileLocks.Locked(fileName) {
-		log.Info("BlockCache::diskEvict : File %s is locked so skipping eviction", fileName)
+	if bc.fileLocks.Locked(cacheKey) {
+		log.Info("BlockCache::diskEvict : File %s is locked so skipping eviction", cacheKey)
 		return
 	}
 
 	// Lock the file name so that its not downloaded when deletion is going on
-	flock := bc.fileLocks.Get(fileName)
+	flock := bc.fileLocks.Get(cacheKey)
 	flock.Lock()
 	defer flock.Unlock()
 
-	bc.fileNodeMap.Delete(fileName)
+	bc.fileNodeMap.Delete(cacheKey)
 
-	localPath := filepath.Join(bc.tmpPath, fileName)
+	localPath := filepath.Join(bc.tmpPath, cacheKey)
 	_ = os.Remove(localPath)
 }
 

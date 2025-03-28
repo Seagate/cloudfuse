@@ -32,8 +32,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"unsafe"
 
+	"github.com/shirou/gopsutil/v4/mem"
 	"golang.org/x/sys/windows"
 )
 
@@ -116,29 +116,13 @@ func GetAvailFree(path string) (uint64, uint64, error) {
 	return avail, free, nil
 }
 
-// https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/ns-sysinfoapi-memorystatusex
-type memoryStatusEx struct {
-	dwLength                uint32
-	dwMemoryLoad            uint32
-	ullTotalPhys            uint64
-	ullAvailPhys            uint64
-	ullTotalPageFile        uint64
-	ullAvailPageFile        uint64
-	ullTotalVirtual         uint64
-	ullAvailVirtual         uint64
-	ullAvailExtendedVirtual uint64
-}
-
-// GetAvailFree: Available blocks
+// GetFreeRam: Available ram
 func GetFreeRam() (uint64, error) {
-	var mse memoryStatusEx
-	kernel32 := windows.NewLazySystemDLL("kernel32.dll")
-	globalMemoryStatusEx := kernel32.NewProc("GlobalMemoryStatusEx")
-	r1, _, err := globalMemoryStatusEx.Call(uintptr(unsafe.Pointer(&mse)))
-	if err != nil || r1 == 0 {
+	v, err := mem.VirtualMemory()
+	if err != nil {
 		return 0, err
 	}
-	return mse.ullTotalPhys, nil
+	return v.Available, nil
 }
 
 // List all mount points which were mounted using cloudfuse

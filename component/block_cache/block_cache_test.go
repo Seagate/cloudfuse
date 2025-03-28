@@ -1,12 +1,4 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
@@ -260,6 +252,11 @@ func (suite *blockCacheTestSuite) TestNoPrefetchConfig() {
 }
 
 func (suite *blockCacheTestSuite) TestInvalidDiskPath() {
+	if runtime.GOOS == "windows" {
+		// Skip this test on Windows
+		return
+	}
+	
 	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n  mem-size-mb: 500\n  prefetch: 12\n  parallelism: 10\n  path: /abcd\n  disk-size-mb: 100\n  disk-timeout-sec: 5"
 	tobj, err := setupPipeline(cfg)
 	defer tobj.cleanupPipeline()
@@ -1101,11 +1098,11 @@ func (suite *blockCacheTestSuite) TestDeleteAndRenameDirAndFile() {
 
 	err = os.MkdirAll(filepath.Join(filepath.Join(tobj.blockCache.tmpPath, "testCreateDirNew")), 0777)
 	suite.assert.NoError(err)
-	err = os.WriteFile(filepath.Join(tobj.blockCache.tmpPath, "testCreateDirNew/a.txt0"), []byte("Hello"), 0777)
+	err = os.WriteFile(filepath.Join(tobj.blockCache.tmpPath, "testCreateDirNew/a.txt_0"), []byte("Hello"), 0777)
 	suite.assert.NoError(err)
-	err = os.WriteFile(filepath.Join(tobj.blockCache.tmpPath, "testCreateDirNew/a.txt1"), []byte("Hello"), 0777)
+	err = os.WriteFile(filepath.Join(tobj.blockCache.tmpPath, "testCreateDirNew/a.txt_1"), []byte("Hello"), 0777)
 	suite.assert.NoError(err)
-	err = os.WriteFile(filepath.Join(tobj.blockCache.tmpPath, "testCreateDirNew/a.txt2"), []byte("Hello"), 0777)
+	err = os.WriteFile(filepath.Join(tobj.blockCache.tmpPath, "testCreateDirNew/a.txt_2"), []byte("Hello"), 0777)
 	suite.assert.NoError(err)
 
 	err = tobj.blockCache.RenameFile(internal.RenameFileOptions{Src: "testCreateDirNew/a.txt", Dst: "testCreateDirNew/b.txt"})

@@ -1,14 +1,6 @@
 //go:build windows
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
@@ -36,10 +28,11 @@
 package block_cache
 
 import (
-	"errors"
 	"fmt"
 	"unsafe"
 
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"golang.org/x/sys/windows"
 )
 
@@ -48,26 +41,32 @@ func AllocateBlock(size uint64) (*Block, error) {
 	if size == 0 {
 		return nil, fmt.Errorf("invalid size")
 	}
-
-	// https://learn.microsoft.com/en-us/windows/win32/memory/creating-a-file-mapping-object#file-mapping-size
-	h, err := windows.CreateFileMapping(windows.InvalidHandle, nil, windows.PAGE_EXECUTE_READWRITE, uint32(size>>32), uint32(size&0xffffffff), nil)
+	
+	freeRam, err := common.GetFreeRam()
 	if err != nil {
-		if errors.Is(err, windows.ERROR_ALREADY_EXISTS) {
-			windows.CloseHandle(h)
+		fmt.Printf("error getting free RAM: %v", err)
+		log.Warn("could not get free RAM: %v", err)
+	} else {
+		if freeRam < size {
+			// Not enough free RAM to allocate the requested size
+			return nil, fmt.Errorf("insufficient memory available: requested %d bytes, available %d bytes", size, freeRam)
 		}
-		return nil, fmt.Errorf("create file mapping error: %v", err)
+	}
+	fmt.Println("freeRam: ", freeRam)
+	fmt.Println("Allocating: ", size)
+
+	// https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc
+	ptr, err := windows.VirtualAlloc(
+		0,
+		uintptr(size),
+		windows.MEM_COMMIT|windows.MEM_RESERVE, 
+		windows.PAGE_READWRITE,
+	)
+	if err != nil || ptr == 0 {
+		return nil, fmt.Errorf("create virtual mapping error: %v", err)
 	}
 
-	addr, err := windows.MapViewOfFile(h, windows.FILE_MAP_READ|windows.FILE_MAP_WRITE, 0, 0, 0)
-	if addr == 0 {
-		return nil, fmt.Errorf("mmap error: %v", err)
-	}
-
-	data := unsafe.Slice((*byte)(unsafe.Pointer(addr)), size)
-
-	if err != nil {
-		return nil, fmt.Errorf("mmap error: %v", err)
-	}
+	data := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), size)
 
 	block := &Block{
 		data:  data,
@@ -91,10 +90,16 @@ func (b *Block) Delete() error {
 
 	addr := uintptr(unsafe.Pointer(unsafe.SliceData(b.data)))
 
-	if err := windows.UnmapViewOfFile(addr); err != nil {
+	err := windows.VirtualFree(
+		uintptr(addr),
+		0,
+		windows.MEM_RELEASE,
+	)
+	b.data = nil
+
+	if err != nil {
 		return fmt.Errorf("cannot unmap memory mapped file: %w", err)
 	}
-	b.data = nil
 
 	return nil
 }
