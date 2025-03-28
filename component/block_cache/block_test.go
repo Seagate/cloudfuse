@@ -83,7 +83,7 @@ func (suite *blockTestSuite) TestAllocateHuge() {
 	if runtime.GOOS == "windows" {
 		suite.assert.Contains(err.Error(), "insufficient memory available:")
 	} else {
-	 	suite.assert.Contains(err.Error(), "mmap error")
+		suite.assert.Contains(err.Error(), "mmap error")
 	}
 }
 

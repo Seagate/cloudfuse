@@ -93,16 +93,16 @@ type BlockCacheOptions struct {
 }
 
 const (
-	compName               = "block_cache"
-	defaultTimeout         = 120
-	blockCacheFileSeperator = "_" // Used to separate block ids in the file name for disk cache
-	MAX_POOL_USAGE  uint32 = 80
-	MIN_POOL_USAGE  uint32 = 50
-	MIN_PREFETCH           = 5
-	MIN_WRITE_BLOCK        = 3
-	MIN_RANDREAD           = 10
-	MAX_FAIL_CNT           = 3
-	MAX_BLOCKS             = 50000
+	compName                       = "block_cache"
+	defaultTimeout                 = 120
+	blockCacheFileSeperator        = "_" // Used to separate block ids in the file name for disk cache
+	MAX_POOL_USAGE          uint32 = 80
+	MIN_POOL_USAGE          uint32 = 50
+	MIN_PREFETCH                   = 5
+	MIN_WRITE_BLOCK                = 3
+	MIN_RANDREAD                   = 10
+	MAX_FAIL_CNT                   = 3
+	MAX_BLOCKS                     = 50000
 )
 
 // Verification to check satisfaction criteria with Component Interface

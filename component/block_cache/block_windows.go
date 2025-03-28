@@ -41,10 +41,9 @@ func AllocateBlock(size uint64) (*Block, error) {
 	if size == 0 {
 		return nil, fmt.Errorf("invalid size")
 	}
-	
+
 	freeRam, err := common.GetFreeRam()
 	if err != nil {
-		fmt.Printf("error getting free RAM: %v", err)
 		log.Warn("could not get free RAM: %v", err)
 	} else {
 		if freeRam < size {
@@ -52,14 +51,12 @@ func AllocateBlock(size uint64) (*Block, error) {
 			return nil, fmt.Errorf("insufficient memory available: requested %d bytes, available %d bytes", size, freeRam)
 		}
 	}
-	fmt.Println("freeRam: ", freeRam)
-	fmt.Println("Allocating: ", size)
 
 	// https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc
 	ptr, err := windows.VirtualAlloc(
 		0,
 		uintptr(size),
-		windows.MEM_COMMIT|windows.MEM_RESERVE, 
+		windows.MEM_COMMIT|windows.MEM_RESERVE,
 		windows.PAGE_READWRITE,
 	)
 	if err != nil || ptr == 0 {

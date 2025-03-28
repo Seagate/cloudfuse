@@ -256,7 +256,7 @@ func (suite *blockCacheTestSuite) TestInvalidDiskPath() {
 		// Skip this test on Windows
 		return
 	}
-	
+
 	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n  mem-size-mb: 500\n  prefetch: 12\n  parallelism: 10\n  path: /abcd\n  disk-size-mb: 100\n  disk-timeout-sec: 5"
 	tobj, err := setupPipeline(cfg)
 	defer tobj.cleanupPipeline()
