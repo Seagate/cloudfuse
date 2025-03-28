@@ -98,9 +98,11 @@ jobs:
           go build -trimpath -ldflags ''"$ldflags"'' -o cloudfuse.exe
           go build -trimpath -ldflags ''"$ldflags"'' -o cfusemon.exe ./tools/health-monitor/
           go build -trimpath -ldflags ''"$ldflags"'' -o windows-startup.exe ./tools/windows-startup/
+          go build -trimpath -ldflags ''"$ldflags"'' -o windows-service.exe ./tools/windows-service/
           touch -m -d $commitDate cloudfuse.exe
           touch -m -d $commitDate cfusemon.exe
-          touch -m -d $commitDate windows-startup.exe
+          touch -m -d $commitDate windows-startup.
+          touch -m -d $commitDate windows-service.exe
 
         # Get the WinFSP installer (from cache or download)
       - name: Get cached WinFSP installer
@@ -186,7 +188,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       go: "1.24"
-      zig: 0.13.0
+      zig: 0.14.0
     permissions:
       contents: write
 

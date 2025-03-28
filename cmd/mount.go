@@ -66,23 +66,24 @@ type mountOptions struct {
 	MountPath  string
 	ConfigFile string
 
-	DryRun            bool
-	Logging           LogOptions     `config:"logging"`
-	Components        []string       `config:"components"`
-	Foreground        bool           `config:"foreground"`
-	NonEmpty          bool           `config:"nonempty"`
-	DefaultWorkingDir string         `config:"default-working-dir"`
-	CPUProfile        string         `config:"cpu-profile"`
-	MemProfile        string         `config:"mem-profile"`
-	PassPhrase        string         `config:"passphrase"`
-	SecureConfig      bool           `config:"secure-config"`
-	DynamicProfiler   bool           `config:"dynamic-profile"`
-	ProfilerPort      int            `config:"profiler-port"`
-	ProfilerIP        string         `config:"profiler-ip"`
-	MonitorOpt        monitorOptions `config:"health_monitor"`
-	WaitForMount      time.Duration  `config:"wait-for-mount"`
-	LazyWrite         bool           `config:"lazy-write"`
-	EnableRemount     bool
+	DryRun              bool
+	Logging             LogOptions     `config:"logging"`
+	Components          []string       `config:"components"`
+	Foreground          bool           `config:"foreground"`
+	NonEmpty            bool           `config:"nonempty"`
+	DefaultWorkingDir   string         `config:"default-working-dir"`
+	CPUProfile          string         `config:"cpu-profile"`
+	MemProfile          string         `config:"mem-profile"`
+	PassPhrase          string         `config:"passphrase"`
+	SecureConfig        bool           `config:"secure-config"`
+	DynamicProfiler     bool           `config:"dynamic-profile"`
+	ProfilerPort        int            `config:"profiler-port"`
+	ProfilerIP          string         `config:"profiler-ip"`
+	MonitorOpt          monitorOptions `config:"health_monitor"`
+	WaitForMount        time.Duration  `config:"wait-for-mount"`
+	LazyWrite           bool           `config:"lazy-write"`
+	EnableRemountUser   bool
+	EnableRemountSystem bool
 
 	// v1 support
 	Streaming         bool     `config:"streaming"`
@@ -274,10 +275,7 @@ var mountCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(_ *cobra.Command, args []string) error {
 		options.MountPath = common.ExpandPath(args[0])
-		configFileProvided := options.ConfigFile != ""
 		common.MountPath = options.MountPath
-
-		configFileExists := true
 
 		if options.ConfigFile == "" {
 			// Config file is not set in cli parameters
@@ -286,20 +284,18 @@ var mountCmd = &cobra.Command{
 			// Fall back to defaults and let components fail if all required env variables are not set.
 			_, err := os.Stat(common.DefaultConfigFilePath)
 			if err != nil && os.IsNotExist(err) {
-				configFileExists = false
+				return errors.New("failed to initialize new pipeline :: config file not provided")
 			} else {
 				options.ConfigFile = common.DefaultConfigFilePath
 			}
 		}
 
-		if configFileExists {
-			err := parseConfig()
-			if err != nil {
-				return err
-			}
+		err := parseConfig()
+		if err != nil {
+			return err
 		}
 
-		err := config.Unmarshal(&options)
+		err = config.Unmarshal(&options)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal config [%s]", err.Error())
 		}
@@ -316,10 +312,6 @@ var mountCmd = &cobra.Command{
 			if _, err := os.Stat(options.MountPath); errors.Is(err, fs.ErrExist) || err == nil {
 				return errors.New("mount path exists")
 			}
-			// Config file
-			if options.ConfigFile == "" {
-				return errors.New("config file not provided")
-			}
 			// Convert the path into a full path so WinFSP can see the config file
 			configPath, err := filepath.Abs(options.ConfigFile)
 			if err != nil {
@@ -330,7 +322,7 @@ var mountCmd = &cobra.Command{
 				return errors.New("config file does not exist")
 			}
 			// mount using WinFSP, and persist on reboot
-			err = createMountInstance(options.EnableRemount)
+			err = createMountInstance(options.EnableRemountUser, options.EnableRemountSystem)
 			if err != nil {
 				return fmt.Errorf("failed to mount instance [%s]", err.Error())
 			}
@@ -338,7 +330,7 @@ var mountCmd = &cobra.Command{
 			return nil
 		}
 
-		if !configFileExists || len(options.Components) == 0 {
+		if len(options.Components) == 0 {
 			pipeline := []string{"libfuse"}
 
 			if config.IsSet("streaming") && options.Streaming {
@@ -355,7 +347,13 @@ var mountCmd = &cobra.Command{
 				pipeline = append(pipeline, "attr_cache")
 			}
 
-			pipeline = append(pipeline, "s3storage")
+			if containers, err := getBucketListS3(); len(containers) != 0 && err == nil {
+				pipeline = append(pipeline, "s3storage")
+			} else if containers, err = getContainerListAzure(); len(containers) != 0 && err == nil {
+				pipeline = append(pipeline, "azstorage")
+			} else {
+				return errors.New("failed to initialize new pipeline :: unable to determine cloud provider. no pipeline components found in the config: " + err.Error())
+			}
 			options.Components = pipeline
 		}
 
@@ -513,14 +511,8 @@ var mountCmd = &cobra.Command{
 				return Destroy(fmt.Sprintf("failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%s]", err.Error()))
 			}
 
-			errorMessage := ""
-			if !configFileProvided {
-				errorMessage += "Config file not provided."
-			} else if !configFileExists {
-				errorMessage += "Config file " + options.ConfigFile + " not found."
-			}
-			log.Err("mount : "+errorMessage+" failed to initialize new pipeline [%v]", err)
-			return Destroy(fmt.Sprintf("%s failed to initialize new pipeline [%s]", errorMessage, err.Error()))
+			log.Err("mount :  failed to initialize new pipeline [%v]", err)
+			return Destroy(fmt.Sprintf("mount : failed to initialize new pipeline [%s]", err.Error()))
 		}
 
 		// Dry run ends here
@@ -766,8 +758,11 @@ func init() {
 	mountCmd.Flags().Lookup("basic-remount-check").Hidden = true
 
 	if runtime.GOOS == "windows" {
-		mountCmd.Flags().BoolVar(&options.EnableRemount, "enable-remount", true, "Remount mount on server restart.")
-		config.BindPFlag("enable-remount", mountCmd.Flags().Lookup("enable-remount"))
+		mountCmd.Flags().BoolVar(&options.EnableRemountSystem, "enable-remount-system", false, "Remount container on server restart. Mount will restart on reboot.")
+		config.BindPFlag("enable-remount-system", mountCmd.Flags().Lookup("enable-remount-system"))
+
+		mountCmd.Flags().BoolVar(&options.EnableRemountUser, "enable-remount-user", false, "Remount container on server restart for current user. Mount will restart on current user log in.")
+		config.BindPFlag("enable-remount-user", mountCmd.Flags().Lookup("enable-remount-user"))
 	}
 
 	mountCmd.PersistentFlags().StringSliceVarP(&options.LibfuseOptions, "o", "o", []string{}, "FUSE options.")
