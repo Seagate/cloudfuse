@@ -26,7 +26,6 @@
 package block_cache
 
 import (
-	"bytes"
 	"container/list"
 	"context"
 	"encoding/base64"
@@ -48,8 +47,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 
 	"github.com/vibhansa-msft/tlru"
-
-	"golang.org/x/sys/unix"
 )
 
 /* NOTES:
@@ -1082,13 +1079,13 @@ func (bc *BlockCache) download(item *workItem) {
 			bc.diskPolicy.Refresh(diskNode.(*list.Element))
 
 			// If user has enabled consistency check then compute the md5sum and save it in xattr
-			if bc.consistency {
-				hash := common.GetCRC64(item.block.data, n)
-				err = syscall.Setxattr(localPath, "user.md5sum", hash, 0)
-				if err != nil {
-					log.Err("BlockCache::download : Failed to set md5sum for file %s [%v]", localPath, err.Error())
-				}
-			}
+			// if bc.consistency {
+			// 	hash := common.GetCRC64(item.block.data, n)
+			// 	err = syscall.Setxattr(localPath, "user.md5sum", hash, 0)
+			// 	if err != nil {
+			// 		log.Err("BlockCache::download : Failed to set md5sum for file %s [%v]", localPath, err.Error())
+			// 	}
+			// }
 		}
 	}
 
@@ -1101,21 +1098,21 @@ func checkBlockConsistency(blockCache *BlockCache, item *workItem, numberOfBytes
 		return true
 	}
 	// Calculate MD5 checksum of the read data
-	actualHash := common.GetCRC64(item.block.data, numberOfBytes)
+	// actualHash := common.GetCRC64(item.block.data, numberOfBytes)
 
-	// Retrieve MD5 checksum from xattr
-	xattrHash := make([]byte, 8)
-	_, err := syscall.Getxattr(localPath, "user.md5sum", xattrHash)
-	if err != nil {
-		log.Err("BlockCache::download : Failed to get md5sum for file %s [%v]", fileName, err.Error())
-	} else {
-		// Compare checksums
-		if !bytes.Equal(actualHash, xattrHash) {
-			log.Err("BlockCache::download : MD5 checksum mismatch for file %s, expected %v, got %v", fileName, xattrHash, actualHash)
-			_ = os.Remove(localPath)
-			return false
-		}
-	}
+	// // Retrieve MD5 checksum from xattr
+	// xattrHash := make([]byte, 8)
+	// _, err := syscall.Getxattr(localPath, "user.md5sum", xattrHash)
+	// if err != nil {
+	// 	log.Err("BlockCache::download : Failed to get md5sum for file %s [%v]", fileName, err.Error())
+	// } else {
+	// 	// Compare checksums
+	// 	if !bytes.Equal(actualHash, xattrHash) {
+	// 		log.Err("BlockCache::download : MD5 checksum mismatch for file %s, expected %v, got %v", fileName, xattrHash, actualHash)
+	// 		_ = os.Remove(localPath)
+	// 		return false
+	// 	}
+	// }
 
 	return true
 }
@@ -1512,13 +1509,13 @@ func (bc *BlockCache) upload(item *workItem) {
 			}
 
 			// If user has enabled consistency check then compute the md5sum and save it in xattr
-			if bc.consistency {
-				hash := common.GetCRC64(item.block.data, int(blockSize))
-				err = syscall.Setxattr(localPath, "user.md5sum", hash, 0)
-				if err != nil {
-					log.Err("BlockCache::download : Failed to set md5sum for file %s [%v]", localPath, err.Error())
-				}
-			}
+			// if bc.consistency {
+			// 	hash := common.GetCRC64(item.block.data, int(blockSize))
+			// 	err = syscall.Setxattr(localPath, "user.md5sum", hash, 0)
+			// 	if err != nil {
+			// 		log.Err("BlockCache::download : Failed to set md5sum for file %s [%v]", localPath, err.Error())
+			// 	}
+			// }
 		}
 	}
 
@@ -1850,22 +1847,22 @@ func (bc *BlockCache) StatFs() (*common.Statfs_t, bool, error) {
 	usage = usage * float64(_1MB)
 
 	available := (float64)(maxCacheSize) - usage
-	stat := &unix.Statfs_t{}
-	err := unix.Statfs("/", stat)
-	if err != nil {
-		log.Debug("BlockCache::StatFs : statfs err [%s].", err.Error())
-		return nil, false, err
-	}
+	// stat := &unix.Statfs_t{}
+	// err := unix.Statfs("/", stat)
+	// if err != nil {
+	// 	log.Debug("BlockCache::StatFs : statfs err [%s].", err.Error())
+	// 	return nil, false, err
+	// }
 	statfs := &common.Statfs_t{}
 	statfs.Frsize = int64(bc.blockSize)
 	statfs.Blocks = uint64(maxCacheSize) / uint64(bc.blockSize)
 	statfs.Bavail = uint64(math.Max(0, available)) / uint64(bc.blockSize)
-	statfs.Bfree = stat.Bavail
-	statfs.Bsize = stat.Bsize
-	statfs.Ffree = stat.Ffree
-	statfs.Files = stat.Files
-	statfs.Flags = stat.Flags
-	statfs.Namemax = uint64(stat.Namelen)
+	// statfs.Bfree = stat.Bavail
+	// statfs.Bsize = stat.Bsize
+	// statfs.Ffree = stat.Ffree
+	// statfs.Files = stat.Files
+	// statfs.Flags = stat.Flags
+	// statfs.Namemax = uint64(stat.Namelen)
 
 	return statfs, true, nil
 }
