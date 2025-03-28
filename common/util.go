@@ -189,7 +189,7 @@ func GetCurrentUser() (uint32, uint32, error) {
 
 		out, err := exec.Command(`C:\Program Files (x86)\WinFsp\bin\fsptool-x64.exe`, "id").Output()
 		if err != nil {
-			return 0, 0, fmt.Errorf("Is WinFSP installed? 'fsptool-x64.exe id' failed with error: %w", err)
+			return 0, 0, fmt.Errorf("is WinFSP installed? 'fsptool-x64.exe id' failed with error: %w", err)
 		}
 
 		idMap := make(map[string]string)
@@ -248,8 +248,8 @@ func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
 
 	// A base64 encode of a key of length 32 will be at maximum a length of 44 bytes
 	if len(secretKey.Bytes()) > 44 {
-		return nil, errors.New("Provided decoded base64 key is longer than 32 bytes. Decoded key " +
-			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+		return nil, errors.New("provided decoded base64 key is longer than 32 bytes. Decoded key " +
+			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length")
 	}
 
 	decodedKey := make([]byte, 32) // Valid key can't be longer than 32 bytes
@@ -293,8 +293,8 @@ func DecryptData(cipherData []byte, key *memguard.Enclave) ([]byte, error) {
 
 	// A base64 encode of a key of length 32 will be at maximum a length of 44 bytes
 	if len(secretKey.Bytes()) > 44 {
-		return nil, errors.New("Provided decoded base64 key is longer than 32 bytes. Decoded key " +
-			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+		return nil, errors.New("provided decoded base64 key is longer than 32 bytes. Decoded key " +
+			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length")
 	}
 
 	decodedKey := make([]byte, 32) // Valid key can't be longer than 32 bytes

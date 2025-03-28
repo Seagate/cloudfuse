@@ -160,7 +160,7 @@ func testStatFsNotPopulated(suite *libfuseTestSuite) {
 func testStatFsError(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	path := "/"
-	suite.mock.EXPECT().StatFs().Return(nil, false, errors.New("Error"))
+	suite.mock.EXPECT().StatFs().Return(nil, false, errors.New("error"))
 	buf := &fuse.Statfs_t{}
 	ret := cfuseFS.Statfs(path, buf)
 	suite.assert.Equal(ret, -fuse.EIO)

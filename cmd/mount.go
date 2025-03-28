@@ -163,7 +163,7 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 
 	err := common.CreateDefaultDirectory()
 	if err != nil {
-		return fmt.Errorf("Failed to create default work dir [%s]", err.Error())
+		return fmt.Errorf("failed to create default work dir [%s]", err.Error())
 	}
 
 	opt.Logging.LogFilePath = common.ExpandPath(opt.Logging.LogFilePath)
