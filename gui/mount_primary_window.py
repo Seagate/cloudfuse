@@ -24,6 +24,7 @@ Defines the FUSEWindow class for managing the Cloudfuse application.
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE
 
+import datetime
 import os
 import subprocess
 from shutil import which
@@ -379,6 +380,11 @@ class FUSEWindow(settings_manager, config_funcs, QMainWindow, Ui_primaryFUSEwind
         Args:
             text (str): The text to add.
         """
+        timestamp = datetime.datetime.now()
+        # format into year/month/day, hour/minute/second
+        formattedTimestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        self.textEdit_output.append(f"{formattedTimestamp}: {text}\n")
+
         self.textEdit_output.append(text)
         self.textEdit_output.moveCursor(QTextCursor.End)
 

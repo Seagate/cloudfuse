@@ -28,7 +28,6 @@ package winservice
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -50,9 +49,7 @@ const (
 	failCmd    = '!'
 )
 
-type Cloudfuse struct{}
-
-// StartMount starts the mount if the name exists in our Windows registry.
+// StartMount starts the mount if the name exists in the WinFsp Windows registry.
 func StartMount(mountPath string, configFile string, passphrase *memguard.Enclave) error {
 	// get the current user uid and gid to set file permissions
 	userId, groupId, err := common.GetCurrentUser()
@@ -71,7 +68,7 @@ func StartMount(mountPath string, configFile string, passphrase *memguard.Enclav
 		}
 
 		// Encode back to base64 when sending passphrase to cloudfuse
-		passphraseStr = base64.StdEncoding.EncodeToString(buff.Data())
+		passphraseStr = buff.String()
 		defer buff.Destroy()
 	}
 
@@ -83,7 +80,7 @@ func StartMount(mountPath string, configFile string, passphrase *memguard.Enclav
 	return nil
 }
 
-// StopMount stops the mount if the name exists in our Windows registry.
+// StopMount stops the mount if the name exists in the WinFsp Windows registry.
 func StopMount(mountPath string) error {
 	instanceName := mountPath
 
@@ -119,9 +116,9 @@ func IsMounted(mountPath string) (bool, error) {
 }
 
 // startService starts cloudfuse by instructing WinFsp to launch it.
-func StartMounts() error {
-	// Read mount file to get names of the mounts we need to start
-	mounts, err := readMounts()
+func StartMounts(useSystem bool) error {
+	// Read mount file to get names of the mounts we need to start from system
+	mounts, err := readMounts(useSystem)
 	// If there is nothing in our file to mount then continue
 	if err != nil {
 		return err
@@ -129,6 +126,25 @@ func StartMounts() error {
 
 	for _, inst := range mounts.Mounts {
 		err := StartMount(inst.MountPath, inst.ConfigFile, nil)
+		if err != nil {
+			log.Err("Unable to start mount with mountpath: ", inst.MountPath)
+		}
+	}
+
+	return nil
+}
+
+// StopMounts stops all mounts the mount if the name exists in our Windows registry.
+func StopMounts(useSystem bool) error {
+	// Read mount file to get names of the mounts we need to start from system
+	mounts, err := readMounts(useSystem)
+	// If there is nothing in our file to mount then continue
+	if err != nil {
+		return err
+	}
+
+	for _, inst := range mounts.Mounts {
+		err := StopMount(inst.MountPath)
 		if err != nil {
 			log.Err("Unable to start mount with mountpath: ", inst.MountPath)
 		}
