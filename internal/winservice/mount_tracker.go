@@ -135,8 +135,8 @@ func removeMount(mounts Mounts, mountPath string) Mounts {
 	return filteredMounts
 }
 
-// DeleteMountJSONFile deletes all the mount.json files on the system
-func DeleteMountJSONFile() error {
+// DeleteMountJSONFiles deletes all the mount.json files on the system
+func DeleteMountJSONFiles() error {
 	trackerFile, err := getMountTrackerFile(false)
 	if err != nil {
 		return err

@@ -67,8 +67,8 @@ var serviceCmd = &cobra.Command{
 
 var installCmd = &cobra.Command{
 	Use:               "install",
-	Short:             "Installs the startup process for Cloudfuse and Windows service. Requires running as admin.",
-	Long:              "Installs the startup process for Cloudfuse and Windows service which remounts any active previously active mounts on startup. Requires running as admin.",
+	Short:             "Installs the startup process and Windows service for Cloudfuse. Requires running as admin.",
+	Long:              "Installs the startup process and Windows service for Cloudfuse. Required for remount flags to work. Requires running as admin.",
 	SuggestFor:        []string{"ins", "inst"},
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
@@ -109,8 +109,8 @@ var installCmd = &cobra.Command{
 
 var uninstallCmd = &cobra.Command{
 	Use:               "uninstall",
-	Short:             "Uninstall the startup process for Cloudfuse and Windows service. Requires running as admin.",
-	Long:              "Uninstall the startup process for Cloudfuse and Windows service. Requires running as admin.",
+	Short:             "Uninstalls the startup process and Windows service for Cloudfuse. Requires running as admin.",
+	Long:              "Uninstalls the startup process and Windows service for Cloudfuse. Requires running as admin.",
 	SuggestFor:        []string{"uninst", "uninstal"},
 	Example:           "cloudfuse service uninstall",
 	FlagErrorHandling: cobra.ExitOnError,
@@ -136,7 +136,7 @@ var uninstallCmd = &cobra.Command{
 			return fmt.Errorf("Failed to remove as a Windows service. Here's why: %v", err)
 		}
 
-		err = deleteMountTracker()
+		err = winservice.DeleteMountJSONFiles()
 		if err != nil {
 			return fmt.Errorf("Failed to remove mount.json tracker file. Here's why: %v", err)
 		}
@@ -268,10 +268,6 @@ func removeService() error {
 		return err
 	}
 	return nil
-}
-
-func deleteMountTracker() error {
-	return winservice.DeleteMountJSONFile()
 }
 
 func init() {

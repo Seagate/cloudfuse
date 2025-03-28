@@ -129,6 +129,7 @@ func main() {
 	isService, err := svc.IsWindowsService()
 	if err != nil || !isService {
 		log.Err("Unable to determine if running as Windows service or not running as Windows service: %v", err.Error())
+		return
 	}
 
 	handler := &Cloudfuse{}
