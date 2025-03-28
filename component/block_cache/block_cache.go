@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -964,7 +964,7 @@ func (bc *BlockCache) download(item *workItem) {
 	item.block.endIndex = item.block.offset + uint64(n)
 
 	if bc.tmpPath != "" {
-		err := os.MkdirAll(filepath.Dir(localPath), 0777)
+		err := os.MkdirAll(filepath.Dir(localPath), 0755)
 		if err != nil {
 			log.Err("BlockCache::download : error creating directory structure for file %s [%s]", localPath, err.Error())
 			return
@@ -1373,7 +1373,7 @@ func (bc *BlockCache) upload(item *workItem) {
 	if bc.tmpPath != "" {
 		localPath := filepath.Join(bc.tmpPath, fileName)
 
-		err := os.MkdirAll(filepath.Dir(localPath), 0777)
+		err := os.MkdirAll(filepath.Dir(localPath), 0755)
 		if err != nil {
 			log.Err("BlockCache::upload : error creating directory structure for file %s [%s]", localPath, err.Error())
 			goto return_safe

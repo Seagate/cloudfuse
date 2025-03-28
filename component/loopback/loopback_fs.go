@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -182,6 +182,7 @@ func (lfs *LoopbackFS) CreateFile(options internal.CreateFileOptions) (*handlema
 	}
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetFileObject(f)
+	handlemap.Add(handle)
 
 	return handle, nil
 }
@@ -212,6 +213,7 @@ func (lfs *LoopbackFS) OpenFile(options internal.OpenFileOptions) (*handlemap.Ha
 	}
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetFileObject(f)
+	handlemap.Add(handle)
 	return handle, nil
 }
 
@@ -224,6 +226,7 @@ func (lfs *LoopbackFS) CloseFile(options internal.CloseFileOptions) error {
 		return syscall.EBADF
 	}
 
+	handlemap.Delete(options.Handle.ID)
 	return f.Close()
 }
 
@@ -231,7 +234,15 @@ func (lfs *LoopbackFS) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("LoopbackFS::RenameFile : %s -> %s", options.Src, options.Dst)
 	oldPath := filepath.Join(lfs.path, options.Src)
 	newPath := filepath.Join(lfs.path, options.Dst)
-	return os.Rename(oldPath, newPath)
+	err := os.Rename(oldPath, newPath)
+	handlemap.GetHandles().Range(func(key, value any) bool {
+		handle := value.(*handlemap.Handle)
+		if handle.Path == options.Src {
+			handle.Path = options.Dst
+		}
+		return true
+	})
+	return err
 }
 
 func (lfs *LoopbackFS) ReadLink(options internal.ReadLinkOptions) (string, error) {
@@ -253,7 +264,7 @@ func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, 
 	f := options.Handle.GetFileObject()
 
 	if f == nil {
-		f1, err := os.OpenFile(filepath.Join(lfs.path, options.Handle.Path), os.O_RDONLY, 0666)
+		f1, err := os.Open(filepath.Join(lfs.path, options.Handle.Path))
 		if err != nil {
 			return 0, nil
 		}
@@ -266,10 +277,6 @@ func (lfs *LoopbackFS) ReadInBuffer(options internal.ReadInBufferOptions) (int, 
 	options.Handle.RLock()
 	defer options.Handle.RUnlock()
 
-	if f == nil {
-		log.Err("LoopbackFS::ReadInBuffer : error [invalid file object]")
-		return 0, os.ErrInvalid
-	}
 	return f.ReadAt(options.Data, options.Offset)
 }
 
@@ -354,7 +361,7 @@ func (lfs *LoopbackFS) GetAttr(options internal.GetAttrOptions) (*internal.ObjAt
 	info, err := os.Lstat(path)
 	if err != nil {
 		log.Err("LoopbackFS::GetAttr : error [%s]", err)
-		return &internal.ObjAttr{}, err
+		return nil, err
 	}
 	attr := &internal.ObjAttr{
 		Path:  options.Name,
@@ -397,7 +404,7 @@ func (lfs *LoopbackFS) Chown(options internal.ChownOptions) error {
 func (lfs *LoopbackFS) StageData(options internal.StageDataOptions) error {
 	log.Trace("LoopbackFS::StageData : name=%s, id=%s", options.Name, options.Id)
 	path := fmt.Sprintf("%s_%s", filepath.Join(lfs.path, options.Name), strings.ReplaceAll(options.Id, "/", "_"))
-	return os.WriteFile(path, options.Data, 0777)
+	return os.WriteFile(path, options.Data, 0644)
 }
 
 func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
@@ -405,7 +412,7 @@ func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
 
 	mainFilepath := filepath.Join(lfs.path, options.Name)
 
-	blob, err := os.OpenFile(mainFilepath, os.O_RDWR|os.O_CREATE, os.FileMode(0777))
+	blob, err := os.OpenFile(mainFilepath, os.O_RDWR|os.O_CREATE, os.FileMode(0644))
 	if err != nil {
 		log.Err("LoopbackFS::CommitData : error opening [%s]", err)
 		return err
@@ -415,7 +422,7 @@ func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
 		path := fmt.Sprintf("%s_%s", filepath.Join(lfs.path, options.Name), strings.ReplaceAll(id, "/", "_"))
 		info, err := os.Lstat(path)
 		if err == nil {
-			block, err := os.OpenFile(path, os.O_RDONLY, os.FileMode(0666))
+			block, err := os.Open(path)
 			if err != nil {
 				return err
 			}

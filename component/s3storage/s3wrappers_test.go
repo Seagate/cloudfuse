@@ -4,7 +4,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -115,7 +115,7 @@ func (s *s3wrapperTestSuite) TestGetKeySymlink() {
 	fileName := "test"
 	expectedName := "test" + symlinkStr
 	isSymLink := true
-	newName := s.client.getKey(fileName, isSymLink)
+	newName := s.client.getKey(fileName, isSymLink, false)
 	s.assert.Equal(expectedName, newName)
 }
 
@@ -124,7 +124,7 @@ func (s *s3wrapperTestSuite) TestGetKeySymlinkDisabled() {
 	fileName := "test"
 	expectedName := "test" + symlinkStr
 	isSymLink := true
-	newName := s.client.getKey(fileName, isSymLink)
+	newName := s.client.getKey(fileName, isSymLink, false)
 	s.assert.Equal(expectedName, newName)
 }
 
@@ -150,7 +150,7 @@ func (s *s3wrapperTestSuite) TestGetKeyWindowsNameConvert() {
 	fileName := "test＂＊：＜＞？｜"
 	expectedName := "test\"*:<>?|"
 	isSymLink := false
-	newName := s.client.getKey(fileName, isSymLink)
+	newName := s.client.getKey(fileName, isSymLink, false)
 	s.assert.Equal(expectedName, newName)
 }
 

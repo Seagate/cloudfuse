@@ -3,7 +3,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -62,7 +62,7 @@ func (suite *fileCacheLinuxTestSuite) SetupTest() {
 	rand := randomString(8)
 	suite.cache_path = common.JoinUnixFilepath(home_dir, "file_cache"+rand)
 	suite.fake_storage_path = common.JoinUnixFilepath(home_dir, "fake_storage"+rand)
-	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 0\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
+	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
 	log.Debug(defaultConfig)
 
 	// Delete the temp directories created
@@ -111,23 +111,15 @@ func (suite *fileCacheLinuxTestSuite) cleanupTest() {
 
 func (suite *fileCacheLinuxTestSuite) TestChmodNotInCache() {
 	defer suite.cleanupTest()
-	// Setup
+	// Setup - create file directly in fake storage
 	path := "file33"
-	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
-
-	_, err := os.Stat(suite.cache_path + "/" + path)
-	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
-		time.Sleep(10 * time.Millisecond)
-		_, err = os.Stat(suite.cache_path + "/" + path)
-	}
-	suite.assert.True(os.IsNotExist(err))
+	suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
 
 	// Chmod
-	err = suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0666)})
+	err := suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: os.FileMode(0666)})
 	suite.assert.NoError(err)
 
 	// Path in fake storage should be updated
@@ -178,7 +170,6 @@ func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
 	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: createHandle})
 	suite.assert.NoError(err)
 
-	// Path should be in the file cache with old mode (since we failed the operation)
 	info, err := os.Stat(suite.cache_path + "/" + path)
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(info.Mode(), newMode)
@@ -187,6 +178,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
 	suite.assert.NoError(err)
 
 	// loop until file does not exist - done due to async nature of eviction
+	time.Sleep(time.Second)
 	_, err = os.Stat(suite.cache_path + "/" + path)
 	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
 		time.Sleep(10 * time.Millisecond)
@@ -206,15 +198,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file36"
-	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
-
-	_, err := os.Stat(suite.cache_path + "/" + path)
-	for i := 0; i < 1000 && !os.IsNotExist(err); i++ {
-		time.Sleep(10 * time.Millisecond)
-		_, err = os.Stat(suite.cache_path + "/" + path)
-	}
-	suite.assert.True(os.IsNotExist(err))
+	suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 
 	// Path should be in fake storage
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)
@@ -222,7 +206,7 @@ func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
 	// Chown
 	owner := os.Getuid()
 	group := os.Getgid()
-	err = suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
+	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
 	suite.assert.NoError(err)
 
 	// Path in fake storage should be updated

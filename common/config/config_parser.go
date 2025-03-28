@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -34,11 +34,12 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"github.com/spf13/cobra"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -73,12 +74,12 @@ type options struct {
 	envTree           *Tree
 	completionFuncMap map[string]func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)
 	secureConfig      bool
-	passphrase        string
+	passphrase        *memguard.Enclave
 }
 
 var userOptions options
 
-func SetSecureConfigOptions(passphrase string) {
+func SetSecureConfigOptions(passphrase *memguard.Enclave) {
 	userOptions.secureConfig = true
 	userOptions.passphrase = passphrase
 }
@@ -105,6 +106,10 @@ func ReadFromConfigFile(configFilePath string) error {
 }
 
 func loadConfigFromBufferToViper(configData []byte) error {
+	// Set type to be yaml so that viper can parse the config data
+	// and since we only allow yaml formatted config files
+	viper.SetConfigType("yaml")
+
 	err := viper.ReadConfig(strings.NewReader(string(configData)))
 	if err != nil {
 		return err
@@ -123,7 +128,7 @@ func ReadFromConfigBuffer(configData []byte) error {
 	return nil
 }
 
-func DecryptConfigFile(fileName string, passphrase string) error {
+func DecryptConfigFile(fileName string, passphrase *memguard.Enclave) error {
 	cipherText, err := os.ReadFile(fileName)
 	if err != nil {
 		return fmt.Errorf("Failed to read encrypted config file [%s]", err.Error())

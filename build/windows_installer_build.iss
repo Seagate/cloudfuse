@@ -3,7 +3,7 @@
 ; https://jrsoftware.org/ishelp/index.php
 
 #define MyAppName "Cloudfuse"
-#define MyAppVersion "1.6.1"
+#define MyAppVersion "1.10.0"
 #define MyAppPublisher "SEAGATE TECHNOLOGY LLC"
 #define MyAppURL "https://github.com/Seagate/cloudfuse"
 #define MyAppExeName "cloudfuseGUI.exe"
@@ -31,8 +31,6 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
-SignTool=signtool /d $q{#MyAppName} v{#MyAppVersion}$q $f
-SignedUninstaller=yes
 VersionInfoVersion={#MyAppVersion}
 ; Tell Windows Explorer to reload the environment
 ChangesEnvironment=yes
@@ -53,16 +51,18 @@ Source: "..\gui\dist\cloudfuseGUI_Windows\_internal\*"; DestDir: "{app}\_interna
 Source: "..\cloudfuse.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\cfusemon.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\windows-startup.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\windows-service.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\NOTICE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\setup\baseConfig.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
-Source: "..\sampleFileCacheConfigAzure.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
-Source: "..\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
-Source: "..\sampleFileCacheWithSASConfigAzure.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
-Source: "..\sampleStreamingConfigAzure.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
-Source: "..\sampleStreamingConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
+Source: "..\sample_configs\sampleFileCacheConfigAzure.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
+Source: "..\sample_configs\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
+Source: "..\sample_configs\sampleFileCacheWithSASConfigAzure.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
+Source: "..\sample_configs\sampleStreamingConfigAzure.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
+Source: "..\sample_configs\sampleStreamingConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; Flags: ignoreversion
 ; Deploy default config
-Source: "..\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; DestName: "config.yaml"; Flags: onlyifdoesntexist
+Source: "..\sample_configs\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; DestName: "config.yaml"; Flags: onlyifdoesntexist
 
 Source: "..\winfsp-2.0.23075.msi"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
@@ -129,7 +129,7 @@ var
 begin
   if CurUninstallStep = usUninstall then
   begin
-    // Install the Cloudfuse Startup Tool
+    // Uninstall the Cloudfuse Startup Tool
     if not Exec(ExpandConstant('{app}\{#MyAppExeCLIName}'), 'service uninstall', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
       SuppressibleMsgBox('Failed to remove cloudfuse as a service.', mbError, MB_OK, IDOK);
@@ -145,4 +145,3 @@ begin
     end;
   end;
 end;
-

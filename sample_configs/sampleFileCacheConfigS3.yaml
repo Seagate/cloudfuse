@@ -6,20 +6,18 @@ logging:
 
 components:
   - libfuse
-  - stream
+  - file_cache
   - attr_cache
   - s3storage
 
 libfuse:
-  attribute-expiration-sec: 120
-  entry-expiration-sec: 120
-  negative-entry-expiration-sec: 240
   network-share: true
 
-stream:
-  block-size-mb: 8
-  blocks-per-file: 3
-  cache-size-mb: 1024
+file_cache:
+  path: /<PATH>/<TO>/<CACHE_DIR>
+  timeout-sec: 64000000
+  allow-non-empty-temp: true
+  ignore-sync: true
 
 attr_cache:
   timeout-sec: 7200
@@ -30,3 +28,4 @@ s3storage:
   secret-key: <ACCOUNT_SECRET_KEY>
   endpoint: https://s3.us-east-1.lyvecloud.seagate.com
   region: us-east-1
+  enable-dir-marker: true

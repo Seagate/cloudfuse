@@ -8,7 +8,7 @@ components:
   - libfuse
   - stream
   - attr_cache
-  - azstorage
+  - s3storage
 
 libfuse:
   attribute-expiration-sec: 120
@@ -18,16 +18,16 @@ libfuse:
 
 stream:
   block-size-mb: 8
-  max-buffers: 64
-  buffer-size-mb: 36
+  blocks-per-file: 3
+  cache-size-mb: 1024
 
 attr_cache:
   timeout-sec: 7200
 
-azstorage:
-  type: block
-  account-name: <ACCOUNT_NAME>
-  account-key: <ACCOUNT_KEY>
-  endpoint: https://<ACCOUNT_NAME>.blob.core.windows.net
-  mode: key
-  container: <CONTAINER_NAME>
+s3storage:
+  bucket-name: <ACCOUNT_NAME>
+  key-id: <ACCOUNT_ACCESS_KEY>
+  secret-key: <ACCOUNT_SECRET_KEY>
+  endpoint: https://s3.us-east-1.lyvecloud.seagate.com
+  region: us-east-1
+  enable-dir-marker: true

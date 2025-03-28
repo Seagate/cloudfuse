@@ -27,7 +27,6 @@
 #  10. 'sdk-trace' has been removed and setting log level to log_debug will auto enable these logs.
 # -----------------------------------------------------------------------------------------------------------------------
 
-
 # Daemon configuration
 foreground: true|false <run blobfuse2 in foreground or background>
 
@@ -73,10 +72,11 @@ libfuse:
   max-fuse-threads: <number of threads allowed at libfuse layer for highly parallel operations, Default is 128>
   direct-io: true|false <enable to bypass the kernel cache>
   network-share: true|false <runs as a network share. may improve performance when latency to cloud is high. only supported on Windows. Known issue - only one Cloudfuse network share can be mounted at a time>
+  windows-sddl: <windows file security and permissions setting in SDDL syntax. Default - D:P(A;;FA;;;WD) corresponding to every user having read/write access>
 
 # Streaming configuration – remove and redirect to block-cache
 stream:
-  # If block-size-mb, max-buffers or buffer-size-mb are 0, the stream component will not cache blocks. 
+  # If block-size-mb, max-buffers or buffer-size-mb are 0, the stream component will not cache blocks.
   block-size-mb: <for read only mode size of each block to be cached in memory while streaming (in MB). For read/write size of newly created blocks. Default - 0 MB>
   max-buffers: <total number of buffers to store blocks in. Default - 0>
   buffer-size-mb: <size for each buffer. Default - 0 MB>
@@ -90,7 +90,7 @@ block_cache:
   disk-size-mb: <maximum disk cache size allowed. Default - 80% of free disk space>
   disk-timeout-sec: <default disk cache eviction timeout (in sec). Default - 120 sec>
   prefetch: <number of blocks to be prefetched in serial read case. Min - 11, Default - 2 times number of CPU cores>
-  parallelism: <number of parallel threads downloading the data and writing to disk cache. Default - 3 times number of CPU cores> 
+  parallelism: <number of parallel threads downloading the data and writing to disk cache. Default - 3 times number of CPU cores>
   prefetch-on-open: true|false <prefetch blocks on open. This shall be used only when user application is going to read file from offset 0>
 
 # Disk cache related configuration
@@ -113,7 +113,7 @@ file_cache:
   refresh-sec: <number of seconds after which compare lmt of file in local cache and container and refresh file if container has the latest copy>
   ignore-sync: true|false <sync call will be ignored and locally cached file will not be deleted>
   hard-limit: true|false <if set to true, file-cache will not allow read/writes to file which exceed the configured limits>
-  
+
 # Attribute cache related configuration
 attr_cache:
   timeout-sec: <time attributes and directory contents can be cached (in sec). Default - 120 sec>
@@ -128,7 +128,7 @@ loopbackfs:
 
 # Azure storage configuration
 azstorage:
-# Required
+  # Required
   type: block|adls <type of storage account to be connected. Default - block>
   account-name: <name of the storage account>
   container: <name of the storage container to be mounted>
@@ -167,11 +167,11 @@ azstorage:
   virtual-directory: true|false <support virtual directories without existence of a special marker blob. Default - true>
   disable-compression: true|false <disable transport layer content encoding like gzip, set this flag to true if blobs have content-encoding set in container>
   max-results-for-list: <maximum number of results returned in a single list API call while getting file attributes. Default - 2>
-  telemetry : <additional information that customer want to push in user-agent>
+  telemetry: <additional information that customer want to push in user-agent>
   honour-acl: true|false <honour ACLs on files and directories when mounted using MSI Auth and object-ID is provided in config>
   cpk-enabled: true|false <enable client provided key encryption>
   cpk-encryption-key: <customer provided base64-encoded AES-256 encryption key value>
-  cpk-encryption-key-sha256:  <customer provided base64-encoded sha256 of the encryption key>
+  cpk-encryption-key-sha256: <customer provided base64-encoded sha256 of the encryption key>
 
 # S3 storage configuration
 s3storage:
@@ -189,6 +189,7 @@ s3storage:
   enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
   checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - SHA1>
   usePathStyle: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
+  enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
 
 # Mount all configuration
 mountall:

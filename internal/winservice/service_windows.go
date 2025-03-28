@@ -3,7 +3,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -34,6 +34,7 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"golang.org/x/sys/windows"
 )
@@ -48,10 +49,8 @@ const (
 	failCmd    = '!'
 )
 
-type Cloudfuse struct{}
-
-// StartMount starts the mount if the name exists in our Windows registry.
-func StartMount(mountPath string, configFile string, passphrase string) error {
+// StartMount starts the mount if the name exists in the WinFsp Windows registry.
+func StartMount(mountPath string, configFile string, passphrase *memguard.Enclave) error {
 	// get the current user uid and gid to set file permissions
 	userId, groupId, err := common.GetCurrentUser()
 	if err != nil {
@@ -61,7 +60,19 @@ func StartMount(mountPath string, configFile string, passphrase string) error {
 
 	instanceName := mountPath
 
-	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), passphrase)
+	var passphraseStr string
+	if passphrase != nil {
+		buff, err := passphrase.Open()
+		if err != nil || buff == nil {
+			return errors.New("unable to decrypt passphrase key")
+		}
+
+		// Encode back to base64 when sending passphrase to cloudfuse
+		passphraseStr = buff.String()
+		defer buff.Destroy()
+	}
+
+	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), passphraseStr)
 	_, err = winFspCommand(buf)
 	if err != nil {
 		return err
@@ -69,7 +80,7 @@ func StartMount(mountPath string, configFile string, passphrase string) error {
 	return nil
 }
 
-// StopMount stops the mount if the name exists in our Windows registry.
+// StopMount stops the mount if the name exists in the WinFsp Windows registry.
 func StopMount(mountPath string) error {
 	instanceName := mountPath
 
@@ -105,16 +116,35 @@ func IsMounted(mountPath string) (bool, error) {
 }
 
 // startService starts cloudfuse by instructing WinFsp to launch it.
-func StartMounts() error {
-	// Read mount file to get names of the mounts we need to start
-	mounts, err := readMounts()
+func StartMounts(useSystem bool) error {
+	// Read mount file to get names of the mounts we need to start from system
+	mounts, err := readMounts(useSystem)
 	// If there is nothing in our file to mount then continue
 	if err != nil {
 		return err
 	}
 
 	for _, inst := range mounts.Mounts {
-		err := StartMount(inst.MountPath, inst.ConfigFile, "")
+		err := StartMount(inst.MountPath, inst.ConfigFile, nil)
+		if err != nil {
+			log.Err("Unable to start mount with mountpath: ", inst.MountPath)
+		}
+	}
+
+	return nil
+}
+
+// StopMounts stops all mounts the mount if the name exists in our Windows registry.
+func StopMounts(useSystem bool) error {
+	// Read mount file to get names of the mounts we need to start from system
+	mounts, err := readMounts(useSystem)
+	// If there is nothing in our file to mount then continue
+	if err != nil {
+		return err
+	}
+
+	for _, inst := range mounts.Mounts {
+		err := StopMount(inst.MountPath)
 		if err != nil {
 			log.Err("Unable to start mount with mountpath: ", inst.MountPath)
 		}

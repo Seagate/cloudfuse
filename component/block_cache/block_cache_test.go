@@ -9,7 +9,7 @@
 
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -885,7 +885,6 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlock() {
 	suite.assert.NotNil(tobj.blockCache)
 
 	path := getTestFileName(suite.T().Name())
-	storagePath := filepath.Join(tobj.fake_storage_path, path)
 
 	data := make([]byte, 5*_1MB)
 	_, _ = rand.Read(data)
@@ -908,7 +907,7 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlock() {
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 
-	storagePath = filepath.Join(tobj.fake_storage_path, path)
+	storagePath := filepath.Join(tobj.fake_storage_path, path)
 	fs, err := os.Stat(storagePath)
 	suite.assert.NoError(err)
 	suite.assert.Equal(fs.Size(), int64(len(data)))
@@ -924,7 +923,6 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlockWithOverwrite() {
 	suite.assert.NotNil(tobj.blockCache)
 
 	path := getTestFileName(suite.T().Name())
-	storagePath := filepath.Join(tobj.fake_storage_path, path)
 
 	data := make([]byte, 5*_1MB)
 	_, _ = rand.Read(data)
@@ -959,7 +957,7 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlockWithOverwrite() {
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 
-	storagePath = filepath.Join(tobj.fake_storage_path, path)
+	storagePath := filepath.Join(tobj.fake_storage_path, path)
 	fs, err := os.Stat(storagePath)
 	suite.assert.NoError(err)
 	suite.assert.Equal(fs.Size(), int64(len(data)))

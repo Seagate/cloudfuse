@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -43,10 +43,11 @@ const InvalidHandleID HandleID = 0
 
 // Flags represented in BitMap for various flags in the handle
 const (
-	HandleFlagUnknown uint16 = iota
-	HandleFlagDirty          // File has been modified with write operation or is a new file
-	HandleFlagFSynced        // User has called fsync on the file explicitly
-	HandleFlagCached         // File is cached in the local system by cloudfuse
+	HandleFlagUnknown  uint16 = iota
+	HandleFlagDirty           // File has been modified with write operation or is a new file
+	HandleFlagFSynced         // User has called fsync on the file explicitly
+	HandleFlagCached          // File is cached in the local system by cloudfuse
+	HandleOpenedAppend        // File is opened for Append
 )
 
 // Structure to hold in memory cache for streaming layer

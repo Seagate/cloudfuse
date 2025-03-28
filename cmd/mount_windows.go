@@ -3,7 +3,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -42,15 +42,17 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 }
 
 // Use WinFSP to mount and if successful, add instance to persistent mount list
-func createMountInstance() error {
-	err := winservice.StartMount(options.MountPath, options.ConfigFile, options.PassPhrase)
+func createMountInstance(enableRemountUser bool, enableRemountSystem bool) error {
+	err := winservice.StartMount(options.MountPath, options.ConfigFile, encryptedPassphrase)
 	if err != nil {
 		return err
 	}
 	// Add the mount to the JSON file so it persists on restart.
-	err = winservice.AddMountJSON(options.MountPath, options.ConfigFile)
-	if err != nil {
-		return fmt.Errorf("failed to add entry to json file [%s]", err.Error())
+	if enableRemountUser || enableRemountSystem {
+		err = winservice.AddMountJSON(options.MountPath, options.ConfigFile, enableRemountSystem)
+		if err != nil {
+			return fmt.Errorf("failed to add entry to json file [%s]", err.Error())
+		}
 	}
 	return nil
 }

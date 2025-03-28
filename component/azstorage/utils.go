@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -42,6 +42,7 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
+	"github.com/awnumar/memguard"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
@@ -276,6 +277,8 @@ func storeDatalakeErrToErr(err error) uint16 {
 			return BlobIsUnderLease
 		case datalakeerror.AuthorizationPermissionMismatch:
 			return InvalidPermission
+		case datalakeerror.BlobNotFound:
+			return ErrFileNotFound
 		default:
 			return ErrUnknown
 		}
@@ -546,16 +549,17 @@ func split(prefixPath string, path string) string {
 	return common.JoinUnixFilepath(paths...)
 }
 
-func sanitizeSASKey(key string) string {
+func sanitizeSASKey(key string) *memguard.Enclave {
+	encryptedKey := memguard.NewEnclave([]byte(key))
 	if key == "" {
-		return key
+		return encryptedKey
 	}
 
 	if key[0] != '?' {
-		return ("?" + key)
+		return memguard.NewEnclave([]byte("?" + key))
 	}
 
-	return key
+	return memguard.NewEnclave([]byte(key))
 }
 
 func getMD5(fi *os.File) ([]byte, error) {

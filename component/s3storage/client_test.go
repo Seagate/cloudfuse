@@ -4,7 +4,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -47,6 +47,8 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/awnumar/memguard"
+	"github.com/spf13/viper"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -73,12 +75,31 @@ func newTestClient(configuration string) (*Client, error) {
 		log.Err("ClientTest::newTestClient : config error [invalid config attributes]")
 		return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, err.Error())
 	}
+
+	// Secure keyID in enclave
+	var encryptedKeyID *memguard.Enclave
+	if viper.GetString("s3storage.key-id") != "" {
+		encryptedKeyID = memguard.NewEnclave([]byte(viper.GetString("s3storage.key-id")))
+		if encryptedKeyID == nil {
+			return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, "Error storing key ID securely")
+		}
+	}
+
+	// Secure secretKey in enclave
+	var encryptedSecretKey *memguard.Enclave
+	if viper.GetString("s3storage.secret-key") != "" {
+		encryptedSecretKey = memguard.NewEnclave([]byte(viper.GetString("s3storage.secret-key")))
+		if encryptedSecretKey == nil {
+			return nil, fmt.Errorf("config error in %s. Here's why: %s", compName, "Error storing secret key securely")
+		}
+	}
+
 	// now push Options data into an Config
 	configForS3Client := Config{
 		authConfig: s3AuthConfig{
 			BucketName: conf.BucketName,
-			KeyID:      conf.KeyID,
-			SecretKey:  conf.SecretKey,
+			KeyID:      encryptedKeyID,
+			SecretKey:  encryptedSecretKey,
 			Region:     conf.Region,
 			Profile:    conf.Profile,
 			Endpoint:   conf.Endpoint,
@@ -88,6 +109,8 @@ func newTestClient(configuration string) (*Client, error) {
 		partSize:                  conf.PartSizeMb * common.MbToBytes,
 		uploadCutoff:              conf.UploadCutoffMb * common.MbToBytes,
 		usePathStyle:              conf.UsePathStyle,
+		disableUsage:              conf.DisableUsage,
+		enableDirMarker:           conf.EnableDirMarker,
 	}
 	// create a Client
 	client, err := NewConnection(configForS3Client)
@@ -135,13 +158,14 @@ func (s *clientTestSuite) setupTestHelper(configuration string, create bool) err
 	if storageTestConfigurationParameters.UploadCutoffMb == 0 {
 		storageTestConfigurationParameters.UploadCutoffMb = 5
 	}
+	storageTestConfigurationParameters.EnableDirMarker = true
 	if configuration == "" {
 		configuration = fmt.Sprintf("s3storage:\n  bucket-name: %s\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s\n  part-size-mb: %d\n"+
-			"  upload-cutoff-mb: %d\n  use-path-style: %t\n",
+			"  upload-cutoff-mb: %d\n  use-path-style: %t\n  enable-dir-marker: %t\n",
 			storageTestConfigurationParameters.BucketName, storageTestConfigurationParameters.KeyID,
 			storageTestConfigurationParameters.SecretKey, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region,
 			storageTestConfigurationParameters.PartSizeMb, storageTestConfigurationParameters.UploadCutoffMb,
-			storageTestConfigurationParameters.UsePathStyle)
+			storageTestConfigurationParameters.UsePathStyle, storageTestConfigurationParameters.EnableDirMarker)
 	}
 	s.config = configuration
 
@@ -575,7 +599,7 @@ func (s *clientTestSuite) TestCreateLink() {
 	err = s.client.CreateLink(source, target, true)
 	s.assert.NoError(err)
 
-	source = s.client.getKey(source, true)
+	source = s.client.getKey(source, true, false)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -600,7 +624,7 @@ func (s *clientTestSuite) TestReadLink() {
 	err := s.client.CreateLink(source, target, true)
 	s.assert.NoError(err)
 
-	source = s.client.getKey(source, true)
+	source = s.client.getKey(source, true, false)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -627,7 +651,7 @@ func (s *clientTestSuite) TestDeleteLink() {
 	err := s.client.CreateLink(source, target, true)
 	s.assert.NoError(err)
 
-	source = s.client.getKey(source, true)
+	source = s.client.getKey(source, true, false)
 
 	_, err = s.awsS3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
 		Bucket: aws.String(s.client.Config.authConfig.BucketName),
@@ -663,7 +687,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 		err := s.client.CreateLink(folder+sources[i], targets[i], true)
 		s.assert.NoError(err)
 
-		sources[i] = s.client.getKey(sources[i], true)
+		sources[i] = s.client.getKey(sources[i], true, false)
 
 		// make sure the links are there
 		result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
@@ -833,6 +857,22 @@ func (s *clientTestSuite) TestRenameDirectory() {
 	s.assert.NoError(err)
 }
 func (s *clientTestSuite) TestGetAttrDir() {
+	defer s.cleanupTest()
+	// setup
+	dirName := generateDirectoryName()
+
+	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
+		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Key:    aws.String(dirName + "/"),
+	})
+	s.assert.NoError(err)
+
+	attr, err := s.client.GetAttr(dirName)
+	s.assert.NoError(err)
+	s.assert.NotNil(attr)
+	s.assert.True(attr.IsDir())
+}
+func (s *clientTestSuite) TestGetAttrDirWithOnlyFile() {
 	defer s.cleanupTest()
 	// setup
 	dirName := generateDirectoryName()

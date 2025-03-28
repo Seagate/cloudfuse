@@ -1,15 +1,7 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -34,12 +26,15 @@
 package cmd
 
 import (
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/awnumar/memguard"
 	"github.com/spf13/cobra"
 )
 
@@ -118,7 +113,11 @@ var generateConfig = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var templateConfig []byte
-		var err error
+
+		err := validateGenConfigOptions()
+		if err != nil {
+			return fmt.Errorf("failed to validate options [%s]", err.Error())
+		}
 
 		templateConfig, err = os.ReadFile(opts.configFilePath)
 		if err != nil {
@@ -142,7 +141,7 @@ var generateConfig = &cobra.Command{
 			}
 		}
 
-		cipherText, err := common.EncryptData([]byte(newConfig), opts.passphrase)
+		cipherText, err := common.EncryptData([]byte(newConfig), encryptedPassphrase)
 		if err != nil {
 			return err
 		}
@@ -155,6 +154,24 @@ var generateConfig = &cobra.Command{
 
 		return nil
 	},
+}
+
+func validateGenConfigOptions() error {
+	if opts.passphrase == "" {
+		opts.passphrase = os.Getenv(SecureConfigEnvName)
+		if opts.passphrase == "" {
+			return errors.New("provide the passphrase as a cli parameter or configure the CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+		}
+	}
+
+	_, err := base64.StdEncoding.DecodeString(string(opts.passphrase))
+	if err != nil {
+		return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
+	}
+
+	encryptedPassphrase = memguard.NewEnclave([]byte(opts.passphrase))
+
+	return nil
 }
 
 func init() {

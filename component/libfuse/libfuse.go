@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -73,6 +73,7 @@ type Libfuse struct {
 	directIO              bool
 	umask                 uint32
 	displayCapacityMb     uint64
+	windowsSDDL           string
 }
 
 // To support pagination in readdir calls this structure holds a block of items for a given directory
@@ -107,6 +108,7 @@ type LibfuseOptions struct {
 	DirectIO                bool   `config:"direct-io" yaml:"direct-io,omitempty"`
 	Umask                   uint32 `config:"umask" yaml:"umask,omitempty"`
 	DisplayCapacityMb       uint64 `config:"display-capacity-mb" yaml:"display-capacity-mb,omitempty"`
+	WindowsSSDL             string `config:"windows-sddl" yaml:"windows-sddl,omitempty"`
 }
 
 const compName = "libfuse"
@@ -202,6 +204,7 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 	lf.ownerGID = opt.Gid
 	lf.ownerUID = opt.Uid
 	lf.umask = opt.Umask
+	lf.windowsSDDL = opt.WindowsSSDL
 
 	if opt.allowOther {
 		lf.dirPermission = uint(common.DefaultAllowOtherPermissionBits)

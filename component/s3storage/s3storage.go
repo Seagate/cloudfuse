@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,6 +27,7 @@ package s3storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"syscall"
@@ -38,6 +39,8 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
+	"github.com/awnumar/memguard"
+	"github.com/spf13/viper"
 )
 
 // S3Storage Wrapper type around aws-sdk-go-v2/service/s3
@@ -79,11 +82,35 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 
 	err = config.UnmarshalKey("restricted-characters-windows", &conf.RestrictedCharsWin)
 	if err != nil {
-		log.Err("AzStorage::Configure : config error [unable to obtain restricted-characters-windows]")
+		log.Err("S3Storage::Configure : config error [unable to obtain restricted-characters-windows]")
 		return err
 	}
 
-	err = ParseAndValidateConfig(s3, conf)
+	secrets := ConfigSecrets{}
+	// Securely store key-id and secret-key in enclave
+	if viper.GetString("s3storage.key-id") != "" {
+		encryptedKeyID := memguard.NewEnclave([]byte(viper.GetString("s3storage.key-id")))
+
+		if encryptedKeyID == nil {
+			err := errors.New("unable to store key-id securely")
+			log.Err("S3Storage::Configure : ", err.Error())
+			return err
+		}
+		secrets.KeyID = encryptedKeyID
+	}
+
+	if viper.GetString("s3storage.secret-key") != "" {
+		encryptedSecretKey := memguard.NewEnclave([]byte(viper.GetString("s3storage.secret-key")))
+
+		if encryptedSecretKey == nil {
+			err := errors.New("unable to store secret-key securely")
+			log.Err("S3Storage::Configure : ", err.Error())
+			return err
+		}
+		secrets.SecretKey = encryptedSecretKey
+	}
+
+	err = ParseAndValidateConfig(s3, conf, secrets)
 	if err != nil {
 		log.Err("S3Storage::Configure : Config validation failed [%s]", err.Error())
 		return fmt.Errorf("config error in %s [%s]", s3.Name(), err.Error())
@@ -196,7 +223,8 @@ func formatListDirName(path string) string {
 
 func (s3 *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	log.Trace("S3Storage::IsDirEmpty : %s", options.Name)
-	list, _, err := s3.storage.List(formatListDirName(options.Name), nil, 1)
+	// List up to two objects, since one could be the directory with a trailing slash
+	list, _, err := s3.storage.List(formatListDirName(options.Name), nil, 2)
 	if err != nil {
 		log.Err("S3Storage::IsDirEmpty : error listing [%s]", err)
 		return false
@@ -474,6 +502,43 @@ func (s3 *S3Storage) Chown(options internal.ChownOptions) error {
 func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("S3Storage::FlushFile : Flush file %s", options.Handle.Path)
 	return s3.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
+}
+
+const blockSize = 4096
+
+func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
+	if s3.stConfig.disableUsage {
+		return nil, false, nil
+	}
+
+	log.Trace("S3Storage::StatFs")
+	// cache_size = f_blocks * f_frsize/1024
+	// cache_size - used = f_frsize * f_bavail/1024
+	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
+	// if cache size is set to 0 then we have the root mount usage
+	sizeUsed, err := s3.storage.GetUsedSize()
+	if err != nil {
+		// TODO: will returning EIO break any applications that depend on StatFs?
+		return nil, true, err
+	}
+
+	stat := common.Statfs_t{
+		Blocks: sizeUsed / blockSize,
+		// there is no set capacity limit in cloud storage
+		// so we use zero for free and avail
+		// this zero value is used in the libfuse component to recognize that cloud storage responded
+		Bavail:  0,
+		Bfree:   0,
+		Bsize:   blockSize,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  blockSize,
+		Namemax: 255,
+	}
+
+	log.Debug("S3Storage::StatFs : responding with free=%d avail=%d blocks=%d (bsize=%d)", stat.Bfree, stat.Bavail, stat.Blocks, stat.Bsize)
+
+	return &stat, true, nil
 }
 
 // TODO: decide if the TODO below is relevant and delete if not

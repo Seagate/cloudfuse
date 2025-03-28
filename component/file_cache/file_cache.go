@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,15 +27,18 @@ package file_cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -119,6 +122,7 @@ const (
 	defaultMaxThreshold     = 80
 	defaultMinThreshold     = 60
 	defaultFileCacheTimeout = 120
+	minimumFileCacheTimeout = 1
 	defaultCacheUpdateCount = 100
 	MB                      = 1024 * 1024
 )
@@ -220,9 +224,9 @@ func (c *FileCache) Configure(_ bool) error {
 
 	c.createEmptyFile = conf.CreateEmptyFile
 	if config.IsSet(compName + ".file-cache-timeout-in-seconds") {
-		c.cacheTimeout = float64(conf.V1Timeout)
+		c.cacheTimeout = max(float64(conf.V1Timeout), minimumFileCacheTimeout)
 	} else if config.IsSet(compName + ".timeout-sec") {
-		c.cacheTimeout = float64(conf.Timeout)
+		c.cacheTimeout = max(float64(conf.Timeout), minimumFileCacheTimeout)
 	} else {
 		c.cacheTimeout = float64(defaultFileCacheTimeout)
 	}
@@ -341,7 +345,7 @@ func (c *FileCache) OnConfigChange() {
 	}
 
 	c.createEmptyFile = conf.CreateEmptyFile
-	c.cacheTimeout = float64(conf.Timeout)
+	c.cacheTimeout = max(float64(conf.Timeout), minimumFileCacheTimeout)
 	c.policyTrace = conf.EnablePolicyTrace
 	c.offloadIO = conf.OffloadIO
 	c.maxCacheSize = conf.MaxSizeMB
@@ -376,6 +380,51 @@ func (c *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 	return cacheConfig
 }
 
+func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
+
+	statfs, populated, err := fc.NextComponent().StatFs()
+	if populated {
+		return statfs, populated, err
+	}
+
+	log.Trace("FileCache::StatFs")
+
+	// cache_size = f_blocks * f_frsize/1024
+	// cache_size - used = f_frsize * f_bavail/1024
+	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
+	// if cache size is set to 0 then we have the root mount usage
+	maxCacheSize := fc.maxCacheSize * MB
+	if maxCacheSize == 0 {
+		log.Err("FileCache::StatFs : Not responding to StatFs because max cache size is zero")
+		return nil, false, nil
+	}
+	usage, _ := common.GetUsage(fc.tmpPath)
+	available := maxCacheSize - usage*MB
+
+	// how much space is available on the underlying file system?
+	availableOnCacheFS, err := fc.getAvailableSize()
+	if err != nil {
+		log.Err("FileCache::StatFs : Not responding to StatFs because getAvailableSize failed. Here's why: %v", err)
+		return nil, false, err
+	}
+
+	const blockSize = 4096
+
+	stat := common.Statfs_t{
+		Blocks:  uint64(maxCacheSize) / uint64(blockSize),
+		Bavail:  uint64(max(0, available)) / uint64(blockSize),
+		Bfree:   availableOnCacheFS / uint64(blockSize),
+		Bsize:   blockSize,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  blockSize,
+		Namemax: 255,
+	}
+
+	log.Debug("FileCache::StatFs : responding with free=%d avail=%d blocks=%d (bsize=%d)", stat.Bfree, stat.Bavail, stat.Blocks, stat.Bsize)
+	return &stat, true, nil
+}
+
 // isLocalDirEmpty: Whether or not the local directory is empty.
 func isLocalDirEmpty(path string) bool {
 	f, _ := common.Open(path)
@@ -383,47 +432,6 @@ func isLocalDirEmpty(path string) bool {
 
 	_, err := f.Readdirnames(1)
 	return err == io.EOF
-}
-
-// invalidateDirectory: Recursively invalidates a directory in the file cache.
-func (fc *FileCache) invalidateDirectory(name string) {
-	log.Trace("FileCache::invalidateDirectory : %s", name)
-
-	localPath := filepath.Join(fc.tmpPath, name)
-	// TODO : wouldn't this cause a race condition? a thread might get the lock before we purge - and the file would be non-existent
-	// WalkDir goes through the tree in lexical order so 'dir' always comes before 'dir/file'
-	var directoriesToPurge []string
-	err := filepath.WalkDir(localPath, func(path string, d fs.DirEntry, err error) error {
-		if err == nil && d != nil {
-			if !d.IsDir() {
-				log.Debug("FileCache::invalidateDirectory : removing file %s from cache", path)
-				fc.policy.CachePurge(path)
-			} else {
-				// remember to delete the directory later (after its children)
-				directoriesToPurge = append(directoriesToPurge, path)
-			}
-		} else {
-			// stat(localPath) failed. err is the one returned by stat
-			// documentation: https://pkg.go.dev/io/fs#WalkDirFunc
-			if os.IsNotExist(err) {
-				log.Info("FileCache::invalidateDirectory : %s does not exist in local cache.", name)
-			} else if err != nil {
-				log.Warn("FileCache::invalidateDirectory : %s stat err [%s].", name, err.Error())
-			}
-		}
-		return nil
-	})
-
-	// clean up leftover source directories in reverse order
-	for i := len(directoriesToPurge) - 1; i >= 0; i-- {
-		log.Debug("FileCache::invalidateDirectory : removing dir %s from cache", directoriesToPurge[i])
-		fc.policy.CachePurge(directoriesToPurge[i])
-	}
-
-	if err != nil {
-		log.Debug("FileCache::invalidateDirectory : Failed to walk directory %s. Here's why: %v", localPath, err)
-		return
-	}
 }
 
 // Note: The primary purpose of the file cache is to keep track of files that are opened by the user.
@@ -434,14 +442,16 @@ func (fc *FileCache) invalidateDirectory(name string) {
 func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("FileCache::DeleteDir : %s", options.Name)
 
+	// The libfuse component only calls DeleteDir on empty directories, so this directory must be empty
 	err := fc.NextComponent().DeleteDir(options)
 	if err != nil {
 		log.Err("FileCache::DeleteDir : %s failed", options.Name)
 		// There is a chance that meta file for directory was not created in which case
 		// rest api delete will fail while we still need to cleanup the local cache for the same
+	} else {
+		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name), nil)
 	}
 
-	fc.invalidateDirectory(options.Name)
 	return err
 }
 
@@ -479,12 +489,20 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 			j++
 		} else {
 			// Case 3: Item is in both local cache and cloud
-			if !attr.IsDir() && !fc.fileLocks.Locked(attr.Path) {
-				info, err := dirent.Info()
-
+			if !attr.IsDir() {
+				flock := fc.fileLocks.Get(attr.Path)
+				flock.Lock()
+				// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
+				info, err := os.Stat(filepath.Join(localPath, dirent.Name())) // Grab local cache attributes
+				flock.Unlock()
 				if err == nil {
-					attr.Mtime = info.ModTime()
-					attr.Size = info.Size()
+					// attr is a pointer returned by NextComponent
+					// modifying attr could corrupt cached directory listings
+					// to update properties, we need to make a deep copy first
+					newAttr := *attr
+					newAttr.Mtime = info.ModTime()
+					newAttr.Size = info.Size()
+					attrs[i] = &newAttr
 				}
 			}
 			i++
@@ -496,14 +514,19 @@ func (fc *FileCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	if token == "" {
 		for _, entry := range dirents {
 			entryPath := common.JoinUnixFilepath(options.Name, entry.Name())
-			if !entry.IsDir() && !fc.fileLocks.Locked(entryPath) {
+			if !entry.IsDir() {
 				// This is an overhead for streamdir for now
 				// As list is paginated we have no way to know whether this particular item exists both in local cache
 				// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
 				// If entry does not exists on storage then only return a local item here.
 				_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath})
 				if err != nil && (err == syscall.ENOENT || os.IsNotExist(err)) {
-					info, err := entry.Info() // Grab local cache attributes
+					// get the lock on the file, to allow any pending operation to complete
+					flock := fc.fileLocks.Get(entryPath)
+					flock.Lock()
+					// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
+					info, err := os.Stat(filepath.Join(localPath, entry.Name())) // Grab local cache attributes
+					flock.Unlock()
 					// If local file is not locked then only use its attributes otherwise rely on container attributes
 					if err == nil {
 						// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
@@ -560,7 +583,42 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	log.Trace("FileCache::RenameDir : src=%s, dst=%s", options.Src, options.Dst)
 
-	err := fc.NextComponent().RenameDir(options)
+	// get a list of source objects form both cloud and cache
+	// cloud
+	var cloudObjects []string
+	cloudObjects, err := fc.listCloudObjects(options.Src)
+	if err != nil {
+		log.Err("FileCache::RenameDir : %s listCloudObjects failed. Here's why: %v", options.Src, err)
+		return err
+	}
+	// cache
+	var localObjects []string
+	localObjects, err = fc.listCachedObjects(options.Src)
+	if err != nil {
+		log.Err("FileCache::RenameDir : %s listCachedObjects failed. Here's why: %v", options.Src, err)
+		return err
+	}
+	// combine the lists
+	objectNames := combineLists(cloudObjects, localObjects)
+
+	// add object destinations, and sort the result
+	for _, srcName := range objectNames {
+		dstName := strings.Replace(srcName, options.Src, options.Dst, 1)
+		objectNames = append(objectNames, dstName)
+	}
+	sort.Strings(objectNames)
+
+	// acquire a file lock on each entry (and defer unlock)
+	var flocks []*common.LockMapItem
+	for _, objectName := range objectNames {
+		flock := fc.fileLocks.Get(objectName)
+		flocks = append(flocks, flock)
+		flock.Lock()
+	}
+	defer unlockAll(flocks)
+
+	// rename the directory in the cloud
+	err = fc.NextComponent().RenameDir(options)
 	if err != nil {
 		log.Err("FileCache::RenameDir : error %s [%s]", options.Src, err.Error())
 		return err
@@ -576,7 +634,20 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 			newPath := strings.Replace(path, localSrcPath, localDstPath, 1)
 			if !d.IsDir() {
 				log.Debug("FileCache::RenameDir : Renaming local file %s -> %s", path, newPath)
-				fc.renameCachedFile(path, newPath)
+				// get object names
+				srcName := fc.getObjectName(path)
+				dstName := fc.getObjectName(newPath)
+				// get locks
+				sflock := fc.fileLocks.Get(srcName)
+				dflock := fc.fileLocks.Get(dstName)
+				// complete local rename
+				err := fc.renameCachedFile(path, newPath, sflock, dflock)
+				if err != nil {
+					// there's really not much we can do to handle the error, so just log it
+					log.Err("FileCache::RenameDir : %s file rename failed. Directory state is inconsistent!", path)
+				}
+				// handle should be updated regardless, for consistency on upload
+				fc.renameOpenHandles(srcName, dstName, sflock, dflock)
 			} else {
 				log.Debug("FileCache::RenameDir : Creating local destination directory %s", newPath)
 				// create the new directory
@@ -604,16 +675,118 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	// clean up leftover source directories in reverse order
 	for i := len(directoriesToPurge) - 1; i >= 0; i-- {
 		log.Debug("FileCache::RenameDir : Removing local directory %s", directoriesToPurge[i])
-		fc.policy.CachePurge(directoriesToPurge[i])
+		fc.policy.CachePurge(directoriesToPurge[i], nil)
 	}
 
-	if fc.cacheTimeout == 0 {
-		// delete destination path immediately
-		log.Info("FileCache::RenameDir : Timeout is zero, so removing local destination %s", options.Dst)
-		go fc.invalidateDirectory(options.Dst)
+	// update any lazy open handles (which are not in the local listing)
+	for _, srcName := range cloudObjects {
+		dstName := strings.Replace(srcName, options.Src, options.Dst, 1)
+		// get locks
+		sflock := fc.fileLocks.Get(srcName)
+		dflock := fc.fileLocks.Get(dstName)
+		// update any remaining open handles
+		fc.renameOpenHandles(srcName, dstName, sflock, dflock)
 	}
 
 	return nil
+}
+
+// recursively list all objects in the container at the given prefix / directory
+func (fc *FileCache) listCloudObjects(prefix string) (objectNames []string, err error) {
+	var done bool
+	var token string
+	for !done {
+		var attrSlice []*internal.ObjAttr
+		attrSlice, token, err = fc.NextComponent().StreamDir(internal.StreamDirOptions{Name: prefix, Token: token})
+		if err != nil {
+			return
+		}
+		for i := len(attrSlice) - 1; i >= 0; i-- {
+			attr := attrSlice[i]
+			if !attr.IsDir() {
+				objectNames = append(objectNames, attr.Path)
+			} else {
+				// recurse!
+				var subdirObjectNames []string
+				subdirObjectNames, err = fc.listCloudObjects(attr.Path)
+				if err != nil {
+					return
+				}
+				objectNames = append(objectNames, subdirObjectNames...)
+			}
+		}
+		done = token == ""
+	}
+	sort.Strings(objectNames)
+	return
+}
+
+// recursively list all files in the directory
+func (fc *FileCache) listCachedObjects(directory string) (objectNames []string, err error) {
+	localDirPath := filepath.Join(fc.tmpPath, directory)
+	walkDirErr := filepath.WalkDir(localDirPath, func(path string, d fs.DirEntry, err error) error {
+		if err == nil && d != nil {
+			if !d.IsDir() {
+				objectName := fc.getObjectName(path)
+				objectNames = append(objectNames, objectName)
+			}
+		} else {
+			// stat(localPath) failed. err is the one returned by stat
+			// documentation: https://pkg.go.dev/io/fs#WalkDirFunc
+			if os.IsNotExist(err) {
+				// none of the files that were moved actually exist in local storage
+				log.Info("FileCache::listObjects : %s does not exist in local cache.", directory)
+			} else if err != nil {
+				log.Warn("FileCache::listObjects : %s stat err [%v].", directory, err)
+			}
+		}
+		return nil
+	})
+	if walkDirErr != nil && !os.IsNotExist(walkDirErr) {
+		err = walkDirErr
+	}
+	sort.Strings(objectNames)
+	return
+}
+
+func combineLists(listA, listB []string) []string {
+	// since both lists are sorted, we can combine the two lists using a double-indexed for loop
+	combinedList := listA
+	i := 0 // Index for listA
+	j := 0 // Index for listB
+	// Iterate through both lists, adding entries from B that are missing from A
+	for i < len(listA) && j < len(listB) {
+		itemA := listA[i]
+		itemB := listB[j]
+		if itemA < itemB {
+			i++
+		} else if itemA > itemB {
+			// we could insert here, but it's probably better to just sort later
+			combinedList = append(combinedList, itemB)
+			j++
+		} else {
+			i++
+			j++
+		}
+	}
+	// sort and return
+	sort.Strings(combinedList)
+	return combinedList
+}
+
+func (fc *FileCache) getObjectName(localPath string) string {
+	relPath, err := filepath.Rel(fc.tmpPath, localPath)
+	if err != nil {
+		relPath = strings.TrimPrefix(localPath, fc.tmpPath+string(filepath.Separator))
+		log.Warn("FileCache::getObjectName : filepath.Rel failed on path %s [%v]. Using TrimPrefix: %s", localPath, err, relPath)
+	}
+	return common.NormalizeObjectName(relPath)
+}
+
+func unlockAll(flocks []*common.LockMapItem) {
+	for _, flock := range flocks {
+		flock.Unlock()
+	}
 }
 
 // CreateFile: Create the file in local cache.
@@ -627,9 +800,6 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 
 	// createEmptyFile was added to optionally support immutable containers. If customers do not care about immutability they can set this to true.
 	if fc.createEmptyFile {
-		// We tried moving CreateFile to a separate thread for better perf.
-		// However, before it is created in cloud storage, if GetAttr is called, the call will fail since the file
-		// does not exist in cloud storage yet, failing the whole CreateFile sequence in FUSE.
 		newF, err := fc.NextComponent().CreateFile(options)
 		if err != nil {
 			log.Err("FileCache::CreateFile : Failed to create file %s", options.Name)
@@ -677,6 +847,9 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		handle.Flags.Set(handlemap.HandleFlagDirty)
 	}
 
+	// update state
+	flock.LazyOpen = false
+
 	return handle, nil
 }
 
@@ -716,7 +889,6 @@ func (fc *FileCache) validateStorageError(path string, err error, method string,
 	return nil
 }
 
-// DeleteFile: Invalidate the file in local cache.
 func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("FileCache::DeleteFile : name=%s", options.Name)
 
@@ -732,18 +904,24 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	}
 
 	localPath := filepath.Join(fc.tmpPath, options.Name)
-	err = deleteFile(localPath)
-	if err != nil && !os.IsNotExist(err) {
-		log.Err("FileCache::DeleteFile : failed to delete local file %s [%s]", localPath, err.Error())
-	}
+	fc.policy.CachePurge(localPath, flock)
 
-	fc.policy.CachePurge(localPath)
+	// update file state
+	flock.LazyOpen = false
 
 	return nil
 }
 
-func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
-	log.Trace("FileCache::downloadFile : name=%s", handle.Path)
+func openCompleted(handle *handlemap.Handle) bool {
+	handle.Lock()
+	defer handle.Unlock()
+	_, found := handle.GetValue("openFileOptions")
+	return !found
+}
+
+// the file lock must be acquired before calling this
+func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.LockMapItem) error {
+	log.Trace("FileCache::openFileInternal : name=%s", handle.Path)
 
 	handle.Lock()
 	defer handle.Unlock()
@@ -762,19 +940,15 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 	localPath := filepath.Join(fc.tmpPath, handle.Path)
 	var f *os.File
 
-	flock := fc.fileLocks.Get(handle.Path)
-	flock.Lock()
-	defer flock.Unlock()
-
 	fc.policy.CacheValid(localPath)
 	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, handle.Path, flock)
-	if err != nil {
-		log.Err("FileCache::downloadFile : Failed to check if download is required for %s [%s]", handle.Path, err.Error())
+	if err != nil && !os.IsNotExist(err) {
+		log.Err("FileCache::openFileInternal : Failed to check if download is required for %s [%s]", handle.Path, err.Error())
 	}
 
 	fileMode := fc.defaultPermission
 	if downloadRequired {
-		log.Debug("FileCache::downloadFile : Need to download %s", handle.Path)
+		log.Debug("FileCache::openFileInternal : Need to download %s", handle.Path)
 
 		fileSize := int64(0)
 		if attr != nil {
@@ -782,17 +956,17 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 		}
 
 		if fileExists {
-			log.Debug("FileCache::downloadFile : Delete cached file %s", handle.Path)
+			log.Debug("FileCache::openFileInternal : Delete cached file %s", handle.Path)
 
 			err := deleteFile(localPath)
 			if err != nil && !os.IsNotExist(err) {
-				log.Err("FileCache::downloadFile : Failed to delete old file %s", handle.Path)
+				log.Err("FileCache::openFileInternal : Failed to delete old file %s", handle.Path)
 			}
 		} else {
 			// Create the file if if doesn't already exist.
 			err := os.MkdirAll(filepath.Dir(localPath), fc.defaultPermission)
 			if err != nil {
-				log.Err("FileCache::downloadFile : error creating directory structure for file %s [%s]", handle.Path, err.Error())
+				log.Err("FileCache::openFileInternal : error creating directory structure for file %s [%s]", handle.Path, err.Error())
 				return err
 			}
 		}
@@ -800,7 +974,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 		// Open the file in write mode.
 		f, err = common.OpenFile(localPath, os.O_CREATE|os.O_RDWR, fMode)
 		if err != nil {
-			log.Err("FileCache::downloadFile : error creating new file %s [%s]", handle.Path, err.Error())
+			log.Err("FileCache::openFileInternal : error creating new file %s [%s]", handle.Path, err.Error())
 			return err
 		}
 
@@ -820,7 +994,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 				})
 			if err != nil {
 				// File was created locally and now download has failed so we need to delete it back from local cache
-				log.Err("FileCache::downloadFile : error downloading file from storage %s [%s]", handle.Path, err.Error())
+				log.Err("FileCache::openFileInternal : error downloading file from storage %s [%s]", handle.Path, err.Error())
 				_ = f.Close()
 				_ = os.Remove(localPath)
 				return err
@@ -829,8 +1003,10 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 
 		// Update the last download time of this file
 		flock.SetDownloadTime()
+		// update file state
+		flock.LazyOpen = false
 
-		log.Debug("FileCache::downloadFile : Download of %s is complete", handle.Path)
+		log.Debug("FileCache::openFileInternal : Download of %s is complete", handle.Path)
 		f.Close()
 
 		// After downloading the file, update the modified times and mode of the file.
@@ -842,7 +1018,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 	// If user has selected some non default mode in config then every local file shall be created with that mode only
 	err = os.Chmod(localPath, fileMode)
 	if err != nil {
-		log.Err("FileCache::downloadFile : Failed to change mode of file %s [%s]", handle.Path, err.Error())
+		log.Err("FileCache::openFileInternal : Failed to change mode of file %s [%s]", handle.Path, err.Error())
 	}
 	// TODO: When chown is supported should we update that?
 
@@ -850,7 +1026,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 		// chtimes shall be the last api otherwise calling chmod/chown will update the last change time
 		err = os.Chtimes(localPath, attr.Atime, attr.Mtime)
 		if err != nil {
-			log.Err("FileCache::downloadFile : Failed to change times of file %s [%s]", handle.Path, err.Error())
+			log.Err("FileCache::openFileInternal : Failed to change times of file %s [%s]", handle.Path, err.Error())
 		}
 	}
 
@@ -859,7 +1035,7 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 	// Open the file and grab a shared lock to prevent deletion by the cache policy.
 	f, err = common.OpenFile(localPath, flags, fMode)
 	if err != nil {
-		log.Err("FileCache::downloadFile : error opening cached file %s [%s]", handle.Path, err.Error())
+		log.Err("FileCache::openFileInternal : error opening cached file %s [%s]", handle.Path, err.Error())
 		return err
 	}
 
@@ -873,11 +1049,13 @@ func (fc *FileCache) downloadFile(handle *handlemap.Handle) error {
 		handle.Flags.Set(handlemap.HandleFlagCached)
 	}
 
-	log.Info("FileCache::downloadFile : file=%s, fd=%d", handle.Path, f.Fd())
+	log.Info("FileCache::openFileInternal : file=%s, fd=%d", handle.Path, f.Fd())
 	handle.SetFileObject(f)
 
 	//set boolean in isDownloadNeeded value to signal that the file has been downloaded
 	handle.RemoveValue("openFileOptions")
+	// update file state
+	flock.LazyOpen = false
 
 	return nil
 }
@@ -891,19 +1069,17 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	flock.Lock()
 	defer flock.Unlock()
 
-	attr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+	localPath := filepath.Join(fc.tmpPath, options.Name)
+	downloadRequired, _, cloudAttr, err := fc.isDownloadRequired(localPath, options.Name, flock)
 
 	// return err in case of authorization permission mismatch
 	if err != nil && err == syscall.EACCES {
 		return nil, err
 	}
 
-	fileSize := int64(0)
-	if attr != nil {
-		fileSize = int64(attr.Size)
-	}
-
-	if fileSize > 0 {
+	// check if we are running out of space
+	if downloadRequired && cloudAttr != nil {
+		fileSize := int64(cloudAttr.Size)
 		if fc.diskHighWaterMark != 0 {
 			currSize, err := common.GetUsage(fc.tmpPath)
 			if err != nil {
@@ -920,10 +1096,89 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	// create handle and record openFileOptions for later
 	handle := handlemap.NewHandle(options.Name)
 	handle.SetValue("openFileOptions", openFileOptions{flags: options.Flags, fMode: options.Mode})
-	// Increment the handle count in this lock item as there is one handle open for this now
+	if options.Flags&os.O_APPEND != 0 {
+		handle.Flags.Set(handlemap.HandleOpenedAppend)
+	}
+
+	// Increment the handle count
 	flock.Inc()
 
-	return handle, nil
+	// will opening the file require downloading it?
+	var openErr error
+	if !downloadRequired {
+		// use the local file to complete the open operation now
+		openErr = fc.openFileInternal(handle, flock)
+	} else {
+		// use a lazy open algorithm to avoid downloading unnecessarily (do nothing for now)
+		// update file state
+		flock.LazyOpen = true
+	}
+
+	return handle, openErr
+}
+
+// isDownloadRequired: Whether or not the file needs to be downloaded to local cache.
+func (fc *FileCache) isDownloadRequired(localPath string, objectPath string, flock *common.LockMapItem) (bool, bool, *internal.ObjAttr, error) {
+	cached := false
+	downloadRequired := false
+	lmt := time.Time{}
+
+	// check if the file exists locally
+	finfo, statErr := os.Stat(localPath)
+	if statErr == nil {
+		// The file does not need to be downloaded as long as it is in the cache policy
+		fileInPolicyCache := fc.policy.IsCached(localPath)
+		if fileInPolicyCache {
+			cached = true
+		} else {
+			log.Warn("FileCache::isDownloadRequired : %s exists but is not present in local cache policy", localPath)
+		}
+		// gather stat details
+		lmt = finfo.ModTime()
+	} else if os.IsNotExist(statErr) {
+		// The file does not exist in the local cache so it needs to be downloaded
+		log.Debug("FileCache::isDownloadRequired : %s not present in local cache", localPath)
+	} else {
+		// Catch all, the file needs to be downloaded
+		log.Debug("FileCache::isDownloadRequired : error calling stat %s [%s]", localPath, statErr.Error())
+	}
+
+	// check if the file is due for a refresh from cloud storage
+	refreshTimerExpired := fc.refreshSec != 0 && time.Since(flock.DownloadTime()).Seconds() > float64(fc.refreshSec)
+
+	// get cloud attributes
+	cloudAttr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: objectPath})
+	if err != nil && !os.IsNotExist(err) {
+		log.Err("FileCache::isDownloadRequired : Failed to get attr of %s [%s]", objectPath, err.Error())
+	}
+
+	if !cached && cloudAttr != nil {
+		downloadRequired = true
+	}
+
+	if cached && refreshTimerExpired && cloudAttr != nil {
+		// File is not expired, but the user has configured a refresh timer, which has expired.
+		// Does the cloud have a newer copy?
+		cloudHasLatestData := cloudAttr.Mtime.After(lmt) || finfo.Size() != cloudAttr.Size
+		// Is the local file open?
+		fileIsOpen := flock.Count() > 0 && !flock.LazyOpen
+		if cloudHasLatestData && !fileIsOpen {
+			log.Info("FileCache::isDownloadRequired : File is modified in container, so forcing redownload %s [A-%v : L-%v] [A-%v : L-%v]",
+				objectPath, cloudAttr.Mtime, lmt, cloudAttr.Size, finfo.Size())
+			downloadRequired = true
+		} else {
+			// log why we decided not to refresh
+			if !cloudHasLatestData {
+				log.Info("FileCache::isDownloadRequired : File in container is not latest, skip redownload %s [A-%v : L-%v]", objectPath, cloudAttr.Mtime, lmt)
+			} else if fileIsOpen {
+				log.Info("FileCache::isDownloadRequired : Need to re-download %s, but skipping as handle is already open", objectPath)
+			}
+			// As we have decided to continue using old file, we reset the timer to check again after refresh time interval
+			flock.SetDownloadTime()
+		}
+	}
+
+	return downloadRequired, cached, cloudAttr, err
 }
 
 // CloseFile: Flush the file and invalidate it from the cache.
@@ -956,15 +1211,13 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 	// if file has not been interactively read or written to by end user, then there is no cached file to close.
 	_, noCachedHandle := options.Handle.GetValue("openFileOptions")
 
-	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
-
-	err := fc.FlushFile(internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true}) //nolint
-	if err != nil {
-		log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
-		return err
-	}
-
 	if !noCachedHandle {
+		err := fc.flushFileInternal(internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true}, flock) //nolint
+		if err != nil {
+			log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
+			return err
+		}
+
 		f := options.Handle.GetFileObject()
 		if f == nil {
 			log.Err("FileCache::closeFileInternal : error [missing fd in handle object] %s", options.Handle.Path)
@@ -980,21 +1233,19 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 
 	flock.Dec()
 
+	// if this is the last lazy handle, clear the lazy flag
+	if noCachedHandle && flock.Count() == 0 {
+		flock.LazyOpen = false
+	}
+
 	// If it is an fsync op then purge the file
 	if options.Handle.Fsynced() {
 		log.Trace("FileCache::closeFileInternal : fsync/sync op, purging %s", options.Handle.Path)
 		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
-
-		err = deleteFile(localPath)
-		if err != nil && !os.IsNotExist(err) {
-			log.Err("FileCache::closeFileInternal : failed to delete local file %s [%s]", localPath, err.Error())
-		}
-
-		fc.policy.CachePurge(localPath)
+		fc.policy.CachePurge(localPath, flock)
 		return nil
 	}
 
-	fc.policy.CacheInvalidate(localPath) // Invalidate the file from the local cache if the timeout is zero.
 	return nil
 }
 
@@ -1004,9 +1255,14 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	// log.Debug("FileCache::ReadInBuffer : Reading %v bytes from %s", len(options.Data), options.Handle.Path)
 
-	err := fc.downloadFile(options.Handle)
-	if err != nil {
-		return 0, fmt.Errorf("error downloading file %s [%s]", options.Handle.Path, err)
+	if !openCompleted(options.Handle) {
+		flock := fc.fileLocks.Get(options.Handle.Path)
+		flock.Lock()
+		err := fc.openFileInternal(options.Handle, flock)
+		flock.Unlock()
+		if err != nil {
+			return 0, fmt.Errorf("error downloading file %s [%s]", options.Handle.Path, err)
+		}
 	}
 
 	f := options.Handle.GetFileObject()
@@ -1017,7 +1273,9 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 
 	// Read and write operations are very frequent so updating cache policy for every read is a costly operation
 	// Update cache policy every 1K operations (includes both read and write) instead
+	options.Handle.Lock()
 	options.Handle.OptCnt++
+	options.Handle.Unlock()
 	if (options.Handle.OptCnt % defaultCacheUpdateCount) == 0 {
 		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 		fc.policy.CacheValid(localPath)
@@ -1039,10 +1297,17 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
 
-	err := fc.downloadFile(options.Handle)
-	if err != nil {
-		return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
+	if !openCompleted(options.Handle) {
+		flock := fc.fileLocks.Get(options.Handle.Path)
+		flock.Lock()
+		err := fc.openFileInternal(options.Handle, flock)
+		flock.Unlock()
+		if err != nil {
+			return 0, fmt.Errorf("error downloading file for %s [%s]", options.Handle.Path, err)
+		}
 	}
+
+	var err error
 
 	f := options.Handle.GetFileObject()
 	if f == nil {
@@ -1064,7 +1329,9 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	// Read and write operations are very frequent so updating cache policy for every read is a costly operation
 	// Update cache policy every 1K operations (includes both read and write) instead
+	options.Handle.Lock()
 	options.Handle.OptCnt++
+	options.Handle.Unlock()
 	if (options.Handle.OptCnt % defaultCacheUpdateCount) == 0 {
 		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 		fc.policy.CacheValid(localPath)
@@ -1072,7 +1339,13 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	// Removing Pwrite as it is not supported on Windows
 	// bytesWritten, err := syscall.Pwrite(options.Handle.FD(), options.Data, options.Offset)
-	bytesWritten, err := f.WriteAt(options.Data, options.Offset)
+
+	var bytesWritten int
+	if options.Handle.Flags.IsSet(handlemap.HandleOpenedAppend) {
+		bytesWritten, err = f.Write(options.Data)
+	} else {
+		bytesWritten, err = f.WriteAt(options.Data, options.Offset)
+	}
 
 	if err == nil {
 		// Mark the handle dirty so the file is written back to storage on FlushFile.
@@ -1123,6 +1396,19 @@ func (fc *FileCache) SyncFile(options internal.SyncFileOptions) error {
 
 // FlushFile: Flush the local file to storage
 func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
+	var flock *common.LockMapItem
+
+	// if flush will upload the file, then acquire the file lock
+	if options.Handle.Dirty() && (!fc.lazyWrite || options.CloseInProgress) {
+		flock = fc.fileLocks.Get(options.Handle.Path)
+		flock.Lock()
+		defer flock.Unlock()
+	}
+
+	return fc.flushFileInternal(options, flock)
+}
+
+func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions, flock *common.LockMapItem) error {
 	//defer exectime.StatTimeCurrentBlock("FileCache::FlushFile")()
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
@@ -1225,7 +1511,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 			localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 			info, err := os.Stat(localPath)
 			if err == nil {
-				err = fc.Chmod(internal.ChmodOptions{Name: options.Handle.Path, Mode: info.Mode()})
+				err = fc.chmodInternal(internal.ChmodOptions{Name: options.Handle.Path, Mode: info.Mode()}, flock)
 				if err != nil {
 					// chmod was missed earlier for this file and doing it now also
 					// resulted in error so ignore this one and proceed for flush handling
@@ -1248,6 +1534,13 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// 2. Path not in cloud storage but in local cache (this could happen if we recently created the file [and are currently writing to it]) (also supports immutable containers)
 	// 3. Path in cloud storage and in local cache (this could result in dirty properties on the service if we recently wrote to the file)
 
+	// If the file is being downloaded or deleted, the size and mod time will be incorrect
+	// wait for download or deletion to complete before getting local file info
+	flock := fc.fileLocks.Get(options.Name)
+	// TODO: should we add RLock and RUnlock to the lock map for GetAttr?
+	flock.Lock()
+	defer flock.Unlock()
+
 	// To cover case 1, get attributes from storage
 	var exists bool
 	attrs, err := fc.NextComponent().GetAttr(options)
@@ -1269,24 +1562,18 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
 	if err == nil && !info.IsDir() {
 		if exists { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
-			// Return from local cache only if file is not under download or deletion
-			// If file is under download then taking size or mod time from it will be incorrect.
-			if !fc.fileLocks.Locked(options.Name) {
-				log.Debug("FileCache::GetAttr : updating %s from local cache", options.Name)
-				attrs.Size = info.Size()
-				attrs.Mtime = info.ModTime()
-			} else {
-				log.Debug("FileCache::GetAttr : %s is locked, use storage attributes", options.Name)
-			}
+			log.Debug("FileCache::GetAttr : updating %s from local cache", options.Name)
+			// attrs is a pointer returned by NextComponent
+			// modifying attrs could corrupt cached directory listings
+			// to update properties, we need to make a deep copy first
+			newAttr := *attrs
+			newAttr.Mtime = info.ModTime()
+			newAttr.Size = info.Size()
+			attrs = &newAttr
 		} else { // Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
-			if !strings.Contains(localPath, fc.tmpPath) {
-				// Here if the path is going out of the temp directory then return ENOENT
-				exists = false
-			} else {
-				log.Debug("FileCache::GetAttr : serving %s attr from local cache", options.Name)
-				exists = true
-				attrs = newObjAttr(options.Name, info)
-			}
+			log.Debug("FileCache::GetAttr : serving %s attr from local cache", options.Name)
+			exists = true
+			attrs = newObjAttr(options.Name, info)
 		}
 	}
 
@@ -1301,16 +1588,23 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("FileCache::RenameFile : src=%s, dst=%s", options.Src, options.Dst)
 
+	// acquire file locks
 	sflock := fc.fileLocks.Get(options.Src)
-	sflock.Lock()
-	defer sflock.Unlock()
-
 	dflock := fc.fileLocks.Get(options.Dst)
-	dflock.Lock()
+	// always lock files in lexical order to prevent deadlock
+	if options.Src < options.Dst {
+		sflock.Lock()
+		dflock.Lock()
+	} else {
+		dflock.Lock()
+		sflock.Lock()
+	}
+	defer sflock.Unlock()
 	defer dflock.Unlock()
 
 	err := fc.NextComponent().RenameFile(options)
-	err = fc.validateStorageError(options.Src, err, "RenameFile", false)
+	localOnly := os.IsNotExist(err)
+	err = fc.validateStorageError(options.Src, err, "RenameFile", true)
 	if err != nil {
 		log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
 		return err
@@ -1323,26 +1617,72 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	// if we do not perform rename operation locally and those destination files are cached then next time they are read
 	// we will be serving the wrong content (as we did not rename locally, we still be having older destination files with
 	// stale content). We either need to remove dest file as well from cache or just run rename to replace the content.
-	fc.renameCachedFile(localSrcPath, localDstPath)
+	localRenameErr := fc.renameCachedFile(localSrcPath, localDstPath, sflock, dflock)
+	if localRenameErr != nil {
+		// renameCachedFile only returns an error when we are at risk for data loss
+		if !localOnly {
+			// we must reverse the cloud rename operation to prevent data loss
+			err := fc.NextComponent().RenameFile(internal.RenameFileOptions{
+				Src: options.Dst,
+				Dst: options.Src,
+			})
+			err = fc.validateStorageError(options.Src, err, "RenameFile", false)
+			if err != nil {
+				log.Err("FileCache::RenameFile : %s failed to reverse cloud rename to avoid data loss! [%v]", options.Src, err)
+			}
+			localRenameErr = errors.Join(localRenameErr, err)
+		}
+		return localRenameErr
+	}
+
+	// rename open handles
+	fc.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
 
 	return nil
 }
 
-func (fc *FileCache) renameCachedFile(localSrcPath string, localDstPath string) {
+func (fc *FileCache) renameCachedFile(localSrcPath, localDstPath string, sflock, dflock *common.LockMapItem) error {
 	err := os.Rename(localSrcPath, localDstPath)
 	if err != nil {
-		// if rename fails, we just delete the source file anyway
-		log.Warn("FileCache::RenameDir : Failed to rename local file %s -> %s. Here's why: %v", localSrcPath, localDstPath, err)
-	} else {
+		if os.IsNotExist(err) {
+			// Case 1
+			log.Info("FileCache::renameCachedFile : %s source file not cached", localSrcPath)
+		} else {
+			log.Warn("FileCache::renameCachedFile : %s -> %s Failed to rename local file. Here's why: %v", localSrcPath, localDstPath, err)
+			// if the file is not open, it should be backed up already
+			if sflock.Count() > 0 {
+				// abort rename to prevent data loss!
+				log.Err("FileCache::renameCachedFile : %s Failed rename and src is open! Rename should be aborted...", localSrcPath)
+				return err
+			}
+		}
+	} else if err == nil {
+		log.Debug("FileCache::renameCachedFile : %s -> %s Successfully renamed local file", localSrcPath, localDstPath)
 		fc.policy.CacheValid(localDstPath)
 	}
 	// delete the source from our cache policy
 	// this will also delete the source file from local storage (if rename failed)
-	fc.policy.CachePurge(localSrcPath)
+	fc.policy.CachePurge(localSrcPath, sflock)
 
-	if fc.cacheTimeout == 0 {
-		// Destination file needs to be deleted immediately
-		go fc.policy.CachePurge(localDstPath)
+	return nil
+}
+
+func (fc *FileCache) renameOpenHandles(srcName, dstName string, sflock, dflock *common.LockMapItem) {
+	// update open handles
+	if sflock.Count() > 0 {
+		// update any open handles to the file with its new name
+		handlemap.GetHandles().Range(func(key, value any) bool {
+			handle := value.(*handlemap.Handle)
+			if handle.Path == srcName {
+				handle.Path = dstName
+			}
+			return true
+		})
+		// copy the number of open handles to the new name
+		for sflock.Count() > 0 {
+			sflock.Dec()
+			dflock.Inc()
+		}
 	}
 }
 
@@ -1376,16 +1716,20 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 		}
 	} else {
 		// If size is not 0 then we need to open the file and then truncate it
-		// downloadFile will download if file was not present in local system
 		h, err = fc.OpenFile(internal.OpenFileOptions{Name: options.Name, Flags: os.O_RDWR, Mode: fc.defaultPermission})
 		if err != nil {
 			log.Err("FileCache::TruncateFile : Error calling OpenFile with %s [%s]", options.Name, err.Error())
 		}
-
-		err = fc.downloadFile(h)
-		if err != nil {
-			log.Err("FileCache::TruncateFile : Error calling downloadFile with %s [%s]", options.Name, err.Error())
-			return err
+		// openFileInternal will download if file was not present in local system
+		if !openCompleted(h) {
+			flock := fc.fileLocks.Get(options.Name)
+			flock.Lock()
+			err = fc.openFileInternal(h, flock)
+			flock.Unlock()
+			if err != nil {
+				log.Err("FileCache::TruncateFile : Error calling openFileInternal with %s [%s]", options.Name, err.Error())
+				return err
+			}
 		}
 	}
 
@@ -1409,6 +1753,17 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 
 // Chmod : Update the file with its new permissions
 func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
+	log.Trace("FileCache::Chmod : Change mode of path %s", options.Name)
+
+	flock := fc.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
+	return fc.chmodInternal(options, flock)
+}
+
+// Chmod : Update the file with its new permissions
+func (fc *FileCache) chmodInternal(options internal.ChmodOptions, flock *common.LockMapItem) error {
 	log.Trace("FileCache::Chmod : Change mode of path %s", options.Name)
 
 	// Update the file in cloud storage
@@ -1444,6 +1799,10 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 // Chown : Update the file with its new owner and group
 func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	log.Trace("FileCache::Chown : Change owner of path %s", options.Name)
+
+	flock := fc.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
 
 	// Update the file in cloud storage
 	err := fc.NextComponent().Chown(options)

@@ -3,7 +3,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2022 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -154,7 +154,7 @@ func (suite *mountTestSuite) TestForegroundConfigFileEmpty() {
 
 	op, err := executeCommandC(rootCmd, "mount", mntDir, "--config-file=", "--foreground=true")
 	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "Config file not provided")
+	suite.assert.Contains(op, "config file not provided")
 }
 
 // mount failure test where the config file type is unsupported

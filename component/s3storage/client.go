@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -47,12 +48,14 @@ import (
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/middleware"
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	smithyHttp "github.com/aws/smithy-go/transport/http"
 )
 
 const (
@@ -95,13 +98,25 @@ func (cl *Client) Configure(cfg Config) error {
 	cl.Config = cfg
 
 	var credentialsProvider aws.CredentialsProvider
-	credentialsInConfig := cl.Config.authConfig.KeyID != "" && cl.Config.authConfig.SecretKey != ""
-	if credentialsInConfig {
-		credentialsProvider = credentials.NewStaticCredentialsProvider(
-			cl.Config.authConfig.KeyID,
-			cl.Config.authConfig.SecretKey,
-			"",
-		)
+	if cl.Config.authConfig.KeyID != nil && cl.Config.authConfig.SecretKey != nil {
+		keyID, err := cl.Config.authConfig.KeyID.Open()
+		if err != nil || keyID == nil {
+			return errors.New("unable to decrypt key id")
+		}
+		defer keyID.Destroy()
+		secretKey, err := cl.Config.authConfig.SecretKey.Open()
+		if err != nil || secretKey == nil {
+			return errors.New("unable to decrypt secret key")
+		}
+		defer secretKey.Destroy()
+		credentialsInConfig := keyID.String() != "" && secretKey.String() != ""
+		if credentialsInConfig {
+			credentialsProvider = credentials.NewStaticCredentialsProvider(
+				strings.Clone(keyID.String()),
+				strings.Clone(secretKey.String()),
+				"",
+			)
+		}
 	}
 
 	var err error
@@ -152,10 +167,12 @@ func (cl *Client) Configure(cfg Config) error {
 		cl.awsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
 			o.UsePathStyle = true
 			o.BaseEndpoint = aws.String(cl.Config.authConfig.Endpoint)
+			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
 		})
 	} else {
 		cl.awsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
 			o.BaseEndpoint = aws.String(cl.Config.authConfig.Endpoint)
+			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
 		})
 	}
 
@@ -203,7 +220,7 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	// Check that the provided bucket exists and that user has access to bucket
-	exists, err := cl.headBucket()
+	exists, err := cl.bucketExists()
 	if err != nil || !exists {
 		// From the aws-sdk-go-v2 documentation
 		// If the bucket does not exist or you do not have permission to access it,
@@ -277,6 +294,11 @@ func (cl *Client) SetPrefixPath(path string) error {
 	return nil
 }
 
+func (cl *Client) bucketExists() (bool, error) {
+	_, err := cl.headBucket()
+	return err != syscall.ENOENT, err
+}
+
 // CreateFile : Create a new file in the bucket/virtual directory
 func (cl *Client) CreateFile(name string, mode os.FileMode) error {
 	log.Trace("Client::CreateFile : name %s", name)
@@ -287,13 +309,18 @@ func (cl *Client) CreateFile(name string, mode os.FileMode) error {
 // CreateDirectory : Create a new directory in the bucket/virtual directory
 func (cl *Client) CreateDirectory(name string) error {
 	log.Trace("Client::CreateDirectory : name %s", name)
-	// MinIO does not support creating an empty file to indicate a directory
-	// directories will be represented only as object prefixes
-	// we have no way of representing an empty directory, so do nothing.
-	// Note: we could try to list the directory and return EEXIST if it has contents,
-	// but that would be a performance penalty for a check that the OS already does.
+
+	// If the S3 endpoint does not support directory markers then we can do nothing here.
 	// So, let's make it clear: we expect the OS to call GetAttr() on the directory
 	// to make sure it doesn't exist before trying to create it.
+	if cl.Config.enableDirMarker {
+		err := cl.putObject(putObjectOptions{name: name, isDir: true})
+		if err != nil {
+			log.Err("Client::CreateDirectory : putObject(%s) failed. Here's why: %v", name, err)
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -326,7 +353,7 @@ func (cl *Client) DeleteFile(name string) error {
 	isSymLink := attr.IsSymlink()
 
 	// delete the object
-	err = cl.deleteObject(name, isSymLink)
+	err = cl.deleteObject(name, isSymLink, attr.IsDir())
 	if err != nil {
 		log.Err("Client::DeleteFile : Failed to delete object %s. Here's why: %v", name, err)
 		return err
@@ -348,7 +375,6 @@ func (cl *Client) DeleteDirectory(name string) error {
 	var marker *string
 	var err error
 	for !done {
-
 		// list all objects with the prefix
 		objects, marker, err := cl.List(name, marker, 0)
 		if err != nil {
@@ -388,7 +414,14 @@ func (cl *Client) DeleteDirectory(name string) error {
 		if marker == nil {
 			done = true
 		}
+	}
 
+	// Delete the current directory
+	if cl.Config.enableDirMarker {
+		err = cl.deleteObject(name, false, true)
+		if err != nil {
+			log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", name, err)
+		}
 	}
 
 	return err
@@ -398,17 +431,9 @@ func (cl *Client) DeleteDirectory(name string) error {
 func (cl *Client) RenameFile(source string, target string, isSymLink bool) error {
 	log.Trace("Client::RenameFile : %s -> %s", source, target)
 
-	err := cl.copyObject(source, target, isSymLink)
+	err := cl.renameObject(renameObjectOptions{source: source, target: target, isSymLink: isSymLink})
 	if err != nil {
 		log.Err("Client::RenameFile : copyObject(%s->%s) failed. Here's why: %v", source, target, err)
-		return err
-	}
-	// Copy of the file is done so now delete the older file
-	// in this case we don't need to check if the file exists, so we use deleteObject, not DeleteFile
-	// this is what S3's DeleteObject spec is meant for: to make sure the object doesn't exist anymore
-	err = cl.deleteObject(source, isSymLink)
-	if err != nil {
-		log.Err("Client::RenameFile : deleteObject(%s) failed. Here's why: %v", source, err)
 	}
 
 	return err
@@ -449,6 +474,14 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 		}
 		if marker == nil {
 			done = true
+
+			// Rename the current directory
+			if cl.Config.enableDirMarker {
+				err := cl.renameObject(renameObjectOptions{source: source, target: target, isDir: true})
+				if err != nil {
+					log.Err("Client::RenameDirectory : Failed to rename %s -> %s. Here's why: %v", source, target, err)
+				}
+			}
 		}
 	}
 	return nil
@@ -461,8 +494,6 @@ func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::GetAttr : name %s", name)
 
 	// first let's suppose the caller is looking for a file
-	// there are no objects with trailing slashes (MinIO doesn't support them)
-	// 	and trailing slashes aren't allowed in filenames
 	// so if this was called with a trailing slash, don't look for an object
 	if len(name) > 0 && name[len(name)-1] != '/' {
 		attr, err := cl.getFileAttr(name)
@@ -486,10 +517,10 @@ func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getFileAttr : name %s", name)
 	isSymlink := false
-	object, err := cl.headObject(name, isSymlink)
+	object, err := cl.headObject(name, isSymlink, false)
 	if err == syscall.ENOENT && !cl.Config.disableSymlink {
 		isSymlink = true
-		return cl.headObject(name, isSymlink)
+		return cl.headObject(name, isSymlink, false)
 	}
 	return object, err
 }
@@ -497,7 +528,17 @@ func (cl *Client) getFileAttr(name string) (*internal.ObjAttr, error) {
 func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
 	log.Trace("Client::getDirectoryAttr : name %s", dirName)
 
-	// to do this, accept anything that comes back from List()
+	// Try seartching for the object directly if supported
+	if cl.Config.enableDirMarker {
+		attr, err := cl.headObject(dirName, false, true)
+		if err == nil {
+			return attr, err
+		}
+	}
+
+	// Otherwise, the cloud does not support directory markers, so use list
+	// or the directory does exist but there is no marker for it, so look for an object
+	// in the directory
 	objects, _, err := cl.List(dirName, nil, 1)
 	if err != nil {
 		log.Err("Client::getDirectoryAttr : List(%s) failed. Here's why: %v", dirName, err)
@@ -530,7 +571,7 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 	}
 
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, count, false)
+	objectDataReader, err := cl.getObject(getObjectOptions{name: name, offset: offset, count: count})
 	if err != nil {
 		log.Err("Client::ReadToFile : getObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -559,7 +600,7 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 func (cl *Client) ReadBuffer(name string, offset int64, length int64, isSymlink bool) ([]byte, error) {
 	log.Trace("Client::ReadBuffer : name %s (%d+%d)", name, offset, length)
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, length, isSymlink)
+	objectDataReader, err := cl.getObject(getObjectOptions{name: name, offset: offset, count: length, isSymLink: isSymlink})
 	if err != nil {
 		log.Err("Client::ReadBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return nil, err
@@ -582,7 +623,7 @@ func (cl *Client) ReadBuffer(name string, offset int64, length int64, isSymlink 
 func (cl *Client) ReadInBuffer(name string, offset int64, length int64, data []byte) error {
 	log.Trace("Client::ReadInBuffer : name %s offset %d len %d", name, offset, length)
 	// get object data
-	objectDataReader, err := cl.getObject(name, offset, length, false)
+	objectDataReader, err := cl.getObject(getObjectOptions{name: name, offset: offset, count: length})
 	if err != nil {
 		log.Err("Client::ReadInBuffer : getObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -622,7 +663,7 @@ func (cl *Client) WriteFromFile(name string, metadata map[string]*string, fi *os
 	}
 
 	// upload file data
-	err = cl.putObject(name, fi, stat.Size(), isSymlink)
+	err = cl.putObject(putObjectOptions{name: name, objectData: fi, size: stat.Size(), isSymLink: isSymlink})
 	if err != nil {
 		log.Err("Client::WriteFromFile : putObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -654,7 +695,7 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]*string, data
 	dataReader := bytes.NewReader(data)
 	// upload data to object
 	// TODO: handle metadata with S3
-	err := cl.putObject(name, dataReader, int64(len(data)), isSymlink)
+	err := cl.putObject(putObjectOptions{name: name, objectData: dataReader, size: int64(len(data)), isSymLink: isSymlink})
 	if err != nil {
 		log.Err("Client::WriteFromBuffer : putObject(%s) failed. Here's why: %v", name, err)
 	}
@@ -665,7 +706,7 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]*string, data
 func (cl *Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, error) {
 	log.Trace("Client::GetFileBlockOffsets : name %s", name)
 	blockList := common.BlockOffsetList{}
-	result, err := cl.headObject(name, false)
+	result, err := cl.headObject(name, false, false)
 	if err != nil {
 		log.Err("Client::GetFileBlockOffsets : Unable to headObject with name %v", name)
 		return &blockList, err
@@ -715,7 +756,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	log.Trace("Client::TruncateFile : Truncating %s to %dB.", name, size)
 
 	// get object data
-	objectDataReader, err := cl.getObject(name, 0, 0, false)
+	objectDataReader, err := cl.getObject(getObjectOptions{name: name})
 	if err != nil {
 		log.Err("Client::TruncateFile : getObject(%s) failed. Here's why: %v", name, err)
 		return err
@@ -741,7 +782,7 @@ func (cl *Client) TruncateFile(name string, size int64) error {
 	}
 	// overwrite the object with the truncated data
 	truncatedDataReader := bytes.NewReader(objectData)
-	err = cl.putObject(name, truncatedDataReader, int64(len(objectData)), false)
+	err = cl.putObject(putObjectOptions{name: name, objectData: truncatedDataReader, size: int64(len(objectData))})
 	if err != nil {
 		log.Err("Client::TruncateFile : Failed to write truncated data to object %s", name)
 	}
@@ -927,7 +968,7 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 	//struct for starting a multipart upload
 	ctx := context.Background()
-	key := cl.getKey(name, false)
+	key := cl.getKey(name, false, false)
 
 	//send command to start copy and get the upload id as it is needed later
 	var uploadID string
@@ -1092,7 +1133,7 @@ func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]
 			var addData []byte
 			// If there is no data in the block and it is not truncated, we need to get it from the cloud. Otherwise we can just copy it.
 			if len(blk.Data) == 0 && !blk.Truncated() {
-				result, err := cl.getObject(name, blk.StartIndex, blk.EndIndex-blk.StartIndex, false)
+				result, err := cl.getObject(getObjectOptions{name: name, offset: blk.StartIndex, count: blk.EndIndex - blk.StartIndex})
 				if err != nil {
 					log.Err("Client::combineSmallBlocks : Unable to get object with error: ", err.Error())
 					return nil, err
@@ -1121,4 +1162,31 @@ func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]
 		}
 	}
 	return newBlockList, nil
+}
+
+func (cl *Client) GetUsedSize() (uint64, error) {
+	headBucketOutput, err := cl.headBucket()
+	if err != nil {
+		return 0, err
+	}
+
+	response, ok := middleware.GetRawResponse(headBucketOutput.ResultMetadata).(*smithyHttp.Response)
+	if !ok || response == nil {
+		return 0, fmt.Errorf("Failed GetRawResponse from HeadBucketOutput")
+	}
+
+	headerValue, ok := response.Header["X-Rstor-Size"]
+	if !ok {
+		headerValue, ok = response.Header["X-Lyve-Size"]
+	}
+	if !ok || len(headerValue) == 0 {
+		return 0, fmt.Errorf("HeadBucket response has no size header (is the endpoint not Lyve Cloud?)")
+	}
+
+	bucketSizeBytes, err := strconv.ParseUint(headerValue[0], 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return bucketSizeBytes, nil
 }

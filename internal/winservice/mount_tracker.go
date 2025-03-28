@@ -3,7 +3,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,7 @@ package winservice
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 )
@@ -43,7 +44,16 @@ type Mounts struct {
 
 const mountFile = "mounts.json"
 
-func getAppDataFolder() (string, error) {
+func getAppDataFolder(useSystem bool) (string, error) {
+	if useSystem {
+		systemRoot := os.Getenv("SystemRoot")
+		if systemRoot == "" {
+			return "", errors.New("Could not find system root")
+		}
+		fullPath := filepath.Join(systemRoot, "System32", "config", "systemprofile", "AppData", "Roaming", "Cloudfuse")
+		return fullPath, nil
+	}
+
 	appDataPath, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
@@ -53,8 +63,8 @@ func getAppDataFolder() (string, error) {
 	return fullPath, nil
 }
 
-func getMountTrackerFile() (string, error) {
-	appDataPath, err := getAppDataFolder()
+func getMountTrackerFile(useSystem bool) (string, error) {
+	appDataPath, err := getAppDataFolder(useSystem)
 	if err != nil {
 		return "", err
 	}
@@ -83,8 +93,8 @@ func getMountTrackerFile() (string, error) {
 	return fullPath, nil
 }
 
-func readMounts() (Mounts, error) {
-	trackerFile, err := getMountTrackerFile()
+func readMounts(useSystem bool) (Mounts, error) {
+	trackerFile, err := getMountTrackerFile(useSystem)
 	if err != nil {
 		return Mounts{}, err
 	}
@@ -99,8 +109,8 @@ func readMounts() (Mounts, error) {
 	return mounts, err
 }
 
-func writeMounts(mounts Mounts) error {
-	trackerFile, err := getMountTrackerFile()
+func writeMounts(mounts Mounts, useSystem bool) error {
+	trackerFile, err := getMountTrackerFile(useSystem)
 	if err != nil {
 		return err
 	}
@@ -125,32 +135,53 @@ func removeMount(mounts Mounts, mountPath string) Mounts {
 	return filteredMounts
 }
 
+// DeleteMountJSONFiles deletes all the mount.json files on the system
+func DeleteMountJSONFiles() error {
+	trackerFile, err := getMountTrackerFile(false)
+	if err != nil {
+		return err
+	}
+
+	err = os.Remove(trackerFile)
+	if err != nil {
+		return err
+	}
+
+	trackerFile, err = getMountTrackerFile(true)
+	if err != nil {
+		return err
+	}
+
+	err = os.Remove(trackerFile)
+	return err
+}
+
 // AddMountJSON adds an entry to our json file with the mount path and config
 // file location.
-func AddMountJSON(mountPath string, configFile string) error {
-	mounts, err := readMounts()
+func AddMountJSON(mountPath string, configFile string, useSystem bool) error {
+	mounts, err := readMounts(useSystem)
 	if err != nil {
 		return err
 	}
 
 	// If a the path to the current mount is already in the mounts.json file
 	// then remove it.
-	removeMount(mounts, mountPath)
+	mounts = removeMount(mounts, mountPath)
 
 	newMount := Mount{MountPath: mountPath, ConfigFile: configFile}
 	mounts.Mounts = append(mounts.Mounts, newMount)
 
-	return writeMounts(mounts)
+	return writeMounts(mounts, useSystem)
 }
 
 // RemoveMountJSON removes an entry to from our json file.
-func RemoveMountJSON(mountPath string) error {
-	mounts, err := readMounts()
+func RemoveMountJSON(mountPath string, useSystem bool) error {
+	mounts, err := readMounts(useSystem)
 	if err != nil {
 		return err
 	}
 
 	mounts = removeMount(mounts, mountPath)
 
-	return writeMounts(mounts)
+	return writeMounts(mounts, useSystem)
 }

@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -32,6 +32,7 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -40,8 +41,6 @@ var errInvalidConfigField = errors.New("config field is invalid")
 
 type Options struct {
 	BucketName                string                  `config:"bucket-name" yaml:"bucket-name,omitempty"`
-	KeyID                     string                  `config:"key-id" yaml:"key-id,omitempty"`
-	SecretKey                 string                  `config:"secret-key" yaml:"secret-key,omitempty"`
 	Region                    string                  `config:"region" yaml:"region,omitempty"`
 	Profile                   string                  `config:"profile" yaml:"region,omitempty"`
 	Endpoint                  string                  `config:"endpoint" yaml:"endpoint,omitempty"`
@@ -54,10 +53,17 @@ type Options struct {
 	EnableChecksum            bool                    `config:"enable-checksum" yaml:"enable-checksum,omitempty"`
 	ChecksumAlgorithm         types.ChecksumAlgorithm `config:"checksum-algorithm" yaml:"checksum-algorithm,omitempty"`
 	UsePathStyle              bool                    `config:"use-path-style" yaml:"use-path-style,omitempty"`
+	DisableUsage              bool                    `config:"disable-usage" yaml:"disable-usage,omitempty"`
+	EnableDirMarker           bool                    `config:"enable-dir-marker" yaml:"enable-dir-marker,omitempty"`
+}
+
+type ConfigSecrets struct {
+	KeyID     *memguard.Enclave
+	SecretKey *memguard.Enclave
 }
 
 // ParseAndValidateConfig : Parse and validate config
-func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
+func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) error {
 	log.Trace("ParseAndValidateConfig : Parsing config")
 
 	// Validate bucket name
@@ -67,8 +73,8 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 
 	// Set authentication config
 	s3.stConfig.authConfig.BucketName = opt.BucketName
-	s3.stConfig.authConfig.KeyID = opt.KeyID
-	s3.stConfig.authConfig.SecretKey = opt.SecretKey
+	s3.stConfig.authConfig.KeyID = secrets.KeyID
+	s3.stConfig.authConfig.SecretKey = secrets.SecretKey
 	s3.stConfig.authConfig.Region = opt.Region
 	s3.stConfig.authConfig.Profile = opt.Profile
 	s3.stConfig.authConfig.Endpoint = opt.Endpoint
@@ -77,6 +83,8 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options) error {
 	s3.stConfig.restrictedCharsWin = opt.RestrictedCharsWin
 	s3.stConfig.disableConcurrentDownload = opt.DisableConcurrentDownload
 	s3.stConfig.usePathStyle = opt.UsePathStyle
+	s3.stConfig.disableUsage = opt.DisableUsage
+	s3.stConfig.enableDirMarker = opt.EnableDirMarker
 
 	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
 	if opt.PartSizeMb < 5 || opt.PartSizeMb > MaxPartSizeMb {
