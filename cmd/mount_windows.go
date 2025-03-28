@@ -42,14 +42,14 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 }
 
 // Use WinFSP to mount and if successful, add instance to persistent mount list
-func createMountInstance(enableRemount bool) error {
+func createMountInstance(enableRemountUser bool, enableRemountSystem bool) error {
 	err := winservice.StartMount(options.MountPath, options.ConfigFile, encryptedPassphrase)
 	if err != nil {
 		return err
 	}
 	// Add the mount to the JSON file so it persists on restart.
-	if enableRemount {
-		err = winservice.AddMountJSON(options.MountPath, options.ConfigFile)
+	if enableRemountUser || enableRemountSystem {
+		err = winservice.AddMountJSON(options.MountPath, options.ConfigFile, enableRemountSystem)
 		if err != nil {
 			return fmt.Errorf("failed to add entry to json file [%s]", err.Error())
 		}
