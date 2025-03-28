@@ -186,5 +186,5 @@ func init() {
 	generateConfig.Flags().StringVar(&opts.outputConfigPath, "output-file", "", "Output config file path.")
 	generateConfig.Flags().StringVar(&opts.tempDirPath, "temp-path", "", "Temporary file path.")
 	generateConfig.Flags().StringVar(&opts.passphrase, "passphrase", "",
-		"Key to be used for encryption / decryption. Key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+		"Password to be used for encryption / decryption. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.")
 }

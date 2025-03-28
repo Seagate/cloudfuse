@@ -27,7 +27,6 @@ package cmd
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"testing"
@@ -209,7 +208,7 @@ func (suite *secureConfigTestSuite) TestSecureConfigEncryptInvalidKey() {
 	defer suite.cleanupTest()
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	outFile, _ := os.CreateTemp("", "conf*.yaml")
-	passphrase := base64.StdEncoding.EncodeToString([]byte("123"))
+	passphrase := ""
 
 	defer os.Remove(confFile.Name())
 	defer os.Remove(outFile.Name())
