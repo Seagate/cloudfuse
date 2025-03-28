@@ -203,13 +203,8 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          # Require: The version of golangci-lint to use.
-          # When `install-mode` is `binary` (default) the value can be v1.2 or v1.2.3 or `latest` to use the latest version.
-          # When `install-mode` is `goinstall` the value can be v1.2.3, `latest`, or the hash of a commit.
           version: latest
-
-          # Optional: golangci-lint command line arguments.
-          args: --tests=false --timeout=5m --out-format=github-actions
+          args: --tests=false --timeout=5m
 
       - name: Notice file check
         run: |
