@@ -47,6 +47,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal/convertname"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/streaming"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
@@ -194,7 +195,12 @@ func (bb *BlockBlob) TestPipeline() error {
 	// we are just validating the auth mode used. So, no need to iterate over the pages
 	_, err := listBlobPager.NextPage(context.Background())
 	if err != nil {
-		log.Err("BlockBlob::TestPipeline : Failed to validate account with given auth %s", err.Error)
+		log.Err("BlockBlob::TestPipeline : Failed to validate account with given auth %s", err.Error())
+		var respErr *azcore.ResponseError
+		errors.As(err, &respErr)
+		if respErr != nil {
+			return fmt.Errorf("BlockBlob::TestPipeline : [%s]", respErr.ErrorCode)
+		}
 		return err
 	}
 

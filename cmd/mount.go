@@ -587,6 +587,29 @@ var mountCmd = &cobra.Command{
 	},
 }
 
+func monitorChild(pid int, done chan struct{}) {
+	// Monitor the child process and if child terminates then exit
+	var wstatus syscall.WaitStatus
+
+	for {
+		// Wait for a signal from child
+		wpid, err := syscall.Wait4(pid, &wstatus, 0, nil)
+		if err != nil {
+			log.Err("Error retrieving child status [%s]", err.Error())
+			break
+		}
+
+		if wpid == pid {
+			// Exit only if child has exited
+			// Signal can be received on a state change of child as well
+			if wstatus.Exited() || wstatus.Signaled() || wstatus.Stopped() {
+				close(done)
+				return
+			}
+		}
+	}
+}
+
 func ignoreFuseOptions(opt string) bool {
 	for _, o := range common.FuseIgnoredFlags() {
 		// Flags like uid and gid come with value so exact string match is not correct in that case.
@@ -778,5 +801,9 @@ func init() {
 
 func Destroy(message string) error {
 	_ = log.Destroy()
-	return fmt.Errorf("%s", message)
+	if message != "" {
+		return fmt.Errorf("%s", message)
+	}
+
+	return nil
 }
