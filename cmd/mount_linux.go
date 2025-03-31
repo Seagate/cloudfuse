@@ -109,6 +109,29 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 	return nil
 }
 
+func monitorChild(pid int, done chan struct{}) {
+	// Monitor the child process and if child terminates then exit
+	var wstatus unix.WaitStatus
+
+	for {
+		// Wait for a signal from child
+		wpid, err := unix.Wait4(pid, &wstatus, 0, nil)
+		if err != nil {
+			log.Err("Error retrieving child status [%s]", err.Error())
+			break
+		}
+
+		if wpid == pid {
+			// Exit only if child has exited
+			// Signal can be received on a state change of child as well
+			if wstatus.Exited() || wstatus.Signaled() || wstatus.Stopped() {
+				close(done)
+				return
+			}
+		}
+	}
+}
+
 func sigusrHandler(pipeline *internal.Pipeline, ctx context.Context) daemon.SignalHandlerFunc {
 	return func(sig os.Signal) error {
 		log.Crit("Mount::sigusrHandler : Signal %d received", sig)

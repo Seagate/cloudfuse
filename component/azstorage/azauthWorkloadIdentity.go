@@ -41,7 +41,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 	serviceBfs "github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake/service"
-	"github.com/Azure/azure-storage-fuse/v2/common/log"
+
+	"github.com/Seagate/cloudfuse/common/log"
 )
 
 // Verify that the Auth implement the correct AzAuth interfaces
