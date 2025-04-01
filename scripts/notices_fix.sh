@@ -299,11 +299,6 @@ fi
 # Generate notices in a temp file now
 generate_notices
 
-if ! generate_qt_notice
-then
-    # File is modified make space for fotter
-    echo -e "\n" >> $output_file
-fi
 # Generate footer for the file
 dump_footer
 
