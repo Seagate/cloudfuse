@@ -28,7 +28,7 @@ class customPasswordDialog(QDialog,Ui_Dialog):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.setWindowTitle('File Encrypted')
+        self.setWindowTitle('Your Config File Is Encrypted!')
 
         Qbtn = (QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.buttonBox = QDialogButtonBox(Qbtn)

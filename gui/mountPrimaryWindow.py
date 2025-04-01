@@ -67,8 +67,9 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         self.textEdit_output.setReadOnly(True)
         self.settings = self.allMountSettings
         self.passphrase = ''
-        self.unlockEncryptedFile()
-        self.initSettingsFromConfig(self.settings)
+        self.settingsUpdatedFromConfig = False
+        # self.unlockEncryptedFile()
+        # self.initSettingsFromConfig(self.settings)
 
         if platform == 'win32':
             # Windows directory and filename conventions:
@@ -104,6 +105,13 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         else:
             self.lineEdit_mountPoint.setToolTip('Designate a location to mount the bucket - the directory must already exist')
 
+    def triggerUpdateSettingsFromConfig(self):
+        if not self.settingsUpdatedFromConfig:
+            self.unlockEncryptedFile()
+            self.initSettingsFromConfig(self.settings)
+            self.settingsUpdatedFromConfig = True
+
+
     def checkConfigDirectory(self):
         workingDir = self.getWorkingDir()
         if not os.path.isdir(workingDir):
@@ -121,6 +129,7 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             return
 
     def updateMountPointInSettings(self):
+        self.triggerUpdateSettingsFromConfig()
         try:
             directory = str(self.lineEdit_mountPoint.text())
             self.myWindow.setValue('mountPoint',directory)
@@ -133,8 +142,9 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
     # There are unique settings per bucket selected for the pipeline,
     #   so we must use different widgets to show the different settings
     def showSettingsWidget(self):
-        targetIndex = self.dropDown_bucketSelect.currentIndex()
 
+        self.triggerUpdateSettingsFromConfig()
+        targetIndex = self.dropDown_bucketSelect.currentIndex()
         if bucketOptions[targetIndex] == 's3storage':
             self.setConfigs = s3SettingsWidget(self.settings)
         else:
@@ -274,6 +284,7 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
 
     # This function reads in the config file, modifies the components section, then writes the config file back
     def modifyPipeline(self):
+        self.triggerUpdateSettingsFromConfig()
         self.addOutputText('Validating configuration...')
         # Update the pipeline/components before mounting the target
         targetBucket = bucketOptions[self.dropDown_bucketSelect.currentIndex()]
