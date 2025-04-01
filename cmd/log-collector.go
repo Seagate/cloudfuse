@@ -117,6 +117,7 @@ func getBaseLogs(logPath string) error {
 
 func getSysLogs(logPath string) error {
 	// collect logs
+	// if time specify flags present. timestamp example in syslog is 'Mar 17 13:41:36'
 	//  grep cloudfuse /var/log/syslog > logs
 	if since != "" {
 		// select only the latest logs in the logPath that are no older than the timestamp provided
