@@ -250,8 +250,7 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 	}
 
 	// NOTE/TODO: this always fails in GitHub Actions on Windows
-	if !(config.IsSet(compName+".uid") || config.IsSet(compName+".gid") ||
-		config.IsSet("lfuse.uid") || config.IsSet("lfuse.gid")) {
+	if !config.IsSet(compName+".uid") && !config.IsSet(compName+".gid") && !config.IsSet("lfuse.uid") && !config.IsSet("lfuse.gid") {
 		var err error
 		lf.ownerUID, lf.ownerGID, err = common.GetCurrentUser()
 		if err != nil {

@@ -147,21 +147,20 @@ func testStatFsNotPopulated(suite *libfuseTestSuite) {
 	suite.assert.Equal(0, ret)
 
 	// By default these are all 0, so they should be populated by the system
-	// and thus each larger than 0
-	suite.assert.Positive(buf.Frsize)
-	suite.assert.Positive(buf.Blocks)
-	suite.assert.Positive(buf.Bavail)
-	suite.assert.Positive(buf.Bfree)
-	suite.assert.Positive(buf.Bsize)
-	suite.assert.Positive(buf.Files)
-	suite.assert.Positive(buf.Ffree)
-	suite.assert.Positive(buf.Namemax)
+	suite.assert.NotZero(buf.Frsize)
+	suite.assert.NotZero(buf.Blocks)
+	suite.assert.NotZero(buf.Bavail)
+	suite.assert.NotZero(buf.Bfree)
+	suite.assert.NotZero(buf.Bsize)
+	suite.assert.NotZero(buf.Files)
+	suite.assert.NotZero(buf.Ffree)
+	suite.assert.NotZero(buf.Namemax)
 }
 
 func testStatFsError(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	path := "/"
-	suite.mock.EXPECT().StatFs().Return(nil, false, errors.New("Error"))
+	suite.mock.EXPECT().StatFs().Return(nil, false, errors.New("error"))
 	buf := &fuse.Statfs_t{}
 	ret := cfuseFS.Statfs(path, buf)
 	suite.assert.Equal(ret, -fuse.EIO)

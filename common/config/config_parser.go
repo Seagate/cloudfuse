@@ -131,21 +131,21 @@ func ReadFromConfigBuffer(configData []byte) error {
 func DecryptConfigFile(fileName string, passphrase *memguard.Enclave) error {
 	cipherText, err := os.ReadFile(fileName)
 	if err != nil {
-		return fmt.Errorf("Failed to read encrypted config file [%s]", err.Error())
+		return fmt.Errorf("failed to read encrypted config file [%s]", err.Error())
 	}
 
 	if len(cipherText) == 0 {
-		return fmt.Errorf("Encrypted config file is empty")
+		return fmt.Errorf("encrypted config file is empty")
 	}
 
 	plainText, err := common.DecryptData(cipherText, passphrase)
 	if err != nil {
-		return fmt.Errorf("Failed to decrypt config file [%s]", err.Error())
+		return fmt.Errorf("failed to decrypt config file [%s]", err.Error())
 	}
 
 	err = loadConfigFromBufferToViper(plainText)
 	if err != nil {
-		return fmt.Errorf("Failed to load decrypted config file [%s]", err.Error())
+		return fmt.Errorf("failed to load decrypted config file [%s]", err.Error())
 	}
 
 	return nil
