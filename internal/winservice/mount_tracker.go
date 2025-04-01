@@ -69,12 +69,17 @@ func getMountTrackerFile(useSystem bool) (string, error) {
 		return "", err
 	}
 
-	fullPath := filepath.Join(appDataPath, mountFile)
+	// Check local file exists for this offset and file combination or not
+	root, err := os.OpenRoot(appDataPath)
+	if err != nil {
+		return "", err
+	}
+	defer root.Close()
 
 	// If the file does not exist, then create it
-	_, err = os.Stat(fullPath)
+	_, err = root.Stat(mountFile)
 	if err != nil && os.IsNotExist(err) {
-		_, err := os.Create(fullPath)
+		f, err := root.Create(mountFile)
 		if err != nil {
 			return "", err
 		}
@@ -84,11 +89,12 @@ func getMountTrackerFile(useSystem bool) (string, error) {
 			return "", err
 		}
 
-		err = os.WriteFile(fullPath, data, 0644)
+		_, err = f.Write(data)
 		if err != nil {
 			return "", err
 		}
 	}
+	fullPath := filepath.Join(appDataPath, mountFile)
 
 	return fullPath, nil
 }
