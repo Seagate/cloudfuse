@@ -976,7 +976,11 @@ func (bc *BlockCache) download(item *workItem) {
 	if bc.tmpPath != "" {
 		root, err := os.OpenRoot(bc.tmpPath)
 		if err != nil {
-			os.Mkdir(bc.tmpPath, 0755)
+			err := os.Mkdir(bc.tmpPath, 0755)
+			if err != nil {
+				log.Err("BlockCache::download : error creating directory structure for file %s [%s]", bc.tmpPath, err.Error())
+				return
+			}
 			root, err = os.OpenRoot(bc.tmpPath)
 			if err != nil {
 				log.Err("BlockCache::download : error creating directory structure for file %s [%s]", bc.tmpPath, err.Error())

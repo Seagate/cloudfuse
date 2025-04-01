@@ -36,8 +36,6 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 )
 
-var journalFile string
-
 type MountSize struct {
 	size        atomic.Uint64
 	file        *os.File
