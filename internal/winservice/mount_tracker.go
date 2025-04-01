@@ -50,6 +50,7 @@ func getAppDataFolder(useSystem bool) (string, error) {
 		if systemRoot == "" {
 			return "", errors.New("Could not find system root")
 		}
+		systemRoot = filepath.Clean(systemRoot)
 		fullPath := filepath.Join(systemRoot, "System32", "config", "systemprofile", "AppData", "Roaming", "Cloudfuse")
 		return fullPath, nil
 	}
