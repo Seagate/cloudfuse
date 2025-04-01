@@ -35,12 +35,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// TODO: rename log command to dumpLogs. followed by a directory to dump logs. ex. cloudfuse dumpLogs /path/to/dir. all logs are gathered by default.
-// consider adding a --since flag to specify logs since a given time stamp to be included ex. cloudfuse dumpLogs /path/to/dir --since yyyy/MM/DD:HH:MM:SS
-// consider adding a --last flag to specify logs in the last minutes, hours, days. ex. cloudfuse dumpLogs /path/do/dir --last 30 minutes
-
-var since string
-var last string
 var dumpLogsCmd = &cobra.Command{
 	Use:               "dumpLogs",
 	Short:             "interface to gather and review cloudfuse logs",
@@ -105,25 +99,14 @@ var dumpLogsCmd = &cobra.Command{
 }
 
 func getBaseLogs(logPath string) error {
-	// collect logs
-	if since != "" {
-		// select only the latest logs in the logPath that are no older than the timestamp provided
-	} else if last != "" {
-		// select only the latest logs in the logPath that are no older than $last value provided
-	}
+
 	var err error
 	return err
 }
 
 func getSysLogs(logPath string) error {
-	// collect logs
-	// if time specify flags present. timestamp example in syslog is 'Mar 17 13:41:36'
 	//  grep cloudfuse /var/log/syslog > logs
-	if since != "" {
-		// select only the latest logs in the logPath that are no older than the timestamp provided
-	} else if last != "" {
-		// select only the latest logs in the logPath that are no older than $last value provided
-	}
+
 	var err error
 	return err
 }
@@ -131,7 +114,4 @@ func getSysLogs(logPath string) error {
 func init() {
 	rootCmd.AddCommand(dumpLogsCmd)
 	dumpLogsCmd.Flags().StringVar(&configPath, "config-file", "", "Input archive creation path")
-	dumpLogsCmd.Flags().StringVar(&since, "since", "", "specify only log data that took place since a given time stamp")
-	dumpLogsCmd.Flags().StringVar(&last, "last", "", "specify only log data in the last minutes, hours, or days.")
-
 }
