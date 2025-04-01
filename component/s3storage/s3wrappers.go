@@ -93,10 +93,16 @@ func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
 		u.Concurrency = cl.Config.concurrency
 	})
 
-	_, err := downloader.Download(context.Background(), fi, &s3.GetObjectInput{
+	getObjectInput := &s3.GetObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
-	})
+	}
+
+	if cl.Config.enableChecksum {
+		getObjectInput.ChecksumMode = types.ChecksumModeEnabled
+	}
+
+	_, err := downloader.Download(context.Background(), fi, getObjectInput)
 	// check for errors
 	if err != nil {
 		attemptedAction := fmt.Sprintf("GetObject(%s)", key)
@@ -126,11 +132,17 @@ func (cl *Client) getObject(options getObjectOptions) (io.ReadCloser, error) {
 		rangeString = "bytes=" + fmt.Sprint(options.offset) + "-" + fmt.Sprint(endRange)
 	}
 
-	result, err := cl.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+	getObjectInput := &s3.GetObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
 		Range:  aws.String(rangeString),
-	})
+	}
+
+	if cl.Config.enableChecksum {
+		getObjectInput.ChecksumMode = types.ChecksumModeEnabled
+	}
+
+	result, err := cl.awsS3Client.GetObject(context.Background(), getObjectInput)
 
 	// check for errors
 	if err != nil {
@@ -268,11 +280,18 @@ func (cl *Client) copyObject(options copyObjectOptions) error {
 	// copy the object to its new key
 	sourceKey := cl.getKey(options.source, options.isSymLink, options.isDir)
 	targetKey := cl.getKey(options.target, options.isSymLink, options.isDir)
-	_, err := cl.awsS3Client.CopyObject(context.Background(), &s3.CopyObjectInput{
+
+	copyObjectInput := &s3.CopyObjectInput{
 		Bucket:     aws.String(cl.Config.authConfig.BucketName),
 		CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, url.PathEscape(sourceKey))),
 		Key:        aws.String(targetKey),
-	})
+	}
+
+	if cl.Config.enableChecksum {
+		copyObjectInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+	}
+
+	_, err := cl.awsS3Client.CopyObject(context.Background(), copyObjectInput)
 	// check for errors on copy
 	if err != nil {
 		attemptedAction := fmt.Sprintf("copy %s to %s", sourceKey, targetKey)
