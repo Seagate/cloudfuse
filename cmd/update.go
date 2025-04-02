@@ -244,7 +244,7 @@ func selectPackageAsset(assets []asset, ext string) (*asset, error) {
 	}
 
 	for _, asset := range assets {
-		if strings.HasPrefix(asset.Name, "cloudfuse_no_gui_") &&
+		if strings.HasPrefix(asset.Name, "cloudfuse") &&
 			strings.Contains(asset.Name, osName) &&
 			strings.Contains(asset.Name, arch) &&
 			strings.HasSuffix(asset.Name, ext) {

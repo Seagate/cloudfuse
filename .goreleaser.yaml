@@ -155,34 +155,16 @@ archives:
       - LICENSE
       - README.md
       - NOTICE
-      - src: ./gui/dist/cloudfuseGUI_Linux/*
-        dst: ./
       - src: setup/baseConfig.yaml
         dst: ./samples/baseConfig.yaml
       - src: sample_configs/*
         dst: ./samples/
 
-  - id: linux-amd64_no_gui
-    ids:
-      - linux-amd64
-      - linux-amd64-health-monitor
-    formats: ["tar.gz"]
-    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    files:
-      - LICENSE
-      - README.md
-      - NOTICE
-      - src: setup/baseConfig.yaml
-        dst: ./samples/baseConfig.yaml
-      - src: sample_configs/*
-        dst: ./samples/
-
-  - id: linux-arm64_no_gui
+  - id: linux-arm64
     ids:
       - linux-arm64
       - linux-arm64-health-monitor
     formats: ["tar.gz"]
-    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md
@@ -203,25 +185,6 @@ archives:
       - LICENSE
       - README.md
       - NOTICE
-      - src: ./gui/dist/cloudfuseGUI_Windows/*
-        dst: ./
-      - src: setup/baseConfig.yaml
-        dst: ./samples/baseConfig.yaml
-      - src: sample_configs/*
-        dst: ./samples/
-
-  - id: windows_no_gui
-    ids:
-      - windows
-      - windows-startup
-      - windows-health-monitor
-      - windows-service
-    formats: ["zip"]
-    name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    files:
-      - LICENSE
-      - README.md
-      - NOTICE
       - src: setup/baseConfig.yaml
         dst: ./samples/baseConfig.yaml
       - src: sample_configs/*
@@ -230,13 +193,13 @@ archives:
 release:
   extra_files:
     - glob: ./build/Output/cloudfuse_{{.Version}}_windows_amd64.exe
-    - glob: ./build/Output/cloudfuse_no_gui_{{.Version}}_windows_amd64.exe
 
 nfpms:
   - id: linux
     package_name: cloudfuse
     ids:
       - linux-amd64
+      - linux-arm64
     vendor: Seagate Technology
     homepage: https://github.com/Seagate/cloudfuse
     maintainer: Seagate Technology <cloudfuse@seagate.com>
@@ -265,72 +228,6 @@ nfpms:
           mode: 0644
       - src: LICENSE
         dst: /usr/share/doc/cloudfuse/LICENSE
-        file_info:
-          mode: 0644
-      - src: copyright
-        dst: /usr/share/doc/cloudfuse/copyright
-        file_info:
-          mode: 0644
-      - src: setup/baseConfig.yaml
-        dst: /usr/share/doc/cloudfuse/examples/baseConfig.yaml
-        file_info:
-          mode: 0644
-      - src: sample_configs/*
-        dst: /usr/share/doc/cloudfuse/examples/
-        file_info:
-          mode: 0644
-      - src: ./manpages/*
-        dst: /usr/share/man/man1/
-        file_info:
-          mode: 0644
-
-    overrides:
-      deb:
-        dependencies:
-          - libfuse3-dev
-          - libc6 (>= 2.24)
-
-      rpm:
-        dependencies:
-          - fuse3-devel
-          - libc6 >= 2.24
-
-  - id: linux_no_gui
-    package_name: cloudfuse
-    ids:
-      - linux-amd64
-      - linux-arm64
-    file_name_template: "{{ .ProjectName }}_no_gui_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-
-    vendor: Seagate Technology
-    homepage: https://github.com/Seagate/cloudfuse
-    maintainer: Seagate Technology <cloudfuse@seagate.com>
-    description: |-
-      FUSE file system for interacting with S3 and Azure storage.
-      Cloudfuse provides the ability to mount a cloud bucket in your local file
-      system. You can easily read and write to the cloud, and connect programs
-      on your computer to the cloud even if they're not cloud-aware.
-    license: MIT
-    changelog: "changelog.yml"
-    formats:
-      - deb
-      - rpm
-    section: utils
-    contents:
-      - src: './dist/linux-{{ .Arch }}-health-monitor_linux_{{ .Arch }}{{- if eq .Arch "amd64" }}_{{ .Amd64 }}{{- else }}_{{ .Arm64 }}{{ end }}/cfusemon'
-        dst: /usr/bin/cfusemon
-        file_info:
-          mode: 0755
-      - src: NOTICE
-        dst: /usr/share/doc/cloudfuse/NOTICE
-        file_info:
-          mode: 0644
-      - src: LICENSE
-        dst: /usr/share/doc/cloudfuse/LICENSE
-        file_info:
-          mode: 0644
-      - src: README.md
-        dst: /usr/share/doc/cloudfuse/README
         file_info:
           mode: 0644
       - src: copyright
