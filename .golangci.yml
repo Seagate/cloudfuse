@@ -13,6 +13,7 @@ linters:
     - staticcheck # Set of rules from staticcheck.
     - testifylint # Checks usage of github.com/stretchr/testify.
     - unused # Checks Go code for unused constants, variables, functions and types
+    - gosec
   settings:
     testifylint:
       # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
