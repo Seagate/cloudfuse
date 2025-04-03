@@ -27,6 +27,7 @@ import os
 from shutil import which
 import ctypes
 import string
+import datetime
 
 # Import QT libraries
 from PySide6.QtCore import Qt, QSettings
@@ -300,7 +301,10 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             return ('', '', -1, False)
 
     def addOutputText(self, textString):
-        self.textEdit_output.setText(f"{self.textEdit_output.toPlainText()}{textString}\n")
+        timestamp = datetime.datetime.now()
+        # format into year/month/day, hour/minute/second
+        formattedTimestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        self.textEdit_output.setText(f"{self.textEdit_output.toPlainText()}{formattedTimestamp}: {textString}\n")
         self.textEdit_output.repaint()
         self.textEdit_output.moveCursor(QtGui.QTextCursor.End)
 
