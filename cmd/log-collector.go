@@ -26,15 +26,23 @@
 package cmd
 
 import (
-	"errors"
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
+	"runtime"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/spf13/cobra"
 )
 
+var dumpPath string
+var logConfigFile string
 var dumpLogsCmd = &cobra.Command{
 	Use:               "dumpLogs",
 	Short:             "interface to gather and review cloudfuse logs",
@@ -47,45 +55,53 @@ var dumpLogsCmd = &cobra.Command{
 
 		dumpPath := common.ExpandPath(args[0])
 		var err error
-		dumpPath, err = filepath.Abs(dumpPath)
-		if err != nil {
-			return fmt.Errorf("couldn't determine absolute path for dump path [%s]", err.Error())
+		if dumpPath, err = filepath.Abs(dumpPath); err != nil {
+			return fmt.Errorf("couldn't determine absolute path for dump logs [%s]", err.Error())
 		}
+		//TODO: make sure dumpPath is empty. if it doesn't exist, create it.
 
-		configPath = common.ExpandPath(configPath)
-		configPath, err := filepath.Abs(configPath)
-		if err != nil {
+		//the options used here are from the mount options from within the same cmd package.
+
+		// if options.ConfigFile != "" {
+		// 	config.SetConfigFile(options.ConfigFile)
+		// } else if configPath != "" {
+		// 	configPath = common.ExpandPath(configPath)
+		// 	configPath, err := filepath.Abs(configPath)
+		// 	if err != nil {
+		// 		return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
+		// 	}
+		// 	config.SetConfigFile(configPath)
+		// } else {
+		// 	// consider checking everywhere and gathering everything at this point
+		// 	return errors.New("config file not provided")
+		// }
+
+		if logConfigFile, err = filepath.Abs(logConfigFile); err != nil {
 			return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
 		}
 
-		if options.ConfigFile != "" {
-			config.SetConfigFile(options.ConfigFile)
-		} else if configPath != "" {
-			config.SetConfigFile(configPath)
-		} else {
-			// consider checking everywhere and gathering everything at this point
-			return errors.New("config file not provided")
-		}
+		config.SetConfigFile(logConfigFile)
 
-		var logType string
 		var logPath string
 		if config.IsSet("logging.type") {
+			var logType string
 			err := config.UnmarshalKey("logging.type", &logType)
 			if err != nil {
 				return fmt.Errorf("failed to parse logging type from config [%s]", err.Error())
 			}
-			err = config.UnmarshalKey("logging.file-path", &logPath)
-			if err != nil {
-				return fmt.Errorf("failed to parse logging file path from config [%s]", err.Error())
-			}
-			if logType == "base" {
-				getBaseLogs(logPath)
-			} else if logType == "syslog" {
-				getSysLogs("/var/log/syslog")
+			if logType == "syslog" {
+				logPath = "/var/log/syslog"
+			} else if logType == "base" {
+				err = config.UnmarshalKey("logging.file-path", &logPath)
+				if err != nil {
+					return fmt.Errorf("failed to parse logging file path from config [%s]", err.Error())
+				}
 			}
 		} else {
-			getSysLogs("/var/log/syslog")
+			logPath = "/var/log/syslog"
 		}
+
+		getLogs(logPath)
 
 		// are any 'base' logging or syslog filters being used to redirect to a separate file?
 		// check for /etc/rsyslog.d and /etc/logrotate.d files
@@ -98,20 +114,170 @@ var dumpLogsCmd = &cobra.Command{
 	},
 }
 
-func getBaseLogs(logPath string) error {
+func getLogs(logPath string) error {
 
-	var err error
+	/*
+
+
+		2. collect contents from the path
+		3. archive contenst to the dumpPath
+	*/
+
+	logPath, err := filepath.Abs(logPath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %s", err.Error)
+	}
+
+	validDir, err := isDirValid(logPath)
+	if err != nil {
+		return err
+	}
+
+	outputFile := fmt.Sprintf("cloudfuse " + time.Now().Format("2006-01-02_15-04-05"))
+
+	if validDir {
+		if runtime.GOOS == "windows" {
+			outputFile += ".zip"
+			err = zipDirectory(logPath, dumpPath+outputFile)
+			if err != nil {
+				return err
+			}
+
+		} else if runtime.GOOS == "linux" {
+			outputFile += ".zip"
+			err = tarGzDirectory(logPath, dumpPath+outputFile)
+			if err != nil {
+				return err
+			}
+
+		}
+	}
+
+	return nil
+}
+
+func zipDirectory(logPath, outputFile string) error {
+	outFile, err := os.Create(outputFile)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	zipWriter := zip.NewWriter(outFile)
+	defer zipWriter.Close()
+
+	filepath.Walk(logPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(logPath, path)
+		if err != nil {
+			return err
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		zipEntry, err := zipWriter.Create(relPath)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(zipEntry, file)
+		return err
+	})
+
+	return nil
+}
+
+func tarGzDirectory(srcDir, tarGzFile string) error {
+	outFile, err := os.Create(tarGzFile)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	gzipWriter := gzip.NewWriter(outFile)
+	defer gzipWriter.Close()
+
+	tarWriter := tar.NewWriter(gzipWriter)
+	defer tarWriter.Close()
+
+	err = filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		header, err := tar.FileInfoHeader(info, relPath)
+		if err != nil {
+			return err
+		}
+		header.Name = relPath // Ensure relative path is used
+
+		err = tarWriter.WriteHeader(header)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(tarWriter, file)
+		return err
+	})
+
 	return err
 }
 
-func getSysLogs(logPath string) error {
-	//  grep cloudfuse /var/log/syslog > logs
+func isDirValid(logPath string) (bool, error) {
 
-	var err error
-	return err
+	info, err := os.Stat(logPath)
+	if os.IsNotExist(err) {
+		return false, fmt.Errorf("the path, %s, does not exist", logPath)
+	} else if !info.IsDir() {
+		return false, fmt.Errorf("the path provided is not a directory")
+	} else if err != nil {
+		return false, fmt.Errorf(err.Error())
+	}
+
+	dir, err := os.Open(logPath)
+	if err != nil {
+		return false, err
+	}
+	defer dir.Close()
+
+	files, err := dir.Readdirnames(1)
+	if err != nil && err != io.EOF {
+		return false, err
+	}
+
+	return len(files) == 0, nil
+
 }
 
 func init() {
 	rootCmd.AddCommand(dumpLogsCmd)
-	dumpLogsCmd.Flags().StringVar(&configPath, "config-file", "", "Input archive creation path")
+	// dumpLogsCmd.Flags().StringVar(&dumpPath, "dump-path", "", "Input archive creation path")
+	// markFlagErrorChk(dumpLogsCmd, "dump-path")
+	dumpLogsCmd.Flags().StringVar(&logConfigFile, "config-file", common.DefaultConfigFilePath, "config-file input path")
 }
