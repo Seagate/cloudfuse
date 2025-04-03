@@ -519,7 +519,7 @@ func (s *clientTestSuite) TestGetRegionEndpoint() {
 
 	region, err = getRegionFromEndpoint("")
 	s.assert.Error(err)
-	s.assert.Equal("", region)
+	s.assert.Empty(region)
 }
 
 func (s *clientTestSuite) TestListBuckets() {
@@ -644,7 +644,7 @@ func (s *clientTestSuite) TestReadLink() {
 	// object body should match target file name
 	output, err := io.ReadAll(result.Body)
 	s.assert.NoError(err)
-	s.assert.EqualValues(target, string(output))
+	s.assert.Equal(target, string(output))
 
 }
 
@@ -710,7 +710,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 		buffer, err := io.ReadAll(result.Body)
 		s.assert.NoError(err)
 
-		s.assert.EqualValues(targets[i], string(buffer))
+		s.assert.Equal(targets[i], string(buffer))
 	}
 
 	//gather keylist for DeleteObjects
@@ -1013,9 +1013,9 @@ func (s *clientTestSuite) TestList() {
 	s.assert.NoError(err)
 	s.assert.NotNil(objects)
 	s.assert.Len(objects, 2)
-	s.assert.EqualValues("c1", objects[0].Name)
+	s.assert.Equal("c1", objects[0].Name)
 	s.assert.True(objects[0].IsDir())
-	s.assert.EqualValues("c2", objects[1].Name)
+	s.assert.Equal("c2", objects[1].Name)
 	s.assert.False(objects[1].IsDir())
 
 	// without trailing "/" only get file ac
@@ -1025,7 +1025,7 @@ func (s *clientTestSuite) TestList() {
 	s.assert.NoError(err)
 	s.assert.NotNil(objects)
 	s.assert.Len(objects, 1)
-	s.assert.EqualValues(objects[0].Name, base+"c")
+	s.assert.Equal(objects[0].Name, base+"c")
 	s.assert.False(objects[0].IsDir())
 
 	// When listing the root, List should not include the root
@@ -1033,7 +1033,7 @@ func (s *clientTestSuite) TestList() {
 	s.assert.NoError(err)
 	s.assert.NotNil(objects)
 	s.assert.NotEmpty(objects)
-	s.assert.NotEqual("", objects[0].Name)
+	s.assert.NotEmpty(objects[0].Name)
 	s.assert.NotEqual("/", objects[0].Name)
 	s.assert.NotEqual(".", objects[0].Name)
 }
@@ -1066,8 +1066,8 @@ func (s *clientTestSuite) TestReadToFile() {
 	s.assert.NoError(err)
 	outputLen, err := f.Read(output)
 	s.assert.NoError(err)
-	s.assert.EqualValues(bodyLen, outputLen)
-	s.assert.EqualValues(body, output)
+	s.assert.Equal(bodyLen, outputLen)
+	s.assert.Equal(body, output)
 	f.Close()
 }
 
@@ -1100,8 +1100,8 @@ func (s *clientTestSuite) TestReadToFileRanged() {
 	s.assert.NoError(err)
 	outputLen, err := f.Read(output)
 	s.assert.NoError(err)
-	s.assert.EqualValues(bodyLen, outputLen)
-	s.assert.EqualValues(body, output)
+	s.assert.Equal(bodyLen, outputLen)
+	s.assert.Equal(body, output)
 	f.Close()
 }
 
@@ -1137,8 +1137,8 @@ func (s *clientTestSuite) TestReadToFileNoMultipart() {
 	s.assert.NoError(err)
 	outputLen, err := f.Read(output)
 	s.assert.NoError(err)
-	s.assert.EqualValues(bodyLen, outputLen)
-	s.assert.EqualValues(body, output)
+	s.assert.Equal(bodyLen, outputLen)
+	s.assert.Equal(body, output)
 	f.Close()
 }
 
@@ -1162,7 +1162,7 @@ func (s *clientTestSuite) TestReadBuffer() {
 
 	// result should match generated body
 	s.assert.NoError(err)
-	s.assert.EqualValues(body, result)
+	s.assert.Equal(body, result)
 }
 func (s *clientTestSuite) TestReadInBuffer() {
 	defer s.cleanupTest()
@@ -1186,7 +1186,7 @@ func (s *clientTestSuite) TestReadInBuffer() {
 
 	// read in buffer should match first outputLen characters of generated body
 	s.assert.NoError(err)
-	s.assert.EqualValues(body[:outputLen], output)
+	s.assert.Equal(body[:outputLen], output)
 }
 func (s *clientTestSuite) TestWriteFromFile() {
 	defer s.cleanupTest()
@@ -1201,7 +1201,7 @@ func (s *clientTestSuite) TestWriteFromFile() {
 	defer os.Remove(f.Name())
 	outputLen, err := f.Write(body)
 	s.assert.NoError(err)
-	s.assert.EqualValues(bodyLen, outputLen)
+	s.assert.Equal(bodyLen, outputLen)
 	var options internal.WriteFileOptions //stub
 
 	err = s.client.WriteFromFile(name, options.Metadata, f)
@@ -1222,7 +1222,7 @@ func (s *clientTestSuite) TestWriteFromFile() {
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
 	s.assert.NoError(err)
-	s.assert.EqualValues(body, output)
+	s.assert.Equal(body, output)
 }
 func (s *clientTestSuite) TestWriteFromBuffer() {
 	defer s.cleanupTest()
@@ -1249,7 +1249,7 @@ func (s *clientTestSuite) TestWriteFromBuffer() {
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
 	s.assert.NoError(err)
-	s.assert.EqualValues(body, output)
+	s.assert.Equal(body, output)
 }
 func (s *clientTestSuite) TestTruncateFile() {
 	defer s.cleanupTest()
@@ -1282,7 +1282,7 @@ func (s *clientTestSuite) TestTruncateFile() {
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
 	s.assert.NoError(err)
-	s.assert.EqualValues(body[:size], output)
+	s.assert.Equal(body[:size], output)
 }
 func (s *clientTestSuite) TestWrite() {
 	defer s.cleanupTest()
@@ -1317,8 +1317,8 @@ func (s *clientTestSuite) TestWrite() {
 	defer result.Body.Close()
 	output, err := io.ReadAll(result.Body)
 	s.assert.NoError(err)
-	s.assert.EqualValues(oldBody[:offset], output[:offset])
-	s.assert.EqualValues(newData, output[offset:])
+	s.assert.Equal(oldBody[:offset], output[:offset])
+	s.assert.Equal(newData, output[offset:])
 }
 
 func TestClient(t *testing.T) {

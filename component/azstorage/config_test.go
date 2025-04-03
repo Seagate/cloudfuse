@@ -304,7 +304,7 @@ func (s *configTestSuite) TestAuthModeMSI() {
 	assert.NoError(err)
 	assert.Equal(az.stConfig.authConfig.AuthMode, EAuthType.MSI())
 	assert.Equal(az.stConfig.authConfig.ApplicationID, opt.ApplicationID)
-	assert.Equal("", az.stConfig.authConfig.ResourceID)
+	assert.Empty(az.stConfig.authConfig.ResourceID)
 
 	// test more than one credential passed for msi
 	opt.ResourceID = "123"

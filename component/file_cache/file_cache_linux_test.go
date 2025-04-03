@@ -172,7 +172,7 @@ func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
 
 	info, err := os.Stat(suite.cache_path + "/" + path)
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(info.Mode(), newMode)
+	suite.assert.Equal(info.Mode(), newMode)
 
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 	suite.assert.NoError(err)
@@ -190,8 +190,8 @@ func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
 	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: path})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(attr)
-	suite.assert.EqualValues(path, attr.Path)
-	suite.assert.EqualValues(attr.Mode, newMode)
+	suite.assert.Equal(path, attr.Path)
+	suite.assert.Equal(attr.Mode, newMode)
 }
 
 func (suite *fileCacheLinuxTestSuite) TestChownNotInCache() {
@@ -271,8 +271,8 @@ func (suite *fileCacheLinuxTestSuite) TestChownCase2() {
 	info, err = os.Stat(suite.cache_path + "/" + path)
 	stat = info.Sys().(*syscall.Stat_t)
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(oldOwner, stat.Uid)
-	suite.assert.EqualValues(oldGroup, stat.Gid)
+	suite.assert.Equal(oldOwner, stat.Uid)
+	suite.assert.Equal(oldGroup, stat.Gid)
 	// Path should not be in fake storage
 	suite.assert.NoFileExists(suite.fake_storage_path + "/" + path)
 }

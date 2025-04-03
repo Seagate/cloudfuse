@@ -355,7 +355,7 @@ func (az *AzStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		log.Err("AzStorage::OpenFile : Failed to create handle for %s", options.Name)
 		return nil, syscall.EFAULT
 	}
-	handle.Size = int64(attr.Size)
+	handle.Size = attr.Size
 	handle.Mtime = attr.Mtime
 
 	// increment open file handles count

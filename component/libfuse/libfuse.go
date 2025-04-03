@@ -30,6 +30,7 @@ package libfuse
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -52,8 +53,8 @@ type Libfuse struct {
 	internal.BaseComponent
 	host                  *fuse.FileSystemHost
 	mountPath             string
-	dirPermission         uint
-	filePermission        uint
+	dirPermission         os.FileMode
+	filePermission        os.FileMode
 	readOnly              bool
 	attributeExpiration   uint32
 	entryExpiration       uint32
@@ -89,26 +90,26 @@ type dirChildCache struct {
 // LibfuseOptions defines the config parameters.
 type LibfuseOptions struct {
 	mountPath               string
-	DefaultPermission       uint32 `config:"default-permission" yaml:"default-permission,omitempty"`
-	AttributeExpiration     uint32 `config:"attribute-expiration-sec" yaml:"attribute-expiration-sec,omitempty"`
-	EntryExpiration         uint32 `config:"entry-expiration-sec" yaml:"entry-expiration-sec,omitempty"`
-	NegativeEntryExpiration uint32 `config:"negative-entry-expiration-sec" yaml:"negative-entry-expiration-sec,omitempty"`
-	EnableFuseTrace         bool   `config:"fuse-trace" yaml:"fuse-trace,omitempty"`
-	allowOther              bool   `config:"allow-other" yaml:"-"`
-	allowRoot               bool   `config:"allow-root" yaml:"-"`
-	readOnly                bool   `config:"read-only" yaml:"-"`
-	ExtensionPath           string `config:"extension" yaml:"extension,omitempty"`
-	DisableWritebackCache   bool   `config:"disable-writeback-cache" yaml:"-"`
-	IgnoreOpenFlags         bool   `config:"ignore-open-flags" yaml:"ignore-open-flags,omitempty"`
-	nonEmptyMount           bool   `config:"nonempty" yaml:"nonempty,omitempty"`
-	NetworkShare            bool   `config:"network-share" yaml:"network-share,omitempty"`
-	Uid                     uint32 `config:"uid" yaml:"uid,omitempty"`
-	Gid                     uint32 `config:"gid" yaml:"gid,omitempty"`
-	MaxFuseThreads          uint32 `config:"max-fuse-threads" yaml:"max-fuse-threads,omitempty"`
-	DirectIO                bool   `config:"direct-io" yaml:"direct-io,omitempty"`
-	Umask                   uint32 `config:"umask" yaml:"umask,omitempty"`
-	DisplayCapacityMb       uint64 `config:"display-capacity-mb" yaml:"display-capacity-mb,omitempty"`
-	WindowsSSDL             string `config:"windows-sddl" yaml:"windows-sddl,omitempty"`
+	DefaultPermission       os.FileMode `config:"default-permission" yaml:"default-permission,omitempty"`
+	AttributeExpiration     uint32      `config:"attribute-expiration-sec" yaml:"attribute-expiration-sec,omitempty"`
+	EntryExpiration         uint32      `config:"entry-expiration-sec" yaml:"entry-expiration-sec,omitempty"`
+	NegativeEntryExpiration uint32      `config:"negative-entry-expiration-sec" yaml:"negative-entry-expiration-sec,omitempty"`
+	EnableFuseTrace         bool        `config:"fuse-trace" yaml:"fuse-trace,omitempty"`
+	allowOther              bool        `config:"allow-other" yaml:"-"`
+	allowRoot               bool        `config:"allow-root" yaml:"-"`
+	readOnly                bool        `config:"read-only" yaml:"-"`
+	ExtensionPath           string      `config:"extension" yaml:"extension,omitempty"`
+	DisableWritebackCache   bool        `config:"disable-writeback-cache" yaml:"-"`
+	IgnoreOpenFlags         bool        `config:"ignore-open-flags" yaml:"ignore-open-flags,omitempty"`
+	nonEmptyMount           bool        `config:"nonempty" yaml:"nonempty,omitempty"`
+	NetworkShare            bool        `config:"network-share" yaml:"network-share,omitempty"`
+	Uid                     uint32      `config:"uid" yaml:"uid,omitempty"`
+	Gid                     uint32      `config:"gid" yaml:"gid,omitempty"`
+	MaxFuseThreads          uint32      `config:"max-fuse-threads" yaml:"max-fuse-threads,omitempty"`
+	DirectIO                bool        `config:"direct-io" yaml:"direct-io,omitempty"`
+	Umask                   uint32      `config:"umask" yaml:"umask,omitempty"`
+	DisplayCapacityMb       uint64      `config:"display-capacity-mb" yaml:"display-capacity-mb,omitempty"`
+	WindowsSSDL             string      `config:"windows-sddl" yaml:"windows-sddl,omitempty"`
 }
 
 const compName = "libfuse"
@@ -207,15 +208,15 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 	lf.windowsSDDL = opt.WindowsSSDL
 
 	if opt.allowOther {
-		lf.dirPermission = uint(common.DefaultAllowOtherPermissionBits)
-		lf.filePermission = uint(common.DefaultAllowOtherPermissionBits)
+		lf.dirPermission = common.DefaultAllowOtherPermissionBits
+		lf.filePermission = common.DefaultAllowOtherPermissionBits
 	} else {
 		if opt.DefaultPermission != 0 {
-			lf.dirPermission = uint(opt.DefaultPermission)
-			lf.filePermission = uint(opt.DefaultPermission)
+			lf.dirPermission = opt.DefaultPermission
+			lf.filePermission = opt.DefaultPermission
 		} else {
-			lf.dirPermission = uint(common.DefaultDirectoryPermissionBits)
-			lf.filePermission = uint(common.DefaultFilePermissionBits)
+			lf.dirPermission = common.DefaultDirectoryPermissionBits
+			lf.filePermission = common.DefaultFilePermissionBits
 		}
 	}
 

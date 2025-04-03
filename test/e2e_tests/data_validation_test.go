@@ -361,17 +361,18 @@ func validateMultipleFilesData(jobs <-chan int, results chan<- string, fileSize 
 		srcFile.Close()
 
 		// write to file in the local directory
-		if fileSize == "huge" {
+		switch fileSize {
+		case "huge":
 			err = os.WriteFile(localFilePath, hugeBuff, 0777)
-		} else if fileSize == "large" {
+		case "large":
 			if strings.ToLower(dataValidationQuickTest) == "true" {
 				err = os.WriteFile(localFilePath, hugeBuff, 0777)
 			} else {
 				err = os.WriteFile(localFilePath, largeBuff, 0777)
 			}
-		} else if fileSize == "medium" {
+		case "medium":
 			err = os.WriteFile(localFilePath, medBuff, 0777)
-		} else {
+		default:
 			err = os.WriteFile(localFilePath, minBuff, 0777)
 		}
 		suite.NoError(err)
@@ -710,7 +711,7 @@ func TestDataValidationTestSuite(t *testing.T) {
 	fmt.Println("Distro Name: " + fileTestDistro)
 
 	// Ignore data validation test on all distros other than UBN
-	if strings.ToLower(dataValidationQuickTest) == "true" || !(strings.Contains(strings.ToUpper(fileTestDistro), "UBUNTU") || strings.Contains(strings.ToUpper(fileTestDistro), "UBN")) {
+	if strings.ToLower(dataValidationQuickTest) == "true" || (!strings.Contains(strings.ToUpper(fileTestDistro), "UBUNTU") && !strings.Contains(strings.ToUpper(fileTestDistro), "UBN")) {
 		fmt.Println("Skipping Data Validation test suite...")
 		return
 	}

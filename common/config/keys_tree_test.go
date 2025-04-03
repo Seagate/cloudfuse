@@ -82,7 +82,7 @@ func (suite *keysTreeTestSuite) TestParseValue() {
 	for _, i := range inputs {
 		suite.Run(i.val, func() {
 			output := parseValue(i.val, i.toType)
-			suite.assert.EqualValues(i.result, output)
+			suite.assert.Equal(i.result, output)
 		})
 	}
 }

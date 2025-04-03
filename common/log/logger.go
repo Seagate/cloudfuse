@@ -37,8 +37,8 @@ type Logger interface {
 	GetLoggerObj() *log.Logger
 
 	SetLogFile(name string) error
-	SetMaxLogSize(size int)
-	SetLogFileCount(count int)
+	SetMaxLogSize(size int64)
+	SetLogFileCount(count int64)
 	SetLogLevel(level common.LogLevel)
 
 	Destroy() error
@@ -98,10 +98,10 @@ func SetConfig(config common.LogConfig) error {
 			logObj.SetLogLevel(config.Level)
 		}
 		if config.MaxFileSize != 0 {
-			logObj.SetMaxLogSize(int(config.MaxFileSize))
+			logObj.SetMaxLogSize(config.MaxFileSize)
 		}
 		if config.FileCount != 0 {
-			logObj.SetLogFileCount(int(config.FileCount))
+			logObj.SetLogFileCount(config.FileCount)
 		}
 	}
 
@@ -115,13 +115,13 @@ func SetLogFile(name string) error {
 	return nil
 }
 
-func SetMaxLogSize(size int) {
+func SetMaxLogSize(size int64) {
 	if logObj != nil {
 		logObj.SetMaxLogSize(size)
 	}
 }
 
-func SetLogFileCount(count int) {
+func SetLogFileCount(count int64) {
 	if logObj != nil {
 		logObj.SetLogFileCount(count)
 	}

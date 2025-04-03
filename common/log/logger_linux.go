@@ -48,7 +48,7 @@ func NewLogger(name string, config common.LogConfig) (Logger, error) {
 			LogFile:      config.FilePath,
 			LogLevel:     config.Level,
 			LogSize:      config.MaxFileSize * 1024 * 1024,
-			LogFileCount: int(config.FileCount),
+			LogFileCount: config.FileCount,
 			LogTag:       config.Tag,
 		})
 		if err != nil {

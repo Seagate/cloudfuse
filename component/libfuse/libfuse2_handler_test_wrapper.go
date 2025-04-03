@@ -127,14 +127,14 @@ func testStatFs(suite *libfuseTestSuite) {
 	ret := cfuseFS.Statfs(path, buf)
 
 	suite.assert.Equal(0, ret)
-	suite.assert.Equal(1, int(buf.Frsize))
-	suite.assert.Equal(2, int(buf.Blocks))
-	suite.assert.Equal(3, int(buf.Bavail))
-	suite.assert.Equal(4, int(buf.Bfree))
-	suite.assert.Equal(5, int(buf.Bsize))
-	suite.assert.Equal(6, int(buf.Files))
-	suite.assert.Equal(7, int(buf.Ffree))
-	suite.assert.Equal(8, int(buf.Namemax))
+	suite.assert.EqualValues(1, buf.Frsize)
+	suite.assert.EqualValues(2, buf.Blocks)
+	suite.assert.EqualValues(3, buf.Bavail)
+	suite.assert.EqualValues(4, buf.Bfree)
+	suite.assert.EqualValues(5, buf.Bsize)
+	suite.assert.EqualValues(6, buf.Files)
+	suite.assert.EqualValues(7, buf.Ffree)
+	suite.assert.EqualValues(8, buf.Namemax)
 }
 
 func testStatFsNotPopulated(suite *libfuseTestSuite) {

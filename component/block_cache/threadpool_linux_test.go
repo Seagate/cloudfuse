@@ -53,9 +53,6 @@ type threadPoolTestSuite struct {
 func (suite *threadPoolTestSuite) SetupTest() {
 }
 
-func (suite *threadPoolTestSuite) cleanupTest() {
-}
-
 func (suite *threadPoolTestSuite) TestCreate() {
 	suite.assert = assert.New(suite.T())
 

@@ -158,18 +158,11 @@ func (suite *rootCmdSuite) TestGetRemoteVersionCurrentSame() {
 	suite.assert.Nil(msg)
 }
 
-func (suite *rootCmdSuite) testExecute() {
-	suite.T().Helper()
-
+func (suite *rootCmdSuite) TestVersion() {
 	defer suite.cleanupTest()
-	buf := new(bytes.Buffer)
-	rootCmd.SetOut(buf)
-	rootCmd.SetErr(buf)
-	rootCmd.SetArgs([]string{"--version"})
-
-	err := Execute()
+	out, err := executeCommandC(rootCmd, "--version")
 	suite.assert.NoError(err)
-	suite.assert.Contains(buf.String(), "cloudfuse version")
+	suite.assert.Contains(out, "cloudfuse version")
 }
 
 func (suite *rootCmdSuite) TestParseArgs() {

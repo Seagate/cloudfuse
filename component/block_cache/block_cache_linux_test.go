@@ -175,7 +175,7 @@ func (suite *blockCacheTestSuite) TestEmpty() {
 
 	suite.assert.NoError(err)
 	suite.assert.Equal("block_cache", tobj.blockCache.Name())
-	suite.assert.EqualValues(16*_1MB, tobj.blockCache.blockSize)
+	suite.assert.Equal(16*_1MB, tobj.blockCache.blockSize)
 	suite.assert.EqualValues(0, tobj.blockCache.diskSize)
 	suite.assert.EqualValues(defaultTimeout, tobj.blockCache.diskTimeout)
 
@@ -185,7 +185,7 @@ func (suite *blockCacheTestSuite) TestEmpty() {
 	coresStr := strings.TrimSpace(string(output))
 	cores, err := strconv.Atoi(coresStr)
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(tobj.blockCache.workers, uint32(3*cores))
+	suite.assert.Equal(tobj.blockCache.workers, uint32(3*cores))
 	suite.assert.EqualValues(tobj.blockCache.prefetch, math.Max((MIN_PREFETCH*2)+1, float64(2*cores)))
 	suite.assert.False(tobj.blockCache.noPrefetch)
 	suite.assert.NotNil(tobj.blockCache.blockPool)
@@ -297,10 +297,10 @@ func (suite *blockCacheTestSuite) TestManualConfig() {
 
 	suite.assert.NoError(err)
 	suite.assert.Equal("block_cache", tobj.blockCache.Name())
-	suite.assert.EqualValues(16*_1MB, tobj.blockCache.blockSize)
-	suite.assert.EqualValues(500*_1MB, tobj.blockCache.memSize)
+	suite.assert.Equal(16*_1MB, tobj.blockCache.blockSize)
+	suite.assert.Equal(500*_1MB, tobj.blockCache.memSize)
 	suite.assert.EqualValues(10, tobj.blockCache.workers)
-	suite.assert.EqualValues(100*_1MB, tobj.blockCache.diskSize)
+	suite.assert.Equal(100*_1MB, tobj.blockCache.diskSize)
 	suite.assert.EqualValues(5, tobj.blockCache.diskTimeout)
 	suite.assert.EqualValues(12, tobj.blockCache.prefetch)
 	suite.assert.EqualValues(10, tobj.blockCache.workers)

@@ -57,8 +57,8 @@ type LogOptions struct {
 	Type           string `config:"type" yaml:"type,omitempty"`
 	LogLevel       string `config:"level" yaml:"level,omitempty"`
 	LogFilePath    string `config:"file-path" yaml:"file-path,omitempty"`
-	MaxLogFileSize uint64 `config:"max-file-size-mb" yaml:"max-file-size-mb,omitempty"`
-	LogFileCount   uint64 `config:"file-count" yaml:"file-count,omitempty"`
+	MaxLogFileSize int64  `config:"max-file-size-mb" yaml:"max-file-size-mb,omitempty"`
+	LogFileCount   int64  `config:"file-count" yaml:"file-count,omitempty"`
 	TimeTracker    bool   `config:"track-time" yaml:"track-time,omitempty"`
 }
 
@@ -176,11 +176,11 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 	}
 
 	// A user provided value of 0 doesn't make sense for MaxLogFileSize or LogFileCount.
-	if opt.Logging.MaxLogFileSize == 0 {
+	if opt.Logging.MaxLogFileSize <= 0 {
 		opt.Logging.MaxLogFileSize = common.DefaultMaxLogFileSize
 	}
 
-	if opt.Logging.LogFileCount == 0 {
+	if opt.Logging.LogFileCount <= 0 {
 		opt.Logging.LogFileCount = common.DefaultLogFileCount
 	}
 

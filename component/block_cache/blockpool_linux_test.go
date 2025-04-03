@@ -53,9 +53,6 @@ type blockpoolTestSuite struct {
 func (suite *blockpoolTestSuite) SetupTest() {
 }
 
-func (suite *blockpoolTestSuite) cleanupTest() {
-}
-
 func validateNullData(b *Block) bool {
 	for i := 0; i < len(b.data); i++ {
 		if b.data[i] != 0 {

@@ -119,8 +119,8 @@ func (handle *Handle) SetFileObject(f *os.File) {
 }
 
 // FD : Get Unix file descriptor
-func (handle *Handle) FD() int {
-	return int(handle.UnixFD)
+func (handle *Handle) FD() uint64 {
+	return handle.UnixFD
 }
 
 // SetValue : Store user defined parameter inside handle

@@ -82,10 +82,10 @@ func (*SilentLogger) SetLogFile(_ string) error {
 	return nil
 }
 
-func (*SilentLogger) SetMaxLogSize(_ int) {
+func (*SilentLogger) SetMaxLogSize(_ int64) {
 }
 
-func (*SilentLogger) SetLogFileCount(_ int) {
+func (*SilentLogger) SetLogFileCount(_ int64) {
 
 }
 

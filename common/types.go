@@ -152,8 +152,8 @@ func (l *LogLevel) Parse(s string) error {
 
 type LogConfig struct {
 	Level       LogLevel
-	MaxFileSize uint64
-	FileCount   uint64
+	MaxFileSize int64
+	FileCount   int64
 	FilePath    string
 	TimeTracker bool
 	Tag         string // logging tag which can be either cloudfuse or cfusemon
