@@ -53,34 +53,31 @@ var dumpLogsCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		dumpPath := common.ExpandPath(args[0])
 		var err error
-		if dumpPath, err = filepath.Abs(dumpPath); err != nil {
+		dumpPath = args[0]
+		dumpPath, err = filepath.Abs(dumpPath)
+		if err != nil {
 			return fmt.Errorf("couldn't determine absolute path for dump logs [%s]", err.Error())
 		}
-		//TODO: make sure dumpPath is empty. if it doesn't exist, create it.
 
-		//the options used here are from the mount options from within the same cmd package.
+		dumpInfo, err := os.Stat(dumpPath)
+		if err != nil {
+			return fmt.Errorf("couldn't stat dump Path")
+		}
 
-		// if options.ConfigFile != "" {
-		// 	config.SetConfigFile(options.ConfigFile)
-		// } else if configPath != "" {
-		// 	configPath = common.ExpandPath(configPath)
-		// 	configPath, err := filepath.Abs(configPath)
-		// 	if err != nil {
-		// 		return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
-		// 	}
-		// 	config.SetConfigFile(configPath)
-		// } else {
-		// 	// consider checking everywhere and gathering everything at this point
-		// 	return errors.New("config file not provided")
-		// }
+		if !dumpInfo.IsDir() {
+			return fmt.Errorf("dumpPath provided needs to be a directory")
+		}
 
+		println(logConfigFile)
 		if logConfigFile, err = filepath.Abs(logConfigFile); err != nil {
 			return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
 		}
 
+		println(logConfigFile)
+
 		config.SetConfigFile(logConfigFile)
+		config.ReadFromConfigFile(logConfigFile)
 
 		var logPath string
 		if config.IsSet("logging.type") {
@@ -101,7 +98,10 @@ var dumpLogsCmd = &cobra.Command{
 			logPath = "/var/log/syslog"
 		}
 
-		getLogs(logPath)
+		err = getLogs(logPath)
+		if err != nil {
+			println(err.Error())
+		}
 
 		// are any 'base' logging or syslog filters being used to redirect to a separate file?
 		// check for /etc/rsyslog.d and /etc/logrotate.d files
@@ -115,41 +115,28 @@ var dumpLogsCmd = &cobra.Command{
 }
 
 func getLogs(logPath string) error {
-
-	/*
-
-
-		2. collect contents from the path
-		3. archive contenst to the dumpPath
-	*/
-
+	//TODO: add logType support and provide syslog gather path
 	logPath, err := filepath.Abs(logPath)
+	logPath = filepath.Dir(logPath)
 	if err != nil {
-		return fmt.Errorf("failed to get absolute path: %s", err.Error)
-	}
-
-	validDir, err := isDirValid(logPath)
-	if err != nil {
-		return err
+		return fmt.Errorf("failed to get absolute path: [%s]", err.Error())
 	}
 
 	outputFile := fmt.Sprintf("cloudfuse " + time.Now().Format("2006-01-02_15-04-05"))
 
-	if validDir {
-		if runtime.GOOS == "windows" {
-			outputFile += ".zip"
-			err = zipDirectory(logPath, dumpPath+outputFile)
-			if err != nil {
-				return err
-			}
+	if runtime.GOOS == "windows" {
+		outputFile += ".zip"
+		err = zipDirectory(logPath, dumpPath+"/"+outputFile)
+		if err != nil {
+			return err
+		}
 
-		} else if runtime.GOOS == "linux" {
-			outputFile += ".zip"
-			err = tarGzDirectory(logPath, dumpPath+outputFile)
-			if err != nil {
-				return err
-			}
-
+	} else if runtime.GOOS == "linux" {
+		outputFile += ".tar.gz"
+		println(dumpPath + "/" + outputFile)
+		err = tarGzDirectory(logPath, dumpPath+"/"+outputFile)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -198,8 +185,8 @@ func zipDirectory(logPath, outputFile string) error {
 	return nil
 }
 
-func tarGzDirectory(srcDir, tarGzFile string) error {
-	outFile, err := os.Create(tarGzFile)
+func tarGzDirectory(logPath, outputFile string) error {
+	outFile, err := os.Create(outputFile)
 	if err != nil {
 		return err
 	}
@@ -211,7 +198,7 @@ func tarGzDirectory(srcDir, tarGzFile string) error {
 	tarWriter := tar.NewWriter(gzipWriter)
 	defer tarWriter.Close()
 
-	err = filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(logPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -220,7 +207,7 @@ func tarGzDirectory(srcDir, tarGzFile string) error {
 			return nil
 		}
 
-		relPath, err := filepath.Rel(srcDir, path)
+		relPath, err := filepath.Rel(logPath, path)
 		if err != nil {
 			return err
 		}
@@ -247,32 +234,6 @@ func tarGzDirectory(srcDir, tarGzFile string) error {
 	})
 
 	return err
-}
-
-func isDirValid(logPath string) (bool, error) {
-
-	info, err := os.Stat(logPath)
-	if os.IsNotExist(err) {
-		return false, fmt.Errorf("the path, %s, does not exist", logPath)
-	} else if !info.IsDir() {
-		return false, fmt.Errorf("the path provided is not a directory")
-	} else if err != nil {
-		return false, fmt.Errorf(err.Error())
-	}
-
-	dir, err := os.Open(logPath)
-	if err != nil {
-		return false, err
-	}
-	defer dir.Close()
-
-	files, err := dir.Readdirnames(1)
-	if err != nil && err != io.EOF {
-		return false, err
-	}
-
-	return len(files) == 0, nil
-
 }
 
 func init() {
