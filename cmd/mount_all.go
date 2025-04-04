@@ -339,8 +339,14 @@ func mountAllContainers(containerList []string, configFile string, mountPath str
 			contConfigFile = contConfigFile + SecureConfigExtension
 		}
 
-		if _, err := os.Stat(contMountPath); os.IsNotExist(err) {
-			err = os.MkdirAll(contMountPath, 0777)
+		root, err := os.OpenRoot(mountPath)
+		if err != nil {
+			return err
+		}
+		defer root.Close()
+
+		if _, err := root.Stat(container); os.IsNotExist(err) {
+			err = root.Mkdir(container, 0777)
 			if err != nil {
 				fmt.Printf("Failed to create directory %s : %s\n", contMountPath, err.Error())
 			}
