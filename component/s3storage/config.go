@@ -121,9 +121,9 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 
 	s3.stConfig.enableChecksum = opt.EnableChecksum
 	if opt.EnableChecksum {
-		// Use default SHA1 checksum if user does not provide algorithm
+		// Use default CRC32 checksum if user does not provide algorithm
 		if opt.ChecksumAlgorithm == "" {
-			opt.ChecksumAlgorithm = types.ChecksumAlgorithmSha1
+			opt.ChecksumAlgorithm = types.ChecksumAlgorithmCrc32
 		}
 
 		if opt.ChecksumAlgorithm != types.ChecksumAlgorithmCrc32 &&
