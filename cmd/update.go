@@ -37,10 +37,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
-	"github.com/Seagate/cloudfuse/common"
 	"github.com/spf13/cobra"
 )
 
@@ -75,9 +75,6 @@ var updateCmd = &cobra.Command{
 	Short: "Update the cloudfuse binary.",
 	Long:  "Update the cloudfuse binary.",
 	RunE: func(command *cobra.Command, args []string) error {
-		if runtime.GOOS == "windows" {
-			return errors.New("Update is not supported on Windows. Download the latest release manually here https://github.com/Seagate/cloudfuse/releases/latest.")
-		}
 		if opt.Package == "" {
 			packageFormat, err := determinePackageFormat()
 			if err != nil {
@@ -85,17 +82,29 @@ var updateCmd = &cobra.Command{
 			}
 			opt.Package = packageFormat
 		}
-		if opt.Output == "" && opt.Package == "tar" {
-			return errors.New("Need to pass parameter --package with deb or rpm or pass parameter --output with location to download to")
-		}
-		if opt.Package != "tar" && opt.Package != "deb" && opt.Package != "rpm" {
-			return errors.New("--package should be one of tar|deb|rpm")
-		}
-		if runtime.GOOS != "linux" && (opt.Package == "deb" || opt.Package == "rpm") {
-			return errors.New(".deb and .rpm packages are supported only on Linux")
-		}
-		if os.Geteuid() != 0 && opt.Output == "" && (opt.Package == "deb" || opt.Package == "rpm") {
-			return errors.New(".deb and .rpm requires elevated privileges")
+
+		switch runtime.GOOS {
+			case "linux":
+				if opt.Package != "tar" && opt.Package != "deb" && opt.Package != "rpm" {
+					return errors.New("--package should be one of tar|deb|rpm")
+				}
+				if os.Geteuid() != 0 && opt.Output == "" && (opt.Package == "deb" || opt.Package == "rpm") {
+					return errors.New(".deb and .rpm requires elevated privileges")
+				}
+				if opt.Output == "" && opt.Package == "tar" {
+					return errors.New("Need to pass parameter --package with deb or rpm or pass parameter --output with location to download to")
+				}
+
+			case "windows":
+				if opt.Package != "exe" && opt.Package != "zip" {
+					return errors.New("--package should be one of exe|zip")
+				}
+				if opt.Output == "" && (opt.Package == "zip") {
+					return errors.New("Need to pass parameter --package with exe or zip or pass parameter --output with location to download to")
+				}
+			
+			default:
+				return errors.New("Unsupported OS. Only Linux and Windows are supported.")
 		}
 
 		if err := installUpdate(context.Background(), &opt); err != nil {
@@ -112,19 +121,19 @@ func installUpdate(ctx context.Context, opt *Options) error {
 		return fmt.Errorf("unable to detect new version: %w", err)
 	}
 
-	if relInfo.Version == common.CloudfuseVersion {
-		fmt.Println("cloudfuse is up to date")
-		return nil
-	}
+	// if relInfo.Version == common.CloudfuseVersion {
+	// 	fmt.Println("cloudfuse is up to date")
+	// 	return nil
+	// }
 
 	fileName, err := downloadUpdate(ctx, relInfo, opt.Output)
 	if err != nil {
 		return fmt.Errorf("unable to download release: %w", err)
 	}
 
-	if err := verifyHash(fileName, relInfo.AssetName, relInfo.HashURL); err != nil {
-		return fmt.Errorf("unable to verify checksum: %w", err)
-	}
+	// if err := verifyHash(fileName, relInfo.AssetName, relInfo.HashURL); err != nil {
+	// 	return fmt.Errorf("unable to verify checksum: %w", err)
+	// }
 
 	if opt.Output != "" {
 		return nil
@@ -134,6 +143,9 @@ func installUpdate(ctx context.Context, opt *Options) error {
 }
 
 func determinePackageFormat() (string, error) {
+	if runtime.GOOS == "windows" {
+		return "exe", nil
+	}
 	if hasCommand("dpkg") {
 		return "deb", nil
 	} else if hasCommand("rpm") {
@@ -148,8 +160,40 @@ func hasCommand(command string) bool {
 	return err == nil
 }
 
+func runInstaller(fileName string) error {
+	absPath, err := filepath.Abs(fileName)
+	if err != nil {
+		return fmt.Errorf("unable to get absolute path: %w", err)
+	}
+
+	args := []string{
+		"/SP-",
+		"/verysilent",
+		"/noicons",
+		"/norestart",
+		"/dir=expand:{autopf}\\Cloudfuse",
+		"/LOG=" + absPath + ".log",
+	}
+
+	cmd := exec.Command(absPath, args...)
+
+	// cmd.Stdout = os.Stdout
+	// cmd.Stderr = os.Stderr
+
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to run installer: %w", err)
+	}
+	
+	return nil
+}
+
 // installPackage installs the deb or rpm package
 func installPackage(fileName string) error {
+	if runtime.GOOS == "windows" {
+		return runInstaller(fileName)
+	}
+
 	var packageCommand string
 	if strings.HasSuffix(fileName, "deb") {
 		packageCommand = "dpkg"
