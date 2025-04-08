@@ -306,6 +306,9 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             if self.getPassphraseFromUser():
                 #Todo: check valid password?
                 self.decryptConfigFile(configPath)
+                return True
+            else: 
+                return False
 
     def getPassphraseFromUser(self):
         dialog = PasswdDialog()
