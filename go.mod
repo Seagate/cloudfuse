@@ -1,6 +1,7 @@
 module github.com/Seagate/cloudfuse
 
 go 1.24.0
+
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.2
@@ -29,7 +30,7 @@ require (
 	github.com/vibhansa-msft/tlru v0.0.0-20240410102558-9e708419e21f
 	github.com/winfsp/cgofuse v1.6.0
 	go.uber.org/atomic v1.11.0
-	golang.org/x/sys v0.31.0
+	golang.org/x/sys v0.32.0
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 )
