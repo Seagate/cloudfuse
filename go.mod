@@ -1,6 +1,7 @@
 module github.com/Seagate/cloudfuse
 
 go 1.24.0
+
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.1
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.2
@@ -14,7 +15,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.70
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.79.0
 	github.com/aws/smithy-go v1.22.3
-	github.com/fsnotify/fsnotify v1.8.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/golang/mock v1.6.0
 	github.com/montanaflynn/stats v0.7.1
