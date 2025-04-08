@@ -69,19 +69,16 @@ var dumpLogsCmd = &cobra.Command{
 			return fmt.Errorf("dumpPath provided needs to be a directory")
 		}
 
-		println(logConfigFile)
 		if logConfigFile, err = filepath.Abs(logConfigFile); err != nil {
 			return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
 		}
-
-		println(logConfigFile)
 
 		config.SetConfigFile(logConfigFile)
 		config.ReadFromConfigFile(logConfigFile)
 
 		var logPath string
+		var logType string
 		if config.IsSet("logging.type") {
-			var logType string
 			err := config.UnmarshalKey("logging.type", &logType)
 			if err != nil {
 				return fmt.Errorf("failed to parse logging type from config [%s]", err.Error())
@@ -96,9 +93,10 @@ var dumpLogsCmd = &cobra.Command{
 			}
 		} else {
 			logPath = "/var/log/syslog"
+			logType = "syslog"
 		}
 
-		err = getLogs(logPath)
+		err = getLogs(logPath, logType)
 		if err != nil {
 			println(err.Error())
 		}
@@ -114,126 +112,154 @@ var dumpLogsCmd = &cobra.Command{
 	},
 }
 
-func getLogs(logPath string) error {
+func getLogs(logPath, logType string) error {
+
 	//TODO: add logType support and provide syslog gather path
 	logPath, err := filepath.Abs(logPath)
-	logPath = filepath.Dir(logPath)
 	if err != nil {
 		return fmt.Errorf("failed to get absolute path: [%s]", err.Error())
 	}
 
-	outputFile := fmt.Sprintf("cloudfuse " + time.Now().Format("2006-01-02_15-04-05"))
+	if logType == "base" {
 
-	if runtime.GOOS == "windows" {
-		outputFile += ".zip"
-		err = zipDirectory(logPath, dumpPath+"/"+outputFile)
+		println("log is base")
+
+		logPath = filepath.Dir(logPath)
+		err = createArchive(logPath)
 		if err != nil {
 			return err
 		}
 
-	} else if runtime.GOOS == "linux" {
-		outputFile += ".tar.gz"
-		println(dumpPath + "/" + outputFile)
-		err = tarGzDirectory(logPath, dumpPath+"/"+outputFile)
-		if err != nil {
-			return err
-		}
+	} else if logType == "syslog" && runtime.GOOS == "linux" {
+
+		println("log is sys")
+
+		// call filterLog that outputs a log file. then call createArchive() to put that log into an archive.
 	}
 
 	return nil
 }
 
-func zipDirectory(logPath, outputFile string) error {
-	outFile, err := os.Create(outputFile)
-	if err != nil {
-		return err
-	}
-	defer outFile.Close()
+func createArchive(logPath string) error {
 
-	zipWriter := zip.NewWriter(outFile)
-	defer zipWriter.Close()
+	//have windows or linux archive paths in here
 
-	filepath.Walk(logPath, func(path string, info os.FileInfo, err error) error {
+	ArchiveName := fmt.Sprintf("cloudfuse " + time.Now().Format("2006-01-02_15-04-05"))
+
+	var err error
+	if runtime.GOOS == "linux" {
+
+		outFile, err := os.Create(dumpPath + "/" + ArchiveName + ".tar.gz")
 		if err != nil {
-			return err
-		}
-
-		if info.IsDir() {
 			return nil
 		}
+		defer outFile.Close()
 
-		relPath, err := filepath.Rel(logPath, path)
+		gzWriter := gzip.NewWriter(outFile)
+		defer gzWriter.Close()
+
+		tarWriter := tar.NewWriter(gzWriter)
+		defer tarWriter.Close()
+
+		items, err := os.ReadDir(logPath)
 		if err != nil {
 			return err
 		}
 
-		file, err := os.Open(path)
-		if err != nil {
-			return err
+		for _, item := range items {
+			if item.IsDir() {
+				continue
+			}
+
+			filePath := filepath.Join(logPath, item.Name())
+			file, err := os.Open(filePath)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+
+			info, err := file.Stat()
+			if err != nil {
+				return err
+			}
+
+			header, err := tar.FileInfoHeader(info, "")
+			if err != nil {
+				return err
+			}
+
+			header.Name = item.Name()
+
+			err = tarWriter.WriteHeader(header)
+			if err != nil {
+				return err
+			}
+
+			_, err = io.Copy(tarWriter, file)
+			if err != nil {
+				return err
+			}
+
 		}
-		defer file.Close()
 
-		zipEntry, err := zipWriter.Create(relPath)
+	} else if runtime.GOOS == "windows" {
+
+		outFile, err := os.Create(dumpPath + "/" + ArchiveName)
 		if err != nil {
-			return err
-		}
-
-		_, err = io.Copy(zipEntry, file)
-		return err
-	})
-
-	return nil
-}
-
-func tarGzDirectory(logPath, outputFile string) error {
-	outFile, err := os.Create(outputFile)
-	if err != nil {
-		return err
-	}
-	defer outFile.Close()
-
-	gzipWriter := gzip.NewWriter(outFile)
-	defer gzipWriter.Close()
-
-	tarWriter := tar.NewWriter(gzipWriter)
-	defer tarWriter.Close()
-
-	err = filepath.Walk(logPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if info.IsDir() {
 			return nil
 		}
+		defer outFile.Close()
 
-		relPath, err := filepath.Rel(logPath, path)
+		zipWriter := zip.NewWriter(outFile)
+		defer zipWriter.Close()
+
+		items, err := os.ReadDir(logPath)
 		if err != nil {
 			return err
 		}
 
-		file, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
+		for _, item := range items {
+			if item.IsDir() {
+				continue
+			}
 
-		header, err := tar.FileInfoHeader(info, relPath)
-		if err != nil {
-			return err
-		}
-		header.Name = relPath // Ensure relative path is used
+			filePath := filepath.Join(logPath, item.Name())
+			file, err := os.Open(filePath)
+			defer file.Close()
+			if err != nil {
+				return err
+			}
 
-		err = tarWriter.WriteHeader(header)
-		if err != nil {
-			return err
+			info, err := file.Stat()
+			if err != nil {
+				return err
+			}
+
+			header, err := zip.FileInfoHeader(info)
+
+			header.Name = item.Name()
+
+			zipEntry, err := zipWriter.Create(item.Name())
+			if err != nil {
+				return err
+			}
+
+			_, err = io.Copy(zipEntry, file)
+
 		}
 
-		_, err = io.Copy(tarWriter, file)
-		return err
-	})
+	}
 
 	return err
+}
+
+func filterLog(logPath string) error {
+
+	//this will take a log file and filter out cloudfuse lines into a separate file
+	// this will mostly be used for the linux syslog.
+
+	return nil
+
 }
 
 func init() {
