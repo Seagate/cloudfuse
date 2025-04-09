@@ -71,7 +71,7 @@ var _ AzConnection = &Datalake{}
 // This is also a known problem with the SDKs.
 func transformAccountEndpoint(potentialDfsEndpoint string) string {
 	if strings.Contains(potentialDfsEndpoint, ".dfs.") {
-		return strings.Replace(potentialDfsEndpoint, ".dfs.", ".blob.", -1)
+		return strings.ReplaceAll(potentialDfsEndpoint, ".dfs.", ".blob.")
 	} else {
 		// Should we just throw here?
 		log.Warn("Datalake::transformAccountEndpoint : Detected use of a custom endpoint. Not all operations are guaranteed to work.")
@@ -239,13 +239,14 @@ func (dl *Datalake) CreateDirectory(name string) error {
 
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
-		if serr == InvalidPermission {
+		switch serr {
+		case InvalidPermission:
 			log.Err("Datalake::CreateDirectory : Insufficient permissions for %s [%s]", name, err.Error())
 			return syscall.EACCES
-		} else if serr == ErrFileAlreadyExists {
+		case ErrFileAlreadyExists:
 			log.Err("Datalake::CreateDirectory : Path already exists for %s [%s]", name, err.Error())
 			return syscall.EEXIST
-		} else {
+		default:
 			log.Err("Datalake::CreateDirectory : Failed to create directory %s [%s]", name, err.Error())
 			return err
 		}
@@ -267,16 +268,17 @@ func (dl *Datalake) DeleteFile(name string) (err error) {
 	_, err = fileClient.Delete(context.Background(), nil)
 	if err != nil {
 		serr := storeDatalakeErrToErr(err)
-		if serr == ErrFileNotFound {
+		switch serr {
+		case ErrFileNotFound:
 			log.Err("Datalake::DeleteFile : %s does not exist", name)
 			return syscall.ENOENT
-		} else if serr == BlobIsUnderLease {
+		case BlobIsUnderLease:
 			log.Err("Datalake::DeleteFile : %s is under lease [%s]", name, err.Error())
 			return syscall.EIO
-		} else if serr == InvalidPermission {
+		case InvalidPermission:
 			log.Err("Datalake::DeleteFile : Insufficient permissions for %s [%s]", name, err.Error())
 			return syscall.EACCES
-		} else {
+		default:
 			log.Err("Datalake::DeleteFile : Failed to delete file %s [%s]", name, err.Error())
 			return err
 		}
@@ -361,12 +363,13 @@ func (dl *Datalake) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 	})
 	if err != nil {
 		e := storeDatalakeErrToErr(err)
-		if e == ErrFileNotFound {
+		switch e {
+		case ErrFileNotFound:
 			return attr, syscall.ENOENT
-		} else if e == InvalidPermission {
+		case InvalidPermission:
 			log.Err("Datalake::GetAttr : Insufficient permissions for %s [%s]", name, err.Error())
 			return attr, syscall.EACCES
-		} else {
+		default:
 			log.Err("Datalake::GetAttr : Failed to get path properties for %s [%s]", name, err.Error())
 			return attr, err
 		}
@@ -452,11 +455,12 @@ func (dl *Datalake) List(prefix string, marker *string, count int32) ([]*interna
 		log.Err("Datalake::List : Failed to validate account with given auth %s", err.Error())
 		m := ""
 		e := storeDatalakeErrToErr(err)
-		if e == ErrFileNotFound { // TODO: should this be checked for list calls
+		switch e {
+		case ErrFileNotFound: // TODO: should this be checked for list calls
 			return pathList, &m, syscall.ENOENT
-		} else if e == InvalidPermission {
+		case InvalidPermission:
 			return pathList, &m, syscall.EACCES
-		} else {
+		default:
 			return pathList, &m, err
 		}
 	}
@@ -605,11 +609,12 @@ func (dl *Datalake) ChangeMod(name string, mode os.FileMode) error {
 	if err != nil {
 		log.Err("Datalake::ChangeMod : Failed to change mode of file %s to %s [%s]", name, mode, err.Error())
 		e := storeDatalakeErrToErr(err)
-		if e == ErrFileNotFound {
+		switch e {
+		case ErrFileNotFound:
 			return syscall.ENOENT
-		} else if e == InvalidPermission {
+		case InvalidPermission:
 			return syscall.EACCES
-		} else {
+		default:
 			return err
 		}
 	}
