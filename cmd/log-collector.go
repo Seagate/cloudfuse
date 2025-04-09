@@ -28,12 +28,16 @@ package cmd
 import (
 	"archive/tar"
 	"archive/zip"
+	"bufio"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -60,6 +64,11 @@ var dumpLogsCmd = &cobra.Command{
 			return fmt.Errorf("couldn't determine absolute path for dump logs [%s]", err.Error())
 		}
 
+		dumpPathExists := common.DirectoryExists(dumpPath)
+		if !dumpPathExists {
+			return fmt.Errorf("the mount path provided does not exist")
+		}
+
 		dumpInfo, err := os.Stat(dumpPath)
 		if err != nil {
 			return fmt.Errorf("couldn't stat dump Path")
@@ -71,6 +80,11 @@ var dumpLogsCmd = &cobra.Command{
 
 		if logConfigFile, err = filepath.Abs(logConfigFile); err != nil {
 			return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
+		}
+
+		_, err = os.Stat(logConfigFile)
+		if errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("the config file path provided does not exist")
 		}
 
 		config.SetConfigFile(logConfigFile)
@@ -96,9 +110,29 @@ var dumpLogsCmd = &cobra.Command{
 			logType = "syslog"
 		}
 
-		err = getLogs(logPath, logType)
+		logPath, err = filepath.Abs(logPath)
 		if err != nil {
-			println(err.Error())
+			return fmt.Errorf("failed to get absolute path: [%s]", err.Error())
+		}
+
+		if logType == "base" {
+			logPath = filepath.Dir(logPath)
+			err = createArchive(logPath)
+			if err != nil {
+				return err
+			}
+		} else if logType == "syslog" && runtime.GOOS == "linux" {
+
+			// call filterLog that outputs a log file. then call createArchive() to put that log into an archive.
+			err, filteredSyslogPath := createFilteredLog(logPath) //generate a separate .log file and place it in a folder. output the path of the filtered log file
+			if err != nil {
+				return fmt.Errorf("failed to filter out the : [%s]", err.Error())
+			}
+			filteredSyslogPath = filepath.Dir(filteredSyslogPath)
+			err = createArchive(filteredSyslogPath) //supply the path of the filtered log file here
+			if err != nil {
+				return err
+			}
 		}
 
 		// are any 'base' logging or syslog filters being used to redirect to a separate file?
@@ -112,46 +146,58 @@ var dumpLogsCmd = &cobra.Command{
 	},
 }
 
-func getLogs(logPath, logType string) error {
+func createFilteredLog(logFile string) (error, string) {
 
-	//TODO: add logType support and provide syslog gather path
-	logPath, err := filepath.Abs(logPath)
+	//this will take a log file and filter out cloudfuse lines into a separate file
+	// this will mostly be used for the linux syslog.
+
+	keyword := "cloudfuse"
+
+	os.MkdirAll("/tmp/cloudfuseSyslog", 0777)
+
+	outPath := "/tmp/cloudfuseSyslog/cloudfuseSyslog.log" //Decide what directory you want to dump this file. an empty folder would be easiest.
+
+	inFile, err := os.Open(logFile)
 	if err != nil {
-		return fmt.Errorf("failed to get absolute path: [%s]", err.Error())
+		return err, ""
 	}
+	defer inFile.Close()
 
-	if logType == "base" {
+	outFile, err := os.Create(outPath)
+	if err != nil {
+		return err, ""
+	}
+	defer outFile.Close()
 
-		println("log is base")
+	scanner := bufio.NewScanner(inFile)
+	writer := bufio.NewWriter(outFile)
 
-		logPath = filepath.Dir(logPath)
-		err = createArchive(logPath)
-		if err != nil {
-			return err
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, keyword) {
+			_, err := writer.WriteString(line + "\n")
+			if err != nil {
+				return err, ""
+			}
 		}
-
-	} else if logType == "syslog" && runtime.GOOS == "linux" {
-
-		println("log is sys")
-
-		// call filterLog that outputs a log file. then call createArchive() to put that log into an archive.
 	}
+	writer.Flush()
 
-	return nil
+	return scanner.Err(), outPath
 }
 
 func createArchive(logPath string) error {
 
 	//have windows or linux archive paths in here
 
-	ArchiveName := fmt.Sprintf("cloudfuse " + time.Now().Format("2006-01-02_15-04-05"))
+	ArchiveName := fmt.Sprintf("cloudfuse" + time.Now().Format("2006-01-02_15-04-05"))
 
 	var err error
 	if runtime.GOOS == "linux" {
 
 		outFile, err := os.Create(dumpPath + "/" + ArchiveName + ".tar.gz")
 		if err != nil {
-			return nil
+			return err
 		}
 		defer outFile.Close()
 
@@ -251,15 +297,6 @@ func createArchive(logPath string) error {
 	}
 
 	return err
-}
-
-func filterLog(logPath string) error {
-
-	//this will take a log file and filter out cloudfuse lines into a separate file
-	// this will mostly be used for the linux syslog.
-
-	return nil
-
 }
 
 func init() {
