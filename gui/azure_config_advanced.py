@@ -27,7 +27,6 @@ from PySide6 import QtGui
 from ui_azure_config_advanced import Ui_Form
 from common_qt_functions import widgetCustomFunctions
 
-file_cache_eviction_choices = ['lru','lfu']
 az_blob_tier = ['none','hot','cool','archive']
 
 class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
@@ -99,7 +98,6 @@ class azureAdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         self.lineEdit_azure_authResource.setText(azStorage['auth-resource'])
 
         self.dropDown_azure_blobTier.setCurrentIndex(az_blob_tier.index(azStorage['tier']))
-        self.dropDown_fileCache_evictionPolicy.setCurrentIndex(file_cache_eviction_choices.index(fileCache['policy']))
 
         if platform == 'win32':
             self.checkBox_libfuse_networkshare.setToolTip('Runs as a network share - may improve performance when latency to cloud is high.')
