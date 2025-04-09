@@ -86,27 +86,27 @@ var updateCmd = &cobra.Command{
 		}
 
 		switch runtime.GOOS {
-			case "linux":
-				if opt.Package != "tar" && opt.Package != "deb" && opt.Package != "rpm" {
-					return errors.New("--package should be one of tar|deb|rpm")
-				}
-				if os.Geteuid() != 0 && opt.Output == "" && (opt.Package == "deb" || opt.Package == "rpm") {
-					return errors.New(".deb and .rpm requires elevated privileges")
-				}
-				if opt.Output == "" && opt.Package == "tar" {
-					return errors.New("Need to pass parameter --package with deb or rpm or pass parameter --output with location to download to")
-				}
+		case "linux":
+			if opt.Package != "tar" && opt.Package != "deb" && opt.Package != "rpm" {
+				return errors.New("--package should be one of tar|deb|rpm")
+			}
+			if os.Geteuid() != 0 && opt.Output == "" && (opt.Package == "deb" || opt.Package == "rpm") {
+				return errors.New(".deb and .rpm requires elevated privileges")
+			}
+			if opt.Output == "" && opt.Package == "tar" {
+				return errors.New("Need to pass parameter --package with deb or rpm or pass parameter --output with location to download to")
+			}
 
-			case "windows":
-				if opt.Package != "exe" && opt.Package != "zip" {
-					return errors.New("--package should be one of exe|zip")
-				}
-				if opt.Output == "" && (opt.Package == "zip") {
-					return errors.New("Need to pass parameter --package with exe or zip or pass parameter --output with location to download to")
-				}
-			
-			default:
-				return errors.New("Unsupported OS. Only Linux and Windows are supported.")
+		case "windows":
+			if opt.Package != "exe" && opt.Package != "zip" {
+				return errors.New("--package should be one of exe|zip")
+			}
+			if opt.Output == "" && (opt.Package == "zip") {
+				return errors.New("Need to pass parameter --package with exe or zip or pass parameter --output with location to download to")
+			}
+
+		default:
+			return errors.New("Unsupported OS. Only Linux and Windows are supported.")
 		}
 
 		if err := installUpdate(context.Background(), &opt); err != nil {
@@ -134,7 +134,7 @@ func installUpdate(ctx context.Context, opt *Options) error {
 	}
 
 	// Only verify hash for Linux releases as Windows releases are not hashed by goreleaser
-	if opt.Package != "exe"{
+	if opt.Package != "exe" {
 		if err := verifyHash(ctx, fileName, relInfo.AssetName, relInfo.HashURL); err != nil {
 			return fmt.Errorf("unable to verify checksum: %w", err)
 		}
@@ -196,7 +196,7 @@ func runWindowsInstaller(fileName string) error {
 	}
 
 	fmt.Println("Cloudfuse was successfully updated. Please restart the machine to apply the changes.")
-	
+
 	return nil
 }
 
