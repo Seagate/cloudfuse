@@ -40,7 +40,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
+	"github.com/Seagate/cloudfuse/common"
 	"github.com/spf13/cobra"
 )
 
@@ -121,25 +123,32 @@ func installUpdate(ctx context.Context, opt *Options) error {
 		return fmt.Errorf("unable to detect new version: %w", err)
 	}
 
-	// if relInfo.Version == common.CloudfuseVersion {
-	// 	fmt.Println("cloudfuse is up to date")
-	// 	return nil
-	// }
+	if relInfo.Version == common.CloudfuseVersion {
+		fmt.Println("cloudfuse is up to date")
+		return nil
+	}
 
 	fileName, err := downloadUpdate(ctx, relInfo, opt.Output)
 	if err != nil {
 		return fmt.Errorf("unable to download release: %w", err)
 	}
 
-	// if err := verifyHash(fileName, relInfo.AssetName, relInfo.HashURL); err != nil {
-	// 	return fmt.Errorf("unable to verify checksum: %w", err)
-	// }
+	// Only verify hash for Linux releases as Windows releases are not hashed by goreleaser
+	if opt.Package != "exe"{
+		if err := verifyHash(ctx, fileName, relInfo.AssetName, relInfo.HashURL); err != nil {
+			return fmt.Errorf("unable to verify checksum: %w", err)
+		}
+	}
 
 	if opt.Output != "" {
 		return nil
 	}
 
-	return installPackage(fileName)
+	if runtime.GOOS == "windows" {
+		return runWindowsInstaller(fileName)
+	}
+
+	return runLinuxInstaller(fileName)
 }
 
 func determinePackageFormat() (string, error) {
@@ -160,7 +169,8 @@ func hasCommand(command string) bool {
 	return err == nil
 }
 
-func runInstaller(fileName string) error {
+// runWindowsInstaller runs the Windows executable installer. Requires the user to restart the machine to apply changes.
+func runWindowsInstaller(fileName string) error {
 	absPath, err := filepath.Abs(fileName)
 	if err != nil {
 		return fmt.Errorf("unable to get absolute path: %w", err)
@@ -190,12 +200,8 @@ func runInstaller(fileName string) error {
 	return nil
 }
 
-// installPackage installs the deb or rpm package
-func installPackage(fileName string) error {
-	if runtime.GOOS == "windows" {
-		return runInstaller(fileName)
-	}
-
+// runLinuxInstaller installs the deb or rpm package
+func runLinuxInstaller(fileName string) error {
 	var packageCommand string
 	if strings.HasSuffix(fileName, "deb") {
 		packageCommand = "dpkg"
@@ -249,10 +255,20 @@ func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
 		url = fmt.Sprintf("https://api.github.com/repos/Seagate/cloudfuse/releases/tags/v%s", version)
 	}
 
-	resp, err := http.Get(url)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get release info: %s", resp.Status)
@@ -269,7 +285,9 @@ func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
 	}
 
 	hashAsset, err := downloadHashAsset(rel.Assets)
-	if err != nil {
+	// Only report an error if package is not exe since goreleaser does not provide a hash
+	// for those releases.
+	if err != nil && opt.Package != "exe" {
 		return nil, err
 	}
 
@@ -322,8 +340,17 @@ func findChecksum(packageName string, checksumTable string) (string, error) {
 	return "", errors.New("checksum not found for the given file name")
 }
 
-func verifyHash(fileName, packageName, hashURL string) error {
-	resp, err := http.Get(hashURL)
+func verifyHash(ctx context.Context, fileName, packageName, hashURL string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, hashURL, nil)
+	if err != nil {
+		return fmt.Errorf("unable to download checksum file: %w", err)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("unable to download checksum file: %w", err)
 	}

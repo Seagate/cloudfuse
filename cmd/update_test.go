@@ -144,6 +144,75 @@ func (suite *updateTestSuite) TestUpdateWithOutputTarLinux() {
 	os.Remove(outputFile.Name())
 }
 
+func (suite *updateTestSuite) TestInvalidOptionsLinux() {
+	if runtime.GOOS != "Linux" {
+		return
+	}
+	defer suite.cleanupTest()
+
+	outputFile, err := os.CreateTemp("", "update-file*")
+	suite.assert.NoError(err)
+
+	_, err = executeCommandC(rootCmd, "update", "--package=ede", fmt.Sprintf("--output=%s", outputFile.Name()))
+	suite.assert.Error(err)
+
+	_, err = executeCommandC(rootCmd, "update", "--package=zip", fmt.Sprintf("--output=%s", outputFile.Name()))
+	suite.assert.Error(err)
+
+	os.Remove(outputFile.Name())
+}
+
+func (suite *updateTestSuite) TestUpdateWithOutputZipWindows() {
+	if runtime.GOOS != "windows" {
+		return
+	}
+	defer suite.cleanupTest()
+
+	outputFile, err := os.CreateTemp("", "update-file*")
+	suite.assert.NoError(err)
+
+	_, err = executeCommandC(rootCmd, "update", "--package=zip", fmt.Sprintf("--output=%s", outputFile.Name()))
+	suite.assert.NoError(err)
+
+	os.Remove(outputFile.Name())
+}
+
+func (suite *updateTestSuite) TestUpdateWithOutputExeWindows() {
+	if runtime.GOOS != "windows" {
+		return
+	}
+	defer suite.cleanupTest()
+
+	outputFile, err := os.CreateTemp("", "update-file*")
+	suite.assert.NoError(err)
+
+	_, err = executeCommandC(rootCmd, "update", "--package=exe", fmt.Sprintf("--output=%s", outputFile.Name()))
+	suite.assert.NoError(err)
+
+	os.Remove(outputFile.Name())
+}
+
+func (suite *updateTestSuite) TestInvalidOptionsWindows() {
+	if runtime.GOOS != "windows" {
+		return
+	}
+	defer suite.cleanupTest()
+
+	outputFile, err := os.CreateTemp("", "update-file*")
+	suite.assert.NoError(err)
+
+	_, err = executeCommandC(rootCmd, "update", "--package=tar", fmt.Sprintf("--output=%s", outputFile.Name()))
+	suite.assert.Error(err)
+
+	_, err = executeCommandC(rootCmd, "update", "--package=deb", fmt.Sprintf("--output=%s", outputFile.Name()))
+	suite.assert.Error(err)
+
+	_, err = executeCommandC(rootCmd, "update", "--package=rpm", fmt.Sprintf("--output=%s", outputFile.Name()))
+	suite.assert.Error(err)
+
+	os.Remove(outputFile.Name())
+}
+
 func TestUpdateCommand(t *testing.T) {
 	suite.Run(t, new(updateTestSuite))
 }
