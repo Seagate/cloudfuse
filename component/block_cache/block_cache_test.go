@@ -26,16 +26,20 @@
 package block_cache
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"io"
+	"math"
 	mrand "math/rand/v2"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -154,74 +158,83 @@ func (tobj *testObj) cleanupPipeline() error {
 	return nil
 }
 
-// // Tests the default configuration of block cache
-// func (suite *blockCacheTestSuite) TestEmpty() {
-// 	emptyConfig := "read-only: true"
-// 	tobj, err := setupPipeline(emptyConfig)
-// 	defer tobj.cleanupPipeline()
+// Tests the default configuration of block cache
+func (suite *blockCacheTestSuite) TestEmpty() {
+	if runtime.GOOS == "windows" {
+		return
+	}
+	emptyConfig := "read-only: true"
+	tobj, err := setupPipeline(emptyConfig)
+	defer tobj.cleanupPipeline()
 
-// 	suite.assert.NoError(err)
-// 	suite.assert.Equal("block_cache", tobj.blockCache.Name())
-// 	suite.assert.EqualValues(16*_1MB, tobj.blockCache.blockSize)
-// 	suite.assert.EqualValues(0, tobj.blockCache.diskSize)
-// 	suite.assert.EqualValues(defaultTimeout, tobj.blockCache.diskTimeout)
+	suite.assert.NoError(err)
+	suite.assert.Equal("block_cache", tobj.blockCache.Name())
+	suite.assert.EqualValues(16*_1MB, tobj.blockCache.blockSize)
+	suite.assert.EqualValues(0, tobj.blockCache.diskSize)
+	suite.assert.EqualValues(defaultTimeout, tobj.blockCache.diskTimeout)
 
-// 	cmd := exec.Command("nproc")
-// 	output, err := cmd.Output()
-// 	suite.assert.NoError(err)
-// 	coresStr := strings.TrimSpace(string(output))
-// 	cores, err := strconv.Atoi(coresStr)
-// 	suite.assert.NoError(err)
-// 	suite.assert.EqualValues(tobj.blockCache.workers, uint32(3*cores))
-// 	suite.assert.EqualValues(tobj.blockCache.prefetch, math.Max((MIN_PREFETCH*2)+1, float64(2*cores)))
-// 	suite.assert.False(tobj.blockCache.noPrefetch)
-// 	suite.assert.NotNil(tobj.blockCache.blockPool)
-// 	suite.assert.NotNil(tobj.blockCache.threadPool)
-// }
+	cmd := exec.Command("nproc")
+	output, err := cmd.Output()
+	suite.assert.NoError(err)
+	coresStr := strings.TrimSpace(string(output))
+	cores, err := strconv.Atoi(coresStr)
+	suite.assert.NoError(err)
+	suite.assert.EqualValues(tobj.blockCache.workers, uint32(3*cores))
+	suite.assert.EqualValues(tobj.blockCache.prefetch, math.Max((MIN_PREFETCH*2)+1, float64(2*cores)))
+	suite.assert.False(tobj.blockCache.noPrefetch)
+	suite.assert.NotNil(tobj.blockCache.blockPool)
+	suite.assert.NotNil(tobj.blockCache.threadPool)
+}
 
-// func (suite *blockCacheTestSuite) TestMemory() {
-// 	emptyConfig := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n"
-// 	tobj, err := setupPipeline(emptyConfig)
-// 	defer tobj.cleanupPipeline()
+func (suite *blockCacheTestSuite) TestMemory() {
+	if runtime.GOOS == "windows" {
+		return
+	}
+	emptyConfig := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n"
+	tobj, err := setupPipeline(emptyConfig)
+	defer tobj.cleanupPipeline()
 
-// 	suite.assert.NoError(err)
-// 	suite.assert.Equal("block_cache", tobj.blockCache.Name())
-// 	cmd := exec.Command("bash", "-c", "free -b | grep Mem | awk '{print $4}'")
-// 	var out bytes.Buffer
-// 	cmd.Stdout = &out
-// 	err = cmd.Run()
-// 	suite.assert.NoError(err)
-// 	free, err := strconv.Atoi(strings.TrimSpace(out.String()))
-// 	suite.assert.NoError(err)
-// 	expected := uint64(0.8 * float64(free))
-// 	actual := tobj.blockCache.memSize
-// 	difference := math.Abs(float64(actual) - float64(expected))
-// 	tolerance := 0.10 * float64(math.Max(float64(actual), float64(expected)))
-// 	suite.assert.LessOrEqual(difference, tolerance)
-// }
+	suite.assert.NoError(err)
+	suite.assert.Equal("block_cache", tobj.blockCache.Name())
+	cmd := exec.Command("bash", "-c", "free -b | grep Mem | awk '{print $4}'")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err = cmd.Run()
+	suite.assert.NoError(err)
+	free, err := strconv.Atoi(strings.TrimSpace(out.String()))
+	suite.assert.NoError(err)
+	expected := uint64(0.8 * float64(free))
+	actual := tobj.blockCache.memSize
+	difference := math.Abs(float64(actual) - float64(expected))
+	tolerance := 0.10 * float64(math.Max(float64(actual), float64(expected)))
+	suite.assert.LessOrEqual(difference, tolerance)
+}
 
-// func (suite *blockCacheTestSuite) TestFreeDiskSpace() {
-// 	disk_cache_path := getFakeStoragePath("fake_storage")
-// 	config := fmt.Sprintf("read-only: true\n\nblock_cache:\n  block-size-mb: 1\n  path: %s", disk_cache_path)
-// 	tobj, err := setupPipeline(config)
-// 	defer tobj.cleanupPipeline()
+func (suite *blockCacheTestSuite) TestFreeDiskSpace() {
+	if runtime.GOOS == "windows" {
+		return
+	}
+	disk_cache_path := getFakeStoragePath("fake_storage")
+	config := fmt.Sprintf("read-only: true\n\nblock_cache:\n  block-size-mb: 1\n  path: %s", disk_cache_path)
+	tobj, err := setupPipeline(config)
+	defer tobj.cleanupPipeline()
 
-// 	suite.assert.NoError(err)
-// 	suite.assert.Equal("block_cache", tobj.blockCache.Name())
+	suite.assert.NoError(err)
+	suite.assert.Equal("block_cache", tobj.blockCache.Name())
 
-// 	cmd := exec.Command("bash", "-c", fmt.Sprintf("df -B1 %s | awk 'NR==2{print $4}'", disk_cache_path))
-// 	var out bytes.Buffer
-// 	cmd.Stdout = &out
-// 	err = cmd.Run()
-// 	suite.assert.NoError(err)
-// 	freeDisk, err := strconv.Atoi(strings.TrimSpace(out.String()))
-// 	suite.assert.NoError(err)
-// 	expected := uint64(0.8 * float64(freeDisk))
-// 	actual := tobj.blockCache.diskSize
-// 	difference := math.Abs(float64(actual) - float64(expected))
-// 	tolerance := 0.10 * float64(math.Max(float64(actual), float64(expected)))
-// 	suite.assert.LessOrEqual(difference, tolerance)
-// }
+	cmd := exec.Command("bash", "-c", fmt.Sprintf("df -B1 %s | awk 'NR==2{print $4}'", disk_cache_path))
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err = cmd.Run()
+	suite.assert.NoError(err)
+	freeDisk, err := strconv.Atoi(strings.TrimSpace(out.String()))
+	suite.assert.NoError(err)
+	expected := uint64(0.8 * float64(freeDisk))
+	actual := tobj.blockCache.diskSize
+	difference := math.Abs(float64(actual) - float64(expected))
+	tolerance := 0.10 * float64(math.Max(float64(actual), float64(expected)))
+	suite.assert.LessOrEqual(difference, tolerance)
+}
 
 func (suite *blockCacheTestSuite) TestInvalidPrefetchCount() {
 	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n  mem-size-mb: 500\n  prefetch: 8\n  parallelism: 10\n  path: abcd\n  disk-size-mb: 100\n  disk-timeout-sec: 5"
