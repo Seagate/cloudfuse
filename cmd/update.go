@@ -168,11 +168,11 @@ func runInstaller(fileName string) error {
 
 	args := []string{
 		"/SP-",
-		"/verysilent",
-		"/noicons",
-		"/norestart",
+		"/VERYSILENT",
+		"/NOICONS",
+		"/NORESTART",
+		"/SUPPRESSMSGBOXES",
 		"/dir=expand:{autopf}\\Cloudfuse",
-		"/LOG=" + absPath + ".log",
 	}
 
 	cmd := exec.Command(absPath, args...)
@@ -184,6 +184,8 @@ func runInstaller(fileName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to run installer: %w", err)
 	}
+
+	fmt.Println("Cloudfuse was successfully updated. Please restart the machine to apply the changes.")
 	
 	return nil
 }
