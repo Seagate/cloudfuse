@@ -1,9 +1,9 @@
-//go:build linux
+//go:build windows
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
+   Copyright © 2023-2024 Seagate Technology LLC and/or its Affiliates
    Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -29,8 +29,11 @@ package block_cache
 
 import (
 	"fmt"
+	"unsafe"
 
-	"golang.org/x/sys/unix"
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
+	"golang.org/x/sys/windows"
 )
 
 // AllocateBlock creates a new memory mapped buffer for the given size
@@ -39,15 +42,31 @@ func AllocateBlock(size uint64) (*Block, error) {
 		return nil, fmt.Errorf("invalid size")
 	}
 
-	prot, flags := unix.PROT_READ|unix.PROT_WRITE, unix.MAP_ANON|unix.MAP_PRIVATE
-	addr, err := unix.Mmap(-1, 0, int(size), prot, flags)
-
+	freeRam, err := common.GetFreeRam()
 	if err != nil {
-		return nil, fmt.Errorf("mmap error: %v", err)
+		log.Warn("could not get free RAM: %v", err)
+	} else {
+		if freeRam < size {
+			// Not enough free RAM to allocate the requested size
+			return nil, fmt.Errorf("insufficient memory available: requested %d bytes, available %d bytes", size, freeRam)
+		}
 	}
 
+	// https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc
+	ptr, err := windows.VirtualAlloc(
+		0,
+		uintptr(size),
+		windows.MEM_COMMIT|windows.MEM_RESERVE,
+		windows.PAGE_READWRITE,
+	)
+	if err != nil || ptr == 0 {
+		return nil, fmt.Errorf("create virtual mapping error: %v", err)
+	}
+
+	data := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), size)
+
 	block := &Block{
-		data:  addr,
+		data:  data,
 		state: nil,
 		id:    -1,
 		node:  nil,
@@ -66,11 +85,17 @@ func (b *Block) Delete() error {
 		return fmt.Errorf("invalid buffer")
 	}
 
-	err := unix.Munmap(b.data)
+	addr := uintptr(unsafe.Pointer(unsafe.SliceData(b.data)))
+
+	err := windows.VirtualFree(
+		uintptr(addr),
+		0,
+		windows.MEM_RELEASE,
+	)
 	b.data = nil
+
 	if err != nil {
-		// if we get here, there is likely memory corruption.
-		return fmt.Errorf("munmap error: %v", err)
+		return fmt.Errorf("cannot unmap memory mapped file: %w", err)
 	}
 
 	return nil

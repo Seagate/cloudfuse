@@ -1,0 +1,31 @@
+logging:
+  level: log_debug
+  file-path: "lyvecloudfuse-logs.txt"
+  type: base
+
+components:
+  - libfuse
+  - block_cache
+  - attr_cache
+  - s3storage
+
+libfuse:
+  attribute-expiration-sec: 0
+  entry-expiration-sec: 0
+  negative-entry-expiration-sec: 0
+  ignore-open-flags: true
+
+block_cache:
+  path: { 1 }
+
+attr_cache:
+  timeout-sec: 3600
+  enable-symlinks: true
+
+s3storage:
+  bucket-name: { S3_BUCKET_NAME }
+  endpoint: { S3_ENDPOINT }
+  key-id: { S3_KEY_ID }
+  region: { S3_REGION }
+  secret-key: { S3_SECRET_KEY }
+  enable-dir-marker: true
