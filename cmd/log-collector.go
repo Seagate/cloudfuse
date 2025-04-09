@@ -119,34 +119,30 @@ var dumpLogsCmd = &cobra.Command{
 			logPath = filepath.Dir(logPath)
 			err = createArchive(logPath)
 			if err != nil {
-				return err
+				return fmt.Errorf("unable to create archive: [%s]", err.Error())
 			}
 		} else if logType == "syslog" && runtime.GOOS == "linux" {
 
 			// call filterLog that outputs a log file. then call createArchive() to put that log into an archive.
-			err, filteredSyslogPath := createFilteredLog(logPath) //generate a separate .log file and place it in a folder. output the path of the filtered log file
+			filteredSyslogPath, err := createFilteredLog(logPath) //generate a separate .log file and place it in a folder. output the path of the filtered log file
 			if err != nil {
-				return fmt.Errorf("failed to filter out the : [%s]", err.Error())
+				return fmt.Errorf("failed to crate a filtered log from the syslog: [%s]", err.Error())
 			}
 			filteredSyslogPath = filepath.Dir(filteredSyslogPath)
 			err = createArchive(filteredSyslogPath) //supply the path of the filtered log file here
 			if err != nil {
-				return err
+				return fmt.Errorf("unable to create archive: [%s]", err.Error())
 			}
 		}
 
 		// are any 'base' logging or syslog filters being used to redirect to a separate file?
 		// check for /etc/rsyslog.d and /etc/logrotate.d files
 
-		//once all logs are collected. create archive. OS dependant: what archive format should I use?
-		// windows: zip
-		// linux: tar
-
-		return err
+		return fmt.Errorf("failed to collect logs and create archive [%s]", err.Error())
 	},
 }
 
-func createFilteredLog(logFile string) (error, string) {
+func createFilteredLog(logFile string) (string, error) {
 
 	//this will take a log file and filter out cloudfuse lines into a separate file
 	// this will mostly be used for the linux syslog.
@@ -159,13 +155,13 @@ func createFilteredLog(logFile string) (error, string) {
 
 	inFile, err := os.Open(logFile)
 	if err != nil {
-		return err, ""
+		return "", err
 	}
 	defer inFile.Close()
 
 	outFile, err := os.Create(outPath)
 	if err != nil {
-		return err, ""
+		return "", err
 	}
 	defer outFile.Close()
 
@@ -177,20 +173,17 @@ func createFilteredLog(logFile string) (error, string) {
 		if strings.Contains(line, keyword) {
 			_, err := writer.WriteString(line + "\n")
 			if err != nil {
-				return err, ""
+				return "", err
 			}
 		}
 	}
 	writer.Flush()
 
-	return scanner.Err(), outPath
+	return outPath, scanner.Err()
 }
 
 func createArchive(logPath string) error {
-
-	//have windows or linux archive paths in here
-
-	ArchiveName := fmt.Sprintf("cloudfuse" + time.Now().Format("2006-01-02_15-04-05"))
+	ArchiveName := fmt.Sprintf("cloudfuse_Logs_" + time.Now().Format("2006-01-02_15-04-05"))
 
 	var err error
 	if runtime.GOOS == "linux" {
