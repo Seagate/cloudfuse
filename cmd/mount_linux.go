@@ -88,6 +88,10 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 	} else { // execute in parent only
 		defer os.Remove(fname)
 
+		childDone := make(chan struct{})
+
+		go monitorChild(child.Pid, childDone)
+
 		select {
 		case <-sigusr2:
 			log.Info("mount: Child [%v] mounted successfully at %s", child.Pid, options.MountPath)
@@ -100,11 +104,8 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 			if err != nil {
 				log.Err("mount: failed to read child [%v] failure logs [%s]", child.Pid, err.Error())
 				return Destroy(fmt.Sprintf("failed to mount, please check logs [%s]", err.Error()))
-			} else if len(buff) > 0 {
-				return Destroy(string(buff))
 			} else {
-				// Nothing was logged, so mount succeeded
-				return nil
+				return Destroy(string(buff))
 			}
 
 		case <-time.After(options.WaitForMount):
