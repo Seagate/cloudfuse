@@ -45,7 +45,9 @@ func getGenericCredential() (*service.SharedKeyCredential, error) {
 	accountName, accountKey := os.Getenv(accountNameEnvVar), os.Getenv(accountKeyEnvVar)
 
 	if accountName == "" || accountKey == "" {
-		return nil, errors.New(accountNameEnvVar + " and/or " + accountKeyEnvVar + " environment variables not specified.")
+		return nil, errors.New(
+			accountNameEnvVar + " and/or " + accountKeyEnvVar + " environment variables not specified.",
+		)
 	}
 	return service.NewSharedKeyCredential(accountName, accountKey)
 }

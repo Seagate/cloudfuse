@@ -92,7 +92,7 @@ func (suite *sizeTrackerMockTestSuite) cleanupTest() {
 func (suite *sizeTrackerMockTestSuite) TestDefault() {
 	defer suite.cleanupTest()
 	suite.assert.Equal("size_tracker", suite.sizeTracker.Name())
-	suite.assert.EqualValues(uint64(0), suite.sizeTracker.mountSize.GetSize())
+	suite.assert.Equal(uint64(0), suite.sizeTracker.mountSize.GetSize())
 }
 
 func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledUnderThreshold() {
@@ -102,22 +102,36 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledUnderThreshold()
 
 	// Create File
 	file := generateFileName()
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file}).Return(&internal.ObjAttr{Path: file}, nil)
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644}).Return(&handlemap.Handle{}, nil)
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: file}).
+		Return(&internal.ObjAttr{Path: file}, nil)
+	suite.mock.EXPECT().
+		CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644}).
+		Return(&handlemap.Handle{}, nil)
 	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
 	suite.assert.NoError(err)
 
 	// Write File
 	data := make([]byte, 1024*1024)
 	_, _ = rand.Read(data)
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: handle.Path}).Return(&internal.ObjAttr{Path: file}, nil)
-	suite.mock.EXPECT().WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data}).Return(len(data), nil)
-	_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: handle.Path}).
+		Return(&internal.ObjAttr{Path: file}, nil)
+	suite.mock.EXPECT().
+		WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data}).
+		Return(len(data), nil)
+	_, err = suite.sizeTracker.WriteFile(
+		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
 	suite.assert.NoError(err)
 
 	// Flush File
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: handle.Path}).Return(&internal.ObjAttr{Path: file, Size: int64(len(data))}, nil)
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: handle.Path}).Return(&internal.ObjAttr{Path: file, Size: int64(len(data))}, nil)
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: handle.Path}).
+		Return(&internal.ObjAttr{Path: file, Size: int64(len(data))}, nil)
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: handle.Path}).
+		Return(&internal.ObjAttr{Path: file, Size: int64(len(data))}, nil)
 	suite.mock.EXPECT().FlushFile(internal.FlushFileOptions{Handle: handle}).Return(nil)
 	err = suite.sizeTracker.FlushFile(internal.FlushFileOptions{Handle: handle})
 	suite.assert.NoError(err)
@@ -151,22 +165,36 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledOverThreshold() 
 
 	// Create File
 	file := generateFileName()
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file}).Return(&internal.ObjAttr{Path: file}, nil)
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644}).Return(&handlemap.Handle{}, nil)
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: file}).
+		Return(&internal.ObjAttr{Path: file}, nil)
+	suite.mock.EXPECT().
+		CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644}).
+		Return(&handlemap.Handle{}, nil)
 	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
 	suite.assert.NoError(err)
 
 	// Write File
 	data := make([]byte, 1024*1024)
 	_, _ = rand.Read(data)
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: handle.Path}).Return(&internal.ObjAttr{Path: file}, nil)
-	suite.mock.EXPECT().WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data}).Return(len(data), nil)
-	_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: handle.Path}).
+		Return(&internal.ObjAttr{Path: file}, nil)
+	suite.mock.EXPECT().
+		WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data}).
+		Return(len(data), nil)
+	_, err = suite.sizeTracker.WriteFile(
+		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
 	suite.assert.NoError(err)
 
 	// Flush File
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: handle.Path}).Return(&internal.ObjAttr{Path: file, Size: int64(len(data))}, nil)
-	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: handle.Path}).Return(&internal.ObjAttr{Path: file, Size: int64(len(data))}, nil)
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: handle.Path}).
+		Return(&internal.ObjAttr{Path: file, Size: int64(len(data))}, nil)
+	suite.mock.EXPECT().
+		GetAttr(internal.GetAttrOptions{Name: handle.Path}).
+		Return(&internal.ObjAttr{Path: file, Size: int64(len(data))}, nil)
 	suite.mock.EXPECT().FlushFile(internal.FlushFileOptions{Handle: handle}).Return(nil)
 	err = suite.sizeTracker.FlushFile(internal.FlushFileOptions{Handle: handle})
 	suite.assert.NoError(err)

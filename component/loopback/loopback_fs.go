@@ -121,7 +121,9 @@ func (lfs *LoopbackFS) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 }
 
 // TODO: we can make it more intricate by generating a token and splitting streamed dir mimicking storage
-func (lfs *LoopbackFS) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
+func (lfs *LoopbackFS) StreamDir(
+	options internal.StreamDirOptions,
+) ([]*internal.ObjAttr, string, error) {
 	if options.Token == "na" {
 		return nil, "", nil
 	}
@@ -403,7 +405,11 @@ func (lfs *LoopbackFS) Chown(options internal.ChownOptions) error {
 
 func (lfs *LoopbackFS) StageData(options internal.StageDataOptions) error {
 	log.Trace("LoopbackFS::StageData : name=%s, id=%s", options.Name, options.Id)
-	path := fmt.Sprintf("%s_%s", filepath.Join(lfs.path, options.Name), strings.ReplaceAll(options.Id, "/", "_"))
+	path := fmt.Sprintf(
+		"%s_%s",
+		filepath.Join(lfs.path, options.Name),
+		strings.ReplaceAll(options.Id, "/", "_"),
+	)
 	return os.WriteFile(path, options.Data, 0644)
 }
 
@@ -419,7 +425,11 @@ func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
 	}
 
 	for idx, id := range options.List {
-		path := fmt.Sprintf("%s_%s", filepath.Join(lfs.path, options.Name), strings.ReplaceAll(id, "/", "_"))
+		path := fmt.Sprintf(
+			"%s_%s",
+			filepath.Join(lfs.path, options.Name),
+			strings.ReplaceAll(id, "/", "_"),
+		)
 		info, err := os.Lstat(path)
 		if err == nil {
 			block, err := os.Open(path)
@@ -454,7 +464,11 @@ func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
 
 	// delete the staged files
 	for _, id := range options.List {
-		path := fmt.Sprintf("%s_%s", filepath.Join(lfs.path, options.Name), strings.ReplaceAll(id, "/", "_"))
+		path := fmt.Sprintf(
+			"%s_%s",
+			filepath.Join(lfs.path, options.Name),
+			strings.ReplaceAll(id, "/", "_"),
+		)
 		_ = os.Remove(path)
 	}
 

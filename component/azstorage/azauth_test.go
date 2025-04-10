@@ -123,7 +123,11 @@ func (suite *authTestSuite) TestBlockInvalidAuth() {
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
 			AccountKey:  encryptedKey,
-			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
+			Endpoint: generateEndpoint(
+				false,
+				storageTestConfigurationParameters.BlockAccount,
+				EAccountType.BLOCK(),
+			),
 		},
 	}
 	assert := assert.New(suite.T())
@@ -146,7 +150,11 @@ func (suite *authTestSuite) TestAdlsInvalidAuth() {
 			AccountType: EAccountType.ADLS(),
 			AccountName: storageTestConfigurationParameters.AdlsAccount,
 			AccountKey:  encryptedKey,
-			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
+			Endpoint: generateEndpoint(
+				false,
+				storageTestConfigurationParameters.AdlsAccount,
+				EAccountType.ADLS(),
+			),
 		},
 	}
 	assert := assert.New(suite.T())
@@ -169,7 +177,11 @@ func (suite *authTestSuite) TestInvalidAccountType() {
 			AccountType: EAccountType.INVALID_ACC(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
 			AccountKey:  encryptedKey,
-			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
+			Endpoint: generateEndpoint(
+				false,
+				storageTestConfigurationParameters.BlockAccount,
+				EAccountType.BLOCK(),
+			),
 		},
 	}
 	assert := assert.New(suite.T())
@@ -188,7 +200,11 @@ func (suite *authTestSuite) TestBlockInvalidSharedKey() {
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
 			AccountKey:  nil,
-			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
+			Endpoint: generateEndpoint(
+				false,
+				storageTestConfigurationParameters.BlockAccount,
+				EAccountType.BLOCK(),
+			),
 		},
 	}
 	assert := assert.New(suite.T())
@@ -211,7 +227,11 @@ func (suite *authTestSuite) TestBlockInvalidSharedKey2() {
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
 			AccountKey:  encryptedKey, // string that will fail to base64 decode
-			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
+			Endpoint: generateEndpoint(
+				false,
+				storageTestConfigurationParameters.BlockAccount,
+				EAccountType.BLOCK(),
+			),
 		},
 	}
 	assert := assert.New(suite.T())
@@ -234,7 +254,11 @@ func (suite *authTestSuite) TestBlockSharedKey() {
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
 			AccountKey:  encryptedKey,
-			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
+			Endpoint: generateEndpoint(
+				false,
+				storageTestConfigurationParameters.BlockAccount,
+				EAccountType.BLOCK(),
+			),
 		},
 	}
 	suite.validateStorageTest("TestBlockSharedKey", stgConfig)
@@ -265,7 +289,11 @@ func (suite *authTestSuite) TestAdlsInvalidSharedKey() {
 			AccountType: EAccountType.ADLS(),
 			AccountName: storageTestConfigurationParameters.AdlsAccount,
 			AccountKey:  nil,
-			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
+			Endpoint: generateEndpoint(
+				false,
+				storageTestConfigurationParameters.AdlsAccount,
+				EAccountType.ADLS(),
+			),
 		},
 	}
 	assert := assert.New(suite.T())
@@ -288,7 +316,11 @@ func (suite *authTestSuite) TestAdlsSharedKey() {
 			AccountType: EAccountType.ADLS(),
 			AccountName: storageTestConfigurationParameters.AdlsAccount,
 			AccountKey:  encryptedKey,
-			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
+			Endpoint: generateEndpoint(
+				false,
+				storageTestConfigurationParameters.AdlsAccount,
+				EAccountType.ADLS(),
+			),
 		},
 	}
 	suite.validateStorageTest("TestAdlsSharedKey", stgConfig)
@@ -319,7 +351,11 @@ func (suite *authTestSuite) TestBlockInvalidSasKey() {
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
 			SASKey:      nil,
-			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
+			Endpoint: generateEndpoint(
+				false,
+				storageTestConfigurationParameters.BlockAccount,
+				EAccountType.BLOCK(),
+			),
 		},
 	}
 	assert := assert.New(suite.T())
@@ -448,7 +484,11 @@ func (suite *authTestSuite) TestAdlsInvalidSasKey() {
 			AccountType: EAccountType.ADLS(),
 			AccountName: storageTestConfigurationParameters.AdlsAccount,
 			SASKey:      nil,
-			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
+			Endpoint: generateEndpoint(
+				false,
+				storageTestConfigurationParameters.AdlsAccount,
+				EAccountType.ADLS(),
+			),
 		},
 	}
 	assert := assert.New(suite.T())

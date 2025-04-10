@@ -100,7 +100,12 @@ func TestDeleteAllObjects(t *testing.T) {
 	}
 }
 
-func deleteObjects(ctx context.Context, client *s3.Client, bucket string, objects []types.ObjectIdentifier) error {
+func deleteObjects(
+	ctx context.Context,
+	client *s3.Client,
+	bucket string,
+	objects []types.ObjectIdentifier,
+) error {
 	_, err := client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
 		Bucket: aws.String(bucket),
 		Delete: &types.Delete{

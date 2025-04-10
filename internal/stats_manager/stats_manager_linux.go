@@ -189,7 +189,10 @@ func statsPolling() {
 			}
 
 			if cmpSt.Timestamp == stMgrOpt.cmpTimeMap[cmpSt.ComponentName] {
-				log.Debug("stats_manager::statsPolling : Skipping as there is no change in stats collected for %v", cmpSt.ComponentName)
+				log.Debug(
+					"stats_manager::statsPolling : Skipping as there is no change in stats collected for %v",
+					cmpSt.ComponentName,
+				)
 				continue
 			}
 

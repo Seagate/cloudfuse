@@ -197,7 +197,14 @@ func (suite *mountSuite) TestMountDirNotEmptySuccess() {
 	tempDir := filepath.Join(mntDir, "tempdir")
 	_ = os.Mkdir(tempDir, 0777)
 
-	mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--config-file="+configFile, "-o", "nonempty")
+	mountCmd := exec.Command(
+		cloudfuseBinary,
+		"mount",
+		mntDir,
+		"--config-file="+configFile,
+		"-o",
+		"nonempty",
+	)
 	cliOut, err := mountCmd.Output()
 	suite.Empty(cliOut)
 	suite.NoError(err)
@@ -266,7 +273,13 @@ func (suite *mountSuite) TestEnvVarMountFailure() {
 	os.Setenv("AZURE_STORAGE_ACCESS_KEY", "myKey")
 	os.Setenv("AZURE_STORAGE_BLOB_ENDPOINT", "https://myAccount.dfs.core.windows.net")
 
-	mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--tmp-path="+tempDir, "--container-name=myContainer")
+	mountCmd := exec.Command(
+		cloudfuseBinary,
+		"mount",
+		mntDir,
+		"--tmp-path="+tempDir,
+		"--container-name=myContainer",
+	)
 	cliOut, err := mountCmd.Output()
 	fmt.Println(string(cliOut))
 	suite.Error(err)
@@ -326,7 +339,13 @@ func (suite *mountSuite) TestEnvVarMount() {
 	// unmount
 	cloudfuseUnmount(suite, mntDir)
 
-	mountAllCmd := exec.Command(cloudfuseBinary, "mount", "all", mntDir, "--tmp-path="+tempCachePath)
+	mountAllCmd := exec.Command(
+		cloudfuseBinary,
+		"mount",
+		"all",
+		mntDir,
+		"--tmp-path="+tempCachePath,
+	)
 	cliOut, err = mountAllCmd.Output()
 	fmt.Println(string(cliOut))
 	suite.NotEmpty(cliOut)
@@ -497,7 +516,10 @@ func TestMain(m *testing.M) {
 
 	err := os.RemoveAll(mntDir)
 	if err != nil {
-		fmt.Printf("MountTest : Could not cleanup mount directory before testing. Here's why: %v\n", err)
+		fmt.Printf(
+			"MountTest : Could not cleanup mount directory before testing. Here's why: %v\n",
+			err,
+		)
 	}
 
 	// On Linux the folder must exist so we need to create it, on Windows it cannot exist.

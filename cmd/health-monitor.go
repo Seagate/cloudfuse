@@ -85,13 +85,19 @@ var healthMonCmd = &cobra.Command{
 
 		err = config.UnmarshalKey("file_cache", &cacheMonitorOptions)
 		if err != nil {
-			log.Err("health-monitor : file_cache config error (invalid config attributes) [%s]", err.Error())
+			log.Err(
+				"health-monitor : file_cache config error (invalid config attributes) [%s]",
+				err.Error(),
+			)
 			return fmt.Errorf("invalid file_cache config [%s]", err.Error())
 		}
 
 		err = config.UnmarshalKey("health_monitor", &options.MonitorOpt)
 		if err != nil {
-			log.Err("health-monitor : health_monitor config error (invalid config attributes) [%s]", err.Error())
+			log.Err(
+				"health-monitor : health_monitor config error (invalid config attributes) [%s]",
+				err.Error(),
+			)
 			return fmt.Errorf("invalid health_monitor config [%s]", err.Error())
 		}
 
@@ -149,14 +155,23 @@ func buildCliParamForMonitor() []string {
 
 	cliParams = append(cliParams, "--pid="+pid)
 	if options.MonitorOpt.CfsPollInterval != 0 {
-		cliParams = append(cliParams, fmt.Sprintf("--stats-poll-interval-sec=%v", options.MonitorOpt.CfsPollInterval))
+		cliParams = append(
+			cliParams,
+			fmt.Sprintf("--stats-poll-interval-sec=%v", options.MonitorOpt.CfsPollInterval),
+		)
 	}
 	if options.MonitorOpt.ProcMonInterval != 0 {
-		cliParams = append(cliParams, fmt.Sprintf("--process-monitor-interval-sec=%v", options.MonitorOpt.ProcMonInterval))
+		cliParams = append(
+			cliParams,
+			fmt.Sprintf("--process-monitor-interval-sec=%v", options.MonitorOpt.ProcMonInterval),
+		)
 	}
 
 	if options.MonitorOpt.OutputPath != "" {
-		cliParams = append(cliParams, fmt.Sprintf("--output-path=%v", options.MonitorOpt.OutputPath))
+		cliParams = append(
+			cliParams,
+			fmt.Sprintf("--output-path=%v", options.MonitorOpt.OutputPath),
+		)
 	}
 
 	cliParams = append(cliParams, "--cache-path="+common.ExpandPath(cacheMonitorOptions.TmpPath))
@@ -175,7 +190,10 @@ func buildCliParamForMonitor() []string {
 		case hmcommon.FileCacheMon:
 			cliParams = append(cliParams, "--no-file-cache-monitor")
 		default:
-			log.Debug("health-monitor::buildCliParamForMonitor: Invalid health monitor option %v", v)
+			log.Debug(
+				"health-monitor::buildCliParamForMonitor: Invalid health monitor option %v",
+				v,
+			)
 		}
 	}
 

@@ -31,7 +31,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"testing"
 	"time"
 
@@ -85,17 +84,18 @@ func (suite *unmountTestSuite) cleanupTest() {
 
 // mount failure test where the mount directory does not exists
 func (suite *unmountTestSuite) TestUnmountCmd() {
-	if runtime.GOOS == "windows" {
-		// WinFSP is not installed in our CI pipeline
-		return
-	}
 	defer suite.cleanupTest()
 
 	mountDirectory1, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory1, 0777)
 	defer os.RemoveAll(mountDirectory1)
 
-	cmd := exec.Command("../cloudfuse", "mount", mountDirectory1, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command(
+		"../cloudfuse",
+		"mount",
+		mountDirectory1,
+		fmt.Sprintf("--config-file=%s", confFileUnMntTest),
+	)
 	_, err := cmd.Output()
 	mountOutput, _ := cmd.CombinedOutput()
 	suite.assert.NoError(err)
@@ -108,15 +108,15 @@ func (suite *unmountTestSuite) TestUnmountCmd() {
 	unmountOutput, err := executeCommandC(rootCmd, "unmount", mountDirectory1)
 	suite.assert.NoError(err)
 	if err != nil {
-		fmt.Printf("Unmount failed. Mount output:\n%s\nUnmount output:\n%s\n", mountOutput, unmountOutput)
+		fmt.Printf(
+			"Unmount failed. Mount output:\n%s\nUnmount output:\n%s\n",
+			mountOutput,
+			unmountOutput,
+		)
 	}
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdLazy() {
-	if runtime.GOOS == "windows" {
-		// lazy unmount is not supported (or necessary) on Windows
-		return
-	}
 	defer suite.cleanupTest()
 
 	lazyFlags := []string{"--lazy", "-z"}
@@ -131,7 +131,12 @@ func (suite *unmountTestSuite) TestUnmountCmdLazy() {
 			os.MkdirAll(mountDirectory6, 0777)
 			defer os.RemoveAll(mountDirectory6)
 
-			cmd := exec.Command("../cloudfuse", "mount", mountDirectory6, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+			cmd := exec.Command(
+				"../cloudfuse",
+				"mount",
+				mountDirectory6,
+				fmt.Sprintf("--config-file=%s", confFileUnMntTest),
+			)
 			_, err := cmd.Output()
 			suite.assert.NoError(err)
 
@@ -168,17 +173,18 @@ func (suite *unmountTestSuite) TestUnmountCmdLazy() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdFail() {
-	if runtime.GOOS == "windows" {
-		// WinFSP is not installed in our CI pipeline
-		return
-	}
 	defer suite.cleanupTest()
 
 	mountDirectory2, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory2, 0777)
 	defer os.RemoveAll(mountDirectory2)
 
-	cmd := exec.Command("../cloudfuse", "mount", mountDirectory2, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command(
+		"../cloudfuse",
+		"mount",
+		mountDirectory2,
+		fmt.Sprintf("--config-file=%s", confFileUnMntTest),
+	)
 	_, err := cmd.Output()
 	suite.assert.NoError(err)
 
@@ -196,17 +202,18 @@ func (suite *unmountTestSuite) TestUnmountCmdFail() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
-	if runtime.GOOS == "windows" {
-		// WinFSP is not installed in our CI pipeline
-		return
-	}
 	defer suite.cleanupTest()
 
 	mountDirectory3, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory3, 0777)
 	defer os.RemoveAll(mountDirectory3)
 
-	cmd := exec.Command("../cloudfuse", "mount", mountDirectory3, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command(
+		"../cloudfuse",
+		"mount",
+		mountDirectory3,
+		fmt.Sprintf("--config-file=%s", confFileUnMntTest),
+	)
 	_, err := cmd.Output()
 	suite.assert.NoError(err)
 
@@ -216,17 +223,18 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
-	if runtime.GOOS == "windows" {
-		// WinFSP is not installed in our CI pipeline
-		return
-	}
 	defer suite.cleanupTest()
 
 	mountDirectory4, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory4, 0777)
 	defer os.RemoveAll(mountDirectory4)
 
-	cmd := exec.Command("../cloudfuse", "mount", mountDirectory4, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command(
+		"../cloudfuse",
+		"mount",
+		mountDirectory4,
+		fmt.Sprintf("--config-file=%s", confFileUnMntTest),
+	)
 	_, err := cmd.Output()
 	suite.assert.NoError(err)
 
@@ -248,17 +256,18 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
 }
 
 func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
-	if runtime.GOOS == "windows" {
-		// WinFSP is not installed in our CI pipeline
-		return
-	}
 	defer suite.cleanupTest()
 
 	mountDirectory5, _ := os.MkdirTemp("", "TestUnMountTemp")
 	os.MkdirAll(mountDirectory5, 0777)
 	defer os.RemoveAll(mountDirectory5)
 
-	cmd := exec.Command("../cloudfuse", "mount", mountDirectory5, fmt.Sprintf("--config-file=%s", confFileUnMntTest))
+	cmd := exec.Command(
+		"../cloudfuse",
+		"mount",
+		mountDirectory5,
+		fmt.Sprintf("--config-file=%s", confFileUnMntTest),
+	)
 	_, err := cmd.Output()
 	suite.assert.NoError(err)
 
