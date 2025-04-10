@@ -39,7 +39,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -106,6 +106,10 @@ func ReadFromConfigFile(configFilePath string) error {
 }
 
 func loadConfigFromBufferToViper(configData []byte) error {
+	// Set type to be yaml so that viper can parse the config data
+	// and since we only allow yaml formatted config files
+	viper.SetConfigType("yaml")
+
 	err := viper.ReadConfig(strings.NewReader(string(configData)))
 	if err != nil {
 		return err
@@ -127,21 +131,21 @@ func ReadFromConfigBuffer(configData []byte) error {
 func DecryptConfigFile(fileName string, passphrase *memguard.Enclave) error {
 	cipherText, err := os.ReadFile(fileName)
 	if err != nil {
-		return fmt.Errorf("Failed to read encrypted config file [%s]", err.Error())
+		return fmt.Errorf("failed to read encrypted config file [%s]", err.Error())
 	}
 
 	if len(cipherText) == 0 {
-		return fmt.Errorf("Encrypted config file is empty")
+		return fmt.Errorf("encrypted config file is empty")
 	}
 
 	plainText, err := common.DecryptData(cipherText, passphrase)
 	if err != nil {
-		return fmt.Errorf("Failed to decrypt config file [%s]", err.Error())
+		return fmt.Errorf("failed to decrypt config file [%s]", err.Error())
 	}
 
 	err = loadConfigFromBufferToViper(plainText)
 	if err != nil {
-		return fmt.Errorf("Failed to load decrypted config file [%s]", err.Error())
+		return fmt.Errorf("failed to load decrypted config file [%s]", err.Error())
 	}
 
 	return nil

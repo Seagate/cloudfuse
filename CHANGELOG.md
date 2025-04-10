@@ -1,5 +1,33 @@
 # Cloudfuse Changelog #
 
+## **1.10.0** ##
+
+March 28th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Features ###
+
+- [#490](https://github.com/Seagate/cloudfuse/pull/490) Adds new mount flags 'enable-remount-system' and 'enable-remount-user' to enable remount on system startup or user login
+along with corresponding unmount flags 'disable-remount-system' and 'disable-remount-user'
+
+## **1.9.3** ##
+
+March 25th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#484](https://github.com/Seagate/cloudfuse/pull/484) Use registry for a more reliable remount on startup
+
+## **1.9.2** ##
+
+March 12th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#475](https://github.com/Seagate/cloudfuse/pull/475) Fix bug where cloudfuse mounts with secure config files on Windows without foreground did not start correctly
+
 ## **1.9.1** ##
 
 March 6th 2025

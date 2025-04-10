@@ -54,6 +54,7 @@ type Options struct {
 	ChecksumAlgorithm         types.ChecksumAlgorithm `config:"checksum-algorithm" yaml:"checksum-algorithm,omitempty"`
 	UsePathStyle              bool                    `config:"use-path-style" yaml:"use-path-style,omitempty"`
 	DisableUsage              bool                    `config:"disable-usage" yaml:"disable-usage,omitempty"`
+	EnableDirMarker           bool                    `config:"enable-dir-marker" yaml:"enable-dir-marker,omitempty"`
 }
 
 type ConfigSecrets struct {
@@ -83,6 +84,7 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 	s3.stConfig.disableConcurrentDownload = opt.DisableConcurrentDownload
 	s3.stConfig.usePathStyle = opt.UsePathStyle
 	s3.stConfig.disableUsage = opt.DisableUsage
+	s3.stConfig.enableDirMarker = opt.EnableDirMarker
 
 	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
 	if opt.PartSizeMb < 5 || opt.PartSizeMb > MaxPartSizeMb {
@@ -119,9 +121,9 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 
 	s3.stConfig.enableChecksum = opt.EnableChecksum
 	if opt.EnableChecksum {
-		// Use default SHA1 checksum if user does not provide algorithm
+		// Use default CRC32 checksum if user does not provide algorithm
 		if opt.ChecksumAlgorithm == "" {
-			opt.ChecksumAlgorithm = types.ChecksumAlgorithmSha1
+			opt.ChecksumAlgorithm = types.ChecksumAlgorithmCrc32
 		}
 
 		if opt.ChecksumAlgorithm != types.ChecksumAlgorithmCrc32 &&

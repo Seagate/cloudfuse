@@ -236,8 +236,7 @@ func formatEndpointProtocol(endpoint string, http bool) string {
 	// If the pvtEndpoint does not have protocol mentioned in front, pvtEndpoint parsing will fail while
 	// creating URI also the string shall end with "/"
 	if correctedEndpoint != "" {
-		if !(strings.HasPrefix(correctedEndpoint, "https://") ||
-			strings.HasPrefix(correctedEndpoint, "http://")) {
+		if !strings.HasPrefix(correctedEndpoint, "https://") && !strings.HasPrefix(correctedEndpoint, "http://") {
 			if http {
 				correctedEndpoint = "http://" + correctedEndpoint
 			} else {
@@ -353,7 +352,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	if opt.CPKEnabled {
 		if opt.CPKEncryptionKey == "" || opt.CPKEncryptionKeySha256 == "" {
 			log.Err("ParseAndValidateConfig : CPK key or CPK key sha256 not provided")
-			return errors.New("CPK key or key sha256 not provided")
+			return errors.New("CPK key or key sha256 not provided") //nolint
 		}
 		az.stConfig.cpkEnabled = opt.CPKEnabled
 		az.stConfig.cpkEncryptionKey = opt.CPKEncryptionKey
@@ -440,7 +439,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	case EAuthType.SAS():
 		az.stConfig.authConfig.AuthMode = EAuthType.SAS()
 		if opt.SaSKey == "" {
-			return errors.New("SAS key not provided")
+			return errors.New("SAS key not provided") //nolint
 		}
 		az.stConfig.authConfig.SASKey = sanitizeSASKey(opt.SaSKey)
 	case EAuthType.MSI():
@@ -616,7 +615,7 @@ func ParseAndReadDynamicConfig(az *AzStorage, opt AzStorageOptions, reload bool)
 	case "sas":
 		az.stConfig.authConfig.AuthMode = EAuthType.SAS()
 		if opt.SaSKey == "" {
-			return errors.New("SAS key not provided")
+			return errors.New("SAS key not provided") //nolint
 		}
 
 		oldSas := az.stConfig.authConfig.SASKey
@@ -634,13 +633,13 @@ func ParseAndReadDynamicConfig(az *AzStorage, opt AzStorageOptions, reload bool)
 				}
 				defer sasKey.Destroy()
 			} else {
-				return errors.New("SAS key update failure")
+				return errors.New("SAS key update failure") //nolint
 			}
 
 			if err := az.storage.UpdateServiceClient("saskey", sasKey.String()); err != nil {
 				az.stConfig.authConfig.SASKey = oldSas
 				_ = az.storage.UpdateServiceClient("saskey", sasKey.String())
-				return errors.New("SAS key update failure")
+				return errors.New("SAS key update failure") //nolint
 			}
 		}
 	}

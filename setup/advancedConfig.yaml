@@ -194,8 +194,9 @@ s3storage:
   concurrency: <number of parallel upload/download threads. Default - 5>
   disable-concurrent-download: true|false <disables concurrent downloads. Can improve performance with small files at the cost of slow downloads for large objects>
   enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
-  checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - SHA1>
+  checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - CRC32>
   usePathStyle: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
+  enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
 
 # Mount all configuration
 mountall:
