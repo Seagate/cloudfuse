@@ -260,13 +260,14 @@ func (bb *BlockBlob) DeleteFile(name string) (err error) {
 	})
 	if err != nil {
 		serr := storeBlobErrToErr(err)
-		if serr == ErrFileNotFound {
+		switch serr {
+		case ErrFileNotFound:
 			log.Err("BlockBlob::DeleteFile : %s does not exist", name)
 			return syscall.ENOENT
-		} else if serr == BlobIsUnderLease {
+		case BlobIsUnderLease:
 			log.Err("BlockBlob::DeleteFile : %s is under lease [%s]", name, err.Error())
 			return syscall.EIO
-		} else {
+		default:
 			log.Err("BlockBlob::DeleteFile : Failed to delete blob %s [%s]", name, err.Error())
 			return err
 		}
@@ -418,12 +419,13 @@ func (bb *BlockBlob) getAttrUsingRest(name string) (attr *internal.ObjAttr, err 
 
 	if err != nil {
 		e := storeBlobErrToErr(err)
-		if e == ErrFileNotFound {
+		switch e {
+		case ErrFileNotFound:
 			return attr, syscall.ENOENT
-		} else if e == InvalidPermission {
+		case InvalidPermission:
 			log.Err("BlockBlob::getAttrUsingRest : Insufficient permissions for %s [%s]", name, err.Error())
 			return attr, syscall.EACCES
-		} else {
+		default:
 			log.Err("BlockBlob::getAttrUsingRest : Failed to get blob properties for %s [%s]", name, err.Error())
 			return attr, err
 		}
@@ -463,12 +465,13 @@ func (bb *BlockBlob) getAttrUsingList(name string) (attr *internal.ObjAttr, err 
 		blobs, new_marker, err = bb.List(name, marker, bb.Config.maxResultsForList)
 		if err != nil {
 			e := storeBlobErrToErr(err)
-			if e == ErrFileNotFound {
+			switch e {
+			case ErrFileNotFound:
 				return attr, syscall.ENOENT
-			} else if e == InvalidPermission {
+			case InvalidPermission:
 				log.Err("BlockBlob::getAttrUsingList : Insufficient permissions for %s [%s]", name, err.Error())
 				return attr, syscall.EACCES
-			} else {
+			default:
 				log.Warn("BlockBlob::getAttrUsingList : Failed to list blob properties for %s [%s]", name, err.Error())
 			}
 		}
@@ -751,9 +754,10 @@ func (bb *BlockBlob) ReadBuffer(name string, offset int64, length int64) ([]byte
 
 	if err != nil {
 		e := storeBlobErrToErr(err)
-		if e == ErrFileNotFound {
+		switch e {
+		case ErrFileNotFound:
 			return buff, syscall.ENOENT
-		} else if e == InvalidRange {
+		case InvalidRange:
 			return buff, syscall.ERANGE
 		}
 
@@ -782,9 +786,10 @@ func (bb *BlockBlob) ReadInBuffer(name string, offset int64, length int64, data 
 
 	if err != nil {
 		e := storeBlobErrToErr(err)
-		if e == ErrFileNotFound {
+		switch e {
+		case ErrFileNotFound:
 			return syscall.ENOENT
-		} else if e == InvalidRange {
+		case InvalidRange:
 			return syscall.ERANGE
 		}
 
@@ -906,13 +911,14 @@ func (bb *BlockBlob) WriteFromFile(name string, metadata map[string]*string, fi 
 
 	if err != nil {
 		serr := storeBlobErrToErr(err)
-		if serr == BlobIsUnderLease {
+		switch serr {
+		case BlobIsUnderLease:
 			log.Err("BlockBlob::WriteFromFile : %s is under a lease, can not update file [%s]", name, err.Error())
 			return syscall.EIO
-		} else if serr == InvalidPermission {
+		case InvalidPermission:
 			log.Err("BlockBlob::WriteFromFile : Insufficient permissions for %s [%s]", name, err.Error())
 			return syscall.EACCES
-		} else {
+		default:
 			log.Err("BlockBlob::WriteFromFile : Failed to upload blob %s [%s]", name, err.Error())
 		}
 		return err

@@ -1299,10 +1299,7 @@ func (bc *BlockCache) waitAndFreeUploadedBlocks(handle *handlemap.Handle, cnt in
 	node := nodeList.Front()
 	nextNode := node
 
-	wipeoutBlock := false
-	if cnt == 1 {
-		wipeoutBlock = true
-	}
+	wipeoutBlock := cnt == 1
 
 	for nextNode != nil && cnt > 0 {
 		node = nextNode
