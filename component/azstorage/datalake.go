@@ -372,10 +372,10 @@ func (dl *Datalake) GetAttr(name string) (blobAttr *internal.ObjAttr, err error)
 		e := storeDatalakeErrToErr(err)
 		switch e {
 		case ErrFileNotFound:
-			return attr, syscall.ENOENT
+			return blobAttr, syscall.ENOENT
 		case InvalidPermission:
 			log.Err("Datalake::GetAttr : Insufficient permissions for %s [%s]", name, err.Error())
-			return attr, syscall.EACCES
+			return blobAttr, syscall.EACCES
 		default:
 			log.Err("Datalake::GetAttr : Failed to get path properties for %s [%s]", name, err.Error())
 			return blobAttr, err
