@@ -68,8 +68,7 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         self.settings = self.allMountSettings
         self.passphrase = ''
         self.settingsUpdatedFromConfig = False
-        # self.unlockEncryptedFile()
-        # self.initSettingsFromConfig(self.settings)
+        self.iniStatusOfEncryptFile()
 
         if platform == 'win32':
             # Windows directory and filename conventions:
@@ -106,10 +105,15 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             self.lineEdit_mountPoint.setToolTip('Designate a location to mount the bucket - the directory must already exist')
 
     def triggerUpdateSettingsFromConfig(self):
+        success = True
         if not self.settingsUpdatedFromConfig:
-            self.unlockEncryptedFile()
+            if not self.unlockEncryptedFile():
+                # failed to unlock the encrypted file
+                success = False
+                return success
             self.initSettingsFromConfig(self.settings)
             self.settingsUpdatedFromConfig = True
+        return success
 
 
     def checkConfigDirectory(self):
@@ -143,7 +147,8 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
     #   so we must use different widgets to show the different settings
     def showSettingsWidget(self):
 
-        self.triggerUpdateSettingsFromConfig()
+        if not self.triggerUpdateSettingsFromConfig():
+            return
         targetIndex = self.dropDown_bucketSelect.currentIndex()
         if bucketOptions[targetIndex] == 's3storage':
             self.setConfigs = s3SettingsWidget(self.settings)
@@ -189,6 +194,9 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         # get config path
         if self.checkForEncryptedConfig(self.getWorkingDir()):
             fileName = 'config.yaml.aes'
+            if not self.getPassphraseFromUser():
+                self.addOutputText('Invalid Password for encrypted config file')
+                self.errorMessageBox('Error mounting: Did not run mount command, password prompt cancelled')
         else:
             fileName = 'config.yaml'
 
@@ -208,6 +216,9 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
 
         # do a dry run to validate options and credentials
         commandParts = [cloudfuseCli, 'mount', directory, f'--config-file={configPath}', '--dry-run']
+        if fileName == 'config.yaml.aes':
+            commandParts.append(f'--passphrase={self.passphrase}')
+
         
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
@@ -227,6 +238,8 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
         commandParts = [cloudfuseCli, 'mount', directory, f'--config-file={configPath}']
         if platform == "win32" and self.checkBox_remount.isChecked():
             commandParts.append('--enable-remount')
+        if fileName == 'config.yaml.aes':
+            commandParts.append(f'--passphrase={self.passphrase}')
         (stdOut, stdErr, exitCode, executableFound) = self.runCommand(commandParts)
         if not executableFound:
             self.addOutputText('cloudfuse.exe not found! Is it installed?')
@@ -300,12 +313,21 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
             return
         self.writeConfigFile(self.settings)
 
+    def iniStatusOfEncryptFile(self):
+        configPath = self.getWorkingDir()
+        if self.checkForEncryptedConfig(configPath):
+            self.checkBox_encryptConfig.setCheckState(Qt.CheckState.Checked)
+        else:
+            self.checkBox_encryptConfig.setCheckState(Qt.CheckState.Unchecked)
+
     def unlockEncryptedFile(self):
         configPath = self.getWorkingDir()
         if self.checkForEncryptedConfig(configPath): 
             if self.getPassphraseFromUser():
                 #Todo: check valid password?
-                self.decryptConfigFile(configPath)
+                if self.decryptConfigFile(configPath):
+                    return False
+                self.checkBox_encryptConfig.setCheckState(Qt.CheckState.Unchecked)
                 return True
             else: 
                 return False
@@ -338,12 +360,16 @@ class FUSEWindow(settingsManager,configFuncs, QMainWindow, Ui_primaryFUSEwindow)
                 # if encryptConfigFile failed to encrypt, reset the state of the checkbox to unchecked
                 if self.encryptConfigFile(configPath):
                     self.checkBox_encryptConfig.setCheckState(Qt.CheckState.Unchecked)
+            else:
+                self.checkBox_encryptConfig.setCheckState(Qt.CheckState.Unchecked)
         else:
             if self.checkForEncryptedConfig(configPath):
                 if self.getPassphraseFromUser():
                     # If encryptConfigFile failed to decrypt, reset state to checked - we couldn't unlock the file
                     if self.decryptConfigFile(configPath):
                         self.checkBox_encryptConfig.setCheckState(Qt.CheckState.Checked)
+                else:
+                    self.checkBox_encryptConfig.setCheckState(Qt.CheckState.Checked)
 
     def encryptConfigFile(self, configPath):
         #./cloudfuse.exe secure encrypt --config-file="C:\Users\509655\AppData\Roaming\Cloudfuse\config.yaml" --passphrase="Tm2P0Y4DrMcMPX+ht4RkMQ=="
