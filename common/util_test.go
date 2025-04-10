@@ -159,7 +159,7 @@ func (suite *typesTestSuite) TestEncryptDecrypt16() {
 
 	d, err := DecryptData(cipher, encryptedPassphrase)
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
+	suite.assert.Equal(data, d)
 }
 
 func (suite *typesTestSuite) TestEncryptDecrypt24() {
@@ -179,7 +179,7 @@ func (suite *typesTestSuite) TestEncryptDecrypt24() {
 
 	d, err := DecryptData(cipher, encryptedPassphrase)
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
+	suite.assert.Equal(data, d)
 }
 
 func (suite *typesTestSuite) TestEncryptDecrypt32() {
@@ -199,7 +199,7 @@ func (suite *typesTestSuite) TestEncryptDecrypt32() {
 
 	d, err := DecryptData(cipher, encryptedPassphrase)
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
+	suite.assert.Equal(data, d)
 }
 
 func (suite *utilTestSuite) TestMonitorCfs() {

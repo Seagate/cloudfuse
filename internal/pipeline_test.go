@@ -77,11 +77,11 @@ type pipelineTestSuite struct {
 	assert *assert.Assertions
 }
 
-func (suite *pipelineTestSuite) SetupTest() {
+func (s *pipelineTestSuite) SetupTest() {
 	AddComponent("ComponentA", NewComponentA)
 	AddComponent("ComponentB", NewComponentB)
 	AddComponent("ComponentC", NewComponentC)
-	suite.assert = assert.New(suite.T())
+	s.assert = assert.New(s.T())
 }
 
 func (s *pipelineTestSuite) TestCreatePipeline() {

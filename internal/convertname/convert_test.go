@@ -44,14 +44,14 @@ func (suite *conversionTestSuite) TestCloudToFile() {
 	filename := "test\"*:<>?|"
 	cloudname := "test＂＊：＜＞？｜"
 	result := WindowsCloudToFile(filename)
-	suite.assert.EqualValues(cloudname, result)
+	suite.assert.Equal(cloudname, result)
 }
 
 func (suite *conversionTestSuite) TestFileToCloud() {
 	filename := "test＂＊：＜＞？｜"
 	cloudname := "test\"*:<>?|"
 	result := WindowsFileToCloud(filename)
-	suite.assert.EqualValues(cloudname, result)
+	suite.assert.Equal(cloudname, result)
 }
 
 func TestConversionTestSuite(t *testing.T) {

@@ -170,7 +170,10 @@ func (se *StatsExporter) addToList(st *ExportedStat, idx int) {
 	case hmcommon.CloudfuseStats:
 		se.outputList[idx].Cfs = append(se.outputList[idx].Cfs, st.Stat.(stats_manager.PipeMsg))
 	case hmcommon.FileCacheMon:
-		se.outputList[idx].FcEvent = append(se.outputList[idx].FcEvent, st.Stat.(*hmcommon.CacheEvent))
+		se.outputList[idx].FcEvent = append(
+			se.outputList[idx].FcEvent,
+			st.Stat.(*hmcommon.CacheEvent),
+		)
 	case hmcommon.CpuProfiler:
 		se.outputList[idx].Cpu = st.Stat.(string)
 	case hmcommon.MemoryProfiler:
@@ -259,12 +262,24 @@ func (se *StatsExporter) getNewFile() error {
 	baseName := filepath.Join(hmcommon.OutputPath, hmcommon.OutputFileName)
 
 	// Remove the oldest file
-	fname = fmt.Sprintf("%v_%v_%v.%v", baseName, hmcommon.Pid, (hmcommon.OutputFileCount - 1), hmcommon.OutputFileExtension)
+	fname = fmt.Sprintf(
+		"%v_%v_%v.%v",
+		baseName,
+		hmcommon.Pid,
+		(hmcommon.OutputFileCount - 1),
+		hmcommon.OutputFileExtension,
+	)
 	_ = os.Remove(fname)
 
 	for i := hmcommon.OutputFileCount - 2; i > 0; i-- {
 		fname = fmt.Sprintf("%v_%v_%v.%v", baseName, hmcommon.Pid, i, hmcommon.OutputFileExtension)
-		fnameNew = fmt.Sprintf("%v_%v_%v.%v", baseName, hmcommon.Pid, (i + 1), hmcommon.OutputFileExtension)
+		fnameNew = fmt.Sprintf(
+			"%v_%v_%v.%v",
+			baseName,
+			hmcommon.Pid,
+			(i + 1),
+			hmcommon.OutputFileExtension,
+		)
 
 		// Move each file to next number 8 -> 9, 7 -> 8, 6 -> 7 ...
 		_ = os.Rename(fname, fnameNew)
@@ -294,7 +309,10 @@ func (se *StatsExporter) getNewFile() error {
 func CloseExporter() error {
 	se, err := NewStatsExporter()
 	if err != nil || se == nil {
-		log.Err("stats_exporter::CloseExporter : Error in creating stats exporter instance [%v]", err)
+		log.Err(
+			"stats_exporter::CloseExporter : Error in creating stats exporter instance [%v]",
+			err,
+		)
 		return err
 	}
 

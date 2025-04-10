@@ -160,7 +160,9 @@ func validateGenConfigOptions() error {
 	if opts.passphrase == "" {
 		opts.passphrase = os.Getenv(SecureConfigEnvName)
 		if opts.passphrase == "" {
-			return errors.New("provide the passphrase as a cli parameter or configure the CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+			return errors.New(
+				"provide the passphrase as a cli parameter or configure the CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable",
+			)
 		}
 	}
 
@@ -176,14 +178,18 @@ func validateGenConfigOptions() error {
 
 func init() {
 	rootCmd.AddCommand(generateTestConfig)
-	generateTestConfig.Flags().StringVar(&opts.configFilePath, "config-file", "", "Input config file.")
-	generateTestConfig.Flags().StringVar(&opts.outputConfigPath, "output-file", "", "Output config file path.")
-	generateTestConfig.Flags().StringVar(&opts.containerName, "container-name", "", "Container name.")
+	generateTestConfig.Flags().
+		StringVar(&opts.configFilePath, "config-file", "", "Input config file.")
+	generateTestConfig.Flags().
+		StringVar(&opts.outputConfigPath, "output-file", "", "Output config file path.")
+	generateTestConfig.Flags().
+		StringVar(&opts.containerName, "container-name", "", "Container name.")
 	generateTestConfig.Flags().StringVar(&opts.tempDirPath, "temp-path", "", "Temporary file path.")
 
 	rootCmd.AddCommand(generateConfig)
 	generateConfig.Flags().StringVar(&opts.configFilePath, "config-file", "", "Input config file.")
-	generateConfig.Flags().StringVar(&opts.outputConfigPath, "output-file", "", "Output config file path.")
+	generateConfig.Flags().
+		StringVar(&opts.outputConfigPath, "output-file", "", "Output config file path.")
 	generateConfig.Flags().StringVar(&opts.tempDirPath, "temp-path", "", "Temporary file path.")
 	generateConfig.Flags().StringVar(&opts.passphrase, "passphrase", "",
 		"Key to be used for encryption / decryption. Key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")

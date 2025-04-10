@@ -99,7 +99,10 @@ func (ms *MountSize) runJournalWriter() {
 			}
 		case <-ms.stopCh:
 			if err := ms.writeSizeToFile(); err != nil {
-				log.Err("SizeTracker::runJournalWriter : Unable to journal final size before closing channel. Error: %v", err)
+				log.Err(
+					"SizeTracker::runJournalWriter : Unable to journal final size before closing channel. Error: %v",
+					err,
+				)
 			}
 			return
 		}

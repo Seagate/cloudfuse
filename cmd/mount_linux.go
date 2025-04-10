@@ -42,7 +42,14 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName string, pidFilePerm os.FileMode, umask int, fname string) error {
+func createDaemon(
+	pipeline *internal.Pipeline,
+	ctx context.Context,
+	pidFileName string,
+	pidFilePerm os.FileMode,
+	umask int,
+	fname string,
+) error {
 	dmnCtx := &daemon.Context{
 		PidFileName: pidFileName,
 		PidFilePerm: pidFilePerm,
