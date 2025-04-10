@@ -83,8 +83,8 @@ type Component interface {
 	RenameDir(RenameDirOptions) error
 
 	// File operations
-	//CreateFile Implementation expectations
-	//1. must return ErrExist if file already exists
+	// CreateFile Implementation expectations
+	// 1. must return ErrExist if file already exists
 	CreateFile(CreateFileOptions) (*handlemap.Handle, error)
 	DeleteFile(DeleteFileOptions) error
 
@@ -111,8 +111,8 @@ type Component interface {
 
 	// Filesystem level operations
 	//GetAttr: Implementation expectations:
-	//1. must return ErrNotExist for absence of a file/directory/symlink
-	//2. must return valid nodeID that was passed with any create/update operations for eg: CreateFile, CreateDir etc
+	// 1. must return ErrNotExist for absence of a file/directory/symlink
+	// 2. must return valid nodeID that was passed with any create/update operations for eg: CreateFile, CreateDir etc
 	GetAttr(GetAttrOptions) (*ObjAttr, error)
 
 	Chmod(ChmodOptions) error

@@ -59,7 +59,7 @@ type attrCacheTestSuite struct {
 
 var emptyConfig = ""
 var defaultSize = int64(0)
-var defaultMode = uint32(0777)
+var defaultMode = uint32(0o777)
 
 const MB = 1024 * 1024
 
@@ -97,10 +97,6 @@ func getPathAttr(path string, size int64, mode os.FileMode, metadata bool) *inte
 		Flags:    flags,
 		Metadata: nil,
 	}
-}
-
-func (suite *attrCacheTestSuite) assertCacheEmpty() bool {
-	return len(suite.attrCache.cache.cacheMap[""].children) == 0
 }
 
 func (suite *attrCacheTestSuite) assertNotInCache(path string) {
@@ -547,7 +543,7 @@ func (suite *attrCacheTestSuite) TestStreamDirDoesNotExist() {
 			// Entries Do Not Already Exist
 			suite.mock.EXPECT().StreamDir(options).Return(aAttr, "", nil).Times(1)
 
-			suite.assertCacheEmpty() // cacheMap should be empty before call
+			suite.assert.Empty(suite.attrCache.cache.cacheMap[""].children) // cacheMap should be empty before call
 			returnedAttr, token, err := suite.attrCache.StreamDir(options)
 			suite.assert.NoError(err)
 			suite.assert.Equal(aAttr, returnedAttr)
@@ -584,7 +580,7 @@ func (suite *attrCacheTestSuite) TestStreamDirPaginated() {
 	options0 := internal.StreamDirOptions{Name: path, Token: "", Count: 2}
 	suite.mock.EXPECT().StreamDir(options0).Return(manyAttr[0:2], mockTokens[0], nil).Times(1)
 
-	suite.assertCacheEmpty() // cacheMap should be empty before call
+	suite.assert.Empty(suite.attrCache.cache.cacheMap[""].children) // cacheMap should be empty before call
 	returnedAttr, token, err := suite.attrCache.StreamDir(options0)
 	suite.assert.NoError(err)
 	suite.assert.Equal(mockTokens[0], token)
@@ -714,7 +710,7 @@ func (suite *attrCacheTestSuite) TestStreamDirNoCacheOnList() {
 	options := internal.StreamDirOptions{Name: path}
 	suite.mock.EXPECT().StreamDir(options).Return(aAttr, "", nil).Times(1)
 
-	suite.assertCacheEmpty() // cacheMap should be empty before call
+	suite.assert.Empty(suite.attrCache.cache.cacheMap[""].children) // cacheMap should be empty before call
 	returnedAttr, token, err := suite.attrCache.StreamDir(options)
 	suite.assert.NoError(err)
 	suite.assert.Empty(token)
@@ -741,12 +737,12 @@ func (suite *attrCacheTestSuite) TestStreamDirNoCacheOnListNoCacheDirs() {
 	options := internal.StreamDirOptions{Name: path}
 	suite.mock.EXPECT().StreamDir(options).Return(aAttr, "", nil)
 
-	suite.assertCacheEmpty() // cacheMap should be empty before call
+	suite.assert.Empty(suite.attrCache.cache.cacheMap[""].children) // cacheMap should be empty before call
 	returnedAttr, _, err := suite.attrCache.StreamDir(options)
 	suite.assert.NoError(err)
 	suite.assert.Equal(aAttr, returnedAttr)
 
-	suite.assertCacheEmpty() // cacheMap should be empty after call
+	suite.assert.Empty(suite.attrCache.cache.cacheMap[""].children) // cacheMap should be empty after call
 }
 
 func (suite *attrCacheTestSuite) TestStreamDirError() {
@@ -1539,7 +1535,7 @@ func (suite *attrCacheTestSuite) TestGetAttrDoesNotExist() {
 			// attributes should not be accessible so call the mock
 			suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode), false), nil)
 
-			suite.assertCacheEmpty() // cacheMap should be empty before call
+			suite.assert.Empty(suite.attrCache.cache.cacheMap[""].children) // cacheMap should be empty before call
 			_, err := suite.attrCache.GetAttr(options)
 			suite.assert.NoError(err)
 			suite.assertUntouched(truncatedPath) // item added to cache after
@@ -1609,7 +1605,7 @@ func (suite *attrCacheTestSuite) TestCacheTimeout() {
 	// attributes should not be accessible so call the mock
 	suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode), true), nil)
 
-	suite.assertCacheEmpty() // cacheMap should be empty before call
+	suite.assert.Empty(suite.attrCache.cache.cacheMap[""].children) // cacheMap should be empty before call
 	_, err := suite.attrCache.GetAttr(options)
 	suite.assert.NoError(err)
 	suite.assertUntouched(path) // item added to cache after

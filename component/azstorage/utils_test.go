@@ -257,11 +257,11 @@ func (s *utilsTestSuite) TestGetFileModeFromACL() {
 	var inputs = []blobACLs{
 		// acl, owner, mode, error string
 		{"", "", 0, "empty permissions from the service"},
-		{"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:r-x,group::r--,mask::r-x,other::rwx", "", 0547, ""},
-		{"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:rwx,group::r--,mask::r--,other::rwx", "", 0447, ""},
-		{"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:rwx,group::rw-,mask::r--,other::rwx", "tmp-obj-id", 0767, ""},
-		{"user::rwx,user:tmp-obj-1:r--,group::rw-,mask::r--,other::rwx", "tmp-obj-id", 0767, ""},
-		{"user::rwx,user:tmp-obj-1:r--,group::rw-,mask::r--,other::rwx", "0", 0067, ""},
+		{"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:r-x,group::r--,mask::r-x,other::rwx", "", 0o547, ""},
+		{"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:rwx,group::r--,mask::r--,other::rwx", "", 0o447, ""},
+		{"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:rwx,group::rw-,mask::r--,other::rwx", "tmp-obj-id", 0o767, ""},
+		{"user::rwx,user:tmp-obj-1:r--,group::rw-,mask::r--,other::rwx", "tmp-obj-id", 0o767, ""},
+		{"user::rwx,user:tmp-obj-1:r--,group::rw-,mask::r--,other::rwx", "0", 0o067, ""},
 	}
 
 	_ = log.SetDefaultLogger("silent", common.LogConfig{})

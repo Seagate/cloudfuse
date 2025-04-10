@@ -30,5 +30,5 @@ type Monitor interface {
 	SetName(string)
 	Monitor() error
 	Validate() error
-	ExportStats(string, interface{})
+	ExportStats(string, any)
 }

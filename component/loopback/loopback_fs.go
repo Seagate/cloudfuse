@@ -42,7 +42,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 )
 
-//LoopbackFS component Config specifications:
+// LoopbackFS component Config specifications:
 //
 //	loopbackfs:
 //		path: <valid-path>
@@ -70,7 +70,7 @@ func (lfs *LoopbackFS) Configure(_ bool) error {
 		return fmt.Errorf("config error in %s [%s]", lfs.Name(), err)
 	}
 	if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
-		err = os.MkdirAll(conf.Path, os.FileMode(0777))
+		err = os.MkdirAll(conf.Path, os.FileMode(0o777))
 		if err != nil {
 			log.Err("LoopbackFS: config error [%s]", err)
 			return fmt.Errorf("config error in %s [%s]", lfs.Name(), err)
@@ -337,7 +337,7 @@ func (lfs *LoopbackFS) CopyToFile(options internal.CopyToFileOptions) error {
 func (lfs *LoopbackFS) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("LoopbackFS::CopyFromFile : name=%s", options.Name)
 	path := filepath.Join(lfs.path, options.Name)
-	fdst, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, os.FileMode(0666))
+	fdst, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, os.FileMode(0o666))
 	if err != nil {
 		log.Err("LoopbackFS::CopyFromFile : error opening [%s]", err)
 		return err
@@ -404,7 +404,7 @@ func (lfs *LoopbackFS) Chown(options internal.ChownOptions) error {
 func (lfs *LoopbackFS) StageData(options internal.StageDataOptions) error {
 	log.Trace("LoopbackFS::StageData : name=%s, id=%s", options.Name, options.Id)
 	path := fmt.Sprintf("%s_%s", filepath.Join(lfs.path, options.Name), strings.ReplaceAll(options.Id, "/", "_"))
-	return os.WriteFile(path, options.Data, 0644)
+	return os.WriteFile(path, options.Data, 0o644)
 }
 
 func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
@@ -412,7 +412,7 @@ func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
 
 	mainFilepath := filepath.Join(lfs.path, options.Name)
 
-	blob, err := os.OpenFile(mainFilepath, os.O_RDWR|os.O_CREATE, os.FileMode(0644))
+	blob, err := os.OpenFile(mainFilepath, os.O_RDWR|os.O_CREATE, os.FileMode(0o644))
 	if err != nil {
 		log.Err("LoopbackFS::CommitData : error opening [%s]", err)
 		return err
@@ -434,7 +434,7 @@ func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
 				return err
 			}
 
-			n, err = blob.WriteAt(data, int64(idx*(int)(options.BlockSize)))
+			n, err = blob.WriteAt(data, int64(idx)*int64(options.BlockSize))
 			if err != nil {
 				return err
 			}
@@ -471,13 +471,13 @@ func (lfs *LoopbackFS) GetCommittedBlockList(name string) (*internal.CommittedBl
 	}
 
 	blockSize := uint64(1 * 1024 * 1024)
-	blocks := info.Size() / (int64)(blockSize)
+	blocks := info.Size() / int64(blockSize)
 	list := make(internal.CommittedBlockList, 0)
 
 	for i := int64(0); i < blocks; i++ {
 		list = append(list, internal.CommittedBlock{
 			Id:     fmt.Sprintf("%d", i),
-			Offset: i * (int64)(blockSize),
+			Offset: i * int64(blockSize),
 			Size:   blockSize,
 		})
 	}

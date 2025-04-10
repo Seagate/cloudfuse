@@ -74,7 +74,7 @@ func (fc *FileCache) Monitor() error {
 	return fc.cacheWatcher()
 }
 
-func (fc *FileCache) ExportStats(timestamp string, st interface{}) {
+func (fc *FileCache) ExportStats(timestamp string, st any) {
 	se, err := hminternal.NewStatsExporter()
 	if err != nil || se == nil {
 		log.Err("cache_monitor::ExportStats : Error in creating stats exporter instance [%v]", err)
@@ -85,11 +85,11 @@ func (fc *FileCache) ExportStats(timestamp string, st interface{}) {
 }
 
 func (fc *FileCache) Validate() error {
-	if len(fc.pid) == 0 {
+	if fc.pid == "" {
 		return fmt.Errorf("pid of cloudfuse is not given")
 	}
 
-	if len(fc.tmpPath) == 0 {
+	if fc.tmpPath == "" {
 		return fmt.Errorf("cache path is not given")
 	}
 
@@ -177,7 +177,7 @@ func (fc *FileCache) createEvent(event *watcher.Event) {
 		delete(fc.cacheObj.fileRemovedMap, event.Path)
 		fc.cacheObj.fileCreatedMap[event.Path] = event.Size()
 		fc.cacheObj.cacheSize += event.Size()
-		fc.cacheObj.cacheConsumed = (float64)(fc.cacheObj.cacheSize*100) / (fc.maxSizeMB * common.MbToBytes)
+		fc.cacheObj.cacheConsumed = float64(fc.cacheObj.cacheSize*100) / (fc.maxSizeMB * common.MbToBytes)
 	}
 
 	e := fc.getCacheEventObj(event)
@@ -193,7 +193,7 @@ func (fc *FileCache) removeEvent(event *watcher.Event) {
 		delete(fc.cacheObj.fileCreatedMap, event.Path)
 		fc.cacheObj.fileRemovedMap[event.Path] = event.Size()
 		fc.cacheObj.cacheSize = int64(math.Max(0, float64(fc.cacheObj.cacheSize-event.Size())))
-		fc.cacheObj.cacheConsumed = (float64)(fc.cacheObj.cacheSize*100) / (fc.maxSizeMB * common.MbToBytes)
+		fc.cacheObj.cacheConsumed = float64(fc.cacheObj.cacheSize*100) / (fc.maxSizeMB * common.MbToBytes)
 	}
 
 	e := fc.getCacheEventObj(event)
@@ -212,7 +212,7 @@ func (fc *FileCache) chmodEvent(event *watcher.Event) {
 		if fileSize != event.Size() {
 			fc.cacheObj.cacheSize += event.Size() - fileSize
 			fc.cacheObj.fileCreatedMap[event.Path] = event.Size()
-			fc.cacheObj.cacheConsumed = (float64)(fc.cacheObj.cacheSize*100) / (fc.maxSizeMB * common.MbToBytes)
+			fc.cacheObj.cacheConsumed = float64(fc.cacheObj.cacheSize*100) / (fc.maxSizeMB * common.MbToBytes)
 		}
 	}
 
@@ -233,7 +233,7 @@ func (fc *FileCache) writeEvent(event *watcher.Event) {
 
 		fc.cacheObj.cacheSize += event.Size() - fileSize
 		fc.cacheObj.fileCreatedMap[event.Path] = event.Size()
-		fc.cacheObj.cacheConsumed = (float64)(fc.cacheObj.cacheSize*100) / (fc.maxSizeMB * common.MbToBytes)
+		fc.cacheObj.cacheConsumed = float64(fc.cacheObj.cacheSize*100) / (fc.maxSizeMB * common.MbToBytes)
 	} else {
 		return
 	}
@@ -268,8 +268,8 @@ func (fc *FileCache) getCacheEventObj(event *watcher.Event) *hmcommon.CacheEvent
 		IsDir:           event.IsDir(),
 		CacheSize:       fc.cacheObj.cacheSize,
 		CacheConsumed:   fmt.Sprintf("%.2f%%", fc.cacheObj.cacheConsumed),
-		CacheFilesCnt:   (int64)(len(fc.cacheObj.fileCreatedMap)),
-		EvictedFilesCnt: (int64)(len(fc.cacheObj.fileRemovedMap)),
+		CacheFilesCnt:   int64(len(fc.cacheObj.fileCreatedMap)),
+		EvictedFilesCnt: int64(len(fc.cacheObj.fileRemovedMap)),
 		Value:           make(map[string]string),
 	}
 

@@ -252,9 +252,9 @@ func (rw *ReadWriteFilenameCache) Stop() error {
 		for fileName, buffer := range rw.fileCache {
 			delete(rw.fileCache, fileName)
 			buffer.Lock()
-			defer buffer.Unlock()
 			buffer.Purge()
 			atomic.AddInt32(&rw.CachedObjects, -1)
+			buffer.Unlock()
 		}
 	}
 	return nil
@@ -408,7 +408,7 @@ func (rw *ReadWriteFilenameCache) readWriteBlocks(handle *handlemap.Handle, offs
 	dataRead, blk_index, dataCopied := 0, 0, int64(0)
 	lastBlock := handle.CacheObj.BlockList[len(handle.CacheObj.BlockList)-1]
 	for dataLeft > 0 {
-		if offset < int64(lastBlock.EndIndex) {
+		if offset < lastBlock.EndIndex {
 			block, _, err := rw.getBlock(handle, blocks[blk_index])
 			if err != nil {
 				return dataRead, err
@@ -423,7 +423,7 @@ func (rw *ReadWriteFilenameCache) readWriteBlocks(handle *handlemap.Handle, offs
 			offset += dataCopied
 			dataRead += int(dataCopied)
 			blk_index += 1
-			//if appending to file
+			// if appending to file
 		} else if write {
 			emptyByteLength := offset - lastBlock.EndIndex
 			// if the data to append + our last block existing data do not exceed block size - just append to last block

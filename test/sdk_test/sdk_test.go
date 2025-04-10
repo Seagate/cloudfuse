@@ -58,7 +58,7 @@ func TestMain(m *testing.M) {
 	pfilepath := flag.String("prefix", "", "File Prefix for the operation")
 	flag.Parse()
 
-	//fmt.Println(*paccountName, " : ", *psas, " : ", *pcontainerName, " : ", *pfilepath)
+	// fmt.Println(*paccountName, " : ", *psas, " : ", *pcontainerName, " : ", *pfilepath)
 	accountName = *paccountName
 	sas = *psas
 	containerName = *pcontainerName
@@ -84,7 +84,7 @@ func TestDownloadUpload(t *testing.T) {
 	for i := 1; i < 7; i++ {
 		// Generate the url
 		blobname := fmt.Sprintf("%s%d", filepath, i)
-		//filename := fmt.Sprintf("%s%s", "/mnt/ramdisk/", blobname)
+		// filename := fmt.Sprintf("%s%s", "/mnt/ramdisk/", blobname)
 		filename := fmt.Sprintf("%s%s", "/mnt/ramdisk/", blobname)
 		blobClient := containerClient.NewBlockBlobClient(path.Base(blobname))
 

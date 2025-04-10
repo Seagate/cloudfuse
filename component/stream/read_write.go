@@ -327,7 +327,7 @@ func (rw *ReadWriteCache) Stop() error {
 	log.Trace("Stream::Stop : stopping component : %s", rw.Name())
 	if !rw.StreamOnly {
 		handleMap := handlemap.GetHandles()
-		handleMap.Range(func(key, value interface{}) bool {
+		handleMap.Range(func(key, value any) bool {
 			handle := value.(*handlemap.Handle)
 			if handle.CacheObj != nil && !handle.CacheObj.StreamOnly {
 				err := rw.purge(handle, -1)
@@ -454,7 +454,7 @@ func (rw *ReadWriteCache) readWriteBlocks(handle *handlemap.Handle, offset int64
 	dataRead, blk_index, dataCopied := 0, 0, int64(0)
 	lastBlock := handle.CacheObj.BlockList[len(handle.CacheObj.BlockList)-1]
 	for dataLeft > 0 {
-		if offset < int64(lastBlock.EndIndex) {
+		if offset < lastBlock.EndIndex {
 			block, _, err := rw.getBlock(handle, blocks[blk_index])
 			if err != nil {
 				return dataRead, err
@@ -469,7 +469,7 @@ func (rw *ReadWriteCache) readWriteBlocks(handle *handlemap.Handle, offset int64
 			offset += dataCopied
 			dataRead += int(dataCopied)
 			blk_index += 1
-			//if appending to file
+			// if appending to file
 		} else if write {
 			emptyByteLength := offset - lastBlock.EndIndex
 			// if the data to append + our last block existing data do not exceed block size - just append to last block

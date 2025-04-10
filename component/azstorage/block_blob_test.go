@@ -260,9 +260,9 @@ func (s *blockBlobTestSuite) setupTestHelper(configuration string, container str
 	}
 }
 
-func (s *blockBlobTestSuite) tearDownTestHelper(delete bool) {
+func (s *blockBlobTestSuite) tearDownTestHelper(del bool) {
 	_ = s.az.Stop()
-	if delete {
+	if del {
 		_, _ = s.containerClient.Delete(ctx, nil)
 	}
 }
@@ -295,7 +295,7 @@ func (s *blockBlobTestSuite) TestDefault() {
 	s.assert.Empty(s.az.stConfig.authConfig.ClientSecret)
 	s.assert.Empty(s.az.stConfig.authConfig.TenantID)
 	s.assert.Empty(s.az.stConfig.authConfig.ClientID)
-	//s.assert.EqualValues("https://"+s.az.stConfig.authConfig.AccountName+".blob.core.windows.net/", s.az.stConfig.authConfig.Endpoint)
+	// s.assert.EqualValues("https://"+s.az.stConfig.authConfig.AccountName+".blob.core.windows.net/", s.az.stConfig.authConfig.Endpoint)
 	s.assert.Equal(EAuthType.KEY(), s.az.stConfig.authConfig.AuthMode)
 	s.assert.Equal(s.container, s.az.stConfig.container)
 	s.assert.Empty(s.az.stConfig.prefixPath)
@@ -394,7 +394,7 @@ func (s *blockBlobTestSuite) TestListContainers() {
 
 func checkMetadata(metadata map[string]*string, key string, val string) bool {
 	for k, v := range metadata {
-		if v != nil && strings.ToLower(k) == key && val == *v {
+		if v != nil && strings.EqualFold(k, key) && val == *v {
 			return true
 		}
 	}
@@ -1424,7 +1424,7 @@ func (s *blockBlobTestSuite) TestTruncateSmallFileSmaller() {
 	s.assert.NotNil(resp.ContentLength)
 	s.assert.EqualValues(truncatedLength, *resp.ContentLength)
 	output, _ := io.ReadAll(resp.Body)
-	s.assert.EqualValues(testData[:truncatedLength], output[:])
+	s.assert.EqualValues(testData[:truncatedLength], output)
 }
 
 func (s *blockBlobTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
@@ -2373,7 +2373,7 @@ func (s *blockBlobTestSuite) TestChmod() {
 	name := generateFileName()
 	s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
-	err := s.az.Chmod(internal.ChmodOptions{Name: name, Mode: 0666})
+	err := s.az.Chmod(internal.ChmodOptions{Name: name, Mode: 0o666})
 	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOTSUP, err)
 }
@@ -2389,7 +2389,7 @@ func (s *blockBlobTestSuite) TestChmodIgnore() {
 	name := generateFileName()
 	s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
-	err := s.az.Chmod(internal.ChmodOptions{Name: name, Mode: 0666})
+	err := s.az.Chmod(internal.ChmodOptions{Name: name, Mode: 0o666})
 	s.assert.NoError(err)
 }
 
@@ -2585,10 +2585,11 @@ func (s *blockBlobTestSuite) TestFlushFileChunkedFile() {
 	name := generateFileName()
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, 16*MB)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerClient.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err = uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerClient.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
 		BlockSize: 4 * MB,
 	})
 	s.assert.NoError(err)
@@ -2615,10 +2616,11 @@ func (s *blockBlobTestSuite) TestFlushFileUpdateChunkedFile() {
 	blockSize := 4 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, 16*MB)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerClient.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err = uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerClient.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
 		BlockSize: int64(blockSize),
 	})
 	s.assert.NoError(err)
@@ -2628,7 +2630,8 @@ func (s *blockBlobTestSuite) TestFlushFileUpdateChunkedFile() {
 	h.Size = 16 * MB
 
 	updatedBlock := make([]byte, 2*MB)
-	rand.Read(updatedBlock)
+	_, err = rand.Read(updatedBlock)
+	s.assert.NoError(err)
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize)
 	s.az.storage.ReadInBuffer(name, int64(blockSize), int64(blockSize), h.CacheObj.BlockOffsetList.BlockList[1].Data)
 	copy(h.CacheObj.BlockOffsetList.BlockList[1].Data[MB:2*MB+MB], updatedBlock)
@@ -2655,10 +2658,11 @@ func (s *blockBlobTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	blockSize := 4 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, 16*MB)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerClient.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err = uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerClient.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
 		BlockSize: int64(blockSize),
 	})
 	s.assert.NoError(err)
@@ -2702,7 +2706,8 @@ func (s *blockBlobTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	h.Size = 12 * MB
 
 	data1 := make([]byte, blockSize)
-	rand.Read(data1)
+	_, err := rand.Read(data1)
+	s.assert.NoError(err)
 	blk1 := &common.Block{
 		StartIndex: 0,
 		EndIndex:   int64(blockSize),
@@ -2712,7 +2717,8 @@ func (s *blockBlobTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	blk1.Flags.Set(common.DirtyBlock)
 
 	data2 := make([]byte, blockSize)
-	rand.Read(data2)
+	_, err = rand.Read(data2)
+	s.assert.NoError(err)
 	blk2 := &common.Block{
 		StartIndex: int64(blockSize),
 		EndIndex:   2 * int64(blockSize),
@@ -2722,7 +2728,8 @@ func (s *blockBlobTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	blk2.Flags.Set(common.DirtyBlock)
 
 	data3 := make([]byte, blockSize)
-	rand.Read(data3)
+	_, err = rand.Read(data3)
+	s.assert.NoError(err)
 	blk3 := &common.Block{
 		StartIndex: 2 * int64(blockSize),
 		EndIndex:   3 * int64(blockSize),
@@ -2733,7 +2740,7 @@ func (s *blockBlobTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
 	bol.Flags.Clear(common.SmallFile)
 
-	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
+	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
 	output := make([]byte, 6*MB)
@@ -2754,10 +2761,11 @@ func (s *blockBlobTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	fileSize := 16 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, fileSize)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerClient.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err = uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerClient.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
 		BlockSize: int64(blockSize),
 	})
 	s.assert.NoError(err)
@@ -2768,7 +2776,8 @@ func (s *blockBlobTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	h.Size = int64(fileSize + 3*blockSize)
 
 	data1 := make([]byte, blockSize)
-	rand.Read(data1)
+	_, err = rand.Read(data1)
+	s.assert.NoError(err)
 	blk1 := &common.Block{
 		StartIndex: int64(fileSize),
 		EndIndex:   int64(fileSize + blockSize),
@@ -2778,7 +2787,8 @@ func (s *blockBlobTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	blk1.Flags.Set(common.DirtyBlock)
 
 	data2 := make([]byte, blockSize)
-	rand.Read(data2)
+	_, err = rand.Read(data2)
+	s.assert.NoError(err)
 	blk2 := &common.Block{
 		StartIndex: int64(fileSize + blockSize),
 		EndIndex:   int64(fileSize + 2*blockSize),
@@ -2788,7 +2798,8 @@ func (s *blockBlobTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	blk2.Flags.Set(common.DirtyBlock)
 
 	data3 := make([]byte, blockSize)
-	rand.Read(data3)
+	_, err = rand.Read(data3)
+	s.assert.NoError(err)
 	blk3 := &common.Block{
 		StartIndex: int64(fileSize + 2*blockSize),
 		EndIndex:   int64(fileSize + 3*blockSize),
@@ -2824,7 +2835,7 @@ func (s *blockBlobTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	handlemap.CreateCacheObject(int64(12*MB), h)
 	h.CacheObj.BlockOffsetList = bol
 	h.CacheObj.BlockIdLength = 16
-	h.Size = int64(3 * int64(blockSize))
+	h.Size = 3 * int64(blockSize)
 
 	blk1 := &common.Block{
 		StartIndex: 0,
@@ -2872,10 +2883,11 @@ func (s *blockBlobTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	fileSize := 16 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, fileSize)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerClient.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err = uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerClient.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
 		BlockSize: int64(blockSize),
 	})
 	s.assert.NoError(err)
@@ -2938,7 +2950,8 @@ func (s *blockBlobTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	h.Size = int64(3 * blockSize)
 
 	data1 := make([]byte, blockSize)
-	rand.Read(data1)
+	_, err := rand.Read(data1)
+	s.assert.NoError(err)
 	blk1 := &common.Block{
 		StartIndex: 0,
 		EndIndex:   int64(blockSize),
@@ -2965,7 +2978,7 @@ func (s *blockBlobTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
 	bol.Flags.Clear(common.SmallFile)
 
-	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
+	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
 	output := make([]byte, 3*blockSize)
@@ -2987,10 +3000,11 @@ func (s *blockBlobTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	fileSize := 16 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, fileSize)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerClient.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err = uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4, s.containerClient.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
 		BlockSize: int64(blockSize),
 	})
 	s.assert.NoError(err)
@@ -3001,7 +3015,8 @@ func (s *blockBlobTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	h.Size = int64(fileSize + 3*blockSize)
 
 	data1 := make([]byte, blockSize)
-	rand.Read(data1)
+	_, err = rand.Read(data1)
+	s.assert.NoError(err)
 	blk1 := &common.Block{
 		StartIndex: int64(fileSize),
 		EndIndex:   int64(fileSize + blockSize),
@@ -3696,7 +3711,7 @@ func (suite *blockBlobTestSuite) UtilityFunctionTestTruncateFileToSmaller(size i
 	suite.assert.NotNil(resp.ContentLength)
 	suite.assert.EqualValues(truncatedLength, *resp.ContentLength)
 	output, _ := io.ReadAll(resp.Body)
-	suite.assert.Equal(data[:truncatedLength], output[:])
+	suite.assert.Equal(data[:truncatedLength], output)
 }
 
 func (suite *blockBlobTestSuite) UtilityFunctionTruncateFileToLarger(size int, truncatedLength int) {

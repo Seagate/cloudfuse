@@ -126,9 +126,9 @@ func (s *datalakeTestSuite) setupTestHelper(configuration string, container stri
 	}
 }
 
-func (s *datalakeTestSuite) tearDownTestHelper(delete bool) {
+func (s *datalakeTestSuite) tearDownTestHelper(del bool) {
 	s.az.Stop()
-	if delete {
+	if del {
 		s.containerClient.Delete(ctx, nil)
 	}
 }
@@ -174,7 +174,7 @@ func (s *datalakeTestSuite) TestDefault() {
 func (s *datalakeTestSuite) TestModifyEndpoint() {
 	defer s.cleanupTest()
 	// Setup
-	s.tearDownTestHelper(false) // Don't delete the generated container.
+	s.tearDownTestHelper(false) // Don't del the generated container.
 	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
 		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
 	s.setupTestHelper(config, s.container, true)
@@ -186,7 +186,7 @@ func (s *datalakeTestSuite) TestModifyEndpoint() {
 func (s *datalakeTestSuite) TestNoEndpoint() {
 	defer s.cleanupTest()
 	// Setup
-	s.tearDownTestHelper(false) // Don't delete the generated container.
+	s.tearDownTestHelper(false) // Don't del the generated container.
 	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
 		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
 	s.setupTestHelper(config, s.container, true)
@@ -267,7 +267,7 @@ func (s *datalakeTestSuite) TestCreateDirWithCPKEnabled() {
 			_, err = dir.GetProperties(ctx, nil)
 			s.assert.Error(err)
 
-			//Directory should exist
+			// Directory should exist
 			dir = s.containerClient.NewDirectoryClient(internal.TruncateDirName(path))
 			_, err = dir.GetProperties(ctx, &directory.GetPropertiesOptions{
 				CPKInfo: datalakeCPKOpt,
@@ -626,7 +626,7 @@ func (s *datalakeTestSuite) TestStreamDirError() {
 func (s *datalakeTestSuite) TestStreamDirListBlocked() {
 	defer s.cleanupTest()
 	// Setup
-	s.tearDownTestHelper(false) // Don't delete the generated container.
+	s.tearDownTestHelper(false) // Don't del the generated container.
 
 	listBlockedTime := 10
 	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  block-list-on-mount-sec: %d\n  fail-unsupported-op: true\n",
@@ -2046,7 +2046,6 @@ func (s *datalakeTestSuite) TestGetAttrFileSize() {
 func (s *datalakeTestSuite) TestGetAttrFileTime() {
 	// TODO: why has this been flaky in the CI on both platforms?
 	fmt.Println("Skipping TestGetAttrFileTime. Should fix this later.")
-	return
 
 	// defer s.cleanupTest()
 	// // Setup
@@ -2088,7 +2087,7 @@ func (s *datalakeTestSuite) TestChmod() {
 	name := generateFileName()
 	s.az.CreateFile(internal.CreateFileOptions{Name: name})
 
-	err := s.az.Chmod(internal.ChmodOptions{Name: name, Mode: 0666})
+	err := s.az.Chmod(internal.ChmodOptions{Name: name, Mode: 0o666})
 	s.assert.NoError(err)
 
 	// File's ACL info should have changed
@@ -2104,7 +2103,7 @@ func (s *datalakeTestSuite) TestChmodError() {
 	// Setup
 	name := generateFileName()
 
-	err := s.az.Chmod(internal.ChmodOptions{Name: name, Mode: 0666})
+	err := s.az.Chmod(internal.ChmodOptions{Name: name, Mode: 0o666})
 	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
@@ -2124,7 +2123,7 @@ func (s *datalakeTestSuite) TestChown() {
 func (s *datalakeTestSuite) TestChownIgnore() {
 	defer s.cleanupTest()
 	// Setup
-	s.tearDownTestHelper(false) // Don't delete the generated container.
+	s.tearDownTestHelper(false) // Don't del the generated container.
 
 	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: false\n",
 		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
@@ -2227,10 +2226,11 @@ func (s *datalakeTestSuite) TestFlushFileChunkedFile() {
 	name := generateFileName()
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, 16*MB)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
+	err = uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
 		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
 			BlockSize: 4 * MB,
 		})
@@ -2258,10 +2258,11 @@ func (s *datalakeTestSuite) TestFlushFileUpdateChunkedFile() {
 	blockSize := 4 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, 16*MB)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
+	err = uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
 		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
 			BlockSize: int64(blockSize),
 		})
@@ -2272,7 +2273,8 @@ func (s *datalakeTestSuite) TestFlushFileUpdateChunkedFile() {
 	h.Size = 16 * MB
 
 	updatedBlock := make([]byte, 2*MB)
-	rand.Read(updatedBlock)
+	_, err = rand.Read(updatedBlock)
+	s.assert.NoError(err)
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize)
 	s.az.storage.ReadInBuffer(name, int64(blockSize), int64(blockSize), h.CacheObj.BlockOffsetList.BlockList[1].Data)
 	copy(h.CacheObj.BlockOffsetList.BlockList[1].Data[MB:2*MB+MB], updatedBlock)
@@ -2299,10 +2301,11 @@ func (s *datalakeTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	blockSize := 4 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, 16*MB)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
+	err = uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
 		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
 			BlockSize: int64(blockSize),
 		})
@@ -2347,7 +2350,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	h.Size = 12 * MB
 
 	data1 := make([]byte, blockSize)
-	rand.Read(data1)
+	_, err := rand.Read(data1)
+	s.assert.NoError(err)
 	blk1 := &common.Block{
 		StartIndex: 0,
 		EndIndex:   int64(blockSize),
@@ -2357,7 +2361,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	blk1.Flags.Set(common.DirtyBlock)
 
 	data2 := make([]byte, blockSize)
-	rand.Read(data2)
+	_, err = rand.Read(data2)
+	s.assert.NoError(err)
 	blk2 := &common.Block{
 		StartIndex: int64(blockSize),
 		EndIndex:   2 * int64(blockSize),
@@ -2367,7 +2372,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	blk2.Flags.Set(common.DirtyBlock)
 
 	data3 := make([]byte, blockSize)
-	rand.Read(data3)
+	_, err = rand.Read(data3)
+	s.assert.NoError(err)
 	blk3 := &common.Block{
 		StartIndex: 2 * int64(blockSize),
 		EndIndex:   3 * int64(blockSize),
@@ -2378,7 +2384,7 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
 	bol.Flags.Clear(common.SmallFile)
 
-	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
+	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
 	output := make([]byte, 6*MB)
@@ -2399,10 +2405,11 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	fileSize := 16 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, fileSize)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
+	err = uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
 		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
 			BlockSize: int64(blockSize),
 		})
@@ -2414,7 +2421,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	h.Size = int64(fileSize + 3*blockSize)
 
 	data1 := make([]byte, blockSize)
-	rand.Read(data1)
+	_, err = rand.Read(data1)
+	s.assert.NoError(err)
 	blk1 := &common.Block{
 		StartIndex: int64(fileSize),
 		EndIndex:   int64(fileSize + blockSize),
@@ -2424,7 +2432,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	blk1.Flags.Set(common.DirtyBlock)
 
 	data2 := make([]byte, blockSize)
-	rand.Read(data2)
+	_, err = rand.Read(data2)
+	s.assert.NoError(err)
 	blk2 := &common.Block{
 		StartIndex: int64(fileSize + blockSize),
 		EndIndex:   int64(fileSize + 2*blockSize),
@@ -2434,7 +2443,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	blk2.Flags.Set(common.DirtyBlock)
 
 	data3 := make([]byte, blockSize)
-	rand.Read(data3)
+	_, err = rand.Read(data3)
+	s.assert.NoError(err)
 	blk3 := &common.Block{
 		StartIndex: int64(fileSize + 2*blockSize),
 		EndIndex:   int64(fileSize + 3*blockSize),
@@ -2470,7 +2480,7 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	handlemap.CreateCacheObject(int64(12*MB), h)
 	h.CacheObj.BlockOffsetList = bol
 	h.CacheObj.BlockIdLength = 16
-	h.Size = int64(3 * int64(blockSize))
+	h.Size = 3 * int64(blockSize)
 
 	blk1 := &common.Block{
 		StartIndex: 0,
@@ -2518,10 +2528,11 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	fileSize := 16 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, fileSize)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
+	err = uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
 		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
 			BlockSize: int64(blockSize),
 		})
@@ -2585,7 +2596,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	h.Size = int64(3 * blockSize)
 
 	data1 := make([]byte, blockSize)
-	rand.Read(data1)
+	_, err := rand.Read(data1)
+	s.assert.NoError(err)
 	blk1 := &common.Block{
 		StartIndex: 0,
 		EndIndex:   int64(blockSize),
@@ -2612,7 +2624,7 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
 	bol.Flags.Clear(common.SmallFile)
 
-	err := s.az.FlushFile(internal.FlushFileOptions{Handle: h})
+	err = s.az.FlushFile(internal.FlushFileOptions{Handle: h})
 	s.assert.NoError(err)
 
 	output := make([]byte, 3*blockSize)
@@ -2634,10 +2646,11 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	fileSize := 16 * MB
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	data := make([]byte, fileSize)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	s.assert.NoError(err)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
+	err = uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
 		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
 			BlockSize: int64(blockSize),
 		})
@@ -2649,7 +2662,8 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	h.Size = int64(fileSize + 3*blockSize)
 
 	data1 := make([]byte, blockSize)
-	rand.Read(data1)
+	_, err = rand.Read(data1)
+	s.assert.NoError(err)
 	blk1 := &common.Block{
 		StartIndex: int64(fileSize),
 		EndIndex:   int64(fileSize + blockSize),
@@ -2848,7 +2862,7 @@ func (s *datalakeTestSuite) TestUploadWithCPKEnabled() {
 // 	// This can be flaky since it may take time to replicate the data. We could hardcode a container and file for this test
 // 	time.Sleep(time.Second * time.Duration(10))
 
-// 	s.tearDownTestHelper(false) // Don't delete the generated container.
+// 	s.tearDownTestHelper(false) // Don't del the generated container.
 
 // 	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  endpoint: https://%s-secondary.dfs.core.windows.net\n",
 // 		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container, storageTestConfigurationParameters.AdlsAccount)

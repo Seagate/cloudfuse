@@ -35,7 +35,7 @@ type StreamConnection interface {
 	DeleteDirectory(options internal.DeleteDirOptions) error
 	RenameFile(options internal.RenameFileOptions) error
 	DeleteFile(options internal.DeleteFileOptions) error
-	CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) //TODO TEST THIS
+	CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) // TODO TEST THIS
 	Configure(cfg StreamOptions) error
 	ReadInBuffer(internal.ReadInBufferOptions) (int, error)
 	OpenFile(internal.OpenFileOptions) (*handlemap.Handle, error)

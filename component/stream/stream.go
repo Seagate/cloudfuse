@@ -105,7 +105,7 @@ func (st *Stream) Configure(_ bool) error {
 	}
 
 	if config.IsSet(compName + ".max-blocks-per-file") {
-		conf.BufferSize = conf.BlockSize * uint64(conf.MaxBlocksPerFile)
+		conf.BufferSize = conf.BlockSize * conf.MaxBlocksPerFile
 	}
 
 	if config.IsSet(compName+".stream-cache-mb") && conf.BufferSize > 0 {
@@ -115,7 +115,7 @@ func (st *Stream) Configure(_ bool) error {
 		}
 	}
 
-	if uint64((conf.BufferSize*conf.CachedObjLimit)*mb) > memory.FreeMemory() {
+	if (conf.BufferSize*conf.CachedObjLimit)*mb > memory.FreeMemory() {
 		log.Err("Stream::Configure : config error, not enough free memory for provided configuration")
 		return errors.New("not enough free memory for provided stream configuration")
 	}

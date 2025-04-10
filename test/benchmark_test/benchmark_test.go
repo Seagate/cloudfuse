@@ -56,7 +56,7 @@ func createSingleFile(size float32, path string) (float64, error) {
 
 	start := time.Now()
 
-	err := os.WriteFile(path, buffer, os.FileMode(0755))
+	err := os.WriteFile(path, buffer, os.FileMode(0o755))
 	if err != nil {
 		return 0, err
 	}
@@ -106,14 +106,14 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		fmt.Printf("error cleaning up base dir %s [%s]", mntPath, err)
 	}
-	err = os.Mkdir(mntPath, os.FileMode(0755))
+	err = os.Mkdir(mntPath, os.FileMode(0o755))
 	if err != nil {
 		fmt.Printf("error mkdir for base dir %s [%s]", mntPath, err)
 	}
 
 	n = *nFlag
 
-	//Parse size flags
+	// Parse size flags
 	sizeStrs := strings.Split(*fileSizesFlag, ",")
 	tempSizes := make([]float32, 0)
 	success := true

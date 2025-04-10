@@ -239,7 +239,7 @@ func formatEndpointProtocol(endpoint string, http bool) string {
 		}
 
 		if correctedEndpoint[len(correctedEndpoint)-1] != '/' {
-			correctedEndpoint = correctedEndpoint + "/"
+			correctedEndpoint += "/"
 		}
 	}
 

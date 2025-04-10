@@ -84,7 +84,7 @@ func getMountTrackerFile(useSystem bool) (string, error) {
 			return "", err
 		}
 
-		err = os.WriteFile(fullPath, data, 0644)
+		err = os.WriteFile(fullPath, data, 0o644)
 		if err != nil {
 			return "", err
 		}
@@ -120,7 +120,7 @@ func writeMounts(mounts Mounts, useSystem bool) error {
 		return err
 	}
 
-	return os.WriteFile(trackerFile, data, 0644)
+	return os.WriteFile(trackerFile, data, 0o644)
 }
 
 func removeMount(mounts Mounts, mountPath string) Mounts {

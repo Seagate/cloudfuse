@@ -63,7 +63,7 @@ func TestUtil(t *testing.T) {
 func (suite *typesTestSuite) TestDirectoryExists() {
 	rand := randomString(8)
 	dir := filepath.Join(home_dir, "dir"+rand)
-	os.MkdirAll(dir, 0777)
+	os.MkdirAll(dir, 0o777)
 	defer os.RemoveAll(dir)
 
 	exists := DirectoryExists(dir)
@@ -82,15 +82,17 @@ func (suite *typesTestSuite) TestEncryptBadKeyTooSmall() {
 	// Generate a random key
 	key := make([]byte, 20)
 	encodedKey := make([]byte, 28)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 	base64.StdEncoding.Encode(encodedKey, key)
 
 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	suite.assert.NoError(err)
 
-	_, err := EncryptData(data, encryptedPassphrase)
+	_, err = EncryptData(data, encryptedPassphrase)
 	suite.assert.Error(err)
 }
 
@@ -98,15 +100,17 @@ func (suite *typesTestSuite) TestDecryptBadKeyTooSmall() {
 	// Generate a random key
 	key := make([]byte, 20)
 	encodedKey := make([]byte, 28)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 	base64.StdEncoding.Encode(encodedKey, key)
 
 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	suite.assert.NoError(err)
 
-	_, err := DecryptData(data, encryptedPassphrase)
+	_, err = DecryptData(data, encryptedPassphrase)
 	suite.assert.Error(err)
 }
 
@@ -114,15 +118,17 @@ func (suite *typesTestSuite) TestEncryptBadKeyTooLong() {
 	// Generate a random key
 	key := make([]byte, 36)
 	encodedKey := make([]byte, 48)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 	base64.StdEncoding.Encode(encodedKey, key)
 
 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	suite.assert.NoError(err)
 
-	_, err := EncryptData(data, encryptedPassphrase)
+	_, err = EncryptData(data, encryptedPassphrase)
 	suite.assert.Error(err)
 }
 
@@ -130,15 +136,17 @@ func (suite *typesTestSuite) TestDecryptBadKeyTooLong() {
 	// Generate a random key
 	key := make([]byte, 36)
 	encodedKey := make([]byte, 48)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 	base64.StdEncoding.Encode(encodedKey, key)
 
 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	suite.assert.NoError(err)
 
-	_, err := DecryptData(data, encryptedPassphrase)
+	_, err = DecryptData(data, encryptedPassphrase)
 	suite.assert.Error(err)
 }
 
@@ -146,13 +154,15 @@ func (suite *typesTestSuite) TestEncryptDecrypt16() {
 	// Generate a random key
 	key := make([]byte, 16)
 	encodedKey := make([]byte, 24)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 	base64.StdEncoding.Encode(encodedKey, key)
 
 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	suite.assert.NoError(err)
 
 	cipher, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.NoError(err)
@@ -166,13 +176,15 @@ func (suite *typesTestSuite) TestEncryptDecrypt24() {
 	// Generate a random key
 	key := make([]byte, 24)
 	encodedKey := make([]byte, 32)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 	base64.StdEncoding.Encode(encodedKey, key)
 
 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	suite.assert.NoError(err)
 
 	cipher, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.NoError(err)
@@ -186,13 +198,15 @@ func (suite *typesTestSuite) TestEncryptDecrypt32() {
 	// Generate a random key
 	key := make([]byte, 32)
 	encodedKey := make([]byte, 44)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	suite.assert.NoError(err)
 	base64.StdEncoding.Encode(encodedKey, key)
 
 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	suite.assert.NoError(err)
 
 	cipher, err := EncryptData(data, encryptedPassphrase)
 	suite.assert.NoError(err)
@@ -307,14 +321,14 @@ func (suite *utilTestSuite) TestGetUSage() {
 	}
 
 	dirName := filepath.Join(pwd, "util_test")
-	err = os.Mkdir(dirName, 0777)
+	err = os.Mkdir(dirName, 0o777)
 	suite.assert.NoError(err)
 
 	data := make([]byte, 1024*1024)
-	err = os.WriteFile(dirName+"/1.txt", data, 0777)
+	err = os.WriteFile(dirName+"/1.txt", data, 0o777)
 	suite.assert.NoError(err)
 
-	err = os.WriteFile(dirName+"/2.txt", data, 0777)
+	err = os.WriteFile(dirName+"/2.txt", data, 0o777)
 	suite.assert.NoError(err)
 
 	usage, err := GetUsage(dirName)
@@ -332,7 +346,7 @@ func (suite *utilTestSuite) TestGetDiskUsage() {
 	}
 
 	dirName := filepath.Join(pwd, "util_test", "a", "b", "c")
-	err = os.MkdirAll(dirName, 0777)
+	err = os.MkdirAll(dirName, 0o777)
 	suite.assert.NoError(err)
 
 	usage, usagePercent, err := GetDiskUsageFromStatfs(dirName)
@@ -354,7 +368,7 @@ func (suite *utilTestSuite) TestDirectoryCleanup() {
 	suite.assert.NoError(err)
 
 	// Directory exists but is empty
-	_ = os.MkdirAll(dirName, 0777)
+	_ = os.MkdirAll(dirName, 0o777)
 	exists = DirectoryExists(dirName)
 	suite.assert.True(exists)
 
@@ -365,7 +379,7 @@ func (suite *utilTestSuite) TestDirectoryCleanup() {
 	suite.assert.NoError(err)
 
 	// Directory exists and is not empty
-	_ = os.MkdirAll(dirName+"/A", 0777)
+	_ = os.MkdirAll(dirName+"/A", 0o777)
 	exists = DirectoryExists(dirName)
 	suite.assert.True(exists)
 

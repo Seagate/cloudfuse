@@ -265,7 +265,7 @@ func (c *FileCache) Configure(_ bool) error {
 	_, err = os.Stat(c.tmpPath)
 	if os.IsNotExist(err) {
 		log.Err("FileCache: config error [tmp-path does not exist. attempting to create tmp-path.]")
-		err := os.MkdirAll(c.tmpPath, os.FileMode(0755))
+		err := os.MkdirAll(c.tmpPath, os.FileMode(0o755))
 		if err != nil {
 			log.Err("FileCache: config error creating directory after clean [%s]", err.Error())
 			return fmt.Errorf("config error in %s [%s]", c.Name(), err.Error())
@@ -791,7 +791,7 @@ func unlockAll(flocks []*common.LockMapItem) {
 
 // CreateFile: Create the file in local cache.
 func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
-	//defer exectime.StatTimeCurrentBlock("FileCache::CreateFile")()
+	// defer exectime.StatTimeCurrentBlock("FileCache::CreateFile")()
 	log.Trace("FileCache::CreateFile : name=%s, mode=%d", options.Name, options.Mode)
 
 	flock := fc.fileLocks.Get(options.Name)
@@ -926,7 +926,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	handle.Lock()
 	defer handle.Unlock()
 
-	//extract flags and mode out of the value from handle
+	// extract flags and mode out of the value from handle
 	var flags int
 	var fMode fs.FileMode
 	val, found := handle.GetValue("openFileOptions")
@@ -952,7 +952,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 
 		fileSize := int64(0)
 		if attr != nil {
-			fileSize = int64(attr.Size)
+			fileSize = attr.Size
 		}
 
 		if fileExists {
@@ -1030,7 +1030,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 		}
 	}
 
-	fileCacheStatsCollector.UpdateStats(stats_manager.Increment, dlFiles, (int64)(1))
+	fileCacheStatsCollector.UpdateStats(stats_manager.Increment, dlFiles, int64(1))
 
 	// Open the file and grab a shared lock to prevent deletion by the cache policy.
 	f, err = common.OpenFile(localPath, flags, fMode)
@@ -1052,7 +1052,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	log.Info("FileCache::openFileInternal : file=%s, fd=%d", handle.Path, f.Fd())
 	handle.SetFileObject(f)
 
-	//set boolean in isDownloadNeeded value to signal that the file has been downloaded
+	// set boolean in isDownloadNeeded value to signal that the file has been downloaded
 	handle.RemoveValue("openFileOptions")
 	// update file state
 	flock.LazyOpen = false
@@ -1079,7 +1079,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 
 	// check if we are running out of space
 	if downloadRequired && cloudAttr != nil {
-		fileSize := int64(cloudAttr.Size)
+		fileSize := cloudAttr.Size
 		if fc.diskHighWaterMark != 0 {
 			currSize, err := common.GetUsage(fc.tmpPath)
 			if err != nil {
@@ -1251,7 +1251,7 @@ func (fc *FileCache) closeFileInternal(options internal.CloseFileOptions, flock 
 
 // ReadInBuffer: Read the local file into a buffer
 func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
-	//defer exectime.StatTimeCurrentBlock("FileCache::ReadInBuffer")()
+	// defer exectime.StatTimeCurrentBlock("FileCache::ReadInBuffer")()
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	// log.Debug("FileCache::ReadInBuffer : Reading %v bytes from %s", len(options.Data), options.Handle.Path)
 
@@ -1293,9 +1293,9 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 
 // WriteFile: Write to the local file
 func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
-	//defer exectime.StatTimeCurrentBlock("FileCache::WriteFile")()
+	// defer exectime.StatTimeCurrentBlock("FileCache::WriteFile")()
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
-	//log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
+	// log.Debug("FileCache::WriteFile : Writing %v bytes from %s", len(options.Data), options.Handle.Path)
 
 	if !openCompleted(options.Handle) {
 		flock := fc.fileLocks.Get(options.Handle.Path)
@@ -1409,7 +1409,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 }
 
 func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions, flock *common.LockMapItem) error {
-	//defer exectime.StatTimeCurrentBlock("FileCache::FlushFile")()
+	// defer exectime.StatTimeCurrentBlock("FileCache::FlushFile")()
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
@@ -1463,7 +1463,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions, flock 
 			if os.IsPermission(err) {
 				info, _ := os.Stat(localPath)
 				orgMode = info.Mode()
-				newMode := orgMode | 0444
+				newMode := orgMode | 0o444
 				err = os.Chmod(localPath, newMode)
 				if err == nil {
 					modeChanged = true

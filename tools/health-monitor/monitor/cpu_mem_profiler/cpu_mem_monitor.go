@@ -84,7 +84,7 @@ func (cm *CpuMemProfiler) Monitor() error {
 	return nil
 }
 
-func (cm *CpuMemProfiler) ExportStats(timestamp string, st interface{}) {
+func (cm *CpuMemProfiler) ExportStats(timestamp string, st any) {
 	se, err := hminternal.NewStatsExporter()
 	if err != nil || se == nil {
 		log.Err("cpu_mem_monitor::ExportStats : Error in creating stats exporter instance [%v]", err)
@@ -100,7 +100,7 @@ func (cm *CpuMemProfiler) ExportStats(timestamp string, st interface{}) {
 }
 
 func (cm *CpuMemProfiler) Validate() error {
-	if len(cm.pid) == 0 {
+	if cm.pid == "" {
 		return fmt.Errorf("pid of cloudfuse is not given")
 	}
 
@@ -165,7 +165,7 @@ func (cm *CpuMemProfiler) getCpuMemoryUsage() (*hmcommon.CpuMemStat, error) {
 
 	cpuIndex, memIndex := getCpuMemIndex(processes[0])
 	stats := strings.Fields(processes[1])
-	if cpuIndex == -1 || memIndex == -1 || len(stats) <= int(math.Max(float64(cpuIndex), float64(memIndex))) || len(stats[cpuIndex]) == 0 || len(stats[memIndex]) == 0 {
+	if cpuIndex == -1 || memIndex == -1 || len(stats) <= int(math.Max(float64(cpuIndex), float64(memIndex))) || stats[cpuIndex] == "" || stats[memIndex] == "" {
 		log.Debug("cpu_mem_monitor::getCpuMemoryUsage : %v", processes)
 		log.Err("cpu_mem_monitor::getCpuMemoryUsage : Cloudfuse is not running on pid %v", cm.pid)
 		return nil, fmt.Errorf("cloudfuse is not running on pid %v", cm.pid)

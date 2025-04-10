@@ -119,7 +119,7 @@ func (cl *Client) getObject(options getObjectOptions) (io.ReadCloser, error) {
 	log.Trace("Client::getObject : get object %s (%d+%d)", key, options.offset, options.count)
 
 	// deal with the range
-	var rangeString string //string to be used to specify range of object to download from S3
+	var rangeString string // string to be used to specify range of object to download from S3
 	//TODO: add handle if the offset+count is greater than the end of Object.
 	if options.count == 0 {
 		// sending Range:"bytes=0-" gives errors from MinIO ("InvalidRange: The requested range is not satisfiable")
@@ -562,7 +562,7 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) { //nolint
 // special characters like "*:<>?| to be displayed on Windows.
 func (cl *Client) getKey(name string, isSymLink bool, isDir bool) string {
 	if isSymLink {
-		name = name + symlinkStr
+		name += symlinkStr
 	}
 
 	name = common.JoinUnixFilepath(cl.Config.prefixPath, name)

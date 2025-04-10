@@ -402,7 +402,7 @@ func (cl *Client) DeleteDirectory(name string) error {
 					log.Err("Client::DeleteDirectory : Failed to delete directory %s. Here's why: %v", object.Path, err)
 				}
 			} else {
-				objectsToDelete = append(objectsToDelete, object) //consider just object instead of object.path to pass down attributes that come from list.
+				objectsToDelete = append(objectsToDelete, object) // consider just object instead of object.path to pass down attributes that come from list.
 			}
 		}
 		// Delete the collected files
@@ -466,7 +466,7 @@ func (cl *Client) RenameDirectory(source string, target string) error {
 			if srcObject.IsDir() {
 				err = cl.RenameDirectory(srcPath, dstPath)
 			} else {
-				err = cl.RenameFile(srcPath, dstPath, srcObject.IsSymlink()) //use sourceObjects to pass along symLink bool
+				err = cl.RenameFile(srcPath, dstPath, srcObject.IsSymlink()) // use sourceObjects to pass along symLink bool
 			}
 			if err != nil {
 				log.Err("Client::RenameDirectory : Failed to rename %s -> %s. Here's why: %v", srcPath, dstPath, err)
@@ -495,10 +495,10 @@ func (cl *Client) GetAttr(name string) (*internal.ObjAttr, error) {
 
 	// first let's suppose the caller is looking for a file
 	// so if this was called with a trailing slash, don't look for an object
-	if len(name) > 0 && name[len(name)-1] != '/' {
+	if name != "" && name[len(name)-1] != '/' {
 		attr, err := cl.getFileAttr(name)
 		if err == nil {
-			return attr, err
+			return attr, nil
 		}
 		if err != syscall.ENOENT {
 			log.Err("Client::GetAttr : Failed to getFileAttr(%s). Here's why: %v", name, err)
@@ -532,7 +532,7 @@ func (cl *Client) getDirectoryAttr(dirName string) (*internal.ObjAttr, error) {
 	if cl.Config.enableDirMarker {
 		attr, err := cl.headObject(dirName, false, true)
 		if err == nil {
-			return attr, err
+			return attr, nil
 		}
 	}
 
@@ -977,11 +977,11 @@ func (cl *Client) StageAndCommit(name string, bol *common.BlockOffsetList) error
 		}
 	}
 
-	//struct for starting a multipart upload
+	// struct for starting a multipart upload
 	ctx := context.Background()
 	key := cl.getKey(name, false, false)
 
-	//send command to start copy and get the upload id as it is needed later
+	// send command to start copy and get the upload id as it is needed later
 	var uploadID string
 	createMultipartUploadInput := &s3.CreateMultipartUploadInput{
 		Bucket:      aws.String(cl.Config.authConfig.BucketName),
@@ -1150,8 +1150,8 @@ func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]
 					return nil, err
 				}
 
-				defer result.Close()
 				addData, err = io.ReadAll(result)
+				result.Close()
 				if err != nil {
 					log.Err("Client::combineSmallBlocks : Unable to read bytes from object with error: ", err.Error())
 					return nil, err

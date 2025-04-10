@@ -181,8 +181,10 @@ func (lf *Libfuse) initFuse() error {
 
 func (lf *Libfuse) destroyFuse() error {
 	log.Trace("Libfuse::destroyFuse : Destroying FUSE")
-	lf.host.Unmount()
-	return nil
+	if lf.host.Unmount() {
+		return nil
+	}
+	return errors.New("failed to unmount fuse filesystem")
 }
 
 func (lf *Libfuse) fillStat(attr *internal.ObjAttr, stbuf *fuse.Stat_t) {
@@ -255,7 +257,7 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 
 	// Return the default configuration for the root
 	if name == "" {
-		stat.Mode = fuse.S_IFDIR | 0777
+		stat.Mode = fuse.S_IFDIR | 0o777
 		stat.Uid = cf.uid
 		stat.Gid = cf.gid
 		stat.Nlink = 2
@@ -368,8 +370,8 @@ func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 		}
 	}
 
-	libfuseStatsCollector.PushEvents(createDir, name, map[string]interface{}{md: fs.FileMode(mode)})
-	libfuseStatsCollector.UpdateStats(stats_manager.Increment, createDir, (int64)(1))
+	libfuseStatsCollector.PushEvents(createDir, name, map[string]any{md: fs.FileMode(mode)})
+	libfuseStatsCollector.UpdateStats(stats_manager.Increment, createDir, int64(1))
 
 	return 0
 }
@@ -379,7 +381,7 @@ func (cf *CgofuseFS) Opendir(path string) (int, uint64) {
 	name := trimFusePath(path)
 	name = common.NormalizeObjectName(name)
 	if name != "" {
-		name = name + "/"
+		name += "/"
 	}
 
 	log.Trace("Libfuse::Opendir : %s", name)
@@ -574,7 +576,7 @@ func (cf *CgofuseFS) Rmdir(path string) int {
 	}
 
 	libfuseStatsCollector.PushEvents(deleteDir, name, nil)
-	libfuseStatsCollector.UpdateStats(stats_manager.Increment, deleteDir, (int64)(1))
+	libfuseStatsCollector.UpdateStats(stats_manager.Increment, deleteDir, int64(1))
 
 	return 0
 }
@@ -604,12 +606,12 @@ func (cf *CgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
 	// 	ret_val.fd = 0
 	// }
 	log.Trace("Libfuse::Create : %s, handle %d", name, fh)
-	//fi.fh = C.ulong(uintptr(unsafe.Pointer(ret_val)))
+	// fi.fh = C.ulong(uintptr(unsafe.Pointer(ret_val)))
 
-	libfuseStatsCollector.PushEvents(createFile, name, map[string]interface{}{md: fs.FileMode(mode)})
+	libfuseStatsCollector.PushEvents(createFile, name, map[string]any{md: fs.FileMode(mode)})
 
 	// increment open file handles count
-	libfuseStatsCollector.UpdateStats(stats_manager.Increment, openHandles, (int64)(1))
+	libfuseStatsCollector.UpdateStats(stats_manager.Increment, openHandles, int64(1))
 
 	return 0, uint64(fh)
 }
@@ -624,7 +626,7 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 		internal.OpenFileOptions{
 			Name:  name,
 			Flags: flags,
-			Mode:  fs.FileMode(fuseFS.filePermission),
+			Mode:  fuseFS.filePermission,
 		})
 
 	if err != nil {
@@ -648,15 +650,15 @@ func (cf *CgofuseFS) Open(path string, flags int) (int, uint64) {
 	// fi.fh = C.ulong(uintptr(unsafe.Pointer(ret_val)))
 
 	// increment open file handles count
-	libfuseStatsCollector.UpdateStats(stats_manager.Increment, openHandles, (int64)(1))
+	libfuseStatsCollector.UpdateStats(stats_manager.Increment, openHandles, int64(1))
 
 	return 0, uint64(fh)
 }
 
 // Read reads data from a file into the buffer with the given offset.
 func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
-	//skipping the logging to avoid creating log noise and the performance costs from huge number of calls.
-	//log.Debug("Libfuse::Read : reading path %s, handle: %d", path, fh)
+	// skipping the logging to avoid creating log noise and the performance costs from huge number of calls.
+	// log.Debug("Libfuse::Read : reading path %s, handle: %d", path, fh)
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
@@ -671,7 +673,7 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 
 	if handle.Cached() {
 		// Remove Pread as not supported on Windows
-		//bytesRead, err = syscall.Pread(handle.FD(), buff, int64(offset))
+		// bytesRead, err = syscall.Pread(handle.FD(), buff, int64(offset))
 		bytesRead, err = handle.FObj.ReadAt(buff, int64(offset))
 	} else {
 		bytesRead, err = fuseFS.NextComponent().ReadInBuffer(
@@ -695,8 +697,8 @@ func (cf *CgofuseFS) Read(path string, buff []byte, ofst int64, fh uint64) int {
 
 // Write writes data to a file from the buffer with the given offset.
 func (cf *CgofuseFS) Write(path string, buff []byte, ofst int64, fh uint64) int {
-	//skipping the logging to avoid creating log noise and the performance costs from huge number of calls
-	//log.Debug("Libfuse::Write : Writing path %s, handle: %d", path, fh)
+	// skipping the logging to avoid creating log noise and the performance costs from huge number of calls
+	// log.Debug("Libfuse::Write : Writing path %s, handle: %d", path, fh)
 	// Get the filehandle
 	handle, exists := handlemap.Load(handlemap.HandleID(fh))
 	if !exists {
@@ -768,8 +770,8 @@ func (cf *CgofuseFS) Truncate(path string, size int64, fh uint64) int {
 		return -fuse.EIO
 	}
 
-	libfuseStatsCollector.PushEvents(truncateFile, name, map[string]interface{}{"size": size})
-	libfuseStatsCollector.UpdateStats(stats_manager.Increment, truncateFile, (int64)(1))
+	libfuseStatsCollector.PushEvents(truncateFile, name, map[string]any{"size": size})
+	libfuseStatsCollector.UpdateStats(stats_manager.Increment, truncateFile, int64(1))
 
 	return 0
 }
@@ -800,7 +802,7 @@ func (cf *CgofuseFS) Release(path string, fh uint64) int {
 	handlemap.Delete(handle.ID)
 
 	// decrement open file handles count
-	libfuseStatsCollector.UpdateStats(stats_manager.Decrement, openHandles, (int64)(1))
+	libfuseStatsCollector.UpdateStats(stats_manager.Decrement, openHandles, int64(1))
 
 	return 0
 }
@@ -824,7 +826,7 @@ func (cf *CgofuseFS) Unlink(path string) int {
 	}
 
 	libfuseStatsCollector.PushEvents(deleteFile, name, nil)
-	libfuseStatsCollector.UpdateStats(stats_manager.Increment, deleteFile, (int64)(1))
+	libfuseStatsCollector.UpdateStats(stats_manager.Increment, deleteFile, int64(1))
 
 	return 0
 }
@@ -882,8 +884,8 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 			return -fuse.EIO
 		}
 
-		libfuseStatsCollector.PushEvents(renameDir, srcPath, map[string]interface{}{source: srcPath, dest: dstPath})
-		libfuseStatsCollector.UpdateStats(stats_manager.Increment, renameDir, (int64)(1))
+		libfuseStatsCollector.PushEvents(renameDir, srcPath, map[string]any{source: srcPath, dest: dstPath})
+		libfuseStatsCollector.UpdateStats(stats_manager.Increment, renameDir, int64(1))
 
 	} else {
 		err := fuseFS.NextComponent().RenameFile(internal.RenameFileOptions{Src: srcPath, Dst: dstPath})
@@ -892,8 +894,8 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 			return -fuse.EIO
 		}
 
-		libfuseStatsCollector.PushEvents(renameFile, srcPath, map[string]interface{}{source: srcPath, dest: dstPath})
-		libfuseStatsCollector.UpdateStats(stats_manager.Increment, renameFile, (int64)(1))
+		libfuseStatsCollector.PushEvents(renameFile, srcPath, map[string]any{source: srcPath, dest: dstPath})
+		libfuseStatsCollector.UpdateStats(stats_manager.Increment, renameFile, int64(1))
 
 	}
 
@@ -913,8 +915,8 @@ func (cf *CgofuseFS) Symlink(target string, newpath string) int {
 		return -fuse.EIO
 	}
 
-	libfuseStatsCollector.PushEvents(createLink, name, map[string]interface{}{trgt: targetPath})
-	libfuseStatsCollector.UpdateStats(stats_manager.Increment, createLink, (int64)(1))
+	libfuseStatsCollector.PushEvents(createLink, name, map[string]any{trgt: targetPath})
+	libfuseStatsCollector.UpdateStats(stats_manager.Increment, createLink, int64(1))
 
 	return 0
 }
@@ -939,8 +941,8 @@ func (cf *CgofuseFS) Readlink(path string) (int, string) {
 	// copy(data, targetPath)
 	// data[len(targetPath)] = 0
 
-	libfuseStatsCollector.PushEvents(readLink, name, map[string]interface{}{trgt: targetPath})
-	libfuseStatsCollector.UpdateStats(stats_manager.Increment, readLink, (int64)(1))
+	libfuseStatsCollector.PushEvents(readLink, name, map[string]any{trgt: targetPath})
+	libfuseStatsCollector.UpdateStats(stats_manager.Increment, readLink, int64(1))
 
 	return 0, targetPath
 }
@@ -970,7 +972,7 @@ func (cf *CgofuseFS) Fsync(path string, datasync bool, fh uint64) int {
 	}
 
 	libfuseStatsCollector.PushEvents(syncFile, handle.Path, nil)
-	libfuseStatsCollector.UpdateStats(stats_manager.Increment, syncFile, (int64)(1))
+	libfuseStatsCollector.UpdateStats(stats_manager.Increment, syncFile, int64(1))
 
 	return 0
 }
@@ -992,7 +994,7 @@ func (cf *CgofuseFS) Fsyncdir(path string, datasync bool, fh uint64) int {
 	}
 
 	libfuseStatsCollector.PushEvents(syncDir, name, nil)
-	libfuseStatsCollector.UpdateStats(stats_manager.Increment, syncDir, (int64)(1))
+	libfuseStatsCollector.UpdateStats(stats_manager.Increment, syncDir, int64(1))
 
 	return 0
 }
@@ -1018,8 +1020,8 @@ func (cf *CgofuseFS) Chmod(path string, mode uint32) int {
 		return -fuse.EIO
 	}
 
-	libfuseStatsCollector.PushEvents(chmod, name, map[string]interface{}{md: fs.FileMode(mode)})
-	libfuseStatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))
+	libfuseStatsCollector.PushEvents(chmod, name, map[string]any{md: fs.FileMode(mode)})
+	libfuseStatsCollector.UpdateStats(stats_manager.Increment, chmod, int64(1))
 
 	return 0
 }

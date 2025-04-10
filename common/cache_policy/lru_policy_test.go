@@ -86,7 +86,7 @@ func (suite *typesTestSuite) TestCachePurge() {
 	lruCache.Purge()
 	suite.assert.Empty(lruCache.Keys())
 	suite.assert.Equal(int64(0), lruCache.Capacity)
-	suite.assert.Equal(map[int64]*list.Element(map[int64]*list.Element(nil)), lruCache.Elements)
+	suite.assert.Equal(map[int64]*list.Element(nil), lruCache.Elements)
 }
 
 func (suite *typesTestSuite) TestBlockNotFound() {
@@ -107,7 +107,7 @@ func (suite *typesTestSuite) TestResizeBlock() {
 	suite.assert.Equal(int64(3), lruCache.Occupied)
 	suite.assert.Len(lruCache.Keys(), 2)
 
-	//resize to larger
+	// resize to larger
 	lruCache.Resize(1, 4)
 	suite.assert.Equal(int64(4), lruCache.Occupied)
 	suite.assert.Len(lruCache.Keys(), 2)

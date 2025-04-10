@@ -120,16 +120,16 @@ func (sc *StatsCollector) statsDumper() {
 
 			_, isPresent := stMgrOpt.statsList[idx].Value[stat.Key]
 			if !isPresent {
-				stMgrOpt.statsList[idx].Value[stat.Key] = (int64)(0)
+				stMgrOpt.statsList[idx].Value[stat.Key] = int64(0)
 			}
 
 			switch stat.Operation {
 			case Increment:
-				stMgrOpt.statsList[idx].Value[stat.Key] = stMgrOpt.statsList[idx].Value[stat.Key].(int64) + stat.Value.(int64)
+				stMgrOpt.statsList[idx].Value[stat.Key] = stMgrOpt.statsList[idx].Value[stat.Key].int64 + stat.Value.int64
 
 			case Decrement:
-				stMgrOpt.statsList[idx].Value[stat.Key] = stMgrOpt.statsList[idx].Value[stat.Key].(int64) - stat.Value.(int64)
-				if stMgrOpt.statsList[idx].Value[stat.Key].(int64) < 0 {
+				stMgrOpt.statsList[idx].Value[stat.Key] = stMgrOpt.statsList[idx].Value[stat.Key].int64 - stat.Value.int64
+				if stMgrOpt.statsList[idx].Value[stat.Key].int64 < 0 {
 					log.Err("stats_manager::statsDumper : Negative value %v after decrement of %v for component %v",
 						stMgrOpt.statsList[idx].Value[stat.Key], stat.Key, stMgrOpt.statsList[idx].ComponentName)
 				}

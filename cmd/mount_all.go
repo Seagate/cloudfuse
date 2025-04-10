@@ -168,7 +168,7 @@ func processCommand() error {
 				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
 			}
 
-			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
+			_, err := base64.StdEncoding.DecodeString(options.PassPhrase)
 			if err != nil {
 				return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
 			}
@@ -324,7 +324,7 @@ func mountAllContainers(containerList []string, configFile string, mountPath str
 	// During mount all some extra config were set, we need to reset those now
 	viper.Set("mount-all-containers", nil)
 
-	//configFileName := configFile[:(len(configFile) - len(ext))]
+	// configFileName := configFile[:(len(configFile) - len(ext))]
 	configFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), "config")
 
 	failCount := 0
@@ -333,11 +333,11 @@ func mountAllContainers(containerList []string, configFile string, mountPath str
 		contConfigFile := configFileName + "_" + container + ext
 
 		if options.SecureConfig {
-			contConfigFile = contConfigFile + SecureConfigExtension
+			contConfigFile += SecureConfigExtension
 		}
 
 		if _, err := os.Stat(contMountPath); os.IsNotExist(err) {
-			err = os.MkdirAll(contMountPath, 0777)
+			err = os.MkdirAll(contMountPath, 0o777)
 			if err != nil {
 				fmt.Printf("Failed to create directory %s : %s\n", contMountPath, err.Error())
 			}
@@ -411,7 +411,7 @@ func writeConfigFile(contConfigFile string) error {
 			return fmt.Errorf("failed to encrypt yaml content [%s]", err.Error())
 		}
 
-		err = os.WriteFile(contConfigFile, cipherText, 0777)
+		err = os.WriteFile(contConfigFile, cipherText, 0o777)
 		if err != nil {
 			return fmt.Errorf("failed to write encrypted file [%s]", err.Error())
 		}
@@ -428,9 +428,7 @@ func writeConfigFile(contConfigFile string) error {
 func buildCliParamForMount() []string {
 	var cliParam []string
 
-	cliParam = append(cliParam, "mount")
-	cliParam = append(cliParam, "<mount-path>")
-	cliParam = append(cliParam, "--config-file=<conf_file>")
+	cliParam = append(cliParam, "mount", "<mount-path>", "--config-file=<conf_file>")
 	for _, opt := range os.Args[4:] {
 		if !ignoreCliParam(opt) {
 			cliParam = append(cliParam, opt)

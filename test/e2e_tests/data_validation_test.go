@@ -188,7 +188,8 @@ func generateFileWithRandomData(suite *dataValidationTestSuite, filePath string,
 	suite.NoError(err)
 	bufferSize := 4 * 1024
 	buffer := make([]byte, 4*1024)
-	rand.Read(buffer)
+	_, err = rand.Read(buffer)
+	suite.NoError(err)
 	blocks := size / bufferSize
 	for i := 0; i < blocks; i++ {
 		bytesToWrite := min(bufferSize, size)
@@ -233,12 +234,12 @@ func (suite *dataValidationTestSuite) TestSmallFileData() {
 	remoteFilePath := filepath.Join(tObj.testMntPath, fileName)
 
 	// create the file in local directory
-	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 
 	// write to file in the local directory
-	err = os.WriteFile(localFilePath, minBuff, 0777)
+	err = os.WriteFile(localFilePath, minBuff, 0o777)
 	suite.NoError(err)
 
 	suite.copyToMountDir(localFilePath, remoteFilePath)
@@ -253,7 +254,7 @@ func (suite *dataValidationTestSuite) TestSmallFileData() {
 
 // data validation for medium sized files
 func (suite *dataValidationTestSuite) TestMediumFileData() {
-	if strings.ToLower(dataValidationStreamDirectTest) == "true" {
+	if strings.EqualFold(dataValidationStreamDirectTest, "true") {
 		fmt.Println("Skipping this test case for stream direct")
 		return
 	}
@@ -262,12 +263,12 @@ func (suite *dataValidationTestSuite) TestMediumFileData() {
 	remoteFilePath := filepath.Join(tObj.testMntPath, fileName)
 
 	// create the file in local directory
-	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 
 	// write to file in the local directory
-	err = os.WriteFile(localFilePath, medBuff, 0777)
+	err = os.WriteFile(localFilePath, medBuff, 0o777)
 	suite.NoError(err)
 
 	suite.copyToMountDir(localFilePath, remoteFilePath)
@@ -282,7 +283,7 @@ func (suite *dataValidationTestSuite) TestMediumFileData() {
 
 // data validation for large sized files
 func (suite *dataValidationTestSuite) TestLargeFileData() {
-	if strings.ToLower(dataValidationStreamDirectTest) == "true" {
+	if strings.EqualFold(dataValidationStreamDirectTest, "true") {
 		fmt.Println("Skipping this test case for stream direct")
 		return
 	}
@@ -291,12 +292,12 @@ func (suite *dataValidationTestSuite) TestLargeFileData() {
 	remoteFilePath := filepath.Join(tObj.testMntPath, fileName)
 
 	// create the file in local directory
-	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 
 	// write to file in the local directory
-	err = os.WriteFile(localFilePath, largeBuff, 0777)
+	err = os.WriteFile(localFilePath, largeBuff, 0o777)
 	suite.NoError(err)
 
 	suite.copyToMountDir(localFilePath, remoteFilePath)
@@ -316,12 +317,12 @@ func (suite *dataValidationTestSuite) TestDataValidationNegative() {
 	remoteFilePath := filepath.Join(tObj.testMntPath, fileName)
 
 	// create the file in local directory
-	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 
 	// write to file in the local directory
-	err = os.WriteFile(localFilePath, minBuff, 0777)
+	err = os.WriteFile(localFilePath, minBuff, 0o777)
 	suite.NoError(err)
 
 	// copy local file to mounted directory
@@ -331,7 +332,7 @@ func (suite *dataValidationTestSuite) TestDataValidationNegative() {
 	suite.dataValidationTestCleanup([]string{tObj.testCachePath})
 
 	// update local file
-	srcFile, err = os.OpenFile(localFilePath, os.O_APPEND|os.O_WRONLY, 0777)
+	srcFile, err = os.OpenFile(localFilePath, os.O_APPEND|os.O_WRONLY, 0o777)
 	suite.NoError(err)
 	_, err = srcFile.WriteString("Added text")
 	srcFile.Close()
@@ -356,24 +357,24 @@ func validateMultipleFilesData(jobs <-chan int, results chan<- string, fileSize 
 		fmt.Println("Local file path: " + localFilePath)
 
 		// create the file in local directory
-		srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0777)
+		srcFile, err := os.OpenFile(localFilePath, os.O_CREATE, 0o777)
 		suite.NoError(err)
 		srcFile.Close()
 
 		// write to file in the local directory
 		switch fileSize {
 		case "huge":
-			err = os.WriteFile(localFilePath, hugeBuff, 0777)
+			err = os.WriteFile(localFilePath, hugeBuff, 0o777)
 		case "large":
-			if strings.ToLower(dataValidationQuickTest) == "true" {
-				err = os.WriteFile(localFilePath, hugeBuff, 0777)
+			if strings.EqualFold(dataValidationQuickTest, "true") {
+				err = os.WriteFile(localFilePath, hugeBuff, 0o777)
 			} else {
-				err = os.WriteFile(localFilePath, largeBuff, 0777)
+				err = os.WriteFile(localFilePath, largeBuff, 0o777)
 			}
 		case "medium":
-			err = os.WriteFile(localFilePath, medBuff, 0777)
+			err = os.WriteFile(localFilePath, medBuff, 0o777)
 		default:
-			err = os.WriteFile(localFilePath, minBuff, 0777)
+			err = os.WriteFile(localFilePath, minBuff, 0o777)
 		}
 		suite.NoError(err)
 
@@ -416,7 +417,7 @@ func (suite *dataValidationTestSuite) TestMultipleSmallFiles() {
 }
 
 func (suite *dataValidationTestSuite) TestMultipleMediumFiles() {
-	if strings.ToLower(dataValidationStreamDirectTest) == "true" {
+	if strings.EqualFold(dataValidationStreamDirectTest, "true") {
 		fmt.Println("Skipping this test case for stream direct")
 		return
 	}
@@ -427,7 +428,7 @@ func (suite *dataValidationTestSuite) TestMultipleMediumFiles() {
 }
 
 func (suite *dataValidationTestSuite) TestMultipleLargeFiles() {
-	if strings.ToLower(dataValidationStreamDirectTest) == "true" {
+	if strings.EqualFold(dataValidationStreamDirectTest, "true") {
 		fmt.Println("Skipping this test case for stream direct")
 		return
 	}
@@ -438,11 +439,11 @@ func (suite *dataValidationTestSuite) TestMultipleLargeFiles() {
 }
 
 func (suite *dataValidationTestSuite) TestMultipleHugeFiles() {
-	if strings.ToLower(dataValidationStreamDirectTest) == "true" {
+	if strings.EqualFold(dataValidationStreamDirectTest, "true") {
 		fmt.Println("Skipping this test case for stream direct")
 		return
 	}
-	if strings.ToLower(dataValidationQuickTest) == "true" {
+	if strings.EqualFold(dataValidationQuickTest, "true") {
 		fmt.Println("Quick test is enabled. Skipping this test case")
 		return
 	}
@@ -634,15 +635,15 @@ func (suite *dataValidationTestSuite) TestPanicOnClosingFile() {
 	buffer := make([]byte, blockSizeBytes)
 	generateFileWithRandomData(suite, remoteFilePath, blockSizeBytes*10)
 
-	rfh, err := os.OpenFile(remoteFilePath, syscall.O_RDWR, 0666)
+	rfh, err := os.OpenFile(remoteFilePath, syscall.O_RDWR, 0o666)
 	suite.NoError(err)
 
-	//Read 1st block
+	// Read 1st block
 	bytes_read, err := rfh.Read(buffer)
 	suite.NoError(err)
 	suite.Equal(bytes_read, blockSizeBytes)
 
-	//Write to 2nd block
+	// Write to 2nd block
 	bytes_written, err := rfh.Write(buffer)
 	suite.Equal(bytes_written, blockSizeBytes)
 	suite.NoError(err)
@@ -658,10 +659,10 @@ func (suite *dataValidationTestSuite) TestPanicOnWritingToFile() {
 	buffer := make([]byte, blockSizeBytes)
 	generateFileWithRandomData(suite, remoteFilePath, blockSizeBytes*20)
 
-	rfh, err := os.OpenFile(remoteFilePath, syscall.O_RDWR, 0666)
+	rfh, err := os.OpenFile(remoteFilePath, syscall.O_RDWR, 0o666)
 	suite.NoError(err)
 
-	//Make the cooking+cooked=prefetchCount
+	// Make the cooking+cooked=prefetchCount
 	for i := 0; i < 3; i++ {
 		offset := 4 * int64(i) * int64(_1MB)
 		bytes_read, err := rfh.ReadAt(buffer, offset)
@@ -686,15 +687,15 @@ func (suite *dataValidationTestSuite) TestPanicOnReadingFileInRandReadMode() {
 	buffer := make([]byte, blockSizeBytes)
 	generateFileWithRandomData(suite, remoteFilePath, blockSizeBytes*84)
 
-	rfh, err := os.OpenFile(remoteFilePath, syscall.O_RDWR, 0666)
+	rfh, err := os.OpenFile(remoteFilePath, syscall.O_RDWR, 0o666)
 	suite.NoError(err)
 
-	//Write at some offset
+	// Write at some offset
 	bytes_written, err := rfh.WriteAt(buffer, 0)
 	suite.Equal(bytes_written, blockSizeBytes)
 	suite.NoError(err)
 
-	//Make the file handle goto random read mode in block cache(This is causing panic)
+	// Make the file handle goto random read mode in block cache(This is causing panic)
 	for i := 0; i < 14; i++ {
 		offset := int64(_1MB) * 6 * int64(i)
 		bytes_read, err := rfh.ReadAt(buffer, offset)
@@ -711,7 +712,7 @@ func TestDataValidationTestSuite(t *testing.T) {
 	fmt.Println("Distro Name: " + fileTestDistro)
 
 	// Ignore data validation test on all distros other than UBN
-	if strings.ToLower(dataValidationQuickTest) == "true" || (!strings.Contains(strings.ToUpper(fileTestDistro), "UBUNTU") && !strings.Contains(strings.ToUpper(fileTestDistro), "UBN")) {
+	if strings.EqualFold(dataValidationQuickTest, "true") || (!strings.Contains(strings.ToUpper(fileTestDistro), "UBUNTU") && !strings.Contains(strings.ToUpper(fileTestDistro), "UBN")) {
 		fmt.Println("Skipping Data Validation test suite...")
 		return
 	}
@@ -721,7 +722,7 @@ func TestDataValidationTestSuite(t *testing.T) {
 	minBuff = make([]byte, 1024)
 	medBuff = make([]byte, (10 * _1MB))
 	largeBuff = make([]byte, (500 * _1MB))
-	if strings.ToLower(dataValidationQuickTest) == "true" {
+	if strings.EqualFold(dataValidationQuickTest, "true") {
 		hugeBuff = make([]byte, (100 * _1MB))
 	} else {
 		hugeBuff = make([]byte, (750 * _1MB))
@@ -759,7 +760,7 @@ func TestDataValidationTestSuite(t *testing.T) {
 		fmt.Printf("TestDataValidationTestSuite : Could not cleanup cache dir before testing. Here's why: %v\n", err)
 	}
 
-	err = os.Mkdir(tObj.testMntPath, 0777)
+	err = os.Mkdir(tObj.testMntPath, 0o777)
 	if err != nil {
 		t.Error("Failed to create test directory")
 	}

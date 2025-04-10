@@ -52,13 +52,13 @@ func ParseVersion(raw string) (*Version, error) {
 
 	v := &Version{segments: make([]int64, 4), original: raw}
 	for i, str := range rawSegments {
-		//For any case such as SemVer-preview.1, SemVer-beta.1, SemVer-alpha.1 this would be true, and we assume the version to be a preview version.
+		// For any case such as SemVer-preview.1, SemVer-beta.1, SemVer-alpha.1 this would be true, and we assume the version to be a preview version.
 		if strings.Contains(str, "-") || strings.Contains(str, "~") {
 			if i != 2 {
 				return nil, errors.New(standardError)
 			}
 			v.preview = true
-			//Splitting the string into two pieces and extracting SemVer which is always at 0th index
+			// Splitting the string into two pieces and extracting SemVer which is always at 0th index
 			str = strings.Split(strings.Split(str, "-")[0], "~")[0]
 		}
 

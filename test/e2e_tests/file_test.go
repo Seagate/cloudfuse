@@ -103,7 +103,7 @@ func (suite *fileTestSuite) fileTestCleanup(toRemove []string) {
 // # Create file test
 func (suite *fileTestSuite) TestFileCreate() {
 	fileName := filepath.Join(suite.testPath, "small_write.txt")
-	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 
@@ -112,7 +112,7 @@ func (suite *fileTestSuite) TestFileCreate() {
 
 func (suite *fileTestSuite) TestFileCreateUtf8Char() {
 	fileName := filepath.Join(suite.testPath, "भारत.txt")
-	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 
@@ -126,11 +126,10 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 		return
 	}
 	fmt.Println("Skipping TestFileCreatSpclChar (flaky)")
-	return
 	// speclChar := "abcd%23ABCD%34123-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत.txt"
 	// fileName := filepath.Join(suite.testPath, speclChar)
 
-	// srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
+	// srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0o777)
 	// suite.NoError(err)
 	// srcFile.Close()
 	// time.Sleep(time.Second * 1)
@@ -157,7 +156,7 @@ func (suite *fileTestSuite) TestFileCreateEncodeChar() {
 	speclChar := "%282%29+class_history_by_item.log"
 	fileName := filepath.Join(suite.testPath, speclChar)
 
-	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 	time.Sleep(time.Second * 1)
@@ -190,14 +189,14 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 	secFile := filepath.Join(speclDirName, "abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|.txt")
 	fileName := filepath.Join(speclDirName, speclChar)
 
-	err := os.Mkdir(speclDirName, 0777)
+	err := os.Mkdir(speclDirName, 0o777)
 	suite.NoError(err)
 
-	srcFile, err := os.OpenFile(secFile, os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(secFile, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 
-	srcFile, err = os.OpenFile(fileName, os.O_CREATE, 0777)
+	srcFile, err = os.OpenFile(fileName, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 	time.Sleep(time.Second * 1)
@@ -221,7 +220,7 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 
 func (suite *fileTestSuite) TestFileCreateLongName() {
 	fileName := filepath.Join(suite.testPath, "Higher Call_ An Incredible True Story of Combat and Chivalry in the War-Torn Skies of World War II, A - Adam Makos & Larry Alexander.epub")
-	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 
@@ -237,7 +236,7 @@ func (suite *fileTestSuite) TestFileCreateSlashName() {
 
 	fileName := filepath.Join(suite.testPath, "abcd\\efg.txt")
 
-	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 
@@ -247,7 +246,7 @@ func (suite *fileTestSuite) TestFileCreateSlashName() {
 func (suite *fileTestSuite) TestFileCreateLabel() {
 	fileName := filepath.Join(suite.testPath, "chunk_f13c48d4-5c1e-11ea-b41d-000d3afe1867.label")
 
-	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 
@@ -260,14 +259,14 @@ func (suite *fileTestSuite) TestFileAppend() {
 	appendContent := []byte("Appended content\n")
 
 	// Create and write initial content to the file
-	srcFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0777)
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0o777)
 	suite.NoError(err)
 	_, err = srcFile.Write(initialContent)
 	suite.NoError(err)
 	srcFile.Close()
 
 	// Open the file with O_APPEND and append new content
-	appendFile, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0777)
+	appendFile, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0o777)
 	suite.NoError(err)
 	_, err = appendFile.Write(appendContent)
 	suite.NoError(err)
@@ -276,8 +275,8 @@ func (suite *fileTestSuite) TestFileAppend() {
 	// Read the file and verify the content
 	data, err := os.ReadFile(fileName)
 	suite.NoError(err)
-	expectedContent := append(initialContent, appendContent...)
-	suite.Equal(expectedContent, data)
+	initialContent = append(initialContent, appendContent...)
+	suite.Equal(initialContent, data)
 
 	suite.fileTestCleanup([]string{fileName})
 }
@@ -285,11 +284,11 @@ func (suite *fileTestSuite) TestFileAppend() {
 // # Write a small file
 func (suite *fileTestSuite) TestFileWriteSmall() {
 	fileName := filepath.Join(suite.testPath, "small_write.txt")
-	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 
-	err = os.WriteFile(fileName, suite.minBuff, 0777)
+	err = os.WriteFile(fileName, suite.minBuff, 0o777)
 	suite.NoError(err)
 
 	suite.fileTestCleanup([]string{fileName})
@@ -298,11 +297,11 @@ func (suite *fileTestSuite) TestFileWriteSmall() {
 // # Read a small file
 func (suite *fileTestSuite) TestFileReadSmall() {
 	fileName := filepath.Join(suite.testPath, "small_write.txt")
-	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	srcFile.Close()
 
-	err = os.WriteFile(fileName, suite.minBuff, 0777)
+	err = os.WriteFile(fileName, suite.minBuff, 0o777)
 	suite.NoError(err)
 
 	data, err := os.ReadFile(fileName)
@@ -315,7 +314,7 @@ func (suite *fileTestSuite) TestFileReadSmall() {
 // # Create duplicate file
 func (suite *fileTestSuite) TestFileCreateDuplicate() {
 	fileName := filepath.Join(suite.testPath, "small_write.txt")
-	f, err := os.OpenFile(fileName, os.O_CREATE, 0777)
+	f, err := os.OpenFile(fileName, os.O_CREATE, 0o777)
 	suite.NoError(err)
 	f.Close()
 
@@ -348,7 +347,7 @@ func (suite *fileTestSuite) TestFileNameConflict() {
 	dirName := filepath.Join(suite.testPath, "test")
 	fileName := filepath.Join(suite.testPath, "test.txt")
 
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0o777)
 	suite.NoError(err)
 
 	f, err := os.Create(fileName)
@@ -365,10 +364,10 @@ func (suite *fileTestSuite) TestFileCopy() {
 	fileName := filepath.Join(suite.testPath, "test")
 	dstFileName := filepath.Join(dirName, "test_copy.txt")
 
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0o777)
 	suite.NoError(err)
 
-	srcFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR, 0777)
+	srcFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR, 0o777)
 	suite.NoError(err)
 	defer srcFile.Close()
 
@@ -415,7 +414,7 @@ func (suite *fileTestSuite) TestFileChmod() {
 		suite.NoError(err)
 		f.Close()
 
-		err = os.Chmod(fileName, 0744)
+		err = os.Chmod(fileName, 0o744)
 		suite.NoError(err)
 		stat, err := os.Stat(fileName)
 		suite.NoError(err)
@@ -427,17 +426,17 @@ func (suite *fileTestSuite) TestFileChmod() {
 
 // # Create multiple med files
 func (suite *fileTestSuite) TestFileCreateMulti() {
-	if strings.ToLower(fileTestStreamDirectPtr) == "true" && strings.ToLower(fileTestDistroName) == "ubuntu-20.04" {
+	if strings.EqualFold(fileTestStreamDirectPtr, "true") && strings.EqualFold(fileTestDistroName, "ubuntu-20.04") {
 		fmt.Println("Skipping this test case for stream direct")
 		return
 	}
 	dirName := filepath.Join(suite.testPath, "multi_dir")
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0o777)
 	suite.NoError(err)
 	fileName := filepath.Join(dirName, "multi")
 	for i := 0; i < 10; i++ {
 		newFile := fileName + strconv.Itoa(i)
-		err := os.WriteFile(newFile, suite.medBuff, 0777)
+		err := os.WriteFile(newFile, suite.medBuff, 0o777)
 		suite.NoError(err)
 	}
 	suite.fileTestCleanup([]string{dirName})
@@ -468,7 +467,7 @@ func (suite *fileTestSuite) TestLinkCreate() {
 	suite.NoError(err)
 	f.Close()
 	symName := filepath.Join(suite.testPath, "small.lnk")
-	err = os.WriteFile(fileName, suite.minBuff, 0777)
+	err = os.WriteFile(fileName, suite.minBuff, 0o777)
 	suite.NoError(err)
 
 	err = os.Symlink(fileName, symName)
@@ -495,7 +494,7 @@ func (suite *fileTestSuite) TestLinkRead() {
 	err = os.Symlink(fileName, symName)
 	suite.NoError(err)
 
-	err = os.WriteFile(fileName, suite.minBuff, 0777)
+	err = os.WriteFile(fileName, suite.minBuff, 0o777)
 	suite.NoError(err)
 	data, err := os.ReadFile(fileName)
 	suite.NoError(err)
@@ -578,7 +577,7 @@ func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
 	f.Close()
 	err = os.Symlink(fileName, symName)
 	suite.NoError(err)
-	err = os.WriteFile(fileName, suite.minBuff, 0777)
+	err = os.WriteFile(fileName, suite.minBuff, 0o777)
 	suite.NoError(err)
 
 	err = os.Remove(symName)
@@ -601,7 +600,7 @@ func (suite *fileTestSuite) TestListDirReadLink() {
 		fmt.Println("Skipping TestListDirReadLink on Windows")
 		return
 	}
-	if suite.adlsTest && strings.ToLower(fileTestEnableSymlinkADLS) != "true" {
+	if suite.adlsTest && !strings.EqualFold(fileTestEnableSymlinkADLS, "true") {
 		fmt.Printf("Skipping this test case for adls : %v, enable-symlink-adls : %v\n", suite.adlsTest, fileTestEnableSymlinkADLS)
 		return
 	}
@@ -611,7 +610,7 @@ func (suite *fileTestSuite) TestListDirReadLink() {
 	suite.NoError(err)
 	f.Close()
 
-	err = os.WriteFile(fileName, suite.minBuff, 0777)
+	err = os.WriteFile(fileName, suite.minBuff, 0o777)
 	suite.NoError(err)
 
 	symName := filepath.Join(suite.testPath, "small_hns.lnk")
@@ -652,11 +651,11 @@ func (suite *fileTestSuite) TestReadOnlyFile() {
 		suite.Equal(nil, err)
 		srcFile.Close()
 		// make it read only permissions
-		err = os.Chmod(fileName, 0444)
+		err = os.Chmod(fileName, 0o444)
 		suite.Equal(nil, err)
-		_, err = os.OpenFile(fileName, os.O_RDONLY, 0444)
+		_, err = os.OpenFile(fileName, os.O_RDONLY, 0o444)
 		suite.Equal(nil, err)
-		_, err = os.OpenFile(fileName, os.O_RDWR, 0444)
+		_, err = os.OpenFile(fileName, os.O_RDWR, 0o444)
 		suite.NotNil(err)
 		suite.fileTestCleanup([]string{fileName})
 	}
@@ -670,10 +669,10 @@ func (suite *fileTestSuite) TestCreateReadOnlyFile() {
 	}
 	if suite.adlsTest == true {
 		fileName := filepath.Join(suite.testPath, "createReadOnlyFile.txt")
-		srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0444)
+		srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0o444)
 		srcFile.Close()
 		suite.NoError(err)
-		_, err = os.OpenFile(fileName, os.O_RDONLY, 0444)
+		_, err = os.OpenFile(fileName, os.O_RDONLY, 0o444)
 		suite.NoError(err)
 		suite.fileTestCleanup([]string{fileName})
 	}
@@ -692,7 +691,7 @@ func (suite *fileTestSuite) TestRenameSpecial() {
 	fileName := filepath.Join(dirName, "भारत.txt")
 	newFileName := filepath.Join(dirName, "भारतabcd.txt")
 
-	err := os.Mkdir(dirName, 0777)
+	err := os.Mkdir(dirName, 0o777)
 	suite.NoError(err)
 
 	f, err := os.Create(fileName)
@@ -744,7 +743,7 @@ func TestFileTestSuite(t *testing.T) {
 		fmt.Printf("TestFileTestSuite : Could not cleanup feature dir before testing. Here's why: %v\n", err)
 	}
 
-	err = os.Mkdir(fileTest.testPath, 0777)
+	err = os.Mkdir(fileTest.testPath, 0o777)
 	if err != nil {
 		t.Error("Failed to create test directory")
 	}

@@ -66,7 +66,7 @@ type AttrCacheOptions struct {
 	// hidden option for backward compatibility
 	NoSymlinks bool `config:"no-symlinks" yaml:"no-symlinks,omitempty"`
 
-	//maximum file attributes overall to be cached
+	// maximum file attributes overall to be cached
 	MaxFiles int `config:"max-files" yaml:"max-files,omitempty"`
 
 	// support v1
@@ -257,10 +257,10 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 }
 
 // move an item to a new location, and return the destination item
-func (ac *AttrCache) moveCachedItem(srcItem *attrCacheItem, srcDir string, dstDir string, movedAt time.Time) *attrCacheItem {
+func (ac *AttrCache) moveCachedItem(srcItem *attrCacheItem, srcDir string, dstDir string, movedAt time.Time) {
 	// don't move deleted items
 	if !srcItem.exists() {
-		return nil
+		return
 	}
 	// generate the destination name
 	dstPath := strings.Replace(srcItem.attr.Path, srcDir, dstDir, 1)
@@ -285,13 +285,11 @@ func (ac *AttrCache) moveCachedItem(srcItem *attrCacheItem, srcDir string, dstDi
 	}
 	// mark the source item deleted
 	srcItem.markDeleted(movedAt)
-	// return the destination item
-	return dstItem
 }
 
 // record that cloud storage has records of this directory and all its ancestors existing
 func (ac *AttrCache) markAncestorsInCloud(dirPath string, time time.Time) {
-	if len(dirPath) != 0 {
+	if dirPath != "" {
 		// get or create directory cache item
 		dirCacheItem, found := ac.cache.get(dirPath)
 		if !found || !dirCacheItem.exists() {
@@ -396,7 +394,7 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	// try to fetch listing from cache
 	cachedPathList, cachedToken, err := ac.fetchCachedDirList(options.Name, options.Token)
 	if err == nil {
-		return cachedPathList, cachedToken, err
+		return cachedPathList, cachedToken, nil
 	}
 	// listing cache is not complete, so call cloud storage
 	pathList, nextToken, err := ac.NextComponent().StreamDir(options)
@@ -739,7 +737,7 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 		if ancestorCacheItem.isInCloud() != anyChildrenInCloud {
 			ancestorCacheItem.markInCloud(anyChildrenInCloud)
 		} else {
-			//if we didn't change the parent, then no change is visible to the grandparent, etc.
+			// if we didn't change the parent, then no change is visible to the grandparent, etc.
 			break
 		}
 		// move on to the next ancestor
@@ -757,7 +755,7 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
 
-		//get the source item
+		// get the source item
 		sourceItem, found := ac.cache.get(options.Src)
 		if !found || !sourceItem.exists() {
 			log.Warn("AttrCache::RenameFile : Source %s does not exist in cache", options.Src)

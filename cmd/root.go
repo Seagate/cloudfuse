@@ -103,8 +103,8 @@ func getRemoteVersion(req string) (string, error) {
 }
 
 // beginDetectNewVersion : Get latest release version and compare if user needs an upgrade or not
-func beginDetectNewVersion() chan interface{} {
-	completed := make(chan interface{})
+func beginDetectNewVersion() chan any {
+	completed := make(chan any)
 	stderr := os.Stderr
 	go func() {
 		defer close(completed)
@@ -149,7 +149,7 @@ func beginDetectNewVersion() chan interface{} {
 // VersionCheck : Start version check and wait for 8 seconds to complete otherwise just timeout and move on
 func VersionCheck() error {
 	select {
-	//either wait till this routine completes or timeout if it exceeds 8 secs
+	// either wait till this routine completes or timeout if it exceeds 8 secs
 	case <-beginDetectNewVersion():
 	case <-time.After(8 * time.Second):
 		return fmt.Errorf("unable to obtain latest version information. please check your internet connection")

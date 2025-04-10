@@ -66,7 +66,7 @@ type azAuthConfig struct {
 type azAuth interface {
 	getEndpoint() string
 	setOption(key, value string)
-	getServiceClient(stConfig *AzStorageConfig) (interface{}, error)
+	getServiceClient(stConfig *AzStorageConfig) (any, error)
 }
 
 // getAzAuth returns a new AzAuth

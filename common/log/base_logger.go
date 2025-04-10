@@ -54,7 +54,7 @@ type LogFileConfig struct {
 }
 
 type BaseLogger struct {
-	channel    chan (string)
+	channel    chan string
 	workerDone sync.WaitGroup
 
 	logger        *log.Logger
@@ -85,37 +85,37 @@ func (l *BaseLogger) GetLogLevel() common.LogLevel {
 	return l.fileConfig.LogLevel
 }
 
-func (l *BaseLogger) Debug(format string, args ...interface{}) {
+func (l *BaseLogger) Debug(format string, args ...any) {
 	if l.fileConfig.LogLevel >= common.ELogLevel.LOG_DEBUG() {
 		l.logEvent(common.ELogLevel.LOG_DEBUG().String(), format, args...)
 	}
 }
 
-func (l *BaseLogger) Trace(format string, args ...interface{}) {
+func (l *BaseLogger) Trace(format string, args ...any) {
 	if l.fileConfig.LogLevel >= common.ELogLevel.LOG_TRACE() {
 		l.logEvent(common.ELogLevel.LOG_TRACE().String(), format, args...)
 	}
 }
 
-func (l *BaseLogger) Info(format string, args ...interface{}) {
+func (l *BaseLogger) Info(format string, args ...any) {
 	if l.fileConfig.LogLevel >= common.ELogLevel.LOG_INFO() {
 		l.logEvent(common.ELogLevel.LOG_INFO().String(), format, args...)
 	}
 }
 
-func (l *BaseLogger) Warn(format string, args ...interface{}) {
+func (l *BaseLogger) Warn(format string, args ...any) {
 	if l.fileConfig.LogLevel >= common.ELogLevel.LOG_WARNING() {
 		l.logEvent(common.ELogLevel.LOG_WARNING().String(), format, args...)
 	}
 }
 
-func (l *BaseLogger) Err(format string, args ...interface{}) {
+func (l *BaseLogger) Err(format string, args ...any) {
 	if l.fileConfig.LogLevel >= common.ELogLevel.LOG_ERR() {
 		l.logEvent(common.ELogLevel.LOG_ERR().String(), format, args...)
 	}
 }
 
-func (l *BaseLogger) Crit(format string, args ...interface{}) {
+func (l *BaseLogger) Crit(format string, args ...any) {
 	if l.fileConfig.LogLevel >= common.ELogLevel.LOG_CRIT() {
 		l.logEvent(common.ELogLevel.LOG_CRIT().String(), format, args...)
 	}
@@ -127,7 +127,7 @@ func (l *BaseLogger) SetLogFile(name string) error {
 		if name == "stdout" {
 			l.logFileHandle = os.Stdout
 		} else {
-			f, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+			f, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 			if err != nil {
 				l.logFileHandle = os.Stdout
 				return err
@@ -135,7 +135,7 @@ func (l *BaseLogger) SetLogFile(name string) error {
 			l.logFileHandle = f
 			fi, e := f.Stat()
 			if e == nil {
-				l.fileConfig.currentLogSize = int64(fi.Size())
+				l.fileConfig.currentLogSize = fi.Size()
 			}
 		}
 	}
@@ -143,7 +143,7 @@ func (l *BaseLogger) SetLogFile(name string) error {
 }
 
 func (l *BaseLogger) SetMaxLogSize(size int64) {
-	l.fileConfig.LogSize = int64(size) * 1024 * 1024
+	l.fileConfig.LogSize = size * 1024 * 1024
 }
 
 func (l *BaseLogger) SetLogFileCount(count int64) {
@@ -183,7 +183,7 @@ func (l *BaseLogger) init() error {
 			l.fileConfig.currentLogSize = fi.Size()
 		}
 		var err error
-		l.logFileHandle, err = os.OpenFile(l.fileConfig.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		l.logFileHandle, err = os.OpenFile(l.fileConfig.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 		if err != nil {
 			l.logFileHandle = os.Stdout
 		}
@@ -195,7 +195,7 @@ func (l *BaseLogger) init() error {
 	// create channel for the dumper thread and start thread
 	l.channel = make(chan string, 100000)
 	l.workerDone.Add(1)
-	go l.logDumper(1, l.channel)
+	go l.logDumper(l.channel)
 
 	return nil
 }
@@ -211,7 +211,7 @@ func (l *BaseLogger) Destroy() error {
 }
 
 // logEvent : Enqueue the log to the channel
-func (l *BaseLogger) logEvent(lvl string, format string, args ...interface{}) {
+func (l *BaseLogger) logEvent(lvl string, format string, args ...any) {
 	// Only log if the log level matches the log request
 	_, fn, ln, _ := runtime.Caller(3)
 	msg := fmt.Sprintf(format, args...)
@@ -228,22 +228,22 @@ func (l *BaseLogger) logEvent(lvl string, format string, args ...interface{}) {
 }
 
 // logDumper : logEvent just enqueues an event in the channel, this thread dumps that log to the file
-func (l *BaseLogger) logDumper(id int, channel <-chan string) {
+func (l *BaseLogger) logDumper(channel <-chan string) {
 	defer l.workerDone.Done()
 
 	for j := range channel {
 		l.logger.Println(j)
 
-		l.fileConfig.currentLogSize += (int64)(len(j))
+		l.fileConfig.currentLogSize += int64(len(j))
 		if l.fileConfig.currentLogSize > l.fileConfig.LogSize {
-			//fmt.Println("Calling logrotate : ", l.fileConfig.currentLogSize, " : ", l.fileConfig.logSize)
+			// fmt.Println("Calling logrotate : ", l.fileConfig.currentLogSize, " : ", l.fileConfig.logSize)
 			_ = l.LogRotate()
 		}
 	}
 }
 
 func (l *BaseLogger) LogRotate() error {
-	//fmt.Println("Log Rotation started")
+	// fmt.Println("Log Rotation started")
 	if err := l.logFileHandle.Close(); err != nil {
 		return err
 	}
@@ -256,7 +256,7 @@ func (l *BaseLogger) LogRotate() error {
 	var fnameNew string
 	fname = fmt.Sprintf("%s.%d", l.fileConfig.LogFile, (l.fileConfig.LogFileCount - 1))
 
-	//fmt.Println("Deleting : ", fname)
+	// fmt.Println("Deleting : ", fname)
 	os.Remove(fname)
 
 	for i := l.fileConfig.LogFileCount - 2; i > 0; i-- {
@@ -264,15 +264,15 @@ func (l *BaseLogger) LogRotate() error {
 		fnameNew = fmt.Sprintf("%s.%d", l.fileConfig.LogFile, (i + 1))
 
 		// Move each file to next number 8 -> 9, 7 -> 8, 6 -> 7 ...
-		//fmt.Println("Renaming : ", fname, " : ", fnameNew)
+		// fmt.Println("Renaming : ", fname, " : ", fnameNew)
 		_ = os.Rename(fname, fnameNew)
 	}
 
-	//fmt.Println("Renaming : ", l.fileConfig.logFile, l.fileConfig.logFile+".1")
+	// fmt.Println("Renaming : ", l.fileConfig.logFile, l.fileConfig.logFile+".1")
 	_ = os.Rename(l.fileConfig.LogFile, l.fileConfig.LogFile+".1")
 
 	var err error
-	l.logFileHandle, err = os.OpenFile(l.fileConfig.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	l.logFileHandle, err = os.OpenFile(l.fileConfig.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		l.logFileHandle = os.Stdout
 	}

@@ -55,7 +55,7 @@ func (suite *lruPolicyTestSuite) SetupTest() {
 	// }
 	suite.assert = assert.New(suite.T())
 
-	os.Mkdir(cache_path, fs.FileMode(0777))
+	os.Mkdir(cache_path, fs.FileMode(0o777))
 
 	config := cachePolicyConfig{
 		tmpPath:       cache_path,
@@ -90,7 +90,7 @@ func (suite *lruPolicyTestSuite) createLocalPath(localPath string, isDir bool) {
 	var err error
 	suite.policy.CacheValid(localPath)
 	if isDir {
-		err = os.Mkdir(localPath, os.FileMode(0777))
+		err = os.Mkdir(localPath, os.FileMode(0o777))
 		suite.assert.NoError(err)
 	} else {
 		fh, err := os.Create(localPath)

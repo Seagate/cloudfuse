@@ -122,7 +122,7 @@ func (suite *mountSuite) TestMountCmd() {
 // or does exist on Windows
 func (suite *mountSuite) TestMountDirNotExists() {
 	if runtime.GOOS == "windows" {
-		os.Mkdir(mntDir, 0777)
+		os.Mkdir(mntDir, 0o777)
 		mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--config-file="+configFile)
 		var errb bytes.Buffer
 		mountCmd.Stderr = &errb
@@ -162,7 +162,7 @@ func (suite *mountSuite) TestMountDirNotExists() {
 // mount failure test where the mount directory is not empty
 func (suite *mountSuite) TestMountDirNotEmptyFailure() {
 	tempDir := filepath.Join(mntDir, "tempdir")
-	_ = os.Mkdir(tempDir, 0777)
+	_ = os.Mkdir(tempDir, 0o777)
 	mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--config-file="+configFile)
 	var errb bytes.Buffer
 	mountCmd.Stderr = &errb
@@ -195,7 +195,7 @@ func (suite *mountSuite) TestMountDirNotEmptyFailure() {
 // mount non-empty directory using nonempty flag
 func (suite *mountSuite) TestMountDirNotEmptySuccess() {
 	tempDir := filepath.Join(mntDir, "tempdir")
-	_ = os.Mkdir(tempDir, 0777)
+	_ = os.Mkdir(tempDir, 0o777)
 
 	mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--config-file="+configFile, "-o", "nonempty")
 	cliOut, err := mountCmd.Output()
@@ -259,7 +259,7 @@ func (suite *mountSuite) TestConfigFileNotProvided() {
 // mount failure test where config file is not provided and environment variables have incorrect credentials
 func (suite *mountSuite) TestEnvVarMountFailure() {
 	tempDir := filepath.Join(mntDir, "..", "tempdir")
-	os.Mkdir(tempDir, 0777)
+	os.Mkdir(tempDir, 0o777)
 
 	// create environment variables
 	os.Setenv("AZURE_STORAGE_ACCOUNT", "myAccount")
@@ -349,10 +349,10 @@ func (suite *mountSuite) TestEnvVarMount() {
 	err = os.RemoveAll(tempCachePath)
 	suite.NoError(err)
 
-	err = os.Mkdir(mntDir, 0777)
+	err = os.Mkdir(mntDir, 0o777)
 	suite.NoError(err)
 
-	err = os.Mkdir(tempCachePath, 0777)
+	err = os.Mkdir(tempCachePath, 0o777)
 	suite.NoError(err)
 
 	os.Unsetenv("AZURE_STORAGE_ACCOUNT")
@@ -436,21 +436,22 @@ func (suite *mountSuite) TestWriteBackCacheAndIgnoreOpenFlags() {
 
 	// write to file in the local directory
 	buff := make([]byte, 200)
-	rand.Read(buff)
-	err := os.WriteFile(remoteFilePath, buff, 0777)
+	_, err := rand.Read(buff)
+	suite.NoError(err)
+	err = os.WriteFile(remoteFilePath, buff, 0o777)
 	suite.NoError(err)
 
 	// unmount
 	cloudfuseUnmount(suite, mntDir)
 
 	mountAndValidate(suite, "--disable-writeback-cache=false", "--ignore-open-flags=false")
-	f, err := os.OpenFile(remoteFilePath, os.O_APPEND, 0777)
+	f, err := os.OpenFile(remoteFilePath, os.O_APPEND, 0o777)
 	suite.Error(err)
 	suite.Nil(f)
 	cloudfuseUnmount(suite, mntDir)
 
 	mountAndValidate(suite, "--disable-writeback-cache=true", "--ignore-open-flags=false")
-	f, err = os.OpenFile(remoteFilePath, os.O_APPEND, 0777)
+	f, err = os.OpenFile(remoteFilePath, os.O_APPEND, 0o777)
 	suite.NoError(err)
 	suite.NotNil(f)
 	f.Close()
@@ -458,7 +459,7 @@ func (suite *mountSuite) TestWriteBackCacheAndIgnoreOpenFlags() {
 	cloudfuseUnmount(suite, mntDir)
 
 	mountAndValidate(suite, "--disable-writeback-cache=false", "--ignore-open-flags=true")
-	f, err = os.OpenFile(remoteFilePath, os.O_APPEND, 0777)
+	f, err = os.OpenFile(remoteFilePath, os.O_APPEND, 0o777)
 	suite.NoError(err)
 	suite.NotNil(f)
 	f.Close()
@@ -466,7 +467,7 @@ func (suite *mountSuite) TestWriteBackCacheAndIgnoreOpenFlags() {
 	cloudfuseUnmount(suite, mntDir)
 
 	mountAndValidate(suite)
-	f, err = os.OpenFile(remoteFilePath, os.O_APPEND, 0777)
+	f, err = os.OpenFile(remoteFilePath, os.O_APPEND, 0o777)
 	suite.NoError(err)
 	suite.NotNil(f)
 	f.Close()
@@ -502,7 +503,7 @@ func TestMain(m *testing.M) {
 
 	// On Linux the folder must exist so we need to create it, on Windows it cannot exist.
 	if runtime.GOOS != "windows" {
-		os.Mkdir(mntDir, 0777)
+		os.Mkdir(mntDir, 0o777)
 	}
 
 	m.Run()

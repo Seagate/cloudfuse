@@ -184,7 +184,7 @@ func (bb *BlockBlob) TestPipeline() error {
 	}
 
 	listBlobPager := bb.Container.NewListBlobsHierarchyPager("/", &container.ListBlobsHierarchyOptions{
-		MaxResults: to.Ptr((int32)(2)),
+		MaxResults: to.Ptr(int32(2)),
 		Prefix:     &bb.Config.prefixPath,
 	})
 
@@ -655,14 +655,14 @@ func trackDownload(name string, bytesTransferred int64, count int64, downloadPtr
 		log.Debug("BlockBlob::trackDownload : Download: Blob = %v, Bytes transferred = %v, Size = %v", name, bytesTransferred, count)
 
 		// send the download progress as an event
-		azStatsCollector.PushEvents(downloadProgress, name, map[string]interface{}{bytesTfrd: bytesTransferred, size: count})
+		azStatsCollector.PushEvents(downloadProgress, name, map[string]any{bytesTfrd: bytesTransferred, size: count})
 	}
 }
 
 // ReadToFile : Download a blob to a local file
 func (bb *BlockBlob) ReadToFile(name string, offset int64, count int64, fi *os.File) (err error) {
 	log.Trace("BlockBlob::ReadToFile : name %s, offset : %d, count %d", name, offset, count)
-	//defer exectime.StatTimeCurrentBlock("BlockBlob::ReadToFile")()
+	// defer exectime.StatTimeCurrentBlock("BlockBlob::ReadToFile")()
 
 	blobClient := bb.getBlobClient(name)
 
@@ -744,7 +744,7 @@ func (bb *BlockBlob) ReadBuffer(name string, offset int64, length int64) ([]byte
 	buff = make([]byte, length)
 	blobClient := bb.getBlobClient(name)
 
-	dlOpts := (blob.DownloadBufferOptions)(*bb.downloadOptions)
+	dlOpts := blob.DownloadBufferOptions(*bb.downloadOptions)
 	dlOpts.Range = blob.HTTPRange{
 		Offset: offset,
 		Count:  length,
@@ -772,7 +772,7 @@ func (bb *BlockBlob) ReadBuffer(name string, offset int64, length int64) ([]byte
 func (bb *BlockBlob) ReadInBuffer(name string, offset int64, length int64, data []byte) error {
 	// log.Trace("BlockBlob::ReadInBuffer : name %s", name)
 	blobClient := bb.getBlobClient(name)
-	opt := (blob.DownloadBufferOptions)(*bb.downloadOptions)
+	opt := blob.DownloadBufferOptions(*bb.downloadOptions)
 	opt.BlockSize = length
 	opt.Range = blob.HTTPRange{
 		Offset: offset,
@@ -846,14 +846,14 @@ func trackUpload(name string, bytesTransferred int64, count int64, uploadPtr *in
 		log.Debug("BlockBlob::trackUpload : Upload: Blob = %v, Bytes transferred = %v, Size = %v", name, bytesTransferred, count)
 
 		// send upload progress as event
-		azStatsCollector.PushEvents(uploadProgress, name, map[string]interface{}{bytesTfrd: bytesTransferred, size: count})
+		azStatsCollector.PushEvents(uploadProgress, name, map[string]any{bytesTfrd: bytesTransferred, size: count})
 	}
 }
 
 // WriteFromFile : Upload local file to blob
 func (bb *BlockBlob) WriteFromFile(name string, metadata map[string]*string, fi *os.File) (err error) {
 	log.Trace("BlockBlob::WriteFromFile : name %s", name)
-	//defer exectime.StatTimeCurrentBlock("WriteFromFile::WriteFromFile")()
+	// defer exectime.StatTimeCurrentBlock("WriteFromFile::WriteFromFile")()
 
 	blobClient := bb.getBlockBlobClient(name)
 	defer log.TimeTrack(time.Now(), "BlockBlob::WriteFromFile", name)
@@ -982,8 +982,8 @@ func (bb *BlockBlob) GetFileBlockOffsets(name string) (*common.BlockOffsetList, 
 	for _, block := range storageBlockList.CommittedBlocks {
 		blk := &common.Block{
 			Id:         *block.Name,
-			StartIndex: int64(blockOffset),
-			EndIndex:   int64(blockOffset) + *block.Size,
+			StartIndex: blockOffset,
+			EndIndex:   blockOffset + *block.Size,
 		}
 		blockOffset += *block.Size
 		blockList.BlockList = append(blockList.BlockList, blk)
@@ -1013,13 +1013,13 @@ func (bb *BlockBlob) createNewBlocks(blockList *common.BlockOffsetList, offset, 
 	numOfBlocks := int64(len(blockList.BlockList))
 	if blockSize == 0 {
 		blockSize = (16 * 1024 * 1024)
-		if math.Ceil((float64)(numOfBlocks)+(float64)(length)/(float64)(blockSize)) > blockblob.MaxBlocks {
-			blockSize = int64(math.Ceil((float64)(length) / (float64)(blockblob.MaxBlocks-numOfBlocks)))
+		if math.Ceil(float64(numOfBlocks)+float64(length)/float64(blockSize)) > blockblob.MaxBlocks {
+			blockSize = int64(math.Ceil(float64(length) / float64(blockblob.MaxBlocks-numOfBlocks)))
 			if blockSize > blockblob.MaxStageBlockBytes {
 				return 0, errors.New("cannot accommodate data within the block limit")
 			}
 		}
-	} else if math.Ceil((float64)(numOfBlocks)+(float64)(length)/(float64)(blockSize)) > blockblob.MaxBlocks {
+	} else if math.Ceil(float64(numOfBlocks)+float64(length)/float64(blockSize)) > blockblob.MaxBlocks {
 		return 0, errors.New("cannot accommodate data within the block limit with configured block-size")
 	}
 
@@ -1039,7 +1039,7 @@ func (bb *BlockBlob) removeBlocks(blockList *common.BlockOffsetList, size int64,
 	_, index := blockList.BinarySearch(size)
 	// if the start index is equal to new size - block should be removed - move one index back
 	if blockList.BlockList[index].StartIndex == size {
-		index = index - 1
+		index--
 	}
 	// if the file we're shrinking is in the middle of a block then shrink that block
 	if blockList.BlockList[index].EndIndex > size {
@@ -1118,7 +1118,7 @@ func (bb *BlockBlob) TruncateFile(name string, size int64) error {
 		return err
 	}
 
-	//If new size is less than 256MB
+	// If new size is less than 256MB
 	if size < blockblob.MaxUploadBlobBytes {
 		data, err := bb.HandleSmallFile(name, size, attr.Size)
 		if err != nil {

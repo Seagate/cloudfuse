@@ -38,7 +38,7 @@ import (
 func NewLogger(name string, config common.LogConfig) (Logger, error) {
 	timeTracker = config.TimeTracker
 
-	if len(strings.TrimSpace(config.Tag)) == 0 {
+	if strings.TrimSpace(config.Tag) == "" {
 		config.Tag = common.FileSystemName
 	}
 

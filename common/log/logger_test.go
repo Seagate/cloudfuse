@@ -51,7 +51,7 @@ func fastTestCrit(lts *LoggerTestSuite) {
 	}
 }
 
-func simpleTest(lts *LoggerTestSuite) {
+func simpleTest() {
 	Crit("Running Simple Test")
 	for l := 0; l < 3; l++ {
 		switch l {
@@ -90,7 +90,7 @@ func (lts *LoggerTestSuite) TestBaseLogger() {
 	err := SetDefaultLogger("base", cfg)
 	assert.NoError(err, "Failed to set base logger")
 
-	simpleTest(lts)
+	simpleTest()
 
 	SetLogLevel(common.ELogLevel.LOG_DEBUG())
 	fastTestDebug(lts)
@@ -110,7 +110,7 @@ func (lts *LoggerTestSuite) TestSilentLogger() {
 	err := SetDefaultLogger("silent", cfg)
 	assert.NoError(err, "Failed to set silent logger")
 
-	simpleTest(lts)
+	simpleTest()
 }
 
 func (lts *LoggerTestSuite) TestSysLogger() {
@@ -123,7 +123,7 @@ func (lts *LoggerTestSuite) TestSysLogger() {
 	err := SetDefaultLogger("syslog", cfg)
 	assert.NoError(err, "Failed to set silent logger")
 
-	simpleTest(lts)
+	simpleTest()
 }
 
 func (lts *LoggerTestSuite) TestNegative() {
