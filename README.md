@@ -1,6 +1,12 @@
 
 # Cloudfuse - An S3 and Azure Storage FUSE driver
 
+[![License](https://img.shields.io/github/license/Seagate/cloudfuse)](/LICENSE)
+[![Release](https://img.shields.io/github/release/Seagate/cloudfuse.svg)](https://github.com/Seagate/cloudfuse/releases/latest)
+[![GitHub Releases Stats of cloudfuse](https://img.shields.io/github/downloads/Seagate/cloudfuse/total.svg?logo=github)](https://somsubhra.github.io/github-release-stats/?username=Seagate&repository=cloudfuse)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Seagate/cloudfuse)](https://goreportcard.com/report/github.com/Seagate/cloudfuse)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Seagate/cloudfuse/badge)](https://scorecard.dev/viewer/?uri=github.com/Seagate/cloudfuse)
+
 Cloudfuse provides the ability to mount a cloud bucket in your local filesystem on Linux and Windows with a GUI for easy configuration.
 With Cloudfuse you can easily read and write to the cloud, and connect programs on your computer to the cloud even if they're not cloud-aware.
 Cloudfuse uses file caching to provide the performance of local storage, or you can use streaming mode to efficiently access small parts of large files (e.g. video playback).
@@ -219,14 +225,6 @@ which is available [here](https://github.com/winfsp/winfsp/blob/master/License.t
 ### Attribution
 
 WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos - [link](https://github.com/winfsp/winfsp)
-
-## Badges
-
-[![License](https://img.shields.io/github/license/Seagate/cloudfuse)](/LICENSE)
-[![Release](https://img.shields.io/github/release/Seagate/cloudfuse.svg)](https://github.com/Seagate/cloudfuse/releases/latest)
-[![GitHub Releases Stats of cloudfuse](https://img.shields.io/github/downloads/Seagate/cloudfuse/total.svg?logo=github)](https://somsubhra.github.io/github-release-stats/?username=Seagate&repository=cloudfuse)
-[![Go Report Card](https://goreportcard.com/badge/github.com/Seagate/cloudfuse)](https://goreportcard.com/report/github.com/Seagate/cloudfuse)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Seagate/cloudfuse/badge)](https://scorecard.dev/viewer/?uri=github.com/Seagate/cloudfuse)
 
 ## Support
 
