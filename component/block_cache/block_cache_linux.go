@@ -908,7 +908,6 @@ func (bc *BlockCache) download(item *workItem) {
 		if err != nil {
 			// On any disk failure we do not fail the download flow
 			log.Err("BlockCache::download : Failed to open file %s [%s]", fileName, err.Error())
-			_ = root.Remove(fileName)
 			return
 		}
 		defer root.Close()
