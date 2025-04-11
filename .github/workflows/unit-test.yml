@@ -174,7 +174,11 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "windows-latest"]
+
+    runs-on: ${{ matrix.os }}
     env:
       go: "1.24"
     steps:
