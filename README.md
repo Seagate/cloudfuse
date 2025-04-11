@@ -1,11 +1,22 @@
 
 # Cloudfuse - An S3 and Azure Storage FUSE driver
 
-[![License](https://img.shields.io/github/license/Seagate/cloudfuse)](/LICENSE)
-[![Release](https://img.shields.io/github/release/Seagate/cloudfuse.svg)](https://github.com/Seagate/cloudfuse/releases/latest)
-[![GitHub Releases Stats of cloudfuse](https://img.shields.io/github/downloads/Seagate/cloudfuse/total.svg?logo=github)](https://somsubhra.github.io/github-release-stats/?username=Seagate&repository=cloudfuse)
-[![Go Report Card](https://goreportcard.com/badge/github.com/Seagate/cloudfuse)](https://goreportcard.com/report/github.com/Seagate/cloudfuse)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Seagate/cloudfuse/badge)](https://scorecard.dev/viewer/?uri=github.com/Seagate/cloudfuse)
+[![License][license-badge]][license-url]
+[![Release][release-badge]][release-url]
+[![GitHub Releases Stats of cloudfuse][stats-badge]][stats-url]
+[![Go Report Card][go-report-badge]][go-report-url]
+[![OpenSSF Scorecard][openssf-badge]][openssf-url]
+
+[license-badge]: https://img.shields.io/github/license/Seagate/cloudfuse
+[license-url]: https://github.com/Seagate/cloudfuse/blob/main/LICENSE
+[release-badge]: https://img.shields.io/github/release/Seagate/cloudfuse.svg
+[release-url]: https://github.com/Seagate/cloudfuse/releases/latest
+[stats-badge]: https://img.shields.io/github/downloads/Seagate/cloudfuse/total.svg?logo=github
+[stats-url]: https://somsubhra.github.io/github-release-stats/?username=Seagate&repository=cloudfuse
+[go-report-badge]: https://goreportcard.com/badge/github.com/Seagate/cloudfuse
+[go-report-url]: https://goreportcard.com/report/github.com/Seagate/cloudfuse
+[openssf-badge]: https://img.shields.io/ossf-scorecard/github.com/Seagate/cloudfuse?label=openssf%20scorecard
+[openssf-url]: https://scorecard.dev/viewer/?uri=github.com/Seagate/cloudfuse
 
 Cloudfuse provides the ability to mount a cloud bucket in your local filesystem on Linux and Windows with a GUI for easy configuration.
 With Cloudfuse you can easily read and write to the cloud, and connect programs on your computer to the cloud even if they're not cloud-aware.
