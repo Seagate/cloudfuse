@@ -94,7 +94,7 @@ var updateCmd = &cobra.Command{
 				return errors.New(".deb and .rpm requires elevated privileges")
 			}
 			if opt.Output == "" && opt.Package == "tar" {
-				return errors.New("Need to pass parameter --package with deb or rpm or pass parameter --output with location to download to")
+				return errors.New("need to pass parameter --package with deb or rpm or pass parameter --output with location to download to")
 			}
 
 		case "windows":
@@ -102,15 +102,15 @@ var updateCmd = &cobra.Command{
 				return errors.New("--package should be one of exe|zip")
 			}
 			if opt.Output == "" && (opt.Package == "zip") {
-				return errors.New("Need to pass parameter --package with exe or zip or pass parameter --output with location to download to")
+				return errors.New("need to pass parameter --package with exe or zip or pass parameter --output with location to download to")
 			}
 
 		default:
-			return errors.New("Unsupported OS. Only Linux and Windows are supported.")
+			return errors.New("unsupported OS. Only Linux and Windows are supported.")
 		}
 
 		if err := installUpdate(context.Background(), &opt); err != nil {
-			return fmt.Errorf("Error: %v", err)
+			return fmt.Errorf("error: %v", err)
 		}
 		return nil
 	},
@@ -160,7 +160,7 @@ func determinePackageFormat() (string, error) {
 	} else if hasCommand("rpm") {
 		return "rpm", nil
 	} else {
-		return "", errors.New("Neither dpkg nor rpm found. Cannot determine package format.")
+		return "", errors.New("neither dpkg nor rpm found. Cannot determine package format.")
 	}
 }
 

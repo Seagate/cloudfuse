@@ -249,7 +249,7 @@ func EncryptData(plainData []byte, password *memguard.Enclave) ([]byte, error) {
 
 	salt := make([]byte, SaltLength)
 	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
-		return nil, fmt.Errorf("Unable to generate random salt with error: %w", err)
+		return nil, fmt.Errorf("unable to generate random salt with error: %w", err)
 	}
 	key := deriveKey(secretKey.Bytes(), salt)
 
