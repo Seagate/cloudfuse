@@ -126,31 +126,31 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 		return
 	}
 	fmt.Println("Skipping TestFileCreatSpclChar (flaky)")
-	return
 
-	fileName := filepath.Join(suite.testPath, speclChar)
+	// speclChar := "abcd%23ABCD%34123-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत.txt"
+	// fileName := filepath.Join(suite.testPath, speclChar)
 
-	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
-	suite.NoError(err)
-	srcFile.Close()
-	time.Sleep(time.Second * 1)
+	// srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
+	// suite.NoError(err)
+	// srcFile.Close()
+	// time.Sleep(time.Second * 1)
 
-	suite.FileExists(fileName)
+	// suite.FileExists(fileName)
 
-	files, err := os.ReadDir(suite.testPath)
-	suite.NoError(err)
-	suite.GreaterOrEqual(len(files), 1)
+	// files, err := os.ReadDir(suite.testPath)
+	// suite.NoError(err)
+	// suite.GreaterOrEqual(len(files), 1)
 
-	found := false
-	for _, file := range files {
-		if file.Name() == speclChar {
-			found = true
-		}
-	}
-	// TODO: why did this come back false occasionally in CI (flaky)
-	suite.True(found)
+	// found := false
+	// for _, file := range files {
+	// 	if file.Name() == speclChar {
+	// 		found = true
+	// 	}
+	// }
+	// // TODO: why did this come back false occasionally in CI (flaky)
+	// suite.True(found)
 
-	suite.fileTestCleanup([]string{fileName})
+	// suite.fileTestCleanup([]string{fileName})
 }
 
 func (suite *fileTestSuite) TestFileCreateEncodeChar() {
