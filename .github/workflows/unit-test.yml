@@ -204,7 +204,7 @@ jobs:
       - name: Set CGO
         shell: bash
         run: |
-          if [[ "${{ env.go }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.go }}' >> $GITHUB_ENV ; fi
+          if [[ "${{ matrix.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ matrix.cgo }}' >> $GITHUB_ENV ; fi
 
       - name: Install libfuse
         if: matrix.os == 'ubuntu-latest'
