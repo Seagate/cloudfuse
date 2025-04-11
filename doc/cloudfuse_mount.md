@@ -45,7 +45,7 @@ cloudfuse mount <mount path> [flags]
       --lazy-write                        Async write to storage container after file handle is closed.
       --log-file-path string              Configures the path for log files. Default is $HOME/.cloudfuse/cloudfuse.log (default "$HOME/.cloudfuse/cloudfuse.log")
       --log-level string                  Enables logs written to syslog. Set to LOG_WARNING by default. Allowed values are LOG_OFF|LOG_CRIT|LOG_ERR|LOG_WARNING|LOG_INFO|LOG_DEBUG (default "LOG_WARNING")
-      --log-type string                   Type of logger to be used by the system. Set to syslog by default. Allowed values are silent|syslog|base. (default "base")
+      --log-type string                   Type of logger to be used by the system. Set to base by default. Allowed values are silent|syslog|base. (default "base")
       --low-disk-threshold uint32         percentage of cache utilization which stops early eviction started by high-disk-threshold (default 80)
       --negative-timeout uint32           The negative entry timeout in seconds.
       --network-share                     Run as a network share. Only supported on Windows.
