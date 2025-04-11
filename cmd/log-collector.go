@@ -66,7 +66,7 @@ var dumpLogsCmd = &cobra.Command{
 
 		dumpPathExists := common.DirectoryExists(dumpPath)
 		if !dumpPathExists {
-			return fmt.Errorf("the mount path provided does not exist")
+			return fmt.Errorf("the dump path provided does not exist")
 		}
 
 		dumpInfo, err := os.Stat(dumpPath)
