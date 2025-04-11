@@ -21,6 +21,7 @@ AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
+UsePreviousAppDir=yes
 LicenseFile=..\LICENSE
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
 ;PrivilegesRequired=lowest
@@ -29,7 +30,7 @@ OutputBaseFilename=cloudfuse
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesInstallIn64BitMode=x64compatible
 VersionInfoVersion={#MyAppVersion}
 ; Tell Windows Explorer to reload the environment
 ChangesEnvironment=yes
@@ -42,10 +43,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "{userappdata}\{#MyAppName}"; Flags: uninsalwaysuninstall
 
 [Files]
-Source: "..\cloudfuse.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\cfusemon.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\windows-startup.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\windows-service.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\cloudfuse.exe"; DestDir: "{app}"; Flags: ignoreversion restartreplace
+Source: "..\cfusemon.exe"; DestDir: "{app}"; Flags: ignoreversion restartreplace
+Source: "..\windows-startup.exe"; DestDir: "{app}"; Flags: ignoreversion restartreplace
+Source: "..\windows-service.exe"; DestDir: "{app}"; Flags: ignoreversion restartreplace
 Source: "..\NOTICE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
