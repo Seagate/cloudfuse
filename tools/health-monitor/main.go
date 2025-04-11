@@ -85,7 +85,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if len(strings.TrimSpace(hmcommon.Pid)) == 0 {
+	if strings.TrimSpace(hmcommon.Pid) == "" {
 		fmt.Printf("pid of cloudfuse process not provided\n")
 		log.Err("main::main : pid of cloudfuse process not provided")
 		time.Sleep(1 * time.Second) // adding 1 second wait for adding to log(base type) before exiting

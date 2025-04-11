@@ -201,7 +201,7 @@ func (bc *BlockCache) Configure(_ bool) error {
 			log.Err("BlockCache::Configure : config error %s [%s]. Assigning a pre-defined value of 4GB.", bc.Name(), err.Error())
 			bc.memSize = uint64(4192) * _1MB
 		} else {
-			bc.memSize = uint64(0.8 * (float64)(sysinfo.Freeram) * float64(sysinfo.Unit))
+			bc.memSize = uint64(0.8 * float64(sysinfo.Freeram) * float64(sysinfo.Unit))
 			defaultMemSize = true
 		}
 	}
@@ -212,10 +212,10 @@ func (bc *BlockCache) Configure(_ bool) error {
 	}
 
 	bc.prefetchOnOpen = conf.PrefetchOnOpen
-	bc.prefetch = uint32(math.Max((MIN_PREFETCH*2)+1, (float64)(2*runtime.NumCPU())))
+	bc.prefetch = uint32(math.Max((MIN_PREFETCH*2)+1, float64(2*runtime.NumCPU())))
 	bc.noPrefetch = false
 
-	if defaultMemSize && (uint64(bc.prefetch)*uint64(bc.blockSize)) > bc.memSize {
+	if defaultMemSize && (uint64(bc.prefetch)*bc.blockSize) > bc.memSize {
 		bc.prefetch = (MIN_PREFETCH * 2) + 1
 	}
 
@@ -250,7 +250,7 @@ func (bc *BlockCache) Configure(_ bool) error {
 		_, err = os.Stat(bc.tmpPath)
 		if os.IsNotExist(err) {
 			log.Info("BlockCache: config error [tmp-path does not exist. attempting to create tmp-path.]")
-			err := os.Mkdir(bc.tmpPath, os.FileMode(0755))
+			err := os.Mkdir(bc.tmpPath, os.FileMode(0o755))
 			if err != nil {
 				log.Err("BlockCache: config error creating directory after clean [%s]", err.Error())
 				return fmt.Errorf("config error in %s [%s]", bc.Name(), err.Error())
@@ -270,7 +270,7 @@ func (bc *BlockCache) Configure(_ bool) error {
 		bc.diskSize = conf.DiskSize * _1MB
 	}
 
-	if (uint64(bc.prefetch) * uint64(bc.blockSize)) > bc.memSize {
+	if (uint64(bc.prefetch) * bc.blockSize) > bc.memSize {
 		log.Err("BlockCache::Configure : config error [memory limit too low for configured prefetch]")
 		return fmt.Errorf("config error in %s [memory limit too low for configured prefetch]", bc.Name())
 	}
@@ -410,7 +410,7 @@ func (bc *BlockCache) prepareHandleForBlockCache(handle *handlemap.Handle) {
 
 	// Set next offset to download as 0
 	// We may not download this if first read starts with some other offset
-	handle.SetValue("#", (uint64)(0))
+	handle.SetValue("#", uint64(0))
 }
 
 // FlushFile: Flush the local file to storage
@@ -712,7 +712,7 @@ func (bc *BlockCache) startPrefetch(handle *handlemap.Handle, index uint64, pref
 				block := handle.Buffers.Cooking.Remove(node).(*Block)
 				block.node = nil
 				i++
-				//This list may contain dirty blocks which are yet to be committed.
+				// This list may contain dirty blocks which are yet to be committed.
 				select {
 				case _, ok := <-block.state:
 					// As we are first reader of this block here its important to unblock any future readers on this block
@@ -967,7 +967,7 @@ func (bc *BlockCache) download(item *workItem) {
 	item.block.endIndex = item.block.offset + uint64(n)
 
 	if bc.tmpPath != "" {
-		err := os.MkdirAll(filepath.Dir(localPath), 0755)
+		err := os.MkdirAll(filepath.Dir(localPath), 0o755)
 		if err != nil {
 			log.Err("BlockCache::download : error creating directory structure for file %s [%s]", localPath, err.Error())
 			return
@@ -1165,7 +1165,7 @@ func (bc *BlockCache) getOrCreateBlock(handle *handlemap.Handle, offset uint64) 
 
 // Stage the given number of blocks from this handle
 func (bc *BlockCache) stageBlocks(handle *handlemap.Handle, cnt int) error {
-	//log.Debug("BlockCache::stageBlocks : Staging blocks for %s, cnt %v", handle.Path, cnt)
+	// log.Debug("BlockCache::stageBlocks : Staging blocks for %s, cnt %v", handle.Path, cnt)
 
 	nodeList := handle.Buffers.Cooking
 	node := nodeList.Front()
@@ -1373,7 +1373,7 @@ func (bc *BlockCache) upload(item *workItem) {
 	if bc.tmpPath != "" {
 		localPath := filepath.Join(bc.tmpPath, fileName)
 
-		err := os.MkdirAll(filepath.Dir(localPath), 0755)
+		err := os.MkdirAll(filepath.Dir(localPath), 0o755)
 		if err != nil {
 			log.Err("BlockCache::upload : error creating directory structure for file %s [%s]", localPath, err.Error())
 			goto return_safe
@@ -1536,7 +1536,7 @@ func (bc *BlockCache) stageZeroBlock(handle *handlemap.Handle, tryCnt int) (stri
 	log.Debug("BlockCache::stageZeroBlock : Staging zero block for %v=>%v, try = %v", handle.ID, handle.Path, tryCnt)
 	err := bc.NextComponent().StageData(internal.StageDataOptions{
 		Name: handle.Path,
-		Data: bc.blockPool.zeroBlock.data[:],
+		Data: bc.blockPool.zeroBlock.data,
 		Id:   id,
 	})
 

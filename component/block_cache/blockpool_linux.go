@@ -78,12 +78,12 @@ func NewBlockPool(blockSize uint64, memSize uint64) *BlockPool {
 	pool := &BlockPool{
 		blocksCh:     make(chan *Block, blockCount-1),
 		resetBlockCh: make(chan *Block, blockCount-1),
-		maxBlocks:    uint32(blockCount),
+		maxBlocks:    blockCount,
 		blockSize:    blockSize,
 	}
 
 	// Preallocate all blocks so that during runtime we do not spend CPU cycles on this
-	for i := (uint32)(0); i < blockCount; i++ {
+	for i := uint32(0); i < blockCount; i++ {
 		b, err := AllocateBlock(blockSize)
 		if err != nil {
 			log.Err("BlockPool::NewBlockPool : Failed to allocate block [%v]", err.Error())
@@ -126,7 +126,7 @@ func (pool *BlockPool) Terminate() {
 
 // Usage provides % usage of this block pool
 func (pool *BlockPool) Usage() uint32 {
-	return ((pool.maxBlocks - (uint32)(len(pool.blocksCh)+len(pool.resetBlockCh))) * 100) / pool.maxBlocks
+	return ((pool.maxBlocks - uint32(len(pool.blocksCh)+len(pool.resetBlockCh))) * 100) / pool.maxBlocks
 }
 
 // MustGet a Block from the pool, wait until something is free

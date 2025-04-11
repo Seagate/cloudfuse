@@ -37,20 +37,20 @@ type Logger interface {
 	GetLoggerObj() *log.Logger
 
 	SetLogFile(name string) error
-	SetMaxLogSize(size int)
-	SetLogFileCount(count int)
+	SetMaxLogSize(size int64)
+	SetLogFileCount(count int64)
 	SetLogLevel(level common.LogLevel)
 
 	Destroy() error
 
 	GetType() string
 	GetLogLevel() common.LogLevel
-	Debug(format string, args ...interface{})
-	Trace(format string, args ...interface{})
-	Info(format string, args ...interface{})
-	Warn(format string, args ...interface{})
-	Err(format string, args ...interface{})
-	Crit(format string, args ...interface{})
+	Debug(format string, args ...any)
+	Trace(format string, args ...any)
+	Info(format string, args ...any)
+	Warn(format string, args ...any)
+	Err(format string, args ...any)
+	Crit(format string, args ...any)
 	LogRotate() error
 }
 
@@ -98,10 +98,10 @@ func SetConfig(config common.LogConfig) error {
 			logObj.SetLogLevel(config.Level)
 		}
 		if config.MaxFileSize != 0 {
-			logObj.SetMaxLogSize(int(config.MaxFileSize))
+			logObj.SetMaxLogSize(config.MaxFileSize)
 		}
 		if config.FileCount != 0 {
-			logObj.SetLogFileCount(int(config.FileCount))
+			logObj.SetLogFileCount(config.FileCount)
 		}
 	}
 
@@ -115,13 +115,13 @@ func SetLogFile(name string) error {
 	return nil
 }
 
-func SetMaxLogSize(size int) {
+func SetMaxLogSize(size int64) {
 	if logObj != nil {
 		logObj.SetMaxLogSize(size)
 	}
 }
 
-func SetLogFileCount(count int) {
+func SetLogFileCount(count int64) {
 	if logObj != nil {
 		logObj.SetLogFileCount(count)
 	}
@@ -143,32 +143,32 @@ func Destroy() error {
 // ------------------ Public methods for logging events ------------------
 
 // Debug : Debug message logging
-func Debug(msg string, args ...interface{}) {
+func Debug(msg string, args ...any) {
 	logObj.Debug(msg, args...)
 }
 
 // Trace : Trace message logging
-func Trace(msg string, args ...interface{}) {
+func Trace(msg string, args ...any) {
 	logObj.Trace(msg, args...)
 }
 
 // Info : Info message logging
-func Info(msg string, args ...interface{}) {
+func Info(msg string, args ...any) {
 	logObj.Info(msg, args...)
 }
 
 // Warn : Warning message logging
-func Warn(msg string, args ...interface{}) {
+func Warn(msg string, args ...any) {
 	logObj.Warn(msg, args...)
 }
 
 // Err : Error message logging
-func Err(msg string, args ...interface{}) {
+func Err(msg string, args ...any) {
 	logObj.Err(msg, args...)
 }
 
 // Crit : Critical message logging
-func Crit(msg string, args ...interface{}) {
+func Crit(msg string, args ...any) {
 	logObj.Crit(msg, args...)
 }
 

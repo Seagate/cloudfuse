@@ -116,7 +116,7 @@ func (p *lruPolicy) StartPolicy() error {
 	}
 
 	if p.duPresent {
-		p.diskUsageMonitor = time.Tick(time.Duration(DiskUsageCheckInterval * time.Minute))
+		p.diskUsageMonitor = time.Tick(DiskUsageCheckInterval * time.Minute)
 	}
 
 	log.Info("lruPolicy::StartPolicy : Policy set with %v timeout", p.cacheTimeout)
@@ -307,9 +307,7 @@ func (p *lruPolicy) updateMarker() {
 	p.extractNode(p.lastMarker)
 	p.setHead(p.lastMarker)
 	// swap lastMarker with currMarker
-	swap := p.lastMarker
-	p.lastMarker = p.currMarker
-	p.currMarker = swap
+	p.lastMarker, p.currMarker = p.currMarker, p.lastMarker
 
 	p.Unlock()
 }

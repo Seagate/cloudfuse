@@ -42,7 +42,7 @@ import (
 type ExportedStat struct {
 	Timestamp   string
 	MonitorName string
-	Stat        interface{}
+	Stat        any
 }
 
 type StatsExporter struct {
@@ -123,7 +123,7 @@ func (se *StatsExporter) Destroy() {
 	se.wg.Wait()
 }
 
-func (se *StatsExporter) AddMonitorStats(monName string, timestamp string, st interface{}) {
+func (se *StatsExporter) AddMonitorStats(monName string, timestamp string, st any) {
 	// check if the channel is full
 	if len(se.channel) == cap(se.channel) {
 		// remove the first element from the channel
@@ -276,7 +276,7 @@ func (se *StatsExporter) getNewFile() error {
 	_ = os.Rename(fname, fnameNew)
 
 	fname = fmt.Sprintf("%v_%v.%v", baseName, hmcommon.Pid, hmcommon.OutputFileExtension)
-	se.opFile, err = os.OpenFile(fname, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	se.opFile, err = os.OpenFile(fname, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		log.Err("stats_exporter::getNewFile : Unable to create output file [%v]", err)
 		return err

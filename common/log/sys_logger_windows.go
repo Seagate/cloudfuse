@@ -161,10 +161,10 @@ func (sl *SysLogger) SetLogFile(name string) error {
 	return nil
 }
 
-func (sl *SysLogger) SetMaxLogSize(size int) {
+func (sl *SysLogger) SetMaxLogSize(size int64) {
 }
 
-func (sl *SysLogger) SetLogFileCount(count int) {
+func (sl *SysLogger) SetLogFileCount(count int64) {
 }
 
 func (sl *SysLogger) Destroy() error {

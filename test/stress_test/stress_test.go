@@ -52,8 +52,8 @@ type workItem struct {
 	fileData []byte
 }
 
-func downloadWorker(t *testing.T, id int, jobs <-chan string, results chan<- int) {
-	//var data []byte
+func downloadWorker(t *testing.T, jobs <-chan string, results chan<- int) {
+	// var data []byte
 	for item := range jobs {
 		i := 0
 		for ; i < retryCount; i++ {
@@ -61,38 +61,40 @@ func downloadWorker(t *testing.T, id int, jobs <-chan string, results chan<- int
 			if errFile == nil {
 				f.Close()
 				_, _ = os.ReadFile(item)
-				//t.Log(data)
-				//t.Log(".")
+				// t.Log(data)
+				// t.Log(".")
 				break
 			} else {
 				t.Log("F")
 			}
 		}
 		if i == retryCount {
-			t.FailNow()
+			t.Error()
+			return
 		}
 
-		//t.Log("Opened File : %s/%s.tst \n", item.baseDir, item.fileName)
+		// t.Log("Opened File : %s/%s.tst \n", item.baseDir, item.fileName)
 		results <- 1
 	}
 }
 
-func uploadWorker(t *testing.T, id int, jobs <-chan workItem, results chan<- int) {
+func uploadWorker(t *testing.T, jobs <-chan workItem, results chan<- int) {
 	for item := range jobs {
 		if item.optType == 1 {
-			errDir := os.MkdirAll(item.baseDir+"/"+item.dirName, 0755)
+			errDir := os.MkdirAll(item.baseDir+"/"+item.dirName, 0o755)
 			if errDir != nil {
-				t.FailNow()
+				t.Error(errDir)
+				return
 			}
-			//t.Log("#")
-			//t.Log("Created Directory : %s/%s \n", item.baseDir, item.dirName)
+			// t.Log("#")
+			// t.Log("Created Directory : %s/%s \n", item.baseDir, item.dirName)
 		} else if item.optType == 2 {
 			i := 0
 			var errFile error
 			for ; i < retryCount; i++ {
-				errFile = os.WriteFile(item.baseDir+"/"+item.fileName+".tst", item.fileData, 0666)
+				errFile = os.WriteFile(item.baseDir+"/"+item.fileName+".tst", item.fileData, 0o666)
 				if errFile == nil {
-					//t.Log(".")
+					// t.Log(".")
 					break
 				} else {
 					t.Log("F")
@@ -100,10 +102,11 @@ func uploadWorker(t *testing.T, id int, jobs <-chan workItem, results chan<- int
 			}
 
 			if i == retryCount {
-				t.FailNow()
+				t.Error()
+				return
 			}
 
-			//t.Log("Created File : %s/%s.tst \n", item.baseDir, item.fileName)
+			// t.Log("Created File : %s/%s.tst \n", item.baseDir, item.fileName)
 		}
 		results <- 1
 	}
@@ -120,28 +123,28 @@ func BytesCount(bytes float64, postfix string) (byteStr string) {
 		} else {
 			postfix = " bps"
 		}
-		byteStr = fmt.Sprintf("%.2f", (float64)(bytes))
+		byteStr = fmt.Sprintf("%.2f", float64(bytes))
 	} else if bytes < (1024 * 1024) {
 		if postfix == "" {
 			postfix = " KB"
 		} else {
 			postfix = " Kbps"
 		}
-		byteStr = fmt.Sprintf("%.2f", (float64)(bytes/1024))
+		byteStr = fmt.Sprintf("%.2f", float64(bytes/1024))
 	} else if bytes < (1024 * 1024 * 1024) {
 		if postfix == "" {
 			postfix = " MB"
 		} else {
 			postfix = " Mbps"
 		}
-		byteStr = fmt.Sprintf("%.2f", (float64)(bytes/(1024*1024)))
+		byteStr = fmt.Sprintf("%.2f", float64(bytes/(1024*1024)))
 	} else {
 		if postfix == "" {
 			postfix = " GB"
 		} else {
 			postfix = " Gbps"
 		}
-		byteStr = fmt.Sprintf("%.2f", (float64)(bytes/(1024*1024*1024)))
+		byteStr = fmt.Sprintf("%.2f", float64(bytes/(1024*1024*1024)))
 	}
 
 	byteStr += postfix
@@ -160,7 +163,7 @@ func stressTestUpload(t *testing.T, name string, noOfDir int, noOfFiles int, fil
 	results := make(chan int, workItemCnt)
 
 	for w := 1; w <= noOfWorkers; w++ {
-		go uploadWorker(t, w, jobs, results)
+		go uploadWorker(t, jobs, results)
 	}
 	t.Logf("Number of workders started : %d \n", noOfWorkers)
 
@@ -170,7 +173,7 @@ func stressTestUpload(t *testing.T, name string, noOfDir int, noOfFiles int, fil
 
 	var fileBuff = make([]byte, fileSize)
 	rand.Read(fileBuff)
-	//t.Log(fileBuff)
+	// t.Log(fileBuff)
 
 	var fileItem workItem
 	fileItem.optType = 2
@@ -204,17 +207,17 @@ func stressTestUpload(t *testing.T, name string, noOfDir int, noOfFiles int, fil
 
 	t.Logf("\n-----------------------------------------------------------------------------------------")
 	t.Logf("Number of directories created : %d \n", noOfDir)
-	t.Logf("Number of files created : %d  each of %s\n", noOfDir*noOfFiles, BytesCount((float64)(fileSize), ""))
-	t.Logf("%s bytes created in %f secs\n", BytesCount((float64)(fileSize*noOfDir*noOfFiles), ""), elapsed.Seconds())
+	t.Logf("Number of files created : %d  each of %s\n", noOfDir*noOfFiles, BytesCount(float64(fileSize), ""))
+	t.Logf("%s bytes created in %f secs\n", BytesCount(float64(fileSize*noOfDir*noOfFiles), ""), elapsed.Seconds())
 	if elapsed.Seconds() >= 1 {
 		t.Logf("Upload Speed %s \n",
 			BytesCount(
-				(float64)((float64)(fileSize*noOfDir*noOfFiles)/(float64)(elapsed.Seconds())),
+				float64(float64(fileSize*noOfDir*noOfFiles)/float64(elapsed.Seconds())),
 				"rate"))
 	} else {
 		t.Logf("Upload Speed %s \n",
 			BytesCount(
-				(float64)(fileSize*noOfDir*noOfFiles),
+				float64(fileSize*noOfDir*noOfFiles),
 				"rate"))
 	}
 }
@@ -228,7 +231,7 @@ func stressTestDownload(t *testing.T, name string, noOfDir int, noOfFiles int, f
 	results := make(chan int, workItemCnt)
 
 	for w := 1; w <= noOfWorkers; w++ {
-		go downloadWorker(t, w, jobs, results)
+		go downloadWorker(t, jobs, results)
 	}
 
 	totalBytes := 0
@@ -241,10 +244,10 @@ func stressTestDownload(t *testing.T, name string, noOfDir int, noOfFiles int, f
 				return err
 			}
 			if !info.IsDir() {
-				//t.Log(path, info.Size())
+				// t.Log(path, info.Size())
 				jobs <- path
 				totalFiles++
-				totalBytes += (int)(info.Size())
+				totalBytes += int(info.Size())
 			}
 			return nil
 		})
@@ -260,16 +263,16 @@ func stressTestDownload(t *testing.T, name string, noOfDir int, noOfFiles int, f
 	elapsed := time.Since(startTime)
 
 	t.Logf("\nTotal files downloaded : %d\n", totalFiles)
-	t.Logf("%s bytes read in %.2f secs\n", BytesCount((float64)(totalBytes), ""), (float64)(elapsed.Seconds()))
+	t.Logf("%s bytes read in %.2f secs\n", BytesCount(float64(totalBytes), ""), float64(elapsed.Seconds()))
 	if elapsed.Seconds() >= 1 {
 		t.Logf("Download Speed %s \n",
 			BytesCount(
-				(float64)((float64)(totalBytes)/(float64)(elapsed.Seconds())),
+				float64(float64(totalBytes)/float64(elapsed.Seconds())),
 				"rate"))
 	} else {
 		t.Logf("Download Speed %s \n",
 			BytesCount(
-				(float64)(totalBytes),
+				float64(totalBytes),
 				"rate"))
 	}
 	t.Log("Cleaning up...")
@@ -354,7 +357,7 @@ func TestMain(m *testing.M) {
 		fmt.Printf("StressTest : Could not cleanup stress dir before testing. Here's why: %v\n", err)
 	}
 
-	err = os.Mkdir(baseDir, 0777)
+	err = os.Mkdir(baseDir, 0o777)
 	if err != nil {
 		fmt.Println("Could not create dir before testing")
 	}

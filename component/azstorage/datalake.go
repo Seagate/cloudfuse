@@ -396,7 +396,7 @@ func (dl *Datalake) GetAttr(name string) (attr *internal.ObjAttr, err error) {
 
 	if *prop.ResourceType == "directory" {
 		attr.Flags = internal.NewDirBitMap()
-		attr.Mode = attr.Mode | os.ModeDir
+		attr.Mode |= os.ModeDir
 	}
 
 	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
@@ -514,7 +514,7 @@ func (dl *Datalake) List(prefix string, marker *string, count int32) ([]*interna
 			}
 			if pathInfo.IsDirectory != nil && *pathInfo.IsDirectory {
 				attr.Flags = internal.NewDirBitMap()
-				attr.Mode = attr.Mode | os.ModeDir
+				attr.Mode |= os.ModeDir
 			}
 		} else {
 			attr, err = dl.GetAttr(*pathInfo.Name)

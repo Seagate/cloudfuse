@@ -86,14 +86,14 @@ var generateTestConfig = &cobra.Command{
 				re := regexp.MustCompile(string(param))
 				newConfig = re.ReplaceAllString(newConfig, opts.tempDirPath)
 			} else {
-				envVar := os.Getenv(string(param)[2 : len(string(param))-2])
+				envVar := os.Getenv(string(param)[2 : len(param)-2])
 				re := regexp.MustCompile(string(param))
 				newConfig = re.ReplaceAllString(newConfig, envVar)
 			}
 		}
 
 		// write the config with the params to the output file
-		err = os.WriteFile(opts.outputConfigPath, []byte(newConfig), 0700)
+		err = os.WriteFile(opts.outputConfigPath, []byte(newConfig), 0o700)
 		if err != nil {
 			return fmt.Errorf("failed to write file [%s]", err.Error())
 		}
@@ -135,7 +135,7 @@ var generateConfig = &cobra.Command{
 				re := regexp.MustCompile(string(param))
 				newConfig = re.ReplaceAllString(newConfig, opts.tempDirPath)
 			} else {
-				envVar := os.Getenv(string(param)[2 : len(string(param))-2])
+				envVar := os.Getenv(string(param)[2 : len(param)-2])
 				re := regexp.MustCompile(string(param))
 				newConfig = re.ReplaceAllString(newConfig, envVar)
 			}
@@ -147,7 +147,7 @@ var generateConfig = &cobra.Command{
 		}
 
 		// write the config with the params to the output file
-		err = os.WriteFile(opts.outputConfigPath, cipherText, 0700)
+		err = os.WriteFile(opts.outputConfigPath, cipherText, 0o700)
 		if err != nil {
 			return fmt.Errorf("failed to write file [%s]", err.Error())
 		}
@@ -164,7 +164,7 @@ func validateGenConfigOptions() error {
 		}
 	}
 
-	_, err := base64.StdEncoding.DecodeString(string(opts.passphrase))
+	_, err := base64.StdEncoding.DecodeString(opts.passphrase)
 	if err != nil {
 		return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
 	}

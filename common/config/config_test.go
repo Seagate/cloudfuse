@@ -175,7 +175,7 @@ func (suite *ConfigTestSuite) TestPlainConfig2Reader() {
 	err := ReadConfigFromReader(strings.NewReader(config2))
 	assert.NoError(err)
 
-	//Case 1
+	// Case 1
 	metaDeepOpts2 := &Metadata{}
 	metaDeepOpts2Truth := &Metadata{
 		Label: Labels{
@@ -186,7 +186,7 @@ func (suite *ConfigTestSuite) TestPlainConfig2Reader() {
 	assert.NoError(err)
 	assert.Equal(metaDeepOpts2Truth, metaDeepOpts2)
 
-	//Case 2
+	// Case 2
 	templatOpts2 := &Template{}
 	templatOpts2Truth := &Template{
 		Meta: Metadata{
@@ -199,7 +199,7 @@ func (suite *ConfigTestSuite) TestPlainConfig2Reader() {
 	assert.NoError(err)
 	assert.Equal(templatOpts2Truth, templatOpts2)
 
-	//Case 3
+	// Case 3
 	specOpts2 := &Spec{}
 	specOpts2Truth := &Spec{
 		Replicas: 2,
@@ -251,7 +251,7 @@ func (suite *ConfigTestSuite) TestPlainConfig2Reader() {
 	assert.NoError(err)
 	assert.Equal(opts2Truth, opts2)
 
-	//Case 5
+	// Case 5
 	apiVersion := 0
 	err = UnmarshalKey("apiVersion", &apiVersion)
 	assert.Error(err)
@@ -264,7 +264,7 @@ func (suite *ConfigTestSuite) TestPlainConfig1Reader() {
 	err := ReadConfigFromReader(strings.NewReader(config1))
 	assert.NoError(err)
 
-	//Case1
+	// Case1
 	opts1 := &Config1{}
 	opts1Truth := &Config1{
 		ApiVer: "v1",
@@ -280,7 +280,7 @@ func (suite *ConfigTestSuite) TestPlainConfig1Reader() {
 	assert.NoError(err)
 	assert.Equal(opts1Truth, opts1)
 
-	//Case2
+	// Case2
 	metaOpts1 := &Metadata{}
 	metaOpts1Truth := &Metadata{
 		Name: "rss-site",
@@ -292,7 +292,7 @@ func (suite *ConfigTestSuite) TestPlainConfig1Reader() {
 	assert.NoError(err)
 	assert.Equal(metaOpts1Truth, metaOpts1)
 
-	//Case 3
+	// Case 3
 	labelOpts1 := &Labels{}
 	labelOpts1Truth := &Labels{
 		App: "web",
@@ -301,7 +301,7 @@ func (suite *ConfigTestSuite) TestPlainConfig1Reader() {
 	assert.NoError(err)
 	assert.Equal(labelOpts1Truth, labelOpts1)
 
-	//Case 4:
+	// Case 4:
 	randOpts := struct {
 		NewName       string `config:"newname"`
 		NotExistField int    `config:"notexists"`
@@ -327,7 +327,7 @@ func (suite *ConfigTestSuite) TestEnvShadowedConfigReader() {
 	err = os.Setenv("CF_TEST_APP", metaOptsTruth.Label.App)
 	assert.NoError(err)
 
-	//Case 1
+	// Case 1
 	BindEnv("name", "CF_TEST_NAME")
 	BindEnv("labels.app", "CF_TEST_APP")
 
@@ -338,7 +338,7 @@ func (suite *ConfigTestSuite) TestEnvShadowedConfigReader() {
 
 	ResetConfig()
 
-	//Case 2
+	// Case 2
 	err = ReadConfigFromReader(strings.NewReader(metaconf))
 	assert.NoError(err)
 	BindEnv("name", "CF_TEST_NAME")
@@ -361,7 +361,7 @@ func (suite *ConfigTestSuite) TestFlagShadowedConfigReader() {
 		},
 	}
 
-	//Case 1
+	// Case 1
 	nameFlag := AddStringFlag("name", "defo", "nahnahnah")
 	err := nameFlag.Value.Set(metaOptsTruth.Name)
 	assert.NoError(err)
@@ -381,7 +381,7 @@ func (suite *ConfigTestSuite) TestFlagShadowedConfigReader() {
 
 	ResetConfig()
 
-	//Case 2
+	// Case 2
 	err = ReadConfigFromReader(strings.NewReader(metaconf))
 	assert.NoError(err)
 	nameFlag = AddStringFlag("name", "defo", "nahnahnah")
@@ -462,7 +462,7 @@ func (suite *ConfigTestSuite) TestConfigFileDescription() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	os.WriteFile("test.yaml", []byte(config2), 0644)
+	os.WriteFile("test.yaml", []byte(config2), 0o644)
 	plaintext, err := os.ReadFile("test.yaml")
 	assert.NoError(err)
 	assert.NotNil(plaintext)
@@ -471,7 +471,7 @@ func (suite *ConfigTestSuite) TestConfigFileDescription() {
 
 	cipherText, err := common.EncryptData(plaintext, encryptedPassphrase)
 	assert.NoError(err)
-	err = os.WriteFile("test_enc.yaml", cipherText, 0644)
+	err = os.WriteFile("test_enc.yaml", cipherText, 0o644)
 	assert.NoError(err)
 
 	err = DecryptConfigFile("test_enc.yaml", encryptedPassphrase)

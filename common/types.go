@@ -52,9 +52,9 @@ const (
 	DefaultConcurrency = 20
 
 	MaxDirListCount                             = 5000
-	DefaultFilePermissionBits       os.FileMode = 0755
-	DefaultDirectoryPermissionBits  os.FileMode = 0775
-	DefaultAllowOtherPermissionBits os.FileMode = 0777
+	DefaultFilePermissionBits       os.FileMode = 0o755
+	DefaultDirectoryPermissionBits  os.FileMode = 0o775
+	DefaultAllowOtherPermissionBits os.FileMode = 0o777
 
 	MbToBytes         = 1024 * 1024
 	GbToBytes         = 1024 * 1024 * 1024
@@ -152,8 +152,8 @@ func (l *LogLevel) Parse(s string) error {
 
 type LogConfig struct {
 	Level       LogLevel
-	MaxFileSize uint64
-	FileCount   uint64
+	MaxFileSize int64
+	FileCount   int64
 	FilePath    string
 	TimeTracker bool
 	Tag         string // logging tag which can be either cloudfuse or cfusemon
@@ -212,7 +212,7 @@ const (
 
 // list that holds blocks containing ids and corresponding offsets
 type BlockOffsetList struct {
-	BlockList     []*Block //blockId to offset mapping
+	BlockList     []*Block // blockId to offset mapping
 	Flags         BitMap16
 	BlockIdLength int64
 	Size          int64
@@ -306,13 +306,13 @@ func (u uuid) Bytes() []byte {
 func NewUUIDWithLength(length int64) []byte {
 	u := make([]byte, length)
 	// Set all bits to randomly (or pseudo-randomly) chosen values.
-	_, err := rand.Read(u[:])
+	_, err := rand.Read(u)
 	if err == nil {
 		u[8] = (u[8] | 0x40) & 0x7F // u.setVariant(ReservedRFC4122)
 		var version byte = 4
 		u[6] = (u[6] & 0xF) | (version << 4) // u.setVersion(4)
 	}
-	return u[:]
+	return u
 }
 
 // NewUUID returns a new uuid using RFC 4122 algorithm.

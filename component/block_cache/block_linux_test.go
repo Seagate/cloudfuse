@@ -50,10 +50,6 @@ type blockTestSuite struct {
 
 func (suite *blockTestSuite) SetupTest() {
 }
-
-func (suite *blockTestSuite) cleanupTest() {
-}
-
 func (suite *blockTestSuite) TestAllocate() {
 	suite.assert = assert.New(suite.T())
 

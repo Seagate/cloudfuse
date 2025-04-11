@@ -60,7 +60,7 @@ Nunc sed blandit libero volutpat sed cras ornare arcu dui. Tempor commodo ullamc
 
 Semper quis lectus nulla at volutpat. Tellus rutrum tellus pellentesque eu tincidunt tortor aliquam. Nunc scelerisque viverra mauris in aliquam sem fringilla. Tincidunt dui ut ornare lectus sit amet. Pharetra magna ac placerat vestibulum lectus. Amet consectetur adipiscing elit duis tristique sollicitudin nibh sit. Augue eget arcu dictum varius duis at. Arcu ac tortor dignissim convallis aenean et tortor at. Mauris cursus mattis molestie a. Duis convallis convallis tellus id interdum velit. Aliquet porttitor lacus luctus accumsan. Proin libero nunc consequat interdum varius sit. A pellentesque sit amet porttitor eget dolor morbi non arcu. Nec sagittis aliquam malesuada bibendum arcu vitae elementum curabitur vitae. Mi proin sed libero enim sed faucibus turpis in. Tincidunt ornare massa eget egestas purus viverra accumsan in nisl. Tellus molestie nunc non blandit.
 
-Fames ac turpis egestas maecenas pharetra convallis posuere. Eget egestas purus viverra accumsan in. In tellus integer feugiat scelerisque varius morbi enim. Pretium fusce id velit ut. Ante metus dictum at tempor commodo ullamcorper a lacus. Ut ornare lectus sit amet est placerat. Vitae purus faucibus ornare suspendisse sed. Nibh tortor id aliquet lectus. Nunc scelerisque viverra mauris in aliquam sem. Sed libero enim sed faucibus turpis in eu mi. Ut pharetra sit amet aliquam id diam. Diam maecenas ultricies mi eget mauris pharetra et ultrices neque. Ac felis donec et odio pellentesque diam volutpat commodo sed. Ut diam quam nulla porttitor massa. Duis tristique sollicitudin nibh sit amet commodo. Senectus et netus et malesuada fames ac turpis. Facilisi morbi tempus iaculis urna id volutpat lacus laoreet non. Euismod in pellentesque massa placerat duis ultricies lacus sed. Nulla facilisi etiam dignissim diam quis enim.
+Fames ac turpis egestas maecenas pharetra convallis posuere. Eget egestas purus viverra accumsan in. In tellus integer feugiat scelerisque varius morbi enim. Pretium fusce id velit ut. Ante metus dictum at tempor commodo ullamcorper a lacus. Ut ornare lectus sit amet est placerat. Vitae purus faucibus ornare suspendisse sed. Nibh tortor id aliquet lectus. Nunc scelerisque viverra mauris in aliquam sem. Sed libero enim sed faucibus turpis in eu mi. Ut pharetra sit amet aliquam id diam. Diam maecenas ultricies mi eget mauris pharetra et ultrices neque. Ac felis donec et odio pellentesque diam volutpat commodo sed. Ut diam quam nulla porttitor massa. Duis tristique sollicitudin nibh sit amet commodo. Senectus et netus et malesuada fames ac turpis. Facilities morbi tempus iaculis urna id volutpat lacus laoreet non. Euismod in pellentesque massa placerat duis ultricies lacus sed. Nulla facilities etiam dignissim diam quis enim.
 
 Euismod elementum nisi quis eleifend quam. Et malesuada fames ac turpis egestas. Pulvinar neque laoreet suspendisse interdum consectetur libero. Mollis nunc sed id semper risus. Enim praesent elementum facilisis leo vel fringilla. Leo urna molestie at elementum eu facilisis sed. Id aliquet lectus proin nibh nisl condimentum id venenatis. Amet consectetur adipiscing elit ut aliquam purus. Diam vulputate ut pharetra sit amet aliquam id diam. Scelerisque in dictum non consectetur a erat name. Euismod elementum nisi quis eleifend quam adipiscing vitae proin sagittis. Ultricies integer quis auctor elit sed. Elit eget gravida cum sociis natoque penatibus. Sed risus ultricies tristique nulla aliquet enim tortor at auctor. Egestas maecenas pharetra convallis posuere morbi leo urna molestie.
 `
@@ -75,21 +75,21 @@ func (suite *LoopbackFSTestSuite) SetupTest() {
 	suite.lfs = lfs.(*LoopbackFS)
 	suite.lfs.path = testPath
 
-	err := os.MkdirAll(testPath, os.FileMode(0777))
+	err := os.MkdirAll(testPath, os.FileMode(0o777))
 	panicIfNotNil(err, "Failed to setup test directories")
-	err = os.MkdirAll(filepath.Join(testPath, dirOne), os.FileMode(0777))
+	err = os.MkdirAll(filepath.Join(testPath, dirOne), os.FileMode(0o777))
 	panicIfNotNil(err, "Failed to setup test directories")
-	err = os.MkdirAll(filepath.Join(testPath, dirEmpty), os.FileMode(0777))
+	err = os.MkdirAll(filepath.Join(testPath, dirEmpty), os.FileMode(0o777))
 	panicIfNotNil(err, "Failed to setup test directories")
 
-	f, err := os.OpenFile(filepath.Join(testPath, fileLorem), os.O_RDWR|os.O_CREATE, os.FileMode(0777))
+	f, err := os.OpenFile(filepath.Join(testPath, fileLorem), os.O_RDWR|os.O_CREATE, os.FileMode(0o777))
 	panicIfNotNil(err, "Failed to setup test files")
 	_, err = f.WriteString(loremText)
 	panicIfNotNil(err, "Failed to setup test files")
 	err = f.Close()
 	panicIfNotNil(err, "Failed to setup test files")
 
-	f, err = os.OpenFile(filepath.Join(testPath, fileHello), os.O_RDWR|os.O_CREATE, os.FileMode(0777))
+	f, err = os.OpenFile(filepath.Join(testPath, fileHello), os.O_RDWR|os.O_CREATE, os.FileMode(0o777))
 	panicIfNotNil(err, "Failed to setup test files")
 	err = f.Close()
 	panicIfNotNil(err, "Failed to setup test files")
@@ -106,7 +106,7 @@ func (suite *LoopbackFSTestSuite) TestCreateDir() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	err := suite.lfs.CreateDir(internal.CreateDirOptions{Name: dirTwo, Mode: os.FileMode(0755)})
+	err := suite.lfs.CreateDir(internal.CreateDirOptions{Name: dirTwo, Mode: os.FileMode(0o755)})
 	assert.NoError(err, "CreateDir: Failed")
 	suite.DirExists(filepath.Join(testPath, dirTwo))
 }
@@ -150,7 +150,7 @@ func (suite *LoopbackFSTestSuite) TestCreateFile() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	handle, err := suite.lfs.CreateFile(internal.CreateFileOptions{Name: fileEmpty, Mode: os.FileMode(0644)})
+	handle, err := suite.lfs.CreateFile(internal.CreateFileOptions{Name: fileEmpty, Mode: os.FileMode(0o644)})
 	assert.NoError(err, "CreateFile: Failed")
 	assert.NotNil(handle)
 
@@ -173,7 +173,7 @@ func (suite *LoopbackFSTestSuite) TestRenameFile() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	handle, err := suite.lfs.CreateFile(internal.CreateFileOptions{Name: fileEmpty, Mode: os.FileMode(0644)})
+	handle, err := suite.lfs.CreateFile(internal.CreateFileOptions{Name: fileEmpty, Mode: os.FileMode(0o644)})
 	assert.NoError(err, "TestRenameFile: Failed")
 	assert.NotNil(handle)
 	assert.FileExists(filepath.Join(testPath, fileEmpty))
@@ -196,7 +196,7 @@ func (suite *LoopbackFSTestSuite) TestRenameOpenFile() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	handle, err := suite.lfs.CreateFile(internal.CreateFileOptions{Name: fileEmpty, Mode: os.FileMode(0644)})
+	handle, err := suite.lfs.CreateFile(internal.CreateFileOptions{Name: fileEmpty, Mode: os.FileMode(0o644)})
 	assert.NoError(err, "TestRenameOpenFile: Failed")
 	assert.NotNil(handle)
 	assert.FileExists(filepath.Join(testPath, fileEmpty))
@@ -204,7 +204,7 @@ func (suite *LoopbackFSTestSuite) TestRenameOpenFile() {
 	err = suite.lfs.CloseFile(internal.CloseFileOptions{Handle: handle})
 	assert.NoError(err, "TestRenameOpenFile: Failed to close file")
 
-	handle, err = suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileEmpty, Flags: os.O_RDONLY, Mode: os.FileMode(0644)})
+	handle, err = suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileEmpty, Flags: os.O_RDONLY, Mode: os.FileMode(0o644)})
 	assert.NoError(err, "TestRenameOpenFile: Failed to open file")
 	assert.NotNil(handle)
 
@@ -226,7 +226,7 @@ func (suite *LoopbackFSTestSuite) TestRenameWriteFile() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	handle, err := suite.lfs.CreateFile(internal.CreateFileOptions{Name: fileEmpty, Mode: os.FileMode(0644)})
+	handle, err := suite.lfs.CreateFile(internal.CreateFileOptions{Name: fileEmpty, Mode: os.FileMode(0o644)})
 	assert.NoError(err, "TestRenameWriteFile: Failed")
 	assert.NotNil(handle)
 	assert.FileExists(filepath.Join(testPath, fileEmpty))
@@ -257,7 +257,7 @@ func (suite *LoopbackFSTestSuite) TestRenameWriteFileGetAttr() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	handle, err := suite.lfs.CreateFile(internal.CreateFileOptions{Name: fileEmpty, Mode: os.FileMode(0644)})
+	handle, err := suite.lfs.CreateFile(internal.CreateFileOptions{Name: fileEmpty, Mode: os.FileMode(0o644)})
 	assert.NoError(err, "TestRenameWriteFile: Failed")
 	assert.NotNil(handle)
 	assert.FileExists(filepath.Join(testPath, fileEmpty))
@@ -292,7 +292,7 @@ func (suite *LoopbackFSTestSuite) TestReadInBuffer() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	handle, err := suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileLorem, Flags: os.O_RDONLY, Mode: os.FileMode(0644)})
+	handle, err := suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileLorem, Flags: os.O_RDONLY, Mode: os.FileMode(0o644)})
 	assert.NoError(err, "ReadInBuffer: Failed to open file")
 	assert.NotNil(handle)
 	testCases := []struct {
@@ -327,7 +327,7 @@ func (suite *LoopbackFSTestSuite) TestWriteFile() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	handle, err := suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileQuotes, Flags: os.O_RDWR | os.O_CREATE, Mode: os.FileMode(0644)})
+	handle, err := suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileQuotes, Flags: os.O_RDWR | os.O_CREATE, Mode: os.FileMode(0o644)})
 	assert.NoError(err, "WriteFile: failed to open file")
 	assert.NotNil(handle)
 
@@ -355,7 +355,7 @@ func (suite *LoopbackFSTestSuite) TestTruncateFile() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	handle, err := suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileLorem, Flags: os.O_RDWR, Mode: os.FileMode(0644)})
+	handle, err := suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileLorem, Flags: os.O_RDWR, Mode: os.FileMode(0o644)})
 	assert.NoError(err, "TruncateFile: failed to open file")
 	assert.NotNil(handle)
 
@@ -373,7 +373,7 @@ func (suite *LoopbackFSTestSuite) TestTruncateClosedFile() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
-	handle, err := suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileLorem, Flags: os.O_RDWR, Mode: os.FileMode(0644)})
+	handle, err := suite.lfs.OpenFile(internal.OpenFileOptions{Name: fileLorem, Flags: os.O_RDWR, Mode: os.FileMode(0o644)})
 	assert.NoError(err, "TruncateFile: failed to open file")
 	assert.NotNil(handle)
 
@@ -409,7 +409,7 @@ func (suite *LoopbackFSTestSuite) TestStageAndCommitData() {
 	lfs := &LoopbackFS{}
 
 	lfs.path = common.ExpandPath("~/blocklfstest")
-	err := os.MkdirAll(lfs.path, os.FileMode(0755))
+	err := os.MkdirAll(lfs.path, os.FileMode(0o755))
 	assert.NoError(err)
 	defer os.RemoveAll(lfs.path)
 

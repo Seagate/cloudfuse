@@ -59,9 +59,9 @@ func (azmsi *azAuthMSI) getTokenCredential() (azcore.TokenCredential, error) {
 	}
 
 	if azmsi.config.ApplicationID != "" {
-		msiOpts.ID = (azidentity.ClientID)(azmsi.config.ApplicationID)
+		msiOpts.ID = azidentity.ClientID(azmsi.config.ApplicationID)
 	} else if azmsi.config.ResourceID != "" {
-		msiOpts.ID = (azidentity.ResourceID)(azmsi.config.ResourceID)
+		msiOpts.ID = azidentity.ResourceID(azmsi.config.ResourceID)
 	} else if azmsi.config.ObjectID != "" {
 		// login using azcli
 		return azmsi.getTokenCredentialUsingCLI()
@@ -105,7 +105,7 @@ type azAuthBlobMSI struct {
 }
 
 // getServiceClient : returns MSI based service client for blob
-func (azmsi *azAuthBlobMSI) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
+func (azmsi *azAuthBlobMSI) getServiceClient(stConfig *AzStorageConfig) (any, error) {
 	cred, err := azmsi.getTokenCredential()
 	if err != nil {
 		log.Err("azAuthBlobMSI::getServiceClient : Failed to get token credential from MSI [%s]", err.Error())
@@ -131,7 +131,7 @@ type azAuthDatalakeMSI struct {
 }
 
 // getServiceClient : returns MSI based service client for datalake
-func (azmsi *azAuthDatalakeMSI) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
+func (azmsi *azAuthDatalakeMSI) getServiceClient(stConfig *AzStorageConfig) (any, error) {
 	cred, err := azmsi.getTokenCredential()
 	if err != nil {
 		log.Err("azAuthDatalakeMSI::getServiceClient : Failed to get token credential from MSI [%s]", err.Error())

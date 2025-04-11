@@ -98,7 +98,7 @@ func (sc *StatsCollector) statsDumper() {
 
 			_, isPresent := stMgrOpt.statsList[idx].Value[stat.Key]
 			if !isPresent {
-				stMgrOpt.statsList[idx].Value[stat.Key] = (int64)(0)
+				stMgrOpt.statsList[idx].Value[stat.Key] = int64(0)
 			}
 
 			switch stat.Operation {
@@ -223,7 +223,7 @@ func createPipe(pipe string) error {
 
 	_, err := os.Stat(pipe)
 	if os.IsNotExist(err) {
-		err = unix.Mkfifo(pipe, 0666)
+		err = unix.Mkfifo(pipe, 0o666)
 		if err != nil {
 			log.Err("stats_manager::createPipe : unable to create pipe %v [%v]", pipe, err)
 			return err

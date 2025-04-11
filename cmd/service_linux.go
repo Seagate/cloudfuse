@@ -89,7 +89,7 @@ var installCmd = &cobra.Command{
 		if errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("the config file path provided does not exist")
 		}
-		//create the new user and set permissions
+		// create the new user and set permissions
 		err = setUser(serviceUser, mountPath, configPath)
 		if err != nil {
 			fmt.Println("could not set up service user ", err)

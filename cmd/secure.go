@@ -125,7 +125,7 @@ func validateOptions() error {
 		}
 	}
 
-	_, err := base64.StdEncoding.DecodeString(string(secOpts.PassPhrase))
+	_, err := base64.StdEncoding.DecodeString(secOpts.PassPhrase)
 	if err != nil {
 		return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
 	}
@@ -199,7 +199,7 @@ func decryptConfigFile(saveConfig bool) ([]byte, error) {
 
 // saveToFile: Save the newly generated config file and delete the source if requested
 func saveToFile(configFileName string, data []byte, deleteSource bool) error {
-	err := os.WriteFile(configFileName, data, 0644)
+	err := os.WriteFile(configFileName, data, 0o644)
 	if err != nil {
 		return err
 	}

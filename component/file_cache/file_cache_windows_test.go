@@ -111,7 +111,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file"
-	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0o777})
 	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
 
 	// Path should be in fake storage
@@ -131,8 +131,8 @@ func (suite *fileCacheWindowsTestSuite) TestChownInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file"
-	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0o777})
+	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0o777})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
 	// Path should be in the file cache

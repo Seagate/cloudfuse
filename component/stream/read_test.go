@@ -101,7 +101,7 @@ func (suite *streamTestSuite) cleanupTest() {
 
 func (suite *streamTestSuite) getRequestOptions(fileIndex int, handle *handlemap.Handle, overwriteEndIndex bool, fileSize, offset, endIndex int64) (internal.OpenFileOptions, internal.ReadInBufferOptions, *[]byte) {
 	var data []byte
-	openFileOptions := internal.OpenFileOptions{Name: fileNames[fileIndex], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions := internal.OpenFileOptions{Name: fileNames[fileIndex], Flags: os.O_RDONLY, Mode: os.FileMode(0o777)}
 	if !overwriteEndIndex {
 		data = make([]byte, suite.stream.BlockSize)
 	} else {
@@ -115,14 +115,16 @@ func (suite *streamTestSuite) getRequestOptions(fileIndex int, handle *handlemap
 // return data buffer populated with data of the given size
 func getBlockData(suite *streamTestSuite, size int) *[]byte {
 	dataBuffer := make([]byte, size)
-	_, _ = rand.Read(dataBuffer)
+	_, err := rand.Read(dataBuffer)
+	suite.assert.NoError(err)
 	return &dataBuffer
 }
 
 // return the block
 func getCachedBlock(suite *streamTestSuite, offset int64, handle *handlemap.Handle) *common.Block {
 	bk := offset
-	blk, _ := handle.CacheObj.Get(bk)
+	blk, ret := handle.CacheObj.Get(bk)
+	suite.assert.True(ret)
 	return blk
 }
 

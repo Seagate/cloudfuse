@@ -59,7 +59,7 @@ var ForegroundMount bool
 func IsDirectoryMounted(path string) bool {
 	mntList, err := os.ReadFile("/etc/mtab")
 	if err != nil {
-		//fmt.Println("failed to read mount points : ", err.Error())
+		// fmt.Println("failed to read mount points : ", err.Error())
 		return false
 	}
 
@@ -74,7 +74,7 @@ func IsDirectoryMounted(path string) bool {
 				// however with libfuse entry does not have that signature
 				// if this path is already mounted using fuse then fail
 				if strings.Contains(line, "fuse") {
-					//fmt.Println(path, " is already mounted.")
+					// fmt.Println(path, " is already mounted.")
 					return true
 				}
 			}
@@ -418,7 +418,7 @@ func CreateDefaultDirectory() error {
 
 	if err != nil && os.IsNotExist(err) {
 		// create the default work dir
-		if err = os.MkdirAll(ExpandPath(DefaultWorkDir), 0755); err != nil {
+		if err := os.MkdirAll(ExpandPath(DefaultWorkDir), 0o755); err != nil {
 			return err
 		}
 	}

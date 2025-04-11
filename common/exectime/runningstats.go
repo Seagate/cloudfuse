@@ -39,7 +39,7 @@ import (
 )
 
 type RunningStatistics struct {
-	N    uint64
+	N    int64
 	oldM time.Duration
 	newM time.Duration
 	oldS time.Duration

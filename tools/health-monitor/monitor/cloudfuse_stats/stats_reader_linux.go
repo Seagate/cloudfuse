@@ -84,7 +84,7 @@ func (cfs *CloudfuseStats) statsPoll() {
 		return
 	}
 
-	pf, err := os.OpenFile(cfs.pollingPipe, os.O_CREATE|os.O_WRONLY, 0666)
+	pf, err := os.OpenFile(cfs.pollingPipe, os.O_CREATE|os.O_WRONLY, 0o666)
 	if err != nil {
 		log.Err("StatsReader::statsPoll : unable to open pipe file [%v]", err)
 		return
@@ -106,7 +106,7 @@ func (cfs *CloudfuseStats) statsPoll() {
 func createPipe(pipe string) error {
 	_, err := os.Stat(pipe)
 	if os.IsNotExist(err) {
-		err = unix.Mkfifo(pipe, 0666)
+		err = unix.Mkfifo(pipe, 0o666)
 		if err != nil {
 			log.Err("StatsReader::createPipe : unable to create pipe [%v]", err)
 			return err

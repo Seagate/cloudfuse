@@ -50,7 +50,7 @@ func (suite *cachePolicyTestSuite) SetupTest() {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
 	}
 	suite.assert = assert.New(suite.T())
-	os.Mkdir(cache_path, fs.FileMode(0777))
+	os.Mkdir(cache_path, fs.FileMode(0o777))
 }
 
 func (suite *cachePolicyTestSuite) cleanupTest() {

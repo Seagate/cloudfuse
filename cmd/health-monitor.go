@@ -129,15 +129,15 @@ func validateHMonOptions() error {
 	configFile = strings.TrimSpace(configFile)
 	errMsg := ""
 
-	if len(pid) == 0 {
+	if pid == "" {
 		errMsg = "pid of cloudfuse process not given. "
 	}
 
-	if len(configFile) == 0 {
+	if configFile == "" {
 		errMsg += "config file not given."
 	}
 
-	if len(errMsg) != 0 {
+	if errMsg != "" {
 		return fmt.Errorf("%s", errMsg)
 	}
 
@@ -159,8 +159,8 @@ func buildCliParamForMonitor() []string {
 		cliParams = append(cliParams, fmt.Sprintf("--output-path=%v", options.MonitorOpt.OutputPath))
 	}
 
-	cliParams = append(cliParams, "--cache-path="+common.ExpandPath(cacheMonitorOptions.TmpPath))
-	cliParams = append(cliParams, fmt.Sprintf("--max-size-mb=%v", cacheMonitorOptions.MaxSizeMB))
+	cliParams = append(cliParams, "--cache-path="+common.ExpandPath(cacheMonitorOptions.TmpPath),
+		fmt.Sprintf("--max-size-mb=%v", cacheMonitorOptions.MaxSizeMB))
 
 	for _, v := range options.MonitorOpt.DisableList {
 		switch v {

@@ -242,7 +242,7 @@ func storeBlobErrToErr(err error) uint16 {
 	errors.As(err, &respErr)
 
 	if respErr != nil {
-		switch (bloberror.Code)(respErr.ErrorCode) {
+		switch bloberror.Code(respErr.ErrorCode) {
 		case bloberror.BlobAlreadyExists:
 			return ErrFileAlreadyExists
 		case bloberror.BlobNotFound:
@@ -266,7 +266,7 @@ func storeDatalakeErrToErr(err error) uint16 {
 	errors.As(err, &respErr)
 
 	if respErr != nil {
-		switch (datalakeerror.StorageErrorCode)(respErr.ErrorCode) {
+		switch datalakeerror.StorageErrorCode(respErr.ErrorCode) {
 		case datalakeerror.PathAlreadyExists:
 			return ErrFileAlreadyExists
 		case datalakeerror.PathNotFound:
@@ -294,12 +294,12 @@ func parseMetadata(attr *internal.ObjAttr, metadata map[string]*string) {
 	attr.Metadata = metadata
 	for k, v := range metadata {
 		if v != nil {
-			if strings.ToLower(k) == folderKey && *v == "true" {
+			if strings.EqualFold(k, folderKey) && *v == "true" {
 				attr.Flags = internal.NewDirBitMap()
-				attr.Mode = attr.Mode | os.ModeDir
-			} else if strings.ToLower(k) == symlinkKey && *v == "true" {
+				attr.Mode |= os.ModeDir
+			} else if strings.EqualFold(k, symlinkKey) && *v == "true" {
 				attr.Flags = internal.NewSymlinkBitMap()
-				attr.Mode = attr.Mode | os.ModeSymlink
+				attr.Mode |= os.ModeSymlink
 			}
 		}
 	}
@@ -384,7 +384,7 @@ func populateContentType(newSet string) error { //nolint
 
 	// We can simply append the new data to end of the map
 	// however there may be conflicting keys and hence we need to merge manually
-	//ContentTypeMap = append(ContentTypeMap, data)
+	// ContentTypeMap = append(ContentTypeMap, data)
 	for k, v := range data {
 		ContentTypes[k] = v
 	}

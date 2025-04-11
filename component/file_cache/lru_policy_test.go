@@ -55,7 +55,7 @@ func (suite *lruPolicyTestSuite) SetupTest() {
 	// }
 	suite.assert = assert.New(suite.T())
 
-	os.Mkdir(cache_path, fs.FileMode(0777))
+	os.Mkdir(cache_path, fs.FileMode(0o777))
 
 	config := cachePolicyConfig{
 		tmpPath:       cache_path,
@@ -90,7 +90,7 @@ func (suite *lruPolicyTestSuite) createLocalPath(localPath string, isDir bool) {
 	var err error
 	suite.policy.CacheValid(localPath)
 	if isDir {
-		err = os.Mkdir(localPath, os.FileMode(0777))
+		err = os.Mkdir(localPath, os.FileMode(0o777))
 		suite.assert.NoError(err)
 	} else {
 		fh, err := os.Create(localPath)
@@ -148,7 +148,7 @@ func (suite *lruPolicyTestSuite) generateNestedDirectory(aPath string) ([]string
 
 func (suite *lruPolicyTestSuite) TestDefault() {
 	defer suite.cleanupTest()
-	suite.assert.EqualValues("lru", suite.policy.Name())
+	suite.assert.Equal("lru", suite.policy.Name())
 	suite.assert.EqualValues(1, suite.policy.cacheTimeout) // cacheTimeout does not change
 	suite.assert.EqualValues(defaultMaxEviction, suite.policy.maxEviction)
 	suite.assert.EqualValues(0, suite.policy.maxSizeMB)
@@ -185,8 +185,8 @@ func (suite *lruPolicyTestSuite) TestCacheValid() {
 	suite.assert.True(ok)
 	suite.assert.NotNil(n)
 	node := n.(*lruNode)
-	suite.assert.EqualValues("temp", node.name)
-	suite.assert.EqualValues(1, node.usage)
+	suite.assert.Equal("temp", node.name)
+	suite.assert.Equal(1, node.usage)
 }
 
 func (suite *lruPolicyTestSuite) TestCachePurge() {

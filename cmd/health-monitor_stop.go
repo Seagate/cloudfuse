@@ -46,7 +46,7 @@ var healthMonStop = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cloudfusePid = strings.TrimSpace(cloudfusePid)
 
-		if len(cloudfusePid) == 0 {
+		if cloudfusePid == "" {
 			return fmt.Errorf("pid of cloudfuse process not given")
 		}
 

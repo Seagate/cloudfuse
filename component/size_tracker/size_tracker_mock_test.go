@@ -92,7 +92,7 @@ func (suite *sizeTrackerMockTestSuite) cleanupTest() {
 func (suite *sizeTrackerMockTestSuite) TestDefault() {
 	defer suite.cleanupTest()
 	suite.assert.Equal("size_tracker", suite.sizeTracker.Name())
-	suite.assert.EqualValues(uint64(0), suite.sizeTracker.mountSize.GetSize())
+	suite.assert.Equal(uint64(0), suite.sizeTracker.mountSize.GetSize())
 }
 
 func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledUnderThreshold() {
@@ -103,8 +103,8 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledUnderThreshold()
 	// Create File
 	file := generateFileName()
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file}).Return(&internal.ObjAttr{Path: file}, nil)
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644}).Return(&handlemap.Handle{}, nil)
-	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file, Mode: 0o644}).Return(&handlemap.Handle{}, nil)
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0o644})
 	suite.assert.NoError(err)
 
 	// Write File
@@ -152,8 +152,8 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledOverThreshold() 
 	// Create File
 	file := generateFileName()
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: file}).Return(&internal.ObjAttr{Path: file}, nil)
-	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644}).Return(&handlemap.Handle{}, nil)
-	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0644})
+	suite.mock.EXPECT().CreateFile(internal.CreateFileOptions{Name: file, Mode: 0o644}).Return(&handlemap.Handle{}, nil)
+	handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0o644})
 	suite.assert.NoError(err)
 
 	// Write File

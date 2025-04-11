@@ -104,7 +104,7 @@ func testMkDir(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(0775)
+	mode := fs.FileMode(0o775)
 	options := internal.CreateDirOptions{Name: name, Mode: mode}
 	suite.mock.EXPECT().CreateDir(options).Return(nil)
 
@@ -114,7 +114,7 @@ func testMkDir(suite *libfuseTestSuite) {
 		suite.mock.EXPECT().GetAttr(option).Return(nil, syscall.ENOENT)
 	}
 
-	err := cfuseFS.Mkdir(path, 0775)
+	err := cfuseFS.Mkdir(path, 0o775)
 	suite.assert.Equal(0, err)
 }
 
@@ -127,14 +127,14 @@ func testStatFs(suite *libfuseTestSuite) {
 	ret := cfuseFS.Statfs(path, buf)
 
 	suite.assert.Equal(0, ret)
-	suite.assert.Equal(1, int(buf.Frsize))
-	suite.assert.Equal(2, int(buf.Blocks))
-	suite.assert.Equal(3, int(buf.Bavail))
-	suite.assert.Equal(4, int(buf.Bfree))
-	suite.assert.Equal(5, int(buf.Bsize))
-	suite.assert.Equal(6, int(buf.Files))
-	suite.assert.Equal(7, int(buf.Ffree))
-	suite.assert.Equal(8, int(buf.Namemax))
+	suite.assert.EqualValues(1, buf.Frsize)
+	suite.assert.EqualValues(2, buf.Blocks)
+	suite.assert.EqualValues(3, buf.Bavail)
+	suite.assert.EqualValues(4, buf.Bfree)
+	suite.assert.EqualValues(5, buf.Bsize)
+	suite.assert.EqualValues(6, buf.Files)
+	suite.assert.EqualValues(7, buf.Ffree)
+	suite.assert.EqualValues(8, buf.Namemax)
 }
 
 func testStatFsNotPopulated(suite *libfuseTestSuite) {
@@ -170,7 +170,7 @@ func testMkDirError(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(0775)
+	mode := fs.FileMode(0o775)
 	options := internal.CreateDirOptions{Name: name, Mode: mode}
 	suite.mock.EXPECT().CreateDir(options).Return(errors.New("failed to create directory"))
 
@@ -180,7 +180,7 @@ func testMkDirError(suite *libfuseTestSuite) {
 		suite.mock.EXPECT().GetAttr(option).Return(nil, syscall.ENOENT)
 	}
 
-	err := cfuseFS.Mkdir(path, 0775)
+	err := cfuseFS.Mkdir(path, 0o775)
 	suite.assert.Equal(-fuse.EIO, err)
 }
 
@@ -195,7 +195,7 @@ func testMkDirErrorAttrExist(suite *libfuseTestSuite) {
 	path := "/" + name
 	option := internal.GetAttrOptions{Name: name}
 	suite.mock.EXPECT().GetAttr(option).Return(&internal.ObjAttr{Flags: internal.NewDirBitMap()}, nil)
-	err := cfuseFS.Mkdir(path, 0775)
+	err := cfuseFS.Mkdir(path, 0o775)
 	suite.assert.Equal(-fuse.EEXIST, err)
 }
 
@@ -242,7 +242,7 @@ func testCreate(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(0775)
+	mode := fs.FileMode(0o775)
 	options := internal.CreateFileOptions{Name: name, Mode: mode}
 	suite.mock.EXPECT().CreateFile(options).Return(&handlemap.Handle{}, nil)
 
@@ -262,7 +262,7 @@ func testCreateError(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(0775)
+	mode := fs.FileMode(0o775)
 	options := internal.CreateFileOptions{Name: name, Mode: mode}
 	suite.mock.EXPECT().CreateFile(options).Return(&handlemap.Handle{}, errors.New("failed to create file"))
 
@@ -274,7 +274,7 @@ func testOpen(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(fuseFS.filePermission)
+	mode := fuseFS.filePermission
 	flags := fuse.O_RDWR & 0xffffffff
 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, nil)
@@ -289,7 +289,7 @@ func testOpenAppendFlagDefault(suite *libfuseTestSuite) {
 
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(fuseFS.filePermission)
+	mode := fuseFS.filePermission
 	flags := fuse.O_RDWR | fuse.O_APPEND&0xffffffff
 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, nil)
@@ -314,7 +314,7 @@ func testOpenAppendFlagDisableWritebackCache(suite *libfuseTestSuite) {
 
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(fuseFS.filePermission)
+	mode := fuseFS.filePermission
 	flags := fuse.O_RDWR | fuse.O_APPEND&0xffffffff
 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, nil)
@@ -339,7 +339,7 @@ func testOpenAppendFlagIgnoreAppendFlag(suite *libfuseTestSuite) {
 
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(fuseFS.filePermission)
+	mode := fuseFS.filePermission
 	flags := fuse.O_RDWR | fuse.O_APPEND&0xffffffff
 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, nil)
@@ -366,7 +366,7 @@ func testOpenNotExists(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(fuseFS.filePermission)
+	mode := fuseFS.filePermission
 	flags := fuse.O_RDWR & 0xffffffff
 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, syscall.ENOENT)
@@ -379,7 +379,7 @@ func testOpenError(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(fuseFS.filePermission)
+	mode := fuseFS.filePermission
 	flags := fuse.O_RDWR & 0xffffffff
 	options := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
 	suite.mock.EXPECT().OpenFile(options).Return(&handlemap.Handle{}, errors.New("failed to open a file"))
@@ -513,7 +513,7 @@ func testFsync(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(fuseFS.filePermission)
+	mode := fuseFS.filePermission
 	flags := fuse.O_RDWR & 0xffffffff
 	handle := &handlemap.Handle{}
 	openOptions := internal.OpenFileOptions{Name: name, Flags: flags, Mode: mode}
@@ -522,7 +522,7 @@ func testFsync(suite *libfuseTestSuite) {
 	suite.assert.NotEqual(uint64(0), fh)
 
 	// Need to convert the ID to the correct filehandle for mocking
-	handle.ID = (handlemap.HandleID)(fh)
+	handle.ID = handlemap.HandleID(fh)
 
 	options := internal.SyncFileOptions{Handle: handle}
 	suite.mock.EXPECT().SyncFile(options).Return(nil)
@@ -545,7 +545,7 @@ func testFsyncError(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(fuseFS.filePermission)
+	mode := fuseFS.filePermission
 	flags := fuse.O_RDWR & 0xffffffff
 	handle := &handlemap.Handle{}
 
@@ -555,7 +555,7 @@ func testFsyncError(suite *libfuseTestSuite) {
 	suite.assert.NotEqual(uint64(0), fh)
 
 	// Need to convert the ID to the correct filehandle for mocking
-	handle.ID = (handlemap.HandleID)(fh)
+	handle.ID = handlemap.HandleID(fh)
 
 	options := internal.SyncFileOptions{Handle: handle}
 	suite.mock.EXPECT().SyncFile(options).Return(errors.New("failed to sync file"))
@@ -590,11 +590,11 @@ func testChmod(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(0775)
+	mode := fs.FileMode(0o775)
 	options := internal.ChmodOptions{Name: name, Mode: mode}
 	suite.mock.EXPECT().Chmod(options).Return(nil)
 
-	err := cfuseFS.Chmod(path, 0775)
+	err := cfuseFS.Chmod(path, 0o775)
 	suite.assert.Equal(0, err)
 }
 
@@ -602,11 +602,11 @@ func testChmodNotExists(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(0775)
+	mode := fs.FileMode(0o775)
 	options := internal.ChmodOptions{Name: name, Mode: mode}
 	suite.mock.EXPECT().Chmod(options).Return(syscall.ENOENT)
 
-	err := cfuseFS.Chmod(path, 0775)
+	err := cfuseFS.Chmod(path, 0o775)
 	suite.assert.Equal(-fuse.ENOENT, err)
 }
 
@@ -614,11 +614,11 @@ func testChmodError(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	name := "path"
 	path := "/" + name
-	mode := fs.FileMode(0775)
+	mode := fs.FileMode(0o775)
 	options := internal.ChmodOptions{Name: name, Mode: mode}
 	suite.mock.EXPECT().Chmod(options).Return(errors.New("failed to chmod"))
 
-	err := cfuseFS.Chmod(path, 0775)
+	err := cfuseFS.Chmod(path, 0o775)
 	suite.assert.Equal(-fuse.EIO, err)
 }
 

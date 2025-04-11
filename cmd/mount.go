@@ -57,8 +57,8 @@ type LogOptions struct {
 	Type           string `config:"type" yaml:"type,omitempty"`
 	LogLevel       string `config:"level" yaml:"level,omitempty"`
 	LogFilePath    string `config:"file-path" yaml:"file-path,omitempty"`
-	MaxLogFileSize uint64 `config:"max-file-size-mb" yaml:"max-file-size-mb,omitempty"`
-	LogFileCount   uint64 `config:"file-count" yaml:"file-count,omitempty"`
+	MaxLogFileSize int64  `config:"max-file-size-mb" yaml:"max-file-size-mb,omitempty"`
+	LogFileCount   int64  `config:"file-count" yaml:"file-count,omitempty"`
 	TimeTracker    bool   `config:"track-time" yaml:"track-time,omitempty"`
 }
 
@@ -169,18 +169,18 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 
 	opt.Logging.LogFilePath = common.ExpandPath(opt.Logging.LogFilePath)
 	if !common.DirectoryExists(filepath.Dir(opt.Logging.LogFilePath)) {
-		err := os.MkdirAll(filepath.Dir(opt.Logging.LogFilePath), os.FileMode(0776)|os.ModeDir)
+		err := os.MkdirAll(filepath.Dir(opt.Logging.LogFilePath), os.FileMode(0o776)|os.ModeDir)
 		if err != nil {
 			return fmt.Errorf("invalid log file path [%s]", err.Error())
 		}
 	}
 
 	// A user provided value of 0 doesn't make sense for MaxLogFileSize or LogFileCount.
-	if opt.Logging.MaxLogFileSize == 0 {
+	if opt.Logging.MaxLogFileSize <= 0 {
 		opt.Logging.MaxLogFileSize = common.DefaultMaxLogFileSize
 	}
 
-	if opt.Logging.LogFileCount == 0 {
+	if opt.Logging.LogFileCount <= 0 {
 		opt.Logging.LogFileCount = common.DefaultLogFileCount
 	}
 
@@ -228,7 +228,7 @@ func parseConfig() error {
 				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
 			}
 
-			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
+			_, err := base64.StdEncoding.DecodeString(options.PassPhrase)
 			if err != nil {
 				return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
 			}
@@ -359,7 +359,7 @@ var mountCmd = &cobra.Command{
 		if config.IsSet("libfuse-options") {
 			for _, v := range options.LibfuseOptions {
 				parameter := strings.Split(v, "=")
-				if len(parameter) > 2 || len(parameter) <= 0 {
+				if len(parameter) > 2 || len(parameter) == 0 {
 					return errors.New(common.FuseAllowedFlags)
 				}
 
@@ -521,7 +521,7 @@ var mountCmd = &cobra.Command{
 			fname := fmt.Sprintf("/tmp/cloudfuse.%v", pid)
 
 			ctx := context.Background()
-			err = createDaemon(pipeline, ctx, pidFileName, 0644, 022, fname)
+			err = createDaemon(pipeline, ctx, pidFileName, 0o644, 0o22, fname)
 			if err != nil {
 				return fmt.Errorf("mount: failed to create daemon [%v]", err.Error())
 			}
