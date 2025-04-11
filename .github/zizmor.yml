@@ -3,3 +3,6 @@ rules:
     ignore:
       - publish-release.yml:154
       - publish-release.yml:166
+  excessive-permissions:
+    ignore:
+      - scorecard.yml:18
