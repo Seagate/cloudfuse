@@ -199,10 +199,12 @@ jobs:
         run: |
           if [[ "${{ env.go }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.go }}' >> $GITHUB_ENV ; fi
 
-      - name: Install libfuse on Linux
+      - name: Install libfuse
+        if: matrix.os == 'ubuntu-latest'
         shell: bash
-        run: |
-          sudo apt-get install fuse3 libfuse3-dev libfuse-dev
+        run: |-
+          sudo apt-get update
+          sudo apt-get install fuse libfuse-dev -y
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
@@ -211,6 +213,7 @@ jobs:
           args: --tests=false --timeout=5m
 
       - name: Notice file check
+        if: matrix.os == 'ubuntu-latest'
         run: |
           ./scripts/notices_fix.sh
           result=$(git diff NOTICE | wc -l)

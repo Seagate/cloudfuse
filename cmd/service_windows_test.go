@@ -45,7 +45,6 @@ type serviceTestSuite struct {
 
 func (suite *serviceTestSuite) SetupTest() {
 	suite.assert = assert.New(suite.T())
-	servOpts = serviceOptions{}
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
