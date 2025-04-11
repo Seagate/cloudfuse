@@ -238,8 +238,8 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	objectList := make([]*internal.ObjAttr, 0)
 
 	path := formatListDirName(options.Name)
-	var iteration int                   // = 0
-	var marker *string = &options.Token // = nil
+	var iteration int           // = 0
+	var marker = &options.Token // = nil
 	var totalEntriesFetched int32
 	entriesRemaining := options.Count
 	if options.Count == 0 {
@@ -396,7 +396,7 @@ func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 		return 0, syscall.ERANGE
 	}
 
-	var dataLen int64 = int64(len(options.Data))
+	var dataLen = int64(len(options.Data))
 	if atomic.LoadInt64(&options.Handle.Size) < (options.Offset + int64(len(options.Data))) {
 		dataLen = options.Handle.Size - options.Offset
 	}

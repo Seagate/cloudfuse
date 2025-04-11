@@ -219,7 +219,7 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 }
 
 func getService(mountPath string) (string, string) {
-	serviceName := strings.Replace(mountPath, "/", "-", -1)
+	serviceName := strings.ReplaceAll(mountPath, "/", "-")
 	serviceFile := "cloudfuse" + serviceName + ".service"
 	serviceFilePath := "/etc/systemd/system/" + serviceFile
 	return serviceName, serviceFilePath
