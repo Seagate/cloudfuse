@@ -61,13 +61,14 @@ func (sc *StatsCollector) statsDumper() {
 		}
 		windows.Close(tPipe)
 
-		if err == windows.ERROR_FILE_NOT_FOUND {
+		switch err {
+		case windows.ERROR_FILE_NOT_FOUND:
 			log.Info("stats_manager::statsDumper : Named pipe %s not found, retrying...", common.TransferPipe)
 			time.Sleep(1 * time.Second)
-		} else if err == windows.ERROR_PIPE_BUSY {
+		case windows.ERROR_PIPE_BUSY:
 			log.Err("stats_manager::statsDumper: Pipe instances are busy, retrying...")
 			time.Sleep(1 * time.Second)
-		} else {
+		default:
 			log.Err("stats_manager::statsDumper: Unable to open pipe %s with error [%v]", common.TransferPipe, err)
 			return
 		}
@@ -125,11 +126,11 @@ func (sc *StatsCollector) statsDumper() {
 
 			switch stat.Operation {
 			case Increment:
-				stMgrOpt.statsList[idx].Value[stat.Key] = stMgrOpt.statsList[idx].Value[stat.Key].int64 + stat.Value.int64
+				stMgrOpt.statsList[idx].Value[stat.Key] = stMgrOpt.statsList[idx].Value[stat.Key].(int64) + stat.Value.(int64)
 
 			case Decrement:
-				stMgrOpt.statsList[idx].Value[stat.Key] = stMgrOpt.statsList[idx].Value[stat.Key].int64 - stat.Value.int64
-				if stMgrOpt.statsList[idx].Value[stat.Key].int64 < 0 {
+				stMgrOpt.statsList[idx].Value[stat.Key] = stMgrOpt.statsList[idx].Value[stat.Key].(int64) - stat.Value.(int64)
+				if stMgrOpt.statsList[idx].Value[stat.Key].(int64) < 0 {
 					log.Err("stats_manager::statsDumper : Negative value %v after decrement of %v for component %v",
 						stMgrOpt.statsList[idx].Value[stat.Key], stat.Key, stMgrOpt.statsList[idx].ComponentName)
 				}
@@ -202,13 +203,14 @@ func statsPolling() {
 		}
 
 		windows.Close(tPipe)
-		if err == windows.ERROR_FILE_NOT_FOUND {
+		switch err {
+		case windows.ERROR_FILE_NOT_FOUND:
 			log.Info("stats_manager::statsPolling : Named pipe %s not found, retrying...", common.TransferPipe)
 			time.Sleep(1 * time.Second)
-		} else if err == windows.ERROR_PIPE_BUSY {
+		case windows.ERROR_PIPE_BUSY:
 			log.Err("stats_manager::statsPolling: Pipe instances are busy, retrying...")
 			time.Sleep(1 * time.Second)
-		} else {
+		default:
 			log.Err("stats_manager::statsPolling: Unable to open pipe %s with error [%v]", common.TransferPipe, err)
 			return
 		}

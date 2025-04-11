@@ -46,7 +46,7 @@ func main() {
 	err := setupEvents()
 
 	if err.Error() == "Access is denied." {
-		//this error will typically take place upon not running with sufficient privileges.
+		// this error will typically take place upon not running with sufficient privileges.
 		println("you should run this as admin and try again")
 	} else if strings.Contains(err.Error(), "registry key already exists") {
 		println("you already have this installed. You're all set")

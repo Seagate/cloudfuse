@@ -44,7 +44,7 @@ func NotifyMountToParent() error {
 // totalSectors walks through all files in the path and gives an estimate of the total number of sectors
 // that are being used. Based on https://stackoverflow.com/questions/32482673/how-to-get-directory-total-size
 func totalSectors(path string) int64 {
-	//bytes per sector is hard coded to 4096 bytes since syscall to windows and BytesPerSector for the drive in question is an estimate.
+	// bytes per sector is hard coded to 4096 bytes since syscall to windows and BytesPerSector for the drive in question is an estimate.
 	// https://devblogs.microsoft.com/oldnewthing/20160427-00/?p=93365
 
 	var totalSectors int64

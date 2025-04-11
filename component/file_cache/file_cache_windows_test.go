@@ -121,7 +121,7 @@ func (suite *fileCacheWindowsTestSuite) TestChownNotInCache() {
 	owner := os.Getuid()
 	group := os.Getgid()
 	err := suite.fileCache.Chown(internal.ChownOptions{Name: path, Owner: owner, Group: group})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	// Path in fake storage should be updated
 	suite.assert.FileExists(suite.fake_storage_path + "/" + path)

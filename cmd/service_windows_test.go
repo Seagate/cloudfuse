@@ -60,7 +60,7 @@ func (suite *serviceTestSuite) cleanupTest() {
 func (suite *serviceTestSuite) TestHelp() {
 	defer suite.cleanupTest()
 	_, err := executeCommandC(rootCmd, "service", "-h")
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 }
 
 func TestServiceCommand(t *testing.T) {

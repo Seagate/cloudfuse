@@ -51,7 +51,7 @@ func newSysLogger(lvl common.LogLevel, tag string) (*SysLogger, error) {
 		tag:   tag,
 	}
 
-	err := sysLog.init() //sets up events..
+	err := sysLog.init() // sets up events..
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (sl *SysLogger) GetLogLevel() common.LogLevel {
 
 func (sl *SysLogger) init() error {
 
-	//install or registry add should already have been ran.
+	// install or registry add should already have been ran.
 	err := sl.logEvent(common.ELogLevel.LOG_DEBUG(), "starting event logger")
 	if err != nil {
 		return NoSyslogService
@@ -95,7 +95,7 @@ func (sl *SysLogger) logEvent(lvl common.LogLevel, msg string) error {
 		return err
 	}
 
-	//the first argument of wlog.Info() is the event ID following the http convention
+	// the first argument of wlog.Info() is the event ID following the http convention
 	//https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 	switch lvl {
 	case common.ELogLevel.LOG_DEBUG():

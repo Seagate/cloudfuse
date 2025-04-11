@@ -147,13 +147,14 @@ func (cfs *CloudfuseStats) statsPoll() {
 		}
 		windows.Close(hPipe)
 
-		if err == windows.ERROR_FILE_NOT_FOUND {
+		switch err {
+		case windows.ERROR_FILE_NOT_FOUND:
 			log.Err("StatsReader::statsReader : Named pipe %s not found, retrying...", cfs.pollingPipe)
 			time.Sleep(1 * time.Second)
-		} else if err == windows.ERROR_PIPE_BUSY {
+		case windows.ERROR_PIPE_BUSY:
 			log.Err("StatsReader::statsReader : Pipe instances are busy, retrying...")
 			time.Sleep(1 * time.Second)
-		} else {
+		default:
 			log.Err("StatsReader::statsReader : Unable to open pipe %s with error [%v]", cfs.pollingPipe, err)
 			return
 		}
@@ -168,7 +169,7 @@ func (cfs *CloudfuseStats) statsPoll() {
 	defer ticker.Stop()
 
 	for t := range ticker.C {
-		_, err = writer.WriteString(fmt.Sprintf("Poll at %v", t.Format(time.RFC3339)))
+		_, err = fmt.Fprintf(writer, "Poll at %v", t.Format(time.RFC3339))
 		log.Debug("stats_manager::statsDumper : writing to polling pipe file:", fmt.Sprintf("Poll at %v", t.Format(time.RFC3339)))
 		if err != nil {
 			log.Err("StatsReader::statsPoll : [%v]", err)
