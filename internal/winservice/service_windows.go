@@ -31,6 +31,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -58,7 +59,7 @@ func StartMount(mountPath string, configFile string, passphrase *memguard.Enclav
 		return err
 	}
 
-	instanceName := mountPath
+	instanceName := strings.ToLower(mountPath)
 
 	if passphrase != nil {
 		buff, err := passphrase.Open()
@@ -80,7 +81,7 @@ func StartMount(mountPath string, configFile string, passphrase *memguard.Enclav
 
 // StopMount stops the mount if the name exists in the WinFsp Windows registry.
 func StopMount(mountPath string) error {
-	instanceName := mountPath
+	instanceName := strings.ToLower(mountPath)
 
 	buf := writeCommandToUtf16(stopCmd, SvcName, instanceName, mountPath)
 	_, err := winFspCommand(buf)
@@ -92,6 +93,7 @@ func StopMount(mountPath string) error {
 
 // IsMounted determines if the given path is mounted.
 func IsMounted(mountPath string) (bool, error) {
+	instanceName := strings.ToLower(mountPath)
 	buf := writeCommandToUtf16(listCmd)
 	list, err := winFspCommand(buf)
 	if err != nil {
@@ -106,7 +108,7 @@ func IsMounted(mountPath string) (bool, error) {
 
 	for i := 0; i < len(list); i += 2 {
 		// Check if the mountpath is associated with our service
-		if list[i] == SvcName && list[i+1] == mountPath {
+		if list[i] == SvcName && list[i+1] == instanceName {
 			return true, nil
 		}
 	}
