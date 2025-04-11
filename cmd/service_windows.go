@@ -39,18 +39,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type serviceOptions struct {
-	ConfigFile string
-	MountPath  string
-}
-
 const (
 	SvcName        = "CloudfuseServiceStartup"
 	SvcDescription = "Cloudfuse Service to start System Mounts on System Start"
 	StartupName    = "CloudfuseStartup.lnk"
 )
-
-var servOpts serviceOptions
 
 // Section defining all the command that we have in secure feature
 var serviceCmd = &cobra.Command{
@@ -76,7 +69,7 @@ var installCmd = &cobra.Command{
 		// Create the registry for WinFsp
 		err := winservice.CreateWinFspRegistry()
 		if err != nil {
-			return fmt.Errorf("Failed to add Windows registry for WinFSP support. Here's why: [%v]", err)
+			return fmt.Errorf("failed to add Windows registry for WinFSP support. Here's why: [%v]", err)
 		}
 		// Add our startup process to the registry
 		var programPath string
@@ -95,12 +88,12 @@ var installCmd = &cobra.Command{
 
 		err = winservice.AddRegistryValue(`SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, "Cloudfuse", programPath)
 		if err != nil {
-			return fmt.Errorf("Failed to add startup registry value. Here's why: %v", err)
+			return fmt.Errorf("failed to add startup registry value. Here's why: %v", err)
 		}
 
 		err = installService()
 		if err != nil {
-			return fmt.Errorf("Failed to install as a Windows service. Here's why: %v", err)
+			return fmt.Errorf("failed to install as a Windows service. Here's why: %v", err)
 		}
 
 		return nil
@@ -118,12 +111,12 @@ var uninstallCmd = &cobra.Command{
 		// Remove the cloudfuse startup registry entry
 		err := winservice.RemoveRegistryValue(`SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, "Cloudfuse")
 		if err != nil {
-			return fmt.Errorf("Failed to remove cloudfuse remount service from Windows startup registry. Here's why: %v", err)
+			return fmt.Errorf("fFailed to remove cloudfuse remount service from Windows startup registry. Here's why: %v", err)
 		}
 		// Remove the registry for WinFsp
 		err = winservice.RemoveWinFspRegistry()
 		if err != nil {
-			return fmt.Errorf("Failed to remove cloudfuse entry from WinFSP registry. Here's why: %v", err)
+			return fmt.Errorf("failed to remove cloudfuse entry from WinFSP registry. Here's why: %v", err)
 		}
 
 		err = stopService()
@@ -133,12 +126,12 @@ var uninstallCmd = &cobra.Command{
 
 		err = removeService()
 		if err != nil {
-			return fmt.Errorf("Failed to remove as a Windows service. Here's why: %v", err)
+			return fmt.Errorf("failed to remove as a Windows service. Here's why: %v", err)
 		}
 
 		err = winservice.DeleteMountJSONFiles()
 		if err != nil {
-			return fmt.Errorf("Failed to remove mount.json tracker file. Here's why: %v", err)
+			return fmt.Errorf("failed to remove mount.json tracker file. Here's why: %v", err)
 		}
 
 		return nil

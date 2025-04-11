@@ -112,7 +112,7 @@ func waitForNetwork(ctx context.Context, targets []string, interval time.Duratio
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("Timed out waiting for network: %w", ctx.Err())
+			return fmt.Errorf("timed out waiting for network: %w", ctx.Err())
 		case <-ticker.C:
 			for _, target := range targets {
 				conn, err := net.DialTimeout("tcp", target, timeout)

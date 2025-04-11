@@ -69,12 +69,16 @@ func StartMount(mountPath string, configFile string, passphrase *memguard.Enclav
 		// Encode back to base64 when sending passphrase to cloudfuse
 		_, err = winFspCommand(writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), buff.String()))
 		defer buff.Destroy()
+		if err != nil {
+			return err
+		}
 	} else {
 		_, err = winFspCommand(writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), ""))
+		if err != nil {
+			return err
+		}
 	}
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 

@@ -331,16 +331,16 @@ func (suite *mountTestSuite) TestUpdateCliParams() {
 	cliParams := []string{"cloudfuse", "mount", "~/mntdir/", "--foreground=false"}
 
 	updateCliParams(&cliParams, "tmp-path", "tmpPath1")
-	suite.assert.Equal(5, len(cliParams))
+	suite.assert.Len(cliParams, 5)
 	suite.assert.Equal("--tmp-path=tmpPath1", cliParams[4])
 
 	updateCliParams(&cliParams, "container-name", "testCnt1")
-	suite.assert.Equal(6, len(cliParams))
+	suite.assert.Len(cliParams, 6)
 	suite.assert.Equal("--container-name=testCnt1", cliParams[5])
 
 	updateCliParams(&cliParams, "tmp-path", "tmpPath2")
 	updateCliParams(&cliParams, "container-name", "testCnt2")
-	suite.assert.Equal(6, len(cliParams))
+	suite.assert.Len(cliParams, 6)
 	suite.assert.Equal("--tmp-path=tmpPath2", cliParams[4])
 	suite.assert.Equal("--container-name=testCnt2", cliParams[5])
 }

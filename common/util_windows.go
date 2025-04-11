@@ -75,7 +75,7 @@ func GetUsage(path string) (float64, error) {
 	totalSectors := totalSectors(path)
 
 	totalBytes := float64(totalSectors * SectorSize)
-	totalBytes = totalBytes / MbToBytes
+	totalBytes /= MbToBytes
 
 	return totalBytes, nil
 }

@@ -43,7 +43,7 @@ type SysLogger struct {
 	logger *log.Logger
 }
 
-var NoSyslogService = errors.New("failed to create syslog object")
+var ErrNoSyslogService = errors.New("failed to create syslog object")
 
 func newSysLogger(lvl common.LogLevel, tag string) (*SysLogger, error) {
 	sysLog := &SysLogger{
@@ -81,7 +81,7 @@ func (sl *SysLogger) init() error {
 	// install or registry add should already have been ran.
 	err := sl.logEvent(common.ELogLevel.LOG_DEBUG(), "starting event logger")
 	if err != nil {
-		return NoSyslogService
+		return ErrNoSyslogService
 	}
 	return nil
 }

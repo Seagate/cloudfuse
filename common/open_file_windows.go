@@ -75,7 +75,7 @@ func OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
 
 // copied from https://cs.opensource.google/go/go/+/master:src/syscall/syscall_windows.go;drc=964985362b4d8702a16bce08c7a825488ccb9601;l=324
 func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
-	if len(path) == 0 {
+	if path == "" {
 		return syscall.InvalidHandle, syscall.ERROR_FILE_NOT_FOUND
 	}
 	pathp, err := syscall.UTF16PtrFromString(path)

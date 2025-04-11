@@ -245,7 +245,7 @@ func statsPolling() {
 		log.Debug("stats_manager::statsPolling : Received message to polling pipe %v", message)
 
 		// validating poll message
-		if !strings.Contains(string(message), "Poll at") {
+		if !strings.Contains(message, "Poll at") {
 			continue
 		}
 
