@@ -187,9 +187,6 @@ func runWindowsInstaller(fileName string) error {
 
 	cmd := exec.Command(absPath, args...)
 
-	// cmd.Stdout = os.Stdout
-	// cmd.Stderr = os.Stderr
-
 	err = cmd.Run()
 	if err != nil {
 		return fmt.Errorf("failed to run installer: %w", err)
