@@ -299,6 +299,10 @@ var mountCmd = &cobra.Command{
 			return fmt.Errorf("failed to unmarshal config [%s]", err.Error())
 		}
 
+		if runtime.GOOS == "windows" && !common.IsDriveLetter(options.MountPath) {
+			return fmt.Errorf("mount path is not a valid drive letter (must include colon symbol) [%s]", err.Error())
+		}
+
 		options.Foreground = options.Foreground || options.DryRun
 
 		// handle Windows background mount (formerly "service mount")
