@@ -276,11 +276,12 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 	attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
 	if err != nil {
 		log.Err("Libfuse::Getattr : Failed to get attributes of %s [%s]", name, err.Error())
-		if err == syscall.ENOENT {
+		switch err {
+		case syscall.ENOENT:
 			return -fuse.ENOENT
-		} else if err == syscall.EACCES {
+		case syscall.EACCES:
 			return -fuse.EACCES
-		} else {
+		default:
 			return -fuse.EIO
 		}
 	}
@@ -738,11 +739,12 @@ func (cf *CgofuseFS) Flush(path string, fh uint64) int {
 	err := fuseFS.NextComponent().FlushFile(internal.FlushFileOptions{Handle: handle})
 	if err != nil {
 		log.Err("Libfuse::Flush : error flushing file %s, handle: %d [%s]", handle.Path, handle.ID, err.Error())
-		if err == syscall.ENOENT {
+		switch err {
+		case syscall.ENOENT:
 			return -fuse.ENOENT
-		} else if err == syscall.EACCES {
+		case syscall.EACCES:
 			return -fuse.EACCES
-		} else {
+		default:
 			return -fuse.EIO
 		}
 	}
@@ -785,11 +787,12 @@ func (cf *CgofuseFS) Release(path string, fh uint64) int {
 	err := fuseFS.NextComponent().CloseFile(internal.CloseFileOptions{Handle: handle})
 	if err != nil {
 		log.Err("Libfuse::Release : error closing file %s, handle: %d [%s]", handle.Path, handle.ID, err.Error())
-		if err == syscall.ENOENT {
+		switch err {
+		case syscall.ENOENT:
 			return -fuse.ENOENT
-		} else if err == syscall.EACCES {
+		case syscall.EACCES:
 			return -fuse.EACCES
-		} else {
+		default:
 			return -fuse.EIO
 		}
 	}

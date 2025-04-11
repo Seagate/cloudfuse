@@ -135,7 +135,7 @@ func beginDetectNewVersion() chan interface{} {
 		}
 
 		if local.OlderThan(*remote) {
-			executablePathSegments := strings.Split(strings.Replace(os.Args[0], "\\", "/", -1), "/")
+			executablePathSegments := strings.Split(strings.ReplaceAll(os.Args[0], "\\", "/"), "/")
 			executableName := executablePathSegments[len(executablePathSegments)-1]
 			log.Info("beginDetectNewVersion: A new version of Cloudfuse is available. Current Version=%s, Latest Version=%s", common.CloudfuseVersion, remoteVersion)
 			fmt.Fprintf(stderr, "*** "+executableName+": A new version [%s] is available. Consider upgrading to latest version for bug-fixes & new features. ***\n", remoteVersion)

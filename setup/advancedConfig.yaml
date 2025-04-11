@@ -27,6 +27,9 @@
 #  10. 'sdk-trace' has been removed and setting log level to log_debug will auto enable these logs.
 # -----------------------------------------------------------------------------------------------------------------------
 
+# the config version number is required in every config file. The current version is:
+config-version: 1.0.0
+
 # Daemon configuration
 foreground: true|false <run blobfuse2 in foreground or background>
 

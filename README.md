@@ -185,6 +185,14 @@ which is available [here](https://github.com/winfsp/winfsp/blob/master/License.t
 
 WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos - [link](https://github.com/winfsp/winfsp)
 
+## Badges
+
+[![License](https://img.shields.io/github/license/Seagate/cloudfuse)](/LICENSE)
+[![Release](https://img.shields.io/github/release/Seagate/cloudfuse.svg)](https://github.com/Seagate/cloudfuse/releases/latest)
+[![GitHub Releases Stats of cloudfuse](https://img.shields.io/github/downloads/Seagate/cloudfuse/total.svg?logo=github)](https://somsubhra.github.io/github-release-stats/?username=Seagate&repository=cloudfuse)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Seagate/cloudfuse)](https://goreportcard.com/report/github.com/Seagate/cloudfuse)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Seagate/cloudfuse/badge)](https://scorecard.dev/viewer/?uri=github.com/Seagate/cloudfuse)
+
 ## Support
 
 ### Contact Us
