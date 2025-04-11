@@ -176,7 +176,14 @@ jobs:
     name: Lint
     strategy:
       matrix:
-        os: ["ubuntu-latest", "windows-latest"]
+        job_name: ["ubuntu-latest", "windows-latest"]
+        include:
+          - job_name: ubuntu-latest
+            os: "ubuntu-latest"
+            cgo: "1"
+          - job_name: windows-latest
+            cgo: "0"
+            os: "windows-latest"
 
     runs-on: ${{ matrix.os }}
     env:
