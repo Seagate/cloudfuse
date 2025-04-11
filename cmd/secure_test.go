@@ -86,6 +86,7 @@ func (suite *secureConfigTestSuite) TestHelp() {
 }
 
 var testPlainTextConfig string = `
+config-version: 1.0.0
 foreground: false
 read-only: true
 allow-other: true
