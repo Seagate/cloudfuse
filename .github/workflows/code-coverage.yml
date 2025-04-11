@@ -22,11 +22,11 @@ jobs:
         include:
           - job_name: linux-fuse3
             os: ubuntu-latest
-            containerName: "test-cnt-ubn"
+            containerName: "test-cnt-ubn-fuse3"
             fuselib: libfuse3-dev
           - job_name: linux-fuse2
             os: ubuntu-latest
-            containerName: "test-cnt-ubn"
+            containerName: "test-cnt-ubn-fuse2"
             fuselib: libfuse-dev
 
     runs-on: ${{ matrix.os }}
