@@ -175,7 +175,7 @@ func (suite *authTestSuite) TestInvalidAccountType() {
 	assert := assert.New(suite.T())
 	stg := NewAzStorageConnection(stgConfig)
 	if stg != nil {
-		assert.Fail("TestInvalidAuth : Created Storage object even though account type is invalid")
+		assert.Fail("TestInvalidAuth : Created Storage object even though account type is invalid ")
 	}
 }
 
