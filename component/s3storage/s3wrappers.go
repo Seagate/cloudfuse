@@ -252,6 +252,7 @@ func (cl *Client) headObject(name string, isSymlink bool, isDir bool) (*internal
 		Key:    aws.String(key),
 	})
 	if err != nil {
+		// Make sure the attempted starts with "HeadObject",  or else parseS3Err will log to Err
 		attemptedAction := fmt.Sprintf("HeadObject(%s)", name)
 		return nil, parseS3Err(err, attemptedAction)
 	}

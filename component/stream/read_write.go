@@ -388,7 +388,7 @@ func (rw *ReadWriteCache) createHandleCache(handle *handlemap.Handle) error {
 			handle.CacheObj.StreamOnly = true
 			return nil
 		}
-		block, _, err := rw.getBlock(handle, &common.Block{StartIndex: 0, EndIndex: handle.Size})
+		block, err := rw.getBlock(handle, &common.Block{StartIndex: 0, EndIndex: handle.Size})
 		if err != nil {
 			return err
 		}
@@ -419,13 +419,13 @@ func (rw *ReadWriteCache) putBlock(handle *handlemap.Handle, block *common.Block
 	return nil
 }
 
-func (rw *ReadWriteCache) getBlock(handle *handlemap.Handle, block *common.Block) (*common.Block, bool, error) {
+func (rw *ReadWriteCache) getBlock(handle *handlemap.Handle, block *common.Block) (*common.Block, error) {
 	cached_block, found := handle.CacheObj.Get(block.StartIndex)
 	if !found {
 		block.Data = make([]byte, block.EndIndex-block.StartIndex)
 		err := rw.putBlock(handle, block)
 		if err != nil {
-			return block, false, err
+			return block, err
 		}
 		options := internal.ReadInBufferOptions{
 			Handle: handle,
@@ -436,12 +436,12 @@ func (rw *ReadWriteCache) getBlock(handle *handlemap.Handle, block *common.Block
 		if len(block.Data) != 0 {
 			_, err = rw.NextComponent().ReadInBuffer(options)
 			if err != nil && err != io.EOF {
-				return nil, false, err
+				return nil, err
 			}
 		}
-		return block, false, nil
+		return block, nil
 	}
-	return cached_block, true, nil
+	return cached_block, nil
 }
 
 func (rw *ReadWriteCache) readWriteBlocks(handle *handlemap.Handle, offset int64, data []byte, write bool) (int, error) {
@@ -455,7 +455,7 @@ func (rw *ReadWriteCache) readWriteBlocks(handle *handlemap.Handle, offset int64
 	lastBlock := handle.CacheObj.BlockList[len(handle.CacheObj.BlockList)-1]
 	for dataLeft > 0 {
 		if offset < lastBlock.EndIndex {
-			block, _, err := rw.getBlock(handle, blocks[blk_index])
+			block, err := rw.getBlock(handle, blocks[blk_index])
 			if err != nil {
 				return dataRead, err
 			}
@@ -474,7 +474,7 @@ func (rw *ReadWriteCache) readWriteBlocks(handle *handlemap.Handle, offset int64
 			emptyByteLength := offset - lastBlock.EndIndex
 			// if the data to append + our last block existing data do not exceed block size - just append to last block
 			if (lastBlock.EndIndex-lastBlock.StartIndex)+(emptyByteLength+dataLeft) <= rw.BlockSize || lastBlock.EndIndex == 0 {
-				_, _, err := rw.getBlock(handle, lastBlock)
+				_, err := rw.getBlock(handle, lastBlock)
 				if err != nil {
 					return dataRead, err
 				}
