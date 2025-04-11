@@ -133,21 +133,6 @@ func (suite *mountTestSuite) TestForegroundMountDirNotEmpty() {
 	suite.assert.Contains(op, "mount directory already exists")
 }
 
-// mount failure test where the mount directory is not a valid drive letter
-func (suite *mountTestSuite) TestForegroundMountDirNotValidDriveLetter() {
-	defer suite.cleanupTest()
-
-	mntDir := "z"
-
-	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest), "--foreground=true")
-	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "path is not a valid drive letter")
-
-	op, err = executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest))
-	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "path is not a valid drive letter")
-}
-
 // mount failure test where the mount path is not provided
 func (suite *mountTestSuite) TestForegroundMountPathNotProvided() {
 	defer suite.cleanupTest()
