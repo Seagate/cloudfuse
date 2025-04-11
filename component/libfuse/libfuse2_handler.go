@@ -368,7 +368,7 @@ func (cf *CgofuseFS) Mkdir(path string, mode uint32) int {
 		}
 	}
 
-	libfuseStatsCollector.PushEvents(createDir, name, map[string]interface{}{md: fs.FileMode(mode)})
+	libfuseStatsCollector.PushEvents(createDir, name, map[string]any{md: fs.FileMode(mode)})
 	libfuseStatsCollector.UpdateStats(stats_manager.Increment, createDir, (int64)(1))
 
 	return 0
@@ -606,7 +606,7 @@ func (cf *CgofuseFS) Create(path string, flags int, mode uint32) (int, uint64) {
 	log.Trace("Libfuse::Create : %s, handle %d", name, fh)
 	//fi.fh = C.ulong(uintptr(unsafe.Pointer(ret_val)))
 
-	libfuseStatsCollector.PushEvents(createFile, name, map[string]interface{}{md: fs.FileMode(mode)})
+	libfuseStatsCollector.PushEvents(createFile, name, map[string]any{md: fs.FileMode(mode)})
 
 	// increment open file handles count
 	libfuseStatsCollector.UpdateStats(stats_manager.Increment, openHandles, (int64)(1))
@@ -768,7 +768,7 @@ func (cf *CgofuseFS) Truncate(path string, size int64, fh uint64) int {
 		return -fuse.EIO
 	}
 
-	libfuseStatsCollector.PushEvents(truncateFile, name, map[string]interface{}{"size": size})
+	libfuseStatsCollector.PushEvents(truncateFile, name, map[string]any{"size": size})
 	libfuseStatsCollector.UpdateStats(stats_manager.Increment, truncateFile, (int64)(1))
 
 	return 0
@@ -882,7 +882,7 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 			return -fuse.EIO
 		}
 
-		libfuseStatsCollector.PushEvents(renameDir, srcPath, map[string]interface{}{source: srcPath, dest: dstPath})
+		libfuseStatsCollector.PushEvents(renameDir, srcPath, map[string]any{source: srcPath, dest: dstPath})
 		libfuseStatsCollector.UpdateStats(stats_manager.Increment, renameDir, (int64)(1))
 
 	} else {
@@ -892,7 +892,7 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 			return -fuse.EIO
 		}
 
-		libfuseStatsCollector.PushEvents(renameFile, srcPath, map[string]interface{}{source: srcPath, dest: dstPath})
+		libfuseStatsCollector.PushEvents(renameFile, srcPath, map[string]any{source: srcPath, dest: dstPath})
 		libfuseStatsCollector.UpdateStats(stats_manager.Increment, renameFile, (int64)(1))
 
 	}
@@ -913,7 +913,7 @@ func (cf *CgofuseFS) Symlink(target string, newpath string) int {
 		return -fuse.EIO
 	}
 
-	libfuseStatsCollector.PushEvents(createLink, name, map[string]interface{}{trgt: targetPath})
+	libfuseStatsCollector.PushEvents(createLink, name, map[string]any{trgt: targetPath})
 	libfuseStatsCollector.UpdateStats(stats_manager.Increment, createLink, (int64)(1))
 
 	return 0
@@ -939,7 +939,7 @@ func (cf *CgofuseFS) Readlink(path string) (int, string) {
 	// copy(data, targetPath)
 	// data[len(targetPath)] = 0
 
-	libfuseStatsCollector.PushEvents(readLink, name, map[string]interface{}{trgt: targetPath})
+	libfuseStatsCollector.PushEvents(readLink, name, map[string]any{trgt: targetPath})
 	libfuseStatsCollector.UpdateStats(stats_manager.Increment, readLink, (int64)(1))
 
 	return 0, targetPath
@@ -1018,7 +1018,7 @@ func (cf *CgofuseFS) Chmod(path string, mode uint32) int {
 		return -fuse.EIO
 	}
 
-	libfuseStatsCollector.PushEvents(chmod, name, map[string]interface{}{md: fs.FileMode(mode)})
+	libfuseStatsCollector.PushEvents(chmod, name, map[string]any{md: fs.FileMode(mode)})
 	libfuseStatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))
 
 	return 0

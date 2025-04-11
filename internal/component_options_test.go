@@ -49,7 +49,7 @@ func (s *componentOptionsTestSuite) TestExtendDirName() {
 	for _, tt := range tests {
 		s.Run(tt.input, func() {
 			output := ExtendDirName(tt.input)
-			assert.EqualValues(tt.expectedOutput, output)
+			assert.Equal(tt.expectedOutput, output)
 		})
 	}
 }
@@ -67,7 +67,7 @@ func (s *componentOptionsTestSuite) TestTruncateDirName() {
 	for _, tt := range tests {
 		s.Run(tt.input, func() {
 			output := TruncateDirName(tt.input)
-			assert.EqualValues(tt.expectedOutput, output)
+			assert.Equal(tt.expectedOutput, output)
 		})
 	}
 }

@@ -127,7 +127,7 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 	}
 	fmt.Println("Skipping TestFileCreatSpclChar (flaky)")
 	return
-	speclChar := "abcd%23ABCD%34123-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत.txt"
+
 	fileName := filepath.Join(suite.testPath, speclChar)
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
@@ -307,7 +307,7 @@ func (suite *fileTestSuite) TestFileReadSmall() {
 
 	data, err := os.ReadFile(fileName)
 	suite.NoError(err)
-	suite.Equal(len(data), len(suite.minBuff))
+	suite.Len(suite.minBuff, len(data))
 
 	suite.fileTestCleanup([]string{fileName})
 }
@@ -435,7 +435,7 @@ func (suite *fileTestSuite) TestFileCreateMulti() {
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 	fileName := filepath.Join(dirName, "multi")
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.medBuff, 0777)
 		suite.NoError(err)
@@ -499,7 +499,7 @@ func (suite *fileTestSuite) TestLinkRead() {
 	suite.NoError(err)
 	data, err := os.ReadFile(fileName)
 	suite.NoError(err)
-	suite.Equal(len(data), len(suite.minBuff))
+	suite.Len(suite.minBuff, len(data))
 	suite.fileTestCleanup([]string{fileName})
 	err = os.Remove(symName)
 	suite.NoError(err)
@@ -586,7 +586,7 @@ func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
 
 	data, err := os.ReadFile(fileName)
 	suite.NoError(err)
-	suite.Equal(len(data), len(suite.minBuff))
+	suite.Len(suite.minBuff, len(data))
 
 	err = os.Symlink(fileName, symName)
 	suite.NoError(err)
@@ -627,14 +627,14 @@ func (suite *fileTestSuite) TestListDirReadLink() {
 
 	data1, err := os.ReadFile(symName)
 	suite.NoError(err)
-	suite.Equal(len(data1), len(suite.minBuff))
+	suite.Len(suite.minBuff, len(data1))
 
 	// temp cache cleanup
 	suite.fileTestCleanup([]string{filepath.Join(suite.testCachePath, "small_hns.txt"), filepath.Join(suite.testCachePath, "small_hns.lnk")})
 
 	data2, err := os.ReadFile(fileName)
 	suite.NoError(err)
-	suite.Equal(len(data2), len(suite.minBuff))
+	suite.Len(suite.minBuff, len(data2))
 
 	// validating data
 	suite.Equal(data1, data2)

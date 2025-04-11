@@ -92,7 +92,7 @@ func (suite *sizeTrackerMockTestSuite) cleanupTest() {
 func (suite *sizeTrackerMockTestSuite) TestDefault() {
 	defer suite.cleanupTest()
 	suite.assert.Equal("size_tracker", suite.sizeTracker.Name())
-	suite.assert.EqualValues(uint64(0), suite.sizeTracker.mountSize.GetSize())
+	suite.assert.Equal(uint64(0), suite.sizeTracker.mountSize.GetSize())
 }
 
 func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledUnderThreshold() {

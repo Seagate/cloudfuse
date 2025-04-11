@@ -190,7 +190,7 @@ func (s3 *S3Storage) CreateDir(options internal.CreateDirOptions) error {
 	err := s3.storage.CreateDirectory(internal.TruncateDirName(options.Name))
 
 	if err == nil {
-		s3StatsCollector.PushEvents(createDir, options.Name, map[string]interface{}{mode: options.Mode.String()})
+		s3StatsCollector.PushEvents(createDir, options.Name, map[string]any{mode: options.Mode.String()})
 		s3StatsCollector.UpdateStats(stats_manager.Increment, createDir, (int64)(1))
 	}
 
@@ -282,7 +282,7 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	if len(path) == 0 {
 		path = "/"
 	}
-	s3StatsCollector.PushEvents(streamDir, path, map[string]interface{}{count: totalEntriesFetched})
+	s3StatsCollector.PushEvents(streamDir, path, map[string]any{count: totalEntriesFetched})
 
 	// increment streamDir call count
 	s3StatsCollector.UpdateStats(stats_manager.Increment, streamDir, (int64)(1))
@@ -298,7 +298,7 @@ func (s3 *S3Storage) RenameDir(options internal.RenameDirOptions) error {
 	err := s3.storage.RenameDirectory(options.Src, options.Dst)
 
 	if err == nil {
-		s3StatsCollector.PushEvents(renameDir, options.Src, map[string]interface{}{src: options.Src, dest: options.Dst})
+		s3StatsCollector.PushEvents(renameDir, options.Src, map[string]any{src: options.Src, dest: options.Dst})
 		s3StatsCollector.UpdateStats(stats_manager.Increment, renameDir, (int64)(1))
 	}
 	return err
@@ -322,7 +322,7 @@ func (s3 *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	}
 	handle.Mtime = time.Now()
 
-	s3StatsCollector.PushEvents(createFile, options.Name, map[string]interface{}{mode: options.Mode.String()})
+	s3StatsCollector.PushEvents(createFile, options.Name, map[string]any{mode: options.Mode.String()})
 
 	// increment open file handles count
 	s3StatsCollector.UpdateStats(stats_manager.Increment, openHandles, (int64)(1))
@@ -382,7 +382,7 @@ func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 	err := s3.storage.RenameFile(options.Src, options.Dst, false)
 
 	if err == nil {
-		s3StatsCollector.PushEvents(renameFile, options.Src, map[string]interface{}{src: options.Src, dest: options.Dst})
+		s3StatsCollector.PushEvents(renameFile, options.Src, map[string]any{src: options.Src, dest: options.Dst})
 		s3StatsCollector.UpdateStats(stats_manager.Increment, renameFile, (int64)(1))
 	}
 	return err
@@ -429,7 +429,7 @@ func (s3 *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
 	err := s3.storage.TruncateFile(options.Name, options.Size)
 
 	if err == nil {
-		s3StatsCollector.PushEvents(truncateFile, options.Name, map[string]interface{}{size: options.Size})
+		s3StatsCollector.PushEvents(truncateFile, options.Name, map[string]any{size: options.Size})
 		s3StatsCollector.UpdateStats(stats_manager.Increment, truncateFile, (int64)(1))
 	}
 	return err
@@ -455,7 +455,7 @@ func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 	err := s3.storage.CreateLink(options.Name, options.Target, true)
 
 	if err == nil {
-		s3StatsCollector.PushEvents(createLink, options.Name, map[string]interface{}{target: options.Target})
+		s3StatsCollector.PushEvents(createLink, options.Name, map[string]any{target: options.Target})
 		s3StatsCollector.UpdateStats(stats_manager.Increment, createLink, (int64)(1))
 	}
 
@@ -488,7 +488,7 @@ func (s3 *S3Storage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 func (s3 *S3Storage) Chmod(options internal.ChmodOptions) error {
 	log.Trace("S3Storage::Chmod : Change mode of file %s", options.Name)
 
-	s3StatsCollector.PushEvents(chmod, options.Name, map[string]interface{}{mode: options.Mode.String()})
+	s3StatsCollector.PushEvents(chmod, options.Name, map[string]any{mode: options.Mode.String()})
 	s3StatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))
 
 	return nil
