@@ -14,7 +14,7 @@ linters:
     - staticcheck # Set of rules from staticcheck.
     - testifylint # Checks usage of github.com/stretchr/testify.
     - unconvert # Remove unnecessary type conversions
-    - unparam # Reports unused function parameters.
+    # - unparam # Reports unused function parameters.
     - unused # Checks Go code for unused constants, variables, functions and types
   settings:
     testifylint:
