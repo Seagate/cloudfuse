@@ -29,6 +29,8 @@ import (
 	"sync"
 	"time"
 
+	"maps"
+
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 )
@@ -143,9 +145,7 @@ func (sc *StatsCollector) PushEvents(op string, path string, mp map[string]any) 
 
 		if mp != nil {
 			event.Value = make(map[string]any)
-			for k, v := range mp {
-				event.Value[k] = v
-			}
+			maps.Copy(event.Value, mp)
 		}
 
 		// check if the channel is full

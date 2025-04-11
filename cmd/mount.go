@@ -49,6 +49,8 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/awnumar/memguard"
 
+	"slices"
+
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"
 )
@@ -462,11 +464,8 @@ var mountCmd = &cobra.Command{
 		common.EnableMonitoring = options.MonitorOpt.EnableMon
 
 		// check if cloudfuse stats monitor is added in the disable list
-		for _, mon := range options.MonitorOpt.DisableList {
-			if mon == common.CfuseStats {
-				common.CfsDisabled = true
-				break
-			}
+		if slices.Contains(options.MonitorOpt.DisableList, common.CfuseStats) {
+			common.CfsDisabled = true
 		}
 
 		config.Set("mount-path", options.MountPath)

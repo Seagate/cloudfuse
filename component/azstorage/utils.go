@@ -53,6 +53,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 	serviceBfs "github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake/service"
 
+	"maps"
+
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake/datalakeerror"
 )
 
@@ -385,9 +387,7 @@ func populateContentType(newSet string) error { //nolint
 	// We can simply append the new data to end of the map
 	// however there may be conflicting keys and hence we need to merge manually
 	// ContentTypeMap = append(ContentTypeMap, data)
-	for k, v := range data {
-		ContentTypes[k] = v
-	}
+	maps.Copy(ContentTypes, data)
 	return nil
 }
 

@@ -172,7 +172,7 @@ func (suite *sizeTrackerTestSuite) TestRenameDir() {
 	err := suite.sizeTracker.CreateDir(internal.CreateDirOptions{Name: src, Mode: 0o755})
 	suite.assert.NoError(err)
 	path := path.Join(src, generateFileName())
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		handle, err := suite.sizeTracker.CreateFile(internal.CreateFileOptions{Name: path + strconv.Itoa(i), Mode: 0o644})
 		suite.assert.NoError(err)
 		_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})

@@ -473,7 +473,7 @@ func (suite *dirTestSuite) TestDirRenameFull() {
 	err = os.Mkdir(filepath.Join(dirName, "tmp"), 0o777)
 	suite.NoError(err)
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.medBuff, 0o777)
 		suite.NoError(err)
@@ -621,7 +621,7 @@ func (suite *dirTestSuite) TestReadDirLink() {
 	suite.NoError(err)
 
 	// Write three more files so one block, 4096 bytes, is filled
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.minBuff, 0o777)
 		suite.NoError(err)
@@ -691,7 +691,7 @@ func (suite *dirTestSuite) TestStatfs() {
 	suite.NoError(err)
 
 	fileName := filepath.Join(dirName, "small_file_")
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.minBuff, 0o777)
 		suite.NoError(err)
@@ -701,7 +701,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		suite.Equal(12*len(suite.minBuff), DiskSize(pathPtr))
 	}
 
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		file := fileName + strconv.Itoa(i)
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)
@@ -711,7 +711,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		suite.Equal(12*4096, DiskSize(pathPtr))
 	}
 
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		file := fileName + strconv.Itoa(i)
 		err := os.WriteFile(file, suite.medBuff, 0o777)
 		suite.NoError(err)
@@ -722,7 +722,7 @@ func (suite *dirTestSuite) TestStatfs() {
 	}
 
 	renameFile := filepath.Join(dirName, "small_file_rename")
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		oldFile := fileName + strconv.Itoa(i)
 		newFile := renameFile + strconv.Itoa(i)
 		err := os.Rename(oldFile, newFile)
@@ -733,7 +733,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		suite.Equal(12*len(suite.medBuff), DiskSize(pathPtr))
 	}
 
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		file := renameFile + strconv.Itoa(i)
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)

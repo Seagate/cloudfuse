@@ -223,7 +223,7 @@ func (tree *Tree) MergeWithKey(key string, obj any, getValue func(val any) (res 
 	}
 
 	if elem.Type().Kind() == reflect.Struct {
-		for i := 0; i < elem.NumField(); i++ {
+		for i := range elem.NumField() {
 			idx := getIdxFromField(elem.Type().Field(i))
 			if _, ok := subTree.children[idx]; ok {
 				if elem.Field(i).Type().Kind() == reflect.Struct {
@@ -260,7 +260,7 @@ func (tree *Tree) Merge(obj any, getValue func(val any) (res any, ok bool)) {
 	}
 
 	if elem.Type().Kind() == reflect.Struct {
-		for i := 0; i < elem.NumField(); i++ {
+		for i := range elem.NumField() {
 			idx := getIdxFromField(elem.Type().Field(i))
 			if _, ok := subTree.children[idx]; ok {
 				if elem.Field(i).Type().Kind() == reflect.Struct {
