@@ -334,7 +334,7 @@ func (rw *ReadWriteFilenameCache) createFileCache(handle *handlemap.Handle) erro
 					handle.CacheObj.StreamOnly = true
 					return nil
 				}
-				block, _, err := rw.getBlock(handle, &common.Block{StartIndex: 0, EndIndex: handle.CacheObj.Size})
+				block, err := rw.getBlock(handle, &common.Block{StartIndex: 0, EndIndex: handle.CacheObj.Size})
 				if err != nil {
 					return err
 				}
@@ -370,14 +370,14 @@ func (rw *ReadWriteFilenameCache) putBlock(handle *handlemap.Handle, buffer *han
 	return nil
 }
 
-func (rw *ReadWriteFilenameCache) getBlock(handle *handlemap.Handle, block *common.Block) (*common.Block, bool, error) {
+func (rw *ReadWriteFilenameCache) getBlock(handle *handlemap.Handle, block *common.Block) (*common.Block, error) {
 	cached_block, found := handle.CacheObj.Get(block.StartIndex)
 	if !found {
 		block.Data = make([]byte, block.EndIndex-block.StartIndex)
 		// put the newly created block into the cache
 		err := rw.putBlock(handle, handle.CacheObj, block)
 		if err != nil {
-			return block, false, err
+			return block, err
 		}
 		options := internal.ReadInBufferOptions{
 			Handle: handle,
@@ -388,12 +388,12 @@ func (rw *ReadWriteFilenameCache) getBlock(handle *handlemap.Handle, block *comm
 		if len(block.Data) != 0 {
 			_, err = rw.NextComponent().ReadInBuffer(options)
 			if err != nil && err != io.EOF {
-				return nil, false, err
+				return nil, err
 			}
 		}
-		return block, false, nil
+		return block, nil
 	}
-	return cached_block, true, nil
+	return cached_block, nil
 }
 
 func (rw *ReadWriteFilenameCache) readWriteBlocks(handle *handlemap.Handle, offset int64, data []byte, write bool) (int, error) {
@@ -409,7 +409,7 @@ func (rw *ReadWriteFilenameCache) readWriteBlocks(handle *handlemap.Handle, offs
 	lastBlock := handle.CacheObj.BlockList[len(handle.CacheObj.BlockList)-1]
 	for dataLeft > 0 {
 		if offset < lastBlock.EndIndex {
-			block, _, err := rw.getBlock(handle, blocks[blk_index])
+			block, err := rw.getBlock(handle, blocks[blk_index])
 			if err != nil {
 				return dataRead, err
 			}
@@ -428,7 +428,7 @@ func (rw *ReadWriteFilenameCache) readWriteBlocks(handle *handlemap.Handle, offs
 			emptyByteLength := offset - lastBlock.EndIndex
 			// if the data to append + our last block existing data do not exceed block size - just append to last block
 			if (lastBlock.EndIndex-lastBlock.StartIndex)+(emptyByteLength+dataLeft) <= rw.BlockSize || lastBlock.EndIndex == 0 {
-				_, _, err := rw.getBlock(handle, lastBlock)
+				_, err := rw.getBlock(handle, lastBlock)
 				if err != nil {
 					return dataRead, err
 				}
