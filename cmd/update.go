@@ -106,7 +106,7 @@ var updateCmd = &cobra.Command{
 			}
 
 		default:
-			return errors.New("unsupported OS. Only Linux and Windows are supported.")
+			return errors.New("unsupported OS, only Linux and Windows are supported")
 		}
 
 		if err := installUpdate(context.Background(), &opt); err != nil {
@@ -160,7 +160,7 @@ func determinePackageFormat() (string, error) {
 	} else if hasCommand("rpm") {
 		return "rpm", nil
 	} else {
-		return "", errors.New("neither dpkg nor rpm found. Cannot determine package format.")
+		return "", errors.New("neither dpkg nor rpm found, cannot determine package format")
 	}
 }
 
