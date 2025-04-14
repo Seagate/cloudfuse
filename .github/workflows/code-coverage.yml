@@ -44,12 +44,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
@@ -596,12 +596,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
@@ -1103,12 +1103,12 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
