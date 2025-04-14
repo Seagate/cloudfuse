@@ -94,7 +94,7 @@ var updateCmd = &cobra.Command{
 				return errors.New(".deb and .rpm requires elevated privileges")
 			}
 			if opt.Output == "" && opt.Package == "tar" {
-				return errors.New("need to pass parameter --package with deb or rpm or pass parameter --output with location to download to")
+				return errors.New("need to pass parameter --package with deb or rpm, or pass parameter --output with location to download to")
 			}
 
 		case "windows":
@@ -102,7 +102,7 @@ var updateCmd = &cobra.Command{
 				return errors.New("--package should be one of exe|zip")
 			}
 			if opt.Output == "" && (opt.Package == "zip") {
-				return errors.New("need to pass parameter --package with exe or zip or pass parameter --output with location to download to")
+				return errors.New("need to pass parameter --package with exe or zip, or pass parameter --output with location to download to")
 			}
 
 		default:
@@ -155,12 +155,12 @@ func determinePackageFormat() (string, error) {
 	if runtime.GOOS == "windows" {
 		return "exe", nil
 	}
-	if hasCommand("dpkg") {
+	if hasCommand("apt") {
 		return "deb", nil
 	} else if hasCommand("rpm") {
 		return "rpm", nil
 	} else {
-		return "", errors.New("neither dpkg nor rpm found, cannot determine package format")
+		return "", errors.New("neither apt nor rpm found, cannot determine package format")
 	}
 }
 
@@ -201,7 +201,7 @@ func runWindowsInstaller(fileName string) error {
 func runLinuxInstaller(fileName string) error {
 	var packageCommand string
 	if strings.HasSuffix(fileName, "deb") {
-		packageCommand = "dpkg"
+		packageCommand = "apt"
 	} else if strings.HasSuffix(fileName, "rpm") {
 		packageCommand = "rpm"
 	} else {
@@ -219,10 +219,20 @@ func runLinuxInstaller(fileName string) error {
 
 // downloadUpdate downloads the update file
 func downloadUpdate(ctx context.Context, relInfo *releaseInfo, output string) (string, error) {
-	resp, err := http.Get(relInfo.AssetURL)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, relInfo.AssetURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("unable to get URL %s: %w", relInfo.AssetURL, err)
+		return "", err
 	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to get release info: %s", resp.Status)
@@ -389,5 +399,5 @@ func init() {
 	rootCmd.AddCommand(updateCmd)
 	updateCmd.PersistentFlags().StringVar(&opt.Output, "output", "", "Save the downloaded binary at a given path (default: replace running binary)")
 	updateCmd.PersistentFlags().StringVar(&opt.Version, "version", "", "Install the given cloudfuse version (default: latest)")
-	updateCmd.PersistentFlags().StringVar(&opt.Package, "package", "", "Package format: tar|deb|rpm (default: tar)")
+	updateCmd.PersistentFlags().StringVar(&opt.Package, "package", "", "Package format: tar|deb|rpm|zip|exe (default: automatically detect package format)")
 }
