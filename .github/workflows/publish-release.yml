@@ -17,12 +17,12 @@ jobs:
       winfsp: winfsp-2.0.23075.msi
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
         with:
           go-version: ${{ env.go }}
           check-latest: true
@@ -50,7 +50,7 @@ jobs:
         # Get the WinFSP installer (from cache or download)
       - name: Get cached WinFSP installer
         id: restore-winfsp-installer
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
@@ -63,7 +63,7 @@ jobs:
 
       - name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
@@ -89,7 +89,7 @@ jobs:
           mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
 
       - name: Cache windows installer
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -114,7 +114,7 @@ jobs:
           sudo apt-get install -y gcc-aarch64-linux-gnu libfuse-dev
       # Get code and Go ready
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -128,7 +128,7 @@ jobs:
           rm zig.tar.xz
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
         with:
           go-version: ${{ env.go }}
           check-latest: true
@@ -142,7 +142,7 @@ jobs:
 
         # Get cached intermediate build products
       - name: Restore cached Windows installer
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -151,7 +151,7 @@ jobs:
 
         # Run GoReleaser (see .goreleaser.yaml)
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6
         with:
           args: release --clean
         env:
