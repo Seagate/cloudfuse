@@ -235,10 +235,10 @@ jobs:
           S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
         run: |-
           RANDOM_NUMBERS=$(head /dev/urandom | tr -dc '0-9' | head -c 8)
-          S3_SUBDIRECTORY="test/test${RANDOM_NUMBERS}"
-          echo $S3_SUBDIRECTORY
+          COMBINED_STRING="test${RANDOM_NUMBERS}"
           echo "S3_SUBDIRECTORY=${COMBINED_STRING}" >> $GITHUB_ENV
-          export $S3_SUBDIRECTORY
+          echo $COMBINED_STRING
+          export S3_SUBDIRECTORY=${COMBINED_STRING}
           ./cloudfuse.test gen-test-config --config-file=s3_key.yaml --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}
 
       - name: S3 Coverage
@@ -286,10 +286,10 @@ jobs:
           S3_SUBDIRECTORY: 
         run: |-
           RANDOM_NUMBERS=$(head /dev/urandom | tr -dc '0-9' | head -c 8)
-          S3_SUBDIRECTORY="test/test${RANDOM_NUMBERS}"
-          echo $S3_SUBDIRECTORY
+          COMBINED_STRING="test${RANDOM_NUMBERS}"
           echo "S3_SUBDIRECTORY=${COMBINED_STRING}" >> $GITHUB_ENV
-          export $S3_SUBDIRECTORY
+          echo $COMBINED_STRING
+          export S3_SUBDIRECTORY=${COMBINED_STRING}
           ./cloudfuse.test gen-test-config --config-file=s3_key_size_tracker.yaml --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}
 
       - name: S3 Coverage with Size Tracker
@@ -799,10 +799,10 @@ jobs:
           for i in {1..8}; do
             RANDOM_NUMBERS+=$(( RANDOM % 10 ))
           done
-          S3_SUBDIRECTORY="test/test${RANDOM_NUMBERS}"
+          COMBINED_STRING="test${RANDOM_NUMBERS}"
           echo "S3_SUBDIRECTORY=${COMBINED_STRING}" >> $GITHUB_ENV
-          echo $S3_SUBDIRECTORY
-          export $S3_SUBDIRECTORY
+          echo $COMBINED_STRING
+          export S3_SUBDIRECTORY=${COMBINED_STRING}
           ./cloudfuse.test gen-test-config --config-file=s3_key.yaml --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}
 
       - name: S3 Coverage
@@ -855,10 +855,10 @@ jobs:
           for i in {1..8}; do
             RANDOM_NUMBERS+=$(( RANDOM % 10 ))
           done
-          S3_SUBDIRECTORY="test/test${RANDOM_NUMBERS}"
+          COMBINED_STRING="test${RANDOM_NUMBERS}"
           echo "S3_SUBDIRECTORY=${COMBINED_STRING}" >> $GITHUB_ENV
-          echo $S3_SUBDIRECTORY
-          export $S3_SUBDIRECTORY
+          echo $COMBINED_STRING
+          export S3_SUBDIRECTORY=${COMBINED_STRING}
           ./cloudfuse.test gen-test-config --config-file=s3_key_size_tracker.yaml --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}
 
       - name: S3 Coverage with Size Tracker
