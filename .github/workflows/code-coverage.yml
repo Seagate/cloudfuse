@@ -235,7 +235,7 @@ jobs:
           S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
         run: |-
           RANDOM_NUMBERS=$(head /dev/urandom | tr -dc '0-9' | head -c 8)
-          COMBINED_STRING="test${RANDOM_NUMBERS}"
+          S3_SUBDIRECTORY="test/test${RANDOM_NUMBERS}"
           echo $S3_SUBDIRECTORY
           echo "S3_SUBDIRECTORY=${COMBINED_STRING}" >> $GITHUB_ENV
           export $S3_SUBDIRECTORY
@@ -286,7 +286,7 @@ jobs:
           S3_SUBDIRECTORY: 
         run: |-
           RANDOM_NUMBERS=$(head /dev/urandom | tr -dc '0-9' | head -c 8)
-          COMBINED_STRING="test${RANDOM_NUMBERS}"
+          S3_SUBDIRECTORY="test/test${RANDOM_NUMBERS}"
           echo $S3_SUBDIRECTORY
           echo "S3_SUBDIRECTORY=${COMBINED_STRING}" >> $GITHUB_ENV
           export $S3_SUBDIRECTORY
@@ -799,7 +799,7 @@ jobs:
           for i in {1..8}; do
             RANDOM_NUMBERS+=$(( RANDOM % 10 ))
           done
-          COMBINED_STRING="test${RANDOM_NUMBERS}"
+          S3_SUBDIRECTORY="test/test${RANDOM_NUMBERS}"
           echo "S3_SUBDIRECTORY=${COMBINED_STRING}" >> $GITHUB_ENV
           echo $S3_SUBDIRECTORY
           export $S3_SUBDIRECTORY
@@ -855,7 +855,7 @@ jobs:
           for i in {1..8}; do
             RANDOM_NUMBERS+=$(( RANDOM % 10 ))
           done
-          COMBINED_STRING="test${RANDOM_NUMBERS}"
+          S3_SUBDIRECTORY="test/test${RANDOM_NUMBERS}"
           echo "S3_SUBDIRECTORY=${COMBINED_STRING}" >> $GITHUB_ENV
           echo $S3_SUBDIRECTORY
           export $S3_SUBDIRECTORY
