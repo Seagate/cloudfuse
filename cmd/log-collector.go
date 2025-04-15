@@ -136,6 +136,11 @@ var dumpLogsCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("unable to create archive: [%s]", err.Error())
 			}
+		} else if logType == "syslog" && runtime.GOOS == "windows" {
+			fmt.Println("Please refer to the windows event viewer for your cloudfuse logs")
+			return fmt.Errorf("no log files to collect. system logging for windows are stored in the event viewer: [%s]", err.Error())
+		} else if logType == "silent" {
+			return fmt.Errorf("no logs were generated due to log type being silent: [%s]", err.Error())
 		}
 
 		// are any 'base' logging or syslog filters being used to redirect to a separate file?
