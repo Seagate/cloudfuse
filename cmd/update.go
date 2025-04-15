@@ -37,8 +37,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/spf13/cobra"
@@ -75,9 +77,6 @@ var updateCmd = &cobra.Command{
 	Short: "Update the cloudfuse binary.",
 	Long:  "Update the cloudfuse binary.",
 	RunE: func(command *cobra.Command, args []string) error {
-		if runtime.GOOS == "windows" {
-			return errors.New("Update is not supported on Windows. Download the latest release manually here https://github.com/Seagate/cloudfuse/releases/latest.")
-		}
 		if opt.Package == "" {
 			packageFormat, err := determinePackageFormat()
 			if err != nil {
@@ -85,21 +84,33 @@ var updateCmd = &cobra.Command{
 			}
 			opt.Package = packageFormat
 		}
-		if opt.Output == "" && opt.Package == "tar" {
-			return errors.New("Need to pass parameter --package with deb or rpm or pass parameter --output with location to download to")
-		}
-		if opt.Package != "tar" && opt.Package != "deb" && opt.Package != "rpm" {
-			return errors.New("--package should be one of tar|deb|rpm")
-		}
-		if runtime.GOOS != "linux" && (opt.Package == "deb" || opt.Package == "rpm") {
-			return errors.New(".deb and .rpm packages are supported only on Linux")
-		}
-		if os.Geteuid() != 0 && opt.Output == "" && (opt.Package == "deb" || opt.Package == "rpm") {
-			return errors.New(".deb and .rpm requires elevated privileges")
+
+		switch runtime.GOOS {
+		case "linux":
+			if opt.Package != "tar" && opt.Package != "deb" && opt.Package != "rpm" {
+				return errors.New("--package should be one of tar|deb|rpm")
+			}
+			if os.Geteuid() != 0 && opt.Output == "" && (opt.Package == "deb" || opt.Package == "rpm") {
+				return errors.New(".deb and .rpm requires elevated privileges")
+			}
+			if opt.Output == "" && opt.Package == "tar" {
+				return errors.New("need to pass parameter --package with deb or rpm, or pass parameter --output with location to download to")
+			}
+
+		case "windows":
+			if opt.Package != "exe" && opt.Package != "zip" {
+				return errors.New("--package should be one of exe|zip")
+			}
+			if opt.Output == "" && (opt.Package == "zip") {
+				return errors.New("need to pass parameter --package with exe or zip, or pass parameter --output with location to download to")
+			}
+
+		default:
+			return errors.New("unsupported OS, only Linux and Windows are supported")
 		}
 
 		if err := installUpdate(context.Background(), &opt); err != nil {
-			return fmt.Errorf("Error: %v", err)
+			return fmt.Errorf("error: %v", err)
 		}
 		return nil
 	},
@@ -122,24 +133,34 @@ func installUpdate(ctx context.Context, opt *Options) error {
 		return fmt.Errorf("unable to download release: %w", err)
 	}
 
-	if err := verifyHash(fileName, relInfo.AssetName, relInfo.HashURL); err != nil {
-		return fmt.Errorf("unable to verify checksum: %w", err)
+	// Only verify hash for Linux releases as Windows releases are not hashed by goreleaser
+	if opt.Package != "exe" {
+		if err := verifyHash(ctx, fileName, relInfo.AssetName, relInfo.HashURL); err != nil {
+			return fmt.Errorf("unable to verify checksum: %w", err)
+		}
 	}
 
 	if opt.Output != "" {
 		return nil
 	}
 
-	return installPackage(fileName)
+	if runtime.GOOS == "windows" {
+		return runWindowsInstaller(fileName)
+	}
+
+	return runLinuxInstaller(fileName)
 }
 
 func determinePackageFormat() (string, error) {
-	if hasCommand("dpkg") {
+	if runtime.GOOS == "windows" {
+		return "exe", nil
+	}
+	if hasCommand("apt") {
 		return "deb", nil
 	} else if hasCommand("rpm") {
 		return "rpm", nil
 	} else {
-		return "", errors.New("Neither dpkg nor rpm found. Cannot determine package format.")
+		return "", errors.New("neither apt nor rpm found, cannot determine package format")
 	}
 }
 
@@ -148,11 +169,39 @@ func hasCommand(command string) bool {
 	return err == nil
 }
 
-// installPackage installs the deb or rpm package
-func installPackage(fileName string) error {
+// runWindowsInstaller runs the Windows executable installer. Requires the user to restart the machine to apply changes.
+func runWindowsInstaller(fileName string) error {
+	absPath, err := filepath.Abs(fileName)
+	if err != nil {
+		return fmt.Errorf("unable to get absolute path: %w", err)
+	}
+
+	args := []string{
+		"/SP-",
+		"/VERYSILENT",
+		"/NOICONS",
+		"/NORESTART",
+		"/SUPPRESSMSGBOXES",
+		"/dir=expand:{autopf}\\Cloudfuse",
+	}
+
+	cmd := exec.Command(absPath, args...)
+
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to run installer: %w", err)
+	}
+
+	fmt.Println("Cloudfuse was successfully updated. Please restart the machine to apply the changes.")
+
+	return nil
+}
+
+// runLinuxInstaller installs the deb or rpm package
+func runLinuxInstaller(fileName string) error {
 	var packageCommand string
 	if strings.HasSuffix(fileName, "deb") {
-		packageCommand = "dpkg"
+		packageCommand = "apt"
 	} else if strings.HasSuffix(fileName, "rpm") {
 		packageCommand = "rpm"
 	} else {
@@ -170,10 +219,20 @@ func installPackage(fileName string) error {
 
 // downloadUpdate downloads the update file
 func downloadUpdate(ctx context.Context, relInfo *releaseInfo, output string) (string, error) {
-	resp, err := http.Get(relInfo.AssetURL)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, relInfo.AssetURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("unable to get URL %s: %w", relInfo.AssetURL, err)
+		return "", err
 	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to get release info: %s", resp.Status)
@@ -203,10 +262,20 @@ func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
 		url = fmt.Sprintf("https://api.github.com/repos/Seagate/cloudfuse/releases/tags/v%s", version)
 	}
 
-	resp, err := http.Get(url)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get release info: %s", resp.Status)
@@ -223,7 +292,9 @@ func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
 	}
 
 	hashAsset, err := downloadHashAsset(rel.Assets)
-	if err != nil {
+	// Only report an error if package is not exe since goreleaser does not provide a hash
+	// for those releases.
+	if err != nil && opt.Package != "exe" {
 		return nil, err
 	}
 
@@ -276,8 +347,17 @@ func findChecksum(packageName string, checksumTable string) (string, error) {
 	return "", errors.New("checksum not found for the given file name")
 }
 
-func verifyHash(fileName, packageName, hashURL string) error {
-	resp, err := http.Get(hashURL)
+func verifyHash(ctx context.Context, fileName, packageName, hashURL string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, hashURL, nil)
+	if err != nil {
+		return fmt.Errorf("unable to download checksum file: %w", err)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("unable to download checksum file: %w", err)
 	}
@@ -319,5 +399,5 @@ func init() {
 	rootCmd.AddCommand(updateCmd)
 	updateCmd.PersistentFlags().StringVar(&opt.Output, "output", "", "Save the downloaded binary at a given path (default: replace running binary)")
 	updateCmd.PersistentFlags().StringVar(&opt.Version, "version", "", "Install the given cloudfuse version (default: latest)")
-	updateCmd.PersistentFlags().StringVar(&opt.Package, "package", "", "Package format: tar|deb|rpm (default: tar)")
+	updateCmd.PersistentFlags().StringVar(&opt.Package, "package", "", "Package format: tar|deb|rpm|zip|exe (default: automatically detect package format)")
 }
