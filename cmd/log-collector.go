@@ -146,7 +146,7 @@ var dumpLogsCmd = &cobra.Command{
 		// are any 'base' logging or syslog filters being used to redirect to a separate file?
 		// check for /etc/rsyslog.d and /etc/logrotate.d files
 
-		return fmt.Errorf("failed to collect logs and create archive [%s]", err.Error())
+		return nil
 	},
 }
 
