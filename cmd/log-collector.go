@@ -50,30 +50,35 @@ var dumpLogsCmd = &cobra.Command{
 	Short:             "interface to gather and review cloudfuse logs",
 	Long:              "interface to gather and review cloudfuse logs",
 	SuggestFor:        []string{"dump", "dumpLog", "dumpLogs"},
-	Args:              cobra.ExactArgs(1),
 	Example:           "cloudfuse dumpLogs ",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var err error
-		dumpPath = args[0]
+		if dumpPath == "" {
+			dumpPath, err = os.Getwd()
+			if err != nil {
+				return fmt.Errorf("couldn't get the current directory [%s]", err.Error())
+			}
+		} else {
+			dumpPathExists := common.DirectoryExists(dumpPath)
+			if !dumpPathExists {
+				return fmt.Errorf("the dump path provided does not exist")
+			}
+
+			dumpInfo, err := os.Stat(dumpPath)
+			if err != nil {
+				return fmt.Errorf("couldn't stat dump Path")
+			}
+
+			if !dumpInfo.IsDir() {
+				return fmt.Errorf("dumpPath provided needs to be a directory")
+			}
+		}
+
 		dumpPath, err = filepath.Abs(dumpPath)
 		if err != nil {
 			return fmt.Errorf("couldn't determine absolute path for dump logs [%s]", err.Error())
-		}
-
-		dumpPathExists := common.DirectoryExists(dumpPath)
-		if !dumpPathExists {
-			return fmt.Errorf("the dump path provided does not exist")
-		}
-
-		dumpInfo, err := os.Stat(dumpPath)
-		if err != nil {
-			return fmt.Errorf("couldn't stat dump Path")
-		}
-
-		if !dumpInfo.IsDir() {
-			return fmt.Errorf("dumpPath provided needs to be a directory")
 		}
 
 		if logConfigFile, err = filepath.Abs(logConfigFile); err != nil {
@@ -292,7 +297,6 @@ func createArchive(logPath string) error {
 
 func init() {
 	rootCmd.AddCommand(dumpLogsCmd)
-	// dumpLogsCmd.Flags().StringVar(&dumpPath, "dump-path", "", "Input archive creation path")
-	// markFlagErrorChk(dumpLogsCmd, "dump-path")
+	dumpLogsCmd.Flags().StringVar(&dumpPath, "output-path", "", "Input archive creation path")
 	dumpLogsCmd.Flags().StringVar(&logConfigFile, "config-file", common.DefaultConfigFilePath, "config-file input path")
 }
