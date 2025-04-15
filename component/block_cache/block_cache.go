@@ -882,7 +882,6 @@ func (bc *BlockCache) download(item *workItem) {
 
 	var diskNode any
 	found := false
-	localPath := ""
 
 	if bc.tmpPath != "" {
 		// Update diskpolicy to reflect the new file
@@ -895,22 +894,29 @@ func (bc *BlockCache) download(item *workItem) {
 		}
 
 		// Check local file exists for this offset and file combination or not
-		localPath = filepath.Join(bc.tmpPath, fileName)
-		_, err := os.Stat(localPath)
+		root, err := os.OpenRoot(bc.tmpPath)
+		if err != nil {
+			// On any disk failure we do not fail the download flow
+			log.Err("BlockCache::download : Failed to open file %s [%s]", fileName, err.Error())
+			return
+		}
+		defer root.Close()
+
+		_, err = root.Stat(fileName)
 
 		if err == nil {
 			// If file exists then read the block from the local file
-			f, err := common.Open(localPath)
+			f, err := common.Open(fileName)
 			if err != nil {
 				// On any disk failure we do not fail the download flow
 				log.Err("BlockCache::download : Failed to open file %s [%s]", fileName, err.Error())
-				_ = os.Remove(localPath)
+				_ = root.Remove(fileName)
 			} else {
 				n, err := f.Read(item.block.data)
 				if err != nil {
 					log.Err("BlockCache::download : Failed to read data from disk cache %s [%s]", fileName, err.Error())
 					f.Close()
-					_ = os.Remove(localPath)
+					_ = root.Remove(fileName)
 				}
 
 				f.Close()
@@ -957,19 +963,28 @@ func (bc *BlockCache) download(item *workItem) {
 	item.block.endIndex = item.block.offset + uint64(n)
 
 	if bc.tmpPath != "" {
-		err := os.MkdirAll(filepath.Dir(localPath), 0755)
+		root, err := os.OpenRoot(bc.tmpPath)
 		if err != nil {
-			log.Err("BlockCache::download : error creating directory structure for file %s [%s]", localPath, err.Error())
-			return
+			err := os.Mkdir(bc.tmpPath, 0755)
+			if err != nil {
+				log.Err("BlockCache::download : error creating directory structure for file %s [%s]", bc.tmpPath, err.Error())
+				return
+			}
+			root, err = os.OpenRoot(bc.tmpPath)
+			if err != nil {
+				log.Err("BlockCache::download : error creating directory structure for file %s [%s]", bc.tmpPath, err.Error())
+				return
+			}
 		}
+		defer root.Close()
 
 		// Dump this block to local disk cache
-		f, err := os.Create(localPath)
+		f, err := root.Create(fileName)
 		if err == nil {
 			_, err := f.Write(item.block.data[:n])
 			if err != nil {
-				log.Err("BlockCache::download : Failed to write %s to disk [%v]", localPath, err.Error())
-				_ = os.Remove(localPath)
+				log.Err("BlockCache::download : Failed to write %s to disk [%v]", fileName, err.Error())
+				_ = root.Remove(fileName)
 			}
 
 			f.Close()
@@ -1289,10 +1304,7 @@ func (bc *BlockCache) waitAndFreeUploadedBlocks(handle *handlemap.Handle, cnt in
 	node := nodeList.Front()
 	nextNode := node
 
-	wipeoutBlock := false
-	if cnt == 1 {
-		wipeoutBlock = true
-	}
+	wipeoutBlock := cnt == 1
 
 	for nextNode != nil && cnt > 0 {
 		node = nextNode
@@ -1364,21 +1376,27 @@ func (bc *BlockCache) upload(item *workItem) {
 	}
 
 	if bc.tmpPath != "" {
-		localPath := filepath.Join(bc.tmpPath, fileName)
-
-		err := os.MkdirAll(filepath.Dir(localPath), 0755)
+		err := os.MkdirAll(bc.tmpPath, 0755)
 		if err != nil {
-			log.Err("BlockCache::upload : error creating directory structure for file %s [%s]", localPath, err.Error())
+			log.Err("BlockCache::upload : error creating directory structure for file %s [%s]", bc.tmpPath, err.Error())
 			goto return_safe
 		}
 
+		// Check local file exists for this offset and file combination or not
+		root, err := os.OpenRoot(bc.tmpPath)
+		if err != nil {
+			log.Err("BlockCache::upload : error opening directory structure for file %s [%s]", bc.tmpPath, err.Error())
+			goto return_safe
+		}
+		defer root.Close()
+
 		// Dump this block to local disk cache
-		f, err := os.Create(localPath)
+		f, err := root.Create(fileName)
 		if err == nil {
 			_, err := f.Write(item.block.data[0 : item.block.endIndex-item.block.offset])
 			if err != nil {
-				log.Err("BlockCache::upload : Failed to write %s to disk [%v]", localPath, err.Error())
-				_ = os.Remove(localPath)
+				log.Err("BlockCache::upload : Failed to write %s to disk [%v]", fileName, err.Error())
+				_ = os.Remove(fileName)
 				goto return_safe
 			}
 
