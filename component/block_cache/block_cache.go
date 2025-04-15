@@ -906,7 +906,7 @@ func (bc *BlockCache) download(item *workItem) {
 
 		if err == nil {
 			// If file exists then read the block from the local file
-			f, err := common.Open(fileName)
+			f, err := root.Open(fileName)
 			if err != nil {
 				// On any disk failure we do not fail the download flow
 				log.Err("BlockCache::download : Failed to open file %s [%s]", fileName, err.Error())
