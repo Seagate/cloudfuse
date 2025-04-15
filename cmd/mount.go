@@ -678,7 +678,7 @@ func init() {
 	mountCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
 		"Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.")
 
-	mountCmd.PersistentFlags().String("log-type", "syslog", "Type of logger to be used by the system. Set to syslog by default. Allowed values are silent|syslog|base.")
+	mountCmd.PersistentFlags().String("log-type", "base", "Type of logger to be used by the system. Set to base by default. Allowed values are silent|syslog|base.")
 	config.BindPFlag("logging.type", mountCmd.PersistentFlags().Lookup("log-type"))
 	_ = mountCmd.RegisterFlagCompletionFunc("log-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"silent", "base", "syslog"}, cobra.ShellCompDirectiveNoFileComp
