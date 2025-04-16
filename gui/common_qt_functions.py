@@ -202,13 +202,8 @@ class defaultSettingsManager():
             }
 
         allMountSettings['logging'] = {
-<<<<<<< HEAD
-            'type' : 'syslog',
-            'level' : 'log_warning',
-=======
             'type' : 'base',
-            'level' : 'log_err',
->>>>>>> bed4fa7cae3b88f07161a8e29195c91ec5695dc4
+            'level' : 'log_warning',
             'file-path' : '$HOME/.cloudfuse/cloudfuse.log',
             'max-file-size-mb' : 512,
             'file-count' : 10 ,
