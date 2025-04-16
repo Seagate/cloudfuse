@@ -219,7 +219,7 @@ func getService(mountPath string) (string, string) {
 	return serviceName, serviceFilePath
 }
 
-func installService(serviceUser string, mountPath string, configPath string) (string, error) {
+func installRemountService(serviceUser string, mountPath string, configPath string) (string, error) {
 	//create the new user and set permissions
 	mountPath, err := filepath.Abs(mountPath)
 	if err != nil {

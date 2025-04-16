@@ -525,7 +525,7 @@ var mountCmd = &cobra.Command{
 						"Pass --service-remount-user with the user the service will run as on remount")
 				}
 
-				serviceName, err := installService(options.ServiceUser, options.MountPath, options.ConfigFile)
+				serviceName, err := installRemountService(options.ServiceUser, options.MountPath, options.ConfigFile)
 				if err != nil {
 					return fmt.Errorf("mount: failed to install service to remount on restart [%v]", err.Error())
 				}

@@ -59,3 +59,8 @@ func unmountCloudfuseWindows(mountPath string, disableRemountUser bool, disableR
 
 	return nil
 }
+
+// stub
+func uninstallService(string) error {
+	return nil
+}
