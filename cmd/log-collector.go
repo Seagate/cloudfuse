@@ -272,10 +272,10 @@ func createArchive(logPath string) error {
 
 			filePath := filepath.Join(logPath, item.Name())
 			file, err := os.Open(filePath)
-			defer file.Close()
 			if err != nil {
 				return err
 			}
+			defer file.Close()
 
 			info, err := file.Stat()
 			if err != nil {
@@ -283,6 +283,9 @@ func createArchive(logPath string) error {
 			}
 
 			header, err := zip.FileInfoHeader(info)
+			if err != nil {
+				return err
+			}
 
 			header.Name = item.Name()
 
@@ -292,6 +295,9 @@ func createArchive(logPath string) error {
 			}
 
 			_, err = io.Copy(zipEntry, file)
+			if err != nil {
+				return err
+			}
 
 		}
 
