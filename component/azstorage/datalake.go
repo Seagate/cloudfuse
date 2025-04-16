@@ -558,7 +558,7 @@ func (dl *Datalake) WriteFromFile(name string, metadata map[string]*string, fi *
 	// File in DataLake may have permissions and ACL set. Just uploading the file will override them.
 	// So, we need to get the existing permissions and ACL and set them back after uploading the file.
 
-	var acl string = ""
+	var acl = ""
 	var fileClient *file.Client = nil
 
 	if dl.Config.preserveACL {

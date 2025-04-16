@@ -184,7 +184,7 @@ func (bc *BlockCache) GenConfig() string {
 	sb.WriteString(fmt.Sprintf("\n  prefetch: %v", prefetch))
 	sb.WriteString(fmt.Sprintf("\n  parallelism: %v", uint32(3*runtime.NumCPU())))
 
-	var tmpPath string = ""
+	var tmpPath = ""
 	_ = config.UnmarshalKey("tmp-path", &tmpPath)
 	if tmpPath != "" {
 		sb.WriteString(fmt.Sprintf("\n  path: %v", tmpPath))
@@ -991,7 +991,7 @@ func (bc *BlockCache) download(item *workItem) {
 				log.Err("BlockCache::download : Failed to open file %s [%s]", fileName, err.Error())
 				_ = root.Remove(fileName)
 			} else {
-				var successfulRead bool = true
+				var successfulRead = true
 				n, err := f.Read(item.block.data)
 				if err != nil {
 					log.Err("BlockCache::download : Failed to read data from disk cache %s [%s]", fileName, err.Error())
