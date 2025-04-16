@@ -42,7 +42,22 @@ func NewLogger(name string, config common.LogConfig) (Logger, error) {
 		config.Tag = common.FileSystemName
 	}
 
-	if name == "base" {
+	switch name {
+	case "syslog":
+		sysLogger, err := newSysLogger(config.Level, config.Tag)
+		if err != nil {
+			if err == ErrNoSyslogService {
+				// Syslog service does not exists on this system
+				// fallback to file based logging.
+				return NewLogger("base", config)
+			}
+			return nil, err
+		}
+		return sysLogger, nil
+	case "silent":
+		silentLogger := &SilentLogger{}
+		return silentLogger, nil
+	case "", "default", "base":
 		baseLogger, err := newBaseLogger(LogFileConfig{
 			LogFile:      config.FilePath,
 			LogLevel:     config.Level,
@@ -54,20 +69,6 @@ func NewLogger(name string, config common.LogConfig) (Logger, error) {
 			return nil, err
 		}
 		return baseLogger, nil
-	} else if name == "silent" {
-		silentLogger := &SilentLogger{}
-		return silentLogger, nil
-	} else if name == "" || name == "default" || name == "syslog" {
-		sysLogger, err := newSysLogger(config.Level, config.Tag)
-		if err != nil {
-			if err == NoSyslogService {
-				// Syslog service does not exists on this system
-				// fallback to file based logging.
-				return NewLogger("base", config)
-			}
-			return nil, err
-		}
-		return sysLogger, nil
 	}
 	return nil, errors.New("invalid logger type")
 }

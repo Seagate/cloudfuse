@@ -31,7 +31,6 @@ from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QScreen
 
-file_cache_eviction_choices = ['lru','lfu']
 libfusePermissions = [0o777,0o666,0o644,0o444]
 
 class defaultSettingsManager():
@@ -160,8 +159,7 @@ class defaultSettingsManager():
 
         allMountSettings['file_cache'] = {
             'path': '',
-            'policy': 'lru',
-            'timeout-sec' : 64000000,
+            'timeout-sec' : 216000,
             'max-eviction': 5000,
             'max-size-mb': 0,
             'high-threshold': 80,
@@ -204,8 +202,13 @@ class defaultSettingsManager():
             }
 
         allMountSettings['logging'] = {
+<<<<<<< HEAD
             'type' : 'syslog',
             'level' : 'log_warning',
+=======
+            'type' : 'base',
+            'level' : 'log_err',
+>>>>>>> bed4fa7cae3b88f07161a8e29195c91ec5695dc4
             'file-path' : '$HOME/.cloudfuse/cloudfuse.log',
             'max-file-size-mb' : 512,
             'file-count' : 10 ,
@@ -421,5 +424,4 @@ class widgetCustomFunctions(customConfigFunctions,QWidget):
         fileCache['low-threshold'] = self.spinBox_fileCache_evictMinThresh.value()
         fileCache['refresh-sec'] = self.spinBox_fileCache_refreshSec.value()
 
-        fileCache['policy'] = file_cache_eviction_choices[self.dropDown_fileCache_evictionPolicy.currentIndex()]
         self.settings['file_cache'] = fileCache
