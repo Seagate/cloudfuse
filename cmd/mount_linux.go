@@ -42,7 +42,6 @@ import (
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
-	"github.com/spf13/cobra"
 
 	"github.com/sevlyar/go-daemon"
 	"golang.org/x/sys/unix"
@@ -220,15 +219,19 @@ func getService(mountPath string) (string, string) {
 	return serviceName, serviceFilePath
 }
 
-func markFlagErrorChk(cmd *cobra.Command, flagName string) {
-	if err := cmd.MarkFlagRequired(flagName); err != nil {
-		panic(fmt.Sprintf("Failed to mark flag as required: %v", err))
-	}
-}
-
 func installService(serviceUser string, mountPath string, configPath string) (string, error) {
 	//create the new user and set permissions
-	err := setUser(serviceUser, mountPath, configPath)
+	mountPath, err := filepath.Abs(mountPath)
+	if err != nil {
+		return "", fmt.Errorf("installService: Failed to get absolute mount path")
+	}
+
+	configPath, err = filepath.Abs(configPath)
+	if err != nil {
+		return "", fmt.Errorf("installService: Failed to get absolute mount path")
+	}
+
+	err = setUser(serviceUser, mountPath, configPath)
 	if err != nil {
 		fmt.Println("could not set up service user ", err)
 		return "", err
@@ -258,30 +261,6 @@ func startService(serviceName string) error {
 	err := systemctlEnableCmd.Run()
 	if err != nil {
 		return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following [%s]", err.Error())
-	}
-	return nil
-}
-
-func uninstallService(mountPath string) error {
-	mountPath, err := filepath.Abs(mountPath)
-	if err != nil {
-		return fmt.Errorf("couldn't determine absolute path from string [%s]", err.Error())
-	}
-	serviceName, serviceFilePath := getService(mountPath)
-	if _, err := os.Stat(serviceFilePath); err == nil {
-		removeFileCmd := exec.Command("rm", serviceFilePath)
-		err := removeFileCmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system [%s]", err.Error())
-		}
-	} else if os.IsNotExist(err) {
-		return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system [%s]", err.Error())
-	}
-	// reload daemon
-	systemctlDaemonReloadCmd := exec.Command("systemctl", "daemon-reload")
-	err = systemctlDaemonReloadCmd.Run()
-	if err != nil {
-		return fmt.Errorf("failed to run 'systemctl daemon-reload' command [%s]", err.Error())
 	}
 	return nil
 }
