@@ -1,0 +1,33 @@
+logging:
+  level: log_debug
+  file-path: "cloudfuse-logs.txt"
+  type: base
+
+components:
+  - libfuse
+  - block_cache
+  - attr_cache
+  - azstorage
+
+libfuse:
+  attribute-expiration-sec: 0
+  entry-expiration-sec: 0
+  negative-entry-expiration-sec: 0
+  ignore-open-flags: true
+
+block_cache:
+  path: { 1 }
+
+attr_cache:
+  timeout-sec: 3600
+  enable-symlinks: true
+
+azstorage:
+  type: { ACCOUNT_TYPE }
+  endpoint: { ACCOUNT_ENDPOINT }
+  use-http: { USE_HTTP }
+  account-name: { NIGHTLY_STO_ACC_NAME }
+  account-key: { NIGHTLY_STO_ACC_KEY }
+  mode: key
+  container: { 0 }
+  tier: hot

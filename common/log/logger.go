@@ -177,12 +177,6 @@ func LogRotate() error {
 	return logObj.LogRotate()
 }
 
-func init() {
-	logObj, _ = NewLogger("syslog", common.LogConfig{
-		Level: common.ELogLevel.LOG_DEBUG(),
-	})
-}
-
 // TimeTracker : Dump time taken by a call
 func TimeTrack(start time.Time, location string, name string) {
 	if timeTracker {
