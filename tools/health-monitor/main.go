@@ -71,8 +71,8 @@ func main() {
 		return
 	}
 
-	err := log.SetDefaultLogger("syslog", common.LogConfig{
-		Level:       common.ELogLevel.LOG_DEBUG(),
+	err := log.SetDefaultLogger("base", common.LogConfig{
+		Level:       common.ELogLevel.LOG_WARNING(),
 		FilePath:    common.ExpandPath(hmcommon.DefaultLogFile),
 		MaxFileSize: common.DefaultMaxLogFileSize,
 		FileCount:   common.DefaultLogFileCount,

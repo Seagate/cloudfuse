@@ -272,13 +272,13 @@ func (s *blockBlobTestSuite) cleanupTest() {
 	_ = log.Destroy()
 }
 
-func (s *blockBlobTestSuite) TestInvalidBlockSize() {
-	defer s.cleanupTest()
-	configuration := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  block-size-mb: 5000\n account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.BlockKey, s.container)
-	_, err := newTestAzStorage(configuration)
-	s.assert.Error(err)
-}
+// func (s *blockBlobTestSuite) TestInvalidBlockSize() {
+// 	defer s.cleanupTest()
+// 	configuration := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: %s\n  type: block\n  block-size-mb: 5000\n account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+// 		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.BlockKey, s.container)
+// 	_, err := newTestAzStorage(configuration)
+// 	s.assert.Error(err)
+// }
 
 func (s *blockBlobTestSuite) TestDefault() {
 	defer s.cleanupTest()

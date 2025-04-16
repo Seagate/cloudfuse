@@ -1,5 +1,4 @@
-//go:build linux && !authtest
-// +build linux,!authtest
+//go:build !authtest
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.

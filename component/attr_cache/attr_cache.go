@@ -794,7 +794,7 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	attr, err := ac.GetAttr(internal.GetAttrOptions{Name: options.Handle.Path, RetrieveMetadata: true})
 	if err != nil {
 		// Ignore not exists errors - this can happen if createEmptyFile is set to false
-		if !(os.IsNotExist(err) || err == syscall.ENOENT) {
+		if !os.IsNotExist(err) && err != syscall.ENOENT {
 			return 0, err
 		}
 	}
@@ -877,7 +877,7 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 	attr, err := ac.GetAttr(internal.GetAttrOptions{Name: options.Name, RetrieveMetadata: true})
 	if err != nil {
 		// Ignore not exists errors - this can happen if createEmptyFile is set to false
-		if !(os.IsNotExist(err) || err == syscall.ENOENT) {
+		if !os.IsNotExist(err) && err != syscall.ENOENT {
 			return err
 		}
 	}
@@ -974,7 +974,8 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	ac.cacheLock.Lock()
 	defer ac.cacheLock.Unlock()
 
-	if err == nil {
+	switch err {
+	case nil:
 		// Retrieved attributes so cache them
 		ac.cache.insert(insertOptions{
 			attr:     pathAttr,
@@ -984,7 +985,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
-	} else if err == syscall.ENOENT {
+	case syscall.ENOENT:
 		// cache this entity not existing
 		ac.cache.insert(insertOptions{
 			attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),

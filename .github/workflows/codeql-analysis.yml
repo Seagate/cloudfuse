@@ -43,14 +43,14 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           persist-credentials: false
 
       # Install latest version of Go. Codeql runs on an older version of go
       - name: Install Go
         if: matrix.language == 'go'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
         with:
           go-version: "1.24"
           check-latest: true
@@ -61,7 +61,7 @@ jobs:
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@45775bd8235c68ba998cffa5171334d58593da47 # v3
         with:
           languages: ${{ matrix.language }}
           # If you wish to specify custom queries, you can do so here or in a config file.
@@ -95,6 +95,6 @@ jobs:
           ./build.sh
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@45775bd8235c68ba998cffa5171334d58593da47 # v3
         with:
           category: "/language:${{matrix.language}}"

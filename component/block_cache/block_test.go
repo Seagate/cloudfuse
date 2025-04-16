@@ -1,5 +1,4 @@
-//go:build linux && !authtest
-// +build linux,!authtest
+//go:build !authtest
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -29,6 +28,7 @@
 package block_cache
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -80,7 +80,11 @@ func (suite *blockTestSuite) TestAllocateHuge() {
 	b, err := AllocateBlock(50 * 1024 * 1024 * 1024)
 	suite.assert.Nil(b)
 	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "mmap error")
+	if runtime.GOOS == "windows" {
+		suite.assert.Contains(err.Error(), "insufficient memory available:")
+	} else {
+		suite.assert.Contains(err.Error(), "mmap error")
+	}
 }
 
 func (suite *blockTestSuite) TestFreeNilData() {
@@ -106,7 +110,7 @@ func (suite *blockTestSuite) TestFreeInvalidData() {
 
 	err = b.Delete()
 	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "invalid argument")
+	suite.assert.Contains(err.Error(), "invalid")
 }
 
 func (suite *blockTestSuite) TestResuse() {

@@ -75,11 +75,11 @@ var _ S3Connection = &Client{}
 // The text before the : symbol is a magic keyword
 // It cannot change as it is parsed by our plugin for network optix to provide more clear errors to the user
 var (
-	errBucketDoesNotExist = errors.New("Bucket Error: S3 bucket does not exist or you do not have permission to access it. Please check your bucket name and endpoint are correct.")
-	errInvalidEndpoint    = errors.New("Endpoint Error: Provided S3 endpoint is invalid. Please check endpoint is correct.")
-	errInvalidCredential  = errors.New("Credential or Endpoint Error: S3 credentials or endpoint are invalid. Please check your credentials and endpoint are correct.")
-	errInvalidSecretKey   = errors.New("Secret Error: S3 secret key is not valid. Please check that the secret key and endpoint are correct.")
-	errNoBucketInAccount  = errors.New("Bucket Error: No bucket exists in S3 account. Please create a bucket in your account.")
+	errBucketDoesNotExist = errors.New("Bucket Error: S3 bucket does not exist or you do not have permission to access it. Please check your bucket name and endpoint are correct.") //nolint
+	errInvalidEndpoint    = errors.New("Endpoint Error: Provided S3 endpoint is invalid. Please check endpoint is correct.")                                                         //nolint
+	errInvalidCredential  = errors.New("Credential or Endpoint Error: S3 credentials or endpoint are invalid. Please check your credentials and endpoint are correct.")              //nolint
+	errInvalidSecretKey   = errors.New("Secret Error: S3 secret key is not valid. Please check that the secret key and endpoint are correct.")                                       //nolint
+	errNoBucketInAccount  = errors.New("Bucket Error: No bucket exists in S3 account. Please create a bucket in your account.")                                                      //nolint
 )
 
 // getSymlinkBool returns true if the symlink flag is set in the metadata map, false otherwise.
@@ -242,7 +242,7 @@ func (cl *Client) Configure(cfg Config) error {
 
 func getRegionFromEndpoint(endpoint string) (string, error) {
 	if endpoint == "" {
-		return "", errors.New("Endpoint is empty")
+		return "", errors.New("endpoint is empty")
 	}
 
 	u, err := url.Parse(endpoint)
@@ -252,7 +252,7 @@ func getRegionFromEndpoint(endpoint string) (string, error) {
 
 	hostParts := strings.Split(u.Hostname(), ".")
 	if len(hostParts) < 2 {
-		return "", errors.New("Invalid Endpoint")
+		return "", errors.New("invalid Endpoint")
 	}
 
 	// the second host part is usually the region
@@ -263,7 +263,7 @@ func getRegionFromEndpoint(endpoint string) (string, error) {
 	}
 	// reserve two hostparts after the region for the domain
 	if len(hostParts)-regionPartIndex < 3 {
-		return "", errors.New("Endpoint does not include a region")
+		return "", errors.New("endpoint does not include a region")
 	}
 
 	region := hostParts[regionPartIndex]
@@ -579,9 +579,20 @@ func (cl *Client) ReadToFile(name string, offset int64, count int64, fi *os.File
 	// read object data
 	defer objectDataReader.Close()
 	objectData, err := io.ReadAll(objectDataReader)
+
 	if err != nil {
-		log.Err("Couldn't read object data from %v. Here's why: %v", name, err)
-		return err
+		if strings.Contains(err.Error(), "checksum did not match") {
+			// If count is 0 and offset is 0 then this is a real checksum error
+			// Otherwise, the error only occurs because the checksum is for the whole object and we did not
+			// read the whole object
+			if offset == 0 && count == 0 {
+				log.Err("Checksum validation error reading object data from %v. Here's why: %v", name, err)
+				return err
+			}
+		} else {
+			log.Err("Couldn't read object data from %v. Here's why: %v", name, err)
+			return err
+		}
 	}
 	// write data to file
 	_, err = fi.Write(objectData)
@@ -1172,7 +1183,7 @@ func (cl *Client) GetUsedSize() (uint64, error) {
 
 	response, ok := middleware.GetRawResponse(headBucketOutput.ResultMetadata).(*smithyHttp.Response)
 	if !ok || response == nil {
-		return 0, fmt.Errorf("Failed GetRawResponse from HeadBucketOutput")
+		return 0, fmt.Errorf("failed GetRawResponse from HeadBucketOutput")
 	}
 
 	headerValue, ok := response.Header["X-Rstor-Size"]

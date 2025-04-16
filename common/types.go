@@ -59,7 +59,7 @@ const (
 	MbToBytes         = 1024 * 1024
 	GbToBytes         = 1024 * 1024 * 1024
 	TbToBytes         = 1024 * 1024 * 1024 * 1024
-	DefaultCapacityMb = TbToBytes / MbToBytes
+	DefaultCapacityMb = 1024 * TbToBytes / MbToBytes // 1 PB
 	CfuseStats        = "cloudfuse_stats"
 
 	FuseAllowedFlags = "invalid FUSE options. Allowed FUSE configurations are: `-o attr_timeout=TIMEOUT`, `-o negative_timeout=TIMEOUT`, `-o entry_timeout=TIMEOUT` `-o allow_other`, `-o allow_root`, `-o umask=PERMISSIONS -o default_permissions`, `-o ro`"
