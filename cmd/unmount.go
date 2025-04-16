@@ -34,7 +34,6 @@ import (
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
-	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 )
@@ -116,7 +115,7 @@ func unmountCloudfuse(mntPath string, lazy bool) error {
 		}
 
 		if !strings.Contains(err.Error(), "executable file not found") {
-			log.Err("unmountCloudfuse : failed to unmount (%s : %s)", err.Error(), errb.String())
+			fmt.Printf("unmountCloudfuse : failed to unmount (%s : %s)\n", err.Error(), errb.String())
 			break
 		}
 	}
