@@ -39,6 +39,7 @@ jobs:
     env:
       cgo: "1"
       go: "1.24"
+      zig: 0.14.0
       containerName: "test-cnt-ubn"
 
       AWS_ENDPOINT: http://localhost:4566
@@ -68,6 +69,14 @@ jobs:
         uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
         with:
           python-version: "3.10"
+
+      - name: Install Zig
+        run: |
+          curl -L https://ziglang.org/download/${{ env.zig }}/zig-linux-x86_64-${{ env.zig }}.tar.xz -o zig.tar.xz
+          mkdir -p $HOME/.local/bin
+          tar -xf zig.tar.xz -C $HOME/.local/bin
+          echo "$HOME/.local/bin/zig-linux-x86_64-${{ env.zig }}" >> $GITHUB_PATH
+          rm zig.tar.xz
 
       - name: Set CGO
         shell: bash
@@ -154,6 +163,7 @@ jobs:
     env:
       go: "1.24"
       cgo: "0"
+      zig: 0.14.0
       containerName: "test-cnt-win"
 
     steps:
@@ -168,6 +178,18 @@ jobs:
           go-version: ${{ env.go }}
           check-latest: true
       - run: go version
+
+      - name: Install Zig
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $zigVersion = "${{ env.zig }}"
+          $zigUrl = "https://ziglang.org/download/$zigVersion/zig-windows-x86_64-$zigVersion.zip"
+          $zigZip = "$env:TEMP\zig.zip"
+          Invoke-WebRequest -Uri $zigUrl -OutFile $zigZip
+          Expand-Archive -Path $zigZip -DestinationPath $env:USERPROFILE\zig
+          echo "$env:USERPROFILE\zig\zig-windows-x86_64-$zigVersion" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Remove-Item $zigZip
 
       - name: Set CGO
         shell: bash
