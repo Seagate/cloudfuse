@@ -27,8 +27,11 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -82,6 +85,10 @@ func (s *pipelineTestSuite) SetupTest() {
 	AddComponent("ComponentB", NewComponentB)
 	AddComponent("ComponentC", NewComponentC)
 	s.assert = assert.New(s.T())
+	err := log.SetDefaultLogger("silent", common.LogConfig{})
+	if err != nil {
+		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
+	}
 }
 
 func (s *pipelineTestSuite) TestCreatePipeline() {

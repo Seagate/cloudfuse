@@ -153,6 +153,26 @@ func GetDiskUsageFromStatfs(path string) (float64, float64, error) {
 	return usedSpace, float64(usedSpace) / float64(totalSpace) * 100, nil
 }
 
+// GetAvailFree: Available blocks
+func GetAvailFree(path string) (uint64, uint64, error) {
+	var stat syscall.Statfs_t
+	err := syscall.Statfs(path, &stat)
+	if err != nil {
+		return 0, 0, err
+	}
+	return stat.Bavail, stat.Bfree, err
+}
+
+// GetAvailFree: Available blocks
+func GetFreeRam() (uint64, error) {
+	var sysinfo syscall.Sysinfo_t
+	err := syscall.Sysinfo(&sysinfo)
+	if err != nil {
+		return 0, err
+	}
+	return sysinfo.Freeram * uint64(sysinfo.Unit), nil
+}
+
 // List all mount points which were mounted using cloudfuse
 func ListMountPoints() ([]string, error) {
 	file, err := os.Open("/etc/mtab")

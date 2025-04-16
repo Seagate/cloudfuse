@@ -1,5 +1,3 @@
-//go:build windows
-
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
@@ -30,6 +28,7 @@ package cmd
 import (
 	_ "github.com/Seagate/cloudfuse/component/attr_cache"
 	_ "github.com/Seagate/cloudfuse/component/azstorage"
+	_ "github.com/Seagate/cloudfuse/component/block_cache"
 	_ "github.com/Seagate/cloudfuse/component/file_cache"
 	_ "github.com/Seagate/cloudfuse/component/libfuse"
 	_ "github.com/Seagate/cloudfuse/component/loopback"

@@ -1,14 +1,4 @@
-//go:build linux
-
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
@@ -48,7 +38,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -104,15 +93,16 @@ type BlockCacheOptions struct {
 }
 
 const (
-	compName               = "block_cache"
-	defaultTimeout         = 120
-	MAX_POOL_USAGE  uint32 = 80
-	MIN_POOL_USAGE  uint32 = 50
-	MIN_PREFETCH           = 5
-	MIN_WRITE_BLOCK        = 3
-	MIN_RANDREAD           = 10
-	MAX_FAIL_CNT           = 3
-	MAX_BLOCKS             = 50000
+	compName                       = "block_cache"
+	defaultTimeout                 = 120
+	blockCacheFileSeperator        = "_" // Used to separate block ids in the file name for disk cache
+	MAX_POOL_USAGE          uint32 = 80
+	MIN_POOL_USAGE          uint32 = 50
+	MIN_PREFETCH                   = 5
+	MIN_WRITE_BLOCK                = 3
+	MIN_RANDREAD                   = 10
+	MAX_FAIL_CNT                   = 3
+	MAX_BLOCKS                     = 50000
 )
 
 // Verification to check satisfaction criteria with Component Interface
@@ -195,13 +185,12 @@ func (bc *BlockCache) Configure(_ bool) error {
 	if config.IsSet(compName + ".mem-size-mb") {
 		bc.memSize = conf.MemSize * _1MB
 	} else {
-		var sysinfo syscall.Sysinfo_t
-		err = syscall.Sysinfo(&sysinfo)
+		freeRam, err := common.GetFreeRam()
 		if err != nil {
 			log.Err("BlockCache::Configure : config error %s [%s]. Assigning a pre-defined value of 4GB.", bc.Name(), err.Error())
 			bc.memSize = uint64(4192) * _1MB
 		} else {
-			bc.memSize = uint64(0.8 * (float64)(sysinfo.Freeram) * float64(sysinfo.Unit))
+			bc.memSize = uint64(0.8 * (float64)(freeRam))
 			defaultMemSize = true
 		}
 	}
@@ -258,8 +247,8 @@ func (bc *BlockCache) Configure(_ bool) error {
 				return fmt.Errorf("config error in %s [%s]", bc.Name(), err.Error())
 			}
 		}
-		var stat syscall.Statfs_t
-		err = syscall.Statfs(bc.tmpPath, &stat)
+
+		bavail, bsize, err := common.GetAvailFree(bc.tmpPath)
 		if err != nil {
 			log.Err(
 				"BlockCache::Configure : config error %s [%s]. Assigning a default value of 4GB or if any value is assigned to .disk-size-mb in config.",
@@ -268,7 +257,7 @@ func (bc *BlockCache) Configure(_ bool) error {
 			)
 			bc.diskSize = uint64(4192) * _1MB
 		} else {
-			bc.diskSize = uint64(0.8 * float64(stat.Bavail) * float64(stat.Bsize))
+			bc.diskSize = uint64(0.8 * float64(bavail) * float64(bsize))
 		}
 	}
 
@@ -333,11 +322,12 @@ func (bc *BlockCache) Configure(_ bool) error {
 func (bc *BlockCache) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	log.Trace("BlockCache::CreateFile : name=%s, mode=%d", options.Name, options.Mode)
 
-	_, err := bc.NextComponent().CreateFile(options)
+	f, err := bc.NextComponent().CreateFile(options)
 	if err != nil {
 		log.Err("BlockCache::CreateFile : Failed to create file %s", options.Name)
 		return nil, err
 	}
+	f.GetFileObject().Close()
 
 	handle := handlemap.NewHandle(options.Name)
 	handle.Size = 0
@@ -1035,7 +1025,7 @@ func (bc *BlockCache) lineupDownload(handle *handlemap.Handle, block *Block, pre
 
 // download : Method to download the given amount of data
 func (bc *BlockCache) download(item *workItem) {
-	fileName := fmt.Sprintf("%s::%v", item.handle.Path, item.block.id)
+	fileName := fmt.Sprintf("%s%s%v", item.handle.Path, blockCacheFileSeperator, item.block.id)
 
 	// filename_blockindex is the key for the lock
 	// this ensure that at a given time a block from a file is downloaded only once across all open handles
@@ -1045,7 +1035,6 @@ func (bc *BlockCache) download(item *workItem) {
 
 	var diskNode any
 	found := false
-	localPath := ""
 
 	if bc.tmpPath != "" {
 		// Update diskpolicy to reflect the new file
@@ -1058,22 +1047,29 @@ func (bc *BlockCache) download(item *workItem) {
 		}
 
 		// Check local file exists for this offset and file combination or not
-		localPath = filepath.Join(bc.tmpPath, fileName)
-		_, err := os.Stat(localPath)
+		root, err := os.OpenRoot(bc.tmpPath)
+		if err != nil {
+			// On any disk failure we do not fail the download flow
+			log.Err("BlockCache::download : Failed to open file %s [%s]", fileName, err.Error())
+			return
+		}
+		defer root.Close()
+
+		_, err = root.Stat(fileName)
 
 		if err == nil {
 			// If file exists then read the block from the local file
-			f, err := os.Open(localPath)
+			f, err := root.Open(fileName)
 			if err != nil {
 				// On any disk failure we do not fail the download flow
 				log.Err("BlockCache::download : Failed to open file %s [%s]", fileName, err.Error())
-				_ = os.Remove(localPath)
+				_ = root.Remove(fileName)
 			} else {
 				n, err := f.Read(item.block.data)
 				if err != nil {
 					log.Err("BlockCache::download : Failed to read data from disk cache %s [%s]", fileName, err.Error())
 					f.Close()
-					_ = os.Remove(localPath)
+					_ = root.Remove(fileName)
 				}
 
 				f.Close()
@@ -1132,27 +1128,40 @@ func (bc *BlockCache) download(item *workItem) {
 	item.block.endIndex = item.block.offset + uint64(n)
 
 	if bc.tmpPath != "" {
-		err := os.MkdirAll(filepath.Dir(localPath), 0755)
+		root, err := os.OpenRoot(bc.tmpPath)
 		if err != nil {
-			log.Err(
-				"BlockCache::download : error creating directory structure for file %s [%s]",
-				localPath,
-				err.Error(),
-			)
-			return
+			err := os.Mkdir(bc.tmpPath, 0755)
+			if err != nil {
+				log.Err(
+					"BlockCache::download : error creating directory structure for file %s [%s]",
+					bc.tmpPath,
+					err.Error(),
+				)
+				return
+			}
+			root, err = os.OpenRoot(bc.tmpPath)
+			if err != nil {
+				log.Err(
+					"BlockCache::download : error creating directory structure for file %s [%s]",
+					bc.tmpPath,
+					err.Error(),
+				)
+				return
+			}
 		}
+		defer root.Close()
 
 		// Dump this block to local disk cache
-		f, err := os.Create(localPath)
+		f, err := root.Create(fileName)
 		if err == nil {
 			_, err := f.Write(item.block.data[:n])
 			if err != nil {
 				log.Err(
 					"BlockCache::download : Failed to write %s to disk [%v]",
-					localPath,
+					fileName,
 					err.Error(),
 				)
-				_ = os.Remove(localPath)
+				_ = root.Remove(fileName)
 			}
 
 			f.Close()
@@ -1585,7 +1594,7 @@ func (bc *BlockCache) waitAndFreeUploadedBlocks(handle *handlemap.Handle, cnt in
 
 // upload : Method to stage the given amount of data
 func (bc *BlockCache) upload(item *workItem) {
-	fileName := fmt.Sprintf("%s::%v", item.handle.Path, item.block.id)
+	fileName := fmt.Sprintf("%s%s%v", item.handle.Path, blockCacheFileSeperator, item.block.id)
 
 	// filename_blockindex is the key for the lock
 	// this ensure that at a given time a block from a file is downloaded only once across all open handles
@@ -1629,29 +1638,39 @@ func (bc *BlockCache) upload(item *workItem) {
 	}
 
 	if bc.tmpPath != "" {
-		localPath := filepath.Join(bc.tmpPath, fileName)
-
-		err := os.MkdirAll(filepath.Dir(localPath), 0755)
+		err := os.MkdirAll(bc.tmpPath, 0755)
 		if err != nil {
 			log.Err(
 				"BlockCache::upload : error creating directory structure for file %s [%s]",
-				localPath,
+				bc.tmpPath,
 				err.Error(),
 			)
 			goto return_safe
 		}
 
+		// Check local file exists for this offset and file combination or not
+		root, err := os.OpenRoot(bc.tmpPath)
+		if err != nil {
+			log.Err(
+				"BlockCache::upload : error opening directory structure for file %s [%s]",
+				bc.tmpPath,
+				err.Error(),
+			)
+			goto return_safe
+		}
+		defer root.Close()
+
 		// Dump this block to local disk cache
-		f, err := os.Create(localPath)
+		f, err := root.Create(fileName)
 		if err == nil {
 			_, err := f.Write(item.block.data[0 : item.block.endIndex-item.block.offset])
 			if err != nil {
 				log.Err(
 					"BlockCache::upload : Failed to write %s to disk [%v]",
-					localPath,
+					fileName,
 					err.Error(),
 				)
-				_ = os.Remove(localPath)
+				_ = os.Remove(fileName)
 				goto return_safe
 			}
 
@@ -1878,22 +1897,22 @@ func (bc *BlockCache) stageZeroBlock(handle *handlemap.Handle, tryCnt int) (stri
 
 // diskEvict : Callback when a node from disk expires
 func (bc *BlockCache) diskEvict(node *list.Element) {
-	fileName := node.Value.(string)
+	cacheKey := node.Value.(string)
 
 	// If this block is already locked then return otherwise Lock() will hung up
-	if bc.fileLocks.Locked(fileName) {
-		log.Info("BlockCache::diskEvict : File %s is locked so skipping eviction", fileName)
+	if bc.fileLocks.Locked(cacheKey) {
+		log.Info("BlockCache::diskEvict : File %s is locked so skipping eviction", cacheKey)
 		return
 	}
 
 	// Lock the file name so that its not downloaded when deletion is going on
-	flock := bc.fileLocks.Get(fileName)
+	flock := bc.fileLocks.Get(cacheKey)
 	flock.Lock()
 	defer flock.Unlock()
 
-	bc.fileNodeMap.Delete(fileName)
+	bc.fileNodeMap.Delete(cacheKey)
 
-	localPath := filepath.Join(bc.tmpPath, fileName)
+	localPath := filepath.Join(bc.tmpPath, cacheKey)
 	_ = os.Remove(localPath)
 }
 

@@ -181,7 +181,7 @@ func (suite *fileCacheTestSuite) TestEmpty() {
 
 	suite.assert.False(suite.fileCache.createEmptyFile)
 	suite.assert.False(suite.fileCache.allowNonEmpty)
-	suite.assert.EqualValues(suite.fileCache.cacheTimeout, 120)
+	suite.assert.EqualValues(suite.fileCache.cacheTimeout, 216000)
 	suite.assert.False(suite.fileCache.cleanupOnStart)
 	suite.assert.True(suite.fileCache.syncToFlush)
 }
