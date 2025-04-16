@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - add-arm-runners-for-unit-tests
   pull_request:
   workflow_dispatch:
     inputs:
@@ -19,12 +20,10 @@ jobs:
     name: Build and Test on Linux
     strategy:
       matrix:
-        go: ["1.24"]
         job_name: ["linux-fuse3", "linux-fuse2", "linux-fuse3-arm", "linux-fuse2-arm"]
         include:
           - job_name: linux-fuse3
             os: ubuntu-latest
-            containerName: "test-cnt-ubn"
             fuselib: libfuse3-dev
           - job_name: linux-fuse2
             os: ubuntu-latest
@@ -39,6 +38,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       cgo: "1"
+      go: "1.24"
       containerName: "test-cnt-ubn"
 
       AWS_ENDPOINT: http://localhost:4566
@@ -60,7 +60,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
         with:
-          go-version: ${{ env.go }}
+          go-version: ${{ matrix.go }}
           check-latest: true
       - run: go version
 
@@ -148,7 +148,6 @@ jobs:
     name: Build and Test on Windows
     strategy:
       matrix:
-        go: ["1.24"]
         os: ["windows-latest", "windows-11-arm"]
     
     runs-on: ${{ matrix.os }}
