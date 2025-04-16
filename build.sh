@@ -1,22 +1,22 @@
 #!/bin/bash
 
-ARCH=$(uname -m)
-if [[ "$ARCH" == "x86_64" ]]; then
-    ZIG_TARGET="x86_64-linux-gnu"
-    LIBDIR="/usr/lib/x86_64-linux-gnu"
-elif [[ "$ARCH" == "aarch64" ]] || [[ "$ARCH" == "arm64" ]]; then
-    ZIG_TARGET="aarch64-linux-gnu"
-    LIBDIR="/usr/lib/aarch64-linux-gnu"
-else
-    echo "Unsupported architecture: $ARCH"
-    exit 1
-fi
-
-export CGO_ENABLED=1
-export CC="zig cc -target $ZIG_TARGET -isystem $LIBDIR -iwithsysroot /usr/include"
-export CXX="zig c++ -target $ZIG_TARGET -isystem $LIBDIR -iwithsysroot /usr/include"
-
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    ARCH=$(uname -m)
+    if [[ "$ARCH" == "x86_64" ]]; then
+        ZIG_TARGET="x86_64-linux-gnu"
+        LIBDIR="/usr/lib/x86_64-linux-gnu"
+    elif [[ "$ARCH" == "aarch64" ]] || [[ "$ARCH" == "arm64" ]]; then
+        ZIG_TARGET="aarch64-linux-gnu"
+        LIBDIR="/usr/lib/aarch64-linux-gnu"
+    else
+        echo "Unsupported architecture: $ARCH"
+        exit 1
+    fi
+
+    export CGO_ENABLED=1
+    export CC="zig cc -target $ZIG_TARGET -isystem $LIBDIR -iwithsysroot /usr/include"
+    export CXX="zig c++ -target $ZIG_TARGET -isystem $LIBDIR -iwithsysroot /usr/include"
+
     if [[ "$1" == "fuse2" ]]; then
         rm -rf cloudfuse
         # Build cloudfuse with fuse2
