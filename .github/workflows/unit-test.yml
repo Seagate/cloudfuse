@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         go: ["1.24"]
-        job_name: ["linux-fuse3", "linux-fuse2"]
+        job_name: ["linux-fuse3", "linux-fuse2", "linux-fuse3-arm", "linux-fuse2-arm"]
         include:
           - job_name: linux-fuse3
             os: ubuntu-latest
@@ -28,6 +28,12 @@ jobs:
             fuselib: libfuse3-dev
           - job_name: linux-fuse2
             os: ubuntu-latest
+            fuselib: libfuse-dev
+          - job_name: linux-fuse3-arm
+            os: ubuntu-24.04-arm
+            fuselib: libfuse3-dev
+          - job_name: linux-fuse2-arm
+            os: ubuntu-24.04-arm
             fuselib: libfuse-dev
 
     runs-on: ${{ matrix.os }}
@@ -140,7 +146,12 @@ jobs:
 
   test:
     name: Build and Test on Windows
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        go: ["1.24"]
+        os: ["windows-latest", "windows-11-arm"]
+    
+    runs-on: ${{ matrix.os }}
     env:
       go: "1.24"
       cgo: "0"
