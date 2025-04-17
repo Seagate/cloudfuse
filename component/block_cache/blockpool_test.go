@@ -44,6 +44,7 @@ type blockpoolTestSuite struct {
 }
 
 func (suite *blockpoolTestSuite) SetupTest() {
+	suite.assert = assert.New(suite.T())
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	suite.assert.NoError(err)
 }
