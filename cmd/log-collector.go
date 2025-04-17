@@ -116,10 +116,18 @@ var dumpLogsCmd = &cobra.Command{
 
 		if logType == "base" {
 			logPath = filepath.Dir(logPath)
-			err = createArchive(logPath)
-			if err != nil {
-				return fmt.Errorf("unable to create archive: [%s]", err.Error())
+			if runtime.GOOS == "linux" {
+				err = createLinuxArchive(logPath)
+				if err != nil {
+					return fmt.Errorf("unable to create archive: [%s]", err.Error())
+				}
+			} else if runtime.GOOS == "windows" {
+				err = createWindowsArchive(logPath)
+				if err != nil {
+					return fmt.Errorf("unable to create archive: [%s]", err.Error())
+				}
 			}
+
 		} else if logType == "syslog" && runtime.GOOS == "linux" {
 
 			// call filterLog that outputs a log file. then call createArchive() to put that log into an archive.
@@ -128,7 +136,7 @@ var dumpLogsCmd = &cobra.Command{
 				return fmt.Errorf("failed to crate a filtered log from the syslog: [%s]", err.Error())
 			}
 			filteredSyslogPath = filepath.Dir(filteredSyslogPath)
-			err = createArchive(filteredSyslogPath) //supply the path of the filtered log file here
+			err = createLinuxArchive(filteredSyslogPath) //supply the path of the filtered log file here
 			if err != nil {
 				return fmt.Errorf("unable to create archive: [%s]", err.Error())
 			}
@@ -186,120 +194,116 @@ func createFilteredLog(logFile string) (string, error) {
 	return outPath, scanner.Err()
 }
 
-func createArchive(logPath string) error {
+func createLinuxArchive(logPath string) error {
 	ArchiveName := fmt.Sprintf("cloudfuse_Logs_" + time.Now().Format("2006-01-02_15-04-05"))
 
-	var err error
-	if runtime.GOOS == "linux" {
+	outFile, err := os.Create(dumpPath + "/" + ArchiveName + ".tar.gz")
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
 
-		outFile, err := os.Create(dumpPath + "/" + ArchiveName + ".tar.gz")
-		if err != nil {
-			return err
-		}
-		defer outFile.Close()
+	gzWriter := gzip.NewWriter(outFile)
+	defer gzWriter.Close()
 
-		gzWriter := gzip.NewWriter(outFile)
-		defer gzWriter.Close()
+	tarWriter := tar.NewWriter(gzWriter)
+	defer tarWriter.Close()
 
-		tarWriter := tar.NewWriter(gzWriter)
-		defer tarWriter.Close()
-
-		items, err := os.ReadDir(logPath)
-		if err != nil {
-			return err
-		}
-
-		for _, item := range items {
-			if item.IsDir() {
-				continue
-			}
-
-			filePath := filepath.Join(logPath, item.Name())
-			file, err := os.Open(filePath)
-			if err != nil {
-				return err
-			}
-			defer file.Close()
-
-			info, err := file.Stat()
-			if err != nil {
-				return err
-			}
-
-			header, err := tar.FileInfoHeader(info, "")
-			if err != nil {
-				return err
-			}
-
-			header.Name = item.Name()
-
-			err = tarWriter.WriteHeader(header)
-			if err != nil {
-				return err
-			}
-
-			_, err = io.Copy(tarWriter, file)
-			if err != nil {
-				return err
-			}
-
-		}
-
-	} else if runtime.GOOS == "windows" {
-
-		outFile, err := os.Create(dumpPath + "/" + ArchiveName)
-		if err != nil {
-			return nil
-		}
-		defer outFile.Close()
-
-		zipWriter := zip.NewWriter(outFile)
-		defer zipWriter.Close()
-
-		items, err := os.ReadDir(logPath)
-		if err != nil {
-			return err
-		}
-
-		for _, item := range items {
-			if item.IsDir() {
-				continue
-			}
-
-			filePath := filepath.Join(logPath, item.Name())
-			file, err := os.Open(filePath)
-			if err != nil {
-				return err
-			}
-			defer file.Close()
-
-			info, err := file.Stat()
-			if err != nil {
-				return err
-			}
-
-			header, err := zip.FileInfoHeader(info)
-			if err != nil {
-				return err
-			}
-
-			header.Name = item.Name()
-
-			zipEntry, err := zipWriter.Create(item.Name())
-			if err != nil {
-				return err
-			}
-
-			_, err = io.Copy(zipEntry, file)
-			if err != nil {
-				return err
-			}
-
-		}
-
+	items, err := os.ReadDir(logPath)
+	if err != nil {
+		return err
 	}
 
-	return err
+	for _, item := range items {
+		if item.IsDir() {
+			continue
+		}
+
+		filePath := filepath.Join(logPath, item.Name())
+		file, err := os.Open(filePath)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		info, err := file.Stat()
+		if err != nil {
+			return err
+		}
+
+		header, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return err
+		}
+
+		header.Name = item.Name()
+
+		err = tarWriter.WriteHeader(header)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(tarWriter, file)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func createWindowsArchive(logPath string) error {
+
+	ArchiveName := fmt.Sprintf("cloudfuse_Logs_" + time.Now().Format("2006-01-02_15-04-05"))
+
+	outFile, err := os.Create(dumpPath + "/" + ArchiveName)
+	if err != nil {
+		return nil
+	}
+	defer outFile.Close()
+
+	zipWriter := zip.NewWriter(outFile)
+	defer zipWriter.Close()
+
+	items, err := os.ReadDir(logPath)
+	if err != nil {
+		return err
+	}
+
+	for _, item := range items {
+		if item.IsDir() {
+			continue
+		}
+
+		filePath := filepath.Join(logPath, item.Name())
+		file, err := os.Open(filePath)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		info, err := file.Stat()
+		if err != nil {
+			return err
+		}
+
+		header, err := zip.FileInfoHeader(info)
+		if err != nil {
+			return err
+		}
+
+		header.Name = item.Name()
+
+		zipEntry, err := zipWriter.Create(item.Name())
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(zipEntry, file)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func init() {
