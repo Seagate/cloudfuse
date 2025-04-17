@@ -109,8 +109,8 @@ var dumpLogsCmd = &cobra.Command{
 				}
 			}
 		} else {
-			logPath = "/var/log/syslog"
-			logType = "syslog"
+			logPath = "$HOME/.cloudfuse/cloudfuse.log" //what does $HOME mean in the context for the end user running the command?
+			logType = "base"
 		}
 
 		logPath, err = filepath.Abs(logPath)
