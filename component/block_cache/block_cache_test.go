@@ -55,7 +55,7 @@ import (
 )
 
 var home_dir, _ = os.UserHomeDir()
-var mountpoint = home_dir + "mountpoint"
+var mountpoint = home_dir + "/mountpoint"
 var dataBuff []byte
 
 type blockCacheTestSuite struct {
@@ -64,7 +64,6 @@ type blockCacheTestSuite struct {
 }
 
 func (suite *blockCacheTestSuite) SetupTest() {
-	suite.assert = assert.New(suite.T())
 	suite.assert = assert.New(suite.T())
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	suite.assert.NoError(err)
@@ -302,7 +301,7 @@ func (suite *blockCacheTestSuite) TestSomeInvalidConfigs() {
 	suite.assert.NotNil(err)
 	suite.assert.Contains(err.Error(), "temp directory not empty")
 
-	cfg = fmt.Sprintf("read-only: true\n\nblock_cache:\n  block-size-mb: 8\n  mem-size-mb: 800\n  prefetch: 12\n  parallelism: 5\n  path: %s \n  disk-size-mb: 100\n  disk-timeout-sec: 0", mountpoint)
+	cfg = fmt.Sprintf("read-only: true\n\nblock_cache:\n  block-size-mb: 8\n  mem-size-mb: 800\n  prefetch: 12\n  parallelism: 5\n  path: %s \n  disk-size-mb: 100\n  disk-timeout-sec: 1", mountpoint)
 	_, err = setupPipeline(cfg)
 	suite.assert.NotNil(err)
 	suite.assert.Contains(err.Error(), "tmp-path is same as mount path")

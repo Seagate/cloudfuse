@@ -271,7 +271,7 @@ func (bc *BlockCache) Configure(_ bool) error {
 			return fmt.Errorf("config error in %s [%s]", bc.Name(), err.Error())
 		}
 
-		if bc.mntPath == bc.tmpPath {
+		if strings.EqualFold(filepath.Clean(bc.mntPath), filepath.Clean(bc.tmpPath)) {
 			log.Err("BlockCache: config error [tmp-path is same as mount path]")
 			return fmt.Errorf("config error in %s error [tmp-path is same as mount path]", bc.Name())
 		}
