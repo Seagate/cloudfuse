@@ -85,32 +85,28 @@ var dumpLogsCmd = &cobra.Command{
 			return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
 		}
 
+		logPath := "$HOME/.cloudfuse/cloudfuse.log"
+		logType := "base"
 		_, err = os.Stat(logConfigFile)
 		if errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("the config file path provided does not exist")
-		}
-
-		config.SetConfigFile(logConfigFile)
-		config.ReadFromConfigFile(logConfigFile)
-
-		var logPath string
-		var logType string
-		if config.IsSet("logging.type") {
-			err := config.UnmarshalKey("logging.type", &logType)
-			if err != nil {
-				return fmt.Errorf("failed to parse logging type from config [%s]", err.Error())
-			}
-			if logType == "syslog" {
-				logPath = "/var/log/syslog"
-			} else if logType == "base" {
-				err = config.UnmarshalKey("logging.file-path", &logPath)
+			fmt.Printf("Warning, the config file was not found. Defaults will be used ")
+		} else {
+			config.SetConfigFile(logConfigFile)
+			config.ReadFromConfigFile(logConfigFile)
+			if config.IsSet("logging.type") {
+				err := config.UnmarshalKey("logging.type", &logType)
 				if err != nil {
-					return fmt.Errorf("failed to parse logging file path from config [%s]", err.Error())
+					return fmt.Errorf("failed to parse logging type from config [%s]", err.Error())
+				}
+				if logType == "syslog" {
+					logPath = "/var/log/syslog"
+				} else if logType == "base" {
+					err = config.UnmarshalKey("logging.file-path", &logPath)
+					if err != nil {
+						return fmt.Errorf("failed to parse logging file path from config [%s]", err.Error())
+					}
 				}
 			}
-		} else {
-			logPath = "$HOME/.cloudfuse/cloudfuse.log" //what does $HOME mean in the context for the end user running the command?
-			logType = "base"
 		}
 
 		logPath, err = filepath.Abs(logPath)
