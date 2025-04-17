@@ -32,6 +32,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -42,6 +44,8 @@ type blockpoolTestSuite struct {
 }
 
 func (suite *blockpoolTestSuite) SetupTest() {
+	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
+	suite.assert.NoError(err)
 }
 
 func (suite *blockpoolTestSuite) cleanupTest() {
