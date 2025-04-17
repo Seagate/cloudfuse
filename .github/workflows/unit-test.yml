@@ -101,7 +101,7 @@ jobs:
 
       - name: Build
         run: |
-          if [[ "${{ matrix.job_name }}" == "linux-fuse2" ]]; then
+          if [[ "${{ matrix.job_name }}" == "linux-fuse2" ]] || "${{ matrix.job_name }}" == "linux-fuse2-arm" ]]; then
             ./build.sh fuse2;
           else
             ./build.sh;
@@ -182,7 +182,7 @@ jobs:
             fi
           fi
 
-          if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
+          if [ "${{ matrix.job_name }}" == "linux-fuse2" ] || "${{ matrix.job_name }}" == "linux-fuse2-arm" ]]; then
             go test -v -timeout=1h ./... --tags=unittest,azurite
           else
             go test -v -timeout=1h ./... --tags=unittest,azurite,fuse3
