@@ -63,22 +63,22 @@ var dumpLogsCmd = &cobra.Command{
 		} else {
 			dumpPathExists := common.DirectoryExists(dumpPath)
 			if !dumpPathExists {
-				return fmt.Errorf("the dump path provided does not exist")
+				return fmt.Errorf("the output path provided does not exist")
 			}
 
 			dumpInfo, err := os.Stat(dumpPath)
 			if err != nil {
-				return fmt.Errorf("couldn't stat dump Path")
+				return fmt.Errorf("couldn't stat the output path")
 			}
 
 			if !dumpInfo.IsDir() {
-				return fmt.Errorf("dumpPath provided needs to be a directory")
+				return fmt.Errorf("the provided output path needs to be a directory")
 			}
 		}
 
 		dumpPath, err = filepath.Abs(dumpPath)
 		if err != nil {
-			return fmt.Errorf("couldn't determine absolute path for dump logs [%s]", err.Error())
+			return fmt.Errorf("couldn't determine absolute path for logs [%s]", err.Error())
 		}
 
 		if logConfigFile, err = filepath.Abs(logConfigFile); err != nil {
