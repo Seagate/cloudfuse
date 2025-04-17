@@ -38,7 +38,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -339,14 +338,15 @@ func (bc *BlockCache) Configure(_ bool) error {
 }
 
 func (bc *BlockCache) getDefaultDiskSize(path string) uint64 {
-	var stat syscall.Statfs_t
-	err := syscall.Statfs(path, &stat)
+	diskSize := uint64(4192) * _1MB
+	bavail, bsize, err := common.GetAvailFree(path)
 	if err != nil {
-		log.Info("BlockCache::getDefaultDiskSize : config error %s [%s]. Assigning a default value of 4GB or if any value is assigned to .disk-size-mb in config.", bc.Name(), err.Error())
-		return uint64(4192) * _1MB
+		log.Err("BlockCache::Configure : config error %s [%s]. Assigning a default value of 4GB or if any value is assigned to .disk-size-mb in config.", bc.Name(), err.Error())
+	} else {
+		diskSize = uint64(0.8 * float64(bavail) * float64(bsize))
 	}
 
-	return uint64(0.8 * float64(stat.Bavail) * float64(stat.Bsize))
+	return diskSize
 }
 
 func (bc *BlockCache) getDefaultMemSize() uint64 {
