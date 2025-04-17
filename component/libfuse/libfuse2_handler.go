@@ -569,6 +569,11 @@ func (cf *CgofuseFS) Rmdir(path string) int {
 				log.Err("Libfuse::libfuse_rmdir : Failed to delete %s [%s]", name, err.Error())
 			}
 			return -fuse.ENOTEMPTY
+		} else {
+			empty = fuseFS.NextComponent().IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
+			if !empty {
+				return -fuse.ENOTEMPTY
+			}
 		}
 	}
 
