@@ -72,10 +72,21 @@ jobs:
 
       - name: Install Zig
         run: |
-          curl -L https://ziglang.org/download/${{ env.zig }}/zig-linux-x86_64-${{ env.zig }}.tar.xz -o zig.tar.xz
+          if [[ "${{ runner.arch }}" == "X64" ]]; then
+            ZIG_ARCH="x86_64"
+          elif [[ "${{ runner.arch }}" == "ARM64" ]]; then
+            ZIG_ARCH="aarch64"
+          else
+            echo "Unsupported architecture: ${{ runner.arch }}"
+            exit 1
+          fi
+
+          ZIG_DIR="zig-linux-${ZIG_ARCH}-${{ env.zig }}"
+          ZIG_TARBALL="${ZIG_DIR}.tar.xz"
+          curl -L https://ziglang.org/download/${{ env.zig }}/${ZIG_TARBALL} -o zig.tar.xz
           mkdir -p $HOME/.local/bin
           tar -xf zig.tar.xz -C $HOME/.local/bin
-          echo "$HOME/.local/bin/zig-linux-x86_64-${{ env.zig }}" >> $GITHUB_PATH
+          echo "$HOME/.local/bin/${ZIG_DIR}" >> $GITHUB_PATH
           rm zig.tar.xz
 
       - name: Set CGO
