@@ -461,7 +461,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		az.stConfig.authConfig.AuthMode = EAuthType.SPN()
 		if opt.ClientID == "" || (opt.ClientSecret == "" && opt.OAuthTokenFilePath == "" && opt.WorkloadIdentityToken == "") || opt.TenantID == "" {
 			//lint:ignore ST1005 ignore
-			return errors.New("Client ID, Tenant ID or Client Secret, OAuthTokenFilePath, WorkloadIdentityToken not provided")
+			return errors.New("client ID, tenant ID or client secret, OAuthTokenFilePath, WorkloadIdentityToken not provided")
 		}
 		az.stConfig.authConfig.ClientID = opt.ClientID
 		az.stConfig.authConfig.ClientSecret = memguard.NewEnclave([]byte(opt.ClientSecret))
@@ -473,7 +473,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	case EAuthType.WORKLOADIDENTITY():
 		az.stConfig.authConfig.AuthMode = EAuthType.WORKLOADIDENTITY()
 		if opt.ClientID == "" || opt.TenantID == "" || opt.ApplicationID == "" {
-			return errors.New("Client ID, Tenant ID or Application ID not provided")
+			return errors.New("client ID, tenant ID or application ID not provided")
 		}
 
 		az.stConfig.authConfig.ClientID = opt.ClientID

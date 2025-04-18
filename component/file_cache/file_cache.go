@@ -121,7 +121,7 @@ const (
 	defaultMaxEviction      = 5000
 	defaultMaxThreshold     = 80
 	defaultMinThreshold     = 60
-	defaultFileCacheTimeout = 120
+	defaultFileCacheTimeout = 216000
 	minimumFileCacheTimeout = 1
 	defaultCacheUpdateCount = 100
 	MB                      = 1024 * 1024

@@ -1,5 +1,4 @@
-//go:build linux && !authtest
-// +build linux,!authtest
+//go:build !authtest
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -33,6 +32,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -43,6 +44,9 @@ type blockpoolTestSuite struct {
 }
 
 func (suite *blockpoolTestSuite) SetupTest() {
+	suite.assert = assert.New(suite.T())
+	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
+	suite.assert.NoError(err)
 }
 
 func (suite *blockpoolTestSuite) cleanupTest() {
