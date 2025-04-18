@@ -126,7 +126,7 @@ func (suite *sizeTrackerTestSuite) cleanupTest() {
 func (suite *sizeTrackerTestSuite) TestDefault() {
 	defer suite.cleanupTest()
 	suite.assert.Equal("size_tracker", suite.sizeTracker.Name())
-	suite.assert.EqualValues(uint64(0), suite.sizeTracker.mountSize.GetSize())
+	suite.assert.Equal(uint64(0), suite.sizeTracker.mountSize.GetSize())
 }
 
 func (suite *sizeTrackerTestSuite) TestDeleteDir() {
@@ -309,7 +309,7 @@ func (suite *sizeTrackerTestSuite) TestWriteFileMultiple() {
 
 	_, err = suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 3 * int64(len(data)), Data: data})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(4*len(data), int(suite.sizeTracker.mountSize.GetSize()))
+	suite.assert.Equal(4*len(data), int(suite.sizeTracker.mountSize.GetSize()))
 
 	err = suite.sizeTracker.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
@@ -326,7 +326,7 @@ func (suite *sizeTrackerTestSuite) TestWriteFileErrorBadFd() {
 	handle := handlemap.NewHandle(file)
 	length, err := suite.sizeTracker.WriteFile(internal.WriteFileOptions{Handle: handle})
 	suite.assert.Error(err)
-	suite.assert.EqualValues(0, length)
+	suite.assert.Equal(0, length)
 	suite.assert.EqualValues(0, suite.sizeTracker.mountSize.GetSize())
 }
 

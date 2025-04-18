@@ -156,7 +156,7 @@ func (suite *genConfig) TestFileCacheConfigGen() {
 	defer os.RemoveAll(tempDir)
 
 	_, err := executeCommandC(rootCmd, "gen-config", fmt.Sprintf("--tmp-path=%s", tempDir))
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	logFilePath := suite.getDefaultLogLocation()
 	defer os.Remove(logFilePath)
@@ -166,7 +166,7 @@ func (suite *genConfig) TestFileCacheConfigGen() {
 
 	//check if the generated file is not empty
 	file, err := os.ReadFile(logFilePath)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotEmpty(file)
 
 	//check if the generated file has the correct component
@@ -188,7 +188,7 @@ func (suite *genConfig) TestBlockCacheConfigGen() {
 	defer os.RemoveAll(tempDir)
 
 	_, err := executeCommandC(rootCmd, "gen-config", "--block-cache", fmt.Sprintf("--tmp-path=%s", tempDir))
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	logFilePath := suite.getDefaultLogLocation()
 	defer os.Remove(logFilePath)
@@ -198,7 +198,7 @@ func (suite *genConfig) TestBlockCacheConfigGen() {
 
 	//check if the generated file is not empty
 	file, err := os.ReadFile(logFilePath)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotEmpty(file)
 
 	//check if the generated file has the correct component
@@ -221,7 +221,7 @@ func (suite *genConfig) TestBlockCacheConfigGen1() {
 	defer os.RemoveAll(tempDir)
 
 	_, err := executeCommandC(rootCmd, "gen-config", "--block-cache")
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	logFilePath := suite.getDefaultLogLocation()
 	defer os.Remove(logFilePath)
@@ -231,7 +231,7 @@ func (suite *genConfig) TestBlockCacheConfigGen1() {
 
 	//check if the generated file is not empty
 	file, err := os.ReadFile(logFilePath)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotEmpty(file)
 
 	//check if the generated file has the correct component
@@ -251,7 +251,7 @@ func (suite *genConfig) TestDirectIOConfigGen() {
 	defer suite.cleanupTest()
 
 	_, err := executeCommandC(rootCmd, "gen-config", "--block-cache", "--direct-io")
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	logFilePath := suite.getDefaultLogLocation()
 	defer os.Remove(logFilePath)
@@ -260,7 +260,7 @@ func (suite *genConfig) TestDirectIOConfigGen() {
 
 	//check if the generated file is not empty
 	file, err := os.ReadFile(logFilePath)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotEmpty(file)
 
 	//check if the generated file has the correct direct io flag
@@ -272,11 +272,11 @@ func (suite *genConfig) TestOutputFile() {
 	defer suite.cleanupTest()
 
 	_, err := executeCommandC(rootCmd, "gen-config", "--direct-io", "--o", "1.yaml", "--tmp-path=/tmp")
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	//check if the generated file is not empty
 	file, err := os.ReadFile("1.yaml")
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotEmpty(file)
 
 	//check if the generated file has the correct direct io flag
@@ -289,7 +289,7 @@ func (suite *genConfig) TestConsoleOutput() {
 	defer suite.cleanupTest()
 
 	op, err := executeCommandC(rootCmd, "gen-config", "--direct-io", "--o", "console", "--tmp-path=/tmp")
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	//check if the generated file has the correct direct io flag
 	suite.assert.Empty(op)

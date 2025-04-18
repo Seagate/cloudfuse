@@ -143,7 +143,7 @@ func (suite *attrCacheTestSuite) assertUntouched(path string) {
 
 	cacheItem, found := suite.attrCache.cache.get(path)
 	suite.assert.True(found)
-	suite.assert.EqualValues(defaultSize, cacheItem.attr.Size)
+	suite.assert.Equal(defaultSize, cacheItem.attr.Size)
 	suite.assert.EqualValues(defaultMode, cacheItem.attr.Mode)
 	suite.assert.True(cacheItem.valid())
 	suite.assert.True(cacheItem.exists())
@@ -180,8 +180,8 @@ func (suite *attrCacheTestSuite) assertNotInCloud(path string) {
 
 // This method is used when we transfer the attributes from the src to dst, and mark src as invalid
 func assertAttributesTransferred(suite *attrCacheTestSuite, srcAttr *internal.ObjAttr, dstAttr *internal.ObjAttr) {
-	suite.assert.EqualValues(srcAttr.Size, dstAttr.Size)
-	suite.assert.EqualValues(srcAttr.Mode, dstAttr.Mode)
+	suite.assert.Equal(srcAttr.Size, dstAttr.Size)
+	suite.assert.Equal(srcAttr.Mode, dstAttr.Mode)
 	checkItem, found := suite.attrCache.cache.get(dstAttr.Path)
 	suite.assert.True(found)
 	suite.assert.True(checkItem.exists())
@@ -336,7 +336,7 @@ func (suite *attrCacheTestSuite) TestConfigMaxFiles() {
 	maxFiles := 10
 	config := fmt.Sprintf("attr_cache:\n  timeout-sec: %d\n  max-files: %d", cacheTimeout, maxFiles)
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-	suite.assert.EqualValues(suite.attrCache.maxFiles, maxFiles)
+	suite.assert.Equal(suite.attrCache.maxFiles, maxFiles)
 }
 
 func (suite *attrCacheTestSuite) TestConfigZero() {
@@ -408,7 +408,7 @@ func (suite *attrCacheTestSuite) TestCreateDirNoCacheDirs() {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		suite.cleanupTest()
 		suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-		suite.assert.EqualValues(!noCacheDirs, suite.attrCache.cacheDirs)
+		suite.assert.Equal(!noCacheDirs, suite.attrCache.cacheDirs)
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
 			extendedPath := internal.ExtendDirName(path)
@@ -500,7 +500,7 @@ func (suite *attrCacheTestSuite) TestDeleteDirNoCacheDirs() {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		suite.cleanupTest()
 		suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-		suite.assert.EqualValues(!noCacheDirs, suite.attrCache.cacheDirs)
+		suite.assert.Equal(!noCacheDirs, suite.attrCache.cacheDirs)
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
 			options := internal.DeleteDirOptions{Name: path}
@@ -572,8 +572,8 @@ func (suite *attrCacheTestSuite) TestStreamDirDoesNotExist() {
 				checkItem, found := suite.attrCache.cache.get(p.Path)
 				suite.assert.True(found)
 				if !p.IsDir() {
-					suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
-					suite.assert.EqualValues(mode, checkItem.attr.Mode) // new mode should be set
+					suite.assert.Equal(size, checkItem.attr.Size) // new size should be set
+					suite.assert.Equal(mode, checkItem.attr.Mode) // new mode should be set
 				}
 				suite.assert.True(checkItem.valid())
 				suite.assert.True(checkItem.exists())
@@ -689,8 +689,8 @@ func (suite *attrCacheTestSuite) TestStreamDirExists() {
 				checkItem, found := suite.attrCache.cache.get(cachePath)
 				suite.assert.True(found)
 				if !checkItem.attr.IsDir() {
-					suite.assert.EqualValues(size, checkItem.attr.Size) // new size should be set
-					suite.assert.EqualValues(mode, checkItem.attr.Mode) // new mode should be set
+					suite.assert.Equal(size, checkItem.attr.Size) // new size should be set
+					suite.assert.Equal(mode, checkItem.attr.Mode) // new mode should be set
 				}
 				suite.assert.True(checkItem.valid())
 				suite.assert.True(checkItem.exists())
@@ -719,7 +719,7 @@ func (suite *attrCacheTestSuite) TestStreamDirNoCacheOnList() {
 	cacheOnList := false
 	config := fmt.Sprintf("attr_cache:\n  no-cache-on-list: %t", !cacheOnList)
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-	suite.assert.EqualValues(cacheOnList, suite.attrCache.cacheOnList)
+	suite.assert.Equal(cacheOnList, suite.attrCache.cacheOnList)
 	path := "a"
 	size := int64(1024)
 	mode := os.FileMode(0)
@@ -745,8 +745,8 @@ func (suite *attrCacheTestSuite) TestStreamDirNoCacheOnListNoCacheDirs() {
 	cacheDirs := false
 	config := fmt.Sprintf("attr_cache:\n  no-cache-on-list: %t\n  no-cache-dirs: %t", !cacheOnList, !cacheDirs)
 	suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-	suite.assert.EqualValues(cacheOnList, suite.attrCache.cacheOnList)
-	suite.assert.EqualValues(cacheDirs, suite.attrCache.cacheDirs)
+	suite.assert.Equal(cacheOnList, suite.attrCache.cacheOnList)
+	suite.assert.Equal(cacheDirs, suite.attrCache.cacheDirs)
 	path := "a"
 	size := int64(1024)
 	mode := os.FileMode(0)
@@ -959,7 +959,7 @@ func (suite *attrCacheTestSuite) TestRenameDirNoCacheDirs() {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		suite.cleanupTest()
 		suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-		suite.assert.EqualValues(!noCacheDirs, suite.attrCache.cacheDirs)
+		suite.assert.Equal(!noCacheDirs, suite.attrCache.cacheDirs)
 		suite.Run(input.src+"->"+input.dst, func() {
 			truncatedSrc := internal.TruncateDirName(input.src)
 			truncatedDst := internal.TruncateDirName(input.dst)
@@ -1217,7 +1217,7 @@ func (suite *attrCacheTestSuite) TestSyncDirNoCacheDirs() {
 	for _, path := range paths {
 		suite.cleanupTest()
 		suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
-		suite.assert.EqualValues(!noCacheDirs, suite.attrCache.cacheDirs)
+		suite.assert.Equal(!noCacheDirs, suite.attrCache.cacheDirs)
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
 			options := internal.SyncDirOptions{Name: path}
@@ -1784,8 +1784,8 @@ func (suite *attrCacheTestSuite) TestChmod() {
 			checkItem, found := suite.attrCache.cache.get(truncatedPath)
 			suite.assert.True(found)
 
-			suite.assert.EqualValues(defaultSize, checkItem.attr.Size)
-			suite.assert.EqualValues(mode, checkItem.attr.Mode) // new mode should be set
+			suite.assert.Equal(defaultSize, checkItem.attr.Size)
+			suite.assert.Equal(mode, checkItem.attr.Mode) // new mode should be set
 			suite.assert.True(checkItem.valid())
 			suite.assert.True(checkItem.exists())
 		})

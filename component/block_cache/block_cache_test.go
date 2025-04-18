@@ -171,7 +171,7 @@ func (suite *blockCacheTestSuite) TestEmpty() {
 
 	suite.assert.NoError(err)
 	suite.assert.Equal("block_cache", tobj.blockCache.Name())
-	suite.assert.EqualValues(16*_1MB, tobj.blockCache.blockSize)
+	suite.assert.Equal(16*_1MB, tobj.blockCache.blockSize)
 	suite.assert.EqualValues(0, tobj.blockCache.diskSize)
 	suite.assert.EqualValues(defaultTimeout, tobj.blockCache.diskTimeout)
 
@@ -181,7 +181,7 @@ func (suite *blockCacheTestSuite) TestEmpty() {
 	coresStr := strings.TrimSpace(string(output))
 	cores, err := strconv.Atoi(coresStr)
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(tobj.blockCache.workers, uint32(3*cores))
+	suite.assert.Equal(tobj.blockCache.workers, uint32(3*cores))
 	suite.assert.EqualValues(tobj.blockCache.prefetch, math.Max((MIN_PREFETCH*2)+1, float64(2*cores)))
 	suite.assert.False(tobj.blockCache.noPrefetch)
 	suite.assert.NotNil(tobj.blockCache.blockPool)
@@ -244,20 +244,20 @@ func (suite *blockCacheTestSuite) TestStatfsMemory() {
 	tobj, err := setupPipeline(emptyConfig)
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
-	suite.assert.Equal(tobj.blockCache.Name(), "block_cache")
+	suite.assert.NoError(err)
+	suite.assert.Equal("block_cache", tobj.blockCache.Name())
 	cmd := exec.Command("bash", "-c", "free -b | grep Mem | awk '{print $4}'")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err = cmd.Run()
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	free, err := strconv.Atoi(strings.TrimSpace(out.String()))
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	expected := uint64(0.8 * float64(free))
 	stat, ret, err := tobj.blockCache.StatFs()
-	suite.assert.Equal(ret, true)
-	suite.assert.Equal(err, nil)
-	suite.assert.NotEqual(stat, &syscall.Statfs_t{})
+	suite.assert.True(ret)
+	suite.assert.NoError(err)
+	suite.assert.NotEqual(&syscall.Statfs_t{}, stat)
 	actual := tobj.blockCache.memSize
 	difference := math.Abs(float64(actual) - float64(expected))
 	tolerance := 0.10 * float64(math.Max(float64(actual), float64(expected)))
@@ -270,21 +270,21 @@ func (suite *blockCacheTestSuite) TestStatfsDisk() {
 	tobj, err := setupPipeline(config)
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
-	suite.assert.Equal(tobj.blockCache.Name(), "block_cache")
+	suite.assert.NoError(err)
+	suite.assert.Equal("block_cache", tobj.blockCache.Name())
 
 	cmd := exec.Command("bash", "-c", fmt.Sprintf("df -B1 %s | awk 'NR==2{print $4}'", disk_cache_path))
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err = cmd.Run()
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	freeDisk, err := strconv.Atoi(strings.TrimSpace(out.String()))
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	expected := uint64(0.8 * float64(freeDisk))
 	stat, ret, err := tobj.blockCache.StatFs()
-	suite.assert.Equal(ret, true)
-	suite.assert.Equal(err, nil)
-	suite.assert.NotEqual(stat, &syscall.Statfs_t{})
+	suite.assert.True(ret)
+	suite.assert.NoError(err)
+	suite.assert.NotEqual(&syscall.Statfs_t{}, stat)
 	actual := tobj.blockCache.diskSize
 	difference := math.Abs(float64(actual) - float64(expected))
 	tolerance := 0.10 * float64(math.Max(float64(actual), float64(expected)))
@@ -351,12 +351,12 @@ func (suite *blockCacheTestSuite) TestSomeInvalidConfigs() {
 
 	cfg = "read-only: true\n\nblock_cache:\n  block-size-mb: 8\n  mem-size-mb: 800\n  prefetch: 12\n  parallelism: 5\n  path: ./ \n  disk-size-mb: 100\n  disk-timeout-sec: 0"
 	_, err = setupPipeline(cfg)
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "temp directory not empty")
 
 	cfg = fmt.Sprintf("read-only: true\n\nblock_cache:\n  block-size-mb: 8\n  mem-size-mb: 800\n  prefetch: 12\n  parallelism: 5\n  path: %s \n  disk-size-mb: 100\n  disk-timeout-sec: 1", mountpoint)
 	_, err = setupPipeline(cfg)
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "tmp-path is same as mount path")
 }
 
@@ -367,10 +367,10 @@ func (suite *blockCacheTestSuite) TestManualConfig() {
 
 	suite.assert.NoError(err)
 	suite.assert.Equal("block_cache", tobj.blockCache.Name())
-	suite.assert.EqualValues(16*_1MB, tobj.blockCache.blockSize)
-	suite.assert.EqualValues(500*_1MB, tobj.blockCache.memSize)
+	suite.assert.Equal(16*_1MB, tobj.blockCache.blockSize)
+	suite.assert.Equal(500*_1MB, tobj.blockCache.memSize)
 	suite.assert.EqualValues(10, tobj.blockCache.workers)
-	suite.assert.EqualValues(100*_1MB, tobj.blockCache.diskSize)
+	suite.assert.Equal(100*_1MB, tobj.blockCache.diskSize)
 	suite.assert.EqualValues(5, tobj.blockCache.diskTimeout)
 	suite.assert.EqualValues(12, tobj.blockCache.prefetch)
 	suite.assert.EqualValues(10, tobj.blockCache.workers)
@@ -634,7 +634,7 @@ func (suite *blockCacheTestSuite) TestFileReadBlockCacheTmpPath() {
 	tmpPath := tobj.blockCache.tmpPath
 
 	entries, err := os.ReadDir(tmpPath)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	var size1048576, size7 bool
 	for _, entry := range entries {
@@ -2680,11 +2680,11 @@ func (suite *blockCacheTestSuite) TestZZZZZStreamToBlockCacheConfig() {
 	tobj, err := setupPipeline(config)
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	if err == nil {
-		suite.assert.Equal(tobj.blockCache.Name(), "block_cache")
-		suite.assert.EqualValues(tobj.blockCache.blockSize, 2*_1MB)
-		suite.assert.EqualValues(tobj.blockCache.memSize, 8*_1MB*30)
+		suite.assert.Equal("block_cache", tobj.blockCache.Name())
+		suite.assert.EqualValues(2*_1MB, tobj.blockCache.blockSize)
+		suite.assert.EqualValues(8*_1MB*30, tobj.blockCache.memSize)
 	}
 }
 
@@ -2692,7 +2692,7 @@ func (suite *blockCacheTestSuite) TestSizeOfFileInOpen() {
 	// Write-back cache is turned on by default while mounting.
 	config := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 1"
 	tobj, err := setupPipeline(config)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	defer tobj.cleanupPipeline()
 
 	path := getTestFileName(suite.T().Name())
@@ -2702,55 +2702,55 @@ func (suite *blockCacheTestSuite) TestSizeOfFileInOpen() {
 	// ------------------------------------------------------------------
 	// Create a local file
 	fh, err := os.Create(localPath)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	// write 1MB data at offset 0
 	n, err := fh.WriteAt(dataBuff[:_1MB], 0)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.Equal(n, int(_1MB))
 
 	err = fh.Close()
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	// ------------------------------------------------------------------
 	// Create a file using Mountpoint
 	options := internal.CreateFileOptions{Name: path, Mode: 0777}
 	h, err := tobj.blockCache.CreateFile(options)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(h.Size, int64(0))
+	suite.assert.Equal(int64(0), h.Size)
 	suite.assert.False(h.Dirty())
 
 	// write 1MB data at offset 0
 	n, err = tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: dataBuff[:_1MB]})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.Equal(n, int(_1MB))
 	suite.assert.True(h.Dirty())
 
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	//---------------------------------------------------------------------
 
 	//Open and close the file using the given flag in local and mountpoint and
 	// check the size is same or not.
 	check := func(flag int) int {
 		lfh, err := os.OpenFile(localPath, flag, 0666)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		suite.assert.NotNil(lfh)
 		err = lfh.Close()
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 
 		openFileOptions := internal.OpenFileOptions{Name: path, Flags: flag, Mode: 0777}
 		rfh, err := tobj.blockCache.OpenFile(openFileOptions)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: rfh})
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 
 		statInfoLocal, err := os.Stat(localPath)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		sizeInLocal := statInfoLocal.Size()
 
 		statInfoMount, err := os.Stat(storagePath)
-		suite.assert.Nil(err)
+		suite.assert.NoError(err)
 		sizeInMount := statInfoMount.Size()
 		suite.assert.Equal(sizeInLocal, sizeInMount)
 		return int(sizeInLocal)
@@ -2758,14 +2758,14 @@ func (suite *blockCacheTestSuite) TestSizeOfFileInOpen() {
 	size := check(os.O_WRONLY) // size of the file would be 1MB
 	suite.assert.Equal(size, int(_1MB))
 	size = check(os.O_TRUNC) // size of the file would be zero here.
-	suite.assert.Equal(size, int(0))
+	suite.assert.Equal(int(0), size)
 }
 
 func (suite *blockCacheTestSuite) TestStrongConsistency() {
 	tobj, err := setupPipeline("")
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(tobj.blockCache)
 
 	tobj.blockCache.consistency = true
@@ -2773,26 +2773,26 @@ func (suite *blockCacheTestSuite) TestStrongConsistency() {
 	path := getTestFileName(suite.T().Name())
 	options := internal.CreateFileOptions{Name: path, Mode: 0777}
 	h, err := tobj.blockCache.CreateFile(options)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(h.Size, int64(0))
+	suite.assert.Equal(int64(0), h.Size)
 	suite.assert.False(h.Dirty())
 
 	storagePath := filepath.Join(tobj.fake_storage_path, path)
 	fs, err := os.Stat(storagePath)
-	suite.assert.Nil(err)
-	suite.assert.Equal(fs.Size(), int64(0))
+	suite.assert.NoError(err)
+	suite.assert.Equal(int64(0), fs.Size())
 	//Generate random size of file in bytes less than 2MB
 	size := mrand.Int64N(2097152)
 	data := make([]byte, size)
 
 	n, err := tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data}) // Write data to file
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.EqualValues(n, size)
 	suite.assert.Equal(h.Size, int64(size))
 
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.Nil(h.Buffers.Cooked)
 	suite.assert.Nil(h.Buffers.Cooking)
 
@@ -2800,43 +2800,43 @@ func (suite *blockCacheTestSuite) TestStrongConsistency() {
 
 	xattrMd5sumOrg := make([]byte, 32)
 	_, err = syscall.Getxattr(localPath, "user.md5sum", xattrMd5sumOrg)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	h, err = tobj.blockCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
 	_, _ = tobj.blockCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data})
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.Nil(h.Buffers.Cooked)
 	suite.assert.Nil(h.Buffers.Cooking)
 
 	xattrMd5sumRead := make([]byte, 32)
 	_, err = syscall.Getxattr(localPath, "user.md5sum", xattrMd5sumRead)
-	suite.assert.Nil(err)
-	suite.assert.EqualValues(xattrMd5sumOrg, xattrMd5sumRead)
+	suite.assert.NoError(err)
+	suite.assert.Equal(xattrMd5sumOrg, xattrMd5sumRead)
 
 	err = syscall.Setxattr(localPath, "user.md5sum", []byte("000"), 0)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	xattrMd5sum1 := make([]byte, 32)
 	_, err = syscall.Getxattr(localPath, "user.md5sum", xattrMd5sum1)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	h, err = tobj.blockCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
 	_, _ = tobj.blockCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data})
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.Nil(h.Buffers.Cooked)
 	suite.assert.Nil(h.Buffers.Cooking)
 
 	xattrMd5sum2 := make([]byte, 32)
 	_, err = syscall.Getxattr(localPath, "user.md5sum", xattrMd5sum2)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
-	suite.assert.NotEqualValues(xattrMd5sum1, xattrMd5sum2)
+	suite.assert.NotEqual(xattrMd5sum1, xattrMd5sum2)
 }
 
 // In order for 'go test' to run this suite, we need to create

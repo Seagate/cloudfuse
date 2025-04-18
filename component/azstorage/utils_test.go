@@ -52,7 +52,7 @@ func (s *utilsTestSuite) TestContentType() {
 	assert := assert.New(s.T())
 
 	val := getContentType("a.tst")
-	assert.EqualValues("application/octet-stream", val, "Content-type mismatch")
+	assert.Equal("application/octet-stream", val, "Content-type mismatch")
 
 	newSet := `{
 		".tst": "application/test",
@@ -62,11 +62,11 @@ func (s *utilsTestSuite) TestContentType() {
 	assert.NoError(err, "Failed to populate new config")
 
 	val = getContentType("a.tst")
-	assert.EqualValues("application/test", val, "Content-type mismatch")
+	assert.Equal("application/test", val, "Content-type mismatch")
 
 	// assert mp4 content type would get deserialized correctly
 	val = getContentType("file.mp4")
-	assert.EqualValues("video/mp4", val)
+	assert.Equal("video/mp4", val)
 }
 
 type contentTypeVal struct {
@@ -107,7 +107,7 @@ func (s *utilsTestSuite) TestPrefixPathRemoval() {
 	for _, i := range inputs {
 		s.Run(common.JoinUnixFilepath(i.prefix, i.path), func() {
 			output := removePrefixPath(i.prefix, i.path)
-			assert.EqualValues(i.result, output)
+			assert.Equal(i.result, output)
 		})
 	}
 
@@ -171,7 +171,7 @@ func (s *utilsTestSuite) TestGetContentType() {
 	for _, i := range inputs {
 		s.Run(i.val, func() {
 			output := getContentType(i.val)
-			assert.EqualValues(i.result, output)
+			assert.Equal(i.result, output)
 		})
 	}
 }
@@ -207,7 +207,7 @@ func (s *utilsTestSuite) TestGetAccessTierType() {
 	for _, i := range inputs {
 		s.Run(i.val, func() {
 			output := getAccessTierType(i.val)
-			assert.EqualValues(i.result, output)
+			assert.Equal(i.result, output)
 		})
 	}
 }
@@ -236,7 +236,7 @@ func (s *utilsTestSuite) TestGetFileMode() {
 				assert.NoError(err)
 			}
 
-			assert.EqualValues(i.mode, m)
+			assert.Equal(i.mode, m)
 			if err != nil {
 				assert.Contains(err.Error(), i.str)
 			}
@@ -273,7 +273,7 @@ func (s *utilsTestSuite) TestGetFileModeFromACL() {
 			m, err := getFileModeFromACL(objid, i.acl, i.owner)
 			if i.errstr == "" {
 				assert.NoError(err)
-				assert.EqualValues(i.mode, m)
+				assert.Equal(i.mode, m)
 			} else {
 				assert.Error(err)
 				assert.Contains(err.Error(), i.errstr)
@@ -313,12 +313,12 @@ func (s *utilsTestSuite) TestSanitizeSASKey() {
 	sanitizedKey = sanitizeSASKey("?abcd")
 	key, _ := sanitizedKey.Open()
 	defer key.Destroy()
-	assert.EqualValues("?abcd", key.String())
+	assert.Equal("?abcd", key.String())
 
 	sanitizedKey = sanitizeSASKey("abcd")
 	key, _ = sanitizedKey.Open()
 	defer key.Destroy()
-	assert.EqualValues("?abcd", key.String())
+	assert.Equal("?abcd", key.String())
 }
 
 func (s *utilsTestSuite) TestSanitizeEtag() {
@@ -326,11 +326,11 @@ func (s *utilsTestSuite) TestSanitizeEtag() {
 
 	etagValue := azcore.ETag("\"abcd\"")
 	etag := sanitizeEtag(&etagValue)
-	assert.EqualValues(etag, "abcd")
+	assert.EqualValues("abcd", etag)
 
 	etagValue = azcore.ETag("abcd")
 	etag = sanitizeEtag(&etagValue)
-	assert.EqualValues(etag, "abcd")
+	assert.EqualValues("abcd", etag)
 }
 
 func (s *utilsTestSuite) TestBlockNonProxyOptions() {
@@ -449,7 +449,7 @@ func (s *utilsTestSuite) TestFormatEndpointAccountType() {
 	for _, i := range inputs {
 		s.Run(i.endpoint+","+i.account.String(), func() {
 			output := formatEndpointAccountType(i.endpoint, i.account)
-			assert.EqualValues(i.result, output)
+			assert.Equal(i.result, output)
 		})
 	}
 }
@@ -481,7 +481,7 @@ func (s *utilsTestSuite) TestFormatEndpointProtocol() {
 	for _, i := range inputs {
 		s.Run(i.endpoint+","+strconv.FormatBool(i.ustHttp), func() {
 			output := formatEndpointProtocol(i.endpoint, i.ustHttp)
-			assert.EqualValues(i.result, output)
+			assert.Equal(i.result, output)
 		})
 	}
 }
@@ -568,7 +568,7 @@ func (suite *utilsTestSuite) TestRemovePrefixPath() {
 	for _, i := range inputs {
 		suite.Run(filepath.Join(i.prefixPath, i.path), func() {
 			output := removePrefixPath(i.prefixPath, i.path)
-			assert.EqualValues(i.result, output)
+			assert.Equal(i.result, output)
 		})
 	}
 }

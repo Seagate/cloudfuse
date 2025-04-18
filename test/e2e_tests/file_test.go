@@ -115,35 +115,35 @@ func (suite *fileTestSuite) TestOpenFlag_O_TRUNC() {
 	buf := "foo"
 	tempbuf := make([]byte, 4096)
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
-	suite.Nil(err)
+	suite.NoError(err)
 	bytesWritten, err := srcFile.Write([]byte(buf))
 	suite.Equal(len(buf), bytesWritten)
-	suite.Nil(err)
+	suite.NoError(err)
 	err = srcFile.Close()
-	suite.Nil(err)
+	suite.NoError(err)
 
 	srcFile, err = os.OpenFile(fileName, os.O_WRONLY, 0666)
-	suite.Nil(err)
+	suite.NoError(err)
 	err = srcFile.Close()
-	suite.Nil(err)
+	suite.NoError(err)
 
 	fileInfo, err := os.Stat(fileName)
 	suite.Equal(int64(len(buf)), fileInfo.Size())
-	suite.Nil(err)
+	suite.NoError(err)
 
 	srcFile, err = os.OpenFile(fileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
-	suite.Nil(err)
+	suite.NoError(err)
 	read, _ := srcFile.Read(tempbuf)
 	suite.Equal(0, read)
 	err = srcFile.Close()
-	suite.Nil(err)
+	suite.NoError(err)
 
 	fileInfo, err = os.Stat(fileName)
 	suite.Equal(int64(0), fileInfo.Size())
-	suite.Nil(err)
+	suite.NoError(err)
 
 	srcFile, err = os.OpenFile(fileName, os.O_RDONLY, 0666)
-	suite.Nil(err)
+	suite.NoError(err)
 	read, _ = srcFile.Read(tempbuf)
 	suite.Equal(0, read)
 }
@@ -165,7 +165,7 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 	}
 	fmt.Println("Skipping TestFileCreatSpclChar (flaky)")
 	return
-	speclChar := "abcd%23ABCD%34123-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत.txt"
+
 	fileName := filepath.Join(suite.testPath, speclChar)
 
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
@@ -345,7 +345,7 @@ func (suite *fileTestSuite) TestFileReadSmall() {
 
 	data, err := os.ReadFile(fileName)
 	suite.NoError(err)
-	suite.Equal(len(data), len(suite.minBuff))
+	suite.Len(suite.minBuff, len(data))
 
 	suite.fileTestCleanup([]string{fileName})
 }
@@ -537,7 +537,7 @@ func (suite *fileTestSuite) TestLinkRead() {
 	suite.NoError(err)
 	data, err := os.ReadFile(fileName)
 	suite.NoError(err)
-	suite.Equal(len(data), len(suite.minBuff))
+	suite.Len(suite.minBuff, len(data))
 	suite.fileTestCleanup([]string{fileName})
 	err = os.Remove(symName)
 	suite.NoError(err)
@@ -624,7 +624,7 @@ func (suite *fileTestSuite) TestLinkDeleteReadTarget() {
 
 	data, err := os.ReadFile(fileName)
 	suite.NoError(err)
-	suite.Equal(len(data), len(suite.minBuff))
+	suite.Len(suite.minBuff, len(data))
 
 	err = os.Symlink(fileName, symName)
 	suite.NoError(err)
@@ -665,14 +665,14 @@ func (suite *fileTestSuite) TestListDirReadLink() {
 
 	data1, err := os.ReadFile(symName)
 	suite.NoError(err)
-	suite.Equal(len(data1), len(suite.minBuff))
+	suite.Len(suite.minBuff, len(data1))
 
 	// temp cache cleanup
 	suite.fileTestCleanup([]string{filepath.Join(suite.testCachePath, "small_hns.txt"), filepath.Join(suite.testCachePath, "small_hns.lnk")})
 
 	data2, err := os.ReadFile(fileName)
 	suite.NoError(err)
-	suite.Equal(len(data2), len(suite.minBuff))
+	suite.Len(suite.minBuff, len(data2))
 
 	// validating data
 	suite.Equal(data1, data2)
