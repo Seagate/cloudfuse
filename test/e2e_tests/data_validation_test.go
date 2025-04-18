@@ -170,12 +170,16 @@ func createFileHandleInLocalAndRemote(
 }
 
 // Open File in Local and Mounted Directories and returns there file handles the associated fd has O_RDONLY Mode
-func openFileHandleInLocalAndRemote(suite *dataValidationTestSuite, flags int, localFilePath, remoteFilePath string) (lfh *os.File, rfh *os.File) {
+func openFileHandleInLocalAndRemote(
+	suite *dataValidationTestSuite,
+	flags int,
+	localFilePath, remoteFilePath string,
+) (lfh *os.File, rfh *os.File) {
 	lfh, err := os.OpenFile(localFilePath, flags, 0666)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	rfh, err = os.OpenFile(remoteFilePath, flags, 0666)
-	suite.Nil(err)
+	suite.NoError(err)
 
 	return lfh, rfh
 }
@@ -219,7 +223,11 @@ func generateFileWithRandomData(suite *dataValidationTestSuite, filePath string,
 	closeFileHandles(suite, fh)
 }
 
-func compareReadOperInLocalAndRemote(suite *dataValidationTestSuite, lfh, rfh *os.File, offset int64) {
+func compareReadOperInLocalAndRemote(
+	suite *dataValidationTestSuite,
+	lfh, rfh *os.File,
+	offset int64,
+) {
 	buffer1 := make([]byte, 4*int(_1MB))
 	buffer2 := make([]byte, 4*int(_1MB))
 
@@ -230,7 +238,11 @@ func compareReadOperInLocalAndRemote(suite *dataValidationTestSuite, lfh, rfh *o
 	suite.Equal(buffer1[:bytes_read_local], buffer2[:bytes_read_remote])
 }
 
-func compareWriteOperInLocalAndRemote(suite *dataValidationTestSuite, lfh, rfh *os.File, offset int64) {
+func compareWriteOperInLocalAndRemote(
+	suite *dataValidationTestSuite,
+	lfh, rfh *os.File,
+	offset int64,
+) {
 	sizeofbuffer := (mrand.Int() % 4) + 1
 	buffer := make([]byte, sizeofbuffer*int(_1MB))
 	rand.Read(buffer)

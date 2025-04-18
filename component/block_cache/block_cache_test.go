@@ -312,12 +312,15 @@ func (suite *blockCacheTestSuite) TestSomeInvalidConfigs() {
 
 	cfg = "read-only: true\n\nblock_cache:\n  block-size-mb: 8\n  mem-size-mb: 800\n  prefetch: 12\n  parallelism: 5\n  path: ./ \n  disk-size-mb: 100\n  disk-timeout-sec: 0"
 	_, err = setupPipeline(cfg)
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "temp directory not empty")
 
-	cfg = fmt.Sprintf("read-only: true\n\nblock_cache:\n  block-size-mb: 8\n  mem-size-mb: 800\n  prefetch: 12\n  parallelism: 5\n  path: %s \n  disk-size-mb: 100\n  disk-timeout-sec: 1", mountpoint)
+	cfg = fmt.Sprintf(
+		"read-only: true\n\nblock_cache:\n  block-size-mb: 8\n  mem-size-mb: 800\n  prefetch: 12\n  parallelism: 5\n  path: %s \n  disk-size-mb: 100\n  disk-timeout-sec: 1",
+		mountpoint,
+	)
 	_, err = setupPipeline(cfg)
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "tmp-path is same as mount path")
 }
 
@@ -605,7 +608,7 @@ func (suite *blockCacheTestSuite) TestFileReadBlockCacheTmpPath() {
 	tmpPath := tobj.blockCache.tmpPath
 
 	entries, err := os.ReadDir(tmpPath)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	var size1048576, size7 bool
 	for _, entry := range entries {
@@ -2888,11 +2891,11 @@ func (suite *blockCacheTestSuite) TestZZZZZStreamToBlockCacheConfig() {
 	tobj, err := setupPipeline(config)
 	defer tobj.cleanupPipeline()
 
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	if err == nil {
-		suite.assert.Equal(tobj.blockCache.Name(), "block_cache")
-		suite.assert.EqualValues(tobj.blockCache.blockSize, 2*_1MB)
-		suite.assert.EqualValues(tobj.blockCache.memSize, 8*_1MB*30)
+		suite.assert.Equal("block_cache", tobj.blockCache.Name())
+		suite.assert.EqualValues(2*_1MB, tobj.blockCache.blockSize)
+		suite.assert.EqualValues(8*_1MB*30, tobj.blockCache.memSize)
 	}
 }
 

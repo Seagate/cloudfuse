@@ -59,7 +59,9 @@ func (suite *libfuseTestSuite) TestConfig() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default libfuse generated
 	config := "allow-other: true\nread-only: true\nlibfuse:\n  attribute-expiration-sec: 60\n  entry-expiration-sec: 60\n  negative-entry-expiration-sec: 60\n  fuse-trace: true\n  disable-writeback-cache: true\n  ignore-open-flags: false\n  network-share: true\n  display-capacity-mb: 262144\n"
-	suite.setupTestHelper(config) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
+	suite.setupTestHelper(
+		config,
+	) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal("libfuse", suite.libfuse.Name())
 	suite.assert.Empty(suite.libfuse.mountPath)
@@ -83,7 +85,9 @@ func (suite *libfuseTestSuite) TestConfigDirectIO() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default libfuse generated
 	config := "allow-other: true\nread-only: true\nlibfuse:\n  attribute-expiration-sec: 60\n  entry-expiration-sec: 60\n  negative-entry-expiration-sec: 60\n  fuse-trace: true\n  disable-writeback-cache: true\n  ignore-open-flags: false\n  direct-io: true\n  network-share: true\n  display-capacity-mb: 262144\n"
-	suite.setupTestHelper(config) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
+	suite.setupTestHelper(
+		config,
+	) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal("libfuse", suite.libfuse.Name())
 	suite.assert.Empty(suite.libfuse.mountPath)

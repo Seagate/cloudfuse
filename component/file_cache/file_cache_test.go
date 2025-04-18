@@ -542,7 +542,7 @@ func (suite *fileCacheTestSuite) TestStreamDirCase3() {
 	suite.assert.EqualValues(1024, dir[1].Size)
 	suite.assert.Equal(file3, dir[2].Path)
 	suite.assert.EqualValues(1024, dir[2].Size)
-	suite.assert.EqualValues(subdir, dir[3].Path)
+	suite.assert.Equal(subdir, dir[3].Path)
 	suite.fileCache.createEmptyFile = false
 }
 
@@ -2178,7 +2178,9 @@ func (suite *fileCacheTestSuite) TestDeleteEmptyDirsNonRoot() {
 	suite.assert.NoError(err)
 	suite.assert.True(val)
 
-	val, err = suite.fileCache.DeleteEmptyDirs(internal.DeleteDirOptions{Name: filepath.Join(suite.cache_path, "h")})
+	val, err = suite.fileCache.DeleteEmptyDirs(
+		internal.DeleteDirOptions{Name: filepath.Join(suite.cache_path, "h")},
+	)
 	suite.assert.NoError(err)
 	suite.assert.True(val)
 }

@@ -3081,13 +3081,13 @@ func getACL(dl *Datalake, name string) (string, error) {
 func (s *datalakeTestSuite) createFileWithData(name string, data []byte, mode os.FileMode) {
 	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
 	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.az.Chmod(internal.ChmodOptions{Name: name, Mode: mode})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	s.az.CloseFile(internal.CloseFileOptions{Handle: h})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 }
 
 func (s *datalakeTestSuite) TestPermissionPreservationWithoutFlag() {
@@ -3100,17 +3100,17 @@ func (s *datalakeTestSuite) TestPermissionPreservationWithoutFlag() {
 	// Simulate file copy and permission checks
 	_ = os.WriteFile(name+"_local", []byte("123123"), mode)
 	f, err := os.OpenFile(name+"_local", os.O_RDWR, mode)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.az.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f, Metadata: nil})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	attr, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(attr)
 	s.assert.NotEqual(os.FileMode(0764), attr.Mode)
 
 	acl, err := getACL(s.az.storage.(*Datalake), name)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Contains(acl, "user::rw-")
 	s.assert.Contains(acl, "group::r--")
 	s.assert.Contains(acl, "other::---")
@@ -3121,8 +3121,13 @@ func (s *datalakeTestSuite) TestPermissionPreservationWithoutFlag() {
 func (s *datalakeTestSuite) TestPermissionPreservationWithFlag() {
 	defer s.cleanupTest()
 	// Setup
-	conf := fmt.Sprintf("azstorage:\n  preserve-acl: true\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	conf := fmt.Sprintf(
+		"azstorage:\n  preserve-acl: true\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+	)
 	s.setupTestHelper(conf, s.container, false)
 
 	name := generateFileName()
@@ -3132,18 +3137,18 @@ func (s *datalakeTestSuite) TestPermissionPreservationWithFlag() {
 	// Simulate file copy and permission checks
 	_ = os.WriteFile(name+"_local", []byte("123123"), mode)
 	f, err := os.OpenFile(name+"_local", os.O_RDWR, mode)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	err = s.az.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f, Metadata: nil})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	attr, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(attr)
 	s.assert.Equal(os.FileMode(0764), attr.Mode)
 
 	acl, err := getACL(s.az.storage.(*Datalake), name)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Contains(acl, "user::rwx")
 	s.assert.Contains(acl, "group::rw-")
 	s.assert.Contains(acl, "other::r--")
@@ -3166,7 +3171,7 @@ func (s *datalakeTestSuite) TestPermissionPreservationWithCommit() {
 		Data:   data,
 		Offset: 0,
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	ids := []string{}
 	ids = append(ids, id)
@@ -3175,15 +3180,15 @@ func (s *datalakeTestSuite) TestPermissionPreservationWithCommit() {
 		List:      ids,
 		BlockSize: 1,
 	})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 
 	attr, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.NotNil(attr)
-	s.assert.EqualValues(os.FileMode(0767), attr.Mode)
+	s.assert.Equal(os.FileMode(0767), attr.Mode)
 
 	acl, err := getACL(s.az.storage.(*Datalake), name)
-	s.assert.Nil(err)
+	s.assert.NoError(err)
 	s.assert.Contains(acl, "user::rwx")
 	s.assert.Contains(acl, "group::rw-")
 	s.assert.Contains(acl, "other::rwx")

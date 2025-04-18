@@ -1529,10 +1529,15 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadataNoSymlinks() {
 	for _, path := range paths {
 		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
 		suite.cleanupTest()
-		suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
+		suite.setupTestHelper(
+			config,
+		) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
 		suite.Run(path, func() {
 			truncatedPath := internal.TruncateDirName(path)
-			suite.addDirectoryToCache("a", true) // add the paths to the cache with IsMetadataRetrived=true
+			suite.addDirectoryToCache(
+				"a",
+				true,
+			) // add the paths to the cache with IsMetadataRetrived=true
 
 			options := internal.GetAttrOptions{Name: path}
 			// no call to mock component since metadata is not needed in noSymlinks mode
