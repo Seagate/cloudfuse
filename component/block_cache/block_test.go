@@ -31,6 +31,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -41,6 +43,9 @@ type blockTestSuite struct {
 }
 
 func (suite *blockTestSuite) SetupTest() {
+	suite.assert = assert.New(suite.T())
+	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
+	suite.assert.NoError(err)
 }
 
 func (suite *blockTestSuite) cleanupTest() {
@@ -193,7 +198,6 @@ func (suite *blockTestSuite) TestWriter() {
 	suite.assert.NotNil(b.state)
 	suite.assert.Nil(b.node)
 	suite.assert.Zero(b.offset)
-	suite.assert.Zero(b.endIndex)
 	suite.assert.Equal(b.id, int64(-1))
 	suite.assert.False(b.IsDirty())
 

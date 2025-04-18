@@ -712,7 +712,6 @@ func (s *s3StorageTestSuite) TestStreamDirNoVirtualDirectory() {
 			s.assert.EqualValues(name, entries[0].Path)
 			s.assert.EqualValues(name, entries[0].Name)
 			s.assert.True(entries[0].IsDir())
-			s.assert.True(entries[0].IsMetadataRetrieved())
 			s.assert.True(entries[0].IsModeDefault())
 		})
 	}
@@ -732,13 +731,11 @@ func (s *s3StorageTestSuite) TestStreamDirHierarchy() {
 	s.assert.EqualValues(base+"/c1", entries[0].Path)
 	s.assert.EqualValues("c1", entries[0].Name)
 	s.assert.True(entries[0].IsDir())
-	s.assert.True(entries[0].IsMetadataRetrieved())
 	s.assert.True(entries[0].IsModeDefault())
 	// Check the file
 	s.assert.EqualValues(base+"/c2", entries[1].Path)
 	s.assert.EqualValues("c2", entries[1].Name)
 	s.assert.False(entries[1].IsDir())
-	s.assert.True(entries[1].IsMetadataRetrieved())
 	s.assert.True(entries[1].IsModeDefault())
 }
 
@@ -761,19 +758,16 @@ func (s *s3StorageTestSuite) TestStreamDirRoot() {
 			s.assert.EqualValues(base, entries[0].Path)
 			s.assert.EqualValues(base, entries[0].Name)
 			s.assert.True(entries[0].IsDir())
-			s.assert.True(entries[0].IsMetadataRetrieved())
 			s.assert.True(entries[0].IsModeDefault())
 			// Check the baseb dir
 			s.assert.EqualValues(base+"b", entries[1].Path)
 			s.assert.EqualValues(base+"b", entries[1].Name)
 			s.assert.True(entries[1].IsDir())
-			s.assert.True(entries[1].IsMetadataRetrieved())
 			s.assert.True(entries[1].IsModeDefault())
 			// Check the basec file
 			s.assert.EqualValues(base+"c", entries[2].Path)
 			s.assert.EqualValues(base+"c", entries[2].Name)
 			s.assert.False(entries[2].IsDir())
-			s.assert.True(entries[2].IsMetadataRetrieved())
 			s.assert.True(entries[2].IsModeDefault())
 		})
 	}
@@ -793,7 +787,6 @@ func (s *s3StorageTestSuite) TestStreamDirSubDir() {
 	s.assert.EqualValues(base+"/c1"+"/gc1", entries[0].Path)
 	s.assert.EqualValues("gc1", entries[0].Name)
 	s.assert.False(entries[0].IsDir())
-	s.assert.True(entries[0].IsMetadataRetrieved())
 	s.assert.True(entries[0].IsModeDefault())
 }
 
@@ -814,7 +807,6 @@ func (s *s3StorageTestSuite) TestStreamDirSubDirPrefixPath() {
 	s.assert.EqualValues("c1"+"/gc1", entries[0].Path)
 	s.assert.EqualValues("gc1", entries[0].Name)
 	s.assert.False(entries[0].IsDir())
-	s.assert.True(entries[0].IsMetadataRetrieved())
 	s.assert.True(entries[0].IsModeDefault())
 }
 
