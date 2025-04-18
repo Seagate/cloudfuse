@@ -54,28 +54,26 @@ const (
 func StartMount(mountPath string, configFile string, passphrase *memguard.Enclave) error {
 	instanceName := strings.ToLower(mountPath)
 
-	err := startMountHelper(instanceName, mountPath, configFile, passphrase)
+	// get the current user uid and gid to set file permissions
+	userId, groupId, err := common.GetCurrentUser()
 	if err != nil {
-		var originalInstanceName string
-		list, err := getMountList()
-		for range list {
-			// Check if the mountpath is associated with our service
-			if list[0] == SvcName && strings.ToLower(list[1]) == instanceName {
-				originalInstanceName = list[1]
-				break
-			}
-		}
-		if err != nil || originalInstanceName == "" {
-			log.Err("Unable to start mount with mountpath: ", instanceName)
-			return err
+		log.Err("startMountHelper : GetCurrentUser() failed with error: %v", err)
+		return err
+	}
+
+	if passphrase != nil {
+		buff, err := passphrase.Open()
+		if err != nil || buff == nil {
+			return errors.New("unable to decrypt passphrase key")
 		}
 
-		err = startMountHelper(originalInstanceName, mountPath, configFile, passphrase)
-		if err != nil {
-			return err
-		}
+		// Encode back to base64 when sending passphrase to cloudfuse
+		_, err = winFspCommand(writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), buff.String()))
+		defer buff.Destroy()
+	} else {
+		_, err = winFspCommand(writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), ""))
 	}
-	return nil
+	return err
 }
 
 // StopMount stops the mount if the name exists in the WinFsp Windows registry.
@@ -142,29 +140,6 @@ func StopMounts(useSystem bool) error {
 		}
 	}
 
-	return nil
-}
-
-func startMountHelper(instanceName string, mountPath string, configFile string, passphrase *memguard.Enclave) error {
-	// get the current user uid and gid to set file permissions
-	userId, groupId, err := common.GetCurrentUser()
-	if err != nil {
-		log.Err("startMountHelper : GetCurrentUser() failed with error: %v", err)
-		return err
-	}
-
-	if passphrase != nil {
-		buff, err := passphrase.Open()
-		if err != nil || buff == nil {
-			return errors.New("unable to decrypt passphrase key")
-		}
-
-		// Encode back to base64 when sending passphrase to cloudfuse
-		_, err = winFspCommand(writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), buff.String()))
-		defer buff.Destroy()
-	} else {
-		_, err = winFspCommand(writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), ""))
-	}
 	return nil
 }
 
