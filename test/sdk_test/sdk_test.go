@@ -66,7 +66,9 @@ func TestMain(m *testing.M) {
 
 	if accountName == "" || sas == "" || containerName == "" || filepath == "" {
 		fmt.Println("Kindly provide the parameters...")
-		fmt.Println("Usage : sdk_test.go -account=<account name> -sas=<storage sas> -container=<container name> -prefix=<file prefix>")
+		fmt.Println(
+			"Usage : sdk_test.go -account=<account name> -sas=<storage sas> -container=<container name> -prefix=<file prefix>",
+		)
 		panic(errors.New("invalid arguments"))
 	}
 

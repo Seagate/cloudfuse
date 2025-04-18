@@ -165,7 +165,9 @@ func processCommand() error {
 		if options.PassPhrase == "" {
 			options.PassPhrase = os.Getenv(SecureConfigEnvName)
 			if options.PassPhrase == "" {
-				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+				return errors.New(
+					"no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable",
+				)
 			}
 
 			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
@@ -192,7 +194,12 @@ func processCommand() error {
 
 	if len(containerList) > 0 {
 		containerList = filterAllowedContainerList(containerList)
-		err = mountAllContainers(containerList, options.ConfigFile, options.MountPath, configFileExists)
+		err = mountAllContainers(
+			containerList,
+			options.ConfigFile,
+			options.MountPath,
+			configFileExists,
+		)
 		if err != nil {
 			return err
 		}
@@ -307,7 +314,12 @@ func filterAllowedContainerList(containers []string) []string {
 }
 
 // mountAllContainers : Iterate allowed container list and create config file and mount path for them
-func mountAllContainers(containerList []string, configFile string, mountPath string, configFileExists bool) error {
+func mountAllContainers(
+	containerList []string,
+	configFile string,
+	mountPath string,
+	configFileExists bool,
+) error {
 	// Now iterate filtered container list and prepare mount path, temp path, and config file for them
 	fileCachePath := ""
 	_ = config.UnmarshalKey("file_cache.path", &fileCachePath)
@@ -399,7 +411,11 @@ func mountAllContainers(containerList []string, configFile string, mountPath str
 		}
 	}
 
-	fmt.Printf("%d of %d containers were successfully mounted\n", (len(containerList) - failCount), len(containerList))
+	fmt.Printf(
+		"%d of %d containers were successfully mounted\n",
+		(len(containerList) - failCount),
+		len(containerList),
+	)
 	return nil
 }
 

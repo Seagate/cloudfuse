@@ -33,7 +33,15 @@ import (
 	"github.com/winfsp/cgofuse/fuse"
 )
 
-func createFuseOptions(host *fuse.FileSystemHost, allowOther bool, allowRoot bool, readOnly bool, nonEmptyMount bool, maxFuseThreads uint32, umask uint32) string {
+func createFuseOptions(
+	host *fuse.FileSystemHost,
+	allowOther bool,
+	allowRoot bool,
+	readOnly bool,
+	nonEmptyMount bool,
+	maxFuseThreads uint32,
+	umask uint32,
+) string {
 	var options string
 	// While reading a file let kernel do readahead for better perf
 	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)

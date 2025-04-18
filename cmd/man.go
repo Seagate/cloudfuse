@@ -69,7 +69,10 @@ var manCmd = &cobra.Command{
 		// dump the entire command tree's man pages into the folder
 		err = doc.GenManTree(rootCmd, header, manCmdInput.outputLocation)
 		if err != nil {
-			return fmt.Errorf("cannot generate man pages [%s]. Please contact the dev team", err.Error())
+			return fmt.Errorf(
+				"cannot generate man pages [%s]. Please contact the dev team",
+				err.Error(),
+			)
 		}
 		return nil
 	},

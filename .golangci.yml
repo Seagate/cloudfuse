@@ -20,6 +20,9 @@ linters:
       disable:
         - require-error
         - suite-thelper
+    staticcheck:
+      checks: ["all", "-ST1003", "-ST1005"]
+
   exclusions:
     generated: lax
     presets:
@@ -43,6 +46,7 @@ formatters:
   enable:
     - gofmt
     - goimports
+    - golines
   exclusions:
     generated: lax
     paths:

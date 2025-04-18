@@ -65,7 +65,11 @@ func (suite *streamTestSuite) TestStreamOnlyOpenFile() {
 	suite.setupTestHelper(config, false)
 
 	handle1 := &handlemap.Handle{Size: 0, Path: fileNames[0]}
-	openFileOptions := internal.OpenFileOptions{Name: fileNames[0], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions := internal.OpenFileOptions{
+		Name:  fileNames[0],
+		Flags: os.O_RDONLY,
+		Mode:  os.FileMode(0777),
+	}
 
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle1, nil)
 	_, _ = suite.stream.OpenFile(openFileOptions)
@@ -229,7 +233,11 @@ func (suite *streamTestSuite) TestCacheSmallFileOnOpen() {
 	// make small file very large to confirm it would be stream only
 	handle := &handlemap.Handle{Size: int64(100000000 * MB), Path: fileNames[0]}
 	getFileBlockOffsetsOptions := internal.GetFileBlockOffsetsOptions{Name: fileNames[0]}
-	openFileOptions := internal.OpenFileOptions{Name: fileNames[0], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions := internal.OpenFileOptions{
+		Name:  fileNames[0],
+		Flags: os.O_RDONLY,
+		Mode:  os.FileMode(0777),
+	}
 	bol := &common.BlockOffsetList{
 		BlockList: []*common.Block{},
 	}
@@ -245,7 +253,11 @@ func (suite *streamTestSuite) TestCacheSmallFileOnOpen() {
 
 	// small file that should get cached on open
 	handle = &handlemap.Handle{Size: int64(1), Path: fileNames[1]}
-	openFileOptions = internal.OpenFileOptions{Name: fileNames[1], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions = internal.OpenFileOptions{
+		Name:  fileNames[1],
+		Flags: os.O_RDONLY,
+		Mode:  os.FileMode(0777),
+	}
 	getFileBlockOffsetsOptions = internal.GetFileBlockOffsetsOptions{Name: fileNames[1]}
 	readInBufferOptions := internal.ReadInBufferOptions{
 		Handle: handle,
@@ -271,10 +283,17 @@ func (suite *streamTestSuite) TestReadInBuffer() {
 
 	handle := &handlemap.Handle{Size: int64(4 * MB), Path: fileNames[0]}
 	getFileBlockOffsetsOptions := internal.GetFileBlockOffsetsOptions{Name: fileNames[0]}
-	openFileOptions := internal.OpenFileOptions{Name: fileNames[0], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions := internal.OpenFileOptions{
+		Name:  fileNames[0],
+		Flags: os.O_RDONLY,
+		Mode:  os.FileMode(0777),
+	}
 	// file consists of two blocks
 	bol := &common.BlockOffsetList{
-		BlockList: []*common.Block{{StartIndex: 0, EndIndex: 2 * MB}, {StartIndex: 2, EndIndex: 4 * MB}},
+		BlockList: []*common.Block{
+			{StartIndex: 0, EndIndex: 2 * MB},
+			{StartIndex: 2, EndIndex: 4 * MB},
+		},
 	}
 
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle, nil)
@@ -288,7 +307,9 @@ func (suite *streamTestSuite) TestReadInBuffer() {
 		Data:   make([]byte, 2*MB),
 	}
 
-	suite.mock.EXPECT().ReadInBuffer(readInBufferOptions).Return(len(readInBufferOptions.Data), syscall.ENOENT)
+	suite.mock.EXPECT().
+		ReadInBuffer(readInBufferOptions).
+		Return(len(readInBufferOptions.Data), syscall.ENOENT)
 	_, err := suite.stream.ReadInBuffer(readInBufferOptions)
 	suite.assert.Error(err)
 }
@@ -302,10 +323,17 @@ func (suite *streamTestSuite) TestOpenLargeFile() {
 
 	handle := &handlemap.Handle{Size: int64(4 * MB), Path: fileNames[0]}
 	getFileBlockOffsetsOptions := internal.GetFileBlockOffsetsOptions{Name: fileNames[0]}
-	openFileOptions := internal.OpenFileOptions{Name: fileNames[0], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions := internal.OpenFileOptions{
+		Name:  fileNames[0],
+		Flags: os.O_RDONLY,
+		Mode:  os.FileMode(0777),
+	}
 	// file consists of two blocks
 	bol := &common.BlockOffsetList{
-		BlockList: []*common.Block{{StartIndex: 0, EndIndex: 2 * MB}, {StartIndex: 2, EndIndex: 4 * MB}},
+		BlockList: []*common.Block{
+			{StartIndex: 0, EndIndex: 2 * MB},
+			{StartIndex: 2, EndIndex: 4 * MB},
+		},
 	}
 
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle, nil)
@@ -327,9 +355,16 @@ func (suite *streamTestSuite) TestStreamOnly() {
 
 	handle := &handlemap.Handle{Size: int64(4 * MB), Path: fileNames[0]}
 	getFileBlockOffsetsOptions := internal.GetFileBlockOffsetsOptions{Name: fileNames[0]}
-	openFileOptions := internal.OpenFileOptions{Name: fileNames[0], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions := internal.OpenFileOptions{
+		Name:  fileNames[0],
+		Flags: os.O_RDONLY,
+		Mode:  os.FileMode(0777),
+	}
 	bol := &common.BlockOffsetList{
-		BlockList: []*common.Block{{StartIndex: 0, EndIndex: 2 * MB}, {StartIndex: 2, EndIndex: 4 * MB}},
+		BlockList: []*common.Block{
+			{StartIndex: 0, EndIndex: 2 * MB},
+			{StartIndex: 2, EndIndex: 4 * MB},
+		},
 	}
 
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle, nil)
@@ -339,7 +374,11 @@ func (suite *streamTestSuite) TestStreamOnly() {
 
 	// create new handle
 	handle = &handlemap.Handle{Size: int64(4 * MB), Path: fileNames[0]}
-	openFileOptions = internal.OpenFileOptions{Name: fileNames[0], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions = internal.OpenFileOptions{
+		Name:  fileNames[0],
+		Flags: os.O_RDONLY,
+		Mode:  os.FileMode(0777),
+	}
 
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle, nil)
 	_, _ = suite.stream.OpenFile(openFileOptions)
@@ -372,9 +411,16 @@ func (suite *streamTestSuite) TestReadLargeFileBlocks() {
 
 	handle1 := &handlemap.Handle{Size: int64(2 * MB), Path: fileNames[0]}
 	getFileBlockOffsetsOptions := internal.GetFileBlockOffsetsOptions{Name: fileNames[0]}
-	openFileOptions := internal.OpenFileOptions{Name: fileNames[0], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions := internal.OpenFileOptions{
+		Name:  fileNames[0],
+		Flags: os.O_RDONLY,
+		Mode:  os.FileMode(0777),
+	}
 	bol := &common.BlockOffsetList{
-		BlockList: []*common.Block{{StartIndex: 0, EndIndex: 1 * MB}, {StartIndex: 1 * MB, EndIndex: 2 * MB}},
+		BlockList: []*common.Block{
+			{StartIndex: 0, EndIndex: 1 * MB},
+			{StartIndex: 1 * MB, EndIndex: 2 * MB},
+		},
 	}
 
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle1, nil)
@@ -417,7 +463,11 @@ func (suite *streamTestSuite) TestPurgeOnClose() {
 
 	handle := &handlemap.Handle{Size: int64(1), Path: fileNames[0]}
 	getFileBlockOffsetsOptions := internal.GetFileBlockOffsetsOptions{Name: fileNames[0]}
-	openFileOptions := internal.OpenFileOptions{Name: fileNames[0], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions := internal.OpenFileOptions{
+		Name:  fileNames[0],
+		Flags: os.O_RDONLY,
+		Mode:  os.FileMode(0777),
+	}
 	bol := &common.BlockOffsetList{
 		BlockList: []*common.Block{},
 	}
@@ -454,7 +504,11 @@ func (suite *streamTestSuite) TestWriteToSmallFileEviction() {
 	// create small file and confirm it gets cached
 	handle := &handlemap.Handle{Size: int64(1 * MB), Path: fileNames[0]}
 	getFileBlockOffsetsOptions := internal.GetFileBlockOffsetsOptions{Name: fileNames[0]}
-	openFileOptions := internal.OpenFileOptions{Name: fileNames[0], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions := internal.OpenFileOptions{
+		Name:  fileNames[0],
+		Flags: os.O_RDONLY,
+		Mode:  os.FileMode(0777),
+	}
 	bol := &common.BlockOffsetList{
 		BlockList: []*common.Block{},
 	}
@@ -499,7 +553,11 @@ func (suite *streamTestSuite) TestLargeFileEviction() {
 
 	handle := &handlemap.Handle{Size: int64(2 * MB), Path: fileNames[0]}
 	getFileBlockOffsetsOptions := internal.GetFileBlockOffsetsOptions{Name: fileNames[0]}
-	openFileOptions := internal.OpenFileOptions{Name: fileNames[0], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions := internal.OpenFileOptions{
+		Name:  fileNames[0],
+		Flags: os.O_RDONLY,
+		Mode:  os.FileMode(0777),
+	}
 	bol := &common.BlockOffsetList{
 		BlockList:     []*common.Block{block1, block2},
 		BlockIdLength: 10,
@@ -554,7 +612,10 @@ func (suite *streamTestSuite) TestLargeFileEviction() {
 		block2.Flags.Clear(common.DirtyBlock)
 		handle.Flags.Set(handlemap.HandleFlagDirty)
 	}
-	suite.mock.EXPECT().FlushFile(internal.FlushFileOptions{Handle: handle}).Do(callbackFunc).Return(nil)
+	suite.mock.EXPECT().
+		FlushFile(internal.FlushFileOptions{Handle: handle}).
+		Do(callbackFunc).
+		Return(nil)
 
 	_, _ = suite.stream.WriteFile(writeFileOptions)
 
@@ -575,9 +636,16 @@ func (suite *streamTestSuite) TestStreamOnlyHandle() {
 
 	handle1 := &handlemap.Handle{Size: int64(2 * MB), Path: fileNames[0]}
 	getFileBlockOffsetsOptions := internal.GetFileBlockOffsetsOptions{Name: fileNames[0]}
-	openFileOptions := internal.OpenFileOptions{Name: fileNames[0], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions := internal.OpenFileOptions{
+		Name:  fileNames[0],
+		Flags: os.O_RDONLY,
+		Mode:  os.FileMode(0777),
+	}
 	bol := &common.BlockOffsetList{
-		BlockList: []*common.Block{{StartIndex: 0, EndIndex: 1 * MB}, {StartIndex: 1, EndIndex: 2 * MB}},
+		BlockList: []*common.Block{
+			{StartIndex: 0, EndIndex: 1 * MB},
+			{StartIndex: 1, EndIndex: 2 * MB},
+		},
 	}
 
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle1, nil)
@@ -589,7 +657,11 @@ func (suite *streamTestSuite) TestStreamOnlyHandle() {
 	assertHandleNotStreamOnly(suite, handle1)
 
 	handle2 := &handlemap.Handle{Size: int64(2 * MB), Path: fileNames[0]}
-	openFileOptions = internal.OpenFileOptions{Name: fileNames[0], Flags: os.O_RDONLY, Mode: os.FileMode(0777)}
+	openFileOptions = internal.OpenFileOptions{
+		Name:  fileNames[0],
+		Flags: os.O_RDONLY,
+		Mode:  os.FileMode(0777),
+	}
 	suite.mock.EXPECT().OpenFile(openFileOptions).Return(handle2, nil)
 	_, _ = suite.stream.OpenFile(openFileOptions)
 
