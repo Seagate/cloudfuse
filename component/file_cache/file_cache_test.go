@@ -438,6 +438,7 @@ func (suite *fileCacheTestSuite) TestStreamDirCase2() {
 
 func (suite *fileCacheTestSuite) TestStreamDirCase3() {
 	defer suite.cleanupTest()
+	suite.fileCache.createEmptyFile = true
 	// Setup
 	name := "dir"
 	subdir := name + "/subdir"
@@ -463,13 +464,14 @@ func (suite *fileCacheTestSuite) TestStreamDirCase3() {
 	suite.assert.NoError(err)
 	suite.assert.NotEmpty(dir)
 	suite.assert.Len(dir, 4)
-	suite.assert.EqualValues(subdir, dir[0].Path)
-	suite.assert.EqualValues(file1, dir[1].Path)
+	suite.assert.EqualValues(file1, dir[0].Path)
+	suite.assert.EqualValues(1024, dir[0].Size)
+	suite.assert.EqualValues(file2, dir[1].Path)
 	suite.assert.EqualValues(1024, dir[1].Size)
-	suite.assert.EqualValues(file2, dir[2].Path)
+	suite.assert.EqualValues(file3, dir[2].Path)
 	suite.assert.EqualValues(1024, dir[2].Size)
-	suite.assert.EqualValues(file3, dir[3].Path)
-	suite.assert.EqualValues(1024, dir[3].Size)
+	suite.assert.EqualValues(subdir, dir[3].Path)
+	suite.fileCache.createEmptyFile = false
 }
 
 func pos(s []*internal.ObjAttr, e string) int {
