@@ -30,6 +30,7 @@ import (
 	"io/fs"
 	"math"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -62,7 +63,7 @@ func (suite *cachePolicyTestSuite) cleanupTest() {
 
 func (suite *cachePolicyTestSuite) TestGetUsage() {
 	defer suite.cleanupTest()
-	f, _ := os.Create(cache_path + "/test")
+	f, _ := os.Create(filepath.Join(cache_path, "test"))
 	data := make([]byte, 1024*1024)
 	f.Write(data)
 	result, _ := common.GetUsage(cache_path)
@@ -73,7 +74,7 @@ func (suite *cachePolicyTestSuite) TestGetUsage() {
 // We should return the sector size used. Here there should be two sectors used
 func (suite *cachePolicyTestSuite) TestGetUsageSizeOnDisk() {
 	defer suite.cleanupTest()
-	f, _ := os.Create(cache_path + "/test")
+	f, _ := os.Create(filepath.Join(cache_path, "test"))
 	data := make([]byte, 4097)
 	f.Write(data)
 	f.Close()
@@ -90,7 +91,7 @@ func (suite *cachePolicyTestSuite) TestGetUsagePercentage() {
 	defer suite.cleanupTest()
 	data := make([]byte, 1024*1024)
 
-	f, _ := os.Create(cache_path + "/test")
+	f, _ := os.Create(filepath.Join(cache_path, "test"))
 	f.Write(data)
 	result := getUsagePercentage(cache_path, 4)
 	// since the value might defer a little distro to distro

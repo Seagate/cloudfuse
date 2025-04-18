@@ -1,5 +1,4 @@
-//go:build linux && !authtest
-// +build linux,!authtest
+//go:build !authtest
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
@@ -29,8 +28,11 @@
 package block_cache
 
 import (
+	"runtime"
 	"testing"
 
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -41,6 +43,9 @@ type blockTestSuite struct {
 }
 
 func (suite *blockTestSuite) SetupTest() {
+	suite.assert = assert.New(suite.T())
+	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
+	suite.assert.NoError(err)
 }
 
 func (suite *blockTestSuite) cleanupTest() {
@@ -80,7 +85,11 @@ func (suite *blockTestSuite) TestAllocateHuge() {
 	b, err := AllocateBlock(50 * 1024 * 1024 * 1024)
 	suite.assert.Nil(b)
 	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "mmap error")
+	if runtime.GOOS == "windows" {
+		suite.assert.Contains(err.Error(), "insufficient memory available:")
+	} else {
+		suite.assert.Contains(err.Error(), "mmap error")
+	}
 }
 
 func (suite *blockTestSuite) TestFreeNilData() {
@@ -106,7 +115,7 @@ func (suite *blockTestSuite) TestFreeInvalidData() {
 
 	err = b.Delete()
 	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "invalid argument")
+	suite.assert.Contains(err.Error(), "invalid")
 }
 
 func (suite *blockTestSuite) TestResuse() {

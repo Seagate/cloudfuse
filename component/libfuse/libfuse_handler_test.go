@@ -49,7 +49,7 @@ func (suite *libfuseTestSuite) TestDefault() {
 	suite.assert.Equal(uint32(120), suite.libfuse.entryExpiration)
 	suite.assert.Equal(uint32(120), suite.libfuse.attributeExpiration)
 	suite.assert.Equal(uint32(120), suite.libfuse.negativeTimeout)
-	suite.assert.Equal(uint64(1024*1024), suite.libfuse.displayCapacityMb)
+	suite.assert.Equal(uint64(1024*1024*1024), suite.libfuse.displayCapacityMb)
 	suite.assert.False(suite.libfuse.disableWritebackCache)
 	suite.assert.True(suite.libfuse.ignoreOpenFlags)
 	suite.assert.False(suite.libfuse.directIO)
@@ -121,7 +121,7 @@ func (suite *libfuseTestSuite) TestConfigZero() {
 	suite.assert.Equal(uint32(0), suite.libfuse.entryExpiration)
 	suite.assert.Equal(uint32(0), suite.libfuse.attributeExpiration)
 	suite.assert.Equal(uint32(0), suite.libfuse.negativeTimeout)
-	suite.assert.Equal(uint64(1024*1024), suite.libfuse.displayCapacityMb)
+	suite.assert.Equal(uint64(1024*1024*1024), suite.libfuse.displayCapacityMb)
 	suite.assert.False(suite.libfuse.directIO)
 }
 

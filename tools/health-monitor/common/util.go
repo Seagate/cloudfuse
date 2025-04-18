@@ -35,7 +35,7 @@ import (
 
 	"github.com/Seagate/cloudfuse/common/log"
 
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 // check whether cloudfuse process is running for the given pid

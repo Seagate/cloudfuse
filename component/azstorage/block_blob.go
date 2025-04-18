@@ -342,8 +342,8 @@ func (bb *BlockBlob) RenameFile(source string, target string, srcAttr *internal.
 		return err
 	}
 
-	var dstLMT *time.Time = copyResponse.LastModified
-	var dstETag string = sanitizeEtag(copyResponse.ETag)
+	var dstLMT = copyResponse.LastModified
+	var dstETag = sanitizeEtag(copyResponse.ETag)
 
 	copyStatus := copyResponse.CopyStatus
 	var prop blob.GetPropertiesResponse

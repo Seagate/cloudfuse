@@ -104,7 +104,7 @@ file_cache:
   path: <path to local disk cache>
 
   # Optional
-  timeout-sec: <default cache eviction timeout (in sec). Default - 120 sec>
+  timeout-sec: <default cache eviction timeout (in sec). Default - 216000 sec>
   max-eviction: <number of files that can be evicted at once. Default - 5000>
   max-size-mb: <maximum cache size allowed. Default - 80% of free disk space>
   high-threshold: <% disk space consumed which triggers eviction. This parameter overrides 'timeout-sec' parameter and cached files will be removed even if they have not expired. Default - 80>

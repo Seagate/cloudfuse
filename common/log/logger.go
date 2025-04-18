@@ -178,7 +178,7 @@ func LogRotate() error {
 }
 
 func init() {
-	logObj, _ = NewLogger("syslog", common.LogConfig{
+	logObj, _ = NewLogger("base", common.LogConfig{
 		Level: common.ELogLevel.LOG_DEBUG(),
 	})
 }
