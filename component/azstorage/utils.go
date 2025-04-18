@@ -99,7 +99,7 @@ func getAzStorageClientOptions(conf *AzStorageConfig) (azcore.ClientOptions, err
 
 	logOptions := getSDKLogOptions()
 
-	transportOptions, err := newBlobfuse2HttpClient(conf)
+	transportOptions, err := newCloudfuseHttpClient(conf)
 	if err != nil {
 		log.Err(
 			"utils::getAzStorageClientOptions : Failed to create transport client [%s]",
@@ -160,14 +160,14 @@ func setSDKLogListener() {
 }
 
 // Create an HTTP Client with configured proxy
-func newBlobfuse2HttpClient(conf *AzStorageConfig) (*http.Client, error) {
+func newCloudfuseHttpClient(conf *AzStorageConfig) (*http.Client, error) {
 	var ProxyURL func(req *http.Request) (*url.URL, error)
 	if conf.proxyAddress == "" {
 		ProxyURL = http.ProxyFromEnvironment
 	} else {
 		u, err := url.Parse(conf.proxyAddress)
 		if err != nil {
-			log.Err("utils::newBlobfuse2HttpClient : Failed to parse proxy : %s [%s]", conf.proxyAddress, err.Error())
+			log.Err("utils::newCloudfuseHttpClient : Failed to parse proxy : %s [%s]", conf.proxyAddress, err.Error())
 			return nil, err
 		}
 		ProxyURL = http.ProxyURL(u)

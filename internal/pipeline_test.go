@@ -73,6 +73,26 @@ func NewComponentC() Component {
 	return &ComponentC{}
 }
 
+type ComponentStream struct {
+	BaseComponent
+}
+
+func NewComponentStream() Component {
+	comp := &ComponentStream{}
+	comp.SetName("stream")
+	return comp
+}
+
+type ComponentBlockCache struct {
+	BaseComponent
+}
+
+func NewComponentBlockCache() Component {
+	comp := &ComponentBlockCache{}
+	comp.SetName("block_cache")
+	return comp
+}
+
 /////////////////////////////////////////
 
 type pipelineTestSuite struct {
@@ -84,7 +104,9 @@ func (s *pipelineTestSuite) SetupTest() {
 	AddComponent("ComponentA", NewComponentA)
 	AddComponent("ComponentB", NewComponentB)
 	AddComponent("ComponentC", NewComponentC)
-	s.assert = assert.New(s.T())
+	AddComponent("stream", NewComponentStream)
+	AddComponent("block_cache", NewComponentBlockCache)
+	suite.assert = assert.New(suite.T())
 	err := log.SetDefaultLogger("silent", common.LogConfig{})
 	if err != nil {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
@@ -117,6 +139,12 @@ func (s *pipelineTestSuite) TestStartStopCreateNewPipeline() {
 
 	err = p.Stop()
 	s.assert.NoError(err)
+}
+
+func (s *pipelineTestSuite) TestStreamToBlockCacheConfig() {
+	p, err := NewPipeline([]string{"stream"}, false)
+	s.assert.Nil(err)
+	s.assert.Equal(p.components[0].Name(), "block_cache")
 }
 
 func TestPipelineTestSuite(t *testing.T) {

@@ -772,7 +772,6 @@ func (s *s3StorageTestSuite) TestStreamDirNoVirtualDirectory() {
 			s.assert.Equal(name, entries[0].Path)
 			s.assert.Equal(name, entries[0].Name)
 			s.assert.True(entries[0].IsDir())
-			s.assert.True(entries[0].IsMetadataRetrieved())
 			s.assert.True(entries[0].IsModeDefault())
 		})
 	}
@@ -792,13 +791,11 @@ func (s *s3StorageTestSuite) TestStreamDirHierarchy() {
 	s.assert.Equal(base+"/c1", entries[0].Path)
 	s.assert.Equal("c1", entries[0].Name)
 	s.assert.True(entries[0].IsDir())
-	s.assert.True(entries[0].IsMetadataRetrieved())
 	s.assert.True(entries[0].IsModeDefault())
 	// Check the file
 	s.assert.Equal(base+"/c2", entries[1].Path)
 	s.assert.Equal("c2", entries[1].Name)
 	s.assert.False(entries[1].IsDir())
-	s.assert.True(entries[1].IsMetadataRetrieved())
 	s.assert.True(entries[1].IsModeDefault())
 }
 
@@ -821,19 +818,16 @@ func (s *s3StorageTestSuite) TestStreamDirRoot() {
 			s.assert.Equal(base, entries[0].Path)
 			s.assert.Equal(base, entries[0].Name)
 			s.assert.True(entries[0].IsDir())
-			s.assert.True(entries[0].IsMetadataRetrieved())
 			s.assert.True(entries[0].IsModeDefault())
 			// Check the baseb dir
 			s.assert.Equal(base+"b", entries[1].Path)
 			s.assert.Equal(base+"b", entries[1].Name)
 			s.assert.True(entries[1].IsDir())
-			s.assert.True(entries[1].IsMetadataRetrieved())
 			s.assert.True(entries[1].IsModeDefault())
 			// Check the basec file
 			s.assert.Equal(base+"c", entries[2].Path)
 			s.assert.Equal(base+"c", entries[2].Name)
 			s.assert.False(entries[2].IsDir())
-			s.assert.True(entries[2].IsMetadataRetrieved())
 			s.assert.True(entries[2].IsModeDefault())
 		})
 	}
@@ -853,7 +847,6 @@ func (s *s3StorageTestSuite) TestStreamDirSubDir() {
 	s.assert.Equal(base+"/c1"+"/gc1", entries[0].Path)
 	s.assert.Equal("gc1", entries[0].Name)
 	s.assert.False(entries[0].IsDir())
-	s.assert.True(entries[0].IsMetadataRetrieved())
 	s.assert.True(entries[0].IsModeDefault())
 }
 
@@ -876,7 +869,6 @@ func (s *s3StorageTestSuite) TestStreamDirSubDirPrefixPath() {
 	s.assert.Equal("c1"+"/gc1", entries[0].Path)
 	s.assert.Equal("gc1", entries[0].Name)
 	s.assert.False(entries[0].IsDir())
-	s.assert.True(entries[0].IsMetadataRetrieved())
 	s.assert.True(entries[0].IsModeDefault())
 }
 

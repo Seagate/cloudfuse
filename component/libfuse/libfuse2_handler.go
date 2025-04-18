@@ -594,7 +594,21 @@ func (cf *CgofuseFS) Rmdir(path string) int {
 
 	empty := fuseFS.NextComponent().IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 	if !empty {
-		return -fuse.ENOTEMPTY
+		// delete empty directories from local cache directory
+		val, err := fuseFS.NextComponent().DeleteEmptyDirs(internal.DeleteDirOptions{Name: name})
+		if !val {
+			// either file cache has failed or not present in the pipeline
+			if err != nil {
+				// if error is not nil, file cache has failed
+				log.Err("Libfuse::libfuse_rmdir : Failed to delete %s [%s]", name, err.Error())
+			}
+			return -fuse.ENOTEMPTY
+		} else {
+			empty = fuseFS.NextComponent().IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
+			if !empty {
+				return -fuse.ENOTEMPTY
+			}
+		}
 	}
 
 	err := fuseFS.NextComponent().DeleteDir(internal.DeleteDirOptions{Name: name})
@@ -1008,7 +1022,14 @@ func (cf *CgofuseFS) Readlink(path string) (int, string) {
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Readlink : Received for %s", name)
 
-	targetPath, err := fuseFS.NextComponent().ReadLink(internal.ReadLinkOptions{Name: name})
+	linkSize := int64(0)
+	attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+	if err == nil && attr != nil {
+		linkSize = attr.Size
+	}
+
+	targetPath, err := fuseFS.NextComponent().
+		ReadLink(internal.ReadLinkOptions{Name: name, Size: linkSize})
 	if err != nil {
 		log.Err("Libfuse::Readlink : error reading link file %s [%s]", name, err.Error())
 		if os.IsNotExist(err) {
@@ -1162,9 +1183,9 @@ func (cf *CgofuseFS) Setxattr(path string, name string, value []byte, flags int)
 	return -fuse.ENOSYS
 }
 
-// blobfuse_cache_update refresh the file-cache policy for this file
+// cloudfuse_cache_update refresh the file-cache policy for this file
 // TODO: Figure out when to call this function since this was called with c code before
-// func blobfuse_cache_update(path string) int {
+// func cloudfuse_cache_update(path string) int {
 // 	name := trimFusePath(path)
 // 	name = common.NormalizeObjectName(name)
 // 	go fuseFS.NextComponent().FileUsed(name) //nolint

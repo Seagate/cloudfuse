@@ -117,6 +117,17 @@ func (ac *AttrCache) Stop() error {
 	return nil
 }
 
+// GenConfig : Generate the default config for the component
+func (ac *AttrCache) GenConfig() string {
+	log.Info("AttrCache::Configure : config generation started")
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("\n%s:", ac.Name()))
+	sb.WriteString(fmt.Sprintf("\n  timeout-sec: %v", defaultAttrCacheTimeout))
+
+	return sb.String()
+}
+
 // Configure : Pipeline will call this method after constructor so that you can read config and initialize yourself
 //
 //	Return failure if any config is not valid to exit the process
@@ -157,7 +168,7 @@ func (ac *AttrCache) Configure(_ bool) error {
 
 	ac.cacheDirs = !conf.NoCacheDirs
 
-	log.Info(
+	log.Crit(
 		"AttrCache::Configure : cache-timeout %d, enable-symlinks %t, cache-on-list %t, max-files %d",
 		ac.cacheTimeout,
 		ac.enableSymlinks,
@@ -1005,12 +1016,8 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		if !value.exists() {
 			log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
 			return nil, syscall.ENOENT
-		}
-		// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
-		// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
-		// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
-		if value.attr.IsMetadataRetrieved() || (!ac.enableSymlinks && !options.RetrieveMetadata) {
-			// path exists and we have all the metadata required or we do not care about metadata
+		} else {
+			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
 			return value.attr, nil
 		}
 	}

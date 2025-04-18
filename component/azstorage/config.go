@@ -179,6 +179,7 @@ type AzStorageOptions struct {
 	CPKEnabled              bool   `config:"cpk-enabled"                   yaml:"cpk-enabled"`
 	CPKEncryptionKey        string `config:"cpk-encryption-key"            yaml:"cpk-encryption-key"`
 	CPKEncryptionKeySha256  string `config:"cpk-encryption-key-sha256"     yaml:"cpk-encryption-key-sha256"`
+	PreserveACL             bool   `config:"preserve-acl"                  yaml:"preserve-acl"`
 
 	// v1 support
 	UseAdls        bool   `config:"use-adls"         yaml:"-"`
@@ -529,7 +530,9 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		log.Warn("unsupported v1 CLI parameter: debug-libcurl is not applicable in cloudfuse.")
 	}
 
-	log.Info(
+	az.stConfig.preserveACL = opt.PreserveACL
+
+	log.Crit(
 		"ParseAndValidateConfig : account %s, container %s, account-type %s, auth %s, prefix %s, endpoint %s, MD5 %v %v, virtual-directory %v, disable-compression %v, CPK %v",
 		"restricted-characters-windows %v",
 		az.stConfig.authConfig.AccountName,
@@ -545,7 +548,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		az.stConfig.cpkEnabled,
 		az.stConfig.restrictedCharsWin,
 	)
-	log.Info(
+	log.Crit(
 		"ParseAndValidateConfig : use-HTTP %t, block-size %d, max-concurrency %d, default-tier %s, fail-unsupported-op %t, mount-all-containers %t",
 		az.stConfig.authConfig.UseHTTP,
 		az.stConfig.blockSize,
@@ -554,15 +557,16 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		az.stConfig.ignoreAccessModifiers,
 		az.stConfig.mountAllContainers,
 	)
-	log.Info(
-		"ParseAndValidateConfig : Retry Config: retry-count %d, max-timeout %d, backoff-time %d, max-delay %d",
+	log.Crit(
+		"ParseAndValidateConfig : Retry Config: retry-count %d, max-timeout %d, backoff-time %d, max-delay %d, preserve-acl: %v",
 		az.stConfig.maxRetries,
 		az.stConfig.maxTimeout,
 		az.stConfig.backoffTime,
 		az.stConfig.maxRetryDelay,
+		az.stConfig.preserveACL,
 	)
 
-	log.Info(
+	log.Crit(
 		"ParseAndValidateConfig : Telemetry : %s, honour-ACL %v, disable-symlink %v",
 		az.stConfig.telemetry,
 		az.stConfig.honourACL,

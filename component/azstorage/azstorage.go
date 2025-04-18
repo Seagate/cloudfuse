@@ -528,7 +528,7 @@ func (az *AzStorage) ReadLink(options internal.ReadLinkOptions) (string, error) 
 		return "", syscall.ENOENT
 	}
 	log.Trace("AzStorage::ReadLink : Read symlink %s", options.Name)
-	data, err := az.storage.ReadBuffer(options.Name, 0, 0)
+	data, err := az.storage.ReadBuffer(options.Name, 0, options.Size)
 
 	if err != nil {
 		azStatsCollector.PushEvents(readLink, options.Name, nil)
@@ -754,6 +754,13 @@ func init() {
 
 	cpkEnabled := config.AddBoolFlag("cpk-enabled", false, "Enable client provided key.")
 	config.BindPFlag(compName+".cpk-enabled", cpkEnabled)
+
+	preserveACL := config.AddBoolFlag(
+		"preserve-acl",
+		false,
+		"Preserve ACL and Permissions set on file during updates",
+	)
+	config.BindPFlag(compName+".preserve-acl", preserveACL)
 
 	config.RegisterFlagCompletionFunc(
 		"container-name",

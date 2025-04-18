@@ -575,7 +575,6 @@ func createObjAttr(
 		Flags:  internal.NewFileBitMap(),
 	}
 	// set flags
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	attr.Metadata = make(map[string]*string)
@@ -600,7 +599,6 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) { //nolint
 	attr.Mode = os.ModeDir
 	// set flags
 	attr.Flags = internal.NewDirBitMap()
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	return attr

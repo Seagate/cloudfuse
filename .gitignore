@@ -13,7 +13,7 @@ adlsgen1fuse
 missing_log.lst
 venv/
 *.backup
-__debug_bin
+__debug_bin*
 .env
 **/var.ps1
 *.prof
@@ -38,3 +38,4 @@ dist/
 /build/winfsp-*
 manpages/
 changelog.yml
+component/azstorage/logfile.txt
