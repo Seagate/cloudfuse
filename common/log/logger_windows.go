@@ -42,17 +42,18 @@ func NewLogger(name string, config common.LogConfig) (Logger, error) {
 		config.Tag = common.FileSystemName
 	}
 
-	if name == "syslog" {
+	switch name {
+	case "syslog":
 		sysLogger, err := newSysLogger(config.Level, config.Tag)
 		if err != nil {
 			//NoSyslogService
 			return NewLogger("base", config)
 		}
 		return sysLogger, nil
-	} else if name == "silent" {
+	case "silent":
 		silentLogger := &SilentLogger{}
 		return silentLogger, nil
-	} else if name == "" || name == "default" || name == "base" {
+	case "", "default", "base":
 		baseLogger, err := newBaseLogger(LogFileConfig{
 			LogFile:      config.FilePath,
 			LogLevel:     config.Level,

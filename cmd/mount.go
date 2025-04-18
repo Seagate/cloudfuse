@@ -84,12 +84,14 @@ type mountOptions struct {
 	LazyWrite           bool           `config:"lazy-write"`
 	EnableRemountUser   bool
 	EnableRemountSystem bool
+	ServiceUser         string
 
 	// v1 support
-	Streaming      bool     `config:"streaming"`
-	AttrCache      bool     `config:"use-attr-cache"`
-	LibfuseOptions []string `config:"libfuse-options"`
-	BlockCache     bool     `config:"block-cache"`
+	Streaming         bool     `config:"streaming"`
+	AttrCache         bool     `config:"use-attr-cache"`
+	LibfuseOptions    []string `config:"libfuse-options"`
+	BlockCache        bool     `config:"block-cache"`
+	EntryCacheTimeout int      `config:"list-cache-timeout"`
 }
 
 var options mountOptions
@@ -356,6 +358,10 @@ var mountCmd = &cobra.Command{
 			options.Components = pipeline
 		}
 
+		if config.IsSet("entry_cache.timeout-sec") || options.EntryCacheTimeout > 0 {
+			options.Components = append(options.Components[:1], append([]string{"entry_cache"}, options.Components[1:]...)...)
+		}
+
 		if config.IsSet("libfuse-options") {
 			for _, v := range options.LibfuseOptions {
 				parameter := strings.Split(v, "=")
@@ -404,6 +410,7 @@ var mountCmd = &cobra.Command{
 					config.Set("lfuse.gid", fmt.Sprint(val))
 				} else if v == "direct_io" || v == "direct_io=true" {
 					config.Set("lfuse.direct-io", "true")
+					config.Set("direct-io", "true")
 				} else {
 					return errors.New(common.FuseAllowedFlags)
 				}
@@ -478,6 +485,19 @@ var mountCmd = &cobra.Command{
 		log.Crit("Logging level set to : %s", logLevel.String())
 		log.Debug("Mount allowed on nonempty path : %v", options.NonEmpty)
 
+		directIO := false
+		_ = config.UnmarshalKey("direct-io", &directIO)
+		if directIO {
+			// Directio is enabled, so remove the attr-cache from the pipeline
+			for i, name := range options.Components {
+				if name == "attr_cache" {
+					options.Components = append(options.Components[:i], options.Components[i+1:]...)
+					log.Crit("Mount::runPipeline : Direct IO enabled, removing attr_cache from pipeline")
+					break
+				}
+			}
+		}
+
 		// If on Linux start with the go daemon
 		// If on Windows, don't use the daemon since it is not supported
 		if runtime.GOOS == "windows" {
@@ -517,13 +537,31 @@ var mountCmd = &cobra.Command{
 				return fmt.Errorf("mount: failed to remove pidFile [%v]", err.Error())
 			}
 
-			pid := os.Getpid()
-			fname := fmt.Sprintf("/tmp/cloudfuse.%v", pid)
+			if options.EnableRemountSystem {
+				// Check if the user exists
+				if options.ServiceUser == "" {
+					return fmt.Errorf("mount: service user is required when enabling remount as system on Linux. " +
+						"Pass --service-remount-user with the user the service will run as on remount")
+				}
 
-			ctx := context.Background()
-			err = createDaemon(pipeline, ctx, pidFileName, 0644, 022, fname)
-			if err != nil {
-				return fmt.Errorf("mount: failed to create daemon [%v]", err.Error())
+				serviceName, err := installRemountService(options.ServiceUser, options.MountPath, options.ConfigFile)
+				if err != nil {
+					return fmt.Errorf("mount: failed to install service to remount on restart [%v]", err.Error())
+				}
+
+				err = startService(serviceName)
+				if err != nil {
+					return fmt.Errorf("mount: failed to start service using remount on restart [%v]", err.Error())
+				}
+			} else {
+				pid := os.Getpid()
+				fname := fmt.Sprintf("/tmp/cloudfuse.%v", pid)
+
+				ctx := context.Background()
+				err = createDaemon(pipeline, ctx, pidFileName, 0644, 022, fname)
+				if err != nil {
+					return fmt.Errorf("mount: failed to create daemon [%v]", err.Error())
+				}
 			}
 		} else {
 			if options.CPUProfile != "" {
@@ -738,12 +776,17 @@ func init() {
 	config.BindPFlag("basic-remount-check", mountCmd.Flags().Lookup("basic-remount-check"))
 	mountCmd.Flags().Lookup("basic-remount-check").Hidden = true
 
-	if runtime.GOOS == "windows" {
-		mountCmd.Flags().BoolVar(&options.EnableRemountSystem, "enable-remount-system", false, "Remount container on server restart. Mount will restart on reboot.")
-		config.BindPFlag("enable-remount-system", mountCmd.Flags().Lookup("enable-remount-system"))
+	mountCmd.Flags().BoolVar(&options.EnableRemountSystem, "enable-remount-system", false, "Remount container on server restart. Mount will restart on reboot.")
+	config.BindPFlag("enable-remount-system", mountCmd.Flags().Lookup("enable-remount-system"))
 
+	if runtime.GOOS == "windows" {
 		mountCmd.Flags().BoolVar(&options.EnableRemountUser, "enable-remount-user", false, "Remount container on server restart for current user. Mount will restart on current user log in.")
 		config.BindPFlag("enable-remount-user", mountCmd.Flags().Lookup("enable-remount-user"))
+	}
+
+	if runtime.GOOS == "linux" {
+		mountCmd.Flags().StringVar(&options.ServiceUser, "remount-system-user", "", "User that the service remount will run as.")
+		config.BindPFlag("remount-system-user", mountCmd.Flags().Lookup("remount-system-user"))
 	}
 
 	mountCmd.PersistentFlags().StringSliceVarP(&options.LibfuseOptions, "o", "o", []string{}, "FUSE options.")
