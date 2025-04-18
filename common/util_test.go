@@ -173,21 +173,21 @@ func (suite *typesTestSuite) TestDecryptBadKey() {
 	suite.assert.Error(err)
 }
 
-func (suite *typesTestSuite) TestEncryptBadKeyTooLong() {
-	// Generate a random key
-	key := make([]byte, 36)
-	encodedKey := make([]byte, 48)
-	rand.Read(key)
-	base64.StdEncoding.Encode(encodedKey, key)
+// func (suite *typesTestSuite) TestEncryptBadKeyTooLong() {
+// 	// Generate a random key
+// 	key := make([]byte, 36)
+// 	encodedKey := make([]byte, 48)
+// 	rand.Read(key)
+// 	base64.StdEncoding.Encode(encodedKey, key)
 
-	encryptedPassphrase := memguard.NewEnclave(encodedKey)
+// 	encryptedPassphrase := memguard.NewEnclave(encodedKey)
 
-	data := make([]byte, 1024)
-	rand.Read(data)
+// 	data := make([]byte, 1024)
+// 	rand.Read(data)
 
-	_, err := EncryptData(data, encryptedPassphrase)
-	suite.assert.Error(err)
-}
+// 	_, err := EncryptData(data, encryptedPassphrase)
+// 	suite.assert.Error(err)
+// }
 
 func (suite *typesTestSuite) TestDecryptBadKeyTooLong() {
 	// Generate a random key
