@@ -121,7 +121,7 @@ func (s *utilsTestSuite) TestContentType() {
 	assert := assert.New(s.T())
 
 	val := getContentType("a.tst")
-	assert.EqualValues("application/octet-stream", val, "Content-type mismatch")
+	assert.Equal("application/octet-stream", val, "Content-type mismatch")
 
 	newSet := `{
 		".tst": "application/test",
@@ -131,11 +131,11 @@ func (s *utilsTestSuite) TestContentType() {
 	assert.NoError(err, "Failed to populate new config")
 
 	val = getContentType("a.tst")
-	assert.EqualValues("application/test", val, "Content-type mismatch")
+	assert.Equal("application/test", val, "Content-type mismatch")
 
 	// assert mp4 content type would get deserialized correctly
 	val = getContentType("file.mp4")
-	assert.EqualValues("video/mp4", val)
+	assert.Equal("video/mp4", val)
 }
 
 type contentTypeVal struct {
@@ -176,7 +176,7 @@ func (s *utilsTestSuite) TestPrefixPathRemoval() {
 	for _, i := range inputs {
 		s.Run(path.Join(i.prefix, i.path), func() {
 			output := split(i.prefix, i.path)
-			assert.EqualValues(i.result, output)
+			assert.Equal(i.result, output)
 		})
 	}
 
@@ -240,7 +240,7 @@ func (s *utilsTestSuite) TestGetContentType() {
 	for _, i := range inputs {
 		s.Run(i.val, func() {
 			output := getContentType(i.val)
-			assert.EqualValues(i.result, output)
+			assert.Equal(i.result, output)
 		})
 	}
 }

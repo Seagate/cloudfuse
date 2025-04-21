@@ -108,7 +108,7 @@ func (suite *cacheMapTestSuite) TestInsert() {
 	suite.assert.NotNil(cachedItem)
 	suite.assert.Equal(filePath, cachedItem.attr.Path)
 	suite.assert.Equal(newSize, cachedItem.attr.Size)
-	suite.assert.EqualValues(newTime, cachedItem.attr.Mtime)
+	suite.assert.Equal(newTime, cachedItem.attr.Mtime)
 	suite.assert.False(cachedItem.attr.IsDir())
 	suite.assert.Same(insertedItem, cachedItem)
 

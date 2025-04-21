@@ -645,15 +645,6 @@ func (dl *Datalake) getFileClientPathEscape(name string) *file.Client {
 	return dl.Filesystem.NewFileClient(url.PathEscape(dl.getFormattedPath(name)))
 }
 
-// // getFileName takes a blob name and will convert the special characters into similar unicode characters
-// // on Windows.
-// func (dl *Datalake) getFileName(name string) string {
-// 	if runtime.GOOS == "windows" && dl.Config.restrictedCharsWin {
-// 		name = convertname.WindowsCloudToFile(name)
-// 	}
-// 	return name
-// }
-
 // getFormattedPath takes a file name and converts special characters to the original ASCII
 // on Windows and adds the prefixPath.
 func (dl *Datalake) getFormattedPath(name string) string {

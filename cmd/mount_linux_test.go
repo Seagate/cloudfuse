@@ -362,14 +362,14 @@ func (suite *mountTestSuite) TestInvalidUIDValue() {
 	defer suite.cleanupTest()
 
 	mntDir, err := os.MkdirTemp("", "mntdir")
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	defer os.RemoveAll(mntDir)
 
 	// incorrect umask value
 	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest),
 		"-o allow_other", "-o attr_timeout=120", "-o entry_timeout=120", "-o negative_timeout=120",
 		"-o ro", "-o allow_root", "-o default_permissions", "-o umask=755", "-o gid=1000", "-o direct_io", "-o uid=abcd")
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(op, "failed to parse uid")
 }
 
@@ -377,14 +377,14 @@ func (suite *mountTestSuite) TestInvalidGIDValue() {
 	defer suite.cleanupTest()
 
 	mntDir, err := os.MkdirTemp("", "mntdir")
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	defer os.RemoveAll(mntDir)
 
 	// incorrect umask value
 	op, err := executeCommandC(rootCmd, "mount", mntDir, fmt.Sprintf("--config-file=%s", confFileMntTest),
 		"-o allow_other", "-o attr_timeout=120", "-o entry_timeout=120", "-o negative_timeout=120",
 		"-o ro", "-o allow_root", "-o default_permissions", "-o umask=755", "-o uid=1000", "-o direct_io", "-o gid=abcd")
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 	suite.assert.Contains(op, "failed to parse gid")
 }
 

@@ -13,7 +13,6 @@ on:
     types: [opened, synchronize, reopened, edited]
     branches:
       - main
-      - blobfuse/2.*
 jobs:
   codespell:
     name: Check for spelling errors

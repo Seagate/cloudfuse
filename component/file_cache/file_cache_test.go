@@ -404,10 +404,10 @@ func (suite *fileCacheTestSuite) TestStreamDirCase1() {
 	suite.assert.NoError(err)
 	suite.assert.NotEmpty(dir)
 	suite.assert.Len(dir, 4)
-	suite.assert.EqualValues(file1, dir[0].Path)
-	suite.assert.EqualValues(file2, dir[1].Path)
-	suite.assert.EqualValues(file3, dir[2].Path)
-	suite.assert.EqualValues(subdir, dir[3].Path)
+	suite.assert.Equal(file1, dir[0].Path)
+	suite.assert.Equal(file2, dir[1].Path)
+	suite.assert.Equal(file3, dir[2].Path)
+	suite.assert.Equal(subdir, dir[3].Path)
 }
 
 func (suite *fileCacheTestSuite) TestStreamDirCase2() {
@@ -430,10 +430,10 @@ func (suite *fileCacheTestSuite) TestStreamDirCase2() {
 	suite.assert.NoError(err)
 	suite.assert.NotEmpty(dir)
 	suite.assert.Len(dir, 4)
-	suite.assert.EqualValues(subdir, dir[0].Path)
-	suite.assert.EqualValues(file1, dir[1].Path)
-	suite.assert.EqualValues(file2, dir[2].Path)
-	suite.assert.EqualValues(file3, dir[3].Path)
+	suite.assert.Equal(subdir, dir[0].Path)
+	suite.assert.Equal(file1, dir[1].Path)
+	suite.assert.Equal(file2, dir[2].Path)
+	suite.assert.Equal(file3, dir[3].Path)
 }
 
 func (suite *fileCacheTestSuite) TestStreamDirCase3() {
@@ -464,13 +464,13 @@ func (suite *fileCacheTestSuite) TestStreamDirCase3() {
 	suite.assert.NoError(err)
 	suite.assert.NotEmpty(dir)
 	suite.assert.Len(dir, 4)
-	suite.assert.EqualValues(file1, dir[0].Path)
+	suite.assert.Equal(file1, dir[0].Path)
 	suite.assert.EqualValues(1024, dir[0].Size)
-	suite.assert.EqualValues(file2, dir[1].Path)
+	suite.assert.Equal(file2, dir[1].Path)
 	suite.assert.EqualValues(1024, dir[1].Size)
-	suite.assert.EqualValues(file3, dir[2].Path)
+	suite.assert.Equal(file3, dir[2].Path)
 	suite.assert.EqualValues(1024, dir[2].Size)
-	suite.assert.EqualValues(subdir, dir[3].Path)
+	suite.assert.Equal(subdir, dir[3].Path)
 	suite.fileCache.createEmptyFile = false
 }
 
@@ -1003,7 +1003,7 @@ func (suite *fileCacheTestSuite) TestOpenFileNotInCache() {
 
 	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR, Mode: suite.fileCache.defaultPermission})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(path, handle.Path)
+	suite.assert.Equal(path, handle.Path)
 	suite.assert.False(handle.Dirty())
 
 	// File should not exist in cache
@@ -1022,7 +1022,7 @@ func (suite *fileCacheTestSuite) TestOpenFileInCache() {
 	// Download is required
 	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(path, handle.Path)
+	suite.assert.Equal(path, handle.Path)
 	suite.assert.False(handle.Dirty())
 
 	// File should exist in cache
@@ -1040,7 +1040,7 @@ func (suite *fileCacheTestSuite) TestOpenCreateGetAttr() {
 	// since it does not exist, we allow the file to be created using OpenFile
 	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_CREATE, Mode: 0777})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(path, handle.Path)
+	suite.assert.Equal(path, handle.Path)
 	// we should report that the file exists now
 	attr, err = suite.fileCache.GetAttr(internal.GetAttrOptions{Name: path})
 	suite.assert.NoError(err)
@@ -1148,7 +1148,7 @@ func (suite *fileCacheTestSuite) TestReadInBufferEmpty() {
 	data := make([]byte, 0)
 	length, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: data})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(0, length)
+	suite.assert.Equal(0, length)
 	suite.assert.Empty(data)
 }
 
@@ -1166,8 +1166,8 @@ func (suite *fileCacheTestSuite) TestReadInBufferNoFlush() {
 	output := make([]byte, 9)
 	length, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, output)
-	suite.assert.EqualValues(len(data), length)
+	suite.assert.Equal(data, output)
+	suite.assert.Equal(len(data), length)
 }
 
 func (suite *fileCacheTestSuite) TestReadInBuffer() {
@@ -1185,8 +1185,8 @@ func (suite *fileCacheTestSuite) TestReadInBuffer() {
 	output := make([]byte, 9)
 	length, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, output)
-	suite.assert.EqualValues(len(data), length)
+	suite.assert.Equal(data, output)
+	suite.assert.Equal(len(data), length)
 }
 
 func (suite *fileCacheTestSuite) TestReadInBufferErrorBadFd() {
@@ -1197,7 +1197,7 @@ func (suite *fileCacheTestSuite) TestReadInBufferErrorBadFd() {
 	length, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle})
 	suite.assert.Error(err)
 	suite.assert.EqualValues(syscall.EBADF, err)
-	suite.assert.EqualValues(0, length)
+	suite.assert.Equal(0, length)
 }
 
 func (suite *fileCacheTestSuite) TestWriteFile() {
@@ -1212,10 +1212,10 @@ func (suite *fileCacheTestSuite) TestWriteFile() {
 	length, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(len(data), length)
+	suite.assert.Equal(len(data), length)
 	// Check that the local cache updated with data
 	d, _ := os.ReadFile(filepath.Join(suite.cache_path, file))
-	suite.assert.EqualValues(data, d)
+	suite.assert.Equal(data, d)
 	suite.assert.True(handle.Dirty())
 }
 
@@ -1227,7 +1227,7 @@ func (suite *fileCacheTestSuite) TestWriteFileErrorBadFd() {
 	len, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle})
 	suite.assert.Error(err)
 	suite.assert.EqualValues(syscall.EBADF, err)
-	suite.assert.EqualValues(0, len)
+	suite.assert.Equal(0, len)
 }
 
 func (suite *fileCacheTestSuite) TestFlushFileEmpty() {
@@ -1269,7 +1269,7 @@ func (suite *fileCacheTestSuite) TestFlushFile() {
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
 	// Check that fake_storage updated with data
 	d, _ := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
-	suite.assert.EqualValues(data, d)
+	suite.assert.Equal(data, d)
 }
 
 func (suite *fileCacheTestSuite) TestFlushFileErrorBadFd() {
@@ -1295,7 +1295,7 @@ func (suite *fileCacheTestSuite) TestGetAttrCase1() {
 	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(attr)
-	suite.assert.EqualValues(file, attr.Path)
+	suite.assert.Equal(file, attr.Path)
 }
 
 func (suite *fileCacheTestSuite) TestGetAttrCase2() {
@@ -1309,7 +1309,7 @@ func (suite *fileCacheTestSuite) TestGetAttrCase2() {
 	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(attr)
-	suite.assert.EqualValues(file, attr.Path)
+	suite.assert.Equal(file, attr.Path)
 }
 
 func (suite *fileCacheTestSuite) TestGetAttrCase3() {
@@ -1326,7 +1326,7 @@ func (suite *fileCacheTestSuite) TestGetAttrCase3() {
 	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(attr)
-	suite.assert.EqualValues(file, attr.Path)
+	suite.assert.Equal(file, attr.Path)
 	suite.assert.EqualValues(1024, attr.Size)
 }
 
@@ -1350,7 +1350,7 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 
 	written, err := suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(size, written)
+	suite.assert.Equal(size, written)
 
 	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 	suite.assert.NoError(err)
@@ -1374,7 +1374,7 @@ func (suite *fileCacheTestSuite) TestGetAttrCase4() {
 	attr, err := suite.fileCache.GetAttr(internal.GetAttrOptions{Name: file})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(attr)
-	suite.assert.EqualValues(file, attr.Path)
+	suite.assert.Equal(file, attr.Path)
 	suite.assert.EqualValues(size, attr.Size)
 }
 
@@ -1740,7 +1740,7 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: handle, Offset: 0, Data: output})
 	suite.assert.NoError(err)
 	suite.assert.Equal(9, n)
-	suite.assert.EqualValues(data, output)
+	suite.assert.Equal(data, output)
 }
 
 func (suite *fileCacheTestSuite) TestZZOffloadIO() {

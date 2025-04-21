@@ -143,8 +143,8 @@ func (s *pipelineTestSuite) TestStartStopCreateNewPipeline() {
 
 func (s *pipelineTestSuite) TestStreamToBlockCacheConfig() {
 	p, err := NewPipeline([]string{"stream"}, false)
-	s.assert.Nil(err)
-	s.assert.Equal(p.components[0].Name(), "block_cache")
+	s.assert.NoError(err)
+	s.assert.Equal("block_cache", p.components[0].Name())
 }
 
 func TestPipelineTestSuite(t *testing.T) {
