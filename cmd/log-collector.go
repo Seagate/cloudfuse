@@ -147,8 +147,7 @@ var dumpLogsCmd = &cobra.Command{
 			return fmt.Errorf("no logs were generated due to log type being silent: [%s]", err.Error())
 		}
 
-		// are any 'base' logging or syslog filters being used to redirect to a separate file?
-		// check for /etc/rsyslog.d and /etc/logrotate.d files
+		// TODO: check if any 'base' logging or syslog filters are being used to redirect to a separate file. do this by checking for /etc/rsyslog.d and /etc/logrotate.d files
 
 		return nil
 	},
@@ -161,7 +160,7 @@ func createFilteredLog(logFile string) (string, error) {
 
 	keyword := "cloudfuse"
 
-	os.MkdirAll("/tmp/cloudfuseSyslog", 0777)
+	os.MkdirAll("/tmp/cloudfuseSyslog", 0760)
 
 	outPath := "/tmp/cloudfuseSyslog/cloudfuseSyslog.log" //Decide what directory you want to dump this file. an empty folder would be easiest.
 
@@ -195,7 +194,7 @@ func createFilteredLog(logFile string) (string, error) {
 }
 
 func createLinuxArchive(logPath string) error {
-	ArchiveName := fmt.Sprintf("cloudfuse_Logs_" + time.Now().Format("2006-01-02_15-04-05"))
+	ArchiveName := fmt.Sprintf("cloudfuse_logs_" + time.Now().Format("2006-01-02_15-04-05"))
 
 	outFile, err := os.Create(dumpPath + "/" + ArchiveName + ".tar.gz")
 	if err != nil {
@@ -214,46 +213,51 @@ func createLinuxArchive(logPath string) error {
 		return err
 	}
 
+	var amountLogs int
 	for _, item := range items {
-		if item.IsDir() {
+		if strings.HasPrefix(item.Name(), "cloudfuse") && strings.HasSuffix(item.Name(), ".log") {
+			filePath := filepath.Join(logPath, item.Name())
+			file, err := os.Open(filePath)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+
+			info, err := file.Stat()
+			if err != nil {
+				return err
+			}
+
+			header, err := tar.FileInfoHeader(info, "")
+			if err != nil {
+				return err
+			}
+
+			header.Name = item.Name()
+
+			err = tarWriter.WriteHeader(header)
+			if err != nil {
+				return err
+			}
+
+			_, err = io.Copy(tarWriter, file)
+			if err != nil {
+				return err
+			}
+			amountLogs++
+		} else {
 			continue
 		}
-
-		filePath := filepath.Join(logPath, item.Name())
-		file, err := os.Open(filePath)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-
-		info, err := file.Stat()
-		if err != nil {
-			return err
-		}
-
-		header, err := tar.FileInfoHeader(info, "")
-		if err != nil {
-			return err
-		}
-
-		header.Name = item.Name()
-
-		err = tarWriter.WriteHeader(header)
-		if err != nil {
-			return err
-		}
-
-		_, err = io.Copy(tarWriter, file)
-		if err != nil {
-			return err
-		}
+	}
+	if amountLogs == 0 {
+		return fmt.Errorf("no cloudfuse log file were found in the path [%s]", dumpPath)
 	}
 	return nil
 }
 
 func createWindowsArchive(logPath string) error {
 
-	ArchiveName := fmt.Sprintf("cloudfuse_Logs_" + time.Now().Format("2006-01-02_15-04-05"))
+	ArchiveName := fmt.Sprintf("cloudfuse_logs_" + time.Now().Format("2006-01-02_15-04-05"))
 
 	outFile, err := os.Create(dumpPath + "/" + ArchiveName)
 	if err != nil {
@@ -264,44 +268,50 @@ func createWindowsArchive(logPath string) error {
 	zipWriter := zip.NewWriter(outFile)
 	defer zipWriter.Close()
 
+	// Replace os.ReadDir() with more logic that can determine if the file is appropriate to collect.
 	items, err := os.ReadDir(logPath)
 	if err != nil {
 		return err
 	}
 
+	var amountLogs int
 	for _, item := range items {
-		if item.IsDir() {
+		if strings.HasPrefix(item.Name(), "cloudfuse") && strings.HasSuffix(item.Name(), ".log") {
+			filePath := filepath.Join(logPath, item.Name())
+			file, err := os.Open(filePath)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+
+			info, err := file.Stat()
+			if err != nil {
+				return err
+			}
+
+			header, err := zip.FileInfoHeader(info)
+			if err != nil {
+				return err
+			}
+
+			header.Name = item.Name()
+
+			zipEntry, err := zipWriter.Create(item.Name())
+			if err != nil {
+				return err
+			}
+
+			_, err = io.Copy(zipEntry, file)
+			if err != nil {
+				return err
+			}
+			amountLogs++
+		} else {
 			continue
 		}
-
-		filePath := filepath.Join(logPath, item.Name())
-		file, err := os.Open(filePath)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-
-		info, err := file.Stat()
-		if err != nil {
-			return err
-		}
-
-		header, err := zip.FileInfoHeader(info)
-		if err != nil {
-			return err
-		}
-
-		header.Name = item.Name()
-
-		zipEntry, err := zipWriter.Create(item.Name())
-		if err != nil {
-			return err
-		}
-
-		_, err = io.Copy(zipEntry, file)
-		if err != nil {
-			return err
-		}
+	}
+	if amountLogs == 0 {
+		return fmt.Errorf("no cloudfuse log file were found in the path [%s]", dumpPath)
 	}
 	return nil
 }
