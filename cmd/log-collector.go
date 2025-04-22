@@ -217,8 +217,9 @@ func createLinuxArchive(logPath string) error {
 	var amountLogs int
 	for _, item := range items {
 		if strings.HasPrefix(item.Name(), "cloudfuse") && strings.HasSuffix(item.Name(), ".log") {
-			filePath := filepath.Join(logPath, item.Name())
-			file, err := os.Open(filePath)
+			itemPath := filepath.Join(logPath, item.Name())
+			itemPath = filepath.Clean(itemPath)
+			file, err := os.Open(itemPath)
 			if err != nil {
 				return err
 			}
@@ -278,8 +279,10 @@ func createWindowsArchive(logPath string) error {
 	var amountLogs int
 	for _, item := range items {
 		if strings.HasPrefix(item.Name(), "cloudfuse") && strings.HasSuffix(item.Name(), ".log") {
-			filePath := filepath.Join(logPath, item.Name())
-			file, err := os.Open(filePath)
+			itemPath := filepath.Join(logPath, item.Name())
+			itemPath = filepath.Clean(itemPath)
+
+			file, err := os.Open(itemPath)
 			if err != nil {
 				return err
 			}
