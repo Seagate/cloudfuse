@@ -86,6 +86,7 @@ var dumpLogsCmd = &cobra.Command{
 		}
 
 		logPath := "$HOME/.cloudfuse/cloudfuse.log"
+		logPath = common.ExpandPath(logPath)
 		logType := "base"
 		_, err = os.Stat(logConfigFile)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -250,7 +251,7 @@ func createLinuxArchive(logPath string) error {
 		}
 	}
 	if amountLogs == 0 {
-		return fmt.Errorf("no cloudfuse log file were found in the path [%s]", dumpPath)
+		return fmt.Errorf("no cloudfuse log file were found in %s", logPath)
 	}
 	return nil
 }
@@ -311,7 +312,7 @@ func createWindowsArchive(logPath string) error {
 		}
 	}
 	if amountLogs == 0 {
-		return fmt.Errorf("no cloudfuse log file were found in the path [%s]", dumpPath)
+		return fmt.Errorf("no cloudfuse log file were found in %s", logPath)
 	}
 	return nil
 }
