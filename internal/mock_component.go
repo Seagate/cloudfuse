@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -126,6 +126,10 @@ func (m *MockComponent) Configure(arg0 bool) error {
 	ret := m.ctrl.Call(m, "Configure", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
+}
+
+func (m *MockComponent) GenConfig() string {
+	return ""
 }
 
 // Configure indicates an expected call of Configure.
@@ -317,6 +321,21 @@ func (m *MockComponent) IsDirEmpty(arg0 IsDirEmptyOptions) bool {
 func (mr *MockComponentMockRecorder) IsDirEmpty(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsDirEmpty", reflect.TypeOf((*MockComponent)(nil).IsDirEmpty), arg0)
+}
+
+// DeleteEmptyDirs mocks base method.
+func (m *MockComponent) DeleteEmptyDirs(arg0 DeleteDirOptions) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteEmptyDirs", arg0)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteDir indicates an expected call of DeleteEmptyDirs.
+func (mr *MockComponentMockRecorder) DeleteEmptyDirs(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEmptyDirs", reflect.TypeOf((*MockComponent)(nil).DeleteEmptyDirs), arg0)
 }
 
 // Name mocks base method.

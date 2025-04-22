@@ -1,19 +1,10 @@
-//go:build linux && !authtest
-// +build linux,!authtest
+//go:build !authtest
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -37,8 +28,11 @@
 package block_cache
 
 import (
+	"runtime"
 	"testing"
 
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -49,6 +43,9 @@ type blockTestSuite struct {
 }
 
 func (suite *blockTestSuite) SetupTest() {
+	suite.assert = assert.New(suite.T())
+	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
+	suite.assert.NoError(err)
 }
 
 func (suite *blockTestSuite) cleanupTest() {
@@ -88,7 +85,11 @@ func (suite *blockTestSuite) TestAllocateHuge() {
 	b, err := AllocateBlock(50 * 1024 * 1024 * 1024)
 	suite.assert.Nil(b)
 	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "mmap error")
+	if runtime.GOOS == "windows" {
+		suite.assert.Contains(err.Error(), "insufficient memory available:")
+	} else {
+		suite.assert.Contains(err.Error(), "mmap error")
+	}
 }
 
 func (suite *blockTestSuite) TestFreeNilData() {
@@ -114,7 +115,7 @@ func (suite *blockTestSuite) TestFreeInvalidData() {
 
 	err = b.Delete()
 	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "invalid argument")
+	suite.assert.Contains(err.Error(), "invalid")
 }
 
 func (suite *blockTestSuite) TestResuse() {
@@ -197,7 +198,6 @@ func (suite *blockTestSuite) TestWriter() {
 	suite.assert.NotNil(b.state)
 	suite.assert.Nil(b.node)
 	suite.assert.Zero(b.offset)
-	suite.assert.Zero(b.endIndex)
 	suite.assert.Equal(b.id, int64(-1))
 	suite.assert.False(b.IsDirty())
 

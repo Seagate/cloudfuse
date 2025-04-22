@@ -1,19 +1,10 @@
-//go:build linux && !authtest
-// +build linux,!authtest
+//go:build !authtest
 
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -41,6 +32,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -51,6 +44,9 @@ type blockpoolTestSuite struct {
 }
 
 func (suite *blockpoolTestSuite) SetupTest() {
+	suite.assert = assert.New(suite.T())
+	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
+	suite.assert.NoError(err)
 }
 
 func (suite *blockpoolTestSuite) cleanupTest() {

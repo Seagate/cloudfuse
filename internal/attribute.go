@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -47,7 +47,6 @@ func CreateObjAttr(objectPath string, size int64, lastModified time.Time) (attr 
 		Flags:  NewFileBitMap(),
 	}
 	// set flags
-	attr.Flags.Set(PropFlagMetadataRetrieved)
 	attr.Flags.Set(PropFlagModeDefault)
 	attr.Metadata = make(map[string]*string)
 
@@ -66,7 +65,6 @@ func CreateObjAttrDir(path string) (attr *ObjAttr) {
 	attr.Mode = os.ModeDir
 	// set flags
 	attr.Flags = NewDirBitMap()
-	attr.Flags.Set(PropFlagMetadataRetrieved)
 	attr.Flags.Set(PropFlagModeDefault)
 
 	return attr
@@ -96,7 +94,6 @@ const (
 	PropFlagIsDir
 	PropFlagEmptyDir
 	PropFlagSymlink
-	PropFlagMetadataRetrieved
 	PropFlagModeDefault // TODO: Does this sound better as ModeDefault or DefaultMode? The getter would be IsModeDefault or IsDefaultMode
 )
 
@@ -123,12 +120,6 @@ func (attr *ObjAttr) IsDir() bool {
 // IsSymlink : Test blob is a symlink or not
 func (attr *ObjAttr) IsSymlink() bool {
 	return attr.Flags.IsSet(PropFlagSymlink)
-}
-
-// IsMetadataRetrieved : Whether or not metadata has been retrieved for this path.
-// Datalake list paths does not support returning x-ms-properties (metadata), so we cannot be sure if the path is a symlink or not.
-func (attr *ObjAttr) IsMetadataRetrieved() bool {
-	return attr.Flags.IsSet(PropFlagMetadataRetrieved)
 }
 
 // IsModeDefault : Whether or not to use the default mode.

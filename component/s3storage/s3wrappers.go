@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -50,23 +50,59 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
+type getObjectOptions struct {
+	name      string
+	offset    int64
+	count     int64
+	isSymLink bool
+	isDir     bool
+}
+
+type putObjectOptions struct {
+	name       string
+	objectData io.Reader
+	size       int64
+	isSymLink  bool
+	isDir      bool
+}
+
+type copyObjectOptions struct {
+	source    string
+	target    string
+	isSymLink bool
+	isDir     bool
+}
+
+type renameObjectOptions struct {
+	source    string
+	target    string
+	isSymLink bool
+	isDir     bool
+}
+
 const symlinkStr = ".rclonelink"
 const maxResultsPerListCall = 1000
 
 // getObjectMultipartDownload downloads an object to a file using multipart download
 // which can be much faster for large objects.
 func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
-	key := cl.getKey(name, false)
+	key := cl.getKey(name, false, false)
 	log.Trace("Client::getObjectMultipartDownload : get object %s", key)
 	downloader := manager.NewDownloader(cl.awsS3Client, func(u *manager.Downloader) {
 		u.PartSize = cl.Config.partSize
 		u.Concurrency = cl.Config.concurrency
 	})
 
-	_, err := downloader.Download(context.Background(), fi, &s3.GetObjectInput{
+	getObjectInput := &s3.GetObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
-	})
+	}
+
+	if cl.Config.enableChecksum {
+		getObjectInput.ChecksumMode = types.ChecksumModeEnabled
+	}
+
+	_, err := downloader.Download(context.Background(), fi, getObjectInput)
 	// check for errors
 	if err != nil {
 		attemptedAction := fmt.Sprintf("GetObject(%s)", key)
@@ -78,29 +114,35 @@ func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {
 // Wrapper for awsS3Client.GetObject.
 // Set count = 0 to read to the end of the object.
 // name is the path to the file.
-func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bool) (io.ReadCloser, error) {
-	key := cl.getKey(name, isSymLink)
-	log.Trace("Client::getObject : get object %s (%d+%d)", key, offset, count)
+func (cl *Client) getObject(options getObjectOptions) (io.ReadCloser, error) {
+	key := cl.getKey(options.name, options.isSymLink, options.isDir)
+	log.Trace("Client::getObject : get object %s (%d+%d)", key, options.offset, options.count)
 
 	// deal with the range
 	var rangeString string //string to be used to specify range of object to download from S3
 	//TODO: add handle if the offset+count is greater than the end of Object.
-	if count == 0 {
+	if options.count == 0 {
 		// sending Range:"bytes=0-" gives errors from MinIO ("InvalidRange: The requested range is not satisfiable")
 		// so if offset is 0 too, leave rangeString empty
-		if offset != 0 {
-			rangeString = "bytes=" + fmt.Sprint(offset) + "-"
+		if options.offset != 0 {
+			rangeString = "bytes=" + fmt.Sprint(options.offset) + "-"
 		}
 	} else {
-		endRange := offset + count - 1
-		rangeString = "bytes=" + fmt.Sprint(offset) + "-" + fmt.Sprint(endRange)
+		endRange := options.offset + options.count - 1
+		rangeString = "bytes=" + fmt.Sprint(options.offset) + "-" + fmt.Sprint(endRange)
 	}
 
-	result, err := cl.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
+	getObjectInput := &s3.GetObjectInput{
 		Bucket: aws.String(cl.Config.authConfig.BucketName),
 		Key:    aws.String(key),
 		Range:  aws.String(rangeString),
-	})
+	}
+
+	if cl.Config.enableChecksum {
+		getObjectInput.ChecksumMode = types.ChecksumModeEnabled
+	}
+
+	result, err := cl.awsS3Client.GetObject(context.Background(), getObjectInput)
 
 	// check for errors
 	if err != nil {
@@ -115,8 +157,8 @@ func (cl *Client) getObject(name string, offset int64, count int64, isSymLink bo
 // Wrapper for awsS3Client.PutObject.
 // Pass in the name of the file, an io.Reader with the object data, the size of the upload,
 // and whether the object is a symbolic link or not.
-func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSymLink bool) error {
-	key := cl.getKey(name, isSymLink)
+func (cl *Client) putObject(options putObjectOptions) error {
+	key := cl.getKey(options.name, options.isSymLink, options.isDir)
 	log.Trace("Client::putObject : putting object %s", key)
 	ctx := context.Background()
 	var err error
@@ -124,7 +166,7 @@ func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSym
 	putObjectInput := &s3.PutObjectInput{
 		Bucket:      aws.String(cl.Config.authConfig.BucketName),
 		Key:         aws.String(key),
-		Body:        objectData,
+		Body:        options.objectData,
 		ContentType: aws.String(getContentType(key)),
 	}
 
@@ -134,7 +176,7 @@ func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSym
 
 	// If the object is small, just do a normal put object.
 	// If not, then use a multipart upload
-	if size < cl.Config.uploadCutoff {
+	if options.size < cl.Config.uploadCutoff {
 		_, err = cl.awsS3Client.PutObject(ctx, putObjectInput)
 	} else {
 		uploader := manager.NewUploader(cl.awsS3Client, func(u *manager.Uploader) {
@@ -151,8 +193,8 @@ func (cl *Client) putObject(name string, objectData io.Reader, size int64, isSym
 
 // Wrapper for awsS3Client.DeleteObject.
 // name is the path to the file.
-func (cl *Client) deleteObject(name string, isSymLink bool) error {
-	key := cl.getKey(name, isSymLink)
+func (cl *Client) deleteObject(name string, isSymLink bool, isDir bool) error {
+	key := cl.getKey(name, isSymLink, isDir)
 	log.Trace("Client::deleteObject : deleting object %s", key)
 
 	_, err := cl.awsS3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
@@ -174,7 +216,7 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 	// build list to send to DeleteObjects
 	keyList := make([]types.ObjectIdentifier, len(objects))
 	for i, object := range objects {
-		key := cl.getKey(object.Path, object.IsSymlink())
+		key := cl.getKey(object.Path, object.IsSymlink(), object.IsDir())
 		keyList[i] = types.ObjectIdentifier{
 			Key: &key,
 		}
@@ -201,8 +243,8 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 // HeadObject() acts just like GetObject, except no contents are returned.
 // So this is used to get metadata / attributes for an object.
 // name is the path to the file.
-func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, error) {
-	key := cl.getKey(name, isSymlink)
+func (cl *Client) headObject(name string, isSymlink bool, isDir bool) (*internal.ObjAttr, error) {
+	key := cl.getKey(name, isSymlink, isDir)
 	log.Trace("Client::headObject : object %s", key)
 
 	result, err := cl.awsS3Client.HeadObject(context.Background(), &s3.HeadObjectInput{
@@ -210,11 +252,19 @@ func (cl *Client) headObject(name string, isSymlink bool) (*internal.ObjAttr, er
 		Key:    aws.String(key),
 	})
 	if err != nil {
+		// Make sure the attempted starts with "HeadObject",  or else parseS3Err will log to Err
 		attemptedAction := fmt.Sprintf("HeadObject(%s)", name)
 		return nil, parseS3Err(err, attemptedAction)
 	}
 
-	object := createObjAttr(name, *result.ContentLength, *result.LastModified, isSymlink)
+	var object *internal.ObjAttr
+
+	if isDir {
+		object = createObjAttrDir(name)
+	} else {
+		object = createObjAttr(name, *result.ContentLength, *result.LastModified, isSymlink)
+	}
+
 	return object, nil
 }
 
@@ -227,19 +277,43 @@ func (cl *Client) headBucket() (*s3.HeadBucketOutput, error) {
 }
 
 // Wrapper for awsS3Client.CopyObject
-func (cl *Client) copyObject(source string, target string, isSymLink bool) error {
+func (cl *Client) copyObject(options copyObjectOptions) error {
 	// copy the object to its new key
-	sourceKey := cl.getKey(source, isSymLink)
-	targetKey := cl.getKey(target, isSymLink)
-	_, err := cl.awsS3Client.CopyObject(context.Background(), &s3.CopyObjectInput{
+	sourceKey := cl.getKey(options.source, options.isSymLink, options.isDir)
+	targetKey := cl.getKey(options.target, options.isSymLink, options.isDir)
+
+	copyObjectInput := &s3.CopyObjectInput{
 		Bucket:     aws.String(cl.Config.authConfig.BucketName),
 		CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, url.PathEscape(sourceKey))),
 		Key:        aws.String(targetKey),
-	})
+	}
+
+	if cl.Config.enableChecksum {
+		copyObjectInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+	}
+
+	_, err := cl.awsS3Client.CopyObject(context.Background(), copyObjectInput)
 	// check for errors on copy
 	if err != nil {
 		attemptedAction := fmt.Sprintf("copy %s to %s", sourceKey, targetKey)
 		return parseS3Err(err, attemptedAction)
+	}
+
+	return err
+}
+
+func (cl *Client) renameObject(options renameObjectOptions) error {
+	err := cl.copyObject(copyObjectOptions{source: options.source, target: options.target, isSymLink: options.isSymLink, isDir: options.isDir}) //nolint
+	if err != nil {
+		log.Err("Client::renameObject : copyObject(%s->%s) failed. Here's why: %v", options.source, options.target, err)
+		return err
+	}
+	// Copy of the file is done so now delete the older file
+	// in this case we don't need to check if the file exists, so we use deleteObject, not DeleteFile
+	// this is what S3's DeleteObject spec is meant for: to make sure the object doesn't exist anymore
+	err = cl.deleteObject(options.source, options.isSymLink, options.isDir)
+	if err != nil {
+		log.Err("Client::renameObject : deleteObject(%s) failed. Here's why: %v", options.source, err)
 	}
 
 	return err
@@ -313,7 +387,7 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	}
 
 	// combine the configured prefix and the prefix being given to List to get a full listPath
-	listPath := cl.getKey(prefix, false)
+	listPath := cl.getKey(prefix, false, false)
 	// replace any trailing forward slash stripped by common.JoinUnixFilepath
 	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
 		listPath += "/"
@@ -367,6 +441,10 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// documentation for this S3 data structure:
 	// 	https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3@v1.30.2#ListObjectsV2Output
 	for _, value := range output.Contents {
+		if *value.Key == listPath {
+			continue
+		}
+
 		// push object info into the list
 		name, isSymLink := cl.getFile(*value.Key)
 
@@ -449,7 +527,6 @@ func createObjAttr(path string, size int64, lastModified time.Time, isSymLink bo
 		Flags:  internal.NewFileBitMap(),
 	}
 	// set flags
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	attr.Metadata = make(map[string]*string)
@@ -474,7 +551,6 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) { //nolint
 	attr.Mode = os.ModeDir
 	// set flags
 	attr.Flags = internal.NewDirBitMap()
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	return attr
@@ -483,7 +559,7 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) { //nolint
 // getKey converts a file name to an object name. If it is a symlink it prepends
 // .rclonelink. If it is set to convert names from Linux to Windows then it allows
 // special characters like "*:<>?| to be displayed on Windows.
-func (cl *Client) getKey(name string, isSymLink bool) string {
+func (cl *Client) getKey(name string, isSymLink bool, isDir bool) string {
 	if isSymLink {
 		name = name + symlinkStr
 	}
@@ -491,6 +567,11 @@ func (cl *Client) getKey(name string, isSymLink bool) string {
 	name = common.JoinUnixFilepath(cl.Config.prefixPath, name)
 	if runtime.GOOS == "windows" && cl.Config.restrictedCharsWin {
 		name = convertname.WindowsFileToCloud(name)
+	}
+
+	// Directories in S3 end in a trailing slash
+	if isDir {
+		name = internal.ExtendDirName(name)
 	}
 	return name
 }

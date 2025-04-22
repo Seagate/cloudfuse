@@ -5,7 +5,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -67,7 +67,7 @@ func TestMain(m *testing.M) {
 	if accountName == "" || sas == "" || containerName == "" || filepath == "" {
 		fmt.Println("Kindly provide the parameters...")
 		fmt.Println("Usage : sdk_test.go -account=<account name> -sas=<storage sas> -container=<container name> -prefix=<file prefix>")
-		panic(errors.New("Invalid arguments"))
+		panic(errors.New("invalid arguments"))
 	}
 
 	m.Run()

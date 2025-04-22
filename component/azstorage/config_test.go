@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -262,7 +262,9 @@ func (s *configTestSuite) TestAuthModeKey() {
 	opt.AccountKey = "abc"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.authConfig.AccountKey, opt.AccountKey)
+	accountKey, _ := az.stConfig.authConfig.AccountKey.Open()
+	defer accountKey.Destroy()
+	assert.Equal(opt.AccountKey, accountKey.String())
 }
 
 func (s *configTestSuite) TestAuthModeSAS() {
@@ -334,21 +336,22 @@ func (s *configTestSuite) TestAuthModeSPN() {
 	err := ParseAndValidateConfig(az, opt)
 	assert.Error(err)
 	assert.Equal(az.stConfig.authConfig.AuthMode, EAuthType.SPN())
-	assert.Contains(err.Error(), "Client ID, Tenant ID or Client Secret not provided")
+	assert.Contains(err.Error(), "client ID, tenant ID or client secret not provided")
 
 	opt.ClientID = "abc"
 	err = ParseAndValidateConfig(az, opt)
 	assert.Error(err)
 	assert.Equal(az.stConfig.authConfig.AuthMode, EAuthType.SPN())
-	assert.Contains(err.Error(), "Client ID, Tenant ID or Client Secret not provided")
+	assert.Contains(err.Error(), "client ID, tenant ID or client secret not provided")
 
 	opt.ClientSecret = "123"
 	opt.TenantID = "xyz"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.authConfig.ClientID, opt.ClientID)
-	assert.Equal(az.stConfig.authConfig.ClientSecret, opt.ClientSecret)
-	assert.Equal(az.stConfig.authConfig.TenantID, opt.TenantID)
+	clientSecret, _ := az.stConfig.authConfig.ClientSecret.Open()
+	assert.Equal(opt.ClientID, az.stConfig.authConfig.ClientID)
+	assert.Equal(opt.ClientSecret, clientSecret.String())
+	assert.Equal(opt.TenantID, az.stConfig.authConfig.TenantID)
 }
 
 func (s *configTestSuite) TestOtherFlags() {

@@ -1,10 +1,8 @@
-package libfuse
-
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +22,8 @@ package libfuse
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE
 */
+
+package libfuse
 
 import (
 	"errors"
@@ -67,6 +67,8 @@ type CgofuseFS struct {
 	// group identifier on linux
 	gid uint32
 }
+
+const windowsDefaultSDDL = "D:P(A;;FA;;;WD)" // Enables everyone on system to have access to mount
 
 // Note: libfuse prepends "/" to the path.
 // TODO: Not sure if this is needed for cgofuse, will need to check
@@ -122,73 +124,44 @@ func (lf *Libfuse) initFuse() error {
 			lf.negativeTimeout)
 
 		// Using SSDL file security option: https://github.com/rclone/rclone/issues/4717
-		// Enables everyone on system to have access to mount
-		options += ",FileSecurity=D:P(A;;FA;;;WD)"
+		windowsSDDL := windowsDefaultSDDL
+		if lf.windowsSDDL != "" {
+			windowsSDDL = lf.windowsSDDL
+		}
+		options += ",FileSecurity=" + windowsSDDL
 	}
 
-	// While reading a file let kernel do readahead for better perf
-	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)
-
-	// Max background thread on the fuse layer for high parallelism
-	options += fmt.Sprintf(",max_background=%d", lf.maxFuseThreads)
-
-	if lf.allowOther {
-		options += ",allow_other"
-	}
-	if lf.allowRoot {
-		options += ",allow_root"
-	}
-	if lf.readOnly {
-		options += ",ro"
-	}
-	if lf.nonEmptyMount {
-		options += ",nonempty"
-	}
-
-	if lf.umask != 0 {
-		options += fmt.Sprintf(",umask=%04d", lf.umask)
-	}
-
-	// direct_io option is used to bypass the kernel cache. It disables the use of
-	// page cache (file content cache) in the kernel for the filesystem.
-	if fuseFS.directIO {
-		options += ",direct_io"
-	} else {
-		options += ",kernel_cache"
-	}
+	fuse_options := createFuseOptions(lf.host, lf.allowOther, lf.allowRoot, lf.readOnly, lf.nonEmptyMount, lf.maxFuseThreads, lf.umask)
+	options += fuse_options
 
 	// Setup options as a slice
 	opts := []string{"-o", options}
 
 	// Runs as network file share on Windows only when mounting to drive letter.
 	if runtime.GOOS == "windows" && lf.networkShare && common.IsDriveLetter(lf.mountPath) {
-		// TODO: We can support any type of valid network share path so this path could
-		// be configurable for the config file. But this is a good default.
+		var nameStorage string
 
-		// by default nameStorage will be blank
-		nameStorage := "default"
-		kindStorage := "cloud"
+		serverName, err := os.Hostname()
+		if err != nil {
+			log.Err("Libfuse::initFuse : failed to mount fuse. unable to determine server host name.")
+			return errors.New("failed to mount fuse. unable to determine server host name")
+		}
 		// Borrow bucket-name string from attribute cache
 		if config.IsSet("s3storage.bucket-name") {
-
 			err := config.UnmarshalKey("s3storage.bucket-name", &nameStorage)
 			if err != nil {
-				nameStorage = "default"
+				nameStorage = "s3"
 				log.Err("initFuse : Failed to unmarshal s3storage.bucket-name")
-			} else {
-				kindStorage = "bucket"
 			}
 		} else if config.IsSet("azstorage.container") {
 			err := config.UnmarshalKey("azstorage.container", &nameStorage)
 			if err != nil {
-				nameStorage = "default"
+				nameStorage = "azure"
 				log.Err("initFuse : Failed to unmarshal s3storage.bucket-name")
-			} else {
-				kindStorage = "container"
 			}
 		}
 
-		volumePrefix := fmt.Sprintf("--VolumePrefix=\\%s\\%s", kindStorage, nameStorage)
+		volumePrefix := fmt.Sprintf("--VolumePrefix=\\%s\\%s", serverName, nameStorage)
 		opts = append(opts, volumePrefix)
 	}
 
@@ -303,11 +276,12 @@ func (cf *CgofuseFS) Getattr(path string, stat *fuse.Stat_t, fh uint64) int {
 	attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
 	if err != nil {
 		log.Err("Libfuse::Getattr : Failed to get attributes of %s [%s]", name, err.Error())
-		if err == syscall.ENOENT {
+		switch err {
+		case syscall.ENOENT:
 			return -fuse.ENOENT
-		} else if err == syscall.EACCES {
+		case syscall.EACCES:
 			return -fuse.EACCES
-		} else {
+		default:
 			return -fuse.EIO
 		}
 	}
@@ -586,7 +560,21 @@ func (cf *CgofuseFS) Rmdir(path string) int {
 
 	empty := fuseFS.NextComponent().IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 	if !empty {
-		return -fuse.ENOTEMPTY
+		// delete empty directories from local cache directory
+		val, err := fuseFS.NextComponent().DeleteEmptyDirs(internal.DeleteDirOptions{Name: name})
+		if !val {
+			// either file cache has failed or not present in the pipeline
+			if err != nil {
+				// if error is not nil, file cache has failed
+				log.Err("Libfuse::libfuse_rmdir : Failed to delete %s [%s]", name, err.Error())
+			}
+			return -fuse.ENOTEMPTY
+		} else {
+			empty = fuseFS.NextComponent().IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
+			if !empty {
+				return -fuse.ENOTEMPTY
+			}
+		}
 	}
 
 	err := fuseFS.NextComponent().DeleteDir(internal.DeleteDirOptions{Name: name})
@@ -765,11 +753,12 @@ func (cf *CgofuseFS) Flush(path string, fh uint64) int {
 	err := fuseFS.NextComponent().FlushFile(internal.FlushFileOptions{Handle: handle})
 	if err != nil {
 		log.Err("Libfuse::Flush : error flushing file %s, handle: %d [%s]", handle.Path, handle.ID, err.Error())
-		if err == syscall.ENOENT {
+		switch err {
+		case syscall.ENOENT:
 			return -fuse.ENOENT
-		} else if err == syscall.EACCES {
+		case syscall.EACCES:
 			return -fuse.EACCES
-		} else {
+		default:
 			return -fuse.EIO
 		}
 	}
@@ -812,11 +801,12 @@ func (cf *CgofuseFS) Release(path string, fh uint64) int {
 	err := fuseFS.NextComponent().CloseFile(internal.CloseFileOptions{Handle: handle})
 	if err != nil {
 		log.Err("Libfuse::Release : error closing file %s, handle: %d [%s]", handle.Path, handle.ID, err.Error())
-		if err == syscall.ENOENT {
+		switch err {
+		case syscall.ENOENT:
 			return -fuse.ENOENT
-		} else if err == syscall.EACCES {
+		case syscall.EACCES:
 			return -fuse.EACCES
-		} else {
+		default:
 			return -fuse.EIO
 		}
 	}
@@ -949,7 +939,13 @@ func (cf *CgofuseFS) Readlink(path string) (int, string) {
 	name = common.NormalizeObjectName(name)
 	log.Trace("Libfuse::Readlink : Received for %s", name)
 
-	targetPath, err := fuseFS.NextComponent().ReadLink(internal.ReadLinkOptions{Name: name})
+	linkSize := int64(0)
+	attr, err := fuseFS.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+	if err == nil && attr != nil {
+		linkSize = attr.Size
+	}
+
+	targetPath, err := fuseFS.NextComponent().ReadLink(internal.ReadLinkOptions{Name: name, Size: linkSize})
 	if err != nil {
 		log.Err("Libfuse::Readlink : error reading link file %s [%s]", name, err.Error())
 		if os.IsNotExist(err) {
@@ -1103,9 +1099,9 @@ func (cf *CgofuseFS) Setxattr(path string, name string, value []byte, flags int)
 	return -fuse.ENOSYS
 }
 
-// blobfuse_cache_update refresh the file-cache policy for this file
+// cloudfuse_cache_update refresh the file-cache policy for this file
 // TODO: Figure out when to call this function since this was called with c code before
-// func blobfuse_cache_update(path string) int {
+// func cloudfuse_cache_update(path string) int {
 // 	name := trimFusePath(path)
 // 	name = common.NormalizeObjectName(name)
 // 	go fuseFS.NextComponent().FileUsed(name) //nolint

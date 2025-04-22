@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -34,6 +34,7 @@ import (
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 
 	"github.com/stretchr/testify/assert"
@@ -75,7 +76,12 @@ func (suite *LoopbackFSTestSuite) SetupTest() {
 	suite.lfs = lfs.(*LoopbackFS)
 	suite.lfs.path = testPath
 
-	err := os.MkdirAll(testPath, os.FileMode(0777))
+	err := log.SetDefaultLogger("silent", common.LogConfig{})
+	if err != nil {
+		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
+	}
+
+	err = os.MkdirAll(testPath, os.FileMode(0777))
 	panicIfNotNil(err, "Failed to setup test directories")
 	err = os.MkdirAll(filepath.Join(testPath, dirOne), os.FileMode(0777))
 	panicIfNotNil(err, "Failed to setup test directories")

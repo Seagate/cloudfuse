@@ -5,7 +5,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -34,6 +34,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	mrand "math/rand/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -117,6 +118,8 @@ func (suite *dataValidationTestSuite) copyToMountDir(localFilePath string, remot
 
 // Computes MD5 and returns the 32byte slice which represents the hash value
 func (suite *dataValidationTestSuite) computeMD5(filePath string) []byte {
+	suite.T().Helper()
+
 	fh, err := os.Open(filePath)
 	suite.NoError(err)
 
@@ -136,6 +139,8 @@ func (suite *dataValidationTestSuite) computeMD5(filePath string) []byte {
 }
 
 func (suite *dataValidationTestSuite) validateData(localFilePath string, remoteFilePath string) {
+	suite.T().Helper()
+
 	localMD5sum := suite.computeMD5(localFilePath)
 	remoteMD5sum := suite.computeMD5(remoteFilePath)
 	suite.Equal(localMD5sum, remoteMD5sum)
@@ -157,6 +162,17 @@ func createFileHandleInLocalAndRemote(suite *dataValidationTestSuite, localFileP
 
 	rfh, err = os.Create(remoteFilePath)
 	suite.NoError(err)
+
+	return lfh, rfh
+}
+
+// Open File in Local and Mounted Directories and returns there file handles the associated fd has O_RDONLY Mode
+func openFileHandleInLocalAndRemote(suite *dataValidationTestSuite, flags int, localFilePath, remoteFilePath string) (lfh *os.File, rfh *os.File) {
+	lfh, err := os.OpenFile(localFilePath, flags, 0666)
+	suite.Nil(err)
+
+	rfh, err = os.OpenFile(remoteFilePath, flags, 0666)
+	suite.Nil(err)
 
 	return lfh, rfh
 }
@@ -198,6 +214,28 @@ func generateFileWithRandomData(suite *dataValidationTestSuite, filePath string,
 		size -= bytesWritten
 	}
 	closeFileHandles(suite, fh)
+}
+
+func compareReadOperInLocalAndRemote(suite *dataValidationTestSuite, lfh, rfh *os.File, offset int64) {
+	buffer1 := make([]byte, 4*int(_1MB))
+	buffer2 := make([]byte, 4*int(_1MB))
+
+	bytes_read_local, err1 := lfh.ReadAt(buffer1, offset)
+	bytes_read_remote, err2 := rfh.ReadAt(buffer2, offset)
+	suite.Equal(err1, err2)
+	suite.Equal(bytes_read_local, bytes_read_remote)
+	suite.Equal(buffer1[:bytes_read_local], buffer2[:bytes_read_remote])
+}
+
+func compareWriteOperInLocalAndRemote(suite *dataValidationTestSuite, lfh, rfh *os.File, offset int64) {
+	sizeofbuffer := (mrand.Int() % 4) + 1
+	buffer := make([]byte, sizeofbuffer*int(_1MB))
+	rand.Read(buffer)
+
+	bytes_written_local, err1 := lfh.WriteAt(buffer, offset)
+	bytes_written_remote, err2 := rfh.WriteAt(buffer, offset)
+	suite.Equal(err1, err2)
+	suite.Equal(bytes_written_local, bytes_written_remote)
 }
 
 // -------------- Data Validation Tests -------------------
@@ -704,6 +742,52 @@ func (suite *dataValidationTestSuite) TestPanicOnReadingFileInRandReadMode() {
 	closeFileHandles(suite, rfh)
 }
 
+// func (suite *dataValidationTestSuite) TestReadDataAtBlockBoundaries() {
+// 	fileName := "testReadDataAtBlockBoundaries"
+// 	localFilePath, remoteFilePath := convertFileNameToFilePath(fileName)
+// 	fileSize := 35 * int(_1MB)
+// 	generateFileWithRandomData(suite, localFilePath, fileSize)
+// 	suite.copyToMountDir(localFilePath, remoteFilePath)
+// 	suite.validateData(localFilePath, remoteFilePath)
+
+// 	lfh, rfh := openFileHandleInLocalAndRemote(suite, os.O_RDWR, localFilePath, remoteFilePath)
+// 	var offset int64 = 0
+// 	//tests run in 16MB block size config.
+// 	//Data in File 35MB(3blocks)
+// 	//block1->16MB, block2->16MB, block3->3MB
+
+// 	//getting 4MB data from 1st block
+// 	compareReadOperInLocalAndRemote(suite, lfh, rfh, offset)
+// 	//getting 4MB data from overlapping blocks
+// 	offset = int64(15 * int(_1MB))
+// 	compareReadOperInLocalAndRemote(suite, lfh, rfh, offset)
+// 	//getting 4MB data from last block
+// 	offset = int64(32 * int(_1MB))
+// 	compareReadOperInLocalAndRemote(suite, lfh, rfh, offset)
+// 	//getting 4MB data from overlapping block with last block
+// 	offset = int64(30 * int(_1MB))
+// 	compareReadOperInLocalAndRemote(suite, lfh, rfh, offset)
+// 	//Read at some random offset
+// 	for i := 0; i < 10; i++ {
+// 		offset = mrand.Int63() % int64(fileSize)
+// 		compareReadOperInLocalAndRemote(suite, lfh, rfh, offset)
+// 	}
+
+// 	//write at end of file
+// 	offset = int64(fileSize)
+// 	compareWriteOperInLocalAndRemote(suite, lfh, rfh, offset)
+// 	//Check the previous write with read
+// 	compareReadOperInLocalAndRemote(suite, lfh, rfh, offset)
+
+// 	//Write at Random offset in the file
+// 	offset = mrand.Int63() % int64(fileSize)
+// 	compareWriteOperInLocalAndRemote(suite, lfh, rfh, offset)
+// 	//Check the previous write with read
+// 	compareReadOperInLocalAndRemote(suite, lfh, rfh, offset)
+
+// 	closeFileHandles(suite, lfh, rfh)
+// }
+
 // -------------- Main Method -------------------
 func TestDataValidationTestSuite(t *testing.T) {
 	initDataValidationFlags()
@@ -751,16 +835,16 @@ func TestDataValidationTestSuite(t *testing.T) {
 	// Sanity check in the off chance the same random name was generated twice and was still around somehow
 	err := os.RemoveAll(tObj.testMntPath)
 	if err != nil {
-		fmt.Printf("TestDataValidationTestSuite : Could not cleanup mount dir before testing. Here's why: %v\n", err)
+		fmt.Printf("Could not cleanup feature dir before testing [%s]\n", err.Error())
 	}
 	err = os.RemoveAll(tObj.testCachePath)
 	if err != nil {
-		fmt.Printf("TestDataValidationTestSuite : Could not cleanup cache dir before testing. Here's why: %v\n", err)
+		fmt.Printf("Could not cleanup cache dir before testing [%s]\n", err.Error())
 	}
 
 	err = os.Mkdir(tObj.testMntPath, 0777)
 	if err != nil {
-		t.Error("Failed to create test directory")
+		t.Errorf("Failed to create test directory [%s]\n", err.Error())
 	}
 	rand.Read(minBuff)
 	rand.Read(medBuff)

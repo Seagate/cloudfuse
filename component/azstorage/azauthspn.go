@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -26,7 +26,10 @@
 package azstorage
 
 import (
+	"errors"
+
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -65,7 +68,20 @@ func (azspn *azAuthSPN) getTokenCredential() (azcore.TokenCredential, error) {
 	} else {
 		log.Trace("AzAuthSPN::getTokenCredential : Using client secret for fetching token")
 
-		cred, err = azidentity.NewClientSecretCredential(azspn.config.TenantID, azspn.config.ClientID, azspn.config.ClientSecret, &azidentity.ClientSecretCredentialOptions{
+		var buff *memguard.LockedBuffer
+		if azspn.config.ClientSecret != nil {
+			buff, err = azspn.config.ClientSecret.Open()
+			if err != nil || buff == nil {
+				return nil, errors.New("unable to decrypt passphrase key")
+			}
+			defer buff.Destroy()
+		} else {
+			err := errors.New("AzAuthSPN::getTokenCredential : Client secret not provided for SPN")
+			log.Err(err.Error())
+			return nil, err
+		}
+
+		cred, err = azidentity.NewClientSecretCredential(azspn.config.TenantID, azspn.config.ClientID, buff.String(), &azidentity.ClientSecretCredentialOptions{
 			ClientOptions: clOpts,
 		})
 		if err != nil {

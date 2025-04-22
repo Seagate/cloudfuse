@@ -52,19 +52,29 @@
       <item>
        <widget class="QLineEdit" name="lineEdit_mountPoint">
         <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Designate a location to mount the bucket - the directory must exist on Linux, but not on Windows&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Designate a location to mount the bucket&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QPushButton" name="button_browse">
-        <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Choose a location to mount the bucket - the directory must exist on Linux, but not on Windows&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
         <property name="text">
          <string>Browse</string>
         </property>
        </widget>
+      </item>
+      <item>
+      <widget class="QCheckBox" name="checkBox_remount">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remount mount on server restart. If checked, mount will automatically restart when system restarts. If unchecked, then when you unmount the mount it will not automatically restart.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="text">
+        <string>Remount on restart</string>
+       </property>
+        <property name="checked">
+        <bool>false</bool>
+       </property>
+      </widget>
       </item>
      </layout>
     </item>
@@ -134,14 +144,6 @@
      <height>22</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menu_Debug">
-    <property name="title">
-     <string>Debug</string>
-    </property>
-    <addaction name="action_debugLogging"/>
-    <addaction name="action_debugHealthMonitor"/>
-    <addaction name="action_debugTesting"/>
-   </widget>
    <widget class="QMenu" name="menu_Help">
     <property name="title">
      <string>Help</string>
@@ -149,7 +151,6 @@
     <addaction name="actionAbout_Qt"/>
     <addaction name="actionAbout_CloudFuse"/>
    </widget>
-   <addaction name="menu_Debug"/>
    <addaction name="menu_Help"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -161,21 +162,6 @@
   <action name="advancedSettings_action">
    <property name="text">
     <string>Advanced</string>
-   </property>
-  </action>
-  <action name="action_debugLogging">
-   <property name="text">
-    <string>Logging</string>
-   </property>
-  </action>
-  <action name="action_debugHealthMonitor">
-   <property name="text">
-    <string>Health Monitor</string>
-   </property>
-  </action>
-  <action name="action_debugTesting">
-   <property name="text">
-    <string>Testing</string>
    </property>
   </action>
   <action name="setup_action">

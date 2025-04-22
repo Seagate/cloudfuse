@@ -5,7 +5,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -741,12 +741,12 @@ func TestFileTestSuite(t *testing.T) {
 	// Sanity check in the off chance the same random name was generated twice and was still around somehow
 	err := os.RemoveAll(fileTest.testPath)
 	if err != nil {
-		fmt.Printf("TestFileTestSuite : Could not cleanup feature dir before testing. Here's why: %v\n", err)
+		fmt.Printf("Could not cleanup feature dir before testing [%s]\n", err.Error())
 	}
 
 	err = os.Mkdir(fileTest.testPath, 0777)
 	if err != nil {
-		t.Error("Failed to create test directory")
+		t.Errorf("Failed to create test directory [%s]\n", err.Error())
 	}
 	rand.Read(fileTest.minBuff)
 	rand.Read(fileTest.medBuff)

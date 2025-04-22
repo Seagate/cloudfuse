@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,8 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -38,6 +40,7 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"github.com/Seagate/cloudfuse/component/azstorage"
 	"github.com/Seagate/cloudfuse/component/s3storage"
@@ -155,12 +158,23 @@ func processCommand() error {
 	}
 
 	// Validate config is to be secured on write or not
-	if options.PassPhrase == "" {
-		options.PassPhrase = os.Getenv(SecureConfigEnvName)
-	}
+	if options.SecureConfig ||
+		filepath.Ext(options.ConfigFile) == SecureConfigExtension {
 
-	if options.SecureConfig && options.PassPhrase == "" {
-		return fmt.Errorf("key not provided to decrypt config file")
+		// Validate config is to be secured on write or not
+		if options.PassPhrase == "" {
+			options.PassPhrase = os.Getenv(SecureConfigEnvName)
+			if options.PassPhrase == "" {
+				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+			}
+
+			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
+			if err != nil {
+				return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
+			}
+		}
+
+		encryptedPassphrase = memguard.NewEnclave([]byte(options.PassPhrase))
 	}
 
 	var containerList []string
@@ -254,10 +268,7 @@ func getBucketListS3() ([]string, error) {
 
 // FiterAllowedContainer : Filter which containers are allowed to be mounted
 func filterAllowedContainerList(containers []string) []string {
-	allowListing := false
-	if len(mountAllOpts.AllowList) > 0 {
-		allowListing = true
-	}
+	allowListing := len(mountAllOpts.AllowList) > 0
 
 	// Convert the entire container list into a map
 	var filterContainer = make(map[string]bool)
@@ -318,15 +329,30 @@ func mountAllContainers(containerList []string, configFile string, mountPath str
 
 	failCount := 0
 	for _, container := range containerList {
-		contMountPath := filepath.Join(mountPath, container)
+		contMountPath := filepath.Clean(filepath.Join(mountPath, container))
 		contConfigFile := configFileName + "_" + container + ext
 
 		if options.SecureConfig {
 			contConfigFile = contConfigFile + SecureConfigExtension
 		}
 
-		if _, err := os.Stat(contMountPath); os.IsNotExist(err) {
-			err = os.MkdirAll(contMountPath, 0777)
+		root, err := os.OpenRoot(mountPath)
+		if err != nil {
+			err = os.MkdirAll(mountPath, 0755)
+			if err != nil {
+				fmt.Printf("Failed to create directory %s : %s\n", contMountPath, err.Error())
+				return err
+			}
+			root, err = os.OpenRoot(mountPath)
+		}
+		if err != nil {
+			fmt.Printf("Failed to open root directory %s : %s\n", mountPath, err.Error())
+			return err
+		}
+		defer root.Close()
+
+		if _, err := root.Stat(container); os.IsNotExist(err) {
+			err = root.Mkdir(container, 0777)
 			if err != nil {
 				fmt.Printf("Failed to create directory %s : %s\n", contMountPath, err.Error())
 			}
@@ -395,7 +421,7 @@ func writeConfigFile(contConfigFile string) error {
 			return fmt.Errorf("failed to marshall yaml content")
 		}
 
-		cipherText, err := common.EncryptData(confStream, opts.passphrase)
+		cipherText, err := common.EncryptData(confStream, encryptedPassphrase)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt yaml content [%s]", err.Error())
 		}

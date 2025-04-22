@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -34,7 +34,6 @@ import (
 	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
-	"github.com/Seagate/cloudfuse/common/log"
 
 	"github.com/spf13/cobra"
 )
@@ -48,8 +47,10 @@ var unmountCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if runtime.GOOS == "windows" {
+			disableRemountUser, _ := cmd.Flags().GetBool("disable-remount-user")
+			disableRemountSystem, _ := cmd.Flags().GetBool("disable-remount-system")
 			options.MountPath = strings.ReplaceAll(common.ExpandPath(args[0]), "\\", "/")
-			return unmountCloudfuseWindows(options.MountPath)
+			return unmountCloudfuseWindows(options.MountPath, disableRemountUser, disableRemountSystem)
 		}
 
 		lazy, _ := cmd.Flags().GetBool("lazy")
@@ -105,7 +106,7 @@ func unmountCloudfuse(mntPath string, lazy bool) error {
 		}
 
 		if !strings.Contains(err.Error(), "executable file not found") {
-			log.Err("unmountCloudfuse : failed to unmount (%s : %s)", err.Error(), errb.String())
+			fmt.Printf("unmountCloudfuse : failed to unmount (%s : %s)\n", err.Error(), errb.String())
 			break
 		}
 	}
@@ -118,5 +119,10 @@ func init() {
 	unmountCmd.AddCommand(umntAllCmd)
 	if runtime.GOOS != "windows" {
 		unmountCmd.PersistentFlags().BoolP("lazy", "z", false, "Use lazy unmount")
+	}
+
+	if runtime.GOOS == "windows" {
+		unmountCmd.Flags().Bool("disable-remount-user", false, "Disable remounting this mount on server restart as user.")
+		unmountCmd.Flags().Bool("disable-remount-system", false, "Disable remounting this mount on server restart as system.")
 	}
 }

@@ -30,11 +30,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/Seagate/cloudfuse/internal/winservice"
-	"github.com/go-ole/go-ole"
-	"github.com/go-ole/go-ole/oleutil"
+	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/svc"
+	"golang.org/x/sys/windows/svc/mgr"
 
 	"github.com/spf13/cobra"
 )
@@ -44,8 +44,11 @@ type serviceOptions struct {
 	MountPath  string
 }
 
-const SvcName = "cloudfuse"
-const StartupName = "CloudfuseStartup.lnk"
+const (
+	SvcName        = "CloudfuseServiceStartup"
+	SvcDescription = "Cloudfuse Service to start System Mounts on System Start"
+	StartupName    = "CloudfuseStartup.lnk"
+)
 
 var servOpts serviceOptions
 
@@ -64,50 +67,78 @@ var serviceCmd = &cobra.Command{
 
 var installCmd = &cobra.Command{
 	Use:               "install",
-	Short:             "Installs the startup process for Cloudfuse. Requires running as admin.",
-	Long:              "Installs the startup process for Cloudfuse which remounts any active previously active mounts on startup. Requires running as admin.",
+	Short:             "Installs the startup process and Windows service for Cloudfuse. Requires running as admin.",
+	Long:              "Installs the startup process and Windows service for Cloudfuse. Required for remount flags to work. Requires running as admin.",
 	SuggestFor:        []string{"ins", "inst"},
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		dir, err := os.Getwd()
+		// Create the registry for WinFsp
+		err := winservice.CreateWinFspRegistry()
 		if err != nil {
-			return fmt.Errorf("unable to determine location of cloudfuse binary [%s]", err.Error())
+			return fmt.Errorf("Failed to add Windows registry for WinFSP support. Here's why: [%v]", err)
 		}
-		programPath := filepath.Join(dir, "windows-startup.exe")
-		startupPath := filepath.Join(os.Getenv("APPDATA"), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", StartupName)
-		err = makeLink(programPath, startupPath)
+		// Add our startup process to the registry
+		var programPath string
+		exepath, err := os.Executable()
 		if err != nil {
-			return fmt.Errorf("unable to create startup link [%s]", err.Error())
+			// If we can't determine our location, use a standard path
+			programFiles := os.Getenv("ProgramFiles")
+			if programFiles == "" {
+				programPath = filepath.Join("C:", "Program Files", "Cloudfuse", "windows-startup.exe")
+			} else {
+				programPath = filepath.Join(programFiles, "Cloudfuse", "windows-startup.exe")
+			}
+		} else {
+			programPath = filepath.Join(filepath.Dir(exepath), "windows-startup.exe")
 		}
 
-		// Create the registry for WinFsp
-		err = winservice.CreateWinFspRegistry()
+		err = winservice.AddRegistryValue(`SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, "Cloudfuse", programPath)
 		if err != nil {
-			return fmt.Errorf("error adding Windows registry for WinFSP support [%s]", err.Error())
+			return fmt.Errorf("Failed to add startup registry value. Here's why: %v", err)
 		}
+
+		err = installService()
+		if err != nil {
+			return fmt.Errorf("Failed to install as a Windows service. Here's why: %v", err)
+		}
+
 		return nil
 	},
 }
 
 var uninstallCmd = &cobra.Command{
 	Use:               "uninstall",
-	Short:             "Uninstall the startup process for Cloudfuse. Requires running as admin.",
-	Long:              "Uninstall the startup process for Cloudfuse. Requires running as admin.",
+	Short:             "Uninstalls the startup process and Windows service for Cloudfuse. Requires running as admin.",
+	Long:              "Uninstalls the startup process and Windows service for Cloudfuse. Requires running as admin.",
 	SuggestFor:        []string{"uninst", "uninstal"},
 	Example:           "cloudfuse service uninstall",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		startupPath := filepath.Join(os.Getenv("APPDATA"), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", StartupName)
-		err := os.Remove(startupPath)
+		// Remove the cloudfuse startup registry entry
+		err := winservice.RemoveRegistryValue(`SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, "Cloudfuse")
 		if err != nil {
-			return fmt.Errorf("failed to delete startup process [%s]", err.Error())
+			return fmt.Errorf("Failed to remove cloudfuse remount service from Windows startup registry. Here's why: %v", err)
 		}
-
 		// Remove the registry for WinFsp
 		err = winservice.RemoveWinFspRegistry()
 		if err != nil {
-			return fmt.Errorf("error removing Windows registry from WinFSP [%s]", err.Error())
+			return fmt.Errorf("Failed to remove cloudfuse entry from WinFSP registry. Here's why: %v", err)
+		}
+
+		err = stopService()
+		if err != nil {
+			fmt.Printf("Attempted to stop service but failed, now attempting to remove service. Here's why: %v", err)
+		}
+
+		err = removeService()
+		if err != nil {
+			return fmt.Errorf("Failed to remove as a Windows service. Here's why: %v", err)
+		}
+
+		err = winservice.DeleteMountJSONFiles()
+		if err != nil {
+			return fmt.Errorf("Failed to remove mount.json tracker file. Here's why: %v", err)
 		}
 
 		return nil
@@ -149,34 +180,90 @@ var removeRegistryCmd = &cobra.Command{
 
 //--------------- command section ends
 
-func makeLink(src string, dst string) error {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
+// installService adds cloudfuse as a windows service.
+func installService() error {
+	// Add our startup process to the registry
+	exepath, err := os.Executable()
+	if err != nil {
+		// If we can't determine our location, use a standard path
+		programFiles := os.Getenv("ProgramFiles")
+		if programFiles == "" {
+			exepath = filepath.Join("C:", "Program Files", "Cloudfuse", "windows-service.exe")
+		} else {
+			exepath = filepath.Join(programFiles, "Cloudfuse", "windows-service.exe")
+		}
+	} else {
+		exepath = filepath.Join(filepath.Dir(exepath), "windows-service.exe")
+	}
 
-	err := ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED|ole.COINIT_SPEED_OVER_MEMORY)
+	scm, err := mgr.Connect()
 	if err != nil {
 		return err
 	}
-	oleShellObject, err := oleutil.CreateObject("WScript.Shell")
+	defer scm.Disconnect() //nolint
+
+	// Don't install the service if it already exists
+	service, err := scm.OpenService(SvcName)
+	if err == nil {
+		service.Close()
+		return fmt.Errorf("%s service already exists", SvcName)
+	}
+
+	config := mgr.Config{
+		ServiceType:  windows.SERVICE_WIN32_OWN_PROCESS,
+		StartType:    mgr.StartAutomatic,
+		ErrorControl: mgr.ErrorNormal,
+		DisplayName:  SvcName,
+		Description:  SvcDescription,
+		Dependencies: []string{"DnsCache", "WinFsp.Launcher"},
+	}
+
+	service, err = scm.CreateService(SvcName, exepath, config)
 	if err != nil {
 		return err
 	}
-	defer oleShellObject.Release()
-	wshell, err := oleShellObject.QueryInterface(ole.IID_IDispatch)
+	defer service.Close()
+
+	return nil
+}
+
+// stopService stops the windows service.
+func stopService() error {
+	scm, err := mgr.Connect()
 	if err != nil {
 		return err
 	}
-	defer wshell.Release()
-	cs, err := oleutil.CallMethod(wshell, "CreateShortcut", dst)
+	defer scm.Disconnect() //nolint
+
+	service, err := scm.OpenService(SvcName)
+	if err != nil {
+		return fmt.Errorf("%s service is not installed", SvcName)
+	}
+	defer service.Close()
+
+	_, err = service.Control(svc.Stop)
+	if err != nil {
+		return fmt.Errorf("%s service could not be stopped: %v", SvcName, err)
+	}
+
+	return nil
+}
+
+// removeService uninstall the cloudfuse windows service.
+func removeService() error {
+	scm, err := mgr.Connect()
 	if err != nil {
 		return err
 	}
-	idispatch := cs.ToIDispatch()
-	_, err = oleutil.PutProperty(idispatch, "TargetPath", src)
+	defer scm.Disconnect() //nolint
+
+	service, err := scm.OpenService(SvcName)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s service is not installed", SvcName)
 	}
-	_, err = oleutil.CallMethod(idispatch, "Save")
+	defer service.Close()
+
+	err = service.Delete()
 	if err != nil {
 		return err
 	}

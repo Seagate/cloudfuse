@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -31,6 +31,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -44,6 +45,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/awnumar/memguard"
 	"gopkg.in/ini.v1"
 )
 
@@ -52,6 +54,7 @@ const SectorSize = 4096
 
 var RootMount bool
 var ForegroundMount bool
+var IsStream bool
 
 // IsDirectoryMounted is a utility function that returns true if the directory is already mounted using fuse
 func IsDirectoryMounted(path string) bool {
@@ -87,7 +90,6 @@ func IsMountActive(path string) (bool, error) {
 	var out bytes.Buffer
 	cmd := exec.Command("pidof", "cloudfuse")
 	cmd.Stdout = &out
-
 	err := cmd.Run()
 	if err != nil {
 		if err.Error() == "exit status 1" {
@@ -98,7 +100,7 @@ func IsMountActive(path string) (bool, error) {
 	}
 
 	// out contains the list of pids of the processes that are running
-	pidString := strings.Replace(out.String(), "\n", " ", -1)
+	pidString := strings.ReplaceAll(out.String(), "\n", " ")
 	pids := strings.Split(pidString, " ")
 	for _, pid := range pids {
 		// Get the mount path for this pid
@@ -187,7 +189,7 @@ func GetCurrentUser() (uint32, uint32, error) {
 
 		out, err := exec.Command(`C:\Program Files (x86)\WinFsp\bin\fsptool-x64.exe`, "id").Output()
 		if err != nil {
-			return 0, 0, fmt.Errorf("Is WinFSP installed? 'fsptool-x64.exe id' failed with error: %w", err)
+			return 0, 0, fmt.Errorf("is WinFSP installed? 'fsptool-x64.exe id' failed with error: %w", err)
 		}
 
 		idMap := make(map[string]string)
@@ -233,16 +235,35 @@ func NormalizeObjectName(name string) string {
 }
 
 // Encrypt given data using the key provided
-func EncryptData(plainData []byte, key string) ([]byte, error) {
-	binaryKey, err := base64.StdEncoding.DecodeString(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
+func EncryptData(plainData []byte, key *memguard.Enclave) ([]byte, error) {
+	if key == nil {
+		return nil, errors.New("provided passphrase key is empty")
 	}
 
-	block, err := aes.NewCipher(binaryKey)
+	secretKey, err := key.Open()
+	if err != nil || secretKey == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	defer secretKey.Destroy()
+
+	// A base64 encode of a key of length 32 will be at maximum a length of 44 bytes
+	if len(secretKey.Bytes()) > 44 {
+		return nil, errors.New("provided decoded base64 key is longer than 32 bytes. Decoded key " +
+			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length")
+	}
+
+	decodedKey := make([]byte, 32) // Valid key can't be longer than 32 bytes
+	_, err = base64.StdEncoding.Decode(decodedKey, secretKey.Bytes())
 	if err != nil {
 		return nil, err
 	}
+	decodedKey = bytes.Trim(decodedKey, "\x00") // trim any null bytes if key is 16, or 24 bytes
+
+	block, err := aes.NewCipher(decodedKey)
+	if err != nil {
+		return nil, err
+	}
+	clear(decodedKey)
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
@@ -259,16 +280,35 @@ func EncryptData(plainData []byte, key string) ([]byte, error) {
 }
 
 // Decrypt given data using the key provided
-func DecryptData(cipherData []byte, key string) ([]byte, error) {
-	binaryKey, err := base64.StdEncoding.DecodeString(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode passphrase [%s]", err.Error())
+func DecryptData(cipherData []byte, key *memguard.Enclave) ([]byte, error) {
+	if key == nil {
+		return nil, errors.New("provided passphrase key is empty")
 	}
 
-	block, err := aes.NewCipher(binaryKey)
+	secretKey, err := key.Open()
+	if err != nil || secretKey == nil {
+		return nil, errors.New("unable to decrypt passphrase key")
+	}
+	defer secretKey.Destroy()
+
+	// A base64 encode of a key of length 32 will be at maximum a length of 44 bytes
+	if len(secretKey.Bytes()) > 44 {
+		return nil, errors.New("provided decoded base64 key is longer than 32 bytes. Decoded key " +
+			"length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length")
+	}
+
+	decodedKey := make([]byte, 32) // Valid key can't be longer than 32 bytes
+	_, err = base64.StdEncoding.Decode(decodedKey, secretKey.Bytes())
 	if err != nil {
 		return nil, err
 	}
+	decodedKey = bytes.Trim(decodedKey, "\x00") // trim any null bytes if key is 16, or 24 bytes
+
+	block, err := aes.NewCipher(decodedKey)
+	if err != nil {
+		return nil, err
+	}
+	clear(decodedKey)
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
@@ -382,5 +422,30 @@ func CreateDefaultDirectory() error {
 			return err
 		}
 	}
+	return nil
+}
+
+type WriteToFileOptions struct {
+	Flags      int
+	Permission os.FileMode
+}
+
+func WriteToFile(filename string, data string, options WriteToFileOptions) error {
+	// Open the file with the provided flags, create it if it doesn't exist
+	//check if options.Permission is 0 if so then assign 0644
+	if options.Permission == 0 {
+		options.Permission = 0644
+	}
+	file, err := os.OpenFile(filename, options.Flags|os.O_CREATE|os.O_WRONLY, options.Permission)
+	if err != nil {
+		return fmt.Errorf("error opening file: [%s]", err.Error())
+	}
+	defer file.Close() // Ensure the file is closed when we're done
+
+	// Write the data content to the file
+	if _, err := file.WriteString(data); err != nil {
+		return fmt.Errorf("error writing to file [%s]", err.Error())
+	}
+
 	return nil
 }

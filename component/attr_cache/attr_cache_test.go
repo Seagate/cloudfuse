@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -75,16 +75,13 @@ func newTestAttrCache(next internal.Component, configuration string) *AttrCache 
 func getDirPathAttr(path string) *internal.ObjAttr {
 	objAttr := getPathAttr(path, defaultSize, fs.FileMode(defaultMode), true)
 	flags := internal.NewDirBitMap()
-	flags.Set(internal.PropFlagMetadataRetrieved)
+
 	objAttr.Flags = flags
 	return objAttr
 }
 
 func getPathAttr(path string, size int64, mode os.FileMode, metadata bool) *internal.ObjAttr {
 	flags := internal.NewFileBitMap()
-	if metadata {
-		flags.Set(internal.PropFlagMetadataRetrieved)
-	}
 	return &internal.ObjAttr{
 		Path:     path,
 		Name:     filepath.Base(path),
@@ -1478,6 +1475,31 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithMetadata() {
 	}
 }
 
+func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadataNoSymlinks() {
+	defer suite.cleanupTest()
+	var paths = []string{"a", "a/", "a/c1", "a/c1/", "a/c2", "a/c1/gc1", "ab", "ab/", "ab/c1", "ac"}
+
+	noSymlinks := true
+	config := fmt.Sprintf("attr_cache:\n  no-symlinks: %t", noSymlinks)
+
+	for _, path := range paths {
+		// This is a little janky but required since testify suite does not support running setup or clean up for subtests.
+		suite.cleanupTest()
+		suite.setupTestHelper(config) // setup a new attr cache with a custom config (clean up will occur after the test as usual)
+		suite.Run(path, func() {
+			truncatedPath := internal.TruncateDirName(path)
+			suite.addDirectoryToCache("a", true) // add the paths to the cache with IsMetadataRetrived=true
+
+			options := internal.GetAttrOptions{Name: path}
+			// no call to mock component since metadata is not needed in noSymlinks mode
+
+			_, err := suite.attrCache.GetAttr(options)
+			suite.assert.NoError(err)
+			suite.assertUntouched(truncatedPath)
+		})
+	}
+}
+
 func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadata() {
 	defer suite.cleanupTest()
 	var paths = []string{"a", "a/", "a/c1", "a/c1/", "a/c2", "a/c1/gc1", "ab", "ab/", "ab/c1", "ac"}
@@ -1515,7 +1537,7 @@ func (suite *attrCacheTestSuite) TestGetAttrExistsWithoutMetadataWithSymlinks() 
 
 			options := internal.GetAttrOptions{Name: path}
 			// attributes should not be accessible so call the mock
-			suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode), false), nil).AnyTimes()
+			//suite.mock.EXPECT().GetAttr(options).Return(getPathAttr(path, defaultSize, fs.FileMode(defaultMode), false), nil)
 
 			_, err := suite.attrCache.GetAttr(options)
 			suite.assert.NoError(err)

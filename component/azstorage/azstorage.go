@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -405,7 +405,7 @@ func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length 
 		return 0, syscall.ERANGE
 	}
 
-	var dataLen int64 = int64(len(options.Data))
+	var dataLen = int64(len(options.Data))
 	if atomic.LoadInt64(&options.Handle.Size) < (options.Offset + int64(len(options.Data))) {
 		dataLen = options.Handle.Size - options.Offset
 	}
@@ -477,7 +477,7 @@ func (az *AzStorage) ReadLink(options internal.ReadLinkOptions) (string, error) 
 		return "", syscall.ENOENT
 	}
 	log.Trace("AzStorage::ReadLink : Read symlink %s", options.Name)
-	data, err := az.storage.ReadBuffer(options.Name, 0, 0)
+	data, err := az.storage.ReadBuffer(options.Name, 0, options.Size)
 
 	if err != nil {
 		azStatsCollector.PushEvents(readLink, options.Name, nil)
@@ -630,6 +630,9 @@ func init() {
 
 	cpkEnabled := config.AddBoolFlag("cpk-enabled", false, "Enable client provided key.")
 	config.BindPFlag(compName+".cpk-enabled", cpkEnabled)
+
+	preserveACL := config.AddBoolFlag("preserve-acl", false, "Preserve ACL and Permissions set on file during updates")
+	config.BindPFlag(compName+".preserve-acl", preserveACL)
 
 	config.RegisterFlagCompletionFunc("container-name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveNoFileComp

@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -84,7 +84,7 @@ var setKeyCmd = &cobra.Command{
 			return fmt.Errorf("failed to marshal config [%s]", err.Error())
 		}
 
-		cipherText, err := common.EncryptData(confStream, secOpts.PassPhrase)
+		cipherText, err := common.EncryptData(confStream, encryptedPassphrase)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt config [%s]", err.Error())
 		}
