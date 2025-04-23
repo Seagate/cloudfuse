@@ -45,11 +45,11 @@ import (
 
 var dumpPath string
 var logConfigFile string
-var dumpLogsCmd = &cobra.Command{
-	Use:               "dumpLogs",
+var gatherLogsCmd = &cobra.Command{
+	Use:               "gatherLogs",
 	Short:             "interface to gather and review cloudfuse logs",
 	Long:              "interface to gather and review cloudfuse logs",
-	SuggestFor:        []string{"dump", "dumpLog", "dumpLogs"},
+	SuggestFor:        []string{"gather", "gatherLog", "gatherLogs"},
 	Example:           "cloudfuse dumpLogs ",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -123,6 +123,7 @@ var dumpLogsCmd = &cobra.Command{
 					return fmt.Errorf("unable to create archive: [%s]", err.Error())
 				}
 			} else if runtime.GOOS == "windows" {
+				//add the system app data system32 thing if there is no filepath in the config.
 				err = createWindowsArchive(logPath)
 				if err != nil {
 					return fmt.Errorf("unable to create archive: [%s]", err.Error())
@@ -321,7 +322,7 @@ func createWindowsArchive(logPath string) error {
 }
 
 func init() {
-	rootCmd.AddCommand(dumpLogsCmd)
-	dumpLogsCmd.Flags().StringVar(&dumpPath, "output-path", "", "Input archive creation path")
-	dumpLogsCmd.Flags().StringVar(&logConfigFile, "config-file", common.DefaultConfigFilePath, "config-file input path")
+	rootCmd.AddCommand(gatherLogsCmd)
+	gatherLogsCmd.Flags().StringVar(&dumpPath, "output-path", "", "Input archive creation path")
+	gatherLogsCmd.Flags().StringVar(&logConfigFile, "config-file", common.DefaultConfigFilePath, "config-file input path")
 }
