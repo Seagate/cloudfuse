@@ -54,6 +54,8 @@ var gatherLogsCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		//err := validateOutputPath(dumpPath)
+
 		var err error
 		if dumpPath == "" {
 			dumpPath, err = os.Getwd()
@@ -61,8 +63,7 @@ var gatherLogsCmd = &cobra.Command{
 				return fmt.Errorf("couldn't get the current directory [%s]", err.Error())
 			}
 		} else {
-			dumpPathExists := common.DirectoryExists(dumpPath)
-			if !dumpPathExists {
+			if !common.DirectoryExists(dumpPath) {
 				return fmt.Errorf("the output path provided does not exist")
 			}
 
@@ -85,30 +86,9 @@ var gatherLogsCmd = &cobra.Command{
 			return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
 		}
 
-		logPath := "$HOME/.cloudfuse/cloudfuse.log"
-		logPath = common.ExpandPath(logPath)
-		logType := "base"
-		_, err = os.Stat(logConfigFile)
-		if errors.Is(err, fs.ErrNotExist) {
-			fmt.Printf("Warning, the config file was not found. Defaults will be used ")
-		} else {
-			config.SetConfigFile(logConfigFile)
-			config.ReadFromConfigFile(logConfigFile)
-			if config.IsSet("logging.type") {
-				err := config.UnmarshalKey("logging.type", &logType)
-				if err != nil {
-					return fmt.Errorf("failed to parse logging type from config [%s]", err.Error())
-				}
-				if logType == "syslog" {
-					logPath = "/var/log/syslog"
-				} else if logType == "base" && config.IsSet("logging.file-path") {
-					err = config.UnmarshalKey("logging.file-path", &logPath)
-					if err != nil {
-						return fmt.Errorf("failed to parse logging file path from config [%s]", err.Error())
-					}
-
-				}
-			}
+		logType, logPath, err := locateLogs(logConfigFile)
+		if err != nil {
+			fmt.Errorf("failed to parse config file [%s]", err.Error())
 		}
 
 		logPath, err = filepath.Abs(logPath)
@@ -158,6 +138,34 @@ var gatherLogsCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func locateLogs(configFile string) (string, string, error) {
+	logPath := "$HOME/.cloudfuse/cloudfuse.log"
+	logPath = common.ExpandPath(logPath)
+	logType := "base"
+	_, err := os.Stat(configFile)
+	if errors.Is(err, fs.ErrNotExist) {
+		fmt.Printf("Warning, the config file was not found. Defaults will be used ")
+	} else {
+		config.SetConfigFile(configFile)
+		config.ReadFromConfigFile(configFile)
+		if config.IsSet("logging.type") {
+			err := config.UnmarshalKey("logging.type", &logType)
+			if err != nil {
+				return "", "", err
+			}
+			if logType == "syslog" {
+				logPath = "/var/log/syslog"
+			} else if logType == "base" && config.IsSet("logging.file-path") {
+				err = config.UnmarshalKey("logging.file-path", &logPath)
+				if err != nil {
+					return "", "", err
+				}
+			}
+		}
+	}
+	return logType, logPath, nil
 }
 
 func createFilteredLog(logFile string) (string, error) {
