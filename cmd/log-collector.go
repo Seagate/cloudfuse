@@ -101,11 +101,12 @@ var gatherLogsCmd = &cobra.Command{
 				}
 				if logType == "syslog" {
 					logPath = "/var/log/syslog"
-				} else if logType == "base" {
+				} else if logType == "base" && config.IsSet("logging.file-path") {
 					err = config.UnmarshalKey("logging.file-path", &logPath)
 					if err != nil {
 						return fmt.Errorf("failed to parse logging file path from config [%s]", err.Error())
 					}
+
 				}
 			}
 		}
@@ -124,7 +125,11 @@ var gatherLogsCmd = &cobra.Command{
 				}
 			} else if runtime.GOOS == "windows" {
 				//add the system app data system32 thing if there is no filepath in the config.
-				err = createWindowsArchive(logPath)
+				if strings.HasPrefix(logPath, ".cloudfuse") {
+					err = createWindowsArchive("path/to/cloudfuse/app/data/system32/thing")
+				} else {
+					err = createWindowsArchive(logPath)
+				}
 				if err != nil {
 					return fmt.Errorf("unable to create archive: [%s]", err.Error())
 				}
