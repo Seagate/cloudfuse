@@ -3,7 +3,6 @@ package cmd
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-
 )
 
 type logCollectTestSuite struct {
@@ -11,12 +10,10 @@ type logCollectTestSuite struct {
 	assert *assert.Assertions
 }
 
-func (suite *logCollectTestSuite) SetupTest {
+func (suite *logCollectTestSuite) SetupTest() {
 	suite.assert = assert.New(suite.T())
 }
 
-func (suite *logCollectTestSuite) cleanupTest {
+func (suite *logCollectTestSuite) cleanupTest() {
 	resetCLIFlags(*gatherLogsCmd)
 }
-
-
