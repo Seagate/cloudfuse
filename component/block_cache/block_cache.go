@@ -26,7 +26,6 @@
 package block_cache
 
 import (
-	"bytes"
 	"container/list"
 	"context"
 	"encoding/base64"
@@ -39,7 +38,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -49,8 +47,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 
 	"github.com/vibhansa-msft/tlru"
-
-	"golang.org/x/sys/unix"
 )
 
 /* NOTES:
@@ -1116,8 +1112,7 @@ func (bc *BlockCache) download(item *workItem) {
 
 			// If user has enabled consistency check then compute the md5sum and save it in xattr
 			if bc.consistency {
-				hash := common.GetCRC64(item.block.data, n)
-				err = syscall.Setxattr(localPath, "user.md5sum", hash, 0)
+				err = setBlockChecksum(localPath, item.block.data, n)
 				if err != nil {
 					log.Err("BlockCache::download : Failed to set md5sum for file %s [%v]", localPath, err.Error())
 				}
@@ -1127,30 +1122,6 @@ func (bc *BlockCache) download(item *workItem) {
 
 	// Just mark the block that download is complete
 	item.block.Ready(BlockStatusDownloaded)
-}
-
-func checkBlockConsistency(blockCache *BlockCache, item *workItem, numberOfBytes int, localPath, fileName string) bool {
-	if !blockCache.consistency {
-		return true
-	}
-	// Calculate MD5 checksum of the read data
-	actualHash := common.GetCRC64(item.block.data, numberOfBytes)
-
-	// Retrieve MD5 checksum from xattr
-	xattrHash := make([]byte, 8)
-	_, err := syscall.Getxattr(localPath, "user.md5sum", xattrHash)
-	if err != nil {
-		log.Err("BlockCache::download : Failed to get md5sum for file %s [%v]", fileName, err.Error())
-	} else {
-		// Compare checksums
-		if !bytes.Equal(actualHash, xattrHash) {
-			log.Err("BlockCache::download : MD5 checksum mismatch for file %s, expected %v, got %v", fileName, xattrHash, actualHash)
-			_ = os.Remove(localPath)
-			return false
-		}
-	}
-
-	return true
 }
 
 // WriteFile: Write to the local file
@@ -1550,8 +1521,7 @@ func (bc *BlockCache) upload(item *workItem) {
 
 			// If user has enabled consistency check then compute the md5sum and save it in xattr
 			if bc.consistency {
-				hash := common.GetCRC64(item.block.data, int(blockSize))
-				err = syscall.Setxattr(localPath, "user.md5sum", hash, 0)
+				err = setBlockChecksum(localPath, item.block.data, int(blockSize))
 				if err != nil {
 					log.Err("BlockCache::download : Failed to set md5sum for file %s [%v]", localPath, err.Error())
 				}
@@ -1887,22 +1857,24 @@ func (bc *BlockCache) StatFs() (*common.Statfs_t, bool, error) {
 	usage = usage * float64(_1MB)
 
 	available := (float64)(maxCacheSize) - usage
-	stat := &unix.Statfs_t{}
-	err := unix.Statfs("/", stat)
+	availableOnCache, _, err := common.GetAvailFree("/")
 	if err != nil {
-		log.Debug("BlockCache::StatFs : statfs err [%s].", err.Error())
+		log.Err("BlockCache::StatFs : failed to get available disk space %s", err.Error())
 		return nil, false, err
 	}
-	statfs := &common.Statfs_t{}
-	statfs.Frsize = int64(bc.blockSize)
-	statfs.Blocks = uint64(maxCacheSize) / uint64(bc.blockSize)
-	statfs.Bavail = uint64(math.Max(0, available)) / uint64(bc.blockSize)
-	statfs.Bfree = stat.Bavail
-	statfs.Bsize = stat.Bsize
-	statfs.Ffree = stat.Ffree
-	statfs.Files = stat.Files
-	statfs.Flags = stat.Flags
-	statfs.Namemax = uint64(stat.Namelen)
+
+	const blockSize = 4096
+
+	statfs := &common.Statfs_t{
+		Blocks:  uint64(maxCacheSize) / uint64(blockSize),
+		Bavail:  uint64(max(0, available)) / uint64(blockSize),
+		Bfree:   availableOnCache,
+		Bsize:   blockSize,
+		Ffree:   1e9,
+		Files:   1e9,
+		Frsize:  blockSize,
+		Namemax: 255,
+	}
 
 	return statfs, true, nil
 }
