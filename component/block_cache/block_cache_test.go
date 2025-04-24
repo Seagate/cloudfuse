@@ -162,7 +162,7 @@ func (tobj *testObj) cleanupPipeline() error {
 // Tests the default configuration of block cache
 func (suite *blockCacheTestSuite) TestEmpty() {
 	if runtime.GOOS == "windows" {
-		return
+		suite.T().Skip("Skipping test on Windows")
 	}
 	emptyConfig := "read-only: true"
 	tobj, err := setupPipeline(emptyConfig)
@@ -189,7 +189,7 @@ func (suite *blockCacheTestSuite) TestEmpty() {
 
 func (suite *blockCacheTestSuite) TestMemory() {
 	if runtime.GOOS == "windows" {
-		return
+		suite.T().Skip("Skipping test on Windows")
 	}
 	emptyConfig := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n"
 	tobj, err := setupPipeline(emptyConfig)
@@ -239,6 +239,9 @@ func (suite *blockCacheTestSuite) TestFreeDiskSpace() {
 }
 
 func (suite *blockCacheTestSuite) TestStatfsMemory() {
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("Skipping test on Windows")
+	}
 	emptyConfig := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n"
 	tobj, err := setupPipeline(emptyConfig)
 	defer tobj.cleanupPipeline()
@@ -264,6 +267,10 @@ func (suite *blockCacheTestSuite) TestStatfsMemory() {
 }
 
 func (suite *blockCacheTestSuite) TestStatfsDisk() {
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("Skipping test on Windows")
+	}
+
 	disk_cache_path := getFakeStoragePath("fake_storage")
 	config := fmt.Sprintf("read-only: true\n\nblock_cache:\n  block-size-mb: 1\n  path: %s", disk_cache_path)
 	tobj, err := setupPipeline(config)
@@ -320,8 +327,7 @@ func (suite *blockCacheTestSuite) TestNoPrefetchConfig() {
 
 func (suite *blockCacheTestSuite) TestInvalidDiskPath() {
 	if runtime.GOOS == "windows" {
-		// Skip this test on Windows
-		return
+		suite.T().Skip("Skipping test on Windows")
 	}
 
 	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n  mem-size-mb: 500\n  prefetch: 12\n  parallelism: 10\n  path: /abcd\n  disk-size-mb: 100\n  disk-timeout-sec: 5"
@@ -2688,6 +2694,9 @@ func (suite *blockCacheTestSuite) TestZZZZZStreamToBlockCacheConfig() {
 }
 
 func (suite *blockCacheTestSuite) TestSizeOfFileInOpen() {
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("Skipping test on Windows")
+	}
 	// Write-back cache is turned on by default while mounting.
 	config := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 1"
 	tobj, err := setupPipeline(config)
