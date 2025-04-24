@@ -54,32 +54,9 @@ var gatherLogsCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		//err := validateOutputPath(dumpPath)
-
-		var err error
-		if dumpPath == "" {
-			dumpPath, err = os.Getwd()
-			if err != nil {
-				return fmt.Errorf("couldn't get the current directory [%s]", err.Error())
-			}
-		} else {
-			if !common.DirectoryExists(dumpPath) {
-				return fmt.Errorf("the output path provided does not exist")
-			}
-
-			dumpInfo, err := os.Stat(dumpPath)
-			if err != nil {
-				return fmt.Errorf("couldn't stat the output path")
-			}
-
-			if !dumpInfo.IsDir() {
-				return fmt.Errorf("the provided output path needs to be a directory")
-			}
-		}
-
-		dumpPath, err = filepath.Abs(dumpPath)
+		err := checkOutputPath(dumpPath)
 		if err != nil {
-			return fmt.Errorf("couldn't determine absolute path for logs [%s]", err.Error())
+			return fmt.Errorf("could not use the output path %s, [%s]", dumpPath, err)
 		}
 
 		if logConfigFile, err = filepath.Abs(logConfigFile); err != nil {
@@ -89,11 +66,6 @@ var gatherLogsCmd = &cobra.Command{
 		logType, logPath, err := locateLogs(logConfigFile)
 		if err != nil {
 			fmt.Errorf("failed to parse config file [%s]", err.Error())
-		}
-
-		logPath, err = filepath.Abs(logPath)
-		if err != nil {
-			return fmt.Errorf("failed to get absolute path: [%s]", err.Error())
 		}
 
 		if logType == "base" {
@@ -140,6 +112,35 @@ var gatherLogsCmd = &cobra.Command{
 	},
 }
 
+func checkOutputPath(dumpPath string) error {
+	var err error
+	if dumpPath == "" {
+		dumpPath, err = os.Getwd()
+		if err != nil {
+			return err
+		}
+	} else {
+		if !common.DirectoryExists(dumpPath) {
+			return err
+		}
+
+		dumpInfo, err := os.Stat(dumpPath)
+		if err != nil {
+			return err
+		}
+
+		if !dumpInfo.IsDir() {
+			return fmt.Errorf("the provided output path needs to be a directory")
+		}
+	}
+
+	dumpPath, err = filepath.Abs(dumpPath)
+	if err != nil {
+		return fmt.Errorf("couldn't determine absolute path for logs [%s]", err.Error())
+	}
+	return nil
+}
+
 func locateLogs(configFile string) (string, string, error) {
 	logPath := "$HOME/.cloudfuse/cloudfuse.log"
 	logPath = common.ExpandPath(logPath)
@@ -164,6 +165,10 @@ func locateLogs(configFile string) (string, string, error) {
 				}
 			}
 		}
+	}
+	logPath, err = filepath.Abs(logPath)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get absolute path for the log path: [%s]", err.Error())
 	}
 	return logType, logPath, nil
 }
