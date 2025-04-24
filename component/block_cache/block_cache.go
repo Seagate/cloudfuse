@@ -304,14 +304,6 @@ func (bc *BlockCache) Configure(_ bool) error {
 			}
 		}
 
-		bavail, bsize, err := common.GetAvailFree(bc.tmpPath)
-		if err != nil {
-			log.Err("BlockCache::Configure : config error %s [%s]. Assigning a default value of 4GB or if any value is assigned to .disk-size-mb in config.", bc.Name(), err.Error())
-			bc.diskSize = uint64(4192) * _1MB
-		} else {
-			bc.diskSize = uint64(0.8 * float64(bavail) * float64(bsize))
-		}
-
 		if !common.IsDirectoryEmpty(bc.tmpPath) {
 			log.Err("BlockCache: config error %s directory is not empty", bc.tmpPath)
 			return fmt.Errorf("config error in %s [%s]", bc.Name(), "temp directory not empty")
@@ -344,11 +336,11 @@ func (bc *BlockCache) Configure(_ bool) error {
 
 func (bc *BlockCache) getDefaultDiskSize(path string) uint64 {
 	diskSize := uint64(4192) * _1MB
-	bavail, bsize, err := common.GetAvailFree(path)
+	bavail, _, err := common.GetAvailFree(path)
 	if err != nil {
 		log.Err("BlockCache::Configure : config error %s [%s]. Assigning a default value of 4GB or if any value is assigned to .disk-size-mb in config.", bc.Name(), err.Error())
 	} else {
-		diskSize = uint64(0.8 * float64(bavail) * float64(bsize))
+		diskSize = uint64(0.8 * float64(bavail) * float64(4096))
 	}
 
 	return diskSize
@@ -1857,7 +1849,7 @@ func (bc *BlockCache) StatFs() (*common.Statfs_t, bool, error) {
 	usage = usage * float64(_1MB)
 
 	available := (float64)(maxCacheSize) - usage
-	availableOnCache, _, err := common.GetAvailFree("/")
+	_, free, err := common.GetAvailFree("/")
 	if err != nil {
 		log.Err("BlockCache::StatFs : failed to get available disk space %s", err.Error())
 		return nil, false, err
@@ -1868,7 +1860,7 @@ func (bc *BlockCache) StatFs() (*common.Statfs_t, bool, error) {
 	statfs := &common.Statfs_t{
 		Blocks:  uint64(maxCacheSize) / uint64(blockSize),
 		Bavail:  uint64(max(0, available)) / uint64(blockSize),
-		Bfree:   availableOnCache,
+		Bfree:   free,
 		Bsize:   blockSize,
 		Ffree:   1e9,
 		Files:   1e9,
