@@ -966,9 +966,28 @@ func (suite *fileCacheTestSuite) TestDeleteFile() {
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
+func (suite *fileCacheTestSuite) TestDeleteOpenFileCase1() {
+	defer suite.cleanupTest()
+	path := "file"
+
+	// setup
+	// Create file directly in "fake_storage" and open in case 1 (lazy open)
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+
+	// Test
+	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
+	suite.assert.Error(err)
+	suite.assert.Equal(syscall.EPERM, err)
+
+	// cleanup
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+}
+
 // Case 2 Test cover when the file does not exist in cloud storage but it exists in the local cache.
 // This can happen if createEmptyFile is false and the file hasn't been flushed yet.
-func (suite *fileCacheTestSuite) TestDeleteFileCase2() {
+func (suite *fileCacheTestSuite) TestDeleteOpenFileCase2() {
 	defer suite.cleanupTest()
 	// Default is to not create empty files on create file to support immutable storage.
 	path := "file5"
@@ -976,7 +995,7 @@ func (suite *fileCacheTestSuite) TestDeleteFileCase2() {
 
 	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
 	suite.assert.Error(err)
-	suite.assert.Equal(syscall.EIO, err)
+	suite.assert.Equal(syscall.EPERM, err)
 
 	// Path should not be in local cache (since we failed the operation)
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
