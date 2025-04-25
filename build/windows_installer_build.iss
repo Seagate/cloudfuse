@@ -3,7 +3,7 @@
 ; https://jrsoftware.org/ishelp/index.php
 
 #define MyAppName "Cloudfuse"
-#define MyAppVersion "1.10.0"
+#define MyAppVersion "1.11.0"
 #define MyAppPublisher "SEAGATE TECHNOLOGY LLC"
 #define MyAppURL "https://github.com/Seagate/cloudfuse"
 #define MyAppExeName "cloudfuseGUI.exe"
