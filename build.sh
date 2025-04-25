@@ -21,6 +21,10 @@ else
     rm -rf windows-startup
     go build -o windows-startup.exe ./tools/windows-startup/
 
+    # Build Windows Service Tool
+    rm -rf windows-service
+    go build -o windows-service.exe ./tools/windows-service/
+
     # Build cloudfuse
     rm -rf cloudfuse.exe
     go build -o cloudfuse.exe

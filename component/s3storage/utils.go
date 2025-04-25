@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,7 @@ package s3storage
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -117,15 +118,16 @@ func parseS3Err(err error, attemptedAction string) error {
 			// this should not come up in normal operation, so for now we just return it without translating to a system error code
 			return err
 		}
-		if errorCode == "NotFound" {
+		if errorCode == "NotFound" || errorCode == "NoSuchKey" {
 			// HeadObject's 404 is not modeled (it is a *smithy.GenericAPIError)
-			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, errorCode)
-			return syscall.ENOENT
-		}
-		if errorCode == "NoSuchKey" {
 			// GetObject's 404 is modeled (it is a *types.NoSuchKey)
 			// CopyObject's 404 is not modeled (it is a *smithy.GenericAPIError)
-			log.Err("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, errorCode)
+			message := fmt.Sprintf("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, errorCode)
+			if strings.HasPrefix(attemptedAction, "HeadObject") {
+				log.Warn(message)
+			} else {
+				log.Err(message)
+			}
 			return syscall.ENOENT
 		}
 	}

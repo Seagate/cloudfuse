@@ -29,16 +29,12 @@ package winservice
 import (
 	"os"
 
-	"github.com/Seagate/cloudfuse/common/log"
-
 	"golang.org/x/sys/windows/registry"
 )
 
 // Windows Registry Paths
 const (
-	cfRegistry       = `SOFTWARE\Seagate\Cloudfuse\`
-	instanceRegistry = cfRegistry + `Instances\`
-	winFspRegistry   = `SOFTWARE\WOW6432Node\WinFsp\Services\`
+	winFspRegistry = `SOFTWARE\WOW6432Node\WinFsp\Services\`
 )
 
 // WinFsp registry constants. JobControl is specified to be 1 by default in WinFsp. The security
@@ -50,11 +46,6 @@ const (
 	security   = `D:P(A;;RPWPLC;;;WD)`
 )
 
-type KeyData struct {
-	MountPath  string
-	ConfigFile string
-}
-
 // Specific mount command used in cloudfuse. This is the command that is executed when WinFsp launches our service.
 // %1-%5 are strings that are added when mounting where:
 // %1 is the mount directory
@@ -63,53 +54,6 @@ type KeyData struct {
 // %4 is the current user's Windows group ID
 // %5 is the passphrase if the config file is encrypted
 const mountCmd = `mount %1 --config-file=%2 -o uid=%3,gid=%4 --passphrase=%5 --foreground=true`
-
-func ReadRegistryInstanceEntry(name string) (KeyData, error) {
-	registryPath := instanceRegistry + name
-
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, registryPath, registry.ALL_ACCESS)
-	if err != nil {
-		log.Err("Unable to read instance names from Windows Registry: %v", err.Error())
-		return KeyData{}, err
-	}
-	defer key.Close()
-
-	var d KeyData
-	d.MountPath = name
-
-	d.ConfigFile, _, err = key.GetStringValue("ConfigFile")
-	if err != nil {
-		log.Err("Unable to read key ConfigFile from instance in Windows Registry: %v", err.Error())
-		return KeyData{}, err
-	}
-
-	return d, nil
-}
-
-// readRegistryEntry reads the cloudfuse registry and returns all the instances to be mounted.
-func readRegistryEntry() ([]KeyData, error) {
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, instanceRegistry, registry.ALL_ACCESS)
-	if err != nil {
-		log.Err("Unable to read instance names from Windows Registry: %v", err.Error())
-		return nil, err
-	}
-	defer key.Close()
-
-	keys, err := key.ReadSubKeyNames(-1)
-	if err != nil {
-		log.Err("Unable to read subkey names from Windows Registry: %v", err.Error())
-		return nil, err
-	}
-
-	var data []KeyData
-
-	for _, k := range keys {
-		d, _ := ReadRegistryInstanceEntry(k)
-		data = append(data, d)
-	}
-
-	return data, nil
-}
 
 // CreateWinFspRegistry creates an entry in the registry for WinFsp
 // so the WinFsp launch tool can launch our mounts.
@@ -124,6 +68,7 @@ func CreateWinFspRegistry() error {
 	if err != nil {
 		return err
 	}
+	defer key.Close()
 
 	err = key.SetStringValue("Executable", executablePath)
 	if err != nil {
@@ -157,9 +102,36 @@ func RemoveWinFspRegistry() error {
 	return nil
 }
 
-// RemoveRegistryMount removes the entire cloudfuse registry
-func RemoveAllRegistryMount() error {
-	err := registry.DeleteKey(registry.LOCAL_MACHINE, cfRegistry)
+func AddRegistryValue(keyName string, valueName string, value string) error {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyName, registry.SET_VALUE)
+	if err != nil {
+		return err
+	}
+	defer key.Close()
+	err = key.SetStringValue(valueName, value)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func RemoveRegistryValue(keyName string, valueName string) error {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyName, registry.SET_VALUE|registry.QUERY_VALUE)
+	if err != nil {
+		return err
+	}
+	defer key.Close()
+
+	// Check if the value exists before trying to delete it.
+	_, _, err = key.GetStringValue(valueName)
+	if err != nil {
+		// the entry already doesn't exist - no need to report an error
+		return nil
+	}
+
+	// Delete the registry value
+	err = key.DeleteValue(valueName)
 	if err != nil {
 		return err
 	}

@@ -4,7 +4,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -144,6 +144,26 @@ func GetDiskUsageFromStatfs(path string) (float64, float64, error) {
 	totalSpace := stat.Blocks * uint64(stat.Frsize)
 	usedSpace := float64(totalSpace - availableSpace)
 	return usedSpace, float64(usedSpace) / float64(totalSpace) * 100, nil
+}
+
+// GetAvailFree: Available blocks
+func GetAvailFree(path string) (uint64, uint64, error) {
+	var stat syscall.Statfs_t
+	err := syscall.Statfs(path, &stat)
+	if err != nil {
+		return 0, 0, err
+	}
+	return stat.Bavail, stat.Bfree, err
+}
+
+// GetAvailFree: Available blocks
+func GetFreeRam() (uint64, error) {
+	var sysinfo syscall.Sysinfo_t
+	err := syscall.Sysinfo(&sysinfo)
+	if err != nil {
+		return 0, err
+	}
+	return sysinfo.Freeram * uint64(sysinfo.Unit), nil
 }
 
 // List all mount points which were mounted using cloudfuse

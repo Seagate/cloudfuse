@@ -28,3 +28,4 @@ s3storage:
   secret-key: <ACCOUNT_SECRET_KEY>
   endpoint: https://s3.us-east-1.lyvecloud.seagate.com
   region: us-east-1
+  enable-dir-marker: true

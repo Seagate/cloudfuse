@@ -191,16 +191,6 @@
         <item>
          <layout class="QVBoxLayout" name="verticalLayout_8">
           <item>
-           <widget class="QLabel" name="label_14">
-            <property name="toolTip">
-             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Eviction policy to be engaged for cache eviction:&lt;/p&gt;&lt;p&gt;LRU = Clear the &lt;span style=&quot; text-decoration: underline;&quot;&gt;L&lt;/span&gt;east &lt;span style=&quot; text-decoration: underline;&quot;&gt;R&lt;/span&gt;ecently &lt;span style=&quot; text-decoration: underline;&quot;&gt;U&lt;/span&gt;sed file next&lt;/p&gt;&lt;p&gt;LFU = Cear the &lt;span style=&quot; text-decoration: underline;&quot;&gt;L&lt;/span&gt;east &lt;span style=&quot; text-decoration: underline;&quot;&gt;F&lt;/span&gt;requently &lt;span style=&quot; text-decoration: underline;&quot;&gt;U&lt;/span&gt;sed file next&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-            </property>
-            <property name="text">
-             <string>Eviction Policy</string>
-            </property>
-           </widget>
-          </item>
-          <item>
            <widget class="QLabel" name="label_15">
             <property name="toolTip">
              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The amount of time (seconds) set to for eviction in the cache &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>

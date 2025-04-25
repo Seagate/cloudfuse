@@ -27,8 +27,6 @@ from PySide6 import QtGui
 from ui_s3_config_advanced import Ui_Form
 from common_qt_functions import widgetCustomFunctions
 
-file_cache_eviction_choices = ['lru','lfu']
-
 class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
     def __init__(self,configSettings):
         super().__init__()
@@ -59,11 +57,6 @@ class s3AdvancedSettingsWidget(widgetCustomFunctions, Ui_Form):
         fileCache = self.settings['file_cache']
         libfuse = self.settings['libfuse']
         s3Storage = self.settings['s3storage']
-
-        # The index of file_cache_eviction is matched with the default
-        #   index values in the ui code, so translate the value from settings to index number
-        policyIndex = file_cache_eviction_choices.index(fileCache['policy'])
-        self.dropDown_fileCache_evictionPolicy.setCurrentIndex(policyIndex)
 
         self.setCheckboxFromSetting(self.checkBox_libfuse_disableWriteback, libfuse['disable-writeback-cache'])
         self.setCheckboxFromSetting(self.checkBox_libfuse_networkshare, libfuse['network-share'])

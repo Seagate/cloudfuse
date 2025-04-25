@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -147,21 +147,20 @@ func testStatFsNotPopulated(suite *libfuseTestSuite) {
 	suite.assert.Equal(0, ret)
 
 	// By default these are all 0, so they should be populated by the system
-	// and thus each larger than 0
-	suite.assert.Positive(buf.Frsize)
-	suite.assert.Positive(buf.Blocks)
-	suite.assert.Positive(buf.Bavail)
-	suite.assert.Positive(buf.Bfree)
-	suite.assert.Positive(buf.Bsize)
-	suite.assert.Positive(buf.Files)
-	suite.assert.Positive(buf.Ffree)
-	suite.assert.Positive(buf.Namemax)
+	suite.assert.NotZero(buf.Frsize)
+	suite.assert.NotZero(buf.Blocks)
+	suite.assert.NotZero(buf.Bavail)
+	suite.assert.NotZero(buf.Bfree)
+	suite.assert.NotZero(buf.Bsize)
+	suite.assert.NotZero(buf.Files)
+	suite.assert.NotZero(buf.Ffree)
+	suite.assert.NotZero(buf.Namemax)
 }
 
 func testStatFsError(suite *libfuseTestSuite) {
 	defer suite.cleanupTest()
 	path := "/"
-	suite.mock.EXPECT().StatFs().Return(nil, false, errors.New("Error"))
+	suite.mock.EXPECT().StatFs().Return(nil, false, errors.New("error"))
 	buf := &fuse.Statfs_t{}
 	ret := cfuseFS.Statfs(path, buf)
 	suite.assert.Equal(ret, -fuse.EIO)
@@ -221,6 +220,7 @@ func testRmDirNotEmpty(suite *libfuseTestSuite) {
 	path := "/" + name
 	isDirEmptyOptions := internal.IsDirEmptyOptions{Name: name}
 	suite.mock.EXPECT().IsDirEmpty(isDirEmptyOptions).Return(false)
+	suite.mock.EXPECT().DeleteEmptyDirs(internal.DeleteDirOptions{Name: name}).Return(false, errors.New("unable to delete directory"))
 
 	err := cfuseFS.Rmdir(path)
 	suite.assert.Equal(-fuse.ENOTEMPTY, err)
@@ -480,6 +480,9 @@ func testReadLink(suite *libfuseTestSuite) {
 	path := "/" + name
 	options := internal.ReadLinkOptions{Name: name}
 	suite.mock.EXPECT().ReadLink(options).Return("target", nil)
+	attr := &internal.ObjAttr{}
+	getAttrOpt := internal.GetAttrOptions{Name: name}
+	suite.mock.EXPECT().GetAttr(getAttrOpt).Return(attr, nil)
 
 	err, target := cfuseFS.Readlink(path)
 	suite.assert.Equal(0, err)
@@ -492,6 +495,9 @@ func testReadLinkNotExists(suite *libfuseTestSuite) {
 	path := "/" + name
 	options := internal.ReadLinkOptions{Name: name}
 	suite.mock.EXPECT().ReadLink(options).Return("", syscall.ENOENT)
+	attr := &internal.ObjAttr{}
+	getAttrOpt := internal.GetAttrOptions{Name: name}
+	suite.mock.EXPECT().GetAttr(getAttrOpt).Return(attr, nil)
 
 	err, target := cfuseFS.Readlink(path)
 	suite.assert.Equal(-fuse.ENOENT, err)
@@ -504,6 +510,8 @@ func testReadLinkError(suite *libfuseTestSuite) {
 	path := "/" + name
 	options := internal.ReadLinkOptions{Name: name}
 	suite.mock.EXPECT().ReadLink(options).Return("", errors.New("failed to read link"))
+	getAttrOpt := internal.GetAttrOptions{Name: name}
+	suite.mock.EXPECT().GetAttr(getAttrOpt).Return(nil, nil)
 
 	err, target := cfuseFS.Readlink(path)
 	suite.assert.Equal(-fuse.EIO, err)

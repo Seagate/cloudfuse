@@ -43,7 +43,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -53,8 +52,6 @@ type sizeTrackerTestSuite struct {
 	assert                *assert.Assertions
 	sizeTracker           *SizeTracker
 	loopback              internal.Component
-	mockCtrl              *gomock.Controller
-	mock                  *internal.MockComponent
 	loopback_storage_path string
 }
 
@@ -108,8 +105,6 @@ func (suite *sizeTrackerTestSuite) SetupTest() {
 func (suite *sizeTrackerTestSuite) setupTestHelper(config string) {
 	suite.assert = assert.New(suite.T())
 
-	suite.mockCtrl = gomock.NewController(suite.T())
-	suite.mock = internal.NewMockComponent(suite.mockCtrl)
 	suite.loopback = newLoopbackFS()
 	suite.sizeTracker = newTestSizeTracker(suite.loopback, config)
 	_ = suite.loopback.Start(context.Background())
@@ -125,7 +120,6 @@ func (suite *sizeTrackerTestSuite) cleanupTest() {
 	journal_file := common.JoinUnixFilepath(common.DefaultWorkDir, journal_test_name)
 	os.Remove(journal_file)
 	os.RemoveAll(suite.loopback_storage_path)
-	suite.mockCtrl.Finish()
 }
 
 // Tests the default configuration of attribute cache
@@ -587,6 +581,17 @@ func (suite *sizeTrackerTestSuite) TestStatFS() {
 	suite.assert.NoError(err)
 	err = suite.sizeTracker.DeleteFile(internal.DeleteFileOptions{Name: file})
 	suite.assert.NoError(err)
+}
+
+func (suite *sizeTrackerTestSuite) TestStatFSNoWrites() {
+	defer suite.cleanupTest()
+	stat, ret, err := suite.sizeTracker.StatFs()
+	suite.assert.True(ret)
+	suite.assert.NoError(err)
+	suite.assert.Equal(uint64(0), stat.Blocks)
+	suite.assert.Equal(int64(4096), stat.Bsize)
+	suite.assert.Equal(uint64(0), stat.Bavail)
+	suite.assert.Equal(uint64(0), stat.Bfree)
 }
 
 // In order for 'go test' to run this suite, we need to create

@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -223,7 +223,8 @@ func formatListDirName(path string) string {
 
 func (s3 *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	log.Trace("S3Storage::IsDirEmpty : %s", options.Name)
-	list, _, err := s3.storage.List(formatListDirName(options.Name), nil, 1)
+	// List up to two objects, since one could be the directory with a trailing slash
+	list, _, err := s3.storage.List(formatListDirName(options.Name), nil, 2)
 	if err != nil {
 		log.Err("S3Storage::IsDirEmpty : error listing [%s]", err)
 		return false
@@ -237,8 +238,8 @@ func (s3 *S3Storage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	objectList := make([]*internal.ObjAttr, 0)
 
 	path := formatListDirName(options.Name)
-	var iteration int                   // = 0
-	var marker *string = &options.Token // = nil
+	var iteration int           // = 0
+	var marker = &options.Token // = nil
 	var totalEntriesFetched int32
 	entriesRemaining := options.Count
 	if options.Count == 0 {
@@ -395,7 +396,7 @@ func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 		return 0, syscall.ERANGE
 	}
 
-	var dataLen int64 = int64(len(options.Data))
+	var dataLen = int64(len(options.Data))
 	if atomic.LoadInt64(&options.Handle.Size) < (options.Offset + int64(len(options.Data))) {
 		dataLen = options.Handle.Size - options.Offset
 	}

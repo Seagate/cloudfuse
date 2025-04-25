@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -26,20 +26,12 @@
 package azstorage
 
 import (
-	"bytes"
-	"context"
-	"errors"
-	"fmt"
-	"os"
-	"os/exec"
-	"strings"
-
-	"github.com/Seagate/cloudfuse/common/log"
-
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 	serviceBfs "github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake/service"
+
+	"github.com/Seagate/cloudfuse/common/log"
 )
 
 // Verify that the Auth implement the correct AzAuth interfaces
@@ -59,18 +51,22 @@ func (azmsi *azAuthMSI) getTokenCredential() (azcore.TokenCredential, error) {
 	}
 
 	if azmsi.config.ApplicationID != "" {
-		msiOpts.ID = (azidentity.ClientID)(azmsi.config.ApplicationID)
+		msiOpts.ID = azidentity.ClientID(azmsi.config.ApplicationID)
 	} else if azmsi.config.ResourceID != "" {
-		msiOpts.ID = (azidentity.ResourceID)(azmsi.config.ResourceID)
+		msiOpts.ID = azidentity.ResourceID(azmsi.config.ResourceID)
 	} else if azmsi.config.ObjectID != "" {
+		// Object id is supported by azidentity hence commenting the earlier code
+		msiOpts.ID = azidentity.ObjectID(azmsi.config.ObjectID)
+
 		// login using azcli
-		return azmsi.getTokenCredentialUsingCLI()
+		// return azmsi.getTokenCredentialUsingCLI()
 	}
 
 	cred, err := azidentity.NewManagedIdentityCredential(msiOpts)
 	return cred, err
 }
 
+/*
 func (azmsi *azAuthMSI) getTokenCredentialUsingCLI() (azcore.TokenCredential, error) {
 	command := "az login --identity --username " + azmsi.config.ObjectID
 
@@ -99,6 +95,7 @@ func (azmsi *azAuthMSI) getTokenCredentialUsingCLI() (azcore.TokenCredential, er
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	return cred, err
 }
+*/
 
 type azAuthBlobMSI struct {
 	azAuthMSI
