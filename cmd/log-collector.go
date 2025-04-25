@@ -36,7 +36,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -214,7 +213,7 @@ func createFilteredLog(logFile string) (string, error) {
 }
 
 func createLinuxArchive(logPath string) error {
-	ArchiveName := fmt.Sprintf("cloudfuse_logs_" + time.Now().Format("2006-01-02_15-04-05"))
+	ArchiveName := fmt.Sprintf("cloudfuse_logs")
 
 	outFile, err := os.Create(dumpPath + "/" + ArchiveName + ".tar.gz")
 	if err != nil {
@@ -278,7 +277,7 @@ func createLinuxArchive(logPath string) error {
 
 func createWindowsArchive(logPath string) error {
 
-	ArchiveName := fmt.Sprintf("cloudfuse_logs_" + time.Now().Format("2006-01-02_15-04-05"))
+	ArchiveName := fmt.Sprintf("cloudfuse_logs")
 
 	outFile, err := os.Create(dumpPath + "/" + ArchiveName)
 	if err != nil {
