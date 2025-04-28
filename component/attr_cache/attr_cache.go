@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -119,6 +119,17 @@ func (ac *AttrCache) Stop() error {
 	return nil
 }
 
+// GenConfig : Generate the default config for the component
+func (ac *AttrCache) GenConfig() string {
+	log.Info("AttrCache::Configure : config generation started")
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("\n%s:", ac.Name()))
+	sb.WriteString(fmt.Sprintf("\n  timeout-sec: %v", defaultAttrCacheTimeout))
+
+	return sb.String()
+}
+
 // Configure : Pipeline will call this method after constructor so that you can read config and initialize yourself
 //
 //	Return failure if any config is not valid to exit the process
@@ -159,7 +170,7 @@ func (ac *AttrCache) Configure(_ bool) error {
 
 	ac.cacheDirs = !conf.NoCacheDirs
 
-	log.Info("AttrCache::Configure : cache-timeout %d, enable-symlinks %t, cache-on-list %t, max-files %d",
+	log.Crit("AttrCache::Configure : cache-timeout %d, enable-symlinks %t, cache-on-list %t, max-files %d",
 		ac.cacheTimeout, ac.enableSymlinks, ac.cacheOnList, ac.maxFiles)
 
 	return nil
@@ -809,7 +820,7 @@ func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 	attr, err := ac.GetAttr(internal.GetAttrOptions{Name: options.Handle.Path, RetrieveMetadata: true})
 	if err != nil {
 		// Ignore not exists errors - this can happen if createEmptyFile is set to false
-		if !(os.IsNotExist(err) || err == syscall.ENOENT) {
+		if !os.IsNotExist(err) && err != syscall.ENOENT {
 			return 0, err
 		}
 	}
@@ -892,7 +903,7 @@ func (ac *AttrCache) CopyFromFile(options internal.CopyFromFileOptions) error {
 	attr, err := ac.GetAttr(internal.GetAttrOptions{Name: options.Name, RetrieveMetadata: true})
 	if err != nil {
 		// Ignore not exists errors - this can happen if createEmptyFile is set to false
-		if !(os.IsNotExist(err) || err == syscall.ENOENT) {
+		if !os.IsNotExist(err) && err != syscall.ENOENT {
 			return err
 		}
 	}
@@ -972,11 +983,14 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	value, found := ac.cache.get(options.Name)
 	ac.cacheLock.RUnlock()
 	if found && value.valid() && time.Since(value.cachedAt).Seconds() < float64(ac.cacheTimeout) {
-		// Serve the request from the attribute cache
-		attr, err, metadataOkay := ac.getAttrFromItem(value, options)
-		// we need to make sure metadata flags look good (this is only an issue for Azure)
-		if metadataOkay {
-			return attr, err
+		// Try to serve the request from the attribute cache
+		// Is the entry marked deleted?
+		if !value.exists() {
+			log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
+			return nil, syscall.ENOENT
+		} else {
+			log.Debug("AttrCache::GetAttr : %s served from cache", options.Name)
+			return value.attr, nil
 		}
 	}
 
@@ -986,7 +1000,8 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	ac.cacheLock.Lock()
 	defer ac.cacheLock.Unlock()
 
-	if err == nil {
+	switch err {
+	case nil:
 		// Retrieved attributes so cache them
 		ac.cache.insert(insertOptions{
 			attr:     pathAttr,
@@ -996,15 +1011,14 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
-	} else {
-		if err == syscall.ENOENT {
-			// cache this entity not existing
-			ac.cache.insert(insertOptions{
-				attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
-				exists:   false,
-				cachedAt: time.Now(),
-			})
-		}
+	case syscall.ENOENT:
+		// cache this entity not existing
+		ac.cache.insert(insertOptions{
+			attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
+			exists:   false,
+			cachedAt: time.Now(),
+		})
+	default:
 		// is the cloud connection down?
 		if errors.Is(err, &common.CloudUnreachableError{}) {
 			// do we have an entry, but it's expired? Let's serve that.

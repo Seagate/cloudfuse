@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -260,13 +260,14 @@ func (bb *BlockBlob) DeleteFile(name string) (err error) {
 	})
 	if err != nil {
 		serr := storeBlobErrToErr(err)
-		if serr == ErrFileNotFound {
+		switch serr {
+		case ErrFileNotFound:
 			log.Err("BlockBlob::DeleteFile : %s does not exist", name)
 			return syscall.ENOENT
-		} else if serr == BlobIsUnderLease {
+		case BlobIsUnderLease:
 			log.Err("BlockBlob::DeleteFile : %s is under lease [%s]", name, err.Error())
 			return syscall.EIO
-		} else {
+		default:
 			log.Err("BlockBlob::DeleteFile : Failed to delete blob %s [%s]", name, err.Error())
 			return err
 		}
@@ -308,25 +309,12 @@ func (bb *BlockBlob) DeleteDirectory(name string) (err error) {
 }
 
 // RenameFile : Rename the file
+// Source file must exist in storage account before calling this method.
 func (bb *BlockBlob) RenameFile(source string, target string) error {
 	log.Trace("BlockBlob::RenameFile : %s -> %s", source, target)
 
 	blobClient := bb.getBlobClient(source)
 	newBlobClient := bb.getBlobClient(target)
-
-	_, err := blobClient.GetProperties(context.Background(), &blob.GetPropertiesOptions{
-		CPKInfo: bb.blobCPKOpt,
-	})
-	if err != nil {
-		serr := storeBlobErrToErr(err)
-		if serr == ErrFileNotFound {
-			log.Err("BlockBlob::RenameFile : %s does not exist", source)
-			return syscall.ENOENT
-		} else {
-			log.Err("BlockBlob::RenameFile : Failed to get blob properties for %s [%s]", source, err.Error())
-			return err
-		}
-	}
 
 	// not specifying source blob metadata, since passing empty metadata headers copies
 	// the source blob metadata to destination blob
@@ -335,6 +323,13 @@ func (bb *BlockBlob) RenameFile(source string, target string) error {
 	})
 
 	if err != nil {
+		serr := storeBlobErrToErr(err)
+		if serr == ErrFileNotFound {
+			//Ideally this case doesn't hit as we are checking for the existence of src
+			//before making the call for RenameFile
+			log.Err("BlockBlob::RenameFile : Src Blob doesn't Exist %s [%s]", source, err.Error())
+			return syscall.ENOENT
+		}
 		log.Err("BlockBlob::RenameFile : Failed to start copy of file %s [%s]", source, err.Error())
 		return err
 	}
@@ -399,13 +394,26 @@ func (bb *BlockBlob) RenameDirectory(source string, target string) error {
 		}
 	}
 
-	err := bb.RenameFile(source, target)
-	// check if the marker blob for source directory does not exist but
-	// blobs were present in it, which were renamed earlier
-	if err == syscall.ENOENT && srcDirPresent {
-		err = nil
+	// To rename source marker blob check its properties before calling rename on it.
+	blobClient := bb.Container.NewBlockBlobClient(filepath.Join(bb.Config.prefixPath, source))
+	_, err := blobClient.GetProperties(context.Background(), &blob.GetPropertiesOptions{
+		CPKInfo: bb.blobCPKOpt,
+	})
+	if err != nil {
+		serr := storeBlobErrToErr(err)
+		if serr == ErrFileNotFound { //marker blob doesn't exist for the directory
+			if srcDirPresent { //Some files exist inside the directory
+				return nil
+			}
+			log.Err("BlockBlob::RenameDirectory : %s marker blob does not exist and Src Directory doesn't Exist", source)
+			return syscall.ENOENT
+		} else {
+			log.Err("BlockBlob::RenameDirectory : Failed to get source directory marker blob properties for %s [%s]", source, err.Error())
+			return err
+		}
 	}
-	return err
+
+	return bb.RenameFile(source, target)
 }
 
 func (bb *BlockBlob) getAttrUsingRest(name string) (attr *internal.ObjAttr, err error) {
@@ -418,12 +426,13 @@ func (bb *BlockBlob) getAttrUsingRest(name string) (attr *internal.ObjAttr, err 
 
 	if err != nil {
 		e := storeBlobErrToErr(err)
-		if e == ErrFileNotFound {
+		switch e {
+		case ErrFileNotFound:
 			return attr, syscall.ENOENT
-		} else if e == InvalidPermission {
+		case InvalidPermission:
 			log.Err("BlockBlob::getAttrUsingRest : Insufficient permissions for %s [%s]", name, err.Error())
 			return attr, syscall.EACCES
-		} else {
+		default:
 			log.Err("BlockBlob::getAttrUsingRest : Failed to get blob properties for %s [%s]", name, err.Error())
 			return attr, err
 		}
@@ -445,7 +454,6 @@ func (bb *BlockBlob) getAttrUsingRest(name string) (attr *internal.ObjAttr, err 
 
 	parseMetadata(attr, prop.Metadata)
 
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	return attr, nil
@@ -463,12 +471,13 @@ func (bb *BlockBlob) getAttrUsingList(name string) (attr *internal.ObjAttr, err 
 		blobs, new_marker, err = bb.List(name, marker, bb.Config.maxResultsForList)
 		if err != nil {
 			e := storeBlobErrToErr(err)
-			if e == ErrFileNotFound {
+			switch e {
+			case ErrFileNotFound:
 				return attr, syscall.ENOENT
-			} else if e == InvalidPermission {
+			case InvalidPermission:
 				log.Err("BlockBlob::getAttrUsingList : Insufficient permissions for %s [%s]", name, err.Error())
 				return attr, syscall.EACCES
-			} else {
+			default:
 				log.Warn("BlockBlob::getAttrUsingList : Failed to list blob properties for %s [%s]", name, err.Error())
 			}
 		}
@@ -591,7 +600,6 @@ func (bb *BlockBlob) List(prefix string, marker *string, count int32) ([]*intern
 				MD5:    blobInfo.Properties.ContentMD5,
 			}
 			parseMetadata(attr, blobInfo.Metadata)
-			attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 			attr.Flags.Set(internal.PropFlagModeDefault)
 		}
 		blobList = append(blobList, attr)
@@ -632,7 +640,6 @@ func (bb *BlockBlob) List(prefix string, marker *string, count int32) ([]*intern
 				attr.Atime = attr.Mtime
 				attr.Crtime = attr.Mtime
 				attr.Ctime = attr.Mtime
-				attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 				attr.Flags.Set(internal.PropFlagModeDefault)
 				blobList = append(blobList, attr)
 			}
@@ -751,9 +758,10 @@ func (bb *BlockBlob) ReadBuffer(name string, offset int64, length int64) ([]byte
 
 	if err != nil {
 		e := storeBlobErrToErr(err)
-		if e == ErrFileNotFound {
+		switch e {
+		case ErrFileNotFound:
 			return buff, syscall.ENOENT
-		} else if e == InvalidRange {
+		case InvalidRange:
 			return buff, syscall.ERANGE
 		}
 
@@ -782,9 +790,10 @@ func (bb *BlockBlob) ReadInBuffer(name string, offset int64, length int64, data 
 
 	if err != nil {
 		e := storeBlobErrToErr(err)
-		if e == ErrFileNotFound {
+		switch e {
+		case ErrFileNotFound:
 			return syscall.ENOENT
-		} else if e == InvalidRange {
+		case InvalidRange:
 			return syscall.ERANGE
 		}
 
@@ -906,13 +915,14 @@ func (bb *BlockBlob) WriteFromFile(name string, metadata map[string]*string, fi 
 
 	if err != nil {
 		serr := storeBlobErrToErr(err)
-		if serr == BlobIsUnderLease {
+		switch serr {
+		case BlobIsUnderLease:
 			log.Err("BlockBlob::WriteFromFile : %s is under a lease, can not update file [%s]", name, err.Error())
 			return syscall.EIO
-		} else if serr == InvalidPermission {
+		case InvalidPermission:
 			log.Err("BlockBlob::WriteFromFile : Insufficient permissions for %s [%s]", name, err.Error())
 			return syscall.EACCES
-		} else {
+		default:
 			log.Err("BlockBlob::WriteFromFile : Failed to upload blob %s [%s]", name, err.Error())
 		}
 		return err

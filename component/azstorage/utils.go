@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -42,6 +42,7 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
+	"github.com/awnumar/memguard"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
@@ -94,7 +95,7 @@ func getAzStorageClientOptions(conf *AzStorageConfig) (azcore.ClientOptions, err
 
 	logOptions := getSDKLogOptions()
 
-	transportOptions, err := newBlobfuse2HttpClient(conf)
+	transportOptions, err := newCloudfuseHttpClient(conf)
 	if err != nil {
 		log.Err("utils::getAzStorageClientOptions : Failed to create transport client [%s]", err.Error())
 	}
@@ -152,14 +153,14 @@ func setSDKLogListener() {
 }
 
 // Create an HTTP Client with configured proxy
-func newBlobfuse2HttpClient(conf *AzStorageConfig) (*http.Client, error) {
+func newCloudfuseHttpClient(conf *AzStorageConfig) (*http.Client, error) {
 	var ProxyURL func(req *http.Request) (*url.URL, error)
 	if conf.proxyAddress == "" {
 		ProxyURL = http.ProxyFromEnvironment
 	} else {
 		u, err := url.Parse(conf.proxyAddress)
 		if err != nil {
-			log.Err("utils::newBlobfuse2HttpClient : Failed to parse proxy : %s [%s]", conf.proxyAddress, err.Error())
+			log.Err("utils::newCloudfuseHttpClient : Failed to parse proxy : %s [%s]", conf.proxyAddress, err.Error())
 			return nil, err
 		}
 		ProxyURL = http.ProxyURL(u)
@@ -548,16 +549,17 @@ func split(prefixPath string, path string) string {
 	return common.JoinUnixFilepath(paths...)
 }
 
-func sanitizeSASKey(key string) string {
+func sanitizeSASKey(key string) *memguard.Enclave {
+	encryptedKey := memguard.NewEnclave([]byte(key))
 	if key == "" {
-		return key
+		return encryptedKey
 	}
 
 	if key[0] != '?' {
-		return ("?" + key)
+		return memguard.NewEnclave([]byte("?" + key))
 	}
 
-	return key
+	return memguard.NewEnclave([]byte(key))
 }
 
 func getMD5(fi *os.File) ([]byte, error) {

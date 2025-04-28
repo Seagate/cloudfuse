@@ -27,7 +27,6 @@
 #  10. 'sdk-trace' has been removed and setting log level to log_debug will auto enable these logs.
 # -----------------------------------------------------------------------------------------------------------------------
 
-
 # Daemon configuration
 foreground: true|false <run cloudfuse in foreground or background>
 
@@ -39,7 +38,7 @@ restricted-characters-windows: true|false <allows filenames with restricted char
 
 # Logger configuration
 logging:
-  type: syslog|silent|base <type of logger to be used by the system. silent = no logger, base = file based logger. Default - syslog>
+  type: syslog|silent|base <type of logger to be used by the system. silent = no logger, base = file based logger. Default - base>
   level: log_off|log_crit|log_err|log_warning|log_info|log_trace|log_debug <log level. Default - log_warning>
   file-path: <path where log files shall be stored. Default - '$HOME/.cloudfuse/cloudfuse.log'>
   max-file-size-mb: <maximum allowed size for each log file (in MB). Default - 512 MB>
@@ -70,7 +69,8 @@ libfuse:
   max-fuse-threads: <number of threads allowed at libfuse layer for highly parallel operations, Default is 128>
   direct-io: true|false <enable to bypass the kernel cache>
   network-share: true|false <runs as a network share. may improve performance when latency to cloud is high. only supported on Windows. Known issue - only one Cloudfuse network share can be mounted at a time>
-  display-capacity-mb: <number of MB to display as the mounted storage capacity. Default - 1TB (1048576 MB)>
+  display-capacity-mb: <number of MB to display as the mounted storage capacity. Default - 1PB (1073741824 MB)>
+  windows-sddl: <windows file security and permissions setting in SDDL syntax. Default - D:P(A;;FA;;;WD) corresponding to every user having read/write access>
 
   # Streaming configuration
 stream:
@@ -97,7 +97,7 @@ file_cache:
   path: <path to local disk cache>
 
   # Optional
-  timeout-sec: <default cache eviction timeout (in sec). Default - 120 sec>
+  timeout-sec: <default cache eviction timeout (in sec). Default - 216000 sec>
   max-eviction: <number of files that can be evicted at once. Default - 5000>
   max-size-mb: <maximum cache size allowed. Default - 80% of free disk space>
   high-threshold: <% disk space consumed which triggers eviction. This parameter overrides 'timeout-sec' parameter and cached files will be removed even if they have not expired. Default - 80>
@@ -127,11 +127,11 @@ loopbackfs:
 
 # Azure storage configuration
 azstorage:
-# Required
+  # Required
   type: block|adls <type of storage account to be connected. Default - block>
   account-name: <name of the storage account>
   container: <name of the storage container to be mounted>
-  endpoint: <storage account endpoint (example - https://account-name.blob.core.windows.net)>
+  endpoint: <specify this parameter only if storage account is behind a private endpoint>
   mode: key|sas|spn|msi|azcli <kind of authentication to be used>
   account-key: <storage account key>
   # OR
@@ -166,11 +166,11 @@ azstorage:
   virtual-directory: true|false <support virtual directories without existence of a special marker blob. Default - true>
   disable-compression: true|false <disable transport layer content encoding like gzip, set this flag to true if blobs have content-encoding set in container>
   max-results-for-list: <maximum number of results returned in a single list API call while getting file attributes. Default - 2>
-  telemetry : <additional information that customer want to push in user-agent>
+  telemetry: <additional information that customer want to push in user-agent>
   honour-acl: true|false <honour ACLs on files and directories when mounted using MSI Auth and object-ID is provided in config>
   cpk-enabled: true|false <enable client provided key encryption>
   cpk-encryption-key: <customer provided base64-encoded AES-256 encryption key value>
-  cpk-encryption-key-sha256:  <customer provided base64-encoded sha256 of the encryption key>
+  cpk-encryption-key-sha256: <customer provided base64-encoded sha256 of the encryption key>
 
 # S3 storage configuration
 s3storage:
@@ -186,9 +186,10 @@ s3storage:
   concurrency: <number of parallel upload/download threads. Default - 5>
   disable-concurrent-download: true|false <disables concurrent downloads. Can improve performance with small files at the cost of slow downloads for large objects>
   enable-checksum: true|false <enables checksum verification on upload. Must be supported by s3 provider>
-  checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - SHA1>
+  checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - CRC32>
   usePathStyle: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
   disable-usage: true|false <do not use bucket size from Lyve Cloud to report drive size and storage statistics (StatFs). If not using Lyve Cloud, set to true.>
+  enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
 
 # Mount all configuration
 mountall:

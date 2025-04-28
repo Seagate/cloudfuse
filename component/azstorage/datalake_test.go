@@ -5,7 +5,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -31,12 +31,15 @@ package azstorage
 import (
 	"bytes"
 	"container/list"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -144,7 +147,9 @@ func (s *datalakeTestSuite) TestDefault() {
 	s.assert.Equal(storageTestConfigurationParameters.AdlsAccount, s.az.stConfig.authConfig.AccountName)
 	s.assert.Equal(EAccountType.ADLS(), s.az.stConfig.authConfig.AccountType)
 	s.assert.False(s.az.stConfig.authConfig.UseHTTP)
-	s.assert.Equal(storageTestConfigurationParameters.AdlsKey, s.az.stConfig.authConfig.AccountKey)
+	accountKey, _ := s.az.stConfig.authConfig.AccountKey.Open()
+	defer accountKey.Destroy()
+	s.assert.Equal(accountKey.String(), storageTestConfigurationParameters.AdlsKey)
 	s.assert.Empty(s.az.stConfig.authConfig.SASKey)
 	s.assert.Empty(s.az.stConfig.authConfig.ApplicationID)
 	s.assert.Empty(s.az.stConfig.authConfig.ResourceID)
@@ -492,13 +497,11 @@ func (s *datalakeTestSuite) TestStreamDirHierarchy() {
 	s.assert.EqualValues(base+"/c1", entries[0].Path)
 	s.assert.EqualValues("c1", entries[0].Name)
 	s.assert.True(entries[0].IsDir())
-	s.assert.False(entries[0].IsMetadataRetrieved())
 	s.assert.False(entries[0].IsModeDefault())
 	// Check the file
 	s.assert.EqualValues(base+"/c2", entries[1].Path)
 	s.assert.EqualValues("c2", entries[1].Name)
 	s.assert.False(entries[1].IsDir())
-	s.assert.False(entries[1].IsMetadataRetrieved())
 	s.assert.False(entries[1].IsModeDefault())
 }
 
@@ -521,19 +524,16 @@ func (s *datalakeTestSuite) TestStreamDirRoot() {
 			s.assert.EqualValues(base, entries[0].Path)
 			s.assert.EqualValues(base, entries[0].Name)
 			s.assert.True(entries[0].IsDir())
-			s.assert.False(entries[0].IsMetadataRetrieved())
 			s.assert.False(entries[0].IsModeDefault())
 			// Check the baseb dir
 			s.assert.EqualValues(base+"b", entries[1].Path)
 			s.assert.EqualValues(base+"b", entries[1].Name)
 			s.assert.True(entries[1].IsDir())
-			s.assert.False(entries[1].IsMetadataRetrieved())
 			s.assert.False(entries[1].IsModeDefault())
 			// Check the basec file
 			s.assert.EqualValues(base+"c", entries[2].Path)
 			s.assert.EqualValues(base+"c", entries[2].Name)
 			s.assert.False(entries[2].IsDir())
-			s.assert.False(entries[2].IsMetadataRetrieved())
 			s.assert.False(entries[2].IsModeDefault())
 		})
 	}
@@ -553,7 +553,6 @@ func (s *datalakeTestSuite) TestStreamDirSubDir() {
 	s.assert.EqualValues(base+"/c1"+"/gc1", entries[0].Path)
 	s.assert.EqualValues("gc1", entries[0].Name)
 	s.assert.False(entries[0].IsDir())
-	s.assert.False(entries[0].IsMetadataRetrieved())
 	s.assert.False(entries[0].IsModeDefault())
 }
 
@@ -573,7 +572,6 @@ func (s *datalakeTestSuite) TestStreamDirSubDirPrefixPath() {
 	s.assert.EqualValues(base+"/c1"+"/gc1", entries[0].Path)
 	s.assert.EqualValues("gc1", entries[0].Name)
 	s.assert.False(entries[0].IsDir())
-	s.assert.False(entries[0].IsMetadataRetrieved())
 	s.assert.False(entries[0].IsModeDefault())
 }
 
@@ -2831,6 +2829,128 @@ func (s *datalakeTestSuite) TestUploadWithCPKEnabled() {
 	_ = s.az.storage.DeleteFile(name1)
 	_ = s.az.storage.DeleteFile(name2)
 	_ = os.Remove(name1)
+}
+
+func getACL(dl *Datalake, name string) (string, error) {
+	fileClient := dl.Filesystem.NewFileClient(filepath.Join(dl.Config.prefixPath, name))
+	acl, err := fileClient.GetAccessControl(context.Background(), nil)
+
+	if err != nil || acl.ACL == nil {
+		return "", err
+	}
+
+	return *acl.ACL, nil
+}
+
+func (s *datalakeTestSuite) createFileWithData(name string, data []byte, mode os.FileMode) {
+	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	_, err := s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	s.assert.Nil(err)
+
+	err = s.az.Chmod(internal.ChmodOptions{Name: name, Mode: mode})
+	s.assert.Nil(err)
+
+	s.az.CloseFile(internal.CloseFileOptions{Handle: h})
+	s.assert.Nil(err)
+}
+
+func (s *datalakeTestSuite) TestPermissionPreservationWithoutFlag() {
+	defer s.cleanupTest()
+	name := generateFileName()
+
+	data := []byte("test data")
+	mode := fs.FileMode(0764)
+	s.createFileWithData(name, data, mode)
+	// Simulate file copy and permission checks
+	_ = os.WriteFile(name+"_local", []byte("123123"), mode)
+	f, err := os.OpenFile(name+"_local", os.O_RDWR, mode)
+	s.assert.Nil(err)
+
+	err = s.az.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f, Metadata: nil})
+	s.assert.Nil(err)
+	attr, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.NotNil(attr)
+	s.assert.NotEqual(os.FileMode(0764), attr.Mode)
+
+	acl, err := getACL(s.az.storage.(*Datalake), name)
+	s.assert.Nil(err)
+	s.assert.Contains(acl, "user::rw-")
+	s.assert.Contains(acl, "group::r--")
+	s.assert.Contains(acl, "other::---")
+
+	os.Remove(name + "_local")
+}
+
+func (s *datalakeTestSuite) TestPermissionPreservationWithFlag() {
+	defer s.cleanupTest()
+	// Setup
+	conf := fmt.Sprintf("azstorage:\n  preserve-acl: true\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	s.setupTestHelper(conf, s.container, false)
+
+	name := generateFileName()
+	data := []byte("test data")
+	mode := fs.FileMode(0764)
+	s.createFileWithData(name, data, mode)
+	// Simulate file copy and permission checks
+	_ = os.WriteFile(name+"_local", []byte("123123"), mode)
+	f, err := os.OpenFile(name+"_local", os.O_RDWR, mode)
+	s.assert.Nil(err)
+
+	err = s.az.CopyFromFile(internal.CopyFromFileOptions{Name: name, File: f, Metadata: nil})
+	s.assert.Nil(err)
+
+	attr, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.NotNil(attr)
+	s.assert.Equal(os.FileMode(0764), attr.Mode)
+
+	acl, err := getACL(s.az.storage.(*Datalake), name)
+	s.assert.Nil(err)
+	s.assert.Contains(acl, "user::rwx")
+	s.assert.Contains(acl, "group::rw-")
+	s.assert.Contains(acl, "other::r--")
+
+	os.Remove(name + "_local")
+}
+
+func (s *datalakeTestSuite) TestPermissionPreservationWithCommit() {
+	defer s.cleanupTest()
+	// Setup
+	s.setupTestHelper("", s.container, false)
+	name := generateFileName()
+	s.createFileWithData(name, []byte("test data"), fs.FileMode(0767))
+	data := []byte("123123")
+
+	id := base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(16))
+	err := s.az.StageData(internal.StageDataOptions{
+		Name:   name,
+		Id:     id,
+		Data:   data,
+		Offset: 0,
+	})
+	s.assert.Nil(err)
+
+	ids := []string{}
+	ids = append(ids, id)
+	err = s.az.CommitData(internal.CommitDataOptions{
+		Name:      name,
+		List:      ids,
+		BlockSize: 1,
+	})
+	s.assert.Nil(err)
+
+	attr, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+	s.assert.Nil(err)
+	s.assert.NotNil(attr)
+	s.assert.EqualValues(os.FileMode(0767), attr.Mode)
+
+	acl, err := getACL(s.az.storage.(*Datalake), name)
+	s.assert.Nil(err)
+	s.assert.Contains(acl, "user::rwx")
+	s.assert.Contains(acl, "group::rw-")
+	s.assert.Contains(acl, "other::rwx")
 }
 
 // func (s *datalakeTestSuite) TestRAGRS() {

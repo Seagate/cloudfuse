@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -33,6 +33,7 @@ import (
 
 	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 
@@ -178,6 +179,7 @@ type AzStorageOptions struct {
 	CPKEnabled              bool   `config:"cpk-enabled" yaml:"cpk-enabled"`
 	CPKEncryptionKey        string `config:"cpk-encryption-key" yaml:"cpk-encryption-key"`
 	CPKEncryptionKeySha256  string `config:"cpk-encryption-key-sha256" yaml:"cpk-encryption-key-sha256"`
+	PreserveACL             bool   `config:"preserve-acl" yaml:"preserve-acl"`
 
 	// v1 support
 	UseAdls        bool   `config:"use-adls" yaml:"-"`
@@ -229,8 +231,7 @@ func formatEndpointProtocol(endpoint string, http bool) string {
 	// If the pvtEndpoint does not have protocol mentioned in front, pvtEndpoint parsing will fail while
 	// creating URI also the string shall end with "/"
 	if correctedEndpoint != "" {
-		if !(strings.HasPrefix(correctedEndpoint, "https://") ||
-			strings.HasPrefix(correctedEndpoint, "http://")) {
+		if !strings.HasPrefix(correctedEndpoint, "https://") && !strings.HasPrefix(correctedEndpoint, "http://") {
 			if http {
 				correctedEndpoint = "http://" + correctedEndpoint
 			} else {
@@ -346,7 +347,7 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 	if opt.CPKEnabled {
 		if opt.CPKEncryptionKey == "" || opt.CPKEncryptionKeySha256 == "" {
 			log.Err("ParseAndValidateConfig : CPK key or CPK key sha256 not provided")
-			return errors.New("CPK key or key sha256 not provided")
+			return errors.New("CPK key or key sha256 not provided") //nolint
 		}
 		az.stConfig.cpkEnabled = opt.CPKEnabled
 		az.stConfig.cpkEncryptionKey = opt.CPKEncryptionKey
@@ -429,11 +430,11 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		if opt.AccountKey == "" {
 			return errors.New("storage key not provided")
 		}
-		az.stConfig.authConfig.AccountKey = opt.AccountKey
+		az.stConfig.authConfig.AccountKey = memguard.NewEnclave([]byte(opt.AccountKey))
 	case EAuthType.SAS():
 		az.stConfig.authConfig.AuthMode = EAuthType.SAS()
 		if opt.SaSKey == "" {
-			return errors.New("SAS key not provided")
+			return errors.New("SAS key not provided") //nolint
 		}
 		az.stConfig.authConfig.SASKey = sanitizeSASKey(opt.SaSKey)
 	case EAuthType.MSI():
@@ -448,10 +449,10 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		az.stConfig.authConfig.AuthMode = EAuthType.SPN()
 		if opt.ClientID == "" || (opt.ClientSecret == "" && opt.OAuthTokenFilePath == "") || opt.TenantID == "" {
 			//lint:ignore ST1005 ignore
-			return errors.New("Client ID, Tenant ID or Client Secret not provided")
+			return errors.New("client ID, tenant ID or client secret not provided")
 		}
 		az.stConfig.authConfig.ClientID = opt.ClientID
-		az.stConfig.authConfig.ClientSecret = opt.ClientSecret
+		az.stConfig.authConfig.ClientSecret = memguard.NewEnclave([]byte(opt.ClientSecret))
 		az.stConfig.authConfig.TenantID = opt.TenantID
 		az.stConfig.authConfig.OAuthTokenFilePath = opt.OAuthTokenFilePath
 	case EAuthType.AZCLI():
@@ -506,14 +507,16 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		log.Warn("unsupported v1 CLI parameter: debug-libcurl is not applicable in cloudfuse.")
 	}
 
-	log.Info("ParseAndValidateConfig : account %s, container %s, account-type %s, auth %s, prefix %s, endpoint %s, MD5 %v %v, virtual-directory %v, disable-compression %v, CPK %v", "restricted-characters-windows %v",
+	az.stConfig.preserveACL = opt.PreserveACL
+
+	log.Crit("ParseAndValidateConfig : account %s, container %s, account-type %s, auth %s, prefix %s, endpoint %s, MD5 %v %v, virtual-directory %v, disable-compression %v, CPK %v", "restricted-characters-windows %v",
 		az.stConfig.authConfig.AccountName, az.stConfig.container, az.stConfig.authConfig.AccountType, az.stConfig.authConfig.AuthMode,
 		az.stConfig.prefixPath, az.stConfig.authConfig.Endpoint, az.stConfig.validateMD5, az.stConfig.updateMD5, az.stConfig.virtualDirectory, az.stConfig.disableCompression, az.stConfig.cpkEnabled, az.stConfig.restrictedCharsWin)
-	log.Info("ParseAndValidateConfig : use-HTTP %t, block-size %d, max-concurrency %d, default-tier %s, fail-unsupported-op %t, mount-all-containers %t", az.stConfig.authConfig.UseHTTP, az.stConfig.blockSize, az.stConfig.maxConcurrency, az.stConfig.defaultTier, az.stConfig.ignoreAccessModifiers, az.stConfig.mountAllContainers)
-	log.Info("ParseAndValidateConfig : Retry Config: retry-count %d, max-timeout %d, backoff-time %d, max-delay %d",
-		az.stConfig.maxRetries, az.stConfig.maxTimeout, az.stConfig.backoffTime, az.stConfig.maxRetryDelay)
+	log.Crit("ParseAndValidateConfig : use-HTTP %t, block-size %d, max-concurrency %d, default-tier %s, fail-unsupported-op %t, mount-all-containers %t", az.stConfig.authConfig.UseHTTP, az.stConfig.blockSize, az.stConfig.maxConcurrency, az.stConfig.defaultTier, az.stConfig.ignoreAccessModifiers, az.stConfig.mountAllContainers)
+	log.Crit("ParseAndValidateConfig : Retry Config: retry-count %d, max-timeout %d, backoff-time %d, max-delay %d, preserve-acl: %v",
+		az.stConfig.maxRetries, az.stConfig.maxTimeout, az.stConfig.backoffTime, az.stConfig.maxRetryDelay, az.stConfig.preserveACL)
 
-	log.Info("ParseAndValidateConfig : Telemetry : %s, honour-ACL %v, disable-symlink %v", az.stConfig.telemetry, az.stConfig.honourACL, az.stConfig.disableSymlink)
+	log.Crit("ParseAndValidateConfig : Telemetry : %s, honour-ACL %v, disable-symlink %v", az.stConfig.telemetry, az.stConfig.honourACL, az.stConfig.disableSymlink)
 
 	return nil
 }
@@ -581,7 +584,7 @@ func ParseAndReadDynamicConfig(az *AzStorage, opt AzStorageOptions, reload bool)
 	case "sas":
 		az.stConfig.authConfig.AuthMode = EAuthType.SAS()
 		if opt.SaSKey == "" {
-			return errors.New("SAS key not provided")
+			return errors.New("SAS key not provided") //nolint
 		}
 
 		oldSas := az.stConfig.authConfig.SASKey
@@ -590,10 +593,22 @@ func ParseAndReadDynamicConfig(az *AzStorage, opt AzStorageOptions, reload bool)
 		if reload {
 			log.Info("ParseAndReadDynamicConfig : SAS Key updated")
 
-			if err := az.storage.UpdateServiceClient("saskey", az.stConfig.authConfig.SASKey); err != nil {
+			var sasKey *memguard.LockedBuffer
+			var err error
+			if az.stConfig.authConfig.SASKey != nil {
+				sasKey, err = az.stConfig.authConfig.SASKey.Open()
+				if err != nil || sasKey == nil {
+					return err
+				}
+				defer sasKey.Destroy()
+			} else {
+				return errors.New("SAS key update failure") //nolint
+			}
+
+			if err := az.storage.UpdateServiceClient("saskey", sasKey.String()); err != nil {
 				az.stConfig.authConfig.SASKey = oldSas
-				_ = az.storage.UpdateServiceClient("saskey", az.stConfig.authConfig.SASKey)
-				return errors.New("SAS key update failure")
+				_ = az.storage.UpdateServiceClient("saskey", sasKey.String())
+				return errors.New("SAS key update failure") //nolint
 			}
 		}
 	}

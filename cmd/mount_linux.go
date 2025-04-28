@@ -4,7 +4,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -131,6 +131,6 @@ func sigusrHandler(pipeline *internal.Pipeline, ctx context.Context) daemon.Sign
 }
 
 // stub for compilation
-func createMountInstance() error {
+func createMountInstance(bool, bool) error {
 	return nil
 }

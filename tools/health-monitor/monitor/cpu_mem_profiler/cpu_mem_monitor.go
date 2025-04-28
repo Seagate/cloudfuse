@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -38,7 +38,7 @@ import (
 	hmcommon "github.com/Seagate/cloudfuse/tools/health-monitor/common"
 	hminternal "github.com/Seagate/cloudfuse/tools/health-monitor/internal"
 
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 type CpuMemProfiler struct {
@@ -185,11 +185,12 @@ func (cm *CpuMemProfiler) getCpuMemoryUsage() (*hmcommon.CpuMemStat, error) {
 
 func getCpuMemIndex(process string) (int, int) {
 	cols := strings.Fields(process)
-	var cpuIndex, memIndex int = -1, -1
+	var cpuIndex, memIndex = -1, -1
 	for i, col := range cols {
-		if col == "%CPU" {
+		switch col {
+		case "%CPU":
 			cpuIndex = i
-		} else if col == "VIRT" {
+		case "VIRT":
 			memIndex = i
 		}
 	}

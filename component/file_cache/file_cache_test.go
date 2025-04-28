@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -172,7 +172,7 @@ func (suite *fileCacheTestSuite) TestEmpty() {
 
 	suite.assert.False(suite.fileCache.createEmptyFile)
 	suite.assert.False(suite.fileCache.allowNonEmpty)
-	suite.assert.EqualValues(suite.fileCache.cacheTimeout, 120)
+	suite.assert.EqualValues(suite.fileCache.cacheTimeout, 216000)
 	suite.assert.False(suite.fileCache.cleanupOnStart)
 	suite.assert.True(suite.fileCache.syncToFlush)
 }
@@ -447,6 +447,7 @@ func (suite *fileCacheTestSuite) TestStreamDirCase2() {
 
 func (suite *fileCacheTestSuite) TestStreamDirCase3() {
 	defer suite.cleanupTest()
+	suite.fileCache.createEmptyFile = true
 	// Setup
 	name := "dir"
 	subdir := name + "/subdir"
@@ -479,6 +480,7 @@ func (suite *fileCacheTestSuite) TestStreamDirCase3() {
 	suite.assert.EqualValues(file3, dir[2].Path)
 	suite.assert.EqualValues(1024, dir[2].Size)
 	suite.assert.EqualValues(subdir, dir[3].Path)
+	suite.fileCache.createEmptyFile = false
 }
 
 func pos(s []*internal.ObjAttr, e string) int {
@@ -973,9 +975,28 @@ func (suite *fileCacheTestSuite) TestDeleteFile() {
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
+func (suite *fileCacheTestSuite) TestDeleteOpenFileCase1() {
+	defer suite.cleanupTest()
+	path := "file"
+
+	// setup
+	// Create file directly in "fake_storage" and open in case 1 (lazy open)
+	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
+
+	// Test
+	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
+	suite.assert.Error(err)
+	suite.assert.Equal(syscall.EPERM, err)
+
+	// cleanup
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+}
+
 // Case 2 Test cover when the file does not exist in cloud storage but it exists in the local cache.
 // This can happen if createEmptyFile is false and the file hasn't been flushed yet.
-func (suite *fileCacheTestSuite) TestDeleteFileCase2() {
+func (suite *fileCacheTestSuite) TestDeleteOpenFileCase2() {
 	defer suite.cleanupTest()
 	// Default is to not create empty files on create file to support immutable storage.
 	path := "file5"
@@ -983,7 +1004,7 @@ func (suite *fileCacheTestSuite) TestDeleteFileCase2() {
 
 	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
 	suite.assert.Error(err)
-	suite.assert.Equal(syscall.EIO, err)
+	suite.assert.Equal(syscall.EPERM, err)
 
 	// Path should not be in local cache (since we failed the operation)
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
@@ -1955,6 +1976,58 @@ func (suite *fileCacheTestSuite) TestHandleDataChange() {
 	suite.assert.Equal(9, n)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
+}
+
+func (suite *fileCacheTestSuite) createDirectoryStructure() {
+	err := os.MkdirAll(filepath.Join(suite.cache_path, "a", "b", "c", "d"), 0777)
+	suite.assert.NoError(err)
+
+	err = os.MkdirAll(filepath.Join(suite.cache_path, "a", "b", "e", "f"), 0777)
+	suite.assert.NoError(err)
+
+	err = os.MkdirAll(filepath.Join(suite.cache_path, "a", "b", "e", "g"), 0777)
+	suite.assert.NoError(err)
+
+	err = os.MkdirAll(filepath.Join(suite.cache_path, "h", "i", "j", "k"), 0777)
+	suite.assert.NoError(err)
+
+	err = os.MkdirAll(filepath.Join(suite.cache_path, "h", "l", "m", "n"), 0777)
+	suite.assert.NoError(err)
+}
+
+func (suite *fileCacheTestSuite) TestDeleteEmptyDirsRoot() {
+	defer suite.cleanupTest()
+
+	suite.createDirectoryStructure()
+	val, err := suite.fileCache.DeleteEmptyDirs(internal.DeleteDirOptions{Name: suite.cache_path})
+	suite.assert.NoError(err)
+	suite.assert.True(val)
+}
+
+func (suite *fileCacheTestSuite) TestDeleteEmptyDirsNonRoot() {
+	defer suite.cleanupTest()
+
+	suite.createDirectoryStructure()
+	val, err := suite.fileCache.DeleteEmptyDirs(internal.DeleteDirOptions{Name: "a"})
+	suite.assert.NoError(err)
+	suite.assert.True(val)
+
+	val, err = suite.fileCache.DeleteEmptyDirs(internal.DeleteDirOptions{Name: filepath.Join(suite.cache_path, "h")})
+	suite.assert.NoError(err)
+	suite.assert.True(val)
+}
+
+func (suite *fileCacheTestSuite) TestDeleteEmptyDirsNegative() {
+	defer suite.cleanupTest()
+
+	suite.createDirectoryStructure()
+	file, err := os.Create(filepath.Join(suite.cache_path, "h", "l", "m", "n", "file.txt"))
+	suite.assert.NoError(err)
+	file.Close()
+
+	val, err := suite.fileCache.DeleteEmptyDirs(internal.DeleteDirOptions{Name: suite.cache_path})
+	suite.assert.Error(err)
+	suite.assert.False(val)
 }
 
 // In order for 'go test' to run this suite, we need to create

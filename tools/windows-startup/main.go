@@ -32,7 +32,8 @@ import (
 )
 
 func main() {
-	err := winservice.StartMounts()
+	useSystem := false
+	err := winservice.StartMounts(useSystem)
 	if err != nil {
 		log.Err("Error starting mounts on startup")
 	}

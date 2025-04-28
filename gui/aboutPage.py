@@ -20,22 +20,27 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE
 
-from PySide6.QtWidgets import QWidget
-from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QMessageBox
+from PySide6.QtCore import Qt
 
-# import the custom window class
-from ui_about_dialog import Ui_About
-
-class aboutPage(QWidget, Ui_About):
-    def __init__(self,cloudfuseVersion):
+class aboutPage(QMessageBox):
+    def __init__(self, cloudfuseVersion: str):
         super().__init__()
-        self.setupUi(self)
-
-        # By default, hyperlinks are set to look for local files in the current directory; set the behavior to  open the
-        #   external link in the system's default browser
-        self.textBrowser.setOpenExternalLinks(True)
-        self.labelcloudfuseVersion.setText(str(cloudfuseVersion).capitalize())
-        self.labelcloudfuseVersion.setFont(QFont('Arial',18,700))
-
-        # Close the window when the ok button is clicked
-        self.buttonBox.clicked.connect(self.close)
+        self.setWindowTitle('About Cloudfuse')
+        self.setTextFormat(Qt.RichText)
+        self.setText(f"""
+            <p><strong><h3>About Cloudfuse</h3></strong></p>
+            <p>This program is using Cloudfuse version {cloudfuseVersion}</p>
+            <p>Cloudfuse provides a virtual filesystem backed by either S3 or Azure Storage for mounting the cloud to a local system.</p>
+            <p>For more information and frequently asked questions please go to the <a href="https://github.com/Seagate/cloudfuse">Cloudfuse GitHub</a>.</p>
+            <p><h4>Help</h4></p>
+            <p>Found a bug? Report it at <a href="https://github.com/Seagate/cloudfuse/issues">github issues</a> with the bug label.</p>
+            <p>Have questions not in the FAQ? Submit it at <a href="https://github.com/Seagate/cloudfuse/issues">github issues</a> with the question label.</p>
+            <p><h4>Third Party Notices</h4></p>
+            <p>See <a href="NOTICE">notices</a> for third party license notices.</p>
+            <p>WinSFP is licensed under the GPLv3 license with a special exception for Free/Libre and Open Source Software, which is available <a href="https://github.com/winfsp/winfsp/blob/master/License.txt">here</a>.</p>
+            <p><h4>Attribution</h4></p>
+            <p>WinSFP - Windows File System Proxy, Copyright Bill Zissimopoulos <a href="https://github.com/winfsp/winfsp">details</a>.</p>
+            <p><h4>License</h4></p>
+            <p>This project is licensed under MIT.</p>
+        """)

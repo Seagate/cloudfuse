@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -31,6 +31,7 @@ import (
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/awnumar/memguard"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -457,7 +458,7 @@ func (suite *ConfigTestSuite) TestAddFlags() {
 	BindEnv("abcd", "CF_TEST_ABCD")
 }
 
-func (suite *ConfigTestSuite) TestConfigFileDescryption() {
+func (suite *ConfigTestSuite) TestConfigFileDescription() {
 	defer suite.cleanupTest()
 	assert := assert.New(suite.T())
 
@@ -466,12 +467,14 @@ func (suite *ConfigTestSuite) TestConfigFileDescryption() {
 	assert.NoError(err)
 	assert.NotNil(plaintext)
 
-	cipherText, err := common.EncryptData(plaintext, "12312312312312312312312312312312")
+	encryptedPassphrase := memguard.NewEnclave([]byte("12312312312312312312312312312312"))
+
+	cipherText, err := common.EncryptData(plaintext, encryptedPassphrase)
 	assert.NoError(err)
 	err = os.WriteFile("test_enc.yaml", cipherText, 0644)
 	assert.NoError(err)
 
-	err = DecryptConfigFile("test_enc.yaml", "12312312312312312312312312312312")
+	err = DecryptConfigFile("test_enc.yaml", encryptedPassphrase)
 	assert.NoError(err)
 
 	_ = os.Remove("test.yaml")

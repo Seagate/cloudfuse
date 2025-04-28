@@ -5,7 +5,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -37,6 +37,7 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -114,13 +115,14 @@ func generateEndpoint(useHttp bool, accountName string, accountType AccountType)
 
 func (suite *authTestSuite) TestBlockInvalidAuth() {
 	defer suite.cleanupTest()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.BlockKey))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.BlockContainer,
 		authConfig: azAuthConfig{
 			AuthMode:    EAuthType.INVALID_AUTH(),
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
-			AccountKey:  storageTestConfigurationParameters.BlockKey,
+			AccountKey:  encryptedKey,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
 		},
 	}
@@ -136,13 +138,14 @@ func (suite *authTestSuite) TestBlockInvalidAuth() {
 
 func (suite *authTestSuite) TestAdlsInvalidAuth() {
 	defer suite.cleanupTest()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.BlockKey))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.AdlsContainer,
 		authConfig: azAuthConfig{
 			AuthMode:    EAuthType.INVALID_AUTH(),
 			AccountType: EAccountType.ADLS(),
 			AccountName: storageTestConfigurationParameters.AdlsAccount,
-			AccountKey:  storageTestConfigurationParameters.AdlsKey,
+			AccountKey:  encryptedKey,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
 		},
 	}
@@ -158,13 +161,14 @@ func (suite *authTestSuite) TestAdlsInvalidAuth() {
 
 func (suite *authTestSuite) TestInvalidAccountType() {
 	defer suite.cleanupTest()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.BlockKey))
 	stgConfig := AzStorageConfig{
-		container: storageTestConfigurationParameters.BlockContainer,
+		container: storageTestConfigurationParameters.AdlsContainer,
 		authConfig: azAuthConfig{
 			AuthMode:    EAuthType.KEY(),
 			AccountType: EAccountType.INVALID_ACC(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
-			AccountKey:  storageTestConfigurationParameters.BlockKey,
+			AccountKey:  encryptedKey,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
 		},
 	}
@@ -183,7 +187,7 @@ func (suite *authTestSuite) TestBlockInvalidSharedKey() {
 			AuthMode:    EAuthType.KEY(),
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
-			AccountKey:  "",
+			AccountKey:  nil,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
 		},
 	}
@@ -199,13 +203,14 @@ func (suite *authTestSuite) TestBlockInvalidSharedKey() {
 
 func (suite *authTestSuite) TestBlockInvalidSharedKey2() {
 	defer suite.cleanupTest()
+	encryptedKey := memguard.NewEnclave([]byte("abcd>="))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.BlockContainer,
 		authConfig: azAuthConfig{
 			AuthMode:    EAuthType.KEY(),
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
-			AccountKey:  "abcd>=", // string that will fail to base64 decode
+			AccountKey:  encryptedKey, // string that will fail to base64 decode
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
 		},
 	}
@@ -221,13 +226,14 @@ func (suite *authTestSuite) TestBlockInvalidSharedKey2() {
 
 func (suite *authTestSuite) TestBlockSharedKey() {
 	defer suite.cleanupTest()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.BlockKey))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.BlockContainer,
 		authConfig: azAuthConfig{
 			AuthMode:    EAuthType.KEY(),
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
-			AccountKey:  storageTestConfigurationParameters.BlockKey,
+			AccountKey:  encryptedKey,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
 		},
 	}
@@ -258,7 +264,7 @@ func (suite *authTestSuite) TestAdlsInvalidSharedKey() {
 			AuthMode:    EAuthType.KEY(),
 			AccountType: EAccountType.ADLS(),
 			AccountName: storageTestConfigurationParameters.AdlsAccount,
-			AccountKey:  "",
+			AccountKey:  nil,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
 		},
 	}
@@ -274,13 +280,14 @@ func (suite *authTestSuite) TestAdlsInvalidSharedKey() {
 
 func (suite *authTestSuite) TestAdlsSharedKey() {
 	defer suite.cleanupTest()
+	encryptedKey := memguard.NewEnclave([]byte(storageTestConfigurationParameters.AdlsKey))
 	stgConfig := AzStorageConfig{
 		container: storageTestConfigurationParameters.AdlsContainer,
 		authConfig: azAuthConfig{
 			AuthMode:    EAuthType.KEY(),
 			AccountType: EAccountType.ADLS(),
 			AccountName: storageTestConfigurationParameters.AdlsAccount,
-			AccountKey:  storageTestConfigurationParameters.AdlsKey,
+			AccountKey:  encryptedKey,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
 		},
 	}
@@ -311,7 +318,7 @@ func (suite *authTestSuite) TestBlockInvalidSasKey() {
 			AuthMode:    EAuthType.SAS(),
 			AccountType: EAccountType.BLOCK(),
 			AccountName: storageTestConfigurationParameters.BlockAccount,
-			SASKey:      "",
+			SASKey:      nil,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.BlockAccount, EAccountType.BLOCK()),
 		},
 	}
@@ -440,7 +447,7 @@ func (suite *authTestSuite) TestAdlsInvalidSasKey() {
 			AuthMode:    EAuthType.SAS(),
 			AccountType: EAccountType.ADLS(),
 			AccountName: storageTestConfigurationParameters.AdlsAccount,
-			SASKey:      "",
+			SASKey:      nil,
 			Endpoint:    generateEndpoint(false, storageTestConfigurationParameters.AdlsAccount, EAccountType.ADLS()),
 		},
 	}

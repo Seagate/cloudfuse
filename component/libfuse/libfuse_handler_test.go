@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -49,7 +49,7 @@ func (suite *libfuseTestSuite) TestDefault() {
 	suite.assert.Equal(uint32(120), suite.libfuse.entryExpiration)
 	suite.assert.Equal(uint32(120), suite.libfuse.attributeExpiration)
 	suite.assert.Equal(uint32(120), suite.libfuse.negativeTimeout)
-	suite.assert.Equal(uint64(1024*1024), suite.libfuse.displayCapacityMb)
+	suite.assert.Equal(uint64(1024*1024*1024), suite.libfuse.displayCapacityMb)
 	suite.assert.False(suite.libfuse.disableWritebackCache)
 	suite.assert.True(suite.libfuse.ignoreOpenFlags)
 	suite.assert.False(suite.libfuse.directIO)
@@ -58,7 +58,7 @@ func (suite *libfuseTestSuite) TestDefault() {
 func (suite *libfuseTestSuite) TestConfig() {
 	defer suite.cleanupTest()
 	suite.cleanupTest() // clean up the default libfuse generated
-	config := "allow-other: true\nread-only: true\nlibfuse:\n  attribute-expiration-sec: 60\n  entry-expiration-sec: 60\n  negative-entry-expiration-sec: 60\n  fuse-trace: true\n  disable-writeback-cache: true\n  ignore-open-flags: false\n  direct-io: true\n  network-share: true\n  display-capacity-mb: 262144\n"
+	config := "allow-other: true\nread-only: true\nlibfuse:\n  attribute-expiration-sec: 60\n  entry-expiration-sec: 60\n  negative-entry-expiration-sec: 60\n  fuse-trace: true\n  disable-writeback-cache: true\n  ignore-open-flags: false\n  network-share: true\n  display-capacity-mb: 262144\n"
 	suite.setupTestHelper(config) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
 
 	suite.assert.Equal("libfuse", suite.libfuse.Name())
@@ -75,6 +75,30 @@ func (suite *libfuseTestSuite) TestConfig() {
 	suite.assert.Equal(uint32(60), suite.libfuse.entryExpiration)
 	suite.assert.Equal(uint32(60), suite.libfuse.attributeExpiration)
 	suite.assert.Equal(uint32(60), suite.libfuse.negativeTimeout)
+	suite.assert.Equal(uint64(262144), suite.libfuse.displayCapacityMb)
+	suite.assert.False(suite.libfuse.directIO)
+}
+
+func (suite *libfuseTestSuite) TestConfigDirectIO() {
+	defer suite.cleanupTest()
+	suite.cleanupTest() // clean up the default libfuse generated
+	config := "allow-other: true\nread-only: true\nlibfuse:\n  attribute-expiration-sec: 60\n  entry-expiration-sec: 60\n  negative-entry-expiration-sec: 60\n  fuse-trace: true\n  disable-writeback-cache: true\n  ignore-open-flags: false\n  direct-io: true\n  network-share: true\n  display-capacity-mb: 262144\n"
+	suite.setupTestHelper(config) // setup a new libfuse with a custom config (clean up will occur after the test as usual)
+
+	suite.assert.Equal("libfuse", suite.libfuse.Name())
+	suite.assert.Empty(suite.libfuse.mountPath)
+	suite.assert.True(suite.libfuse.readOnly)
+	suite.assert.True(suite.libfuse.traceEnable)
+	suite.assert.True(suite.libfuse.disableWritebackCache)
+	suite.assert.False(suite.libfuse.ignoreOpenFlags)
+	suite.assert.True(suite.libfuse.allowOther)
+	suite.assert.True(suite.libfuse.networkShare)
+	suite.assert.False(suite.libfuse.allowRoot)
+	suite.assert.Equal(suite.libfuse.dirPermission, uint(fs.FileMode(0777)))
+	suite.assert.Equal(suite.libfuse.filePermission, uint(fs.FileMode(0777)))
+	suite.assert.Equal(uint32(0), suite.libfuse.entryExpiration)
+	suite.assert.Equal(uint32(0), suite.libfuse.attributeExpiration)
+	suite.assert.Equal(uint32(0), suite.libfuse.negativeTimeout)
 	suite.assert.Equal(uint64(262144), suite.libfuse.displayCapacityMb)
 	suite.assert.True(suite.libfuse.directIO)
 }
@@ -97,7 +121,7 @@ func (suite *libfuseTestSuite) TestConfigZero() {
 	suite.assert.Equal(uint32(0), suite.libfuse.entryExpiration)
 	suite.assert.Equal(uint32(0), suite.libfuse.attributeExpiration)
 	suite.assert.Equal(uint32(0), suite.libfuse.negativeTimeout)
-	suite.assert.Equal(uint64(1024*1024), suite.libfuse.displayCapacityMb)
+	suite.assert.Equal(uint64(1024*1024*1024), suite.libfuse.displayCapacityMb)
 	suite.assert.False(suite.libfuse.directIO)
 }
 

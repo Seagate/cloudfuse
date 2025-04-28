@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -32,6 +32,7 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/internal"
 
+	"github.com/awnumar/memguard"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
@@ -53,6 +54,7 @@ type Config struct {
 	usePathStyle              bool
 	disableSymlink            bool
 	disableUsage              bool
+	enableDirMarker           bool
 }
 
 // TODO: move s3AuthConfig to s3auth.go
@@ -62,8 +64,8 @@ type Config struct {
 // s3AuthConfig : Config to authenticate to storage
 type s3AuthConfig struct {
 	BucketName string
-	KeyID      string
-	SecretKey  string
+	KeyID      *memguard.Enclave
+	SecretKey  *memguard.Enclave
 	Region     string
 	Profile    string
 	Endpoint   string

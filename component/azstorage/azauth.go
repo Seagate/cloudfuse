@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/awnumar/memguard"
 )
 
 // AzAuthConfig : Config to authenticate to storage
@@ -40,10 +41,10 @@ type azAuthConfig struct {
 	AuthMode    AuthType
 
 	// Key config
-	AccountKey string
+	AccountKey *memguard.Enclave
 
 	// SAS config
-	SASKey string
+	SASKey *memguard.Enclave
 
 	// MSI config
 	ApplicationID string
@@ -53,7 +54,7 @@ type azAuthConfig struct {
 	// SPN config
 	TenantID                string
 	ClientID                string
-	ClientSecret            string
+	ClientSecret            *memguard.Enclave
 	OAuthTokenFilePath      string
 	ActiveDirectoryEndpoint string
 
