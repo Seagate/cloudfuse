@@ -1000,8 +1000,8 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	ac.cacheLock.Lock()
 	defer ac.cacheLock.Unlock()
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		// Retrieved attributes so cache them
 		ac.cache.insert(insertOptions{
 			attr:     pathAttr,
@@ -1011,38 +1011,36 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		if ac.cacheDirs {
 			ac.markAncestorsInCloud(getParentDir(options.Name), time.Now())
 		}
-	case syscall.ENOENT:
+	case err == syscall.ENOENT:
 		// cache this entity not existing
 		ac.cache.insert(insertOptions{
 			attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
 			exists:   false,
 			cachedAt: time.Now(),
 		})
-	default:
-		// is the cloud connection down?
-		if errors.Is(err, &common.CloudUnreachableError{}) {
-			// do we have an entry, but it's expired? Let's serve that.
-			if found && value.valid() {
-				// Serve the request from the attribute cache
-				if !value.exists() {
-					return value.attr, errors.Join(syscall.ENOENT, err)
-				} else {
-					return value.attr, err
-				}
+	case errors.Is(err, &common.CloudUnreachableError{}):
+		// the cloud connection is down
+		// do we have an entry, but it's expired? Let's serve that.
+		if found && value.valid() {
+			// Serve the request from the attribute cache
+			if !value.exists() {
+				return value.attr, errors.Join(syscall.ENOENT, err)
 			} else {
-				// we have no cached data about this item
-				// but do we have a complete listing for its parent directory?
-				entry, found := ac.cache.get(getParentDir(options.Name))
-				if found && entry.listingComplete {
-					return nil, errors.Join(syscall.ENOENT, err)
-				} else {
-					// we have no way of knowing whether the requested item is in the directory in the cloud
-					// NOTE:
-					// the OS can call GetAttr on a file without listing its parent directory
-					// so having a valid file entry in cache does not mean we have a complete listing of its parent
-					// so we can't just check if the directory has any children as a proxy for whether it's been listed
-					return nil, common.NewNoCachedDataError(err)
-				}
+				return value.attr, err
+			}
+		} else {
+			// we have no cached data about this item
+			// but do we have a complete listing for its parent directory?
+			entry, found := ac.cache.get(getParentDir(options.Name))
+			if found && entry.listingComplete {
+				return nil, errors.Join(syscall.ENOENT, err)
+			} else {
+				// we have no way of knowing whether the requested item is in the directory in the cloud
+				// NOTE:
+				// the OS can call GetAttr on a file without listing its parent directory
+				// so having a valid file entry in cache does not mean we have a complete listing of its parent
+				// so we can't just check if the directory has any children as a proxy for whether it's been listed
+				return nil, common.NewNoCachedDataError(err)
 			}
 		}
 	}
