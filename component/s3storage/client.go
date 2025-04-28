@@ -1201,3 +1201,48 @@ func (cl *Client) GetUsedSize() (uint64, error) {
 
 	return bucketSizeBytes, nil
 }
+
+func (cl *Client) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
+    log.Trace("Client::GetCommittedBlockList : name %s", name)
+	blockList := make(internal.CommittedBlockList, 0)
+	result, err := cl.headObject(name, false, false)
+	if err != nil {
+		log.Err("Client::GetCommittedBlockList : Unable to headObject with name %v", name)
+		return nil, err
+	}
+
+	cutoff := cl.Config.uploadCutoff
+	var objectSize int64
+
+	// if file is smaller than the uploadCutoff it is small, otherwise it is a multipart
+	// upload
+	if result.Size < cutoff {
+		return &blockList, nil
+	}
+
+	partSize := cl.Config.partSize
+
+	// Create a list of blocks that are the partSize except for the last block
+	for objectSize <= result.Size {
+		if objectSize+partSize >= result.Size {
+			// This is the last block to add
+			blk := internal.CommittedBlock{
+				Id:         base64.StdEncoding.EncodeToString(common.NewUUID().Bytes()),
+				Offset:     objectSize,
+				Size:   	uint64(result.Size-objectSize),
+			}
+			blockList = append(blockList, blk)
+			break
+		}
+
+		blk := internal.CommittedBlock{
+			Id:         base64.StdEncoding.EncodeToString(common.NewUUID().Bytes()),
+			Offset: 	objectSize,
+			Size:   uint64(partSize),
+		}
+		blockList = append(blockList, blk)
+		objectSize += partSize
+	}
+
+	return &blockList, nil
+}
