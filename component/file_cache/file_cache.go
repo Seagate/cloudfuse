@@ -506,23 +506,23 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 	// we are offline
 	// check if the directory exists in cloud storage
 	_, err = fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
-	// is the attribute cache information about this directory expired?
-	if errors.Is(err, &common.CloudUnreachableError{}) {
-		// if we have no information, just return the error
+	switch {
+	case errors.Is(err, &common.CloudUnreachableError{}):
+		// the attribute cache information about this directory is expired
 		if errors.Is(err, &common.NoCachedDataError{}) {
+			// we have no information, so just return the error
 			// no ops are allowed when the directory's cloud state is unknown
 			log.Err("FileCache::CreateDir : %s GetAttr failed. We are offline and we have no attribute data for this path.", options.Name)
-			return err
-		}
-		// we have valid information - clean up the error
-		if errors.Is(err, os.ErrNotExist) {
-			err = syscall.ENOENT
 		} else {
-			err = nil
+			// we have valid information - clean up the error
+			if errors.Is(err, os.ErrNotExist) {
+				err = syscall.ENOENT
+			} else {
+				err = nil
+			}
 		}
-	}
-	// does the directory already exist in the cloud?
-	if os.IsNotExist(err) { // no
+	case os.IsNotExist(err):
+		// the directory does not exist in the cloud
 		// record this directory to sync to cloud later
 		// Note: the s3storage component returns success on CreateDir, even without a cloud connection.
 		//  The thread that pushes local changes to the cloud will have to account for this
@@ -531,16 +531,17 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 		fc.offlineOps.Store(options.Name, internal.CreateObjAttrDir(options.Name))
 		// try to create the directory locally
 		// return its errors directly, since it will rightly return EEXIST when needed, etc
-		return os.Mkdir(localPath, options.Mode.Perm())
-	} else if err == nil { // yes
-		// the directory already exists in cloud, so it can't be created
+		err = os.Mkdir(localPath, options.Mode.Perm())
+	case err == nil:
+		// the directory already exists in the cloud, so it can't be created
 		log.Err("FileCache::CreateDir : %s already exists in cloud storage", options.Name)
-		return os.ErrExist
-	} else { // we are online, but GetAttr failed for some other reason
-		// report and return the error
+		err = os.ErrExist
+	default:
+		// we are online, but GetAttr failed for some other reason
+		// log this and return the error, as is
 		log.Err("FileCache::CreateDir : %s GetAttr failed. Here's why: %v", options.Name, err)
-		return err
 	}
+	return err
 }
 
 // DeleteDir: Delete empty directory
