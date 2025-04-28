@@ -1185,7 +1185,7 @@ func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]
 	return newBlockList, nil
 }
 
-// GetCommittedBlockList : Get the list of committed blocks (parts in S3 terminology).
+// GetCommittedBlockList : Get the list of committed blocks.
 func (cl *Client) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
     log.Trace("Client::GetCommittedBlockList : name %s", name)
     key := cl.getKey(name, false, false)
