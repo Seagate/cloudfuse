@@ -1205,10 +1205,10 @@ func (cl *Client) GetCommittedBlockList(name string) (*internal.CommittedBlockLi
 
     blockList := make(internal.CommittedBlockList, 0)
 
-    // If ObjectParts is nil or TotalPartsCount is 0, it's likely a small file (not multipart) or empty.
+    // If ObjectParts is nil or TotalPartsCount is 0 it's likely a small file or empty.
     if result.ObjectParts == nil || result.ObjectParts.TotalPartsCount == nil || *result.ObjectParts.TotalPartsCount == 0 {
         log.Debug("Client::GetCommittedBlockList : %s is likely a small file or empty (no parts found).", name)
-        return &blockList, nil // Return empty list, similar to Azure's behavior for small files
+        return &blockList, nil
     }
 
     // Sort parts by PartNumber as the API doesn't guarantee order
@@ -1218,7 +1218,6 @@ func (cl *Client) GetCommittedBlockList(name string) (*internal.CommittedBlockLi
     })
 	offset := int64(0)
     for _, part := range parts {
-        // Use PartNumber as the block name/ID. Convert to string.
         blockName := strconv.Itoa(int(*part.PartNumber))
         blk := internal.CommittedBlock{
             Id: blockName,
