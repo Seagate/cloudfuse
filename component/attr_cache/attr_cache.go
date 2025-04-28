@@ -1024,10 +1024,10 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			// do we have an entry, but it's expired? Let's serve that.
 			if found && value.valid() {
 				// Serve the request from the attribute cache
-				attr, getAttrErr, metadataOkay := ac.getAttrFromItem(value, options)
-				// we need to make sure metadata flags look good (this is only an issue for Azure)
-				if metadataOkay {
-					return attr, errors.Join(getAttrErr, err)
+				if !value.exists() {
+					return value.attr, errors.Join(syscall.ENOENT, err)
+				} else {
+					return value.attr, err
 				}
 			} else {
 				// we have no cached data about this item
@@ -1047,22 +1047,6 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		}
 	}
 	return pathAttr, err
-}
-
-// return a GetAttr response from the attribute cache item
-func (ac *AttrCache) getAttrFromItem(value *attrCacheItem, options internal.GetAttrOptions) (attr *internal.ObjAttr, err error, metadataOkay bool) {
-	// Is the entry marked deleted?
-	if !value.exists() {
-		log.Debug("AttrCache::GetAttr : %s (ENOENT) served from cache", options.Name)
-		err = syscall.ENOENT
-		metadataOkay = true
-	} else {
-		// IsMetadataRetrieved is false in the case of ADLS List since the API does not support metadata.
-		// Once migration of ADLS list to blob endpoint is done (in future service versions), we can remove this.
-		// options.RetrieveMetadata is set by CopyFromFile and WriteFile which need metadata to ensure it is preserved.
-		metadataOkay = value.attr.IsMetadataRetrieved() || (!ac.enableSymlinks && !options.RetrieveMetadata)
-	}
-	return value.attr, err, metadataOkay
 }
 
 // CreateLink : Mark the new link invalid
