@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -713,52 +714,61 @@ func (cl *Client) WriteFromBuffer(name string, metadata map[string]*string, data
 	return err
 }
 
-// GetFileBlockOffsets: store blocks ids and corresponding offsets.
+// GetFileBlockOffsets: store blocks ids and corresponding offsets using S3 parts information.
 func (cl *Client) GetFileBlockOffsets(name string) (*common.BlockOffsetList, error) {
-	log.Trace("Client::GetFileBlockOffsets : name %s", name)
-	blockList := common.BlockOffsetList{}
-	result, err := cl.headObject(name, false, false)
-	if err != nil {
-		log.Err("Client::GetFileBlockOffsets : Unable to headObject with name %v", name)
-		return &blockList, err
-	}
+    log.Trace("Client::GetFileBlockOffsets : name %s", name)
+    key := cl.getKey(name, false, false)
+    blockList := common.BlockOffsetList{}
 
-	cutoff := cl.Config.uploadCutoff
-	var objectSize int64
+    getObjectAttributesInput := &s3.GetObjectAttributesInput{
+        Bucket:           aws.String(cl.Config.authConfig.BucketName),
+        Key:              aws.String(key),
+        ObjectAttributes: []types.ObjectAttributes{types.ObjectAttributesObjectParts, types.ObjectAttributesChecksum, types.ObjectAttributesObjectSize},
+    }
 
-	// if file is smaller than the uploadCutoff it is small, otherwise it is a multipart
-	// upload
-	if result.Size < cutoff {
-		blockList.Flags.Set(common.SmallFile)
-		return &blockList, nil
-	}
+    result, err := cl.awsS3Client.GetObjectAttributes(context.Background(), getObjectAttributesInput)
+    if err != nil {
+        log.Err("Client::GetFileBlockOffsets : Failed to get object attributes for %s [%s]", name, err.Error())
+        attemptedAction := fmt.Sprintf("GetObjectAttributes(%s)", key)
+        // Check if the error is NoSuchKey, map it to ENOENT
+        var nsk *types.NoSuchKey
+        if errors.As(err, &nsk) {
+            return &blockList, syscall.ENOENT
+        }
+        return &blockList, parseS3Err(err, attemptedAction)
+    }
 
-	partSize := cl.Config.partSize
+    // If ObjectParts is nil or TotalPartsCount is 0, it's a small file or empty.
+    if result.ObjectParts == nil || result.ObjectParts.TotalPartsCount == nil || *result.ObjectParts.TotalPartsCount == 0 {
+        blockList.Flags.Set(common.SmallFile)
+        return &blockList, nil
+    }
 
-	// Create a list of blocks that are the partSize except for the last block
-	for objectSize <= result.Size {
-		if objectSize+partSize >= result.Size {
-			// This is the last block to add
-			blk := &common.Block{
-				Id:         base64.StdEncoding.EncodeToString(common.NewUUID().Bytes()),
-				StartIndex: objectSize,
-				EndIndex:   result.Size,
-			}
-			blockList.BlockList = append(blockList.BlockList, blk)
-			break
-		}
+    // Sort parts by PartNumber as the API doesn't guarantee order
+    parts := result.ObjectParts.Parts
+    sort.SliceStable(parts, func(i, j int) bool {
+        return *parts[i].PartNumber < *parts[j].PartNumber
+    })
 
-		blk := &common.Block{
-			Id:         base64.StdEncoding.EncodeToString(common.NewUUID().Bytes()),
-			StartIndex: objectSize,
-			EndIndex:   objectSize + partSize,
-		}
-		blockList.BlockList = append(blockList.BlockList, blk)
-		objectSize += partSize
-	}
-	blockList.BlockIdLength = common.GetIdLength(blockList.BlockList[0].Id)
+    var blockOffset int64 = 0
+    maxIdLen := 0
+    for _, part := range parts {
+        partNumStr := strconv.Itoa(int(*part.PartNumber))
+        if len(partNumStr) > maxIdLen {
+            maxIdLen = len(partNumStr)
+        }
+        blk := &common.Block{
+            Id:         partNumStr,
+            StartIndex: blockOffset,
+            EndIndex:   blockOffset + *part.Size,
+        }
+        blockOffset += *part.Size
+        blockList.BlockList = append(blockList.BlockList, blk)
+    }
 
-	return &blockList, nil
+    blockList.BlockIdLength = int64(maxIdLen)
+
+    return &blockList, nil
 }
 
 // Truncate object to size in bytes.
@@ -1173,6 +1183,53 @@ func (cl *Client) combineSmallBlocks(name string, blockList []*common.Block) ([]
 		}
 	}
 	return newBlockList, nil
+}
+
+// GetCommittedBlockList : Get the list of committed blocks (parts in S3 terminology).
+func (cl *Client) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
+    log.Trace("Client::GetCommittedBlockList : name %s", name)
+    key := cl.getKey(name, false, false)
+
+    getObjectAttributesInput := &s3.GetObjectAttributesInput{
+        Bucket:           aws.String(cl.Config.authConfig.BucketName),
+        Key:              aws.String(key),
+        ObjectAttributes: []types.ObjectAttributes{types.ObjectAttributesObjectParts, types.ObjectAttributesChecksum, types.ObjectAttributesObjectSize},
+    }
+
+    result, err := cl.awsS3Client.GetObjectAttributes(context.Background(), getObjectAttributesInput)
+    if err != nil {
+        log.Err("Client::GetCommittedBlockList : Failed to get object attributes for %s [%s]", name, err.Error())
+        attemptedAction := fmt.Sprintf("GetObjectAttributes(%s)", key)
+        return nil, parseS3Err(err, attemptedAction)
+    }
+
+    blockList := make(internal.CommittedBlockList, 0)
+
+    // If ObjectParts is nil or TotalPartsCount is 0, it's likely a small file (not multipart) or empty.
+    if result.ObjectParts == nil || result.ObjectParts.TotalPartsCount == nil || *result.ObjectParts.TotalPartsCount == 0 {
+        log.Debug("Client::GetCommittedBlockList : %s is likely a small file or empty (no parts found).", name)
+        return &blockList, nil // Return empty list, similar to Azure's behavior for small files
+    }
+
+    // Sort parts by PartNumber as the API doesn't guarantee order
+    parts := result.ObjectParts.Parts
+    sort.SliceStable(parts, func(i, j int) bool {
+        return *parts[i].PartNumber < *parts[j].PartNumber
+    })
+	offset := int64(0)
+    for _, part := range parts {
+        // Use PartNumber as the block name/ID. Convert to string.
+        blockName := strconv.Itoa(int(*part.PartNumber))
+        blk := internal.CommittedBlock{
+            Id: blockName,
+			Offset: offset,
+            Size: uint64(*part.Size),
+        }
+        blockList = append(blockList, blk)
+		offset += *part.Size
+    }
+
+    return &blockList, nil
 }
 
 func (cl *Client) GetUsedSize() (uint64, error) {

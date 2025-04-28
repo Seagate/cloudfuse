@@ -2730,12 +2730,8 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsChunkedFile() {
 	data := make([]byte, 10*MB)
 	rand.Read(data)
 
-	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.s3Storage.storage.(*Client).Config.authConfig.BucketName),
-		Key:               aws.String(common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)),
-		Body:              bytes.NewReader(data),
-		ChecksumAlgorithm: s.s3Storage.stConfig.checksumAlgorithm,
-	})
+	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
+	err := s.uploadReaderAtToObject(context.Background(), bytes.NewReader(data), int64(len(data)), key, int64(blockSizeMB))
 	s.assert.NoError(err)
 
 	// GetFileBlockOffsets
@@ -2743,7 +2739,7 @@ func (s *s3StorageTestSuite) TestGetFileBlockOffsetsChunkedFile() {
 	s.assert.NoError(err)
 	s.assert.Len(offsetList.BlockList, 2)
 	s.assert.Zero(offsetList.Flags)
-	s.assert.EqualValues(16, offsetList.BlockIdLength)
+	s.assert.EqualValues(1, offsetList.BlockIdLength)
 }
 
 func (s *s3StorageTestSuite) TestGetFileBlockOffsetsError() {
@@ -3410,6 +3406,8 @@ func (s *s3StorageTestSuite) UtilityFunctionTruncateFileToLarger(size int, trunc
 	s.assert.Len(output, truncatedLength)
 	s.assert.EqualValues(data[:], output[:size])
 }
+
+
 
 func TestS3Storage(t *testing.T) {
 	suite.Run(t, new(s3StorageTestSuite))

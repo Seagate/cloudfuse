@@ -1321,6 +1321,88 @@ func (s *clientTestSuite) TestWrite() {
 	s.assert.EqualValues(newData, output[offset:])
 }
 
+func (s *clientTestSuite) TestGetCommittedBlockListSmallFile() {
+    defer s.cleanupTest()
+    // Setup: Create a small file (less than part size)
+    name := generateFileName()
+    bodyLen := 1024 // 1 KB, definitely smaller than default part size
+    body := []byte(randomString(bodyLen))
+
+    err := s.client.WriteFromBuffer(name, nil, body)
+    s.assert.NoError(err)
+
+    // Call GetCommittedBlockList
+    blockList, err := s.client.GetCommittedBlockList(name)
+
+    // Assertions
+    s.assert.NoError(err)
+    s.assert.NotNil(blockList)
+    s.assert.Len(*blockList, 0, "Expected empty block list for small file")
+}
+
+func (s *clientTestSuite) TestGetCommittedBlockListMultipartFile() {
+    defer s.cleanupTest()
+    // Setup: Create a file larger than the part size to ensure multipart upload
+    name := generateFileName()
+    // Ensure file size is larger than part size (default 5MB in setup)
+    // Let's make it ~12MB to get 3 parts (5MB, 5MB, 2MB)
+    partSize := s.client.Config.partSize
+    if partSize == 0 {
+        partSize = DefaultPartSize // Use default if not set
+    }
+    bodyLen := int(partSize*2 + partSize/2) // Approx 12.5 MB if partSize is 5MB
+    body := randomString(bodyLen)
+
+    err := s.client.WriteFromBuffer(name, nil, []byte(body))
+    s.assert.NoError(err)
+
+    // Call GetCommittedBlockList
+    blockList, err := s.client.GetCommittedBlockList(name)
+
+    // Assertions
+    s.assert.NoError(err)
+    s.assert.NotNil(blockList)
+
+    // Calculate expected number of parts
+    expectedParts := int(bodyLen / int(partSize))
+    if bodyLen%int(partSize) != 0 {
+        expectedParts++
+    }
+    s.assert.Len(*blockList, expectedParts, "Unexpected number of blocks")
+
+    // Verify block details (IDs, offsets, sizes)
+    var currentOffset int64 = 0
+    for i, block := range *blockList {
+        expectedID := fmt.Sprintf("%d", i+1)
+        s.assert.Equal(expectedID, block.Id, "Block ID mismatch")
+        s.assert.Equal(currentOffset, block.Offset, "Block Offset mismatch")
+
+        expectedSize := uint64(partSize)
+        if i == expectedParts-1 { // Last part might be smaller
+            expectedSize = uint64(bodyLen) - uint64(currentOffset)
+        }
+        s.assert.Equal(expectedSize, block.Size, "Block Size mismatch")
+
+        currentOffset += int64(block.Size)
+    }
+    s.assert.Equal(int64(bodyLen), currentOffset, "Total size mismatch")
+}
+
+func (s *clientTestSuite) TestGetCommittedBlockListNonExistentFile() {
+    defer s.cleanupTest()
+    // Setup: Generate a name for a file that doesn't exist
+    name := generateFileName()
+
+    // Call GetCommittedBlockList
+    blockList, err := s.client.GetCommittedBlockList(name)
+
+    // Assertions
+    s.assert.Error(err, "Expected an error for non-existent file")
+    // The underlying GetObjectAttributes returns NoSuchKey, which parseS3Err maps to ENOENT
+    s.assert.Equal(syscall.ENOENT, err, "Expected ENOENT error")
+    s.assert.Nil(blockList, "Expected nil block list on error")
+}
+
 func TestClient(t *testing.T) {
 	suite.Run(t, new(clientTestSuite))
 }
