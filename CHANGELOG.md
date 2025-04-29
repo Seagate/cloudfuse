@@ -1,5 +1,14 @@
 # Cloudfuse Changelog #
 
+## **1.11.1** ##
+
+April 29h 2025
+This version is based on [blobfuse2 2.4.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.4.0) (upstream).
+
+### Bug Fixes ###
+
+- [#532](https://github.com/Seagate/cloudfuse/pull/532) Fix releases for RHEL that did not correctly link to glibc
+
 ## **1.11.0** ##
 
 April 25th 2025
