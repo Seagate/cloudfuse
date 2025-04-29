@@ -115,6 +115,8 @@ type S3Connection interface {
 	StageAndCommit(name string, bol *common.BlockOffsetList) error
 
 	GetCommittedBlockList(string) (*internal.CommittedBlockList, error)
+	StageBlock(string, []byte, string) error
+	CommitBlocks(string, []string) error
 
 	NewCredentialKey(_, _ string) error
 	GetUsedSize() (uint64, error)

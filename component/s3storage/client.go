@@ -38,6 +38,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -67,6 +68,8 @@ type Client struct {
 	Connection
 	awsS3Client *s3.Client // S3 client library supplied by AWS
 	blockLocks  common.KeyedMutex
+	stagedBlocks      map[string]map[string][]byte // map[fileName]map[blockId]data
+	stagedBlocksMutex sync.RWMutex                 // Mutex to protect the cache
 }
 
 // Verify that Client implements S3Connection interface
@@ -1245,4 +1248,169 @@ func (cl *Client) GetCommittedBlockList(name string) (*internal.CommittedBlockLi
 	}
 
 	return &blockList, nil
+}
+
+// CommitBlocks : Initiates and completes an S3 multipart upload using locally cached blocks.
+func (cl *Client) CommitBlocks(name string, blockList []string) error {
+    log.Trace("Client::CommitBlocks: name %s, %d blocks", name, len(blockList))
+
+    //struct for starting a multipart upload
+	ctx := context.Background()
+	key := cl.getKey(name, false, false)
+
+    // Retrieve cached blocks for this file
+    cl.stagedBlocksMutex.RLock()
+    cachedFileBlocks, fileExists := cl.stagedBlocks[name]
+    if !fileExists || len(cachedFileBlocks) == 0 {
+        cl.stagedBlocksMutex.RUnlock()
+        if len(blockList) == 0 {
+            log.Info("Client::CommitBlocks: No blocks staged and blockList empty for %s. Creating empty file.", name)
+            return cl.putObject(putObjectOptions{name: name, objectData: bytes.NewReader([]byte{}), size: 0})
+        }
+        log.Err("Client::CommitBlocks: No blocks found in cache for %s, but blockList is not empty.", name)
+        return fmt.Errorf("no blocks found in cache for %s", name)
+    }
+    cl.stagedBlocksMutex.RUnlock()
+
+    var uploadID string
+	createMultipartUploadInput := &s3.CreateMultipartUploadInput{
+		Bucket:      aws.String(cl.Config.authConfig.BucketName),
+		Key:         aws.String(key),
+		ContentType: aws.String(getContentType(key)),
+	}
+
+    if cl.Config.enableChecksum {
+        createMultipartUploadInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+    }
+
+    createOutput, err := cl.awsS3Client.CreateMultipartUpload(ctx, createMultipartUploadInput)
+    if err != nil {
+		log.Err("Client::CommitBlocks : Failed to create multipart upload. Here's why: %v ", name, err)
+		return err
+	}
+    if createOutput != nil {
+		if createOutput.UploadId != nil {
+			uploadID = *createOutput.UploadId
+		}
+	}
+	if uploadID == "" {
+		log.Err("Client::CommitBlocks : No upload id found in start upload request. Here's why: %v ", name, err)
+		return err
+	}
+
+    // Upload Parts
+    completedParts := make([]types.CompletedPart, 0, len(blockList))
+    var currentPartNumber int32 = 1
+    var uploadErr error
+
+    for i, blockID := range blockList {
+        blockData, blockExists := cachedFileBlocks[blockID]
+        if !blockExists {
+            uploadErr = fmt.Errorf("block ID %s from blockList not found in cache for %s", blockID, name)
+            log.Err("Client::CommitBlocks: %v", uploadErr)
+            break
+        }
+
+        partSize := len(blockData)
+        isLastPart := (i == len(blockList)-1)
+
+        if partSize < DefaultPartSize && !isLastPart {
+            log.Err("Client::CommitBlocks: cached block ID %s for %s is too small (%d bytes) and not the last part: %v", blockID, name, partSize, uploadErr)
+            break
+        }
+
+        uploadPartInput := &s3.UploadPartInput{
+            Bucket:     aws.String(cl.Config.authConfig.BucketName),
+            Key:        aws.String(key),
+            UploadId:   aws.String(uploadID),
+            PartNumber: &currentPartNumber,
+            Body:       bytes.NewReader(blockData),
+        }
+        if cl.Config.enableChecksum {
+            uploadPartInput.ChecksumAlgorithm = cl.Config.checksumAlgorithm
+        }
+
+        partResp, err := cl.awsS3Client.UploadPart(ctx, uploadPartInput)
+        if err != nil {
+            log.Err("Client::CommitBlocks : failed to upload part: ", uploadErr)
+            break
+        }
+
+        cleanETag := strings.Trim(*partResp.ETag, "\"")
+        partNum := currentPartNumber
+        cPart := types.CompletedPart{
+            ETag:       aws.String(cleanETag),
+            PartNumber: &partNum,
+        }
+		// Collect the checksums
+		// It is easier to just collect all checksums and then upload them together
+		// as ones that are not used will just be nil and an object can only ever
+		// have one valid checksum
+		if cl.Config.enableChecksum {
+			cPart.ChecksumCRC32 = partResp.ChecksumCRC32
+			cPart.ChecksumCRC32C = partResp.ChecksumCRC32C
+			cPart.ChecksumSHA1 = partResp.ChecksumSHA1
+			cPart.ChecksumSHA256 = partResp.ChecksumSHA256
+		}
+        completedParts = append(completedParts, cPart)
+        currentPartNumber++
+    }
+
+    // Complete or Abort Multipart Upload
+    if uploadErr != nil {
+        log.Info("Client::CommitBlocks: Aborting multipart upload %s for %s due to error: %v", uploadID, name, uploadErr)
+        _ = cl.abortMultipartUpload(key, uploadID) // Attempt to clean up S3
+        cl.cleanupStagedBlocks(name)
+        return uploadErr
+    }
+
+    completeInput := &s3.CompleteMultipartUploadInput{
+        Bucket:   aws.String(cl.Config.authConfig.BucketName),
+        Key:      aws.String(key),
+        UploadId: aws.String(uploadID),
+        MultipartUpload: &types.CompletedMultipartUpload{
+            Parts: completedParts,
+        },
+    }
+
+    _, err = cl.awsS3Client.CompleteMultipartUpload(ctx, completeInput)
+    if err != nil {
+        log.Err("Client::CommitBlocks : Failed to complete multipart upload %s for %s: %v", uploadID, name, err)
+        _ = cl.abortMultipartUpload(key, uploadID)
+        cl.cleanupStagedBlocks(name)
+        return parseS3Err(err, fmt.Sprintf("CompleteMultipartUpload(%s)", name))
+    }
+
+    cl.cleanupStagedBlocks(name)
+
+    return nil
+}
+
+func (cl *Client) StageBlock(name string, data []byte, id string) error {
+    log.Trace("Client::StageBlock: name %s, ID %s, length %d", name, id, len(data))
+
+    cl.stagedBlocksMutex.Lock()
+    defer cl.stagedBlocksMutex.Unlock()
+
+    if cl.stagedBlocks == nil {
+        cl.stagedBlocks = make(map[string]map[string][]byte)
+    }
+    if _, ok := cl.stagedBlocks[name]; !ok {
+        cl.stagedBlocks[name] = make(map[string][]byte)
+    }
+
+    dataCopy := make([]byte, len(data))
+    copy(dataCopy, data)
+    cl.stagedBlocks[name][id] = dataCopy
+
+    log.Debug("Client::StageBlock: Cached block ID %s for %s", id, name)
+    return nil
+}
+
+// Helper function to clean up the cache for a specific file
+func (cl *Client) cleanupStagedBlocks(name string) {
+    cl.stagedBlocksMutex.Lock()
+    defer cl.stagedBlocksMutex.Unlock()
+    delete(cl.stagedBlocks, name)
+    log.Debug("Client::cleanupStagedBlocks: Cleaned cache for %s", name)
 }
