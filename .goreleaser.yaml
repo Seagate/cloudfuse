@@ -323,7 +323,7 @@ nfpms:
       rpm:
         dependencies:
           - fuse3
-          - libc6 >= 2.24
+          - glibc >= 2.24
 
   - id: linux-fuse2
     package_name: cloudfuse
@@ -387,7 +387,7 @@ nfpms:
       rpm:
         dependencies:
           - fuse
-          - libc6 >= 2.24
+          - glibc >= 2.24
 
 metadata:
   mod_timestamp: "{{ .CommitTimestamp }}"

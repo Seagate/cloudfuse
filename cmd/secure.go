@@ -121,7 +121,9 @@ func validateOptions() error {
 	if secOpts.PassPhrase == "" {
 		secOpts.PassPhrase = os.Getenv(SecureConfigEnvName)
 		if secOpts.PassPhrase == "" {
-			return errors.New("provide the passphrase as a cli parameter or configure the CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+			return errors.New(
+				"provide the passphrase as a cli parameter or configure the CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable",
+			)
 		}
 	}
 

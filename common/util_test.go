@@ -71,13 +71,13 @@ func (suite *utilTestSuite) TestIsMountActiveNoMount() {
 	cmd := exec.Command("../cloudfuse", "unmount", "all")
 	cmd.Stdout = &out
 	err := cmd.Run()
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	cmd = exec.Command("pidof", "cloudfuse")
 	cmd.Stdout = &out
 	err = cmd.Run()
 	suite.assert.Equal("exit status 1", err.Error())
 	res, err := IsMountActive("/mnt/cloudfuse")
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.False(res)
 }
 
@@ -281,7 +281,7 @@ func (suite *typesTestSuite) TestEncryptDecrypt4() {
 
 	d, err := DecryptData(cipher, encryptedPassphrase)
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
+	suite.assert.Equal(data, d)
 }
 
 func (suite *typesTestSuite) TestEncryptDecrypt5() {
@@ -299,7 +299,7 @@ func (suite *typesTestSuite) TestEncryptDecrypt5() {
 
 	d, err := DecryptData(cipher, encryptedPassphrase)
 	suite.assert.NoError(err)
-	suite.assert.EqualValues(data, d)
+	suite.assert.Equal(data, d)
 }
 
 func (suite *utilTestSuite) TestMonitorCfs() {

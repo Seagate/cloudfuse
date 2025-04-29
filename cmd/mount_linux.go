@@ -53,7 +53,14 @@ type serviceOptions struct {
 	ServiceUser string
 }
 
-func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName string, pidFilePerm os.FileMode, umask int, fname string) error {
+func createDaemon(
+	pipeline *internal.Pipeline,
+	ctx context.Context,
+	pidFileName string,
+	pidFilePerm os.FileMode,
+	umask int,
+	fname string,
+) error {
 	dmnCtx := &daemon.Context{
 		PidFileName: pidFileName,
 		PidFilePerm: pidFilePerm,
@@ -208,7 +215,9 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 		}
 	}
 	// advise on required permissions
-	fmt.Println("ensure the user, " + serviceUser + ", has the following access: \n" + mountPath + ": read, write, and execute \n" + configPath + ": read")
+	fmt.Println(
+		"ensure the user, " + serviceUser + ", has the following access: \n" + mountPath + ": read, write, and execute \n" + configPath + ": read",
+	)
 	return nil
 }
 
@@ -219,7 +228,11 @@ func getService(mountPath string) (string, string) {
 	return serviceName, serviceFilePath
 }
 
-func installRemountService(serviceUser string, mountPath string, configPath string) (string, error) {
+func installRemountService(
+	serviceUser string,
+	mountPath string,
+	configPath string,
+) (string, error) {
 	//create the new user and set permissions
 	mountPath, err := filepath.Abs(mountPath)
 	if err != nil {
@@ -251,7 +264,10 @@ func installRemountService(serviceUser string, mountPath string, configPath stri
 	systemctlEnableCmd := exec.Command("systemctl", "enable", serviceName)
 	err = systemctlEnableCmd.Run()
 	if err != nil {
-		return "", fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following [%s]", err.Error())
+		return "", fmt.Errorf(
+			"failed to run 'systemctl daemon-reload' command due to following [%s]",
+			err.Error(),
+		)
 	}
 	return serviceName, nil
 }
@@ -260,7 +276,10 @@ func startService(serviceName string) error {
 	systemctlEnableCmd := exec.Command("systemctl", "start", serviceName)
 	err := systemctlEnableCmd.Run()
 	if err != nil {
-		return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following [%s]", err.Error())
+		return fmt.Errorf(
+			"failed to run 'systemctl daemon-reload' command due to following [%s]",
+			err.Error(),
+		)
 	}
 	return nil
 }

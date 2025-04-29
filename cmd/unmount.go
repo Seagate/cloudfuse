@@ -58,7 +58,11 @@ var unmountCmd = &cobra.Command{
 		if runtime.GOOS == "linux" && disableRemountSystem {
 			err := uninstallService(mountPath)
 			if err != nil {
-				return fmt.Errorf("failed to unmount and disable remount on restart for mount %s [%s]", mountPath, err.Error())
+				return fmt.Errorf(
+					"failed to unmount and disable remount on restart for mount %s [%s]",
+					mountPath,
+					err.Error(),
+				)
 			}
 		}
 
@@ -115,7 +119,11 @@ func unmountCloudfuse(mntPath string, lazy bool) error {
 		}
 
 		if !strings.Contains(err.Error(), "executable file not found") {
-			fmt.Printf("unmountCloudfuse : failed to unmount (%s : %s)\n", err.Error(), errb.String())
+			fmt.Printf(
+				"unmountCloudfuse : failed to unmount (%s : %s)\n",
+				err.Error(),
+				errb.String(),
+			)
 			break
 		}
 	}
@@ -131,8 +139,10 @@ func init() {
 	}
 
 	if runtime.GOOS == "windows" {
-		unmountCmd.Flags().Bool("disable-remount-user", false, "Disable remounting this mount on server restart as user.")
+		unmountCmd.Flags().
+			Bool("disable-remount-user", false, "Disable remounting this mount on server restart as user.")
 	}
 
-	unmountCmd.Flags().Bool("disable-remount-system", false, "Disable remounting this mount on server restart as system.")
+	unmountCmd.Flags().
+		Bool("disable-remount-system", false, "Disable remounting this mount on server restart as system.")
 }

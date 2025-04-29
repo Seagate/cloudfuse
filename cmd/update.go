@@ -90,11 +90,14 @@ var updateCmd = &cobra.Command{
 			if opt.Package != "tar" && opt.Package != "deb" && opt.Package != "rpm" {
 				return errors.New("--package should be one of tar|deb|rpm")
 			}
-			if os.Geteuid() != 0 && opt.Output == "" && (opt.Package == "deb" || opt.Package == "rpm") {
+			if os.Geteuid() != 0 && opt.Output == "" &&
+				(opt.Package == "deb" || opt.Package == "rpm") {
 				return errors.New(".deb and .rpm requires elevated privileges")
 			}
 			if opt.Output == "" && opt.Package == "tar" {
-				return errors.New("need to pass parameter --package with deb or rpm, or pass parameter --output with location to download to")
+				return errors.New(
+					"need to pass parameter --package with deb or rpm, or pass parameter --output with location to download to",
+				)
 			}
 
 		case "windows":
@@ -102,7 +105,9 @@ var updateCmd = &cobra.Command{
 				return errors.New("--package should be one of exe|zip")
 			}
 			if opt.Output == "" && (opt.Package == "zip") {
-				return errors.New("need to pass parameter --package with exe or zip, or pass parameter --output with location to download to")
+				return errors.New(
+					"need to pass parameter --package with exe or zip, or pass parameter --output with location to download to",
+				)
 			}
 
 		default:
@@ -192,7 +197,9 @@ func runWindowsInstaller(fileName string) error {
 		return fmt.Errorf("failed to run installer: %w", err)
 	}
 
-	fmt.Println("Cloudfuse was successfully updated. Please restart the machine to apply the changes.")
+	fmt.Println(
+		"Cloudfuse was successfully updated. Please restart the machine to apply the changes.",
+	)
 
 	return nil
 }
@@ -259,7 +266,10 @@ func downloadUpdate(ctx context.Context, relInfo *releaseInfo, output string) (s
 func getRelease(ctx context.Context, version string) (*releaseInfo, error) {
 	url := "https://api.github.com/repos/Seagate/cloudfuse/releases/latest"
 	if version != "" {
-		url = fmt.Sprintf("https://api.github.com/repos/Seagate/cloudfuse/releases/tags/v%s", version)
+		url = fmt.Sprintf(
+			"https://api.github.com/repos/Seagate/cloudfuse/releases/tags/v%s",
+			version,
+		)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -397,7 +407,10 @@ func verifyHash(ctx context.Context, fileName, packageName, hashURL string) erro
 
 func init() {
 	rootCmd.AddCommand(updateCmd)
-	updateCmd.PersistentFlags().StringVar(&opt.Output, "output", "", "Save the downloaded binary at a given path (default: replace running binary)")
-	updateCmd.PersistentFlags().StringVar(&opt.Version, "version", "", "Install the given cloudfuse version (default: latest)")
-	updateCmd.PersistentFlags().StringVar(&opt.Package, "package", "", "Package format: tar|deb|rpm|zip|exe (default: automatically detect package format)")
+	updateCmd.PersistentFlags().
+		StringVar(&opt.Output, "output", "", "Save the downloaded binary at a given path (default: replace running binary)")
+	updateCmd.PersistentFlags().
+		StringVar(&opt.Version, "version", "", "Install the given cloudfuse version (default: latest)")
+	updateCmd.PersistentFlags().
+		StringVar(&opt.Package, "package", "", "Package format: tar|deb|rpm|zip|exe (default: automatically detect package format)")
 }

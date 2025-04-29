@@ -85,7 +85,7 @@ func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinuxDefault() {
 
 	_, err := executeCommandC(rootCmd, "update")
 	suite.assert.Error(err)
-	suite.assert.Equal(err.Error(), ".deb and .rpm requires elevated privileges")
+	suite.assert.Equal(".deb and .rpm requires elevated privileges", err.Error())
 }
 
 func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinux() {
@@ -96,7 +96,7 @@ func (suite *updateTestSuite) TestUpdateAdminRightsPromptLinux() {
 
 	_, err := executeCommandC(rootCmd, "update", "--package=deb")
 	suite.assert.Error(err)
-	suite.assert.Equal(err.Error(), ".deb and .rpm requires elevated privileges")
+	suite.assert.Equal(".deb and .rpm requires elevated privileges", err.Error())
 }
 
 func (suite *updateTestSuite) TestUpdateWithOutputDebLinux() {
@@ -108,7 +108,12 @@ func (suite *updateTestSuite) TestUpdateWithOutputDebLinux() {
 	outputFile, err := os.CreateTemp("", "update-file*")
 	suite.assert.NoError(err)
 
-	_, err = executeCommandC(rootCmd, "update", "--package=deb", fmt.Sprintf("--output=%s", outputFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"update",
+		"--package=deb",
+		fmt.Sprintf("--output=%s", outputFile.Name()),
+	)
 	suite.assert.NoError(err)
 
 	os.Remove(outputFile.Name())
@@ -123,7 +128,12 @@ func (suite *updateTestSuite) TestUpdateWithOutputRpmLinux() {
 	outputFile, err := os.CreateTemp("", "update-file*")
 	suite.assert.NoError(err)
 
-	_, err = executeCommandC(rootCmd, "update", "--package=rpm", fmt.Sprintf("--output=%s", outputFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"update",
+		"--package=rpm",
+		fmt.Sprintf("--output=%s", outputFile.Name()),
+	)
 	suite.assert.NoError(err)
 
 	os.Remove(outputFile.Name())
@@ -138,7 +148,12 @@ func (suite *updateTestSuite) TestUpdateWithOutputTarLinux() {
 	outputFile, err := os.CreateTemp("", "update-file*")
 	suite.assert.NoError(err)
 
-	_, err = executeCommandC(rootCmd, "update", "--package=tar", fmt.Sprintf("--output=%s", outputFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"update",
+		"--package=tar",
+		fmt.Sprintf("--output=%s", outputFile.Name()),
+	)
 	suite.assert.NoError(err)
 
 	os.Remove(outputFile.Name())
@@ -153,10 +168,20 @@ func (suite *updateTestSuite) TestInvalidOptionsLinux() {
 	outputFile, err := os.CreateTemp("", "update-file*")
 	suite.assert.NoError(err)
 
-	_, err = executeCommandC(rootCmd, "update", "--package=ede", fmt.Sprintf("--output=%s", outputFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"update",
+		"--package=ede",
+		fmt.Sprintf("--output=%s", outputFile.Name()),
+	)
 	suite.assert.Error(err)
 
-	_, err = executeCommandC(rootCmd, "update", "--package=zip", fmt.Sprintf("--output=%s", outputFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"update",
+		"--package=zip",
+		fmt.Sprintf("--output=%s", outputFile.Name()),
+	)
 	suite.assert.Error(err)
 
 	os.Remove(outputFile.Name())
@@ -171,7 +196,12 @@ func (suite *updateTestSuite) TestUpdateWithOutputZipWindows() {
 	outputFile, err := os.CreateTemp("", "update-file*")
 	suite.assert.NoError(err)
 
-	_, err = executeCommandC(rootCmd, "update", "--package=zip", fmt.Sprintf("--output=%s", outputFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"update",
+		"--package=zip",
+		fmt.Sprintf("--output=%s", outputFile.Name()),
+	)
 	suite.assert.NoError(err)
 
 	os.Remove(outputFile.Name())
@@ -186,7 +216,12 @@ func (suite *updateTestSuite) TestUpdateWithOutputExeWindows() {
 	outputFile, err := os.CreateTemp("", "update-file*")
 	suite.assert.NoError(err)
 
-	_, err = executeCommandC(rootCmd, "update", "--package=exe", fmt.Sprintf("--output=%s", outputFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"update",
+		"--package=exe",
+		fmt.Sprintf("--output=%s", outputFile.Name()),
+	)
 	suite.assert.NoError(err)
 
 	os.Remove(outputFile.Name())
@@ -201,13 +236,28 @@ func (suite *updateTestSuite) TestInvalidOptionsWindows() {
 	outputFile, err := os.CreateTemp("", "update-file*")
 	suite.assert.NoError(err)
 
-	_, err = executeCommandC(rootCmd, "update", "--package=tar", fmt.Sprintf("--output=%s", outputFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"update",
+		"--package=tar",
+		fmt.Sprintf("--output=%s", outputFile.Name()),
+	)
 	suite.assert.Error(err)
 
-	_, err = executeCommandC(rootCmd, "update", "--package=deb", fmt.Sprintf("--output=%s", outputFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"update",
+		"--package=deb",
+		fmt.Sprintf("--output=%s", outputFile.Name()),
+	)
 	suite.assert.Error(err)
 
-	_, err = executeCommandC(rootCmd, "update", "--package=rpm", fmt.Sprintf("--output=%s", outputFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"update",
+		"--package=rpm",
+		fmt.Sprintf("--output=%s", outputFile.Name()),
+	)
 	suite.assert.Error(err)
 
 	os.Remove(outputFile.Name())

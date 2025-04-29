@@ -49,7 +49,10 @@ func uninstallService(mountPath string) error {
 		removeFileCmd := exec.Command("rm", serviceFilePath)
 		err := removeFileCmd.Run()
 		if err != nil {
-			return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system [%s]", err.Error())
+			return fmt.Errorf(
+				"failed to delete "+serviceName+" file from /etc/systemd/system [%s]",
+				err.Error(),
+			)
 		}
 	} else if os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system [%s]", err.Error())
