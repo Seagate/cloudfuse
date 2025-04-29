@@ -1406,66 +1406,66 @@ func (s *clientTestSuite) TestWrite() {
 }
 
 func (s *clientTestSuite) TestGetCommittedBlockListSmallFile() {
-    defer s.cleanupTest()
-    name := generateFileName()
-    bodyLen := 1024
-    body := []byte(randomString(bodyLen))
+	defer s.cleanupTest()
+	name := generateFileName()
+	bodyLen := 1024
+	body := []byte(randomString(bodyLen))
 
-    err := s.client.WriteFromBuffer(name, nil, body)
-    s.assert.NoError(err)
+	err := s.client.WriteFromBuffer(name, nil, body)
+	s.assert.NoError(err)
 
-    blockList, err := s.client.GetCommittedBlockList(name)
+	blockList, err := s.client.GetCommittedBlockList(name)
 
-    s.assert.NoError(err)
-    s.assert.NotNil(blockList)
-    s.assert.Len(*blockList, 0)
+	s.assert.NoError(err)
+	s.assert.NotNil(blockList)
+	s.assert.Empty(*blockList)
 }
 
 func (s *clientTestSuite) TestGetCommittedBlockListMultipartFile() {
-    defer s.cleanupTest()
-    name := generateFileName()
-    partSize := s.client.Config.partSize
-    bodyLen := int(partSize*2 + partSize/2)
-    body := randomString(bodyLen)
+	defer s.cleanupTest()
+	name := generateFileName()
+	partSize := s.client.Config.partSize
+	bodyLen := int(partSize*2 + partSize/2)
+	body := randomString(bodyLen)
 
-    err := s.client.WriteFromBuffer(name, nil, []byte(body))
-    s.assert.NoError(err)
+	err := s.client.WriteFromBuffer(name, nil, []byte(body))
+	s.assert.NoError(err)
 
-    blockList, err := s.client.GetCommittedBlockList(name)
+	blockList, err := s.client.GetCommittedBlockList(name)
 
-    s.assert.NoError(err)
-    s.assert.NotNil(blockList)
+	s.assert.NoError(err)
+	s.assert.NotNil(blockList)
 
-    expectedParts := int(bodyLen / int(partSize))
-    if bodyLen%int(partSize) != 0 {
-        expectedParts++
-    }
-    s.assert.Len(*blockList, expectedParts)
+	expectedParts := int(bodyLen / int(partSize))
+	if bodyLen%int(partSize) != 0 {
+		expectedParts++
+	}
+	s.assert.Len(*blockList, expectedParts)
 
-    var currentOffset int64 = 0
-    for i, block := range *blockList {
-        s.assert.Equal(currentOffset, block.Offset)
+	var currentOffset int64 = 0
+	for i, block := range *blockList {
+		s.assert.Equal(currentOffset, block.Offset)
 
-        expectedSize := uint64(partSize)
-        if i == expectedParts-1 { // Last part might be smaller
-            expectedSize = uint64(bodyLen) - uint64(currentOffset)
-        }
-        s.assert.Equal(expectedSize, block.Size)
+		expectedSize := uint64(partSize)
+		if i == expectedParts-1 { // Last part might be smaller
+			expectedSize = uint64(bodyLen) - uint64(currentOffset)
+		}
+		s.assert.Equal(expectedSize, block.Size)
 
-        currentOffset += int64(block.Size)
-    }
-    s.assert.Equal(int64(bodyLen), currentOffset)
+		currentOffset += int64(block.Size)
+	}
+	s.assert.Equal(int64(bodyLen), currentOffset)
 }
 
 func (s *clientTestSuite) TestGetCommittedBlockListNonExistentFile() {
-    defer s.cleanupTest()
-    name := generateFileName()
+	defer s.cleanupTest()
+	name := generateFileName()
 
-    blockList, err := s.client.GetCommittedBlockList(name)
+	blockList, err := s.client.GetCommittedBlockList(name)
 
-    s.assert.Error(err)
-    s.assert.Equal(syscall.ENOENT, err)
-    s.assert.Nil(blockList)
+	s.assert.Error(err)
+	s.assert.Equal(syscall.ENOENT, err)
+	s.assert.Nil(blockList)
 }
 
 func TestClient(t *testing.T) {
