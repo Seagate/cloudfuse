@@ -54,7 +54,7 @@ type SizeTracker struct {
 
 // Structure defining your config parameters
 type SizeTrackerOptions struct {
-	JournalName         string `config:"journal-name" yaml:"journal-name,omitempty"`
+	JournalName         string `config:"journal-name"             yaml:"journal-name,omitempty"`
 	TotalBucketCapacity uint64 `config:"bucket-capacity-fallback" yaml:"bucket-capacity-fallback,omitempty"`
 }
 
@@ -135,7 +135,26 @@ func (st *SizeTracker) Configure(_ bool) error {
 }
 
 func sanitizeFileName(filename string) string {
-	replacer := strings.NewReplacer("\\", "_", "/", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_")
+	replacer := strings.NewReplacer(
+		"\\",
+		"_",
+		"/",
+		"_",
+		":",
+		"_",
+		"*",
+		"_",
+		"?",
+		"_",
+		"\"",
+		"_",
+		"<",
+		"_",
+		">",
+		"_",
+		"|",
+		"_",
+	)
 	return replacer.Replace(filename)
 }
 
@@ -195,7 +214,8 @@ func (st *SizeTracker) RenameFile(options internal.RenameFileOptions) error {
 
 func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error) {
 	var oldSize int64
-	attr, getAttrErr1 := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
+	attr, getAttrErr1 := st.NextComponent().
+		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
 	if getAttrErr1 == nil {
 		oldSize = attr.Size
 	} else {
@@ -282,7 +302,8 @@ func (st *SizeTracker) CopyFromFile(options internal.CopyFromFileOptions) error 
 
 func (st *SizeTracker) FlushFile(options internal.FlushFileOptions) error {
 	var origSize int64
-	attr, getAttrErr1 := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
+	attr, getAttrErr1 := st.NextComponent().
+		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
 	if getAttrErr1 == nil {
 		origSize = attr.Size
 	} else {
@@ -295,7 +316,8 @@ func (st *SizeTracker) FlushFile(options internal.FlushFileOptions) error {
 	}
 
 	var newSize int64
-	attr, getAttrErr2 := st.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
+	attr, getAttrErr2 := st.NextComponent().
+		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
 	if getAttrErr2 == nil {
 		newSize = attr.Size
 	} else {
@@ -336,8 +358,14 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 			// If the user is over the capacity limit set by Nx, then we need to prevent them from
 			// accidental overuse of their bucket. So we change our reporting to instead report
 			// the used capacity of the bucket to enable the VMS to start eviction
-			if float64(stat.Blocks*uint64(blockSize)) > evictionThreshold*float64(st.totalBucketCapacity) {
-				log.Warn("SizeTracker::StatFs : changing from size_tracker size to S3 bucket size due to overuse of bucket")
+			if float64(
+				stat.Blocks*uint64(blockSize),
+			) > evictionThreshold*float64(
+				st.totalBucketCapacity,
+			) {
+				log.Warn(
+					"SizeTracker::StatFs : changing from size_tracker size to S3 bucket size due to overuse of bucket",
+				)
 				blocks = stat.Blocks
 			}
 		}
@@ -357,7 +385,13 @@ func (st *SizeTracker) StatFs() (*common.Statfs_t, bool, error) {
 		Namemax: 255,
 	}
 
-	log.Debug("SizeTracker::StatFs : responding with free=%d avail=%d blocks=%d (bsize=%d)", stat.Bfree, stat.Bavail, stat.Blocks, stat.Bsize)
+	log.Debug(
+		"SizeTracker::StatFs : responding with free=%d avail=%d blocks=%d (bsize=%d)",
+		stat.Bfree,
+		stat.Bavail,
+		stat.Blocks,
+		stat.Bsize,
+	)
 
 	return &stat, true, nil
 }

@@ -55,19 +55,28 @@ type azAuthBlobCLI struct {
 func (azcli *azAuthBlobCLI) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	cred, err := azcli.getTokenCredential()
 	if err != nil {
-		log.Err("azAuthBlobCLI::getServiceClient : Failed to get token credential from azcli [%s]", err.Error())
+		log.Err(
+			"azAuthBlobCLI::getServiceClient : Failed to get token credential from azcli [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	opts, err := getAzBlobServiceClientOptions(stConfig)
 	if err != nil {
-		log.Err("azAuthBlobCLI::getServiceClient : Failed to create client options [%s]", err.Error())
+		log.Err(
+			"azAuthBlobCLI::getServiceClient : Failed to create client options [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	svcClient, err := service.NewClient(azcli.config.Endpoint, cred, opts)
 	if err != nil {
-		log.Err("azAuthBlobCLI::getServiceClient : Failed to create service client [%s]", err.Error())
+		log.Err(
+			"azAuthBlobCLI::getServiceClient : Failed to create service client [%s]",
+			err.Error(),
+		)
 	}
 
 	return svcClient, err
@@ -81,19 +90,28 @@ type azAuthDatalakeCLI struct {
 func (azcli *azAuthDatalakeCLI) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	cred, err := azcli.getTokenCredential()
 	if err != nil {
-		log.Err("azAuthDatalakeCLI::getServiceClient : Failed to get token credential from azcli [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeCLI::getServiceClient : Failed to get token credential from azcli [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	opts, err := getAzDatalakeServiceClientOptions(stConfig)
 	if err != nil {
-		log.Err("azAuthDatalakeCLI::getServiceClient : Failed to create client options [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeCLI::getServiceClient : Failed to create client options [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	svcClient, err := serviceBfs.NewClient(azcli.config.Endpoint, cred, opts)
 	if err != nil {
-		log.Err("azAuthDatalakeCLI::getServiceClient : Failed to create service client [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeCLI::getServiceClient : Failed to create service client [%s]",
+			err.Error(),
+		)
 	}
 
 	return svcClient, err
