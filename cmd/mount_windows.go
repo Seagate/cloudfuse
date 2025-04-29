@@ -56,3 +56,13 @@ func createMountInstance(enableRemountUser bool, enableRemountSystem bool) error
 	}
 	return nil
 }
+
+// stub
+func installRemountService(string, string, string) (string, error) {
+	return "", nil
+}
+
+// stub
+func startService(string) error {
+	return nil
+}
