@@ -79,7 +79,9 @@ func (suite *blockCacheLinuxTestSuite) TestStrongConsistency() {
 	size := mrand.Int64N(2097152)
 	data := make([]byte, size)
 
-	n, err := tobj.blockCache.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data}) // Write data to file
+	n, err := tobj.blockCache.WriteFile(
+		internal.WriteFileOptions{Handle: h, Offset: 0, Data: data},
+	) // Write data to file
 	suite.assert.NoError(err)
 	suite.assert.EqualValues(n, size)
 	suite.assert.Equal(h.Size, int64(size))
@@ -98,7 +100,9 @@ func (suite *blockCacheLinuxTestSuite) TestStrongConsistency() {
 	h, err = tobj.blockCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	_, _ = tobj.blockCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data})
+	_, _ = tobj.blockCache.ReadInBuffer(
+		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data},
+	)
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 	suite.assert.Nil(h.Buffers.Cooked)
@@ -119,7 +123,9 @@ func (suite *blockCacheLinuxTestSuite) TestStrongConsistency() {
 	h, err = tobj.blockCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	_, _ = tobj.blockCache.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data})
+	_, _ = tobj.blockCache.ReadInBuffer(
+		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: data},
+	)
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)
 	suite.assert.Nil(h.Buffers.Cooked)

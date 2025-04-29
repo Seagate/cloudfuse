@@ -81,7 +81,11 @@ func (suite *lruPolicyTestSuite) cleanupTest() {
 
 	err := os.RemoveAll(cache_path)
 	if err != nil {
-		fmt.Printf("lruPolicyTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", cache_path, err)
+		fmt.Printf(
+			"lruPolicyTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n",
+			cache_path,
+			err,
+		)
 	}
 }
 
@@ -112,7 +116,9 @@ func (suite *lruPolicyTestSuite) createLocalPath(localPath string, isDir bool) {
 //	ab/c1
 //
 // ac
-func (suite *lruPolicyTestSuite) generateNestedDirectory(aPath string) ([]string, []string, []string) {
+func (suite *lruPolicyTestSuite) generateNestedDirectory(
+	aPath string,
+) ([]string, []string, []string) {
 	localBasePath := filepath.Join(suite.policy.tmpPath, internal.TruncateDirName(aPath))
 	suite.createLocalPath(localBasePath, true)
 	c1 := filepath.Join(localBasePath, "c1")

@@ -85,7 +85,9 @@ func (az *AzStorage) Configure(isParent bool) error {
 
 	err = config.UnmarshalKey("restricted-characters-windows", &conf.RestrictedCharsWin)
 	if err != nil {
-		log.Err("AzStorage::Configure : config error [unable to obtain restricted-characters-windows]")
+		log.Err(
+			"AzStorage::Configure : config error [unable to obtain restricted-characters-windows]",
+		)
 		return err
 	}
 
@@ -157,7 +159,10 @@ func (az *AzStorage) configureAndTest(isParent bool) error {
 	if isParent {
 		err = az.storage.TestPipeline()
 		if err != nil {
-			log.Err("AzStorage::configureAndTest : Failed to validate credentials [%s]", err.Error())
+			log.Err(
+				"AzStorage::configureAndTest : Failed to validate credentials [%s]",
+				err.Error(),
+			)
 			return fmt.Errorf("failed to authenticate credentials for %s", az.Name())
 		}
 	}
@@ -200,7 +205,11 @@ func (az *AzStorage) CreateDir(options internal.CreateDirOptions) error {
 	err := az.storage.CreateDirectory(internal.TruncateDirName(options.Name))
 
 	if err == nil {
-		azStatsCollector.PushEvents(createDir, options.Name, map[string]interface{}{mode: options.Mode.String()})
+		azStatsCollector.PushEvents(
+			createDir,
+			options.Name,
+			map[string]interface{}{mode: options.Mode.String()},
+		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, createDir, (int64)(1))
 	}
 
@@ -244,8 +253,15 @@ func (az *AzStorage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	return false
 }
 
-func (az *AzStorage) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
-	log.Trace("AzStorage::StreamDir : Path %s, offset %d, count %d", options.Name, options.Offset, options.Count)
+func (az *AzStorage) StreamDir(
+	options internal.StreamDirOptions,
+) ([]*internal.ObjAttr, string, error) {
+	log.Trace(
+		"AzStorage::StreamDir : Path %s, offset %d, count %d",
+		options.Name,
+		options.Offset,
+		options.Count,
+	)
 
 	if az.listBlocked {
 		diff := time.Since(az.startTime)
@@ -269,7 +285,12 @@ func (az *AzStorage) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 		return new_list, "", err
 	}
 
-	log.Debug("AzStorage::StreamDir : Retrieved %d objects with %s marker for Path %s", len(new_list), options.Token, path)
+	log.Debug(
+		"AzStorage::StreamDir : Retrieved %d objects with %s marker for Path %s",
+		len(new_list),
+		options.Token,
+		path,
+	)
 
 	if new_marker == nil {
 		new_marker = to.Ptr("")
@@ -308,7 +329,11 @@ func (az *AzStorage) RenameDir(options internal.RenameDirOptions) error {
 	err := az.storage.RenameDirectory(options.Src, options.Dst)
 
 	if err == nil {
-		azStatsCollector.PushEvents(renameDir, options.Src, map[string]interface{}{src: options.Src, dest: options.Dst})
+		azStatsCollector.PushEvents(
+			renameDir,
+			options.Src,
+			map[string]interface{}{src: options.Src, dest: options.Dst},
+		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, renameDir, (int64)(1))
 	}
 	return err
@@ -332,7 +357,11 @@ func (az *AzStorage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	}
 	handle.Mtime = time.Now()
 
-	azStatsCollector.PushEvents(createFile, options.Name, map[string]interface{}{mode: options.Mode.String()})
+	azStatsCollector.PushEvents(
+		createFile,
+		options.Name,
+		map[string]interface{}{mode: options.Mode.String()},
+	)
 
 	// increment open file handles count
 	azStatsCollector.UpdateStats(stats_manager.Increment, openHandles, (int64)(1))
@@ -392,7 +421,11 @@ func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
 	err := az.storage.RenameFile(options.Src, options.Dst, options.SrcAttr)
 
 	if err == nil {
-		azStatsCollector.PushEvents(renameFile, options.Src, map[string]interface{}{src: options.Src, dest: options.Dst})
+		azStatsCollector.PushEvents(
+			renameFile,
+			options.Src,
+			map[string]interface{}{src: options.Src, dest: options.Dst},
+		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, renameFile, (int64)(1))
 	}
 	return err
@@ -414,10 +447,20 @@ func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length 
 		return 0, nil
 	}
 
-	err = az.storage.ReadInBuffer(options.Handle.Path, options.Offset, dataLen, options.Data, options.Etag)
+	err = az.storage.ReadInBuffer(
+		options.Handle.Path,
+		options.Offset,
+		dataLen,
+		options.Data,
+		options.Etag,
+	)
 
 	if err != nil {
-		log.Err("AzStorage::ReadInBuffer : Failed to read %s [%s]", options.Handle.Path, err.Error())
+		log.Err(
+			"AzStorage::ReadInBuffer : Failed to read %s [%s]",
+			options.Handle.Path,
+			err.Error(),
+		)
 	}
 
 	length = int(dataLen)
@@ -429,7 +472,9 @@ func (az *AzStorage) WriteFile(options internal.WriteFileOptions) (int, error) {
 	return len(options.Data), err
 }
 
-func (az *AzStorage) GetFileBlockOffsets(options internal.GetFileBlockOffsetsOptions) (*common.BlockOffsetList, error) {
+func (az *AzStorage) GetFileBlockOffsets(
+	options internal.GetFileBlockOffsetsOptions,
+) (*common.BlockOffsetList, error) {
 	return az.storage.GetFileBlockOffsets(options.Name)
 
 }
@@ -439,7 +484,11 @@ func (az *AzStorage) TruncateFile(options internal.TruncateFileOptions) error {
 	err := az.storage.TruncateFile(options.Name, options.Size)
 
 	if err == nil {
-		azStatsCollector.PushEvents(truncateFile, options.Name, map[string]interface{}{size: options.Size})
+		azStatsCollector.PushEvents(
+			truncateFile,
+			options.Name,
+			map[string]interface{}{size: options.Size},
+		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, truncateFile, (int64)(1))
 	}
 	return err
@@ -458,14 +507,22 @@ func (az *AzStorage) CopyFromFile(options internal.CopyFromFileOptions) error {
 // Symlink operations
 func (az *AzStorage) CreateLink(options internal.CreateLinkOptions) error {
 	if az.stConfig.disableSymlink {
-		log.Err("AzStorage::CreateLink : %s -> %s - Symlink support not enabled", options.Name, options.Target)
+		log.Err(
+			"AzStorage::CreateLink : %s -> %s - Symlink support not enabled",
+			options.Name,
+			options.Target,
+		)
 		return syscall.ENOTSUP
 	}
 	log.Trace("AzStorage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
 	err := az.storage.CreateLink(options.Name, options.Target)
 
 	if err == nil {
-		azStatsCollector.PushEvents(createLink, options.Name, map[string]interface{}{target: options.Target})
+		azStatsCollector.PushEvents(
+			createLink,
+			options.Name,
+			map[string]interface{}{target: options.Target},
+		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, createLink, (int64)(1))
 	}
 
@@ -499,7 +556,11 @@ func (az *AzStorage) Chmod(options internal.ChmodOptions) error {
 	err := az.storage.ChangeMod(options.Name, options.Mode)
 
 	if err == nil {
-		azStatsCollector.PushEvents(chmod, options.Name, map[string]interface{}{mode: options.Mode.String()})
+		azStatsCollector.PushEvents(
+			chmod,
+			options.Name,
+			map[string]interface{}{mode: options.Mode.String()},
+		)
 		azStatsCollector.UpdateStats(stats_manager.Increment, chmod, (int64)(1))
 	}
 
@@ -507,7 +568,12 @@ func (az *AzStorage) Chmod(options internal.ChmodOptions) error {
 }
 
 func (az *AzStorage) Chown(options internal.ChownOptions) error {
-	log.Trace("AzStorage::Chown : Change ownership of file %s to %d-%d", options.Name, options.Owner, options.Group)
+	log.Trace(
+		"AzStorage::Chown : Change ownership of file %s to %d-%d",
+		options.Name,
+		options.Owner,
+		options.Group,
+	)
 	return az.storage.ChangeOwner(options.Name, options.Owner, options.Group)
 }
 
@@ -558,22 +624,42 @@ func init() {
 	internal.AddComponent(compName, NewazstorageComponent)
 	RegisterEnvVariables()
 
-	useHttps := config.AddBoolFlag("use-https", true, "Enables HTTPS communication with Blob storage.")
+	useHttps := config.AddBoolFlag(
+		"use-https",
+		true,
+		"Enables HTTPS communication with Blob storage.",
+	)
 	config.BindPFlag(compName+".use-https", useHttps)
 	useHttps.Hidden = true
 
-	blockListSecFlag := config.AddInt32Flag("cancel-list-on-mount-seconds", 0, "Number of seconds list call is blocked post mount")
+	blockListSecFlag := config.AddInt32Flag(
+		"cancel-list-on-mount-seconds",
+		0,
+		"Number of seconds list call is blocked post mount",
+	)
 	config.BindPFlag(compName+".block-list-on-mount-sec", blockListSecFlag)
 	blockListSecFlag.Hidden = true
 
-	containerNameFlag := config.AddStringFlag("container-name", "", "Configures the name of the container to be mounted")
+	containerNameFlag := config.AddStringFlag(
+		"container-name",
+		"",
+		"Configures the name of the container to be mounted",
+	)
 	config.BindPFlag(compName+".container", containerNameFlag)
 
-	useAdls := config.AddBoolFlag("use-adls", false, "Enables cloudfuse to access Azure DataLake storage account.")
+	useAdls := config.AddBoolFlag(
+		"use-adls",
+		false,
+		"Enables cloudfuse to access Azure DataLake storage account.",
+	)
 	config.BindPFlag(compName+".use-adls", useAdls)
 	useAdls.Hidden = true
 
-	maxConcurrency := config.AddUint16Flag("max-concurrency", 32, "Option to override default number of concurrent storage connections")
+	maxConcurrency := config.AddUint16Flag(
+		"max-concurrency",
+		32,
+		"Option to override default number of concurrent storage connections",
+	)
 	config.BindPFlag(compName+".max-concurrency", maxConcurrency)
 	maxConcurrency.Hidden = true
 
@@ -585,60 +671,111 @@ func init() {
 	config.BindPFlag(compName+".https-proxy", httpsProxy)
 	httpsProxy.Hidden = true
 
-	maxRetry := config.AddUint16Flag("max-retry", 3, "Maximum retry count if the failure codes are retryable.")
+	maxRetry := config.AddUint16Flag(
+		"max-retry",
+		3,
+		"Maximum retry count if the failure codes are retryable.",
+	)
 	config.BindPFlag(compName+".max-retries", maxRetry)
 	maxRetry.Hidden = true
 
-	maxRetryInterval := config.AddUint16Flag("max-retry-interval-in-seconds", 3, "Maximum number of seconds between 2 retries.")
+	maxRetryInterval := config.AddUint16Flag(
+		"max-retry-interval-in-seconds",
+		3,
+		"Maximum number of seconds between 2 retries.",
+	)
 	config.BindPFlag(compName+".max-retry-timeout-sec", maxRetryInterval)
 	maxRetryInterval.Hidden = true
 
-	retryDelayFactor := config.AddUint16Flag("retry-delay-factor", 1, "Retry delay between two tries")
+	retryDelayFactor := config.AddUint16Flag(
+		"retry-delay-factor",
+		1,
+		"Retry delay between two tries",
+	)
 	config.BindPFlag(compName+".retry-backoff-sec", retryDelayFactor)
 	retryDelayFactor.Hidden = true
 
-	setContentType := config.AddBoolFlag("set-content-type", true, "Turns on automatic 'content-type' property based on the file extension.")
+	setContentType := config.AddBoolFlag(
+		"set-content-type",
+		true,
+		"Turns on automatic 'content-type' property based on the file extension.",
+	)
 	config.BindPFlag(compName+".set-content-type", setContentType)
 	setContentType.Hidden = true
 
-	caCertFile := config.AddStringFlag("ca-cert-file", "", "Specifies the proxy pem certificate path if its not in the default path.")
+	caCertFile := config.AddStringFlag(
+		"ca-cert-file",
+		"",
+		"Specifies the proxy pem certificate path if its not in the default path.",
+	)
 	config.BindPFlag(compName+".ca-cert-file", caCertFile)
 	caCertFile.Hidden = true
 
-	debugLibcurl := config.AddStringFlag("debug-libcurl", "", "Flag to allow users to debug libcurl calls.")
+	debugLibcurl := config.AddStringFlag(
+		"debug-libcurl",
+		"",
+		"Flag to allow users to debug libcurl calls.",
+	)
 	config.BindPFlag(compName+".debug-libcurl", debugLibcurl)
 	debugLibcurl.Hidden = true
 
-	virtualDir := config.AddBoolFlag("virtual-directory", false, "Support virtual directories without existence of a special marker blob.")
+	virtualDir := config.AddBoolFlag(
+		"virtual-directory",
+		false,
+		"Support virtual directories without existence of a special marker blob.",
+	)
 	config.BindPFlag(compName+".virtual-directory", virtualDir)
 
-	subDirectory := config.AddStringFlag("subdirectory", "", "Mount only this sub-directory from given container.")
+	subDirectory := config.AddStringFlag(
+		"subdirectory",
+		"",
+		"Mount only this sub-directory from given container.",
+	)
 	config.BindPFlag(compName+".subdirectory", subDirectory)
 
-	disableCompression := config.AddBoolFlag("disable-compression", false, "Disable transport layer compression.")
+	disableCompression := config.AddBoolFlag(
+		"disable-compression",
+		false,
+		"Disable transport layer compression.",
+	)
 	config.BindPFlag(compName+".disable-compression", disableCompression)
 
 	telemetry := config.AddStringFlag("telemetry", "", "Additional telemetry information.")
 	config.BindPFlag(compName+".telemetry", telemetry)
 	telemetry.Hidden = true
 
-	honourACL := config.AddBoolFlag("honour-acl", false, "Match ObjectID in ACL against the one used for authentication.")
+	honourACL := config.AddBoolFlag(
+		"honour-acl",
+		false,
+		"Match ObjectID in ACL against the one used for authentication.",
+	)
 	config.BindPFlag(compName+".honour-acl", honourACL)
 	honourACL.Hidden = true
 
-	restrictedCharsWin := config.AddBoolFlag("restricted-characters-windows", false, "Enable support for displaying restricted characters on Windows.")
+	restrictedCharsWin := config.AddBoolFlag(
+		"restricted-characters-windows",
+		false,
+		"Enable support for displaying restricted characters on Windows.",
+	)
 	config.BindPFlag("restricted-characters-windows", restrictedCharsWin)
 
 	cpkEnabled := config.AddBoolFlag("cpk-enabled", false, "Enable client provided key.")
 	config.BindPFlag(compName+".cpk-enabled", cpkEnabled)
 
-	preserveACL := config.AddBoolFlag("preserve-acl", false, "Preserve ACL and Permissions set on file during updates")
+	preserveACL := config.AddBoolFlag(
+		"preserve-acl",
+		false,
+		"Preserve ACL and Permissions set on file during updates",
+	)
 	config.BindPFlag(compName+".preserve-acl", preserveACL)
 
 	blobFilter := config.AddStringFlag("filter", "", "Filter string to match blobs")
 	config.BindPFlag(compName+".filter", blobFilter)
 
-	config.RegisterFlagCompletionFunc("container-name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	})
+	config.RegisterFlagCompletionFunc(
+		"container-name",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		},
+	)
 }

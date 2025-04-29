@@ -62,17 +62,29 @@ func (suite *fileCacheLinuxTestSuite) SetupTest() {
 	rand := randomString(8)
 	suite.cache_path = common.JoinUnixFilepath(home_dir, "file_cache"+rand)
 	suite.fake_storage_path = common.JoinUnixFilepath(home_dir, "fake_storage"+rand)
-	defaultConfig := fmt.Sprintf("file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s", suite.cache_path, suite.fake_storage_path)
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true\n  timeout-sec: 1\n\nloopbackfs:\n  path: %s",
+		suite.cache_path,
+		suite.fake_storage_path,
+	)
 	log.Debug(defaultConfig)
 
 	// Delete the temp directories created
 	err = os.RemoveAll(suite.cache_path)
 	if err != nil {
-		fmt.Printf("fileCacheLinuxTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
+		fmt.Printf(
+			"fileCacheLinuxTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n",
+			suite.cache_path,
+			err,
+		)
 	}
 	err = os.RemoveAll(suite.fake_storage_path)
 	if err != nil {
-		fmt.Printf("fileCacheLinuxTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
+		fmt.Printf(
+			"fileCacheLinuxTestSuite::SetupTest : os.RemoveAll(%s) failed [%v]\n",
+			suite.fake_storage_path,
+			err,
+		)
 	}
 	suite.setupTestHelper(defaultConfig)
 }
@@ -101,11 +113,19 @@ func (suite *fileCacheLinuxTestSuite) cleanupTest() {
 	// Delete the temp directories created
 	err = os.RemoveAll(suite.cache_path)
 	if err != nil {
-		fmt.Printf("fileCacheLinuxTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.cache_path, err)
+		fmt.Printf(
+			"fileCacheLinuxTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n",
+			suite.cache_path,
+			err,
+		)
 	}
 	err = os.RemoveAll(suite.fake_storage_path)
 	if err != nil {
-		fmt.Printf("fileCacheLinuxTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", suite.fake_storage_path, err)
+		fmt.Printf(
+			"fileCacheLinuxTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n",
+			suite.fake_storage_path,
+			err,
+		)
 	}
 }
 
@@ -131,7 +151,9 @@ func (suite *fileCacheLinuxTestSuite) TestChmodInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file34"
-	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0666})
+	createHandle, _ := suite.fileCache.CreateFile(
+		internal.CreateFileOptions{Name: path, Mode: 0666},
+	)
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0666})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 
@@ -160,7 +182,9 @@ func (suite *fileCacheLinuxTestSuite) TestChmodCase2() {
 	path := "file35"
 	oldMode := os.FileMode(0511)
 
-	createHandle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: oldMode})
+	createHandle, err := suite.fileCache.CreateFile(
+		internal.CreateFileOptions{Name: path, Mode: oldMode},
+	)
 	suite.assert.NoError(err)
 
 	newMode := os.FileMode(0666)
@@ -221,7 +245,9 @@ func (suite *fileCacheLinuxTestSuite) TestChownInCache() {
 	defer suite.cleanupTest()
 	// Setup
 	path := "file37"
-	createHandle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	createHandle, _ := suite.fileCache.CreateFile(
+		internal.CreateFileOptions{Name: path, Mode: 0777},
+	)
 	openHandle, _ := suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: createHandle})
 

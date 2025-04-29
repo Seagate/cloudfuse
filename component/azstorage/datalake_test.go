@@ -44,7 +44,6 @@ import (
 	"strings"
 	"syscall"
 	"testing"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -112,14 +111,21 @@ func (s *datalakeTestSuite) setupTestHelper(configuration string, container stri
 	}
 	s.container = container
 	if configuration == "" {
-		configuration = fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-			storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+		configuration = fmt.Sprintf(
+			"azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+			storageTestConfigurationParameters.AdlsAccount,
+			storageTestConfigurationParameters.AdlsAccount,
+			storageTestConfigurationParameters.AdlsKey,
+			s.container,
+		)
 	}
 	s.config = configuration
 	s.assert = assert.New(s.T())
 
 	s.az, _ = newTestAzStorage(configuration)
-	s.az.Start(ctx) // Note: Start->TestValidation will fail but it doesn't matter. We are creating the container a few lines below anyway.
+	s.az.Start(
+		ctx,
+	) // Note: Start->TestValidation will fail but it doesn't matter. We are creating the container a few lines below anyway.
 	// We could create the container before but that requires rewriting the code to new up a service client.
 
 	s.serviceClient = s.az.storage.(*Datalake).Service // Grab the service client to do some validation
@@ -143,7 +149,10 @@ func (s *datalakeTestSuite) cleanupTest() {
 
 func (s *datalakeTestSuite) TestDefault() {
 	defer s.cleanupTest()
-	s.assert.Equal(storageTestConfigurationParameters.AdlsAccount, s.az.stConfig.authConfig.AccountName)
+	s.assert.Equal(
+		storageTestConfigurationParameters.AdlsAccount,
+		s.az.stConfig.authConfig.AccountName,
+	)
 	s.assert.Equal(EAccountType.ADLS(), s.az.stConfig.authConfig.AccountType)
 	s.assert.False(s.az.stConfig.authConfig.UseHTTP)
 	accountKey, _ := s.az.stConfig.authConfig.AccountKey.Open()
@@ -156,7 +165,10 @@ func (s *datalakeTestSuite) TestDefault() {
 	s.assert.Empty(s.az.stConfig.authConfig.ClientSecret)
 	s.assert.Empty(s.az.stConfig.authConfig.TenantID)
 	s.assert.Empty(s.az.stConfig.authConfig.ClientID)
-	s.assert.Equal("https://"+s.az.stConfig.authConfig.AccountName+".dfs.core.windows.net/", s.az.stConfig.authConfig.Endpoint)
+	s.assert.Equal(
+		"https://"+s.az.stConfig.authConfig.AccountName+".dfs.core.windows.net/",
+		s.az.stConfig.authConfig.Endpoint,
+	)
 	s.assert.Equal(EAuthType.KEY(), s.az.stConfig.authConfig.AuthMode)
 	s.assert.Equal(s.container, s.az.stConfig.container)
 	s.assert.Empty(s.az.stConfig.prefixPath)
@@ -178,8 +190,13 @@ func (s *datalakeTestSuite) TestModifyEndpoint() {
 	defer s.cleanupTest()
 	// Setup
 	s.tearDownTestHelper(false) // Don't delete the generated container.
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+	)
 	s.setupTestHelper(config, s.container, true)
 
 	err := s.az.storage.TestPipeline()
@@ -190,8 +207,12 @@ func (s *datalakeTestSuite) TestNoEndpoint() {
 	defer s.cleanupTest()
 	// Setup
 	s.tearDownTestHelper(false) // Don't delete the generated container.
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+	)
 	s.setupTestHelper(config, s.container, true)
 
 	err := s.az.storage.TestPipeline()
@@ -247,8 +268,15 @@ func (s *datalakeTestSuite) TestCreateDirWithCPKEnabled() {
 	defer s.cleanupTest()
 	CPKEncryptionKey, CPKEncryptionKeySHA256 := generateCPKInfo()
 
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container, CPKEncryptionKey, CPKEncryptionKeySHA256)
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+		CPKEncryptionKey,
+		CPKEncryptionKeySHA256,
+	)
 	s.setupTestHelper(config, s.container, false)
 
 	datalakeCPKOpt := &file.CPKInfo{
@@ -453,7 +481,9 @@ func (s *datalakeTestSuite) TestIsDirEmptyError() {
 
 	empty := s.az.IsDirEmpty(internal.IsDirEmptyOptions{Name: name})
 
-	s.assert.True(empty) // Note: See comment in BlockBlob.List. BlockBlob behaves differently from Datalake
+	s.assert.True(
+		empty,
+	) // Note: See comment in BlockBlob.List. BlockBlob behaves differently from Datalake
 
 	// Directory should not be in the account
 	dir := s.containerClient.NewDirectoryClient(name)
@@ -579,8 +609,13 @@ func (s *datalakeTestSuite) TestStreamDirWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	config := fmt.Sprintf(
+		"restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+	)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
 	// Setup
@@ -611,7 +646,9 @@ func (s *datalakeTestSuite) TestStreamDirError() {
 
 	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: name})
 
-	s.assert.Error(err) // Note: See comment in BlockBlob.List. BlockBlob behaves differently from Datalake
+	s.assert.Error(
+		err,
+	) // Note: See comment in BlockBlob.List. BlockBlob behaves differently from Datalake
 	s.assert.Empty(entries)
 	// Directory should not be in the account
 	dir := s.containerClient.NewDirectoryClient(name)
@@ -625,8 +662,14 @@ func (s *datalakeTestSuite) TestStreamDirListBlocked() {
 	s.tearDownTestHelper(false) // Don't delete the generated container.
 
 	listBlockedTime := 10
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  block-list-on-mount-sec: %d\n  fail-unsupported-op: true\n",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container, listBlockedTime)
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  block-list-on-mount-sec: %d\n  fail-unsupported-op: true\n",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+		listBlockedTime,
+	)
 	s.setupTestHelper(config, s.container, true)
 
 	name := generateDirectoryName()
@@ -677,8 +720,15 @@ func (s *datalakeTestSuite) TestRenameDirWithCPKEnabled() {
 	defer s.cleanupTest()
 	CPKEncryptionKey, CPKEncryptionKeySHA256 := generateCPKInfo()
 
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container, CPKEncryptionKey, CPKEncryptionKeySHA256)
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+		CPKEncryptionKey,
+		CPKEncryptionKeySHA256,
+	)
 	s.setupTestHelper(config, s.container, false)
 
 	datalakeCPKOpt := &file.CPKInfo{
@@ -790,7 +840,8 @@ func (s *datalakeTestSuite) TestRenameDirSubDirPrefixPath() {
 	// aDst paths should exist -> aDst and aDst/gc1
 	_, err = s.containerClient.NewDirectoryClient(baseSrc+"/"+baseDst).GetProperties(ctx, nil)
 	s.assert.NoError(err)
-	_, err = s.containerClient.NewDirectoryClient(baseSrc+"/"+baseDst+"/gc1").GetProperties(ctx, nil)
+	_, err = s.containerClient.NewDirectoryClient(baseSrc+"/"+baseDst+"/gc1").
+		GetProperties(ctx, nil)
 	s.assert.NoError(err)
 }
 
@@ -837,8 +888,13 @@ func (s *datalakeTestSuite) TestCreateFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	config := fmt.Sprintf(
+		"restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+	)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
 	// Setup
@@ -1189,7 +1245,9 @@ func (s *datalakeTestSuite) TestAppendOffsetLargerThanSize() {
 	_, err = s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 45, Data: newTestData})
 	s.assert.NoError(err)
 
-	currentData := []byte("testdatates1dat1tes2dat2tes3dat3tes4dat4\x00\x00\x00\x00\x0043211234cake")
+	currentData := []byte(
+		"testdatates1dat1tes2dat2tes3dat3tes4dat4\x00\x00\x00\x00\x0043211234cake",
+	)
 	dataLen := len(currentData)
 	output := make([]byte, dataLen)
 
@@ -1284,8 +1342,13 @@ func (s *datalakeTestSuite) TestDeleteFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	config := fmt.Sprintf(
+		"restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+	)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
 	// Setup
@@ -1343,8 +1406,13 @@ func (s *datalakeTestSuite) TestRenameFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	config := fmt.Sprintf(
+		"restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+	)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
 	// Setup
@@ -1374,8 +1442,15 @@ func (s *datalakeTestSuite) TestRenameFileWithCPKenabled() {
 	defer s.cleanupTest()
 	CPKEncryptionKey, CPKEncryptionKeySHA256 := generateCPKInfo()
 
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container, CPKEncryptionKey, CPKEncryptionKeySHA256)
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+		CPKEncryptionKey,
+		CPKEncryptionKeySHA256,
+	)
 	s.setupTestHelper(config, s.container, false)
 
 	datalakeCPKOpt := &file.CPKInfo{
@@ -1496,9 +1571,11 @@ func (suite *datalakeTestSuite) TestReadInBufferWithETAG() {
 
 	output := make([]byte, 5)
 	var etag string
-	len, err := suite.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: fileHandle, Offset: 0, Data: output, Etag: &etag})
+	len, err := suite.az.ReadInBuffer(
+		internal.ReadInBufferOptions{Handle: fileHandle, Offset: 0, Data: output, Etag: &etag},
+	)
 	suite.assert.NoError(err)
-	suite.assert.NotEqual("", etag)
+	suite.assert.NotEmpty(etag)
 	suite.assert.Equal(5, len)
 	suite.assert.EqualValues(testData[:5], output)
 	_ = suite.az.CloseFile(internal.CloseFileOptions{Handle: fileHandle})
@@ -1540,7 +1617,9 @@ func (s *datalakeTestSuite) TestReadInBufferBadRange() {
 	h := handlemap.NewHandle(name)
 	h.Size = 10
 
-	_, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 20, Data: make([]byte, 2)})
+	_, err := s.az.ReadInBuffer(
+		internal.ReadInBufferOptions{Handle: h, Offset: 20, Data: make([]byte, 2)},
+	)
 	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ERANGE, err)
 }
@@ -1552,7 +1631,9 @@ func (s *datalakeTestSuite) TestReadInBufferError() {
 	h := handlemap.NewHandle(name)
 	h.Size = 10
 
-	_, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: make([]byte, 2)})
+	_, err := s.az.ReadInBuffer(
+		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: make([]byte, 2)},
+	)
 	s.assert.Error(err)
 	s.assert.EqualValues(syscall.ENOENT, err)
 }
@@ -1584,8 +1665,13 @@ func (s *datalakeTestSuite) TestWriteFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	config := fmt.Sprintf(
+		"restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+	)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
 	// Setup
@@ -1640,8 +1726,13 @@ func (s *datalakeTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	config := fmt.Sprintf(
+		"restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+	)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
 	// Setup
@@ -1654,7 +1745,9 @@ func (s *datalakeTestSuite) TestTruncateSmallFileSmallerWindowsNameConvert() {
 	truncatedLength := 5
 	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
-	err := s.az.TruncateFile(internal.TruncateFileOptions{Name: windowsName, Size: int64(truncatedLength)})
+	err := s.az.TruncateFile(
+		internal.TruncateFileOptions{Name: windowsName, Size: int64(truncatedLength)},
+	)
 	s.assert.NoError(err)
 
 	// Blob should have updated data
@@ -1678,10 +1771,18 @@ func (s *datalakeTestSuite) TestTruncateChunkedFileSmaller() {
 	data := []byte(testData)
 	truncatedLength := 5
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
-		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err := uploadReaderAtToBlockBlob(
+		ctx,
+		bytes.NewReader(data),
+		int64(len(data)),
+		4,
+		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(
+			name,
+		),
+		&blockblob.UploadBufferOptions{
 			BlockSize: 4,
-		})
+		},
+	)
 	s.assert.NoError(err)
 
 	err = s.az.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
@@ -1731,10 +1832,18 @@ func (s *datalakeTestSuite) TestTruncateChunkedFileEqual() {
 	data := []byte(testData)
 	truncatedLength := 9
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
-		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err := uploadReaderAtToBlockBlob(
+		ctx,
+		bytes.NewReader(data),
+		int64(len(data)),
+		4,
+		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(
+			name,
+		),
+		&blockblob.UploadBufferOptions{
 			BlockSize: 4,
-		})
+		},
+	)
 	s.assert.NoError(err)
 
 	err = s.az.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
@@ -1784,10 +1893,18 @@ func (s *datalakeTestSuite) TestTruncateChunkedFileBigger() {
 	data := []byte(testData)
 	truncatedLength := 15
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
-		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err := uploadReaderAtToBlockBlob(
+		ctx,
+		bytes.NewReader(data),
+		int64(len(data)),
+		4,
+		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(
+			name,
+		),
+		&blockblob.UploadBufferOptions{
 			BlockSize: 4,
-		})
+		},
+	)
 	s.assert.NoError(err)
 
 	s.az.TruncateFile(internal.TruncateFileOptions{Name: name, Size: int64(truncatedLength)})
@@ -1880,8 +1997,13 @@ func (s *datalakeTestSuite) TestCopyFromFileWindowsNameConvert() {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	config := fmt.Sprintf("restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	config := fmt.Sprintf(
+		"restricted-characters-windows: true\nazstorage:\n  account-name: %s\n  endpoint: https://%s.blob.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+	)
 	s.setupTestHelper(config, s.container, true)
 	defer s.cleanupTest()
 	// Setup
@@ -2062,29 +2184,29 @@ func (s *datalakeTestSuite) TestGetAttrFileSize() {
 func (s *datalakeTestSuite) TestGetAttrFileTime() {
 	// TODO: why has this been flaky in the CI on both platforms?
 	fmt.Println("Skipping TestGetAttrFileTime. Should fix this later.")
-	return
+	// return
 
-	// Setup
-	name := generateFileName()
-	h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
-	testData := "test data"
-	data := []byte(testData)
-	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	// // Setup
+	// name := generateFileName()
+	// h, _ := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	// testData := "test data"
+	// data := []byte(testData)
+	// s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
-	before, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.NoError(err)
-	s.assert.NotNil(before.Mtime)
+	// before, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+	// s.assert.NoError(err)
+	// s.assert.NotNil(before.Mtime)
 
-	time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
+	// time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
 
-	s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
-	time.Sleep(time.Second * 1)
+	// s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
+	// time.Sleep(time.Second * 1)
 
-	after, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
-	s.assert.NoError(err)
-	s.assert.NotNil(after.Mtime)
+	// after, err := s.az.GetAttr(internal.GetAttrOptions{Name: name})
+	// s.assert.NoError(err)
+	// s.assert.NotNil(after.Mtime)
 
-	s.assert.True(after.Mtime.After(before.Mtime))
+	// s.assert.True(after.Mtime.After(before.Mtime))
 }
 
 func (s *datalakeTestSuite) TestGetAttrError() {
@@ -2141,8 +2263,13 @@ func (s *datalakeTestSuite) TestChownIgnore() {
 	// Setup
 	s.tearDownTestHelper(false) // Don't delete the generated container.
 
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: false\n",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: false\n",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+	)
 	s.setupTestHelper(config, s.container, true)
 	name := generateFileName()
 	s.az.CreateFile(internal.CreateFileOptions{Name: name})
@@ -2229,7 +2356,9 @@ func (s *datalakeTestSuite) TestFlushFileEmptyFile() {
 	s.assert.NoError(err)
 
 	output := make([]byte, 1)
-	length, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+	length, err := s.az.ReadInBuffer(
+		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+	)
 	s.assert.NoError(err)
 	s.assert.Equal(0, length)
 	s.assert.Empty(output[:length])
@@ -2245,10 +2374,18 @@ func (s *datalakeTestSuite) TestFlushFileChunkedFile() {
 	rand.Read(data)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
-		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err := uploadReaderAtToBlockBlob(
+		ctx,
+		bytes.NewReader(data),
+		int64(len(data)),
+		4,
+		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(
+			name,
+		),
+		&blockblob.UploadBufferOptions{
 			BlockSize: 4 * MB,
-		})
+		},
+	)
 	s.assert.NoError(err)
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
@@ -2259,7 +2396,9 @@ func (s *datalakeTestSuite) TestFlushFileChunkedFile() {
 	s.assert.NoError(err)
 
 	output := make([]byte, 16*MB)
-	length, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
+	length, err := s.az.ReadInBuffer(
+		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
+	)
 	s.assert.NoError(err)
 	s.assert.Equal(16*MB, length)
 	s.assert.Equal(data, output)
@@ -2276,10 +2415,18 @@ func (s *datalakeTestSuite) TestFlushFileUpdateChunkedFile() {
 	rand.Read(data)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
-		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err := uploadReaderAtToBlockBlob(
+		ctx,
+		bytes.NewReader(data),
+		int64(len(data)),
+		4,
+		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(
+			name,
+		),
+		&blockblob.UploadBufferOptions{
 			BlockSize: int64(blockSize),
-		})
+		},
+	)
 	s.assert.NoError(err)
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
@@ -2289,7 +2436,13 @@ func (s *datalakeTestSuite) TestFlushFileUpdateChunkedFile() {
 	updatedBlock := make([]byte, 2*MB)
 	rand.Read(updatedBlock)
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize)
-	s.az.storage.ReadInBuffer(name, int64(blockSize), int64(blockSize), h.CacheObj.BlockOffsetList.BlockList[1].Data, nil)
+	s.az.storage.ReadInBuffer(
+		name,
+		int64(blockSize),
+		int64(blockSize),
+		h.CacheObj.BlockOffsetList.BlockList[1].Data,
+		nil,
+	)
 	copy(h.CacheObj.BlockOffsetList.BlockList[1].Data[MB:2*MB+MB], updatedBlock)
 	h.CacheObj.BlockList[1].Flags.Set(common.DirtyBlock)
 
@@ -2317,10 +2470,18 @@ func (s *datalakeTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	rand.Read(data)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
-		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err := uploadReaderAtToBlockBlob(
+		ctx,
+		bytes.NewReader(data),
+		int64(len(data)),
+		4,
+		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(
+			name,
+		),
+		&blockblob.UploadBufferOptions{
 			BlockSize: int64(blockSize),
-		})
+		},
+	)
 	s.assert.NoError(err)
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
@@ -2330,7 +2491,13 @@ func (s *datalakeTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	// truncate block
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize/2)
 	h.CacheObj.BlockOffsetList.BlockList[1].EndIndex = int64(blockSize + blockSize/2)
-	s.az.storage.ReadInBuffer(name, int64(blockSize), int64(blockSize)/2, h.CacheObj.BlockOffsetList.BlockList[1].Data, nil)
+	s.az.storage.ReadInBuffer(
+		name,
+		int64(blockSize),
+		int64(blockSize)/2,
+		h.CacheObj.BlockOffsetList.BlockList[1].Data,
+		nil,
+	)
 	h.CacheObj.BlockList[1].Flags.Set(common.DirtyBlock)
 
 	// remove 2 blocks
@@ -2366,8 +2533,10 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	blk1 := &common.Block{
 		StartIndex: 0,
 		EndIndex:   int64(blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
-		Data:       data1,
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
+		Data: data1,
 	}
 	blk1.Flags.Set(common.DirtyBlock)
 
@@ -2376,8 +2545,10 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	blk2 := &common.Block{
 		StartIndex: int64(blockSize),
 		EndIndex:   2 * int64(blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
-		Data:       data2,
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
+		Data: data2,
 	}
 	blk2.Flags.Set(common.DirtyBlock)
 
@@ -2386,8 +2557,10 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksEmptyFile() {
 	blk3 := &common.Block{
 		StartIndex: 2 * int64(blockSize),
 		EndIndex:   3 * int64(blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
-		Data:       data3,
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
+		Data: data3,
 	}
 	blk3.Flags.Set(common.DirtyBlock)
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
@@ -2417,10 +2590,18 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	rand.Read(data)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
-		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err := uploadReaderAtToBlockBlob(
+		ctx,
+		bytes.NewReader(data),
+		int64(len(data)),
+		4,
+		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(
+			name,
+		),
+		&blockblob.UploadBufferOptions{
 			BlockSize: int64(blockSize),
-		})
+		},
+	)
 	s.assert.NoError(err)
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
@@ -2433,8 +2614,10 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	blk1 := &common.Block{
 		StartIndex: int64(fileSize),
 		EndIndex:   int64(fileSize + blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
-		Data:       data1,
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
+		Data: data1,
 	}
 	blk1.Flags.Set(common.DirtyBlock)
 
@@ -2443,8 +2626,10 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	blk2 := &common.Block{
 		StartIndex: int64(fileSize + blockSize),
 		EndIndex:   int64(fileSize + 2*blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
-		Data:       data2,
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
+		Data: data2,
 	}
 	blk2.Flags.Set(common.DirtyBlock)
 
@@ -2453,8 +2638,10 @@ func (s *datalakeTestSuite) TestFlushFileAppendBlocksChunkedFile() {
 	blk3 := &common.Block{
 		StartIndex: int64(fileSize + 2*blockSize),
 		EndIndex:   int64(fileSize + 3*blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
-		Data:       data3,
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
+		Data: data3,
 	}
 	blk3.Flags.Set(common.DirtyBlock)
 	h.CacheObj.BlockList = append(h.CacheObj.BlockList, blk1, blk2, blk3)
@@ -2490,7 +2677,9 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	blk1 := &common.Block{
 		StartIndex: 0,
 		EndIndex:   int64(blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
 	}
 	blk1.Flags.Set(common.TruncatedBlock)
 	blk1.Flags.Set(common.DirtyBlock)
@@ -2498,7 +2687,9 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	blk2 := &common.Block{
 		StartIndex: int64(blockSize),
 		EndIndex:   2 * int64(blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
 	}
 	blk2.Flags.Set(common.TruncatedBlock)
 	blk2.Flags.Set(common.DirtyBlock)
@@ -2506,7 +2697,9 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksEmptyFile() {
 	blk3 := &common.Block{
 		StartIndex: 2 * int64(blockSize),
 		EndIndex:   3 * int64(blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
 	}
 	blk3.Flags.Set(common.TruncatedBlock)
 	blk3.Flags.Set(common.DirtyBlock)
@@ -2536,10 +2729,18 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	rand.Read(data)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
-		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err := uploadReaderAtToBlockBlob(
+		ctx,
+		bytes.NewReader(data),
+		int64(len(data)),
+		4,
+		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(
+			name,
+		),
+		&blockblob.UploadBufferOptions{
 			BlockSize: int64(blockSize),
-		})
+		},
+	)
 	s.assert.NoError(err)
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
@@ -2550,7 +2751,9 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	blk1 := &common.Block{
 		StartIndex: int64(fileSize),
 		EndIndex:   int64(fileSize + blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
 	}
 	blk1.Flags.Set(common.TruncatedBlock)
 	blk1.Flags.Set(common.DirtyBlock)
@@ -2558,7 +2761,9 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	blk2 := &common.Block{
 		StartIndex: int64(fileSize + blockSize),
 		EndIndex:   int64(fileSize + 2*blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
 	}
 	blk2.Flags.Set(common.TruncatedBlock)
 	blk2.Flags.Set(common.DirtyBlock)
@@ -2566,7 +2771,9 @@ func (s *datalakeTestSuite) TestFlushFileTruncateBlocksChunkedFile() {
 	blk3 := &common.Block{
 		StartIndex: int64(fileSize + 2*blockSize),
 		EndIndex:   int64(fileSize + 3*blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
 	}
 	blk3.Flags.Set(common.TruncatedBlock)
 	blk3.Flags.Set(common.DirtyBlock)
@@ -2604,15 +2811,19 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	blk1 := &common.Block{
 		StartIndex: 0,
 		EndIndex:   int64(blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
-		Data:       data1,
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
+		Data: data1,
 	}
 	blk1.Flags.Set(common.DirtyBlock)
 
 	blk2 := &common.Block{
 		StartIndex: int64(blockSize),
 		EndIndex:   2 * int64(blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
 	}
 	blk2.Flags.Set(common.DirtyBlock)
 	blk2.Flags.Set(common.TruncatedBlock)
@@ -2620,7 +2831,9 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksEmptyFile() {
 	blk3 := &common.Block{
 		StartIndex: 2 * int64(blockSize),
 		EndIndex:   3 * int64(blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
 	}
 	blk3.Flags.Set(common.DirtyBlock)
 	blk3.Flags.Set(common.TruncatedBlock)
@@ -2652,10 +2865,18 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	rand.Read(data)
 
 	// use our method to make the max upload size (size before a blob is broken down to blocks) to 4 Bytes
-	err := uploadReaderAtToBlockBlob(ctx, bytes.NewReader(data), int64(len(data)), 4,
-		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(name), &blockblob.UploadBufferOptions{
+	err := uploadReaderAtToBlockBlob(
+		ctx,
+		bytes.NewReader(data),
+		int64(len(data)),
+		4,
+		s.az.storage.(*Datalake).BlockBlob.Container.NewBlockBlobClient(
+			name,
+		),
+		&blockblob.UploadBufferOptions{
 			BlockSize: int64(blockSize),
-		})
+		},
+	)
 	s.assert.NoError(err)
 	bol, _ := s.az.GetFileBlockOffsets(internal.GetFileBlockOffsetsOptions{Name: name})
 	handlemap.CreateCacheObject(int64(16*MB), h)
@@ -2668,15 +2889,19 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	blk1 := &common.Block{
 		StartIndex: int64(fileSize),
 		EndIndex:   int64(fileSize + blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
-		Data:       data1,
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
+		Data: data1,
 	}
 	blk1.Flags.Set(common.DirtyBlock)
 
 	blk2 := &common.Block{
 		StartIndex: int64(fileSize + blockSize),
 		EndIndex:   int64(fileSize + 2*blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
 	}
 	blk2.Flags.Set(common.DirtyBlock)
 	blk2.Flags.Set(common.TruncatedBlock)
@@ -2684,7 +2909,9 @@ func (s *datalakeTestSuite) TestFlushFileAppendAndTruncateBlocksChunkedFile() {
 	blk3 := &common.Block{
 		StartIndex: int64(fileSize + 2*blockSize),
 		EndIndex:   int64(fileSize + 3*blockSize),
-		Id:         base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(h.CacheObj.BlockIdLength)),
+		Id: base64.StdEncoding.EncodeToString(
+			common.NewUUIDWithLength(h.CacheObj.BlockIdLength),
+		),
 	}
 	blk3.Flags.Set(common.DirtyBlock)
 	blk3.Flags.Set(common.TruncatedBlock)
@@ -2732,8 +2959,15 @@ func (s *datalakeTestSuite) TestDownloadWithCPKEnabled() {
 	s.tearDownTestHelper(false)
 	CPKEncryptionKey, CPKEncryptionKeySHA256 := generateCPKInfo()
 
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container, CPKEncryptionKey, CPKEncryptionKeySHA256)
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+		CPKEncryptionKey,
+		CPKEncryptionKeySHA256,
+	)
 	s.setupTestHelper(config, s.container, false)
 
 	blobCPKOpt := &blob.CPKInfo{
@@ -2783,8 +3017,15 @@ func (s *datalakeTestSuite) TestUploadWithCPKEnabled() {
 	s.tearDownTestHelper(false)
 
 	CPKEncryptionKey, CPKEncryptionKeySHA256 := generateCPKInfo()
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container, CPKEncryptionKey, CPKEncryptionKeySHA256)
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  cpk-enabled: true\n  cpk-encryption-key: %s\n  cpk-encryption-key-sha256: %s\n",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+		CPKEncryptionKey,
+		CPKEncryptionKeySHA256,
+	)
 	s.setupTestHelper(config, s.container, false)
 
 	datalakeCPKOpt := &file.CPKInfo{
@@ -2903,8 +3144,13 @@ func (s *datalakeTestSuite) TestPermissionPreservationWithoutFlag() {
 func (s *datalakeTestSuite) TestPermissionPreservationWithFlag() {
 	defer s.cleanupTest()
 	// Setup
-	conf := fmt.Sprintf("azstorage:\n  preserve-acl: true\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	conf := fmt.Sprintf(
+		"azstorage:\n  preserve-acl: true\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+	)
 	s.setupTestHelper(conf, s.container, false)
 
 	name := generateFileName()
@@ -3000,13 +3246,19 @@ func (s *datalakeTestSuite) TestBlobFilters() {
 	blobList := make([]*internal.ObjAttr, 0)
 
 	for {
-		new_list, new_marker, err := s.az.StreamDir(internal.StreamDirOptions{Name: name + "/", Token: marker, Count: 50})
+		new_list, new_marker, err := s.az.StreamDir(
+			internal.StreamDirOptions{Name: name + "/", Token: marker, Count: 50},
+		)
 		s.assert.NoError(err)
 		blobList = append(blobList, new_list...)
 		marker = new_marker
 		iteration++
 
-		log.Debug("AzStorage::ReadDir : So far retrieved %d objects in %d iterations", len(blobList), iteration)
+		log.Debug(
+			"AzStorage::ReadDir : So far retrieved %d objects in %d iterations",
+			len(blobList),
+			iteration,
+		)
 		if new_marker == "" {
 			break
 		}
@@ -3017,13 +3269,19 @@ func (s *datalakeTestSuite) TestBlobFilters() {
 
 	blobList = make([]*internal.ObjAttr, 0)
 	for {
-		new_list, new_marker, err := s.az.StreamDir(internal.StreamDirOptions{Name: name + "/", Token: marker, Count: 50})
+		new_list, new_marker, err := s.az.StreamDir(
+			internal.StreamDirOptions{Name: name + "/", Token: marker, Count: 50},
+		)
 		s.assert.NoError(err)
 		blobList = append(blobList, new_list...)
 		marker = new_marker
 		iteration++
 
-		log.Debug("AzStorage::ReadDir : So far retrieved %d objects in %d iterations", len(blobList), iteration)
+		log.Debug(
+			"AzStorage::ReadDir : So far retrieved %d objects in %d iterations",
+			len(blobList),
+			iteration,
+		)
 		if new_marker == "" {
 			break
 		}
@@ -3035,13 +3293,19 @@ func (s *datalakeTestSuite) TestBlobFilters() {
 
 	blobList = make([]*internal.ObjAttr, 0)
 	for {
-		new_list, new_marker, err := s.az.StreamDir(internal.StreamDirOptions{Name: name + "/", Token: marker, Count: 50})
+		new_list, new_marker, err := s.az.StreamDir(
+			internal.StreamDirOptions{Name: name + "/", Token: marker, Count: 50},
+		)
 		s.assert.NoError(err)
 		blobList = append(blobList, new_list...)
 		marker = new_marker
 		iteration++
 
-		log.Debug("AzStorage::ReadDir : So far retrieved %d objects in %d iterations", len(blobList), iteration)
+		log.Debug(
+			"AzStorage::ReadDir : So far retrieved %d objects in %d iterations",
+			len(blobList),
+			iteration,
+		)
 		if new_marker == "" {
 			break
 		}
@@ -3056,8 +3320,13 @@ func (s *datalakeTestSuite) TestList() {
 	defer s.cleanupTest()
 	// Setup
 	s.tearDownTestHelper(false) // Don't delete the generated container.
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n",
-		storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsAccount, storageTestConfigurationParameters.AdlsKey, s.container)
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  endpoint: https://%s.dfs.core.windows.net/\n  type: adls\n  account-key: %s\n  mode: key\n  container: %s\n",
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsAccount,
+		storageTestConfigurationParameters.AdlsKey,
+		s.container,
+	)
 	s.setupTestHelper(config, s.container, false)
 
 	base := generateDirectoryName()

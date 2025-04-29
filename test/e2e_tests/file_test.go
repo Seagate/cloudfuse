@@ -164,31 +164,31 @@ func (suite *fileTestSuite) TestFileCreatSpclChar() {
 		return
 	}
 	fmt.Println("Skipping TestFileCreatSpclChar (flaky)")
-	return
+	// return
+	// speclChar := "abcd%23ABCD%34123-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत.txt"
+	// fileName := filepath.Join(suite.testPath, speclChar)
 
-	fileName := filepath.Join(suite.testPath, speclChar)
+	// srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
+	// suite.NoError(err)
+	// srcFile.Close()
+	// time.Sleep(time.Second * 1)
 
-	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
-	suite.NoError(err)
-	srcFile.Close()
-	time.Sleep(time.Second * 1)
+	// suite.FileExists(fileName)
 
-	suite.FileExists(fileName)
+	// files, err := os.ReadDir(suite.testPath)
+	// suite.NoError(err)
+	// suite.GreaterOrEqual(len(files), 1)
 
-	files, err := os.ReadDir(suite.testPath)
-	suite.NoError(err)
-	suite.GreaterOrEqual(len(files), 1)
+	// found := false
+	// for _, file := range files {
+	// 	if file.Name() == speclChar {
+	// 		found = true
+	// 	}
+	// }
+	// // TODO: why did this come back false occasionally in CI (flaky)
+	// suite.True(found)
 
-	found := false
-	for _, file := range files {
-		if file.Name() == speclChar {
-			found = true
-		}
-	}
-	// TODO: why did this come back false occasionally in CI (flaky)
-	suite.True(found)
-
-	suite.fileTestCleanup([]string{fileName})
+	// suite.fileTestCleanup([]string{fileName})
 }
 
 func (suite *fileTestSuite) TestFileCreateEncodeChar() {
@@ -225,7 +225,10 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 	}
 	speclChar := "abcd%23ABCD%34123-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत.txt"
 	speclDirName := filepath.Join(suite.testPath, "abc%23%24%25efg-._~!$&'()*+,;=!@ΣΑΠΦΩ$भारत")
-	secFile := filepath.Join(speclDirName, "abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|.txt")
+	secFile := filepath.Join(
+		speclDirName,
+		"abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|abcd123~!@#$%^&*()_+=-{}][\":;'?><,.|.txt",
+	)
 	fileName := filepath.Join(speclDirName, speclChar)
 
 	err := os.Mkdir(speclDirName, 0777)
@@ -258,7 +261,10 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 }
 
 func (suite *fileTestSuite) TestFileCreateLongName() {
-	fileName := filepath.Join(suite.testPath, "Higher Call_ An Incredible True Story of Combat and Chivalry in the War-Torn Skies of World War II, A - Adam Makos & Larry Alexander.epub")
+	fileName := filepath.Join(
+		suite.testPath,
+		"Higher Call_ An Incredible True Story of Combat and Chivalry in the War-Torn Skies of World War II, A - Adam Makos & Larry Alexander.epub",
+	)
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
@@ -465,7 +471,8 @@ func (suite *fileTestSuite) TestFileChmod() {
 
 // # Create multiple med files
 func (suite *fileTestSuite) TestFileCreateMulti() {
-	if strings.ToLower(fileTestStreamDirectPtr) == "true" && strings.ToLower(fileTestDistroName) == "ubuntu-20.04" {
+	if strings.ToLower(fileTestStreamDirectPtr) == "true" &&
+		strings.ToLower(fileTestDistroName) == "ubuntu-20.04" {
 		fmt.Println("Skipping this test case for stream direct")
 		return
 	}
@@ -640,7 +647,11 @@ func (suite *fileTestSuite) TestListDirReadLink() {
 		return
 	}
 	if suite.adlsTest && strings.ToLower(fileTestEnableSymlinkADLS) != "true" {
-		fmt.Printf("Skipping this test case for adls : %v, enable-symlink-adls : %v\n", suite.adlsTest, fileTestEnableSymlinkADLS)
+		fmt.Printf(
+			"Skipping this test case for adls : %v, enable-symlink-adls : %v\n",
+			suite.adlsTest,
+			fileTestEnableSymlinkADLS,
+		)
 		return
 	}
 
@@ -661,14 +672,24 @@ func (suite *fileTestSuite) TestListDirReadLink() {
 	suite.NotEmpty(dl)
 
 	// temp cache cleanup
-	suite.fileTestCleanup([]string{filepath.Join(suite.testCachePath, "small_hns.txt"), filepath.Join(suite.testCachePath, "small_hns.lnk")})
+	suite.fileTestCleanup(
+		[]string{
+			filepath.Join(suite.testCachePath, "small_hns.txt"),
+			filepath.Join(suite.testCachePath, "small_hns.lnk"),
+		},
+	)
 
 	data1, err := os.ReadFile(symName)
 	suite.NoError(err)
 	suite.Len(suite.minBuff, len(data1))
 
 	// temp cache cleanup
-	suite.fileTestCleanup([]string{filepath.Join(suite.testCachePath, "small_hns.txt"), filepath.Join(suite.testCachePath, "small_hns.lnk")})
+	suite.fileTestCleanup(
+		[]string{
+			filepath.Join(suite.testCachePath, "small_hns.txt"),
+			filepath.Join(suite.testCachePath, "small_hns.lnk"),
+		},
+	)
 
 	data2, err := os.ReadFile(fileName)
 	suite.NoError(err)
@@ -801,7 +822,17 @@ func init() {
 	regFileTestFlag(&fileTestAdlsPtr, "adls", "", "Account is ADLS or not")
 	regFileTestFlag(&fileTestTempPathPtr, "tmp-path", "", "Cache dir path")
 	regFileTestFlag(&fileTestGitClonePtr, "clone", "", "Git clone test is enable or not")
-	regFileTestFlag(&fileTestStreamDirectPtr, "stream-direct-test", "false", "Run stream direct tests")
+	regFileTestFlag(
+		&fileTestStreamDirectPtr,
+		"stream-direct-test",
+		"false",
+		"Run stream direct tests",
+	)
 	regFileTestFlag(&fileTestDistroName, "distro-name", "", "Name of the distro")
-	regFileTestFlag(&fileTestEnableSymlinkADLS, "enable-symlink-adls", "false", "Enable symlink support for ADLS accounts")
+	regFileTestFlag(
+		&fileTestEnableSymlinkADLS,
+		"enable-symlink-adls",
+		"false",
+		"Enable symlink support for ADLS accounts",
+	)
 }

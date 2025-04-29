@@ -42,7 +42,12 @@ func setBlockChecksum(localPath string, data []byte, n int) error {
 	return unix.Setxattr(localPath, "user.md5sum", hash, 0)
 }
 
-func checkBlockConsistency(blockCache *BlockCache, item *workItem, numberOfBytes int, localPath, fileName string) bool {
+func checkBlockConsistency(
+	blockCache *BlockCache,
+	item *workItem,
+	numberOfBytes int,
+	localPath, fileName string,
+) bool {
 	if !blockCache.consistency {
 		return true
 	}
@@ -53,7 +58,11 @@ func checkBlockConsistency(blockCache *BlockCache, item *workItem, numberOfBytes
 	xattrHash := make([]byte, 8)
 	_, err := unix.Getxattr(localPath, "user.md5sum", xattrHash)
 	if err != nil {
-		log.Err("BlockCache::download : Failed to get md5sum for file %s [%v]", fileName, err.Error())
+		log.Err(
+			"BlockCache::download : Failed to get md5sum for file %s [%v]",
+			fileName,
+			err.Error(),
+		)
 	} else {
 		// Compare checksums
 		if !bytes.Equal(actualHash, xattrHash) {

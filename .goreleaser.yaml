@@ -359,7 +359,7 @@ nfpms:
       rpm:
         dependencies:
           - fuse3-devel
-          - libc6 >= 2.24
+          - glibc >= 2.24
 
 metadata:
   mod_timestamp: "{{ .CommitTimestamp }}"

@@ -100,13 +100,13 @@ type pipelineTestSuite struct {
 	assert *assert.Assertions
 }
 
-func (suite *pipelineTestSuite) SetupTest() {
+func (s *pipelineTestSuite) SetupTest() {
 	AddComponent("ComponentA", NewComponentA)
 	AddComponent("ComponentB", NewComponentB)
 	AddComponent("ComponentC", NewComponentC)
 	AddComponent("stream", NewComponentStream)
 	AddComponent("block_cache", NewComponentBlockCache)
-	suite.assert = assert.New(suite.T())
+	s.assert = assert.New(s.T())
 	err := log.SetDefaultLogger("silent", common.LogConfig{})
 	if err != nil {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
