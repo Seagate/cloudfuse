@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -55,14 +55,19 @@ func (azspn *azAuthSPN) getTokenCredential() (azcore.TokenCredential, error) {
 		log.Trace("AzAuthSPN::getTokenCredential : Going for fedrated token flow")
 
 		// TODO:: track2 : test this in Azure Kubernetes setup
-		cred, err = azidentity.NewWorkloadIdentityCredential(&azidentity.WorkloadIdentityCredentialOptions{
-			ClientOptions: clOpts,
-			ClientID:      azspn.config.ClientID,
-			TenantID:      azspn.config.TenantID,
-			TokenFilePath: azspn.config.OAuthTokenFilePath,
-		})
+		cred, err = azidentity.NewWorkloadIdentityCredential(
+			&azidentity.WorkloadIdentityCredentialOptions{
+				ClientOptions: clOpts,
+				ClientID:      azspn.config.ClientID,
+				TenantID:      azspn.config.TenantID,
+				TokenFilePath: azspn.config.OAuthTokenFilePath,
+			},
+		)
 		if err != nil {
-			log.Err("AzAuthSPN::getTokenCredential : Failed to generate token for SPN [%s]", err.Error())
+			log.Err(
+				"AzAuthSPN::getTokenCredential : Failed to generate token for SPN [%s]",
+				err.Error(),
+			)
 			return nil, err
 		}
 	} else {
@@ -101,19 +106,28 @@ type azAuthBlobSPN struct {
 func (azspn *azAuthBlobSPN) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	cred, err := azspn.getTokenCredential()
 	if err != nil {
-		log.Err("azAuthBlobSPN::getServiceClient : Failed to get token credential from SPN [%s]", err.Error())
+		log.Err(
+			"azAuthBlobSPN::getServiceClient : Failed to get token credential from SPN [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	opts, err := getAzBlobServiceClientOptions(stConfig)
 	if err != nil {
-		log.Err("azAuthBlobSPN::getServiceClient : Failed to create client options [%s]", err.Error())
+		log.Err(
+			"azAuthBlobSPN::getServiceClient : Failed to create client options [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	svcClient, err := service.NewClient(azspn.config.Endpoint, cred, opts)
 	if err != nil {
-		log.Err("azAuthBlobSPN::getServiceClient : Failed to create service client [%s]", err.Error())
+		log.Err(
+			"azAuthBlobSPN::getServiceClient : Failed to create service client [%s]",
+			err.Error(),
+		)
 	}
 
 	return svcClient, err
@@ -127,19 +141,28 @@ type azAuthDatalakeSPN struct {
 func (azspn *azAuthDatalakeSPN) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	cred, err := azspn.getTokenCredential()
 	if err != nil {
-		log.Err("azAuthDatalakeSPN::getServiceClient : Failed to get token credential from SPN [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeSPN::getServiceClient : Failed to get token credential from SPN [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	opts, err := getAzDatalakeServiceClientOptions(stConfig)
 	if err != nil {
-		log.Err("azAuthDatalakeSPN::getServiceClient : Failed to create client options [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeSPN::getServiceClient : Failed to create client options [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	svcClient, err := serviceBfs.NewClient(azspn.config.Endpoint, cred, opts)
 	if err != nil {
-		log.Err("azAuthDatalakeSPN::getServiceClient : Failed to create service client [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeSPN::getServiceClient : Failed to create service client [%s]",
+			err.Error(),
+		)
 	}
 
 	return svcClient, err

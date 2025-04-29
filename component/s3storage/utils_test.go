@@ -1,7 +1,7 @@
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -121,7 +121,7 @@ func (s *utilsTestSuite) TestContentType() {
 	assert := assert.New(s.T())
 
 	val := getContentType("a.tst")
-	assert.EqualValues("application/octet-stream", val, "Content-type mismatch")
+	assert.Equal("application/octet-stream", val, "Content-type mismatch")
 
 	newSet := `{
 		".tst": "application/test",
@@ -131,11 +131,11 @@ func (s *utilsTestSuite) TestContentType() {
 	assert.NoError(err, "Failed to populate new config")
 
 	val = getContentType("a.tst")
-	assert.EqualValues("application/test", val, "Content-type mismatch")
+	assert.Equal("application/test", val, "Content-type mismatch")
 
 	// assert mp4 content type would get deserialized correctly
 	val = getContentType("file.mp4")
-	assert.EqualValues("video/mp4", val)
+	assert.Equal("video/mp4", val)
 }
 
 type contentTypeVal struct {
@@ -176,7 +176,7 @@ func (s *utilsTestSuite) TestPrefixPathRemoval() {
 	for _, i := range inputs {
 		s.Run(path.Join(i.prefix, i.path), func() {
 			output := split(i.prefix, i.path)
-			assert.EqualValues(i.result, output)
+			assert.Equal(i.result, output)
 		})
 	}
 
@@ -217,11 +217,20 @@ func (s *utilsTestSuite) TestGetContentType() {
 		{val: "a.3gp", result: "video/3gpp"},
 		{val: "a.mp4", result: "video/mp4"},
 		{val: "a.doc", result: "application/msword"},
-		{val: "a.docx", result: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+		{
+			val:    "a.docx",
+			result: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		},
 		{val: "a.ppt", result: "application/vnd.ms-powerpoint"},
-		{val: "a.pptx", result: "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+		{
+			val:    "a.pptx",
+			result: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+		},
 		{val: "a.xls", result: "application/vnd.ms-excel"},
-		{val: "a.xlsx", result: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+		{
+			val:    "a.xlsx",
+			result: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		},
 		{val: "a.gz", result: "application/x-gzip"},
 		{val: "a.jar", result: "application/java-archive"},
 		{val: "a.rar", result: "application/vnd.rar"},
@@ -240,7 +249,7 @@ func (s *utilsTestSuite) TestGetContentType() {
 	for _, i := range inputs {
 		s.Run(i.val, func() {
 			output := getContentType(i.val)
-			assert.EqualValues(i.result, output)
+			assert.Equal(i.result, output)
 		})
 	}
 }

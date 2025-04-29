@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -64,14 +64,28 @@ func initializePlugins() error {
 
 		getExternalComponentFunc, err := p.Lookup("GetExternalComponent")
 		if err != nil {
-			log.Err("initializePlugins: GetExternalComponent function lookup error in plugin %s: %s", file, err.Error())
-			return fmt.Errorf("GetExternalComponent function lookup error in plugin %s: %s", file, err.Error())
+			log.Err(
+				"initializePlugins: GetExternalComponent function lookup error in plugin %s: %s",
+				file,
+				err.Error(),
+			)
+			return fmt.Errorf(
+				"GetExternalComponent function lookup error in plugin %s: %s",
+				file,
+				err.Error(),
+			)
 		}
 
 		getExternalComponent, ok := getExternalComponentFunc.(func() (string, func() exported.Component))
 		if !ok {
-			log.Err("initializePlugins: GetExternalComponent function in %s has some incorrect definition", file)
-			return fmt.Errorf("GetExternalComponent function in %s has some incorrect definition", file)
+			log.Err(
+				"initializePlugins: GetExternalComponent function in %s has some incorrect definition",
+				file,
+			)
+			return fmt.Errorf(
+				"GetExternalComponent function in %s has some incorrect definition",
+				file,
+			)
 		}
 
 		compName, initExternalComponent := getExternalComponent()

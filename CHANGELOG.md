@@ -1,5 +1,22 @@
 # Cloudfuse Changelog #
 
+## **1.11.0** ##
+
+April 25th 2025
+This version is based on [blobfuse2 2.4.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.4.0) (upstream).
+
+### Features ###
+
+- [#494](https://github.com/Seagate/cloudfuse/pull/494) Adds initial support for block cache on Windows
+- [#507](https://github.com/Seagate/cloudfuse/pull/507) Change default display capacity and other defaults to more
+sensible values
+- [#478](https://github.com/Seagate/cloudfuse/pull/478) Improve checksum support when using s3storage
+
+### Bug Fixes ###
+
+- [#520](https://github.com/Seagate/cloudfuse/pull/520) Unmount on Windows is no longer case sensitive
+- [#513](https://github.com/Seagate/cloudfuse/pull/513) Change default log level of GUI
+
 ## **1.10.0** ##
 
 March 28th 2025

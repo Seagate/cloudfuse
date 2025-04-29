@@ -4,7 +4,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -56,7 +56,14 @@ func NotifyMountToParent() error {
 	return nil
 }
 
-var duPath []string = []string{"/usr/bin/du", "/usr/local/bin/du", "/usr/sbin/du", "/usr/local/sbin/du", "/sbin/du", "/bin/du"}
+var duPath []string = []string{
+	"/usr/bin/du",
+	"/usr/local/bin/du",
+	"/usr/sbin/du",
+	"/usr/local/sbin/du",
+	"/sbin/du",
+	"/bin/du",
+}
 var selectedDuPath string = ""
 
 // GetUsage: The current disk usage in MB

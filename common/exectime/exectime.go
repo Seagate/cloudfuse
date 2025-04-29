@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -69,7 +69,14 @@ func (t *Timer) PrintStats() {
 		}
 		for key, stat := range t.statsMap {
 			total := stat.Mean() * time.Duration(stat.N)
-			msg := fmt.Sprintf("%s: avg=%s, std=%s, total=%s, ops/sec=%f\n", key, stat.Mean(), stat.StandardDeviation(), total, (1.0 / float64(stat.Mean().Seconds())))
+			msg := fmt.Sprintf(
+				"%s: avg=%s, std=%s, total=%s, ops/sec=%f\n",
+				key,
+				stat.Mean(),
+				stat.StandardDeviation(),
+				total,
+				(1.0 / float64(stat.Mean().Seconds())),
+			)
 			_, err = t.out.Write([]byte(msg))
 			if err != nil {
 				fmt.Printf("Timer::PrintStats: error writing [%s]\n", err)

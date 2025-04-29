@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -71,13 +71,13 @@ func (suite *utilTestSuite) TestIsMountActiveNoMount() {
 	cmd := exec.Command("../cloudfuse", "unmount", "all")
 	cmd.Stdout = &out
 	err := cmd.Run()
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	cmd = exec.Command("pidof", "cloudfuse")
 	cmd.Stdout = &out
 	err = cmd.Run()
 	suite.assert.Equal("exit status 1", err.Error())
 	res, err := IsMountActive("/mnt/cloudfuse")
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.False(res)
 }
 

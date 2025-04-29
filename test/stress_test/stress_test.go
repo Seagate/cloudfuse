@@ -5,7 +5,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -69,7 +69,8 @@ func downloadWorker(t *testing.T, id int, jobs <-chan string, results chan<- int
 			}
 		}
 		if i == retryCount {
-			t.FailNow()
+			t.Error()
+			return
 		}
 
 		//t.Log("Opened File : %s/%s.tst \n", item.baseDir, item.fileName)
@@ -82,7 +83,8 @@ func uploadWorker(t *testing.T, id int, jobs <-chan workItem, results chan<- int
 		if item.optType == 1 {
 			errDir := os.MkdirAll(item.baseDir+"/"+item.dirName, 0755)
 			if errDir != nil {
-				t.FailNow()
+				t.Error()
+				return
 			}
 			//t.Log("#")
 			//t.Log("Created Directory : %s/%s \n", item.baseDir, item.dirName)
@@ -100,7 +102,8 @@ func uploadWorker(t *testing.T, id int, jobs <-chan workItem, results chan<- int
 			}
 
 			if i == retryCount {
-				t.FailNow()
+				t.Error()
+				return
 			}
 
 			//t.Log("Created File : %s/%s.tst \n", item.baseDir, item.fileName)
@@ -202,10 +205,20 @@ func stressTestUpload(t *testing.T, name string, noOfDir int, noOfFiles int, fil
 	elapsed := time.Since(startTime)
 	close(results)
 
-	t.Logf("\n-----------------------------------------------------------------------------------------")
+	t.Logf(
+		"\n-----------------------------------------------------------------------------------------",
+	)
 	t.Logf("Number of directories created : %d \n", noOfDir)
-	t.Logf("Number of files created : %d  each of %s\n", noOfDir*noOfFiles, BytesCount((float64)(fileSize), ""))
-	t.Logf("%s bytes created in %f secs\n", BytesCount((float64)(fileSize*noOfDir*noOfFiles), ""), elapsed.Seconds())
+	t.Logf(
+		"Number of files created : %d  each of %s\n",
+		noOfDir*noOfFiles,
+		BytesCount((float64)(fileSize), ""),
+	)
+	t.Logf(
+		"%s bytes created in %f secs\n",
+		BytesCount((float64)(fileSize*noOfDir*noOfFiles), ""),
+		elapsed.Seconds(),
+	)
 	if elapsed.Seconds() >= 1 {
 		t.Logf("Upload Speed %s \n",
 			BytesCount(
@@ -260,7 +273,11 @@ func stressTestDownload(t *testing.T, name string, noOfDir int, noOfFiles int, f
 	elapsed := time.Since(startTime)
 
 	t.Logf("\nTotal files downloaded : %d\n", totalFiles)
-	t.Logf("%s bytes read in %.2f secs\n", BytesCount((float64)(totalBytes), ""), (float64)(elapsed.Seconds()))
+	t.Logf(
+		"%s bytes read in %.2f secs\n",
+		BytesCount((float64)(totalBytes), ""),
+		(float64)(elapsed.Seconds()),
+	)
 	if elapsed.Seconds() >= 1 {
 		t.Logf("Download Speed %s \n",
 			BytesCount(
@@ -274,7 +291,9 @@ func stressTestDownload(t *testing.T, name string, noOfDir int, noOfFiles int, f
 	}
 	t.Log("Cleaning up...")
 	os.RemoveAll(baseDir + "/" + name)
-	t.Log("-----------------------------------------------------------------------------------------")
+	t.Log(
+		"-----------------------------------------------------------------------------------------",
+	)
 
 }
 
@@ -351,7 +370,10 @@ func TestMain(m *testing.M) {
 
 	err := os.RemoveAll(baseDir)
 	if err != nil {
-		fmt.Printf("StressTest : Could not cleanup stress dir before testing. Here's why: %v\n", err)
+		fmt.Printf(
+			"StressTest : Could not cleanup stress dir before testing. Here's why: %v\n",
+			err,
+		)
 	}
 
 	err = os.Mkdir(baseDir, 0777)

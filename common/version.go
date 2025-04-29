@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -46,7 +46,8 @@ func ParseVersion(raw string) (*Version, error) {
 	const standardError = "invalid version string"
 
 	rawSegments := strings.Split(raw, ".")
-	if len(rawSegments) != 3 && (len(rawSegments) != 4 || (!strings.Contains(rawSegments[2], "-") && !strings.Contains(rawSegments[2], "~"))) {
+	if len(rawSegments) != 3 &&
+		(len(rawSegments) != 4 || (!strings.Contains(rawSegments[2], "-") && !strings.Contains(rawSegments[2], "~"))) {
 		return nil, errors.New(standardError)
 	}
 

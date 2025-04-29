@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -59,12 +59,12 @@ type AttrCache struct {
 
 // Structure defining your config parameters
 type AttrCacheOptions struct {
-	Timeout        uint32 `config:"timeout-sec" yaml:"timeout-sec,omitempty"`
+	Timeout        uint32 `config:"timeout-sec"      yaml:"timeout-sec,omitempty"`
 	NoCacheOnList  bool   `config:"no-cache-on-list" yaml:"no-cache-on-list,omitempty"`
-	EnableSymlinks bool   `config:"enable-symlinks" yaml:"enable-symlinks,omitempty"`
-	NoCacheDirs    bool   `config:"no-cache-dirs" yaml:"no-cache-dirs,omitempty"`
+	EnableSymlinks bool   `config:"enable-symlinks"  yaml:"enable-symlinks,omitempty"`
+	NoCacheDirs    bool   `config:"no-cache-dirs"    yaml:"no-cache-dirs,omitempty"`
 	// hidden option for backward compatibility
-	NoSymlinks bool `config:"no-symlinks" yaml:"no-symlinks,omitempty"`
+	NoSymlinks bool `config:"no-symlinks"      yaml:"no-symlinks,omitempty"`
 
 	//maximum file attributes overall to be cached
 	MaxFiles int `config:"max-files" yaml:"max-files,omitempty"`
@@ -168,8 +168,13 @@ func (ac *AttrCache) Configure(_ bool) error {
 
 	ac.cacheDirs = !conf.NoCacheDirs
 
-	log.Crit("AttrCache::Configure : cache-timeout %d, enable-symlinks %t, cache-on-list %t, max-files %d",
-		ac.cacheTimeout, ac.enableSymlinks, ac.cacheOnList, ac.maxFiles)
+	log.Crit(
+		"AttrCache::Configure : cache-timeout %d, enable-symlinks %t, cache-on-list %t, max-files %d",
+		ac.cacheTimeout,
+		ac.enableSymlinks,
+		ac.cacheOnList,
+		ac.maxFiles,
+	)
 
 	return nil
 }
@@ -268,7 +273,12 @@ func (ac *AttrCache) invalidateDirectory(path string) {
 }
 
 // move an item to a new location, and return the destination item
-func (ac *AttrCache) moveCachedItem(srcItem *attrCacheItem, srcDir string, dstDir string, movedAt time.Time) *attrCacheItem {
+func (ac *AttrCache) moveCachedItem(
+	srcItem *attrCacheItem,
+	srcDir string,
+	dstDir string,
+	movedAt time.Time,
+) *attrCacheItem {
 	// don't move deleted items
 	if !srcItem.exists() {
 		return nil
@@ -379,7 +389,10 @@ func (ac *AttrCache) DeleteDir(options internal.DeleteDirOptions) error {
 }
 
 // merge results from our cache into pathMap
-func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*internal.ObjAttr) ([]*internal.ObjAttr, int) {
+func (ac *AttrCache) addDirsNotInCloudToListing(
+	listPath string,
+	pathList []*internal.ObjAttr,
+) ([]*internal.ObjAttr, int) {
 	numAdded := 0
 
 	dir, found := ac.cache.get(listPath)
@@ -401,7 +414,9 @@ func (ac *AttrCache) addDirsNotInCloudToListing(listPath string, pathList []*int
 }
 
 // StreamDir : Optionally cache attributes of paths returned by next component
-func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.ObjAttr, string, error) {
+func (ac *AttrCache) StreamDir(
+	options internal.StreamDirOptions,
+) ([]*internal.ObjAttr, string, error) {
 	log.Trace("AttrCache::StreamDir : %s, token=\"%s\"", options.Name, options.Token)
 
 	// try to fetch listing from cache
@@ -435,18 +450,28 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 	}
 	// add cached items in
 	if len(cachedPathList) > 0 {
-		log.Info("AttrCache::StreamDir : %s merging in %d list cache entries...", options.Name, len(cachedPathList))
+		log.Info(
+			"AttrCache::StreamDir : %s merging in %d list cache entries...",
+			options.Name,
+			len(cachedPathList),
+		)
 		pathList = append(pathList, cachedPathList...)
 	}
 	// values should be returned in ascending order by key, without duplicates
 	// sort
-	slices.SortFunc[[]*internal.ObjAttr, *internal.ObjAttr](pathList, func(a, b *internal.ObjAttr) int {
-		return strings.Compare(a.Path, b.Path)
-	})
+	slices.SortFunc[[]*internal.ObjAttr, *internal.ObjAttr](
+		pathList,
+		func(a, b *internal.ObjAttr) int {
+			return strings.Compare(a.Path, b.Path)
+		},
+	)
 	// remove duplicates
-	pathList = slices.CompactFunc[[]*internal.ObjAttr, *internal.ObjAttr](pathList, func(a, b *internal.ObjAttr) bool {
-		return a.Path == b.Path
-	})
+	pathList = slices.CompactFunc[[]*internal.ObjAttr, *internal.ObjAttr](
+		pathList,
+		func(a, b *internal.ObjAttr) bool {
+			return a.Path == b.Path
+		},
+	)
 	ac.cacheListSegment(pathList, options.Name, options.Token, nextToken)
 	log.Trace("AttrCache::StreamDir : %s returning %d entries", options.Name, len(pathList))
 	return pathList, nextToken, err
@@ -456,7 +481,10 @@ func (ac *AttrCache) StreamDir(options internal.StreamDirOptions) ([]*internal.O
 // Any request other than a request for the next page will return all children,
 // and the token for the next page (if there is one).
 // If page requests are repeated or backtrack, this may cause unexpected OS behavior.
-func (ac *AttrCache) fetchCachedDirList(path string, token string) ([]*internal.ObjAttr, string, error) {
+func (ac *AttrCache) fetchCachedDirList(
+	path string,
+	token string,
+) ([]*internal.ObjAttr, string, error) {
 	var pathList []*internal.ObjAttr
 	if !ac.cacheOnList {
 		return pathList, "", fmt.Errorf("cache on list is disabled")
@@ -486,7 +514,11 @@ func (ac *AttrCache) fetchCachedDirList(path string, token string) ([]*internal.
 		log.Info("AttrCache::fetchCachedDirList : %s listing segment %s cache expired", path, token)
 		// drop the invalid segment from the list cache
 		delete(listDirCache.listCache, token)
-		return pathList, "", fmt.Errorf("%s directory listing segment %s cache expired", path, token)
+		return pathList, "", fmt.Errorf(
+			"%s directory listing segment %s cache expired",
+			path,
+			token,
+		)
 	}
 	log.Trace("AttrCache::fetchCachedDirList : %s token=\"%s\"->\"%s\" serving %d items from cache",
 		path, token, cachedListSegment.nextToken, len(cachedListSegment.entries))
@@ -523,7 +555,11 @@ func (ac *AttrCache) cacheAttributes(pathList []*internal.ObjAttr, listDirPath s
 
 // cacheListSegment : On dir listing cache the listing
 // this will lock and release the mutex for writing
-func (ac *AttrCache) cacheListSegment(pathList []*internal.ObjAttr, listDirPath string, token, nextToken string) {
+func (ac *AttrCache) cacheListSegment(
+	pathList []*internal.ObjAttr,
+	listDirPath string,
+	token, nextToken string,
+) {
 	// Check whether or not we are supposed to cache on list
 	if !ac.cacheOnList {
 		return
@@ -540,7 +576,11 @@ func (ac *AttrCache) cacheListSegment(pathList []*internal.ObjAttr, listDirPath 
 		log.Err("AttrCache::cacheListSegment : %s directory not found in cache", listDirPath)
 		return
 	}
-	newListCacheSegment := listCacheSegment{entries: pathList, nextToken: nextToken, cachedAt: currTime}
+	newListCacheSegment := listCacheSegment{
+		entries:   pathList,
+		nextToken: nextToken,
+		cachedAt:  currTime,
+	}
 	if listDirItem.listCache == nil {
 		listDirItem.listCache = make(map[string]listCacheSegment)
 	}
@@ -562,7 +602,10 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 
 	// This function only has a use if we're caching directories
 	if !ac.cacheDirs {
-		log.Debug("AttrCache::IsDirEmpty : %s Dir cache is disabled. Checking with container", options.Name)
+		log.Debug(
+			"AttrCache::IsDirEmpty : %s Dir cache is disabled. Checking with container",
+			options.Name,
+		)
 		return ac.NextComponent().IsDirEmpty(options)
 	}
 	// Is the directory in our cache?
@@ -571,7 +614,10 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	ac.cacheLock.RUnlock()
 	// If the directory does not exist in the attribute cache then let the next component answer
 	if !pathInCache {
-		log.Debug("AttrCache::IsDirEmpty : %s not found in attr_cache. Checking with container", options.Name)
+		log.Debug(
+			"AttrCache::IsDirEmpty : %s not found in attr_cache. Checking with container",
+			options.Name,
+		)
 		return ac.NextComponent().IsDirEmpty(options)
 	}
 	log.Debug("AttrCache::IsDirEmpty : %s found in attr_cache", options.Name)
@@ -581,7 +627,10 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 		return false
 	}
 	// Dir is in cache but no contents are, so check with container
-	log.Debug("AttrCache::IsDirEmpty : %s children not found in cache. Checking with container", options.Name)
+	log.Debug(
+		"AttrCache::IsDirEmpty : %s children not found in cache. Checking with container",
+		options.Name,
+	)
 	return ac.NextComponent().IsDirEmpty(options)
 }
 
@@ -706,7 +755,10 @@ func (ac *AttrCache) DeleteFile(options internal.DeleteFileOptions) error {
 		defer ac.cacheLock.Unlock()
 		toBeDeleted, found := ac.cache.get(options.Name)
 		if !found || !toBeDeleted.valid() {
-			log.Warn("AttrCache::DeleteFile : %s no valid entry found. Adding entry...", options.Name)
+			log.Warn(
+				"AttrCache::DeleteFile : %s no valid entry found. Adding entry...",
+				options.Name,
+			)
 			// add deleted file entry
 			attr := internal.CreateObjAttr(options.Name, 0, deletionTime)
 			toBeDeleted = ac.cache.insert(insertOptions{
@@ -791,7 +843,9 @@ func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 func (ac *AttrCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	// GetAttr on cache hit will serve from cache, on cache miss will serve from next component.
-	attr, err := ac.GetAttr(internal.GetAttrOptions{Name: options.Handle.Path, RetrieveMetadata: true})
+	attr, err := ac.GetAttr(
+		internal.GetAttrOptions{Name: options.Handle.Path, RetrieveMetadata: true},
+	)
 	if err != nil {
 		// Ignore not exists errors - this can happen if createEmptyFile is set to false
 		if !os.IsNotExist(err) && err != syscall.ENOENT {
@@ -1006,7 +1060,11 @@ func (ac *AttrCache) CreateLink(options internal.CreateLinkOptions) error {
 		currentTime := time.Now()
 		ac.cacheLock.Lock()
 		defer ac.cacheLock.Unlock()
-		linkAttr := internal.CreateObjAttr(options.Name, int64(len([]byte(options.Target))), currentTime)
+		linkAttr := internal.CreateObjAttr(
+			options.Name,
+			int64(len([]byte(options.Target))),
+			currentTime,
+		)
 		linkAttr.Flags.Set(internal.PropFlagSymlink)
 		ac.cache.insert(insertOptions{
 			attr:     linkAttr,
@@ -1099,12 +1157,24 @@ func NewAttrCacheComponent() internal.Component {
 func init() {
 	internal.AddComponent(compName, NewAttrCacheComponent)
 
-	attrCacheTimeout := config.AddUint32Flag("attr-cache-timeout", defaultAttrCacheTimeout, "attribute cache timeout")
+	attrCacheTimeout := config.AddUint32Flag(
+		"attr-cache-timeout",
+		defaultAttrCacheTimeout,
+		"attribute cache timeout",
+	)
 	config.BindPFlag(compName+".timeout-sec", attrCacheTimeout)
 
-	enableSymlinks := config.AddBoolFlag("enable-symlinks", false, "whether or not symlinks should be supported")
+	enableSymlinks := config.AddBoolFlag(
+		"enable-symlinks",
+		false,
+		"whether or not symlinks should be supported",
+	)
 	config.BindPFlag(compName+".enable-symlinks", enableSymlinks)
-	noCacheDirs := config.AddBoolFlag("no-cache-dirs", false, "whether or not empty directories should be cached")
+	noCacheDirs := config.AddBoolFlag(
+		"no-cache-dirs",
+		false,
+		"whether or not empty directories should be cached",
+	)
 	config.BindPFlag(compName+".no-cache-dirs", noCacheDirs)
 
 	cacheOnList := config.AddBoolFlag("cache-on-list", true, "Cache attributes on listing.")

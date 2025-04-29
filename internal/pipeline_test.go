@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -100,13 +100,13 @@ type pipelineTestSuite struct {
 	assert *assert.Assertions
 }
 
-func (suite *pipelineTestSuite) SetupTest() {
+func (s *pipelineTestSuite) SetupTest() {
 	AddComponent("ComponentA", NewComponentA)
 	AddComponent("ComponentB", NewComponentB)
 	AddComponent("ComponentC", NewComponentC)
 	AddComponent("stream", NewComponentStream)
 	AddComponent("block_cache", NewComponentBlockCache)
-	suite.assert = assert.New(suite.T())
+	s.assert = assert.New(s.T())
 	err := log.SetDefaultLogger("silent", common.LogConfig{})
 	if err != nil {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
@@ -143,8 +143,8 @@ func (s *pipelineTestSuite) TestStartStopCreateNewPipeline() {
 
 func (s *pipelineTestSuite) TestStreamToBlockCacheConfig() {
 	p, err := NewPipeline([]string{"stream"}, false)
-	s.assert.Nil(err)
-	s.assert.Equal(p.components[0].Name(), "block_cache")
+	s.assert.NoError(err)
+	s.assert.Equal("block_cache", p.components[0].Name())
 }
 
 func TestPipelineTestSuite(t *testing.T) {

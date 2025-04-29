@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -61,23 +61,40 @@ func (rw *ReadWriteFilenameCache) Configure(conf StreamOptions) error {
 	return nil
 }
 
-func (rw *ReadWriteFilenameCache) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
+func (rw *ReadWriteFilenameCache) CreateFile(
+	options internal.CreateFileOptions,
+) (*handlemap.Handle, error) {
 	log.Trace("Stream::CreateFile : name=%s, mode=%s", options.Name, options.Mode)
 	handle, err := rw.NextComponent().CreateFile(options)
 	if err != nil {
-		log.Err("Stream::CreateFile : error failed to create file %s: [%s]", options.Name, err.Error())
+		log.Err(
+			"Stream::CreateFile : error failed to create file %s: [%s]",
+			options.Name,
+			err.Error(),
+		)
 	}
 	if !rw.StreamOnly {
 		err = rw.createFileCache(handle)
 		if err != nil {
-			log.Err("Stream::CreateFile : error creating cache object %s [%s]", options.Name, err.Error())
+			log.Err(
+				"Stream::CreateFile : error creating cache object %s [%s]",
+				options.Name,
+				err.Error(),
+			)
 		}
 	}
 	return handle, err
 }
 
-func (rw *ReadWriteFilenameCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
-	log.Trace("Stream::OpenFile : name=%s, flags=%d, mode=%s", options.Name, options.Flags, options.Mode)
+func (rw *ReadWriteFilenameCache) OpenFile(
+	options internal.OpenFileOptions,
+) (*handlemap.Handle, error) {
+	log.Trace(
+		"Stream::OpenFile : name=%s, flags=%d, mode=%s",
+		options.Name,
+		options.Flags,
+		options.Mode,
+	)
 	handle, err := rw.NextComponent().OpenFile(options)
 	if err != nil {
 		log.Err("Stream::OpenFile : error failed to open file %s [%s]", options.Name, err.Error())
@@ -86,7 +103,11 @@ func (rw *ReadWriteFilenameCache) OpenFile(options internal.OpenFileOptions) (*h
 	if !rw.StreamOnly {
 		err = rw.createFileCache(handle)
 		if err != nil {
-			log.Err("Stream::OpenFile : error failed to create cache object %s [%s]", options.Name, err.Error())
+			log.Err(
+				"Stream::OpenFile : error failed to create cache object %s [%s]",
+				options.Name,
+				err.Error(),
+			)
 		}
 	}
 	return handle, err
@@ -97,14 +118,22 @@ func (rw *ReadWriteFilenameCache) ReadInBuffer(options internal.ReadInBufferOpti
 	if !rw.StreamOnly && options.Handle.CacheObj.StreamOnly {
 		err := rw.createFileCache(options.Handle)
 		if err != nil {
-			log.Err("Stream::ReadInBuffer : error failed to create cache object  %s [%s]", options.Handle.Path, err.Error())
+			log.Err(
+				"Stream::ReadInBuffer : error failed to create cache object  %s [%s]",
+				options.Handle.Path,
+				err.Error(),
+			)
 			return 0, err
 		}
 	}
 	if rw.StreamOnly || options.Handle.CacheObj.StreamOnly {
 		data, err := rw.NextComponent().ReadInBuffer(options)
 		if err != nil && err != io.EOF {
-			log.Err("Stream::ReadInBuffer : error failed to download requested data for %s: [%s]", options.Handle.Path, err.Error())
+			log.Err(
+				"Stream::ReadInBuffer : error failed to download requested data for %s: [%s]",
+				options.Handle.Path,
+				err.Error(),
+			)
 		}
 		return data, err
 	}
@@ -113,7 +142,11 @@ func (rw *ReadWriteFilenameCache) ReadInBuffer(options internal.ReadInBufferOpti
 	}
 	read, err := rw.readWriteBlocks(options.Handle, options.Offset, options.Data, false)
 	if err != nil {
-		log.Err("Stream::ReadInBuffer : error failed to download requested data for %s: [%s]", options.Handle.Path, err.Error())
+		log.Err(
+			"Stream::ReadInBuffer : error failed to download requested data for %s: [%s]",
+			options.Handle.Path,
+			err.Error(),
+		)
 	}
 	return read, err
 }
@@ -123,20 +156,32 @@ func (rw *ReadWriteFilenameCache) WriteFile(options internal.WriteFileOptions) (
 	if !rw.StreamOnly && options.Handle.CacheObj.StreamOnly {
 		err := rw.createFileCache(options.Handle)
 		if err != nil {
-			log.Err("Stream::WriteFile : error failed to create cache object %s [%s]", options.Handle.Path, err.Error())
+			log.Err(
+				"Stream::WriteFile : error failed to create cache object %s [%s]",
+				options.Handle.Path,
+				err.Error(),
+			)
 			return 0, err
 		}
 	}
 	if rw.StreamOnly || options.Handle.CacheObj.StreamOnly {
 		data, err := rw.NextComponent().WriteFile(options)
 		if err != nil && err != io.EOF {
-			log.Err("Stream::WriteFile : error failed to write data to %s: [%s]", options.Handle.Path, err.Error())
+			log.Err(
+				"Stream::WriteFile : error failed to write data to %s: [%s]",
+				options.Handle.Path,
+				err.Error(),
+			)
 		}
 		return data, err
 	}
 	written, err := rw.readWriteBlocks(options.Handle, options.Offset, options.Data, true)
 	if err != nil {
-		log.Err("Stream::WriteFile : error failed to write data to %s: [%s]", options.Handle.Path, err.Error())
+		log.Err(
+			"Stream::WriteFile : error failed to write data to %s: [%s]",
+			options.Handle.Path,
+			err.Error(),
+		)
 	}
 	options.Handle.Flags.Set(handlemap.HandleFlagDirty)
 	return written, err
@@ -192,7 +237,11 @@ func (rw *ReadWriteFilenameCache) FlushFile(options internal.FlushFileOptions) e
 	if options.Handle.Dirty() {
 		err := rw.NextComponent().FlushFile(options)
 		if err != nil {
-			log.Err("Stream::FlushFile : error flushing file %s [%s]", options.Handle.Path, err.Error())
+			log.Err(
+				"Stream::FlushFile : error flushing file %s [%s]",
+				options.Handle.Path,
+				err.Error(),
+			)
 			return err
 		}
 		options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
@@ -222,7 +271,11 @@ func (rw *ReadWriteFilenameCache) DeleteDirectory(options internal.DeleteDirOpti
 	}
 	err := rw.NextComponent().DeleteDir(options)
 	if err != nil {
-		log.Err("Stream::DeleteDirectory : error deleting directory %s [%s]", options.Name, err.Error())
+		log.Err(
+			"Stream::DeleteDirectory : error deleting directory %s [%s]",
+			options.Name,
+			err.Error(),
+		)
 		return err
 	}
 	return nil
@@ -237,7 +290,11 @@ func (rw *ReadWriteFilenameCache) RenameDirectory(options internal.RenameDirOpti
 	}
 	err := rw.NextComponent().RenameDir(options)
 	if err != nil {
-		log.Err("Stream::RenameDirectory : error renaming directory %s [%s]", options.Src, err.Error())
+		log.Err(
+			"Stream::RenameDirectory : error renaming directory %s [%s]",
+			options.Src,
+			err.Error(),
+		)
 		return err
 	}
 	return nil
@@ -261,7 +318,9 @@ func (rw *ReadWriteFilenameCache) Stop() error {
 }
 
 // GetAttr : Try to serve the request from the attribute cache, otherwise cache attributes of the path returned by next component
-func (rw *ReadWriteFilenameCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr, error) {
+func (rw *ReadWriteFilenameCache) GetAttr(
+	options internal.GetAttrOptions,
+) (*internal.ObjAttr, error) {
 	// log.Trace("AttrCache::GetAttr : %s", options.Name)
 	attrs, err := rw.NextComponent().GetAttr(options)
 	if err != nil {
@@ -353,7 +412,11 @@ func (rw *ReadWriteFilenameCache) createFileCache(handle *handlemap.Handle) erro
 	}
 }
 
-func (rw *ReadWriteFilenameCache) putBlock(handle *handlemap.Handle, buffer *handlemap.Cache, block *common.Block) error {
+func (rw *ReadWriteFilenameCache) putBlock(
+	handle *handlemap.Handle,
+	buffer *handlemap.Cache,
+	block *common.Block,
+) error {
 	ok := buffer.Put(block.StartIndex, block)
 	// if the cache is full and we couldn't evict - we need to do a flush
 	if !ok {
@@ -370,7 +433,10 @@ func (rw *ReadWriteFilenameCache) putBlock(handle *handlemap.Handle, buffer *han
 	return nil
 }
 
-func (rw *ReadWriteFilenameCache) getBlock(handle *handlemap.Handle, block *common.Block) (*common.Block, bool, error) {
+func (rw *ReadWriteFilenameCache) getBlock(
+	handle *handlemap.Handle,
+	block *common.Block,
+) (*common.Block, bool, error) {
 	cached_block, found := handle.CacheObj.Get(block.StartIndex)
 	if !found {
 		block.Data = make([]byte, block.EndIndex-block.StartIndex)
@@ -396,7 +462,12 @@ func (rw *ReadWriteFilenameCache) getBlock(handle *handlemap.Handle, block *comm
 	return cached_block, true, nil
 }
 
-func (rw *ReadWriteFilenameCache) readWriteBlocks(handle *handlemap.Handle, offset int64, data []byte, write bool) (int, error) {
+func (rw *ReadWriteFilenameCache) readWriteBlocks(
+	handle *handlemap.Handle,
+	offset int64,
+	data []byte,
+	write bool,
+) (int, error) {
 	// if it's not a small file then we look the blocks it consistts of
 	handle.CacheObj.Lock()
 	defer handle.CacheObj.Unlock()
@@ -414,7 +485,9 @@ func (rw *ReadWriteFilenameCache) readWriteBlocks(handle *handlemap.Handle, offs
 				return dataRead, err
 			}
 			if write {
-				dataCopied = int64(copy(block.Data[offset-blocks[blk_index].StartIndex:], data[dataRead:]))
+				dataCopied = int64(
+					copy(block.Data[offset-blocks[blk_index].StartIndex:], data[dataRead:]),
+				)
 				block.Flags.Set(common.DirtyBlock)
 			} else {
 				dataCopied = int64(copy(data[dataRead:], block.Data[offset-blocks[blk_index].StartIndex:]))
@@ -473,7 +546,11 @@ func (rw *ReadWriteFilenameCache) readWriteBlocks(handle *handlemap.Handle, offs
 }
 
 func (rw *ReadWriteFilenameCache) SyncFile(options internal.SyncFileOptions) error {
-	log.Trace("ReadWriteFilenameCache::SyncFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
+	log.Trace(
+		"ReadWriteFilenameCache::SyncFile : handle=%d, path=%s",
+		options.Handle.ID,
+		options.Handle.Path,
+	)
 
 	err := rw.FlushFile(internal.FlushFileOptions{Handle: options.Handle})
 	if err != nil {

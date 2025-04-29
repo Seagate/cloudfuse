@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -108,7 +108,7 @@ func (suite *cacheMapTestSuite) TestInsert() {
 	suite.assert.NotNil(cachedItem)
 	suite.assert.Equal(filePath, cachedItem.attr.Path)
 	suite.assert.Equal(newSize, cachedItem.attr.Size)
-	suite.assert.EqualValues(newTime, cachedItem.attr.Mtime)
+	suite.assert.Equal(newTime, cachedItem.attr.Mtime)
 	suite.assert.False(cachedItem.attr.IsDir())
 	suite.assert.Same(insertedItem, cachedItem)
 

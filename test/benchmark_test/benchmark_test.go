@@ -5,7 +5,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -86,7 +86,8 @@ func (suite *benchmarkSuite) TestCreateSingleFiles() {
 		if err != nil {
 			suite.T().Logf("error computing std for %.2fGB file [%s]\n", size, err)
 		}
-		suite.T().Logf("Standard Deviation of create files for %.2fGB files=%s\n", size, time.Duration(std))
+		suite.T().
+			Logf("Standard Deviation of create files for %.2fGB files=%s\n", size, time.Duration(std))
 	}
 }
 
@@ -97,7 +98,11 @@ func TestBenchmarkSuite(t *testing.T) {
 func TestMain(m *testing.M) {
 	pathFlag := flag.String("mnt-path", ".", "Mount Path of container")
 	nFlag := flag.Int("n", 5, "Number of times to run a test.")
-	fileSizesFlag := flag.String("sizes", "0.5,1,2,3,4", "List different sizes of uploads to run. All values are specified in GBs. Default sizes=0.5,1,2,3,4")
+	fileSizesFlag := flag.String(
+		"sizes",
+		"0.5,1,2,3,4",
+		"List different sizes of uploads to run. All values are specified in GBs. Default sizes=0.5,1,2,3,4",
+	)
 
 	flag.Parse()
 

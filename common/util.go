@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -116,7 +116,11 @@ func IsMountActive(path string) (bool, error) {
 
 		err := cmd.Run()
 		if err != nil {
-			return true, fmt.Errorf("failed to get command line arguments for pid %s [%v]", pid, err.Error())
+			return true, fmt.Errorf(
+				"failed to get command line arguments for pid %s [%v]",
+				pid,
+				err.Error(),
+			)
 		}
 
 		if strings.Contains(out.String(), path) {
@@ -189,7 +193,10 @@ func GetCurrentUser() (uint32, uint32, error) {
 
 		out, err := exec.Command(`C:\Program Files (x86)\WinFsp\bin\fsptool-x64.exe`, "id").Output()
 		if err != nil {
-			return 0, 0, fmt.Errorf("is WinFSP installed? 'fsptool-x64.exe id' failed with error: %w", err)
+			return 0, 0, fmt.Errorf(
+				"is WinFSP installed? 'fsptool-x64.exe id' failed with error: %w",
+				err,
+			)
 		}
 
 		idMap := make(map[string]string)

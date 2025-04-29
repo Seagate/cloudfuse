@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -73,19 +73,27 @@ type azAuthBlobSAS struct {
 // getServiceClient : returns SAS based service client for blob
 func (azsas *azAuthBlobSAS) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	if azsas.config.SASKey == nil {
-		log.Err("azAuthBlobSAS::getServiceClient : SAS key for account is empty, cannot authenticate user")
+		log.Err(
+			"azAuthBlobSAS::getServiceClient : SAS key for account is empty, cannot authenticate user",
+		)
 		return nil, errors.New("sas key for account is empty, cannot authenticate user")
 	}
 
 	opts, err := getAzBlobServiceClientOptions(stConfig)
 	if err != nil {
-		log.Err("azAuthBlobSAS::getServiceClient : Failed to create client options [%s]", err.Error())
+		log.Err(
+			"azAuthBlobSAS::getServiceClient : Failed to create client options [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	svcClient, err := service.NewClientWithNoCredential(azsas.getEndpoint(), opts)
 	if err != nil {
-		log.Err("azAuthBlobSAS::getServiceClient : Failed to create service client [%s]", err.Error())
+		log.Err(
+			"azAuthBlobSAS::getServiceClient : Failed to create service client [%s]",
+			err.Error(),
+		)
 	}
 
 	return svcClient, err
@@ -98,19 +106,27 @@ type azAuthDatalakeSAS struct {
 // getServiceClient : returns SAS based service client for datalake
 func (azsas *azAuthDatalakeSAS) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	if azsas.config.SASKey == nil {
-		log.Err("azAuthDatalakeSAS::getServiceClient : SAS key for account is empty, cannot authenticate user")
+		log.Err(
+			"azAuthDatalakeSAS::getServiceClient : SAS key for account is empty, cannot authenticate user",
+		)
 		return nil, errors.New("sas key for account is empty, cannot authenticate user")
 	}
 
 	opts, err := getAzDatalakeServiceClientOptions(stConfig)
 	if err != nil {
-		log.Err("azAuthDatalakeSAS::getServiceClient : Failed to create client options [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeSAS::getServiceClient : Failed to create client options [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	svcClient, err := serviceBfs.NewClientWithNoCredential(azsas.getEndpoint(), opts)
 	if err != nil {
-		log.Err("azAuthDatalakeSAS::getServiceClient : Failed to create service client [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeSAS::getServiceClient : Failed to create service client [%s]",
+			err.Error(),
+		)
 	}
 
 	return svcClient, err

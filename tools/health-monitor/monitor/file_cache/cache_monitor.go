@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -177,7 +177,9 @@ func (fc *FileCache) createEvent(event *watcher.Event) {
 		delete(fc.cacheObj.fileRemovedMap, event.Path)
 		fc.cacheObj.fileCreatedMap[event.Path] = event.Size()
 		fc.cacheObj.cacheSize += event.Size()
-		fc.cacheObj.cacheConsumed = (float64)(fc.cacheObj.cacheSize*100) / (fc.maxSizeMB * common.MbToBytes)
+		fc.cacheObj.cacheConsumed = (float64)(
+			fc.cacheObj.cacheSize*100,
+		) / (fc.maxSizeMB * common.MbToBytes)
 	}
 
 	e := fc.getCacheEventObj(event)
@@ -193,7 +195,9 @@ func (fc *FileCache) removeEvent(event *watcher.Event) {
 		delete(fc.cacheObj.fileCreatedMap, event.Path)
 		fc.cacheObj.fileRemovedMap[event.Path] = event.Size()
 		fc.cacheObj.cacheSize = int64(math.Max(0, float64(fc.cacheObj.cacheSize-event.Size())))
-		fc.cacheObj.cacheConsumed = (float64)(fc.cacheObj.cacheSize*100) / (fc.maxSizeMB * common.MbToBytes)
+		fc.cacheObj.cacheConsumed = (float64)(
+			fc.cacheObj.cacheSize*100,
+		) / (fc.maxSizeMB * common.MbToBytes)
 	}
 
 	e := fc.getCacheEventObj(event)
@@ -212,7 +216,9 @@ func (fc *FileCache) chmodEvent(event *watcher.Event) {
 		if fileSize != event.Size() {
 			fc.cacheObj.cacheSize += event.Size() - fileSize
 			fc.cacheObj.fileCreatedMap[event.Path] = event.Size()
-			fc.cacheObj.cacheConsumed = (float64)(fc.cacheObj.cacheSize*100) / (fc.maxSizeMB * common.MbToBytes)
+			fc.cacheObj.cacheConsumed = (float64)(
+				fc.cacheObj.cacheSize*100,
+			) / (fc.maxSizeMB * common.MbToBytes)
 		}
 	}
 
@@ -233,7 +239,9 @@ func (fc *FileCache) writeEvent(event *watcher.Event) {
 
 		fc.cacheObj.cacheSize += event.Size() - fileSize
 		fc.cacheObj.fileCreatedMap[event.Path] = event.Size()
-		fc.cacheObj.cacheConsumed = (float64)(fc.cacheObj.cacheSize*100) / (fc.maxSizeMB * common.MbToBytes)
+		fc.cacheObj.cacheConsumed = (float64)(
+			fc.cacheObj.cacheSize*100,
+		) / (fc.maxSizeMB * common.MbToBytes)
 	} else {
 		return
 	}

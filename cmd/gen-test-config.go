@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -99,8 +99,11 @@ var generateTestConfig = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(generateTestConfig)
-	generateTestConfig.Flags().StringVar(&opts.configFilePath, "config-file", "", "Input config file.")
-	generateTestConfig.Flags().StringVar(&opts.outputConfigPath, "output-file", "", "Output config file path.")
-	generateTestConfig.Flags().StringVar(&opts.containerName, "container-name", "", "Container name.")
+	generateTestConfig.Flags().
+		StringVar(&opts.configFilePath, "config-file", "", "Input config file.")
+	generateTestConfig.Flags().
+		StringVar(&opts.outputConfigPath, "output-file", "", "Output config file path.")
+	generateTestConfig.Flags().
+		StringVar(&opts.containerName, "container-name", "", "Container name.")
 	generateTestConfig.Flags().StringVar(&opts.tempDirPath, "temp-path", "", "Temporary file path.")
 }

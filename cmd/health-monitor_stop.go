@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -67,7 +67,14 @@ var healthMonStop = &cobra.Command{
 // Attempts to get pid of the health monitor
 func getPid(cloudfusePid string) (string, error) {
 	if runtime.GOOS == "windows" {
-		cliOut := exec.Command("wmic", "process", "where", fmt.Sprintf("ParentProcessId=%s", cloudfusePid), "get", "ProcessId")
+		cliOut := exec.Command(
+			"wmic",
+			"process",
+			"where",
+			fmt.Sprintf("ParentProcessId=%s", cloudfusePid),
+			"get",
+			"ProcessId",
+		)
 		output, err := cliOut.Output()
 		if err != nil {
 			return "", err
@@ -93,7 +100,8 @@ func getPid(cloudfusePid string) (string, error) {
 	}
 	processes := strings.Split(string(out), "\n")
 	for _, process := range processes {
-		if strings.Contains(process, "cfusemon") && strings.Contains(process, fmt.Sprintf("--pid=%s", cloudfusePid)) {
+		if strings.Contains(process, "cfusemon") &&
+			strings.Contains(process, fmt.Sprintf("--pid=%s", cloudfusePid)) {
 			re := regexp.MustCompile(`[-]?\d[\d,]*[\.]?[\d{2}]*`)
 			pids := re.FindAllString(process, 1)
 			if pids == nil {
@@ -133,6 +141,7 @@ func init() {
 	healthMonCmd.AddCommand(healthMonStop)
 	healthMonStop.AddCommand(healthMonStopAll)
 
-	healthMonStop.Flags().StringVar(&cloudfusePid, "pid", "", "Cloudfuse PID associated with the health monitor that should be stopped")
+	healthMonStop.Flags().
+		StringVar(&cloudfusePid, "pid", "", "Cloudfuse PID associated with the health monitor that should be stopped")
 	_ = healthMonStop.MarkFlagRequired("pid")
 }

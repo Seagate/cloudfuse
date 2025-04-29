@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -66,7 +66,11 @@ func (suite *keysTreeTestSuite) TestParseValue() {
 		{val: "4294967295", toType: reflect.Uint32, result: 4294967295},
 		{val: "18446744073709551615", toType: reflect.Uint64, result: uint64(18446744073709551615)},
 		{val: "6.24321908234", toType: reflect.Float32, result: float32(6.24321908234)},
-		{val: "31247921747687123.123871293791263", toType: reflect.Float64, result: 31247921747687123.123871293791263},
+		{
+			val:    "31247921747687123.123871293791263",
+			toType: reflect.Float64,
+			result: 31247921747687123.123871293791263,
+		},
 		{val: "6-8i", toType: reflect.Complex64, result: 6 - 8i},
 		{val: "2341241-910284i", toType: reflect.Complex128, result: 2341241 - 910284i},
 		{val: "Hello World", toType: reflect.String, result: "Hello World"},
@@ -74,7 +78,7 @@ func (suite *keysTreeTestSuite) TestParseValue() {
 	for _, i := range inputs {
 		suite.Run(i.val, func() {
 			output := parseValue(i.val, i.toType)
-			suite.assert.EqualValues(i.result, output)
+			suite.assert.EqualValues(i.result, output) //nolint
 		})
 	}
 }

@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -80,9 +80,13 @@ const (
 // getAzStorageClientOptions : Create client options based on the config
 func getAzStorageClientOptions(conf *AzStorageConfig) (azcore.ClientOptions, error) {
 	retryOptions := policy.RetryOptions{
-		MaxRetries:    conf.maxRetries,                                 // Try at most 3 times to perform the operation (set to 1 to disable retries)
-		TryTimeout:    time.Second * time.Duration(conf.maxTimeout),    // Maximum time allowed for any single try
-		RetryDelay:    time.Second * time.Duration(conf.backoffTime),   // Backoff amount for each retry (exponential or linear)
+		MaxRetries: conf.maxRetries, // Try at most 3 times to perform the operation (set to 1 to disable retries)
+		TryTimeout: time.Second * time.Duration(
+			conf.maxTimeout,
+		), // Maximum time allowed for any single try
+		RetryDelay: time.Second * time.Duration(
+			conf.backoffTime,
+		), // Backoff amount for each retry (exponential or linear)
 		MaxRetryDelay: time.Second * time.Duration(conf.maxRetryDelay), // Max delay between retries
 	}
 
@@ -97,7 +101,10 @@ func getAzStorageClientOptions(conf *AzStorageConfig) (azcore.ClientOptions, err
 
 	transportOptions, err := newCloudfuseHttpClient(conf)
 	if err != nil {
-		log.Err("utils::getAzStorageClientOptions : Failed to create transport client [%s]", err.Error())
+		log.Err(
+			"utils::getAzStorageClientOptions : Failed to create transport client [%s]",
+			err.Error(),
+		)
 	}
 
 	return azcore.ClientOptions{
@@ -513,8 +520,16 @@ func getFileMode(permissions string) (os.FileMode, error) {
 	// Expect service to return a 9 char string with r, w, x, or -
 	const rwx = "rwxrwxrwx"
 	if len(rwx) > len(permissions) {
-		log.Err("utils::getFileMode : Unexpected length of permissions from the service %d: %s", len(permissions), permissions)
-		return 0, fmt.Errorf("unexpected length of permissions from the service %d: %s", len(permissions), permissions)
+		log.Err(
+			"utils::getFileMode : Unexpected length of permissions from the service %d: %s",
+			len(permissions),
+			permissions,
+		)
+		return 0, fmt.Errorf(
+			"unexpected length of permissions from the service %d: %s",
+			len(permissions),
+			permissions,
+		)
 	} else if len(rwx) < len(permissions) {
 		log.Debug("utils::getFileMode : Unexpected permissions from the service: %s", permissions)
 	}
