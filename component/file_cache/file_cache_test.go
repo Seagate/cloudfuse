@@ -981,8 +981,8 @@ func (suite *fileCacheTestSuite) TestDeleteOpenFileCase1() {
 
 	// setup
 	// Create file directly in "fake_storage" and open in case 1 (lazy open)
-	handle, _ := suite.loopback.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
-	suite.loopback.CloseFile(internal.CloseFileOptions{Handle: handle})
+	handle, _ := suite.nextComponent.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
+	suite.nextComponent.CloseFile(internal.CloseFileOptions{Handle: handle})
 	handle, _ = suite.fileCache.OpenFile(internal.OpenFileOptions{Name: path, Mode: 0777})
 
 	// Test
