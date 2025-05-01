@@ -157,7 +157,8 @@ func (p *lruPolicy) CacheValid(name string) {
 	}
 }
 
-func (p *lruPolicy) CachePurge(name string, flock *common.LockMapItem) {
+// file must be locked before calling this function
+func (p *lruPolicy) CachePurge(name string) {
 	log.Trace("lruPolicy::CachePurge : %s", name)
 
 	p.removeNode(name)
