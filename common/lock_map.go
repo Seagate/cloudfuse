@@ -87,6 +87,11 @@ func (l *LockMapItem) Unlock() {
 	l.mtx.Unlock()
 }
 
+// Check if this file is already exLocked or not
+func (l *LockMapItem) Locked() bool {
+	return l.exLocked
+}
+
 // Increment the handle count
 func (l *LockMapItem) Inc() {
 	l.handleCount++

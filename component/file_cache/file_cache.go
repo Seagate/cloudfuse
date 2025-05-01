@@ -1914,6 +1914,12 @@ func (fc *FileCache) renameCachedFile(
 	localSrcPath, localDstPath string,
 	sflock, dflock *common.LockMapItem,
 ) error {
+	// ensure files are locked
+	if !sflock.Locked() || !dflock.Locked() {
+		log.Err("FileCache::renameCachedFile : Files must be locked before calling renameCachedFile!")
+		return fmt.Errorf("Files must be locked before calling renameCachedFile!")
+	}
+	// rename local file
 	err := os.Rename(localSrcPath, localDstPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -1928,7 +1934,7 @@ func (fc *FileCache) renameCachedFile(
 				return err
 			}
 		}
-	} else if err == nil {
+	} else {
 		log.Debug("FileCache::renameCachedFile : %s -> %s Successfully renamed local file", localSrcPath, localDstPath)
 		fc.policy.CacheValid(localDstPath)
 	}
@@ -2027,6 +2033,11 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 // Chmod : Update the file with its new permissions
 func (fc *FileCache) chmodInternal(options internal.ChmodOptions, flock *common.LockMapItem) error {
 	log.Trace("FileCache::Chmod : Change mode of path %s", options.Name)
+
+	if !flock.Locked() {
+		log.Err("FileCache::Chmod : File must be locked before calling chmodInternal!")
+		return fmt.Errorf("File must be locked before calling chmodInternal!")
+	}
 
 	// Update the file in cloud storage
 	err := fc.NextComponent().Chmod(options)
