@@ -1916,7 +1916,9 @@ func (fc *FileCache) renameCachedFile(
 ) error {
 	// ensure files are locked
 	if !sflock.Locked() || !dflock.Locked() {
-		log.Err("FileCache::renameCachedFile : Files must be locked before calling renameCachedFile!")
+		log.Err(
+			"FileCache::renameCachedFile : Files must be locked before calling renameCachedFile!",
+		)
 		return fmt.Errorf("Files must be locked before calling renameCachedFile!")
 	}
 	// rename local file
