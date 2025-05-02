@@ -478,18 +478,18 @@ func isLocalDirEmpty(path string) bool {
 }
 
 func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
+	log.Trace("FileCache::CreateDir : %s", options.Name)
+
 	// if offline access is disabled, just pass this call on to the attribute cache
 	if !fc.offlineAccess {
 		return fc.NextComponent().CreateDir(options)
 	}
-	log.Trace("FileCache::CreateDir : %s", options.Name)
+
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 
 	// Do not call nextComponent.CreateDir when we are offline.
 	// Otherwise the attribute cache could go out of sync with the cloud.
-	// TODO: create a new component API function to check this (SRGDEV-614), instead of using StatFs
-	_, _, err := fc.NextComponent().StatFs()
-	if !errors.Is(err, &common.CloudUnreachableError{}) {
+	if fc.cloudConnected() {
 		// we have a cloud connection, so it's safe to call the next component
 		err := fc.NextComponent().CreateDir(options)
 		if err == nil || errors.Is(err, os.ErrExist) {
@@ -505,37 +505,31 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 
 	// we are offline
 	// check if the directory exists in cloud storage
-	_, err = fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
+	notInCloud, err := fc.checkCloud(options.Name)
 	switch {
-	case errors.Is(err, &common.CloudUnreachableError{}):
-		// the attribute cache information about this directory is expired
-		if errors.Is(err, &common.NoCachedDataError{}) {
-			// we have no information, so just return the error
-			// no ops are allowed when the directory's cloud state is unknown
-			log.Err("FileCache::CreateDir : %s GetAttr failed. We are offline and we have no attribute data for this path.", options.Name)
-		} else {
-			// we have valid information - clean up the error
-			if errors.Is(err, os.ErrNotExist) {
-				err = syscall.ENOENT
-			} else {
-				err = nil
-			}
-		}
-	case os.IsNotExist(err):
-		// the directory does not exist in the cloud
-		// record this directory to sync to cloud later
-		// Note: the s3storage component returns success on CreateDir, even without a cloud connection.
-		//  The thread that pushes local changes to the cloud will have to account for this
-		//  to avoid creating an entry for this directory in the attribute cache,
-		//  which would give us the false impression that the directory is in the cloud.
-		fc.offlineOps.Store(options.Name, internal.CreateObjAttrDir(options.Name))
-		// try to create the directory locally
-		// return its errors directly, since it will rightly return EEXIST when needed, etc
+	case notInCloud:
+		// the directory does not exist in the cloud, so we can create it locally
 		err = os.Mkdir(localPath, options.Mode.Perm())
+		if err != nil {
+			// report and return any error directly, since it will rightly return EEXIST when needed, etc
+			log.Err("FileCache::CreateDir : %s os.Mkdir failed. Here's why: %v", err)
+		} else {
+			// record this directory to sync to cloud later
+			// Note: the s3storage component can return success on CreateDir, even without a cloud connection.
+			//  The thread that pushes local changes to the cloud will have to account for this
+			//  to avoid creating an entry for this directory in the attribute cache,
+			//  which would give us the false impression that the directory is in the cloud.
+			fc.offlineOps.Store(options.Name, internal.CreateObjAttrDir(options.Name))
+		}
 	case err == nil:
-		// the directory already exists in the cloud, so it can't be created
-		log.Err("FileCache::CreateDir : %s already exists in cloud storage", options.Name)
+		// the directory already exists in the cloud
+		log.Warn("FileCache::CreateDir : %s already exists in cloud storage", options.Name)
+		// set err so the caller knows why this failed
 		err = os.ErrExist
+	case isOffline(err):
+		// we are offline and we don't know whether the directory exists in cloud storage
+		// block directory creation (to protect data consistency)
+		log.Warn("FileCache::CreateDir : %s might exist in cloud storage. Creation is blocked.", options.Name)
 	default:
 		// we are online, but GetAttr failed for some other reason
 		// log this and return the error, as is
