@@ -575,11 +575,36 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	return err
 }
 
+// this returns true when offline access is enabled, and it's safe to access this object offline
+func (fc *FileCache) offlineOperationAllowed(name string) bool {
+	return fc.offlineAccess && fc.notInCloud(name)
+}
+
+// notInCloud is true if we *know* that this entity does not exist in cloud storage
+// and err is the error returned from GetAttr
+func (fc *FileCache) checkCloud(name string) (notInCloud bool, getAttrErr error) {
+	_, getAttrErr = fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+	notInCloud = errors.Is(getAttrErr, os.ErrNotExist)
+	return notInCloud, getAttrErr
+}
+
 // returns true if we *know* that this entity does not exist in cloud storage
 // otherwise returns false (including ambiguous cases)
 func (fc *FileCache) notInCloud(name string) bool {
-	_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
-	return errors.Is(err, os.ErrNotExist)
+	notInCloud, _ := fc.checkCloud(name)
+	return notInCloud
+}
+
+// checks if the error returned from cloud storage means we're offline
+func isOffline(err error) bool {
+	return errors.Is(err, &common.CloudUnreachableError{})
+}
+
+// checks if we are offline by requesting state information from the cloud storage component
+func (fc *FileCache) cloudConnected() bool {
+	// TODO: create a new component API function to check this (SRGDEV-614), instead of using StatFs
+	_, _, err := fc.NextComponent().StatFs()
+	return !errors.Is(err, &common.CloudUnreachableError{})
 }
 
 // StreamDir : Add local files to the list retrieved from storage container
@@ -989,7 +1014,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 			newF.GetFileObject().Close()
 		}
 		// are we offline?
-		if fc.offlineAccess && errors.Is(err, &common.CloudUnreachableError{}) && fc.notInCloud(options.Name) {
+		if isOffline(err) && fc.offlineOperationAllowed(options.Name) {
 			// remember that we're offline
 			offline = true
 			// clear the error
