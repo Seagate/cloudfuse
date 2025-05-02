@@ -511,7 +511,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 		// the directory does not exist in the cloud, so we can create it locally
 		err = os.Mkdir(localPath, options.Mode.Perm())
 		if err != nil {
-			// report and return any error directly, since it will rightly return EEXIST when needed, etc
+			// report and return the error, since it will rightly return EEXIST when needed, etc
 			log.Err("FileCache::CreateDir : %s os.Mkdir failed. Here's why: %v", err)
 		} else {
 			// record this directory to sync to cloud later
@@ -520,20 +520,25 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 			//  to avoid creating an entry for this directory in the attribute cache,
 			//  which would give us the false impression that the directory is in the cloud.
 			fc.offlineOps.Store(options.Name, internal.CreateObjAttrDir(options.Name))
+			log.Info("FileCache::CreateDir : %s created offline and queued for cloud sync", options.Name)
 		}
-	case err == nil:
-		// the directory already exists in the cloud
-		log.Warn("FileCache::CreateDir : %s already exists in cloud storage", options.Name)
-		// set err so the caller knows why this failed
-		err = os.ErrExist
-	case isOffline(err):
+	case err != nil && !isOffline(err):
+		// we seem to have regained our cloud connection, but GetAttr failed for some reason
+		// log this and return the error from GetAttr as is
+		log.Err("FileCache::CreateDir : %s GetAttr failed. Here's why: %v", options.Name, err)
+	case errors.Is(err, &common.NoCachedDataError{}):
 		// we are offline and we don't know whether the directory exists in cloud storage
 		// block directory creation (to protect data consistency)
 		log.Warn("FileCache::CreateDir : %s might exist in cloud storage. Creation is blocked.", options.Name)
 	default:
-		// we are online, but GetAttr failed for some other reason
-		// log this and return the error, as is
-		log.Err("FileCache::CreateDir : %s GetAttr failed. Here's why: %v", options.Name, err)
+		// the directory already exists in cloud storage
+		err = os.ErrExist
+		// use distinct log messages for when the attribute cache entry is valid or expired
+		if err == nil { // valid
+			log.Warn("FileCache::CreateDir : %s already exists in cloud storage", options.Name)
+		} else { // expired
+			log.Warn("FileCache::CreateDir : %s already exists in cloud storage (and we are offline)", options.Name)
+		}
 	}
 	return err
 }
