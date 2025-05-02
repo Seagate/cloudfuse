@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"os/exec"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -46,7 +49,7 @@ type logCollectTestSuite struct {
 
 func (suite *logCollectTestSuite) SetupTest() {
 	suite.assert = assert.New(suite.T())
-	err := log.SetDefaultLogger("log_debug", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
+	err := log.SetDefaultLogger("base", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
 		panic(fmt.Sprintf("Unable to set debug logger as default: %v", err))
 	}
@@ -56,22 +59,59 @@ func (suite *logCollectTestSuite) cleanupTest() {
 	resetCLIFlags(*gatherLogsCmd)
 }
 
+func (suite *logCollectTestSuite) verifyArchive(archivePath string) bool {
+	tempDir, err := os.MkdirTemp(currentDir, "tmpLogData")
+	suite.assert.NoError(err)
+
+	tempDir, err = filepath.Abs(tempDir)
+	suite.assert.NoError(err)
+
+	defer os.RemoveAll(tempDir)
+
+	cmd := exec.Command("tar", "-xvf", archivePath, "-C", tempDir)
+	err = cmd.Run()
+	suite.assert.NoError(err)
+
+	//verify archive contents (compare with original files that were put into archive)
+	return false
+}
+
 func (suite *logCollectTestSuite) TestNoConfig() {
 	defer suite.cleanupTest()
 
-	mntDir, err := os.MkdirTemp("", "mntdir")
-	suite.assert.Nil(err)
-	tempDir := filepath.Join(mntDir, "tempdir")
-	err = os.MkdirAll(tempDir, 0777)
+	//create temp files in default directory $HOME/.cloudfuse/cloudfuse.log
 
-	//in progress contstructing mount with no config
-	op, err := executeCommandC(rootCmd, "mount", tempDir, fmt.Sprintf("--config-file=%s", ""), "--foreground=true")
-
-	//check default log areas have logs generated
+	baseDefaultDir := "$HOME/.cloudfuse/"
+	baseDefaultDir = common.ExpandPath(baseDefaultDir)
+	os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
 
 	//run gatherLogs command
+	curDir, _ := os.Getwd()
+	println(curDir)
+	_, err := executeCommandC(rootCmd, "gatherLogs")
+	suite.assert.NoError(err)
 
-	//check gatherLogs archvie  (maybe extract it and make sure the files are the same?)
+	currentDir, err := os.Getwd()
+	suite.assert.NoError(err)
+
+	//check gatherLogs archive (maybe extract it and make sure the files are the same?)
+	items, err := os.ReadDir(currentDir)
+	suite.assert.NoError(err)
+
+	var foundArchive bool
+	var archiveName string
+	for _, item := range items {
+		if strings.HasPrefix(item.Name(), "cloudfuse_logs") && strings.HasSuffix(item.Name(), "tar.gz") {
+			foundArchive = true
+			archiveName = item.Name()
+		}
+		if foundArchive {
+			break
+		}
+	}
+	suite.assert.True(foundArchive)
+	defer os.Remove(archiveName)
+
 }
 
 func (suite *logCollectTestSuite) TestValidBaseConfig() {
