@@ -1070,7 +1070,7 @@ func openCompleted(handle *handlemap.Handle) bool {
 	return !found
 }
 
-// flock must already be acquired before calling this function
+// flock must already be locked before calling this function
 func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.LockMapItem) error {
 	log.Trace("FileCache::openFileInternal : name=%s", handle.Path)
 
@@ -1301,7 +1301,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	return handle, openErr
 }
 
-// isDownloadRequired: Whether or not the file needs to be downloaded to local cache.
+// flock must already be locked before calling this function
 func (fc *FileCache) isDownloadRequired(
 	localPath string,
 	objectPath string,
