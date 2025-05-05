@@ -788,33 +788,31 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 						newPath,
 					)
 					fc.policy.CacheValid(newPath)
-					// delete the source from our cache policy
-					fc.policy.CachePurge(path)
 				case os.IsNotExist(err):
 					// Case 1
 					log.Info("FileCache::RenameDir : source file %s is not cached", srcName)
-					// delete the source from our cache policy
-					fc.policy.CachePurge(path)
 				default:
 					// unexpected error from os.Rename
-					log.Warn(
-						"FileCache::RenameDir : Failed to rename local file (%s -> %s). Here's why: %v",
+					// there's really not much we can do to handle the error, so just log it
+					log.Err(
+						"FileCache::RenameDir : %s -> %s - os.Rename(%s -> %s) failed. Here's why: %v",
+						options.Src,
+						options.Dst,
 						path,
 						newPath,
 						err,
 					)
-					// the file data should be in cloud storage anyway, unless it's open...
+					// Check if the file is open
 					if sflock.Count() > 0 {
-						// there's really not much we can do to handle the error, so just log it
-						log.Err(
-							"FileCache::RenameDir : %s Directory state is inconsistent! os.Rename(%s -> %s) failed with src open. Here's why: %v",
-							options.Src,
-							path,
-							newPath,
-							err,
+						log.Warn(
+							"FileCache::RenameDir : open local src (%s) will be uploaded as %s on close.",
+							srcName,
+							dstName,
 						)
 					}
 				}
+				// delete the source from our cache policy, and delete the file (if it exists)
+				fc.policy.CachePurge(path)
 				// handle should be updated regardless, for consistency on upload
 				fc.renameOpenHandles(srcName, dstName, sflock, dflock)
 			} else {
