@@ -49,7 +49,7 @@ var gatherLogsCmd = &cobra.Command{
 	Short:             "interface to gather and review cloudfuse logs",
 	Long:              "interface to gather and review cloudfuse logs",
 	SuggestFor:        []string{"gather", "gatherLog", "gatherLogs"},
-	Example:           "cloudfuse dumpLogs ",
+	Example:           "cloudfuse gatherLogs ",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -111,19 +111,19 @@ var gatherLogsCmd = &cobra.Command{
 	},
 }
 
-func checkOutputPath(dumpPath string) error {
+func checkOutputPath(outPath string) error {
 	var err error
-	if dumpPath == "" {
+	if outPath == "" {
 		dumpPath, err = os.Getwd()
 		if err != nil {
 			return err
 		}
 	} else {
-		if !common.DirectoryExists(dumpPath) {
+		if !common.DirectoryExists(outPath) {
 			return err
 		}
 
-		dumpInfo, err := os.Stat(dumpPath)
+		dumpInfo, err := os.Stat(outPath)
 		if err != nil {
 			return err
 		}
