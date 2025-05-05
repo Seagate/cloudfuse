@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,7 +61,37 @@ func (suite *logCollectTestSuite) cleanupTest() {
 	resetCLIFlags(*gatherLogsCmd)
 }
 
-func (suite *logCollectTestSuite) verifyArchive(archivePath string) bool {
+func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) bool {
+
+	//store file name and hash in a map
+	fileHashMap := make(map[string]string)
+	items, err := os.ReadDir(logPath)
+	suite.assert.NoError(err)
+
+	//collect file and hash values into the map
+	for _, item := range items {
+		if strings.HasPrefix(item.Name(), "cloudfuse") && strings.HasSuffix(item.Name(), ".log") {
+
+			//get file path
+			itemPath := filepath.Join(logPath, item.Name())
+			itemPath = filepath.Clean(itemPath)
+
+			// generate and store checksum for file
+			file, err := os.Open(itemPath)
+			suite.assert.NoError(err)
+			hasher := sha256.New()
+			_, err = io.Copy(hasher, file)
+			suite.assert.NoError(err)
+			hashStr := string(hasher.Sum(nil))
+			fileHashMap[item.Name()] = hashStr
+
+			//go ahead and just do a checksum between this file and the extracted counterpart
+
+		}
+	}
+
+	currentDir, err := os.Getwd()
+	suite.assert.NoError(err)
 	tempDir, err := os.MkdirTemp(currentDir, "tmpLogData")
 	suite.assert.NoError(err)
 
@@ -68,12 +100,39 @@ func (suite *logCollectTestSuite) verifyArchive(archivePath string) bool {
 
 	defer os.RemoveAll(tempDir)
 
-	cmd := exec.Command("tar", "-xvf", archivePath, "-C", tempDir)
+	cmd := exec.Command("tar", "-xvf", archivePath+"/cloudfuse_logs.tar.gz", "-C", tempDir)
 	err = cmd.Run()
 	suite.assert.NoError(err)
 
 	//verify archive contents (compare with original files that were put into archive)
-	return false
+
+	items, err = os.ReadDir(tempDir)
+	suite.assert.NoError(err)
+	for _, archivedItem := range items {
+		if strings.HasPrefix(archivedItem.Name(), "cloudfuse") && strings.HasSuffix(archivedItem.Name(), ".log") {
+
+			//get file path
+			itemPath := filepath.Join(tempDir, archivedItem.Name())
+			itemPath = filepath.Clean(itemPath)
+
+			// generate and store checksum for file
+			file, err := os.Open(itemPath)
+			suite.assert.NoError(err)
+
+			suite.assert.True(fileHashMap[archivedItem.Name()] != "")
+			hasher := sha256.New()
+			_, err = io.Copy(hasher, file)
+			suite.assert.NoError(err)
+			hashStr := string(hasher.Sum(nil))
+			suite.assert.Equal(fileHashMap[archivedItem.Name()], hashStr)
+
+			//go ahead and just do a checksum between this file and the extracted counterpart
+
+		} else {
+			return false //found a non cloudfuse log file
+		}
+	}
+	return true
 }
 
 func (suite *logCollectTestSuite) TestNoConfig() {
@@ -86,8 +145,6 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 	os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
 
 	//run gatherLogs command
-	curDir, _ := os.Getwd()
-	println(curDir)
 	_, err := executeCommandC(rootCmd, "gatherLogs")
 	suite.assert.NoError(err)
 
@@ -104,13 +161,14 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 		if strings.HasPrefix(item.Name(), "cloudfuse_logs") && strings.HasSuffix(item.Name(), "tar.gz") {
 			foundArchive = true
 			archiveName = item.Name()
-		}
-		if foundArchive {
 			break
 		}
 	}
 	suite.assert.True(foundArchive)
 	defer os.Remove(archiveName)
+
+	isSumChecked := suite.verifyArchive(baseDefaultDir, currentDir)
+	suite.assert.True(isSumChecked)
 
 }
 
