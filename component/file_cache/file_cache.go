@@ -777,7 +777,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				dstName := fc.getObjectName(newPath)
 				sflock := fc.fileLocks.Get(srcName)
 				dflock := fc.fileLocks.Get(dstName)
-				fc.renameLocalFile(srcName, dstName, sflock, dflock, false)
+				_ = fc.renameLocalFile(srcName, dstName, sflock, dflock, false)
 			} else {
 				log.Debug("FileCache::RenameDir : Creating local destination directory %s", newPath)
 				// create the new directory
