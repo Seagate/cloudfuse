@@ -1876,16 +1876,16 @@ func (fc *FileCache) renameLocalFile(
 	localSrcPath := filepath.Join(fc.tmpPath, srcName)
 	localDstPath := filepath.Join(fc.tmpPath, dstName)
 
-	localRenameErr := os.Rename(localSrcPath, localDstPath)
+	err := os.Rename(localSrcPath, localDstPath)
 	switch {
-	case localRenameErr == nil:
+	case err == nil:
 		log.Debug(
 			"FileCache::renameLocalFile : %s -> %s Successfully renamed local file",
 			localSrcPath,
 			localDstPath,
 		)
 		fc.policy.CacheValid(localDstPath)
-	case os.IsNotExist(localRenameErr):
+	case os.IsNotExist(err):
 		if localOnly {
 			// neither cloud nor file cache has this file, so return ENOENT
 			log.Err("FileCache::renameLocalFile : %s source file not found", srcName)
@@ -1900,7 +1900,7 @@ func (fc *FileCache) renameLocalFile(
 			"FileCache::renameLocalFile : os.Rename(%s -> %s) failed. Here's why: %v",
 			localSrcPath,
 			localDstPath,
-			localRenameErr,
+			err,
 		)
 		// check if the file is open
 		if sflock.Count() > 0 {
