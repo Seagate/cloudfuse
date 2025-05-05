@@ -48,7 +48,7 @@ type lruPolicy struct {
 	sync.Mutex
 	cachePolicyConfig
 
-	nodeMap sync.Map
+	nodeMap sync.Map // uses os.Separator (filepath.Join)
 
 	head       *lruNode
 	currMarker *lruNode
@@ -404,8 +404,8 @@ func (p *lruPolicy) deleteExpiredNodes() {
 func (p *lruPolicy) deleteItem(name string) {
 	log.Trace("lruPolicy::deleteItem : Deleting %s", name)
 
-	azPath := common.NormalizeObjectName(strings.TrimPrefix(name, p.tmpPath))
-	if azPath == "" {
+	objName := common.NormalizeObjectName(strings.TrimPrefix(name, p.tmpPath))
+	if objName == "" {
 		log.Err(
 			"lruPolicy::DeleteItem : Empty file name formed name : %s, tmpPath : %s",
 			name,
@@ -414,18 +414,18 @@ func (p *lruPolicy) deleteItem(name string) {
 		return
 	}
 
-	if azPath[0] == '/' {
-		azPath = azPath[1:]
+	if objName[0] == '/' {
+		objName = objName[1:]
 	}
 
-	flock := p.fileLocks.Get(azPath)
+	flock := p.fileLocks.Get(objName)
 	flock.Lock()
 	defer flock.Unlock()
 
 	// check if the file has been marked valid again after removeNode was called
 	_, found := p.nodeMap.Load(name)
 	if found {
-		log.Warn("lruPolicy::DeleteItem : File marked valid %s", azPath)
+		log.Warn("lruPolicy::DeleteItem : File marked valid %s", objName)
 		return
 	}
 
