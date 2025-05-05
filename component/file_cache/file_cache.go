@@ -27,7 +27,6 @@ package file_cache
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -778,43 +777,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				dstName := fc.getObjectName(newPath)
 				sflock := fc.fileLocks.Get(srcName)
 				dflock := fc.fileLocks.Get(dstName)
-				// complete local rename
-				err := os.Rename(path, newPath)
-				switch {
-				case err == nil:
-					log.Debug(
-						"FileCache::RenameDir : %s -> %s Successfully renamed local file",
-						path,
-						newPath,
-					)
-					fc.policy.CacheValid(newPath)
-				case os.IsNotExist(err):
-					// Case 1
-					log.Info("FileCache::RenameDir : source file %s is not cached", srcName)
-				default:
-					// unexpected error from os.Rename
-					// there's really not much we can do to handle the error, so just log it
-					log.Err(
-						"FileCache::RenameDir : %s -> %s - os.Rename(%s -> %s) failed. Here's why: %v",
-						options.Src,
-						options.Dst,
-						path,
-						newPath,
-						err,
-					)
-					// Check if the file is open
-					if sflock.Count() > 0 {
-						log.Warn(
-							"FileCache::RenameDir : open local src (%s) will be uploaded as %s on close.",
-							srcName,
-							dstName,
-						)
-					}
-				}
-				// delete the source from our cache policy, and delete the file (if it exists)
-				fc.policy.CachePurge(path)
-				// handle should be updated regardless, for consistency on upload
-				fc.renameOpenHandles(srcName, dstName, sflock, dflock)
+				fc.renameLocalFile(srcName, dstName, sflock, dflock, false)
 			} else {
 				log.Debug("FileCache::RenameDir : Creating local destination directory %s", newPath)
 				// create the new directory
@@ -1901,63 +1864,51 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 		return err
 	}
 
-	localSrcPath := filepath.Join(fc.tmpPath, options.Src)
-	localDstPath := filepath.Join(fc.tmpPath, options.Dst)
+	return fc.renameLocalFile(options.Src, options.Dst, sflock, dflock, localOnly)
+}
 
-	// in case of git clone multiple rename requests come for which destination files already exists in system
-	// if we do not perform rename operation locally and those destination files are cached then next time they are read
-	// we will be serving the wrong content (as we did not rename locally, we still be having older destination files with
-	// stale content). We either need to remove dest file as well from cache or just run rename to replace the content.
+// source and destination files should already be locked before calling this function
+func (fc *FileCache) renameLocalFile(
+	srcName, dstName string,
+	sflock, dflock *common.LockMapItem,
+	localOnly bool,
+) error {
+	localSrcPath := filepath.Join(fc.tmpPath, srcName)
+	localDstPath := filepath.Join(fc.tmpPath, dstName)
+
 	localRenameErr := os.Rename(localSrcPath, localDstPath)
 	switch {
 	case localRenameErr == nil:
 		log.Debug(
-			"FileCache::RenameFile : %s -> %s Successfully renamed local file",
+			"FileCache::renameLocalFile : %s -> %s Successfully renamed local file",
 			localSrcPath,
 			localDstPath,
 		)
 		fc.policy.CacheValid(localDstPath)
 	case os.IsNotExist(localRenameErr):
-		// Case 1
-		log.Info("FileCache::RenameFile : %s source file not cached", localSrcPath)
+		if localOnly {
+			// neither cloud nor file cache has this file, so return ENOENT
+			log.Err("FileCache::renameLocalFile : %s source file not found", srcName)
+			return syscall.ENOENT
+		} else {
+			// Case 1
+			log.Info("FileCache::renameLocalFile : %s source file not cached", localSrcPath)
+		}
 	default:
-		// local rename failed for some other reason
-		log.Warn(
-			"FileCache::RenameFile : %s -> %s Failed to rename local file. Here's why: %v",
+		// unexpected error from os.Rename
+		log.Err(
+			"FileCache::renameLocalFile : os.Rename(%s -> %s) failed. Here's why: %v",
 			localSrcPath,
 			localDstPath,
 			localRenameErr,
 		)
-		// the file data should be in cloud storage anyway, unless it's open...
+		// check if the file is open
 		if sflock.Count() > 0 {
-			// We are at risk for data loss... Abort rename!
-			log.Err(
-				"FileCache::RenameFile : %s Failed rename and src is open! Rename should be aborted...",
+			log.Warn(
+				"FileCache::renameLocalFile : open local file (%s) will be uploaded as %s on close.",
 				localSrcPath,
+				dstName,
 			)
-			// did we already rename the cloud copy?
-			if !localOnly {
-				// we must reverse the cloud rename operation to prevent misplacing the data
-				err := fc.NextComponent().RenameFile(internal.RenameFileOptions{
-					Src: options.Dst,
-					Dst: options.Src,
-				})
-				err = fc.validateStorageError(options.Src, err, "RenameFile", false)
-				if err != nil {
-					// local rename failed, but cloud rename can't be reversed...
-					// we're in an impossible situation, and cannot recover
-					// all we can do is log the error, and hope for the best
-					log.Err(
-						"FileCache::RenameFile : %s failed to reverse cloud rename to avoid data loss! [%v]",
-						options.Src,
-						err,
-					)
-				}
-				localRenameErr = errors.Join(localRenameErr, err)
-			}
-			// do not purge the source file from the cache
-			// let the requester know the rename failed because os.Rename failed
-			return localRenameErr
 		}
 	}
 
@@ -1966,7 +1917,7 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	fc.policy.CachePurge(localSrcPath)
 
 	// rename open handles
-	fc.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
+	fc.renameOpenHandles(srcName, dstName, sflock, dflock)
 
 	return nil
 }
