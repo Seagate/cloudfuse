@@ -21,7 +21,7 @@ var configValidBaseTest string = `
 logging:
   type: base
   level: log_debug
-  file-path: $HOME/cloudfuse/logTest/cloudfuse.log
+  file-path: $HOME/logTest/cloudfuse.log
 `
 
 var configInvalidBaseTest string = `
@@ -59,6 +59,9 @@ func (suite *logCollectTestSuite) SetupTest() {
 
 func (suite *logCollectTestSuite) cleanupTest() {
 	resetCLIFlags(*gatherLogsCmd)
+
+	//TODO: delete data created by running 'cloudfuse gatherLogs' command
+
 }
 
 func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) bool {
@@ -84,8 +87,6 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 			suite.assert.NoError(err)
 			hashStr := string(hasher.Sum(nil))
 			fileHashMap[item.Name()] = hashStr
-
-			//go ahead and just do a checksum between this file and the extracted counterpart
 
 		}
 	}
@@ -126,8 +127,6 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 			hashStr := string(hasher.Sum(nil))
 			suite.assert.Equal(fileHashMap[archivedItem.Name()], hashStr)
 
-			//go ahead and just do a checksum between this file and the extracted counterpart
-
 		} else {
 			return false //found a non cloudfuse log file
 		}
@@ -151,7 +150,6 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 	currentDir, err := os.Getwd()
 	suite.assert.NoError(err)
 
-	//check gatherLogs archive (maybe extract it and make sure the files are the same?)
 	items, err := os.ReadDir(currentDir)
 	suite.assert.NoError(err)
 
@@ -167,12 +165,45 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 	suite.assert.True(foundArchive)
 	defer os.Remove(archiveName)
 
-	isSumChecked := suite.verifyArchive(baseDefaultDir, currentDir)
-	suite.assert.True(isSumChecked)
+	isArcValid := suite.verifyArchive(baseDefaultDir, currentDir)
+	suite.assert.True(isArcValid)
 
 }
 
 func (suite *logCollectTestSuite) TestValidBaseConfig() {
+	defer suite.cleanupTest()
+
+	//set up test log directory
+	logPath := "$HOME"
+	logPath = common.ExpandPath(logPath)
+	tempLogDir, err := os.MkdirTemp(logPath, "logTest")
+	suite.assert.NoError(err)
+	tempLogDir, err = filepath.Abs(tempLogDir)
+	suite.assert.NoError(err)
+	defer os.RemoveAll(tempLogDir)
+
+	//set up config file
+	configValidBaseTest = strings.Replace(configValidBaseTest, "$HOME/logTest/cloudfuse.log", tempLogDir+"/cloudfuse.log", 1)
+	confFile, _ := os.CreateTemp("", "conf*.yaml")
+	defer os.Remove(confFile.Name())
+	_, err = confFile.WriteString(configValidBaseTest)
+	suite.assert.NoError(err)
+	confFile.Close()
+
+	//put stub log files in test log directory
+	tempLog, err := os.CreateTemp(tempLogDir, "cloudfuse*.log")
+	suite.assert.NoError(err)
+	defer os.RemoveAll(tempLog.Name())
+
+	//run the log collector
+	_, err = executeCommandSecure(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", confFile.Name()))
+	suite.assert.NoError(err)
+
+	//verify the archive
+	currentDir, err := os.Getwd()
+	suite.assert.NoError(err)
+	isArcValid := suite.verifyArchive(tempLogDir, currentDir)
+	suite.assert.True(isArcValid)
 
 }
 
