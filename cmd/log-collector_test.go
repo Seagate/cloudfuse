@@ -146,22 +146,7 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 
 	currentDir, err := os.Getwd()
 	suite.assert.NoError(err)
-
-	items, err := os.ReadDir(currentDir)
-	suite.assert.NoError(err)
-
-	var foundArchive bool
-	var archiveName string
-	for _, item := range items {
-		if strings.HasPrefix(item.Name(), "cloudfuse_logs") && strings.HasSuffix(item.Name(), "tar.gz") {
-			foundArchive = true
-			archiveName = item.Name()
-			break
-		}
-	}
-	suite.assert.True(foundArchive)
-	defer os.Remove(archiveName)
-
+	suite.assert.FileExists(currentDir + "/cloudfuse_logs.tar.gz")
 	isArcValid := suite.verifyArchive(baseDefaultDir, currentDir)
 	suite.assert.True(isArcValid)
 
@@ -180,7 +165,7 @@ func (suite *logCollectTestSuite) TestValidBaseConfig() {
 	defer os.RemoveAll(tempLogDir)
 
 	//set up config file
-	configValidBaseTest = strings.Replace(configValidBaseTest, "$HOME/logTest/cloudfuse.log", tempLogDir+"/cloudfuse.log", 1)
+	configValidBaseTest = strings.Replace(configValidBaseTest, "$HOME/logTest/cloudfuse.log", tempLogDir+"/cloudfuse.log", 1) //reference s.setupconfig helper on blockblob and s3 tests
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	defer os.Remove(confFile.Name())
 	_, err = confFile.WriteString(configValidBaseTest)
