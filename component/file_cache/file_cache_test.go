@@ -577,9 +577,7 @@ func (suite *fileCacheTestSuite) TestStreamDirCase3() {
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file3, Mode: 0777})
 	suite.fileCache.TruncateFile(internal.TruncateFileOptions{Name: file3, Size: 1024})
 	// Change the sizes directly in fake storage
-	suite.loopback.TruncateFile(
-		internal.TruncateFileOptions{Name: file1},
-	) // Length is default 0
+	suite.loopback.TruncateFile(internal.TruncateFileOptions{Name: file1}) // Length is default 0
 	suite.loopback.TruncateFile(internal.TruncateFileOptions{Name: file2})
 	suite.loopback.TruncateFile(internal.TruncateFileOptions{Name: file3})
 
