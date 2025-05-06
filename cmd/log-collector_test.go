@@ -59,9 +59,6 @@ func (suite *logCollectTestSuite) SetupTest() {
 
 func (suite *logCollectTestSuite) cleanupTest() {
 	resetCLIFlags(*gatherLogsCmd)
-
-	//TODO: delete data created by running 'cloudfuse gatherLogs' command
-
 }
 
 func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) bool {
@@ -223,7 +220,28 @@ func (suite *logCollectTestSuite) TestInvalidBaseConfig() {
 }
 
 func (suite *logCollectTestSuite) TestValidSyslogConfig() {
+	defer suite.cleanupTest()
 
+	//set up config file
+	confFile, _ := os.CreateTemp("", "conf*.yaml")
+	defer os.Remove(confFile.Name())
+	_, err := confFile.WriteString(configValidSyslogTest)
+	suite.assert.NoError(err)
+	confFile.Close()
+
+	//run the log collector
+	_, err = executeCommandSecure(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", confFile.Name()))
+	suite.assert.NoError(err)
+
+	// look for generated archive
+	currentDir, err := os.Getwd()
+	suite.assert.NoError(err)
+	// look for temp cloudfuse.log file generated from syslog
+	filteredLogPath := "/tmp/cloudfuseSyslog/cloudfuse.log"
+
+	// use validate archive between those two files.
+	isArcValid := suite.verifyArchive(filteredLogPath, currentDir)
+	suite.assert.True(isArcValid)
 }
 
 func (suite *logCollectTestSuite) TestInvalidSyslogConfig() {
