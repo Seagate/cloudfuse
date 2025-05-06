@@ -162,6 +162,9 @@ func locateLogs(configFile string) (string, string, error) {
 				if err != nil {
 					return "", "", err
 				}
+				if strings.HasPrefix(logPath, "$HOME") {
+					logPath = common.ExpandPath(logPath)
+				}
 			}
 		}
 	}
