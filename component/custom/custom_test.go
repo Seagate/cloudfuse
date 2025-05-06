@@ -68,17 +68,33 @@ func (suite *customTestSuite) _TestInitializePluginsValidPath() {
 	plugin2 := "./sample_custom_component2.so"
 
 	// Compile the Go plugin source files into .so files
-	cmd := exec.Command("go", "build", "-buildmode=plugin", "-gcflags=all=-N -l", "-o", plugin1, source1)
+	cmd := exec.Command(
+		"go",
+		"build",
+		"-buildmode=plugin",
+		"-gcflags=all=-N -l",
+		"-o",
+		plugin1,
+		source1,
+	)
 	err := cmd.Run()
-	suite.assert.Nil(err)
-	cmd = exec.Command("go", "build", "-buildmode=plugin", "-gcflags=all=-N -l", "-o", plugin2, source2)
+	suite.assert.NoError(err)
+	cmd = exec.Command(
+		"go",
+		"build",
+		"-buildmode=plugin",
+		"-gcflags=all=-N -l",
+		"-o",
+		plugin2,
+		source2,
+	)
 	err = cmd.Run()
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	os.Setenv("CLOUDFUSE_PLUGIN_PATH", plugin1+":"+plugin2)
 
 	err = initializePlugins()
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 
 	// Clean up the generated .so files
 	os.Remove(plugin1)
@@ -90,14 +106,14 @@ func (suite *customTestSuite) TestInitializePluginsInvalidPath() {
 	os.Setenv("CLOUDFUSE_PLUGIN_PATH", dummyPath)
 
 	err := initializePlugins()
-	suite.assert.NotNil(err)
+	suite.assert.Error(err)
 }
 
 func (suite *customTestSuite) TestInitializePluginsEmptyPath() {
 	os.Setenv("CLOUDFUSE_PLUGIN_PATH", "")
 
 	err := initializePlugins()
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 }
 
 func TestCustomSuite(t *testing.T) {

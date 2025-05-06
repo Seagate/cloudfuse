@@ -223,7 +223,11 @@ func BindPFlag(key string, flag *pflag.Flag) {
 //
 // the key parameter should take on the value "auth.key"
 func UnmarshalKey(key string, obj interface{}) error {
-	err := viper.UnmarshalKey(key, obj, func(decodeConfig *mapstructure.DecoderConfig) { decodeConfig.TagName = STRUCT_TAG })
+	err := viper.UnmarshalKey(
+		key,
+		obj,
+		func(decodeConfig *mapstructure.DecoderConfig) { decodeConfig.TagName = STRUCT_TAG },
+	)
 	if err != nil {
 		return fmt.Errorf("config error: unmarshalling [%v]", err)
 	}
@@ -250,7 +254,10 @@ func UnmarshalKey(key string, obj interface{}) error {
 // Unmarshal populates the passed object and all the exported fields.
 // use lower case attribute names to ignore a particular field
 func Unmarshal(obj interface{}) error {
-	err := viper.Unmarshal(obj, func(decodeConfig *mapstructure.DecoderConfig) { decodeConfig.TagName = STRUCT_TAG })
+	err := viper.Unmarshal(
+		obj,
+		func(decodeConfig *mapstructure.DecoderConfig) { decodeConfig.TagName = STRUCT_TAG },
+	)
 	if err != nil {
 		return fmt.Errorf("config error: unmarshalling [%v]", err)
 	}
@@ -386,7 +393,10 @@ func AddDurationFlag(name string, value time.Duration, usage string) *pflag.Flag
 	return userOptions.flags.Lookup(name)
 }
 
-func RegisterFlagCompletionFunc(flagName string, completionFunc func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)) {
+func RegisterFlagCompletionFunc(
+	flagName string,
+	completionFunc func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective),
+) {
 	userOptions.completionFuncMap[flagName] = completionFunc
 }
 
@@ -406,5 +416,7 @@ func init() {
 
 	userOptions.flagTree = NewTree()
 	userOptions.envTree = NewTree()
-	userOptions.completionFuncMap = make(map[string]func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective))
+	userOptions.completionFuncMap = make(
+		map[string]func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective),
+	)
 }
