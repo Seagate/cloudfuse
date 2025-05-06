@@ -28,7 +28,7 @@ var configInvalidBaseTest string = `
 logging:
   type: base
   level: log_debug
-  file-path: /home/davidhabinsky/cloudfuse/logTest/cloudfuse.log
+  file-path: /home/fakeUser/cloudfuse.log
 `
 
 var configValidSyslogTest string = `
@@ -208,7 +208,18 @@ func (suite *logCollectTestSuite) TestValidBaseConfig() {
 }
 
 func (suite *logCollectTestSuite) TestInvalidBaseConfig() {
+	defer suite.cleanupTest()
 
+	//set up config file
+	confFile, _ := os.CreateTemp("", "conf*.yaml")
+	defer os.Remove(confFile.Name())
+	_, err := confFile.WriteString(configInvalidBaseTest)
+	suite.assert.NoError(err)
+	confFile.Close()
+
+	//run the log collector
+	_, err = executeCommandSecure(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", confFile.Name()))
+	suite.assert.Error(err)
 }
 
 func (suite *logCollectTestSuite) TestValidSyslogConfig() {

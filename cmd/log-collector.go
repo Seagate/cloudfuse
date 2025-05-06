@@ -62,7 +62,7 @@ var gatherLogsCmd = &cobra.Command{
 			return fmt.Errorf("couldn't determine absolute path for config file [%s]", err.Error())
 		}
 
-		logType, logPath, err := locateLogs(logConfigFile)
+		logType, logPath, err := getLogInfo(logConfigFile)
 		if err != nil {
 			fmt.Errorf("failed to parse config file [%s]", err.Error())
 		}
@@ -140,7 +140,7 @@ func checkOutputPath(outPath string) error {
 	return nil
 }
 
-func locateLogs(configFile string) (string, string, error) {
+func getLogInfo(configFile string) (string, string, error) {
 	logPath := "$HOME/.cloudfuse/cloudfuse.log"
 	logPath = common.ExpandPath(logPath)
 	logType := "base"
@@ -216,8 +216,15 @@ func createFilteredLog(logFile string) (string, error) {
 }
 
 func createLinuxArchive(logPath string) error {
-	ArchiveName := fmt.Sprintf("cloudfuse_logs")
 
+	//first check logPath is valid
+	items, err := os.ReadDir(logPath)
+	if err != nil {
+		return err
+	}
+
+	//setup tar.gz file
+	ArchiveName := fmt.Sprintf("cloudfuse_logs")
 	outFile, err := os.Create(dumpPath + "/" + ArchiveName + ".tar.gz")
 	if err != nil {
 		return err
@@ -230,11 +237,7 @@ func createLinuxArchive(logPath string) error {
 	tarWriter := tar.NewWriter(gzWriter)
 	defer tarWriter.Close()
 
-	items, err := os.ReadDir(logPath)
-	if err != nil {
-		return err
-	}
-
+	//populate tar.gz file
 	var amountLogs int
 	for _, item := range items {
 		if strings.HasPrefix(item.Name(), "cloudfuse") && strings.HasSuffix(item.Name(), ".log") {
@@ -275,6 +278,7 @@ func createLinuxArchive(logPath string) error {
 	if amountLogs == 0 {
 		return fmt.Errorf("no cloudfuse log file were found in %s", logPath)
 	}
+
 	return nil
 }
 
