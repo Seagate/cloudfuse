@@ -10,6 +10,7 @@
 # see https://google.github.io/osv-scanner/github-action/
 
 name: OSV-Scanner
+permissions: {}
 
 on:
   pull_request:
