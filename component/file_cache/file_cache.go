@@ -660,10 +660,10 @@ func (fc *FileCache) StreamDir(
 
 	// To cover case 1, grab all entries from storage
 	attrs, token, err := fc.NextComponent().StreamDir(options)
-	if errors.Is(err, &common.CloudUnreachableError{}) && fc.offlineAccess {
+	if isOffline(err) && fc.offlineAccess {
 		// we're offline and offline access is allowed, so let's check if we have valid a listing
 		if !errors.Is(err, &common.NoCachedDataError{}) {
-			// we have a valid listing. Let's drop the error message
+			// drop the error message
 			err = nil
 		}
 	}
@@ -675,6 +675,13 @@ func (fc *FileCache) StreamDir(
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	dirents, err := os.ReadDir(localPath)
 	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Err(
+				"FileCache::StreamDir : %s os.ReadDir failed. Here's why: %v",
+				options.Name,
+				err,
+			)
+		}
 		return attrs, token, nil
 	}
 
@@ -753,18 +760,15 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	// If the directory does not exist locally then call the next component
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	f, err := common.Open(localPath)
-	if err == nil {
+	switch {
+	case err == nil:
 		log.Debug("FileCache::IsDirEmpty : %s found in local cache", options.Name)
 		// Check local cache directory is empty or not
 		path, err := f.Readdirnames(1)
 
 		// If the local directory has a path in it, it is likely due to !createEmptyFile.
 		if err == nil && !fc.createEmptyFile && len(path) > 0 {
-			log.Debug(
-				"FileCache::IsDirEmpty : %s had a subpath in the local cache (%s)",
-				options.Name,
-				path[0],
-			)
+			log.Debug("FileCache::IsDirEmpty : %s has local contents (%s)", options.Name, path[0])
 			return false
 		}
 
@@ -774,15 +778,16 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 			log.Debug("FileCache::IsDirEmpty : %s was not empty in local cache", options.Name)
 			return false
 		}
-	} else if os.IsNotExist(err) {
+	case os.IsNotExist(err):
 		// Not found in local cache so check with container
 		log.Debug("FileCache::IsDirEmpty : %s not found in local cache", options.Name)
-	} else {
+	default:
 		// Unknown error, check with container
-		log.Err("FileCache::IsDirEmpty : %s failed while checking local cache [%s]", options.Name, err.Error())
+		log.Err("FileCache::IsDirEmpty : %s failed to open local dir [%v]", options.Name, err)
 	}
 
 	log.Debug("FileCache::IsDirEmpty : %s checking with container", options.Name)
+	// when offline, this will return false
 	return fc.NextComponent().IsDirEmpty(options)
 }
 
