@@ -646,7 +646,7 @@ func isOffline(err error) bool {
 func (fc *FileCache) cloudConnected() bool {
 	// TODO: create a new component API function to check this (SRGDEV-614), instead of using StatFs
 	_, _, err := fc.NextComponent().StatFs()
-	return !errors.Is(err, &common.CloudUnreachableError{})
+	return !isOffline(err)
 }
 
 // StreamDir : Add local files to the list retrieved from storage container
