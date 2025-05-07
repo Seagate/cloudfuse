@@ -453,6 +453,7 @@ func (fc *FileCache) GetPolicyConfig(conf FileCacheOptions) cachePolicyConfig {
 func (fc *FileCache) StatFs() (*common.Statfs_t, bool, error) {
 
 	statfs, populated, err := fc.NextComponent().StatFs()
+	// TODO: handle offline errors
 	if populated {
 		// if we are offline, this will return EIO to the system
 		// TODO: Is this the desired behavior?
@@ -602,18 +603,15 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name), nil)
 	}
 	// is the cloud connection down? Is offline access enabled?
-	if errors.Is(err, &common.CloudUnreachableError{}) && fc.offlineAccess {
-		// to prevent consistency issues: if this is not a local directory, don't delete it locally
-		if fc.notInCloud(options.Name) {
-			// this is a local directory
-			// remove it from the deferred cloud operations
-			// TODO: protect this with a semaphore (probably flock)
-			fc.offlineOps.Delete(options.Name)
-			// delete it locally
-			fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name), nil)
-			// clear the error
-			err = nil
-		}
+	if isOffline(err) && fc.offlineOperationAllowed(options.Name) {
+		// this is a local directory
+		// remove it from the deferred cloud operations
+		// TODO: protect this with a semaphore (probably flock)
+		fc.offlineOps.Delete(options.Name)
+		// delete it locally
+		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name), nil)
+		// clear the error
+		err = nil
 	}
 
 	return err
@@ -625,7 +623,7 @@ func (fc *FileCache) offlineOperationAllowed(name string) bool {
 }
 
 // notInCloud is true if we *know* that this entity does not exist in cloud storage
-// and err is the error returned from GetAttr
+// and getAttrErr is the error returned from GetAttr
 func (fc *FileCache) checkCloud(name string) (notInCloud bool, getAttrErr error) {
 	_, getAttrErr = fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
 	notInCloud = errors.Is(getAttrErr, os.ErrNotExist)
