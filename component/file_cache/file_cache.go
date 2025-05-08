@@ -1022,34 +1022,28 @@ func (fc *FileCache) validateStorageError(
 ) error {
 	// For methods that take in file name, the goal is to update the path in cloud storage and the local cache.
 	// See comments in GetAttr for the different situations we can run into. This specifically handles case 2.
-	if err != nil {
-		if err == syscall.ENOENT || os.IsNotExist(err) {
-			log.Debug("FileCache::%s : %s does not exist in cloud storage", method, path)
-			if !fc.createEmptyFile {
-				// Check if the file exists in the local cache
-				// (policy might not think the file exists if the file is merely marked for eviction and not actually evicted yet)
-				localPath := filepath.Join(fc.tmpPath, path)
-				_, err := os.Stat(localPath)
-				if os.IsNotExist(
-					err,
-				) { // If the file is not in the local cache, then the file does not exist.
-					log.Err("FileCache::%s : %s does not exist in local cache", method, path)
-					return syscall.ENOENT
+	if os.IsNotExist(err) {
+		log.Debug("FileCache::%s : %s does not exist in cloud storage", method, path)
+		if !fc.createEmptyFile {
+			// Check if the file exists in the local cache
+			// (policy might not think the file exists if the file is merely marked for eviction and not actually evicted yet)
+			localPath := filepath.Join(fc.tmpPath, path)
+			if _, err := os.Stat(localPath); os.IsNotExist(err) {
+				// If the file is not in the local cache, then the file does not exist.
+				log.Err("FileCache::%s : %s does not exist in local cache", method, path)
+				return syscall.ENOENT
+			} else {
+				if !recoverable {
+					log.Err("FileCache::%s : %s has not been closed/flushed yet, unable to recover this operation on close", method, path)
+					return syscall.EIO
 				} else {
-					if !recoverable {
-						log.Err("FileCache::%s : %s has not been closed/flushed yet, unable to recover this operation on close", method, path)
-						return syscall.EIO
-					} else {
-						log.Info("FileCache::%s : %s has not been closed/flushed yet, we can recover this operation on close", method, path)
-						return nil
-					}
+					log.Info("FileCache::%s : %s has not been closed/flushed yet, we can recover this operation on close", method, path)
+					return nil
 				}
 			}
-		} else {
-			return err
 		}
 	}
-	return nil
+	return err
 }
 
 func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
