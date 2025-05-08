@@ -226,9 +226,9 @@ func (suite *logCollectTestSuite) TestValidSyslogConfig() {
 func (suite *logCollectTestSuite) TestInvalidConfig() {
 	defer suite.cleanupTest()
 	//set up config file
-	validSyslogConfig := logCollectTestConfig{logType: "invalid", level: "invalid"}
+	invalidSyslogConfig := logCollectTestConfig{logType: "invalid", level: "invalid"}
 	config := fmt.Sprintf("logging:\n  type: %s\n  lefsvel: %s\n",
-		validSyslogConfig.logType, validSyslogConfig.level)
+		invalidSyslogConfig.logType, invalidSyslogConfig.level)
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	defer os.Remove(confFile.Name())
 	_, err := confFile.WriteString(config)
@@ -255,9 +255,9 @@ func (suite *logCollectTestSuite) TestInvalidConfig() {
 func (suite *logCollectTestSuite) TestSilentConfig() {
 	defer suite.cleanupTest()
 	//set up config file
-	validSyslogConfig := logCollectTestConfig{logType: "silent", level: "log_debug"}
-	config := fmt.Sprintf("logging:\n  type: %s\n  lefsvel: %s\n",
-		validSyslogConfig.logType, validSyslogConfig.level)
+	silentConfig := logCollectTestConfig{logType: "silent", level: "log_debug"}
+	config := fmt.Sprintf("logging:\n  type: %s\n  level: %s\n",
+		silentConfig.logType, silentConfig.level)
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	defer os.Remove(confFile.Name())
 	_, err := confFile.WriteString(config)
