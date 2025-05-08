@@ -617,9 +617,23 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	return err
 }
 
+// checks if we are offline by requesting state information from the cloud storage component
+func (fc *FileCache) cloudConnected() bool {
+	// TODO: create a new component API function to check this (SRGDEV-614), instead of using StatFs
+	_, _, err := fc.NextComponent().StatFs()
+	return !isOffline(err)
+}
+
 // this returns true when offline access is enabled, and it's safe to access this object offline
 func (fc *FileCache) offlineOperationAllowed(name string) bool {
 	return fc.offlineAccess && fc.notInCloud(name)
+}
+
+// returns true if we *know* that this entity does not exist in cloud storage
+// otherwise returns false (including ambiguous cases)
+func (fc *FileCache) notInCloud(name string) bool {
+	notInCloud, _ := fc.checkCloud(name)
+	return notInCloud
 }
 
 // notInCloud is true if we *know* that this entity does not exist in cloud storage
@@ -630,23 +644,14 @@ func (fc *FileCache) checkCloud(name string) (notInCloud bool, getAttrErr error)
 	return notInCloud, getAttrErr
 }
 
-// returns true if we *know* that this entity does not exist in cloud storage
-// otherwise returns false (including ambiguous cases)
-func (fc *FileCache) notInCloud(name string) bool {
-	notInCloud, _ := fc.checkCloud(name)
-	return notInCloud
-}
-
 // checks if the error returned from cloud storage means we're offline
 func isOffline(err error) bool {
 	return errors.Is(err, &common.CloudUnreachableError{})
 }
 
-// checks if we are offline by requesting state information from the cloud storage component
-func (fc *FileCache) cloudConnected() bool {
-	// TODO: create a new component API function to check this (SRGDEV-614), instead of using StatFs
-	_, _, err := fc.NextComponent().StatFs()
-	return !isOffline(err)
+// checks whether we have usable metadata, despite being offline
+func offlineDataAvailable(err error) bool {
+	return isOffline(err) && !errors.Is(err, &common.NoCachedDataError{})
 }
 
 // StreamDir : Add local files to the list retrieved from storage container
@@ -890,9 +895,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	// rename the directory in the cloud
 	err = fc.NextComponent().RenameDir(options)
 	// if we are offline, and offline access is enabled, allow local directories to be renamed
-	if fc.offlineAccess && errors.Is(err, &common.CloudUnreachableError{}) &&
-		fc.notInCloud(options.Src) &&
-		fc.notInCloud(options.Dst) {
+	if isOffline(err) && fc.offlineOperationAllowed(options.Src) && fc.notInCloud(options.Dst) {
 		log.Debug(
 			"FileCache::RenameDir : %s -> %s Cloud is unreachable but neither directory is in cloud storage. Proceeding with offline rename.",
 			options.Src,
@@ -941,11 +944,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 				// remember to delete the src directory later (after its contents are deleted)
 				directoriesToPurge = append(directoriesToPurge, path)
 				// update pending cloud ops
-				_, operationPending := fc.offlineOps.LoadAndDelete(fc.getObjectName(path))
-				if operationPending {
-					newObjectName := fc.getObjectName(newPath)
-					fc.offlineOps.Store(newObjectName, internal.CreateObjAttrDir(newObjectName))
-				}
+				fc.renamePendingOp(fc.getObjectName(path), fc.getObjectName(newPath))
 			}
 		} else {
 			// stat(localPath) failed. err is the one returned by stat
@@ -987,7 +986,9 @@ func (fc *FileCache) listCloudObjects(prefix string) (objectNames []string, err 
 		var attrSlice []*internal.ObjAttr
 		attrSlice, token, err = fc.NextComponent().
 			StreamDir(internal.StreamDirOptions{Name: prefix, Token: token})
-		if err != nil {
+		if offlineDataAvailable(err) && fc.offlineAccess {
+			err = nil
+		} else if err != nil {
 			return
 		}
 		// collect the object names
@@ -2134,19 +2135,23 @@ func (fc *FileCache) renameCachedFile(
 	// this will also delete the source file from local storage (if rename failed)
 	fc.policy.CachePurge(localSrcPath, sflock)
 	// update pending cloud ops
-	pendingOp, operationPending := fc.offlineOps.LoadAndDelete(fc.getObjectName(localSrcPath))
+	fc.renamePendingOp(fc.getObjectName(localSrcPath), fc.getObjectName(localDstPath))
+
+	return nil
+}
+
+func (fc *FileCache) renamePendingOp(srcName, dstName string) {
+	pendingOp, operationPending := fc.offlineOps.LoadAndDelete(srcName)
 	if operationPending {
 		attr, ok := pendingOp.(internal.ObjAttr)
 		if ok {
-			newObjectName := fc.getObjectName(localDstPath)
-			fc.offlineOps.Store(
-				newObjectName,
-				internal.CreateObjAttr(newObjectName, attr.Size, attr.Mtime),
-			)
+			if attr.IsDir() {
+				fc.offlineOps.Store(dstName, internal.CreateObjAttrDir(dstName))
+			} else {
+				fc.offlineOps.Store(dstName, internal.CreateObjAttr(dstName, attr.Size, attr.Mtime))
+			}
 		}
 	}
-
-	return nil
 }
 
 func (fc *FileCache) renameOpenHandles(
