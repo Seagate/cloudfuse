@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -95,7 +95,7 @@ func (cfs *CloudfuseStats) statsPoll() {
 	defer ticker.Stop()
 
 	for t := range ticker.C {
-		_, err = pf.WriteString(fmt.Sprintf("Poll at %v\n", t.Format(time.RFC3339)))
+		_, err = fmt.Fprintf(pf, "Poll at %v\n", t.Format(time.RFC3339))
 		if err != nil {
 			log.Err("StatsReader::statsPoll : [%v]", err)
 			break

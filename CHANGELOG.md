@@ -1,5 +1,105 @@
 # Cloudfuse Changelog #
 
+## **1.11.1** ##
+
+April 29h 2025
+This version is based on [blobfuse2 2.4.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.4.0) (upstream).
+
+### Bug Fixes ###
+
+- [#532](https://github.com/Seagate/cloudfuse/pull/532) Fix releases for RHEL that did not correctly link to glibc
+
+## **1.11.0** ##
+
+April 25th 2025
+This version is based on [blobfuse2 2.4.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.4.0) (upstream).
+
+### Features ###
+
+- [#494](https://github.com/Seagate/cloudfuse/pull/494) Adds initial support for block cache on Windows
+- [#507](https://github.com/Seagate/cloudfuse/pull/507) Change default display capacity and other defaults to more
+sensible values
+- [#478](https://github.com/Seagate/cloudfuse/pull/478) Improve checksum support when using s3storage
+
+### Bug Fixes ###
+
+- [#520](https://github.com/Seagate/cloudfuse/pull/520) Unmount on Windows is no longer case sensitive
+- [#513](https://github.com/Seagate/cloudfuse/pull/513) Change default log level of GUI
+
+## **1.10.0** ##
+
+March 28th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Features ###
+
+- [#490](https://github.com/Seagate/cloudfuse/pull/490) Adds new mount flags 'enable-remount-system' and 'enable-remount-user' to enable remount on system startup or user login
+along with corresponding unmount flags 'disable-remount-system' and 'disable-remount-user'
+
+## **1.9.3** ##
+
+March 25th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#484](https://github.com/Seagate/cloudfuse/pull/484) Use registry for a more reliable remount on startup
+
+## **1.9.2** ##
+
+March 12th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#475](https://github.com/Seagate/cloudfuse/pull/475) Fix bug where cloudfuse mounts with secure config files on Windows without foreground did not start correctly
+
+## **1.9.1** ##
+
+March 6th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Bug Fixes ###
+
+- [#471](https://github.com/Seagate/cloudfuse/pull/471) Fix bug where passphrase for secure encryption was not properly decoded as base64
+
+## **1.9.0** ##
+
+March 4th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#469](https://github.com/Seagate/cloudfuse/pull/469) Add enable-remount and disable-remount flags to CLI for Windows to better enable customizability on which mounts should remount on restart
+- [#467](https://github.com/Seagate/cloudfuse/pull/467) Fixed bug with creation of windows startup utility
+
+## **1.8.2** ##
+
+March 3rd 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#445](https://github.com/Seagate/cloudfuse/pull/462) Support custom SDDL strings on Windows to customize mount permissions
+- [#464](https://github.com/Seagate/cloudfuse/pull/464) No_gui installer now is able to restart mounts on restart if the user installs cloudfuse as a service
+- [#445](https://github.com/Seagate/cloudfuse/pull/450) GUI is able to mount as a drive letter on Windows
+
+## **1.8.1** ##
+
+February 20th 2025
+This version is based on [blobfuse2 2.3.2](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.3.2) (upstream).
+
+### Changes ###
+
+- [#286](https://github.com/Seagate/cloudfuse/pull/286) Prevent heap inspection of stored secrets
+- [#445](https://github.com/Seagate/cloudfuse/pull/445) Cleanup and remove unused debug info in GUI
+- [#338](https://github.com/Seagate/cloudfuse/pull/338) The service command now works on Linux to install cloudfuse as a service
+
+### Bug Fixes ###
+
+- [#444](https://github.com/Seagate/cloudfuse/pull/444) Fix issue when renaming directories
+- [#455](https://github.com/Seagate/cloudfuse/pull/455) Network share on Windows now correctly uses the hostname
+
 ## **1.8.0** ##
 
 February 4th 2025

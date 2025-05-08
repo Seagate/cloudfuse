@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -56,6 +56,10 @@ func (base *BaseComponent) Configure(isParent bool) error {
 	return nil
 }
 
+func (base *BaseComponent) GenConfig() string {
+	return ""
+}
+
 func (base *BaseComponent) Priority() ComponentPriority {
 	return EComponentPriority.LevelMid()
 }
@@ -100,6 +104,13 @@ func (base *BaseComponent) IsDirEmpty(options IsDirEmptyOptions) bool {
 		return base.next.IsDirEmpty(options)
 	}
 	return false
+}
+
+func (base *BaseComponent) DeleteEmptyDirs(options DeleteDirOptions) (bool, error) {
+	if base.next != nil {
+		return base.next.DeleteEmptyDirs(options)
+	}
+	return false, nil
 }
 
 func (base *BaseComponent) OpenDir(options OpenDirOptions) error {
@@ -245,7 +256,9 @@ func (base *BaseComponent) GetAttr(options GetAttrOptions) (*ObjAttr, error) {
 	return &ObjAttr{}, nil
 }
 
-func (base *BaseComponent) GetFileBlockOffsets(options GetFileBlockOffsetsOptions) (*common.BlockOffsetList, error) {
+func (base *BaseComponent) GetFileBlockOffsets(
+	options GetFileBlockOffsetsOptions,
+) (*common.BlockOffsetList, error) {
 	if base.next != nil {
 		return base.next.GetFileBlockOffsets(options)
 	}

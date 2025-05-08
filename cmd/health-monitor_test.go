@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -112,8 +112,15 @@ func (suite *hmonTestSuite) TestBuildHmonCliParams() {
 
 	options = mountOptions{}
 	options.MonitorOpt = monitorOptions{
-		EnableMon:       true,
-		DisableList:     []string{hmcommon.CloudfuseStats, hmcommon.CpuProfiler, hmcommon.MemoryProfiler, hmcommon.NetworkProfiler, hmcommon.FileCacheMon, "invalid_monitor"},
+		EnableMon: true,
+		DisableList: []string{
+			hmcommon.CloudfuseStats,
+			hmcommon.CpuProfiler,
+			hmcommon.MemoryProfiler,
+			hmcommon.NetworkProfiler,
+			hmcommon.FileCacheMon,
+			"invalid_monitor",
+		},
 		CfsPollInterval: 10,
 		ProcMonInterval: 10,
 		OutputPath:      "/tmp/health_monitor",
@@ -140,7 +147,12 @@ func (suite *hmonTestSuite) TestHmonInvalidOptions() {
 func (suite *hmonTestSuite) TestHmonInvalidConfigFile() {
 	defer suite.cleanupTest()
 
-	op, err := executeCommandC(rootCmd, "health-monitor", fmt.Sprintf("--pid=%s", generateRandomPID()), "--config-file=cfgNotFound.yaml")
+	op, err := executeCommandC(
+		rootCmd,
+		"health-monitor",
+		fmt.Sprintf("--pid=%s", generateRandomPID()),
+		"--config-file=cfgNotFound.yaml",
+	)
 	suite.assert.Error(err)
 	suite.assert.Contains(op, "invalid config file")
 	// The error message is different on Windows, so need to test with cases
@@ -163,7 +175,12 @@ func (suite *hmonTestSuite) TestHmonWithConfigFailure() {
 	suite.assert.NoError(err)
 	confFile.Close()
 
-	op, err := executeCommandC(rootCmd, "health-monitor", fmt.Sprintf("--pid=%s", generateRandomPID()), fmt.Sprintf("--config-file=%s", cfgFileHmonTest))
+	op, err := executeCommandC(
+		rootCmd,
+		"health-monitor",
+		fmt.Sprintf("--pid=%s", generateRandomPID()),
+		fmt.Sprintf("--config-file=%s", cfgFileHmonTest),
+	)
 	suite.assert.Error(err)
 	suite.assert.Contains(op, "failed to start health monitor")
 }
@@ -181,7 +198,12 @@ func (suite *hmonTestSuite) TestHmonStopPidEmpty() {
 }
 
 func (suite *hmonTestSuite) TestHmonStopPidInvalid() {
-	op, err := executeCommandC(rootCmd, "health-monitor", "stop", fmt.Sprintf("--pid=%s", generateRandomPID()))
+	op, err := executeCommandC(
+		rootCmd,
+		"health-monitor",
+		"stop",
+		fmt.Sprintf("--pid=%s", generateRandomPID()),
+	)
 	suite.assert.Error(err)
 	suite.assert.Contains(op, "failed to get health monitor pid")
 }

@@ -1,17 +1,8 @@
 /*
-    _____           _____   _____   ____          ______  _____  ------
-   |     |  |      |     | |     | |     |     | |       |            |
-   |     |  |      |     | |     | |     |     | |       |            |
-   | --- |  |      |     | |-----| |---- |     | |-----| |-----  ------
-   |     |  |      |     | |     | |     |     |       | |       |
-   | ____|  |_____ | ____| | ____| |     |_____|  _____| |_____  |_____
-
-
-   Licensed under the MIT License <http://opensource.org/licenses/MIT>.
+	Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
-   Author : <blobfusedev@microsoft.com>
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -64,19 +55,28 @@ type azAuthBlobCLI struct {
 func (azcli *azAuthBlobCLI) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	cred, err := azcli.getTokenCredential()
 	if err != nil {
-		log.Err("azAuthBlobCLI::getServiceClient : Failed to get token credential from azcli [%s]", err.Error())
+		log.Err(
+			"azAuthBlobCLI::getServiceClient : Failed to get token credential from azcli [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	opts, err := getAzBlobServiceClientOptions(stConfig)
 	if err != nil {
-		log.Err("azAuthBlobCLI::getServiceClient : Failed to create client options [%s]", err.Error())
+		log.Err(
+			"azAuthBlobCLI::getServiceClient : Failed to create client options [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	svcClient, err := service.NewClient(azcli.config.Endpoint, cred, opts)
 	if err != nil {
-		log.Err("azAuthBlobCLI::getServiceClient : Failed to create service client [%s]", err.Error())
+		log.Err(
+			"azAuthBlobCLI::getServiceClient : Failed to create service client [%s]",
+			err.Error(),
+		)
 	}
 
 	return svcClient, err
@@ -90,19 +90,28 @@ type azAuthDatalakeCLI struct {
 func (azcli *azAuthDatalakeCLI) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	cred, err := azcli.getTokenCredential()
 	if err != nil {
-		log.Err("azAuthDatalakeCLI::getServiceClient : Failed to get token credential from azcli [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeCLI::getServiceClient : Failed to get token credential from azcli [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	opts, err := getAzDatalakeServiceClientOptions(stConfig)
 	if err != nil {
-		log.Err("azAuthDatalakeCLI::getServiceClient : Failed to create client options [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeCLI::getServiceClient : Failed to create client options [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	svcClient, err := serviceBfs.NewClient(azcli.config.Endpoint, cred, opts)
 	if err != nil {
-		log.Err("azAuthDatalakeCLI::getServiceClient : Failed to create service client [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeCLI::getServiceClient : Failed to create service client [%s]",
+			err.Error(),
+		)
 	}
 
 	return svcClient, err

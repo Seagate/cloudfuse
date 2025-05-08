@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -73,7 +73,11 @@ func getUsagePercentage(path string, maxSize float64) float64 {
 	if maxSize == 0 {
 		currSize, usagePercent, err = common.GetDiskUsageFromStatfs(path)
 		if err != nil {
-			log.Err("cachePolicy::getUsagePercentage : failed to get disk usage for %s [%v]", path, err.Error)
+			log.Err(
+				"cachePolicy::getUsagePercentage : failed to get disk usage for %s [%v]",
+				path,
+				err.Error,
+			)
 		}
 	} else {
 		// We need to compute % usage of temp directory against configured limit
@@ -87,8 +91,16 @@ func getUsagePercentage(path string, maxSize float64) float64 {
 
 	log.Debug("cachePolicy::getUsagePercentage : current cache usage : %f%%", usagePercent)
 
-	fileCacheStatsCollector.UpdateStats(stats_manager.Replace, cacheUsage, fmt.Sprintf("%f MB", currSize))
-	fileCacheStatsCollector.UpdateStats(stats_manager.Replace, usgPer, fmt.Sprintf("%f%%", usagePercent))
+	fileCacheStatsCollector.UpdateStats(
+		stats_manager.Replace,
+		cacheUsage,
+		fmt.Sprintf("%f MB", currSize),
+	)
+	fileCacheStatsCollector.UpdateStats(
+		stats_manager.Replace,
+		usgPer,
+		fmt.Sprintf("%f%%", usagePercent),
+	)
 
 	return usagePercent
 }
@@ -115,7 +127,7 @@ func deleteFile(name string) error {
 	}
 
 	if err != nil {
-		log.Err("lruPolicy::DeleteItem : Failed to delete local file %s, [%s]", name, err.Error())
+		log.Err("cachePolicy::DeleteItem : Failed to delete local file %s [%v]", name, err.Error())
 		return err
 	}
 

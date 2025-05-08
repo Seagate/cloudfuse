@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +30,7 @@ package libfuse
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -73,6 +74,7 @@ type Libfuse struct {
 	directIO              bool
 	umask                 uint32
 	displayCapacityMb     uint64
+	windowsSDDL           string
 }
 
 // To support pagination in readdir calls this structure holds a block of items for a given directory
@@ -88,25 +90,26 @@ type dirChildCache struct {
 // LibfuseOptions defines the config parameters.
 type LibfuseOptions struct {
 	mountPath               string
-	DefaultPermission       uint32 `config:"default-permission" yaml:"default-permission,omitempty"`
-	AttributeExpiration     uint32 `config:"attribute-expiration-sec" yaml:"attribute-expiration-sec,omitempty"`
-	EntryExpiration         uint32 `config:"entry-expiration-sec" yaml:"entry-expiration-sec,omitempty"`
+	DefaultPermission       uint32 `config:"default-permission"            yaml:"default-permission,omitempty"`
+	AttributeExpiration     uint32 `config:"attribute-expiration-sec"      yaml:"attribute-expiration-sec,omitempty"`
+	EntryExpiration         uint32 `config:"entry-expiration-sec"          yaml:"entry-expiration-sec,omitempty"`
 	NegativeEntryExpiration uint32 `config:"negative-entry-expiration-sec" yaml:"negative-entry-expiration-sec,omitempty"`
-	EnableFuseTrace         bool   `config:"fuse-trace" yaml:"fuse-trace,omitempty"`
-	allowOther              bool   `config:"allow-other" yaml:"-"`
-	allowRoot               bool   `config:"allow-root" yaml:"-"`
-	readOnly                bool   `config:"read-only" yaml:"-"`
-	ExtensionPath           string `config:"extension" yaml:"extension,omitempty"`
-	DisableWritebackCache   bool   `config:"disable-writeback-cache" yaml:"-"`
-	IgnoreOpenFlags         bool   `config:"ignore-open-flags" yaml:"ignore-open-flags,omitempty"`
-	nonEmptyMount           bool   `config:"nonempty" yaml:"nonempty,omitempty"`
-	NetworkShare            bool   `config:"network-share" yaml:"network-share,omitempty"`
-	Uid                     uint32 `config:"uid" yaml:"uid,omitempty"`
-	Gid                     uint32 `config:"gid" yaml:"gid,omitempty"`
-	MaxFuseThreads          uint32 `config:"max-fuse-threads" yaml:"max-fuse-threads,omitempty"`
-	DirectIO                bool   `config:"direct-io" yaml:"direct-io,omitempty"`
-	Umask                   uint32 `config:"umask" yaml:"umask,omitempty"`
-	DisplayCapacityMb       uint64 `config:"display-capacity-mb" yaml:"display-capacity-mb,omitempty"`
+	EnableFuseTrace         bool   `config:"fuse-trace"                    yaml:"fuse-trace,omitempty"`
+	allowOther              bool   `config:"allow-other"                   yaml:"-"`
+	allowRoot               bool   `config:"allow-root"                    yaml:"-"`
+	readOnly                bool   `config:"read-only"                     yaml:"-"`
+	ExtensionPath           string `config:"extension"                     yaml:"extension,omitempty"`
+	DisableWritebackCache   bool   `config:"disable-writeback-cache"       yaml:"-"`
+	IgnoreOpenFlags         bool   `config:"ignore-open-flags"             yaml:"ignore-open-flags,omitempty"`
+	nonEmptyMount           bool   `config:"nonempty"                      yaml:"nonempty,omitempty"`
+	NetworkShare            bool   `config:"network-share"                 yaml:"network-share,omitempty"`
+	Uid                     uint32 `config:"uid"                           yaml:"uid,omitempty"`
+	Gid                     uint32 `config:"gid"                           yaml:"gid,omitempty"`
+	MaxFuseThreads          uint32 `config:"max-fuse-threads"              yaml:"max-fuse-threads,omitempty"`
+	DirectIO                bool   `config:"direct-io"                     yaml:"direct-io,omitempty"`
+	Umask                   uint32 `config:"umask"                         yaml:"umask,omitempty"`
+	DisplayCapacityMb       uint64 `config:"display-capacity-mb"           yaml:"display-capacity-mb,omitempty"`
+	WindowsSSDL             string `config:"windows-sddl"                  yaml:"windows-sddl,omitempty"`
 }
 
 const compName = "libfuse"
@@ -202,6 +205,7 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 	lf.ownerGID = opt.Gid
 	lf.ownerUID = opt.Uid
 	lf.umask = opt.Umask
+	lf.windowsSDDL = opt.WindowsSSDL
 
 	if opt.allowOther {
 		lf.dirPermission = uint(common.DefaultAllowOtherPermissionBits)
@@ -216,22 +220,32 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 		}
 	}
 
-	if config.IsSet(compName+".entry-expiration-sec") || config.IsSet("lfuse.entry-expiration-sec") {
+	if config.IsSet(compName+".entry-expiration-sec") ||
+		config.IsSet("lfuse.entry-expiration-sec") {
 		lf.entryExpiration = opt.EntryExpiration
 	} else {
 		lf.entryExpiration = defaultEntryExpiration
 	}
 
-	if config.IsSet(compName+".attribute-expiration-sec") || config.IsSet("lfuse.attribute-expiration-sec") {
+	if config.IsSet(compName+".attribute-expiration-sec") ||
+		config.IsSet("lfuse.attribute-expiration-sec") {
 		lf.attributeExpiration = opt.AttributeExpiration
 	} else {
 		lf.attributeExpiration = defaultAttrExpiration
 	}
 
-	if config.IsSet(compName+".negative-entry-expiration-sec") || config.IsSet("lfuse.negative-entry-expiration-sec") {
+	if config.IsSet(compName+".negative-entry-expiration-sec") ||
+		config.IsSet("lfuse.negative-entry-expiration-sec") {
 		lf.negativeTimeout = opt.NegativeEntryExpiration
 	} else {
 		lf.negativeTimeout = defaultNegativeEntryExpiration
+	}
+
+	if lf.directIO {
+		lf.negativeTimeout = 0
+		lf.attributeExpiration = 0
+		lf.entryExpiration = 0
+		log.Crit("Libfuse::Validate : DirectIO enabled, setting fuse timeouts to 0")
 	}
 
 	if config.IsSet(compName + ".max-fuse-threads") {
@@ -247,8 +261,9 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 	}
 
 	// NOTE/TODO: this always fails in GitHub Actions on Windows
-	if !(config.IsSet(compName+".uid") || config.IsSet(compName+".gid") ||
-		config.IsSet("lfuse.uid") || config.IsSet("lfuse.gid")) {
+	if !config.IsSet(compName+".uid") && !config.IsSet(compName+".gid") &&
+		!config.IsSet("lfuse.uid") &&
+		!config.IsSet("lfuse.gid") {
 		var err error
 		lf.ownerUID, lf.ownerGID, err = common.GetCurrentUser()
 		if err != nil {
@@ -259,6 +274,29 @@ func (lf *Libfuse) Validate(opt *LibfuseOptions) error {
 	log.Info("Libfuse::Validate : UID %v, GID %v", lf.ownerUID, lf.ownerGID)
 
 	return nil
+}
+
+func (lf *Libfuse) GenConfig() string {
+	log.Info("Libfuse::Configure : config generation started")
+
+	// If DirectIO is enabled, override expiration values
+	directIO := false
+	_ = config.UnmarshalKey("direct-io", &directIO)
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("\n%s:", lf.Name()))
+
+	timeout := defaultEntryExpiration
+	if directIO {
+		timeout = 0
+		sb.WriteString("\n  direct-io: true")
+	}
+
+	sb.WriteString(fmt.Sprintf("\n  attribute-expiration-sec: %v", timeout))
+	sb.WriteString(fmt.Sprintf("\n  entry-expiration-sec: %v", timeout))
+	sb.WriteString(fmt.Sprintf("\n  negative-entry-expiration-sec: %v", timeout))
+
+	return sb.String()
 }
 
 // Configure : Pipeline will call this method after constructor so that you can read config and initialize yourself
@@ -316,10 +354,29 @@ func (lf *Libfuse) Configure(_ bool) error {
 		return fmt.Errorf("%s config error %s", lf.Name(), err.Error())
 	}
 
-	log.Info("Libfuse::Configure : read-only %t, allow-other %t, allow-root %t, default-perm %d, entry-timeout %d, attr-time %d, negative-timeout %d, "+
-		"ignore-open-flags: %t, nonempty %t, network-share %t, direct_io %t, max-fuse-threads %d, fuse-trace %t, extension %s, disable-writeback-cache %t, dirPermission %v, mountPath %v, umask %v, displayCapacityMb %v",
-		lf.readOnly, lf.allowOther, lf.allowRoot, lf.filePermission, lf.entryExpiration, lf.attributeExpiration, lf.negativeTimeout,
-		lf.ignoreOpenFlags, lf.nonEmptyMount, lf.networkShare, lf.directIO, lf.maxFuseThreads, lf.traceEnable, lf.extensionPath, lf.disableWritebackCache, lf.dirPermission, lf.mountPath, lf.umask, lf.displayCapacityMb)
+	log.Crit(
+		"Libfuse::Configure : read-only %t, allow-other %t, allow-root %t, default-perm %d, entry-timeout %d, attr-time %d, negative-timeout %d, "+
+			"ignore-open-flags: %t, nonempty %t, network-share %t, direct_io %t, max-fuse-threads %d, fuse-trace %t, extension %s, disable-writeback-cache %t, dirPermission %v, mountPath %v, umask %v, displayCapacityMb %v",
+		lf.readOnly,
+		lf.allowOther,
+		lf.allowRoot,
+		lf.filePermission,
+		lf.entryExpiration,
+		lf.attributeExpiration,
+		lf.negativeTimeout,
+		lf.ignoreOpenFlags,
+		lf.nonEmptyMount,
+		lf.networkShare,
+		lf.directIO,
+		lf.maxFuseThreads,
+		lf.traceEnable,
+		lf.extensionPath,
+		lf.disableWritebackCache,
+		lf.dirPermission,
+		lf.mountPath,
+		lf.umask,
+		lf.displayCapacityMb,
+	)
 
 	return nil
 }
@@ -344,25 +401,49 @@ func init() {
 	entryTimeoutFlag := config.AddUint32Flag("entry-timeout", 0, "The entry timeout in seconds.")
 	config.BindPFlag(compName+".entry-expiration-sec", entryTimeoutFlag)
 
-	negativeTimeoutFlag := config.AddUint32Flag("negative-timeout", 0, "The negative entry timeout in seconds.")
+	negativeTimeoutFlag := config.AddUint32Flag(
+		"negative-timeout",
+		0,
+		"The negative entry timeout in seconds.",
+	)
 	config.BindPFlag(compName+".negative-entry-expiration-sec", negativeTimeoutFlag)
 
-	allowOther := config.AddBoolFlag("allow-other", false, "Allow other users to access this mount point.")
+	allowOther := config.AddBoolFlag(
+		"allow-other",
+		false,
+		"Allow other users to access this mount point.",
+	)
 	config.BindPFlag("allow-other", allowOther)
 
-	disableWritebackCache := config.AddBoolFlag("disable-writeback-cache", false, "Disallow libfuse to buffer write requests if you must strictly open files in O_WRONLY or O_APPEND mode.")
+	disableWritebackCache := config.AddBoolFlag(
+		"disable-writeback-cache",
+		false,
+		"Disallow libfuse to buffer write requests if you must strictly open files in O_WRONLY or O_APPEND mode.",
+	)
 	config.BindPFlag(compName+".disable-writeback-cache", disableWritebackCache)
 
 	debug := config.AddBoolPFlag("d", false, "Mount with foreground and FUSE logs on.")
 	config.BindPFlag(compName+".fuse-trace", debug)
 	debug.Hidden = true
 
-	ignoreOpenFlags := config.AddBoolFlag("ignore-open-flags", true, "Ignore unsupported open flags (APPEND, WRONLY) by cloudfuse when writeback caching is enabled.")
+	ignoreOpenFlags := config.AddBoolFlag(
+		"ignore-open-flags",
+		true,
+		"Ignore unsupported open flags (APPEND, WRONLY) by cloudfuse when writeback caching is enabled.",
+	)
 	config.BindPFlag(compName+".ignore-open-flags", ignoreOpenFlags)
 
-	networkShareFlags := config.AddBoolFlag("network-share", false, "Run as a network share. Only supported on Windows.")
+	networkShareFlags := config.AddBoolFlag(
+		"network-share",
+		false,
+		"Run as a network share. Only supported on Windows.",
+	)
 	config.BindPFlag(compName+".network-share", networkShareFlags)
 
-	displayCapacityFlag := config.AddUint64Flag("display-capacity-mb", common.DefaultCapacityMb, "Storage capacity to display.")
+	displayCapacityFlag := config.AddUint64Flag(
+		"display-capacity-mb",
+		common.DefaultCapacityMb,
+		"Storage capacity to display.",
+	)
 	config.BindPFlag(compName+".display-capacity-mb", displayCapacityFlag)
 }

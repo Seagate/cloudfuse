@@ -154,7 +154,7 @@ func (suite *mountTestSuite) TestForegroundConfigFileEmpty() {
 
 	op, err := executeCommandC(rootCmd, "mount", mntDir, "--config-file=", "--foreground=true")
 	suite.assert.NotNil(err)
-	suite.assert.Contains(op, "Config file not provided")
+	suite.assert.Contains(op, "config file not provided")
 }
 
 // mount failure test where the config file type is unsupported

@@ -16,13 +16,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           persist-credentials: false
 
       - name: Fetch cached compiled GUI
         id: restore-compiled-gui
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           # enableCrossOsArchive always needs to be set on cached items in Windows jobs
           # see cache documentation: https://github.com/actions/cache#inputs
@@ -32,7 +32,7 @@ jobs:
 
       - name: Install Python
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
 
@@ -57,7 +57,7 @@ jobs:
 
       - name: Cache compiled GUI
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           enableCrossOsArchive: true
           path: gui/dist/cloudfuseGUI_${{ runner.os }}
@@ -69,17 +69,17 @@ jobs:
     needs: compile-gui
     runs-on: windows-latest
     env:
-      go: "1.23"
+      go: "1.24"
       cgo: "0"
       winfsp: winfsp-2.0.23075.msi
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           persist-credentials: false
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
         with:
           go-version: ${{ env.go }}
           check-latest: true
@@ -98,14 +98,16 @@ jobs:
           go build -trimpath -ldflags ''"$ldflags"'' -o cloudfuse.exe
           go build -trimpath -ldflags ''"$ldflags"'' -o cfusemon.exe ./tools/health-monitor/
           go build -trimpath -ldflags ''"$ldflags"'' -o windows-startup.exe ./tools/windows-startup/
+          go build -trimpath -ldflags ''"$ldflags"'' -o windows-service.exe ./tools/windows-service/
           touch -m -d $commitDate cloudfuse.exe
           touch -m -d $commitDate cfusemon.exe
-          touch -m -d $commitDate windows-startup.exe
+          touch -m -d $commitDate windows-startup.
+          touch -m -d $commitDate windows-service.exe
 
         # Get the WinFSP installer (from cache or download)
       - name: Get cached WinFSP installer
         id: restore-winfsp-installer
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
@@ -118,13 +120,13 @@ jobs:
 
       - name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
 
       - name: Fetch cached compiled GUI
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           enableCrossOsArchive: true
           path: gui/dist/cloudfuseGUI_${{ runner.os }}
@@ -166,14 +168,14 @@ jobs:
           mv build/Output/cloudfuse.exe build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
 
       - name: Cache windows installer
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
 
       - name: Cache windows installer No GUi
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -185,25 +187,20 @@ jobs:
     needs: create-installer
     runs-on: ubuntu-latest
     env:
-      go: "1.23"
-      zig: 0.13.0
+      go: "1.24"
+      zig: 0.14.0
     permissions:
       contents: write
 
     steps:
-      # libfuse-dev is required to build our command-line program
+      # libfuse-dev is required to build our command-line program and enable GoReleaser to build for ARM64
       - name: Install Libfuse
         run: |
-          sudo apt-get install -y libfuse-dev
-
-        # enable GoReleaser to build for ARM64
-      - name: Install ARM64 compilers
-        run: |
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-
-        # Get code and Go ready
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu libfuse-dev
+      # Get code and Go ready
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -217,7 +214,7 @@ jobs:
           rm zig.tar.xz
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
         with:
           go-version: ${{ env.go }}
           check-latest: true
@@ -231,7 +228,7 @@ jobs:
 
         # Get cached intermediate build products
       - name: Restore cached Windows installer
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -240,7 +237,7 @@ jobs:
 
         # Get cached intermediate build products
       - name: Restore cached Windows installer No Gui
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -248,7 +245,7 @@ jobs:
           fail-on-cache-miss: true
 
       - name: Restore Linux compiled GUI
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           path: gui/dist/cloudfuseGUI_Linux
           key: Linux-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
@@ -256,7 +253,7 @@ jobs:
         continue-on-error: false
 
       - name: Restore Windows compiled GUI
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
         with:
           enableCrossOsArchive: true
           path: gui/dist/cloudfuseGUI_Windows
@@ -269,7 +266,7 @@ jobs:
 
         # Run GoReleaser (see .goreleaser.yaml)
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6
         with:
           args: release --clean
         env:

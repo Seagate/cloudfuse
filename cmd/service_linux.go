@@ -55,7 +55,9 @@ var serviceCmd = &cobra.Command{
 	Example:           "cloudfuse service install",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.New("missing command options\n\nDid you mean this?\n\tcloudfuse service install\n\nRun 'cloudfuse service --help' for usage")
+		return errors.New(
+			"missing command options\n\nDid you mean this?\n\tcloudfuse service install\n\nRun 'cloudfuse service --help' for usage",
+		)
 	},
 }
 
@@ -74,11 +76,17 @@ var installCmd = &cobra.Command{
 
 		mountPath, err := filepath.Abs(mountPath)
 		if err != nil {
-			return fmt.Errorf("couldn't couldn't determine absolute path from string [%s]", err.Error())
+			return fmt.Errorf(
+				"couldn't couldn't determine absolute path from string [%s]",
+				err.Error(),
+			)
 		}
 		configPath, err := filepath.Abs(configPath)
 		if err != nil {
-			return fmt.Errorf("couldn't couldn't determine absolute path from string [%s]", err.Error())
+			return fmt.Errorf(
+				"couldn't couldn't determine absolute path from string [%s]",
+				err.Error(),
+			)
 		}
 
 		mountExists := common.DirectoryExists(mountPath)
@@ -110,7 +118,10 @@ var installCmd = &cobra.Command{
 		systemctlEnableCmd := exec.Command("systemctl", "enable", serviceName)
 		err = systemctlEnableCmd.Run()
 		if err != nil {
-			return fmt.Errorf("failed to run 'systemctl daemon-reload' command due to following [%s]", err.Error())
+			return fmt.Errorf(
+				"failed to run 'systemctl daemon-reload' command due to following [%s]",
+				err.Error(),
+			)
 		}
 		return nil
 	},
@@ -135,7 +146,10 @@ var uninstallCmd = &cobra.Command{
 			removeFileCmd := exec.Command("rm", serviceFilePath)
 			err := removeFileCmd.Run()
 			if err != nil {
-				return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system [%s]", err.Error())
+				return fmt.Errorf(
+					"failed to delete "+serviceName+" file from /etc/systemd/system [%s]",
+					err.Error(),
+				)
 			}
 		} else if os.IsNotExist(err) {
 			return fmt.Errorf("failed to delete "+serviceName+" file from /etc/systemd/system [%s]", err.Error())
@@ -214,12 +228,14 @@ func setUser(serviceUser string, mountPath string, configPath string) error {
 		}
 	}
 	// advise on required permissions
-	fmt.Println("ensure the user, " + serviceUser + ", has the following access: \n" + mountPath + ": read, write, and execute \n" + configPath + ": read")
+	fmt.Println(
+		"ensure the user, " + serviceUser + ", has the following access: \n" + mountPath + ": read, write, and execute \n" + configPath + ": read",
+	)
 	return nil
 }
 
 func getService(mountPath string) (string, string) {
-	serviceName := strings.Replace(mountPath, "/", "-", -1)
+	serviceName := strings.ReplaceAll(mountPath, "/", "-")
 	serviceFile := "cloudfuse" + serviceName + ".service"
 	serviceFilePath := "/etc/systemd/system/" + serviceFile
 	return serviceName, serviceFilePath

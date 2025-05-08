@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -38,7 +38,7 @@ import (
 	hmcommon "github.com/Seagate/cloudfuse/tools/health-monitor/common"
 	hminternal "github.com/Seagate/cloudfuse/tools/health-monitor/internal"
 
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 type CpuMemProfiler struct {
@@ -87,7 +87,10 @@ func (cm *CpuMemProfiler) Monitor() error {
 func (cm *CpuMemProfiler) ExportStats(timestamp string, st interface{}) {
 	se, err := hminternal.NewStatsExporter()
 	if err != nil || se == nil {
-		log.Err("cpu_mem_monitor::ExportStats : Error in creating stats exporter instance [%v]", err)
+		log.Err(
+			"cpu_mem_monitor::ExportStats : Error in creating stats exporter instance [%v]",
+			err,
+		)
 		return
 	}
 
@@ -153,7 +156,11 @@ func (cm *CpuMemProfiler) getCpuMemoryUsage() (*hmcommon.CpuMemStat, error) {
 
 	cliOut, err := exec.Command("bash", "-c", topCmd).Output()
 	if err != nil {
-		log.Err("cpu_mem_monitor::getCpuMemoryUsage : Cloudfuse is not running on pid %v [%v]", cm.pid, err)
+		log.Err(
+			"cpu_mem_monitor::getCpuMemoryUsage : Cloudfuse is not running on pid %v [%v]",
+			cm.pid,
+			err,
+		)
 		return nil, err
 	}
 
@@ -165,7 +172,10 @@ func (cm *CpuMemProfiler) getCpuMemoryUsage() (*hmcommon.CpuMemStat, error) {
 
 	cpuIndex, memIndex := getCpuMemIndex(processes[0])
 	stats := strings.Fields(processes[1])
-	if cpuIndex == -1 || memIndex == -1 || len(stats) <= int(math.Max(float64(cpuIndex), float64(memIndex))) || len(stats[cpuIndex]) == 0 || len(stats[memIndex]) == 0 {
+	if cpuIndex == -1 || memIndex == -1 ||
+		len(stats) <= int(math.Max(float64(cpuIndex), float64(memIndex))) ||
+		len(stats[cpuIndex]) == 0 ||
+		len(stats[memIndex]) == 0 {
 		log.Debug("cpu_mem_monitor::getCpuMemoryUsage : %v", processes)
 		log.Err("cpu_mem_monitor::getCpuMemoryUsage : Cloudfuse is not running on pid %v", cm.pid)
 		return nil, fmt.Errorf("cloudfuse is not running on pid %v", cm.pid)
@@ -176,7 +186,8 @@ func (cm *CpuMemProfiler) getCpuMemoryUsage() (*hmcommon.CpuMemStat, error) {
 		MemUsage: stats[memIndex],
 	}
 	cpuMemStat.CpuUsage += "%"
-	if cpuMemStat.MemUsage[len(cpuMemStat.MemUsage)-1] >= '0' && cpuMemStat.MemUsage[len(cpuMemStat.MemUsage)-1] <= '9' {
+	if cpuMemStat.MemUsage[len(cpuMemStat.MemUsage)-1] >= '0' &&
+		cpuMemStat.MemUsage[len(cpuMemStat.MemUsage)-1] <= '9' {
 		cpuMemStat.MemUsage += "k"
 	}
 
@@ -185,11 +196,12 @@ func (cm *CpuMemProfiler) getCpuMemoryUsage() (*hmcommon.CpuMemStat, error) {
 
 func getCpuMemIndex(process string) (int, int) {
 	cols := strings.Fields(process)
-	var cpuIndex, memIndex int = -1, -1
+	var cpuIndex, memIndex = -1, -1
 	for i, col := range cols {
-		if col == "%CPU" {
+		switch col {
+		case "%CPU":
 			cpuIndex = i
-		} else if col == "VIRT" {
+		case "VIRT":
 			memIndex = i
 		}
 	}

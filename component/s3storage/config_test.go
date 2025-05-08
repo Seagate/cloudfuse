@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -118,11 +118,11 @@ func (s *configTestSuite) TestValidChecksum() {
 	s.opt.EnableChecksum = true
 
 	// Then
-	// Default should be SHA1 if user does not provide checksum algorithm
+	// Default should be CRC32 if user does not provide checksum algorithm
 	err := ParseAndValidateConfig(s.s3, s.opt, s.secrets)
 	s.assert.NoError(err)
 	s.assert.True(s.s3.stConfig.enableChecksum)
-	s.assert.Equal(types.ChecksumAlgorithm("SHA1"), s.s3.stConfig.checksumAlgorithm)
+	s.assert.Equal(types.ChecksumAlgorithm("CRC32"), s.s3.stConfig.checksumAlgorithm)
 
 	// When
 	s.opt.EnableChecksum = true

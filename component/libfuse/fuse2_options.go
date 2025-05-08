@@ -1,10 +1,10 @@
-//go:build windows
+//go:build !fuse3
 
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,15 +25,53 @@
    SOFTWARE
 */
 
-package cmd
+package libfuse
 
 import (
-	_ "github.com/Seagate/cloudfuse/component/attr_cache"
-	_ "github.com/Seagate/cloudfuse/component/azstorage"
-	_ "github.com/Seagate/cloudfuse/component/file_cache"
-	_ "github.com/Seagate/cloudfuse/component/libfuse"
-	_ "github.com/Seagate/cloudfuse/component/loopback"
-	_ "github.com/Seagate/cloudfuse/component/s3storage"
-	_ "github.com/Seagate/cloudfuse/component/size_tracker"
-	_ "github.com/Seagate/cloudfuse/component/stream"
+	"fmt"
+
+	"github.com/winfsp/cgofuse/fuse"
 )
+
+func createFuseOptions(
+	host *fuse.FileSystemHost,
+	allowOther bool,
+	allowRoot bool,
+	readOnly bool,
+	nonEmptyMount bool,
+	maxFuseThreads uint32,
+	umask uint32,
+) string {
+	var options string
+	// While reading a file let kernel do readahead for better perf
+	options += fmt.Sprintf(",max_readahead=%d", 4*1024*1024)
+
+	// Max background thread on the fuse layer for high parallelism
+	options += fmt.Sprintf(",max_background=%d", maxFuseThreads)
+
+	if allowOther {
+		options += ",allow_other"
+	}
+	if allowRoot {
+		options += ",allow_root"
+	}
+	if readOnly {
+		options += ",ro"
+	}
+	if nonEmptyMount {
+		options += ",nonempty"
+	}
+
+	if umask != 0 {
+		options += fmt.Sprintf(",umask=%04d", umask)
+	}
+
+	// direct_io option is used to bypass the kernel cache. It disables the use of
+	// page cache (file content cache) in the kernel for the filesystem.
+	if fuseFS.directIO {
+		options += ",direct_io"
+	} else {
+		options += ",kernel_cache"
+	}
+	return options
+}

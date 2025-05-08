@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +30,7 @@ import (
 	"io/fs"
 	"math"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -56,13 +57,17 @@ func (suite *cachePolicyTestSuite) SetupTest() {
 func (suite *cachePolicyTestSuite) cleanupTest() {
 	err := os.RemoveAll(cache_path)
 	if err != nil {
-		fmt.Printf("cachePolicyTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", cache_path, err)
+		fmt.Printf(
+			"cachePolicyTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n",
+			cache_path,
+			err,
+		)
 	}
 }
 
 func (suite *cachePolicyTestSuite) TestGetUsage() {
 	defer suite.cleanupTest()
-	f, _ := os.Create(cache_path + "/test")
+	f, _ := os.Create(filepath.Join(cache_path, "test"))
 	data := make([]byte, 1024*1024)
 	f.Write(data)
 	result, _ := common.GetUsage(cache_path)
@@ -73,7 +78,7 @@ func (suite *cachePolicyTestSuite) TestGetUsage() {
 // We should return the sector size used. Here there should be two sectors used
 func (suite *cachePolicyTestSuite) TestGetUsageSizeOnDisk() {
 	defer suite.cleanupTest()
-	f, _ := os.Create(cache_path + "/test")
+	f, _ := os.Create(filepath.Join(cache_path, "test"))
 	data := make([]byte, 4097)
 	f.Write(data)
 	f.Close()
@@ -90,7 +95,7 @@ func (suite *cachePolicyTestSuite) TestGetUsagePercentage() {
 	defer suite.cleanupTest()
 	data := make([]byte, 1024*1024)
 
-	f, _ := os.Create(cache_path + "/test")
+	f, _ := os.Create(filepath.Join(cache_path, "test"))
 	f.Write(data)
 	result := getUsagePercentage(cache_path, 4)
 	// since the value might defer a little distro to distro

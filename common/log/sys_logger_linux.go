@@ -4,7 +4,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -44,7 +44,7 @@ type SysLogger struct {
 	logger *log.Logger
 }
 
-var NoSyslogService = errors.New("failed to create syslog object")
+var ErrNoSyslogService = errors.New("failed to create syslog object")
 
 func newSysLogger(lvl common.LogLevel, tag string) (*SysLogger, error) {
 	l := &SysLogger{
@@ -81,7 +81,7 @@ func (l *SysLogger) init() error {
 	logwriter, e := syslog.New(getSyslogLevel(l.level), l.tag)
 
 	if e != nil {
-		return NoSyslogService
+		return ErrNoSyslogService
 	}
 
 	l.logger = log.New(logwriter, "", 0)

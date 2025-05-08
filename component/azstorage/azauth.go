@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -194,12 +194,18 @@ func (base *azOAuthBase) getAzIdentityClientOptions(config *azAuthConfig) azcore
 	}
 
 	if config.ActiveDirectoryEndpoint != "" {
-		log.Debug("azAuthBase::getAzIdentityClientOptions : ActiveDirectoryAuthorityHost = %s", config.ActiveDirectoryEndpoint)
+		log.Debug(
+			"azAuthBase::getAzIdentityClientOptions : ActiveDirectoryAuthorityHost = %s",
+			config.ActiveDirectoryEndpoint,
+		)
 		opts.Cloud.ActiveDirectoryAuthorityHost = config.ActiveDirectoryEndpoint
 	}
 	if config.AuthResource != "" {
 		if val, ok := opts.Cloud.Services[cloud.ResourceManager]; ok {
-			log.Debug("azAuthBase::getAzIdentityClientOptions : AuthResource = %s", config.AuthResource)
+			log.Debug(
+				"azAuthBase::getAzIdentityClientOptions : AuthResource = %s",
+				config.AuthResource,
+			)
 			val.Endpoint = config.AuthResource
 			opts.Cloud.Services[cloud.ResourceManager] = val
 		}

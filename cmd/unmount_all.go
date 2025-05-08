@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -56,7 +56,9 @@ var umntAllCmd = &cobra.Command{
 			mountfound += 1
 			var err error
 			if runtime.GOOS == "windows" {
-				err = unmountCloudfuseWindows(mntPath)
+				disableRemountUser, _ := cmd.Flags().GetBool("disable-remount-user")
+				disableRemountSystem, _ := cmd.Flags().GetBool("disable-remount-system")
+				err = unmountCloudfuseWindows(mntPath, disableRemountUser, disableRemountSystem)
 			} else {
 				err = unmountCloudfuse(mntPath, lazy)
 			}
@@ -79,4 +81,13 @@ var umntAllCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func init() {
+	if runtime.GOOS == "windows" {
+		umntAllCmd.Flags().
+			Bool("disable-remount-user", false, "Disable remounting this mount on server restart as user.")
+		umntAllCmd.Flags().
+			Bool("disable-remount-system", false, "Disable remounting this mount on server restart as system.")
+	}
 }

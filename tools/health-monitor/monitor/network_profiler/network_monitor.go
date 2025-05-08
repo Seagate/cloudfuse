@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -60,7 +60,10 @@ func (nw *NetworkProfiler) Monitor() error {
 func (nw *NetworkProfiler) ExportStats(timestamp string, st interface{}) {
 	se, err := hminternal.NewStatsExporter()
 	if err != nil || se == nil {
-		log.Err("network_monitor::ExportStats : Error in creating stats exporter instance [%v]", err)
+		log.Err(
+			"network_monitor::ExportStats : Error in creating stats exporter instance [%v]",
+			err,
+		)
 		return
 	}
 

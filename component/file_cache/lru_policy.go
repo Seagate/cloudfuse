@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -258,7 +258,11 @@ func (p *lruPolicy) clearCache() {
 			if pUsage > p.highThreshold {
 				continueDeletion := true
 				for continueDeletion {
-					log.Info("lruPolicy::ClearCache : High threshold reached %f > %f", pUsage, p.highThreshold)
+					log.Info(
+						"lruPolicy::ClearCache : High threshold reached %f > %f",
+						pUsage,
+						p.highThreshold,
+					)
 
 					cleanupCount++
 					p.updateMarker()
@@ -267,7 +271,11 @@ func (p *lruPolicy) clearCache() {
 
 					pUsage := getUsagePercentage(p.tmpPath, p.maxSizeMB)
 					if pUsage < p.lowThreshold || cleanupCount >= 3 {
-						log.Info("lruPolicy::ClearCache : Threshold stabilized %f > %f", pUsage, p.lowThreshold)
+						log.Info(
+							"lruPolicy::ClearCache : Threshold stabilized %f > %f",
+							pUsage,
+							p.lowThreshold,
+						)
 						continueDeletion = false
 					}
 				}
@@ -397,7 +405,11 @@ func (p *lruPolicy) deleteItem(name string) {
 
 	azPath := common.NormalizeObjectName(strings.TrimPrefix(name, p.tmpPath))
 	if azPath == "" {
-		log.Err("lruPolicy::DeleteItem : Empty file name formed name : %s, tmpPath : %s", name, p.tmpPath)
+		log.Err(
+			"lruPolicy::DeleteItem : Empty file name formed name : %s, tmpPath : %s",
+			name,
+			p.tmpPath,
+		)
 		return
 	}
 
@@ -447,7 +459,7 @@ func (p *lruPolicy) printNodes() {
 
 	node := p.head
 
-	var count int = 0
+	var count = 0
 	log.Debug("lruPolicy::printNodes : Starts")
 
 	for ; node != nil; node = node.next {
