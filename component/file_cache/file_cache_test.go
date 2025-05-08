@@ -1004,7 +1004,7 @@ func (suite *fileCacheTestSuite) TestCreateFileInDirCreateEmptyFile() {
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
-func (suite *fileCacheTestSuite) TestChmodCreateEmptyFile() {
+func (suite *fileCacheTestSuite) TestChmodNonexistentCreateEmptyFile() {
 	defer suite.cleanupTest()
 	// Set flag high to test bugfix
 	createEmptyFile := true
