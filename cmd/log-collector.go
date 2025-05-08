@@ -88,21 +88,22 @@ var gatherLogsCmd = &cobra.Command{
 				}
 			}
 
-		} else if logType == "syslog" && runtime.GOOS == "linux" {
-
-			// call filterLog that outputs a log file. then call createArchive() to put that log into an archive.
-			filteredSyslogPath, err := createFilteredLog(logPath) //generate a separate .log file and place it in a folder. output the path of the filtered log file
-			if err != nil {
-				return fmt.Errorf("failed to crate a filtered log from the syslog: [%s]", err.Error())
+		} else if logType == "syslog" {
+			if runtime.GOOS == "linux" {
+				// call filterLog that outputs a log file. then call createArchive() to put that log into an archive.
+				filteredSyslogPath, err := createFilteredLog(logPath) //generate a separate .log file and place it in a folder. output the path of the filtered log file
+				if err != nil {
+					return fmt.Errorf("failed to crate a filtered log from the syslog: [%s]", err.Error())
+				}
+				filteredSyslogPath = filepath.Dir(filteredSyslogPath)
+				err = createLinuxArchive(filteredSyslogPath) //supply the path of the filtered log file here
+				if err != nil {
+					return fmt.Errorf("unable to create archive: [%s]", err.Error())
+				}
+			} else if runtime.GOOS == "windows" {
+				fmt.Println("Please refer to the windows event viewer for your cloudfuse logs")
+				return fmt.Errorf("no log files to collect. system logging for windows are stored in the event viewer: [%s]", err.Error())
 			}
-			filteredSyslogPath = filepath.Dir(filteredSyslogPath)
-			err = createLinuxArchive(filteredSyslogPath) //supply the path of the filtered log file here
-			if err != nil {
-				return fmt.Errorf("unable to create archive: [%s]", err.Error())
-			}
-		} else if logType == "syslog" && runtime.GOOS == "windows" {
-			fmt.Println("Please refer to the windows event viewer for your cloudfuse logs")
-			return fmt.Errorf("no log files to collect. system logging for windows are stored in the event viewer: [%s]", err.Error())
 		}
 		// TODO: check if any 'base' logging or syslog filters are being used to redirect to a separate file. do this by checking for /etc/rsyslog.d and /etc/logrotate.d files
 
