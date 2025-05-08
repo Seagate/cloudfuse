@@ -17,25 +17,11 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-var configValidBaseTest string = `
-logging:
-  type: base
-  level: log_debug
-  file-path: $HOME/logTest/cloudfuse.log
-`
-
-var configInvalidBaseTest string = `
-logging:
-  type: base
-  level: log_debug
-  file-path: /home/fakeUser/cloudfuse.log
-`
-
-var configValidSyslogTest string = `
-logging:
-  type: syslog
-  level: log_debug
-`
+type logCollectTestConfig struct {
+	logType  string
+	level    string
+	filePath string
+}
 
 // what makes a syslog log type invalid?
 var configInvalidSyslogTest string = `
@@ -165,10 +151,12 @@ func (suite *logCollectTestSuite) TestValidBaseConfig() {
 	defer os.RemoveAll(tempLogDir)
 
 	//set up config file
-	configValidBaseTest = strings.Replace(configValidBaseTest, "$HOME/logTest/cloudfuse.log", tempLogDir+"/cloudfuse.log", 1) //reference s.setupconfig helper on blockblob and s3 tests
+	validBaseConfig := logCollectTestConfig{logType: "base", level: "log_debug", filePath: tempLogDir + "/cloudfuse.log"}
+	config := fmt.Sprintf("logging:\n  type: %s\n  level: %s\n  file-path: %s\n",
+		validBaseConfig.logType, validBaseConfig.level, validBaseConfig.filePath)
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	defer os.Remove(confFile.Name())
-	_, err = confFile.WriteString(configValidBaseTest)
+	_, err = confFile.WriteString(config)
 	suite.assert.NoError(err)
 	confFile.Close()
 
@@ -193,9 +181,12 @@ func (suite *logCollectTestSuite) TestInvalidBaseConfig() {
 	defer suite.cleanupTest()
 
 	//set up config file
+	invalidBaseConfig := logCollectTestConfig{logType: "base", level: "log_debug", filePath: "/home/fakeUser/cloudfuse.log"}
+	config := fmt.Sprintf("logging:\n  type: %s\n  level: %s\n  file-path: %s\n",
+		invalidBaseConfig.logType, invalidBaseConfig.level, invalidBaseConfig.filePath)
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	defer os.Remove(confFile.Name())
-	_, err := confFile.WriteString(configInvalidBaseTest)
+	_, err := confFile.WriteString(config)
 	suite.assert.NoError(err)
 	confFile.Close()
 
@@ -208,9 +199,12 @@ func (suite *logCollectTestSuite) TestValidSyslogConfig() {
 	defer suite.cleanupTest()
 
 	//set up config file
+	validSyslogConfig := logCollectTestConfig{logType: "syslog", level: "log_debug"}
+	config := fmt.Sprintf("logging:\n  type: %s\n  level: %s\n",
+		validSyslogConfig.logType, validSyslogConfig.level)
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	defer os.Remove(confFile.Name())
-	_, err := confFile.WriteString(configValidSyslogTest)
+	_, err := confFile.WriteString(config)
 	suite.assert.NoError(err)
 	confFile.Close()
 
@@ -222,7 +216,7 @@ func (suite *logCollectTestSuite) TestValidSyslogConfig() {
 	currentDir, err := os.Getwd()
 	suite.assert.NoError(err)
 	// look for temp cloudfuse.log file generated from syslog
-	filteredLogPath := "/tmp/cloudfuseSyslog/cloudfuse.log"
+	filteredLogPath := "/tmp/cloudfuseSyslog"
 
 	// use validate archive between those two files.
 	isArcValid := suite.verifyArchive(filteredLogPath, currentDir)

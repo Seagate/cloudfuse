@@ -184,7 +184,7 @@ func createFilteredLog(logFile string) (string, error) {
 
 	os.Mkdir("/tmp/cloudfuseSyslog", 0760)
 
-	outPath := "/tmp/cloudfuseSyslog/cloudfuseSyslog.log" //Decide what directory you want to dump this file. an empty folder would be easiest.
+	outPath := "/tmp/cloudfuseSyslog/cloudfuseSyslog.log"
 
 	inFile, err := os.Open(logFile)
 	if err != nil {
