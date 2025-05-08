@@ -102,7 +102,7 @@ var gatherLogsCmd = &cobra.Command{
 			fmt.Println("Please refer to the windows event viewer for your cloudfuse logs")
 			return fmt.Errorf("no log files to collect. system logging for windows are stored in the event viewer: [%s]", err.Error())
 		} else if logType == "silent" {
-			return fmt.Errorf("no logs were generated due to log type being silent: [%s]", err.Error())
+			return fmt.Errorf("no logs were generated due to log type being silent")
 		}
 
 		// TODO: check if any 'base' logging or syslog filters are being used to redirect to a separate file. do this by checking for /etc/rsyslog.d and /etc/logrotate.d files
@@ -157,20 +157,26 @@ func getLogInfo(configFile string) (string, string, error) {
 			}
 			if logType == "syslog" {
 				logPath = "/var/log/syslog"
-			} else if logType == "base" && config.IsSet("logging.file-path") {
-				err = config.UnmarshalKey("logging.file-path", &logPath)
-				if err != nil {
-					return "", "", err
+			} else if logType == "base" {
+				if config.IsSet("logging.file-path") {
+					err = config.UnmarshalKey("logging.file-path", &logPath)
+					if err != nil {
+						return "", "", err
+					}
+					if strings.HasPrefix(logPath, "$HOME") {
+						logPath = common.ExpandPath(logPath)
+					}
+					logPath, err = filepath.Abs(logPath)
+				} else {
+					fmt.Printf("Warning, file path for base log not found. using default.")
 				}
-				if strings.HasPrefix(logPath, "$HOME") {
-					logPath = common.ExpandPath(logPath)
-				}
+			} else if logType != "silent" {
+				fmt.Printf("Warning, logging type not found. using default.")
 			}
 		}
-	}
-	logPath, err = filepath.Abs(logPath)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get absolute path for the log path: [%s]", err.Error())
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get absolute path for the log path: [%s]", err.Error())
+		}
 	}
 	return logType, logPath, nil
 }
