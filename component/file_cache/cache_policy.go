@@ -56,8 +56,8 @@ type cachePolicy interface {
 
 	UpdateConfig(cachePolicyConfig) error
 
-	CacheValid(name string)                            // Mark the file as hit
-	CachePurge(name string, flock *common.LockMapItem) // Delete the file from cache
+	CacheValid(name string) // Mark the file as hit
+	CachePurge(name string) // Delete the file from cache
 
 	IsCached(name string) bool // Whether or not the cache policy considers this file cached
 
