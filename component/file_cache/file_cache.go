@@ -1226,18 +1226,13 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 	err := fc.NextComponent().DeleteFile(options)
 	err = fc.validateStorageError(options.Name, err, "DeleteFile", true)
-	if fc.offlineAccess && errors.Is(err, &common.CloudUnreachableError{}) &&
-		fc.notInCloud(options.Name) {
-		// we are offline and the file is local only, so handle deletion locally
-		_, statErr := os.Stat(localPath)
-		if statErr == nil {
-			err = nil
-		} else {
-			return statErr
-		}
+	if isOffline(err) && fc.offlineOperationAllowed(options.Name) {
+		// we are offline and the file is not in cloud, so handle deletion locally
+		// reset err to whether the local file exists
+		_, err = os.Stat(localPath)
 	}
 	if err != nil {
-		log.Err("FileCache::DeleteFile : error  %s [%s]", options.Name, err.Error())
+		log.Err("FileCache::DeleteFile : %s deletion failed. Here's why:  %v", options.Name, err)
 		return err
 	}
 
