@@ -1433,7 +1433,42 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	defer flock.Unlock()
 
 	localPath := filepath.Join(fc.tmpPath, options.Name)
-	downloadRequired, _, cloudAttr, err := fc.isDownloadRequired(localPath, options.Name, flock)
+	downloadRequired, cached, cloudAttr, err := fc.isDownloadRequired(
+		localPath,
+		options.Name,
+		flock,
+	)
+
+	// are we offline?
+	if !fc.cloudConnected() {
+		if !fc.offlineAccess {
+			// offline access is not allowed
+			if downloadRequired {
+				// data is unavailable - do not open the file
+				log.Err("FileCache::OpenFile : %s can't download data (offline)", options.Name)
+				return nil, &common.CloudUnreachableError{}
+			} else {
+				// download is not required, but we can't write while we're offline
+				log.Err("FileCache::OpenFile : %s Read-only enabled (offline)", options.Name)
+				options.Flags = os.O_RDONLY
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			// offline access is allowed, but this object might exist in cloud storage
+			if cached {
+				// data is cached but (might be) in cloud, so only allow read-only access
+				log.Err("FileCache::OpenFile : %s Read-only access, for consistency offline", options.Name)
+				options.Flags = os.O_RDONLY
+				if downloadRequired {
+					log.Warn("FileCache::OpenFile : %s ignoring refresh timer (offline)", options.Name)
+					downloadRequired = false
+				}
+			} else {
+				// data is unavailable - do not open the file
+				log.Err("FileCache::OpenFile : %s data unavailable (offline)", options.Name)
+				return nil, &common.CloudUnreachableError{}
+			}
+		}
+	}
 
 	// return err in case of authorization permission mismatch
 	if err != nil && err == syscall.EACCES {
