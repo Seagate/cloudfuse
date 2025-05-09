@@ -90,13 +90,13 @@ var gatherLogsCmd = &cobra.Command{
 
 		} else if logType == "syslog" {
 			if runtime.GOOS == "linux" {
-				// call filterLog that outputs a log file. then call createArchive() to put that log into an archive.
-				filteredSyslogPath, err := createFilteredLog(logPath) //generate a separate .log file and place it in a folder. output the path of the filtered log file
+
+				filteredSyslogPath, err := createFilteredLog(logPath)
 				if err != nil {
 					return fmt.Errorf("failed to crate a filtered log from the syslog: [%s]", err.Error())
 				}
 				filteredSyslogPath = filepath.Dir(filteredSyslogPath)
-				err = createLinuxArchive(filteredSyslogPath) //supply the path of the filtered log file here
+				err = createLinuxArchive(filteredSyslogPath)
 				if err != nil {
 					return fmt.Errorf("unable to create archive: [%s]", err.Error())
 				}
@@ -111,6 +111,7 @@ var gatherLogsCmd = &cobra.Command{
 	},
 }
 
+// checkOutputPath makes sure the path for archive creation is valid.
 func checkOutputPath(outPath string) error {
 	var err error
 	if outPath == "" {
@@ -140,6 +141,7 @@ func checkOutputPath(outPath string) error {
 	return nil
 }
 
+// getLoginfo populates the logType, and logPath values found in the config file.
 func getLogInfo(configFile string) (string, string, error) {
 	logPath := "$HOME/.cloudfuse/cloudfuse.log"
 	logPath = common.ExpandPath(logPath)
@@ -184,10 +186,9 @@ func getLogInfo(configFile string) (string, string, error) {
 	return logType, logPath, nil
 }
 
+// createFilteredLog creates a new log file containing only the cloudfuse logs from the input log file.
+// It only runs for linux when the configured logging type is set to "syslog"
 func createFilteredLog(logFile string) (string, error) {
-
-	//this will take a log file and filter out cloudfuse lines into a separate file
-	// this will mostly be used for the linux syslog.
 
 	keyword := "cloudfuse"
 
@@ -227,7 +228,7 @@ func createFilteredLog(logFile string) (string, error) {
 func createLinuxArchive(logPath string) error {
 
 	//first check logPath is valid
-	items, err := os.ReadDir(logPath)
+	_, err := os.Stat(logPath)
 	if err != nil {
 		return err
 	}
@@ -248,6 +249,10 @@ func createLinuxArchive(logPath string) error {
 
 	//populate tar.gz file
 	var amountLogs int
+	items, err := os.ReadDir(logPath)
+	if err != nil {
+		return err
+	}
 	for _, item := range items {
 		if strings.HasPrefix(item.Name(), "cloudfuse") && strings.HasSuffix(item.Name(), ".log") {
 			itemPath := filepath.Join(logPath, item.Name())
@@ -304,7 +309,6 @@ func createWindowsArchive(logPath string) error {
 	zipWriter := zip.NewWriter(outFile)
 	defer zipWriter.Close()
 
-	// Replace os.ReadDir() with more logic that can determine if the file is appropriate to collect.
 	items, err := os.ReadDir(logPath)
 	if err != nil {
 		return err
