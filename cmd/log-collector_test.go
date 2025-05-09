@@ -282,6 +282,7 @@ func (suite *logCollectTestSuite) TestSilentConfig() {
 	suite.assert.Error(err)
 }
 
+// Log collection test using --output-path flag
 func (suite *logCollectTestSuite) TestOutputPath() {
 
 	// create temp folder for output Path
