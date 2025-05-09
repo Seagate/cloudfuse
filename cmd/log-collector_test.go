@@ -23,13 +23,6 @@ type logCollectTestConfig struct {
 	filePath string
 }
 
-// what makes a syslog log type invalid?
-var configInvalidSyslogTest string = `
-logging:
-  type: syslog
-  level: log_debug
-`
-
 type logCollectTestSuite struct {
 	suite.Suite
 	assert *assert.Assertions
