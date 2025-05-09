@@ -1066,7 +1066,7 @@ func (s *s3StorageTestSuite) TestCreateFile() {
 	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.Equal(name, h.Path)
-	s.assert.EqualValues(0, h.Size)
+	s.assert.EqualValues(0, h.Size.Load())
 	// File should be in the account
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, name)
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
@@ -1098,7 +1098,7 @@ func (s *s3StorageTestSuite) TestCreateFileWindowsNameConvert() {
 	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.Equal(windowsName, h.Path)
-	s.assert.EqualValues(0, h.Size)
+	s.assert.EqualValues(0, h.Size.Load())
 	// File should be in the account with the correct object key
 	key := common.JoinUnixFilepath(s.s3Storage.stConfig.prefixPath, objectName)
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
@@ -1121,7 +1121,7 @@ func (s *s3StorageTestSuite) TestOpenFile() {
 	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.Equal(name, h.Path)
-	s.assert.EqualValues(0, h.Size)
+	s.assert.EqualValues(0, h.Size.Load())
 }
 
 func (s *s3StorageTestSuite) TestOpenFileError() {
@@ -1151,7 +1151,7 @@ func (s *s3StorageTestSuite) TestOpenFileSize() {
 	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.Equal(name, h.Path)
-	s.assert.EqualValues(size, h.Size)
+	s.assert.EqualValues(size, h.Size.Load())
 }
 
 func (s *s3StorageTestSuite) TestCloseFile() {
@@ -1385,7 +1385,7 @@ func (s *s3StorageTestSuite) TestReadInBufferLargeBuffer() {
 		internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output},
 	)
 	s.assert.NoError(err)
-	s.assert.EqualValues(h.Size, len)
+	s.assert.EqualValues(h.Size.Load(), len)
 	s.assert.EqualValues(testData, output[:h.Size])
 }
 

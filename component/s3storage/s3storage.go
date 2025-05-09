@@ -29,7 +29,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -366,7 +365,7 @@ func (s3 *S3Storage) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		log.Err("S3Storage::OpenFile : Failed to create handle for %s", options.Name)
 		return nil, syscall.EFAULT
 	}
-	handle.Size = int64(attr.Size)
+	handle.Size.Store(attr.Size)
 	handle.Mtime = attr.Mtime
 
 	// increment open file handles count
@@ -417,13 +416,14 @@ func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
 	//log.Trace("S3Storage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 
-	if options.Offset > atomic.LoadInt64(&options.Handle.Size) {
+	if options.Offset > options.Handle.Size.Load() {
 		return 0, syscall.ERANGE
 	}
 
 	var dataLen = int64(len(options.Data))
-	if atomic.LoadInt64(&options.Handle.Size) < (options.Offset + int64(len(options.Data))) {
-		dataLen = options.Handle.Size - options.Offset
+	sizeNow := options.Handle.Size.Load()
+	if sizeNow < (options.Offset + int64(len(options.Data))) {
+		dataLen = sizeNow - options.Offset
 	}
 
 	if dataLen == 0 {

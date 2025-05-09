@@ -38,6 +38,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -417,7 +418,7 @@ func (bc *BlockCache) CreateFile(options internal.CreateFileOptions) (*handlemap
 	f.GetFileObject().Close()
 
 	handle := handlemap.NewHandle(options.Name)
-	handle.Size = 0
+	handle.Size.Store(0)
 	handle.Mtime = time.Now()
 
 	// As file is created on storage as well there is no need to mark this as dirty
@@ -444,7 +445,7 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 
 	handle := handlemap.NewHandle(options.Name)
 	handle.Mtime = attr.Mtime
-	handle.Size = attr.Size
+	handle.Size.Store(attr.Size)
 
 	log.Debug("BlockCache::OpenFile : Size of file handle.Size %v", handle.Size)
 	bc.prepareHandleForBlockCache(handle)
@@ -453,9 +454,9 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 		(options.Flags&os.O_WRONLY != 0 && options.Flags&os.O_APPEND == 0) {
 		// If file is opened in truncate or wronly mode then we need to wipe out the data consider current file size as 0
 		log.Debug("BlockCache::OpenFile : Truncate %v to 0", options.Name)
-		handle.Size = 0
+		handle.Size.Store(0)
 		handle.Flags.Set(handlemap.HandleFlagDirty)
-	} else if handle.Size != 0 && (options.Flags&os.O_RDWR != 0 || options.Flags&os.O_APPEND != 0) {
+	} else if handle.Size.Load() != 0 && (options.Flags&os.O_RDWR != 0 || options.Flags&os.O_APPEND != 0) {
 		// File is not opened in read-only mode so we need to get the list of blocks and validate the size
 		// As there can be a potential write on this file, currently configured block size and block size of the file in container
 		// has to match otherwise it will corrupt the file. Fail the open call if this is not the case.
@@ -471,9 +472,10 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 		}
 	}
 
-	if handle.Size > 0 {
+	size := handle.Size.Load()
+	if size > 0 {
 		// This shall be done after the refresh only as this will populate the queues created by above method
-		if handle.Size < int64(bc.blockSize) {
+		if size < int64(bc.blockSize) {
 			// File is small and can fit in one block itself
 			_ = bc.refreshBlock(handle, 0, false)
 		} else if bc.prefetchOnOpen && !bc.noPrefetch {
@@ -635,13 +637,13 @@ func (bc *BlockCache) closeFileInternal(options internal.CloseFileOptions) error
 	return nil
 }
 
-func (bc *BlockCache) getBlockSize(fileSize uint64, block *Block) uint64 {
-	return min(bc.blockSize, fileSize-block.offset)
+func (bc *BlockCache) getBlockSize(fileSize *atomic.Int64, block *Block) uint64 {
+	return min(bc.blockSize, uint64(fileSize.Load())-block.offset)
 }
 
 // ReadInBuffer: Read the file into a buffer
 func (bc *BlockCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, error) {
-	if options.Offset >= options.Handle.Size {
+	if options.Offset >= options.Handle.Size.Load() {
 		// EOF reached so early exit
 		return 0, io.EOF
 	}
@@ -671,7 +673,7 @@ func (bc *BlockCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, e
 
 		// Copy data from this block to user buffer
 		readOffset := uint64(options.Offset) - block.offset
-		blockSize := bc.getBlockSize(uint64(options.Handle.Size), block)
+		blockSize := bc.getBlockSize(options.Handle.Size, block)
 
 		bytesRead := copy(options.Data[dataRead:], block.data[readOffset:blockSize])
 
@@ -679,7 +681,7 @@ func (bc *BlockCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, e
 		options.Offset += int64(bytesRead)
 		dataRead += bytesRead
 
-		if options.Offset >= options.Handle.Size {
+		if options.Offset >= options.Handle.Size.Load() {
 			// EOF reached so early exit
 			return dataRead, io.EOF
 		}
@@ -722,7 +724,7 @@ if you are first reader of this block
 Return this block once prefetch is queued and block is marked open for all
 */
 func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Block, error) {
-	if readoffset >= uint64(handle.Size) {
+	if readoffset >= uint64(handle.Size.Load()) {
 		return nil, io.EOF
 	}
 
@@ -831,7 +833,7 @@ func (bc *BlockCache) getBlock(handle *handlemap.Handle, readoffset uint64) (*Bl
 			if !bc.noPrefetch && handle.OptCnt <= MIN_RANDREAD {
 				// So far this file has been read sequentially so prefetch more
 				val, _ := handle.GetValue("#")
-				if int64(val.(uint64)*bc.blockSize) < handle.Size {
+				if int64(val.(uint64)*bc.blockSize) < handle.Size.Load() {
 					_ = bc.startPrefetch(handle, val.(uint64), true)
 				}
 			}
@@ -1030,7 +1032,7 @@ func (bc *BlockCache) refreshBlock(handle *handlemap.Handle, index uint64, prefe
 
 	// Convert index to offset
 	offset := index * bc.blockSize
-	if int64(offset) >= handle.Size {
+	if int64(offset) >= handle.Size.Load() {
 		// We have reached EOF so return back no need to download anything here
 		return io.EOF
 	}
@@ -1165,8 +1167,8 @@ func (bc *BlockCache) download(item *workItem) {
 					_ = root.Remove(fileName)
 				}
 
-				if n != int(bc.blockSize) && item.block.offset+uint64(n) != uint64(item.handle.Size) {
-					log.Err("BlockCache::download : Local data retrieved from disk size mismatch, Expected %v, OnDisk %v, fileSize %v", bc.getBlockSize(uint64(item.handle.Size), item.block), n, item.handle.Size)
+				if n != int(bc.blockSize) && item.block.offset+uint64(n) != uint64(item.handle.Size.Load()) {
+					log.Err("BlockCache::download : Local data retrieved from disk size mismatch, Expected %v, OnDisk %v, fileSize %v", bc.getBlockSize(item.handle.Size, item.block), n, item.handle.Size)
 					successfulRead = false
 					f.Close()
 					_ = root.Remove(fileName)
@@ -1307,8 +1309,14 @@ func (bc *BlockCache) WriteFile(options internal.WriteFileOptions) (int, error) 
 		options.Offset += int64(bytesWritten)
 		dataWritten += bytesWritten
 
-		if options.Handle.Size < options.Offset {
-			options.Handle.Size = options.Offset
+		for {
+			oldSize := options.Handle.Size.Load()
+			if oldSize >= options.Offset {
+				break
+			}
+			if options.Handle.Size.CompareAndSwap(oldSize, options.Offset) {
+				break
+			}
 		}
 	}
 
@@ -1356,7 +1364,7 @@ func (bc *BlockCache) getOrCreateBlock(handle *handlemap.Handle, offset uint64) 
 		block.id = int64(index)
 		block.offset = index * bc.blockSize
 
-		if block.offset < uint64(handle.Size) {
+		if block.offset < uint64(handle.Size.Load()) {
 			shouldCommit, shouldDownload := shouldCommitAndDownload(block.id, handle)
 
 			// if a block has been staged and deleted from the buffer list, then we should commit the existing blocks
@@ -1578,13 +1586,13 @@ func (bc *BlockCache) lineupUpload(
 	listMap[block.id] = &blockInfo{
 		id:        id,
 		committed: false,
-		size:      bc.getBlockSize(uint64(handle.Size), block),
+		size:      bc.getBlockSize(handle.Size, block),
 	}
 
 	log.Debug(
 		"BlockCache::lineupUpload : block %v, size %v for %v=>%s, blockId %v",
 		block.id,
-		bc.getBlockSize(uint64(handle.Size), block),
+		bc.getBlockSize(handle.Size, block),
 		handle.ID,
 		handle.Path,
 		id,
@@ -1673,7 +1681,7 @@ func (bc *BlockCache) upload(item *workItem) {
 	flock := bc.fileLocks.Get(fileName)
 	flock.Lock()
 	defer flock.Unlock()
-	blockSize := bc.getBlockSize(uint64(item.handle.Size), item.block)
+	blockSize := bc.getBlockSize(item.handle.Size, item.block)
 	// This block is updated so we need to stage it now
 	err := bc.NextComponent().StageData(internal.StageDataOptions{
 		Name:   item.handle.Path,

@@ -44,6 +44,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/awnumar/memguard"
 	"gopkg.in/ini.v1"
@@ -343,19 +344,54 @@ func GetCurrentDistro() string {
 	return distro
 }
 
-type BitMap16 uint16
+type BitMap16 struct {
+	val atomic.Uint32
+}
 
-// IsSet : Check whether the given bit is set or not
-func (bm BitMap16) IsSet(bit uint16) bool { return (bm & (1 << bit)) != 0 }
+func (bm *BitMap16) IsSet(bit uint16) bool {
+	if bit >= 16 {
+		return false
+	}
+	return (bm.val.Load() & (1 << bit)) != 0
+}
 
-// Set : Set the given bit in bitmap
-func (bm *BitMap16) Set(bit uint16) { *bm |= (1 << bit) }
+func (bm *BitMap16) Set(bit uint16) {
+	if bit >= 16 {
+		return
+	}
+	mask := uint32(1 << bit)
+	for {
+		old := bm.val.Load()
+		newVal := old | mask
+		if newVal == old {
+			return
+		}
+		if bm.val.CompareAndSwap(old, newVal) {
+			return
+		}
+	}
+}
 
-// Clear : Clear the given bit from bitmap
-func (bm *BitMap16) Clear(bit uint16) { *bm &= ^(1 << bit) }
+func (bm *BitMap16) Clear(bit uint16) {
+	if bit >= 16 {
+		return
+	}
+	mask := uint32(1 << bit)
+	for {
+		old := bm.val.Load()
+		newVal := old &^ mask
+		if newVal == old {
+			return
+		}
+		if bm.val.CompareAndSwap(old, newVal) {
+			return
+		}
+	}
+}
 
-// Reset : Reset the whole bitmap by setting it to 0
-func (bm *BitMap16) Reset() { *bm = 0 }
+func (bm *BitMap16) Reset() {
+	bm.val.Store(0)
+}
 
 type KeyedMutex struct {
 	mutexes sync.Map // Zero value is empty and ready for use

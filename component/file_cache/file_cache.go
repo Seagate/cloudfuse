@@ -1233,7 +1233,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 
 	inf, err := f.Stat()
 	if err == nil {
-		handle.Size = inf.Size()
+		handle.Size.Store(inf.Size())
 	}
 
 	handle.UnixFD = uint64(f.Fd())

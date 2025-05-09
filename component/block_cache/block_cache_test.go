@@ -378,7 +378,7 @@ func (suite *blockCacheTestSuite) TestFileOpenClose() {
 	h, err := tobj.blockCache.OpenFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(h.Size, int64(5*_1MB))
+	suite.assert.Equal(h.Size.Load(), int64(5*_1MB))
 	suite.assert.NotNil(h.Buffers.Cooked)
 	suite.assert.NotNil(h.Buffers.Cooking)
 
@@ -492,7 +492,7 @@ func (suite *blockCacheTestSuite) TestFileReadTotalBytes() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	storagePath := filepath.Join(tobj.fake_storage_path, path)
@@ -508,7 +508,7 @@ func (suite *blockCacheTestSuite) TestFileReadTotalBytes() {
 	) // Write data to file
 	suite.assert.NoError(err)
 	suite.assert.Equal(int64(n), size)
-	suite.assert.Equal(h.Size, size)
+	suite.assert.Equal(h.Size.Load(), size)
 
 	data = make([]byte, 1000)
 
@@ -544,7 +544,7 @@ func (suite *blockCacheTestSuite) TestFileReadBlockCacheTmpPath() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	storagePath := filepath.Join(tobj.fake_storage_path, path)
@@ -560,7 +560,7 @@ func (suite *blockCacheTestSuite) TestFileReadBlockCacheTmpPath() {
 	) // Write data to file
 	suite.assert.NoError(err)
 	suite.assert.Equal(n, size)
-	suite.assert.Equal(h.Size, int64(size))
+	suite.assert.Equal(h.Size.Load(), int64(size))
 
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)
@@ -569,7 +569,7 @@ func (suite *blockCacheTestSuite) TestFileReadBlockCacheTmpPath() {
 	h, err = tobj.blockCache.OpenFile(options2)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(h.Size, int64(size))
+	suite.assert.Equal(h.Size.Load(), int64(size))
 	suite.assert.NotNil(h.Buffers.Cooked)
 	suite.assert.NotNil(h.Buffers.Cooking)
 
@@ -648,7 +648,7 @@ func (suite *blockCacheTestSuite) TestFileReadSerial() {
 	h, err := tobj.blockCache.OpenFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(h.Size, int64(50*_1MB))
+	suite.assert.Equal(h.Size.Load(), int64(50*_1MB))
 	suite.assert.NotNil(h.Buffers.Cooked)
 	suite.assert.NotNil(h.Buffers.Cooking)
 
@@ -692,7 +692,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandom() {
 	h, err := tobj.blockCache.OpenFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(h.Size, int64(100*_1MB))
+	suite.assert.Equal(h.Size.Load(), int64(100*_1MB))
 	suite.assert.NotNil(h.Buffers.Cooked)
 	suite.assert.NotNil(h.Buffers.Cooking)
 
@@ -735,7 +735,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 	h, err := tobj.blockCache.OpenFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(h.Size, int64(100*_1MB))
+	suite.assert.Equal(h.Size.Load(), int64(100*_1MB))
 	suite.assert.NotNil(h.Buffers.Cooked)
 	suite.assert.NotNil(h.Buffers.Cooking)
 
@@ -835,7 +835,7 @@ func (suite *blockCacheTestSuite) TestCreateFile() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	storagePath := filepath.Join(tobj.fake_storage_path, path)
@@ -868,7 +868,7 @@ func (suite *blockCacheTestSuite) TestOpenWithTruncate() {
 	h, err := tobj.blockCache.OpenFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(h.Size, int64(5*_1MB))
+	suite.assert.Equal(h.Size.Load(), int64(5*_1MB))
 
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)
@@ -877,7 +877,7 @@ func (suite *blockCacheTestSuite) TestOpenWithTruncate() {
 	h, err = tobj.blockCache.OpenFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.True(h.Dirty())
 
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
@@ -896,7 +896,7 @@ func (suite *blockCacheTestSuite) TestWriteFileSimple() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	storagePath := filepath.Join(tobj.fake_storage_path, path)
@@ -909,7 +909,7 @@ func (suite *blockCacheTestSuite) TestWriteFileSimple() {
 	) // 5 bytes
 	suite.assert.NoError(err)
 	suite.assert.Equal(5, n)
-	suite.assert.Equal(int64(5), h.Size)
+	suite.assert.Equal(int64(5), h.Size.Load())
 	suite.assert.True(h.Dirty())
 	suite.assert.Equal(0, h.Buffers.Cooked.Len())
 	suite.assert.Equal(1, h.Buffers.Cooking.Len())
@@ -935,7 +935,7 @@ func (suite *blockCacheTestSuite) TestWriteFileSimple() {
 	) // 5 bytes
 	suite.assert.NoError(err)
 	suite.assert.Equal(5, n)
-	suite.assert.Equal(int64(10), h.Size)
+	suite.assert.Equal(int64(10), h.Size.Load())
 	suite.assert.True(h.Dirty())
 	suite.assert.Equal(0, h.Buffers.Cooked.Len())
 	suite.assert.Equal(1, h.Buffers.Cooking.Len())
@@ -967,7 +967,7 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlock() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	n, err := tobj.blockCache.WriteFile(
@@ -975,7 +975,7 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlock() {
 	) // 5 bytes
 	suite.assert.NoError(err)
 	suite.assert.Len(data, n)
-	suite.assert.Equal(h.Size, int64(len(data)))
+	suite.assert.Equal(h.Size.Load(), int64(len(data)))
 	suite.assert.True(h.Dirty())
 	suite.assert.Equal(2, h.Buffers.Cooked.Len())
 	suite.assert.Equal(3, h.Buffers.Cooking.Len())
@@ -1007,7 +1007,7 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlockWithOverwrite() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	n, err := tobj.blockCache.WriteFile(
@@ -1015,7 +1015,7 @@ func (suite *blockCacheTestSuite) TestWriteFileMultiBlockWithOverwrite() {
 	) // 5 bytes
 	suite.assert.NoError(err)
 	suite.assert.Len(data, n)
-	suite.assert.Equal(h.Size, int64(len(data)))
+	suite.assert.Equal(h.Size.Load(), int64(len(data)))
 	suite.assert.True(h.Dirty())
 	suite.assert.Equal(2, h.Buffers.Cooked.Len())
 	suite.assert.Equal(3, h.Buffers.Cooking.Len())
@@ -1064,7 +1064,7 @@ func (suite *blockCacheTestSuite) TestWritefileWithAppend() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	n, err := tobj.blockCache.WriteFile(
@@ -1072,7 +1072,7 @@ func (suite *blockCacheTestSuite) TestWritefileWithAppend() {
 	) // 5 bytes
 	suite.assert.NoError(err)
 	suite.assert.Len(data, n)
-	suite.assert.Equal(h.Size, int64(len(data)))
+	suite.assert.Equal(h.Size.Load(), int64(len(data)))
 	suite.assert.True(h.Dirty())
 
 	err = tobj.blockCache.SyncFile(internal.SyncFileOptions{Handle: h})
@@ -1087,7 +1087,7 @@ func (suite *blockCacheTestSuite) TestWritefileWithAppend() {
 	) // 5 bytes
 	suite.assert.NoError(err)
 	suite.assert.Len(data, n)
-	suite.assert.Equal(h.Size, int64(len(data)))
+	suite.assert.Equal(h.Size.Load(), int64(len(data)))
 	suite.assert.True(h.Dirty())
 
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
@@ -1101,11 +1101,11 @@ func (suite *blockCacheTestSuite) TestWritefileWithAppend() {
 	_, _ = rand.Read(data)
 
 	n, err = tobj.blockCache.WriteFile(
-		internal.WriteFileOptions{Handle: h, Offset: h.Size, Data: dataNew},
+		internal.WriteFileOptions{Handle: h, Offset: h.Size.Load(), Data: dataNew},
 	) // 5 bytes
 	suite.assert.NoError(err)
 	suite.assert.Len(dataNew, n)
-	suite.assert.Equal(h.Size, int64(len(data)+len(dataNew)))
+	suite.assert.Equal(h.Size.Load(), int64(len(data)+len(dataNew)))
 	suite.assert.True(h.Dirty())
 
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
@@ -1116,7 +1116,7 @@ func (suite *blockCacheTestSuite) TestWritefileWithAppend() {
 	)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(h.Size, int64(len(data)+len(dataNew)))
+	suite.assert.Equal(h.Size.Load(), int64(len(data)+len(dataNew)))
 
 	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
 	suite.assert.NoError(err)
@@ -1175,7 +1175,7 @@ func (suite *blockCacheTestSuite) TestDeleteAndRenameDirAndFile() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	n, err := tobj.blockCache.WriteFile(
@@ -1183,7 +1183,7 @@ func (suite *blockCacheTestSuite) TestDeleteAndRenameDirAndFile() {
 	) // 5 bytes
 	suite.assert.NoError(err)
 	suite.assert.Equal(5, n)
-	suite.assert.Equal(int64(5), h.Size)
+	suite.assert.Equal(int64(5), h.Size.Load())
 	suite.assert.True(h.Dirty())
 	suite.assert.Equal(0, h.Buffers.Cooked.Len())
 	suite.assert.Equal(1, h.Buffers.Cooking.Len())
@@ -1348,7 +1348,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteSparseFile() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// write 1MB data at offset 0
@@ -1445,7 +1445,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteSparseFileWithPartialBlock() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// write 1MB data at offset 0
@@ -1543,7 +1543,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteSparseFileWithBlockOverlap() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// write 1MB data at offset 0
@@ -1636,7 +1636,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteFileOneBlock() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// write 2MB data at offset 4*1_MB
@@ -1731,7 +1731,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteFlushAndOverwrite() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// write 1MB data at offset 0
@@ -1846,7 +1846,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteUncommittedBlockValidation() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	for i := 0; i < prefetch+50; i++ {
@@ -1922,7 +1922,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteExistingFile() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// write 5MB data
@@ -1944,7 +1944,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteExistingFile() {
 	nh, err := tobj.blockCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(nh)
-	suite.assert.Equal(nh.Size, int64(5*_1MB))
+	suite.assert.Equal(nh.Size.Load(), int64(5*_1MB))
 	suite.assert.False(h.Dirty())
 
 	// write randomly in new handle at offset 2MB
@@ -1982,7 +1982,7 @@ func (suite *blockCacheTestSuite) TestPreventRaceCondition() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// writing at offset 0 in block 0
@@ -2063,7 +2063,7 @@ func (suite *blockCacheTestSuite) TestBlockParallelUploadAndWrite() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// writing at offset 0 in block 0
@@ -2171,7 +2171,7 @@ func (suite *blockCacheTestSuite) TestBlockParallelUploadAndWriteValidation() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// writing at offset 0 in block 0
@@ -2289,7 +2289,7 @@ func (suite *blockCacheTestSuite) TestBlockParallelReadAndWriteValidation() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// write 3MB at offset 0
@@ -2310,7 +2310,7 @@ func (suite *blockCacheTestSuite) TestBlockParallelReadAndWriteValidation() {
 	nh, err := tobj.blockCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(nh)
-	suite.assert.Equal(nh.Size, int64(3*_1MB))
+	suite.assert.Equal(nh.Size.Load(), int64(3*_1MB))
 	suite.assert.False(nh.Dirty())
 
 	// read 1MB data at offset 0
@@ -2393,7 +2393,7 @@ func (suite *blockCacheTestSuite) TestBlockOverwriteValidation() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// write 3MB at offset 0
@@ -2414,7 +2414,7 @@ func (suite *blockCacheTestSuite) TestBlockOverwriteValidation() {
 	nh, err := tobj.blockCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(nh)
-	suite.assert.Equal(nh.Size, int64(3*_1MB))
+	suite.assert.Equal(nh.Size.Load(), int64(3*_1MB))
 	suite.assert.False(nh.Dirty())
 
 	// update 5 bytes data at offset 0
@@ -2471,17 +2471,17 @@ func (suite *blockCacheTestSuite) TestBlockFailOverwrite() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	h, err = tobj.blockCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// updating the size and adding entry in block list map to replicate the download failure of the first block
-	h.Size = int64(_1MB)
+	h.Size.Store(int64(_1MB))
 	lst, _ := h.GetValue("blockList")
 	listMap := lst.(map[int64]*blockInfo)
 	listMap[0] = &blockInfo{
@@ -2523,17 +2523,17 @@ func (suite *blockCacheTestSuite) TestBlockDownloadFailed() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	h, err = tobj.blockCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// updating the size to replicate the download failure
-	h.Size = int64(4 * _1MB)
+	h.Size.Store(int64(4 * _1MB))
 
 	data := make([]byte, _1MB)
 	n, err := tobj.blockCache.ReadInBuffer(
@@ -2579,7 +2579,7 @@ func (suite *blockCacheTestSuite) TestReadStagedBlock() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	// write 4MB at offset 0
@@ -2653,7 +2653,7 @@ func (suite *blockCacheTestSuite) TestReadUncommittedBlockValidation() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	ind = 0
@@ -2735,7 +2735,7 @@ func (suite *blockCacheTestSuite) TestReadUncommittedPrefetchedBlock() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	n, err := tobj.blockCache.WriteFile(
@@ -2752,7 +2752,7 @@ func (suite *blockCacheTestSuite) TestReadUncommittedPrefetchedBlock() {
 	h, err = tobj.blockCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(h.Size, int64(_1MB))
+	suite.assert.Equal(h.Size.Load(), int64(_1MB))
 	suite.assert.False(h.Dirty())
 
 	ind := uint64(1)
@@ -2820,7 +2820,7 @@ func (suite *blockCacheTestSuite) TestReadWriteBlockInParallel() {
 	h, err := tobj.blockCache.CreateFile(options)
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.Equal(int64(0), h.Size.Load())
 	suite.assert.False(h.Dirty())
 
 	n, err := tobj.blockCache.WriteFile(
@@ -2837,7 +2837,7 @@ func (suite *blockCacheTestSuite) TestReadWriteBlockInParallel() {
 	h, err = tobj.blockCache.OpenFile(internal.OpenFileOptions{Name: path, Flags: os.O_RDWR})
 	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
-	suite.assert.Equal(h.Size, int64(5*_1MB))
+	suite.assert.Equal(h.Size.Load(), int64(5*_1MB))
 	suite.assert.False(h.Dirty())
 
 	ind := uint64(0)

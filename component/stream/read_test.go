@@ -598,7 +598,7 @@ func (suite *streamTestSuite) TestEmptyFile() {
 	suite.cleanupTest()
 	config := "stream:\n  block-size-mb: 16\n  buffer-size-mb: 16\n  max-buffers: 4\n"
 	suite.setupTestHelper(config, true)
-	handle := &handlemap.Handle{Size: 0, Path: fileNames[0]}
+	handle := &handlemap.Handle{Path: fileNames[0]}
 
 	// case1: we know the size of the file from the get go, 0
 	openFileOptions, readInBufferOptions, _ := suite.getRequestOptions(

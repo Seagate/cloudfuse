@@ -97,7 +97,7 @@ func (rw *ReadWriteCache) OpenFile(options internal.OpenFileOptions) (*handlemap
 	}
 
 	if options.Flags&os.O_TRUNC != 0 {
-		handle.Size = 0
+		handle.Size.Store(0)
 	}
 
 	if !rw.StreamOnly {
@@ -140,7 +140,7 @@ func (rw *ReadWriteCache) ReadInBuffer(options internal.ReadInBufferOptions) (in
 	}
 	options.Handle.CacheObj.Lock()
 	defer options.Handle.CacheObj.Unlock()
-	if atomic.LoadInt64(&options.Handle.Size) == 0 {
+	if options.Handle.Size.Load() == 0 {
 		return 0, nil
 	}
 	read, err := rw.readWriteBlocks(options.Handle, options.Offset, options.Data, false)
@@ -416,7 +416,7 @@ func (rw *ReadWriteCache) purge(handle *handlemap.Handle, size int64) error {
 	handle.CacheObj.Purge()
 	// if size isn't -1 then we're resizing
 	if size != -1 {
-		atomic.StoreInt64(&handle.Size, size)
+		handle.Size.Store(size)
 	}
 	handle.CacheObj.StreamOnly = true
 	atomic.AddInt32(&rw.CachedObjects, -1)
@@ -435,7 +435,7 @@ func (rw *ReadWriteCache) createHandleCache(handle *handlemap.Handle) error {
 	}
 	var offsets *common.BlockOffsetList
 	var err error
-	if handle.Size == 0 {
+	if handle.Size.Load() == 0 {
 		offsets = &common.BlockOffsetList{}
 		offsets.Flags.Set(common.SmallFile)
 	} else {
@@ -447,11 +447,14 @@ func (rw *ReadWriteCache) createHandleCache(handle *handlemap.Handle) error {
 	handle.CacheObj.BlockOffsetList = offsets
 	// if its a small file then download the file in its entirety if there is memory available, otherwise stream only
 	if handle.CacheObj.SmallFile() {
-		if uint64(atomic.LoadInt64(&handle.Size)) > memory.FreeMemory() {
+		if uint64(handle.Size.Load()) > memory.FreeMemory() {
 			handle.CacheObj.StreamOnly = true
 			return nil
 		}
-		block, _, err := rw.getBlock(handle, &common.Block{StartIndex: 0, EndIndex: handle.Size})
+		block, _, err := rw.getBlock(
+			handle,
+			&common.Block{StartIndex: 0, EndIndex: handle.Size.Load()},
+		)
 		if err != nil {
 			return err
 		}
@@ -560,7 +563,7 @@ func (rw *ReadWriteCache) readWriteBlocks(
 				newLastBlockEndIndex := lastBlock.EndIndex + dataLeft + emptyByteLength
 				handle.CacheObj.Resize(lastBlock.StartIndex, newLastBlockEndIndex)
 				lastBlock.Flags.Set(common.DirtyBlock)
-				atomic.StoreInt64(&handle.Size, lastBlock.EndIndex)
+				handle.Size.Store(lastBlock.EndIndex)
 				dataRead += int(dataLeft)
 				return dataRead, nil
 			}
@@ -577,7 +580,7 @@ func (rw *ReadWriteCache) readWriteBlocks(
 			if err != nil {
 				return dataRead, err
 			}
-			atomic.StoreInt64(&handle.Size, blk.EndIndex)
+			handle.Size.Store(blk.EndIndex)
 			dataRead += int(dataCopied)
 			return dataRead, nil
 		} else {

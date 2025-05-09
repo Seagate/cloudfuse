@@ -69,7 +69,7 @@ type Libfuse struct {
 	ignoreOpenFlags       bool
 	nonEmptyMount         bool
 	networkShare          bool // Run as a network file share on Windows
-	lsFlags               common.BitMap16
+	lsFlags               *common.BitMap16
 	maxFuseThreads        uint32
 	directIO              bool
 	umask                 uint32

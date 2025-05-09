@@ -1064,7 +1064,8 @@ func (suite *attrCacheTestSuite) TestOpenFile() {
 	defer suite.cleanupTest()
 	path := "a"
 	options := internal.OpenFileOptions{Name: path}
-	handle := &handlemap.Handle{Size: int64(100 * MB), Path: path}
+	handle := &handlemap.Handle{Path: path}
+	handle.Size.Store(100 * MB)
 
 	// If the file is opened successfully, don't change (or create) its attribute entry
 	// If the file does not exist, create or update its attribute entry to be marked as deleted
