@@ -48,6 +48,7 @@ func (suite *logCollectTestSuite) cleanupTest(currentDir string) {
 	os.Remove(currentDir + "/cloudfuse_logs.tar.gz")
 }
 
+// verifyArchive compares original log files with archived log files using a checksum.
 func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) bool {
 
 	//store file name and hash in a map
@@ -118,6 +119,7 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 	return true
 }
 
+// Log collection test where no config file is provided
 func (suite *logCollectTestSuite) TestNoConfig() {
 	currentDir, err := os.Getwd()
 	suite.assert.NoError(err)
@@ -139,6 +141,7 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 
 }
 
+// Log collection test using 'base' for the logging type in the config.
 func (suite *logCollectTestSuite) TestValidBaseConfig() {
 	currentDir, err := os.Getwd()
 	suite.assert.NoError(err)
@@ -178,6 +181,7 @@ func (suite *logCollectTestSuite) TestValidBaseConfig() {
 
 }
 
+// Log collection test using 'base' for the logging type with a nonexisting file path in the config.
 func (suite *logCollectTestSuite) TestInvalidBaseConfig() {
 	currentDir, err := os.Getwd()
 	suite.assert.NoError(err)
@@ -198,6 +202,7 @@ func (suite *logCollectTestSuite) TestInvalidBaseConfig() {
 	suite.assert.Error(err)
 }
 
+// Log collection test using 'syslog' for the logging type in the config.
 func (suite *logCollectTestSuite) TestValidSyslogConfig() {
 	currentDir, err := os.Getwd()
 	suite.assert.NoError(err)
@@ -227,6 +232,7 @@ func (suite *logCollectTestSuite) TestValidSyslogConfig() {
 	suite.assert.True(isArcValid)
 }
 
+// Log collection test using 'invalid' for the logging type and level in the config.
 func (suite *logCollectTestSuite) TestInvalidConfig() {
 	currentDir, err := os.Getwd()
 	suite.assert.NoError(err)
@@ -257,6 +263,7 @@ func (suite *logCollectTestSuite) TestInvalidConfig() {
 	suite.assert.True(isArcValid)
 }
 
+// Log collection test using 'silent' for the logging type in the config.
 func (suite *logCollectTestSuite) TestSilentConfig() {
 	currentDir, err := os.Getwd()
 	suite.assert.NoError(err)
