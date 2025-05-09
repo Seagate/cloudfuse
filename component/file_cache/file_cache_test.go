@@ -1080,8 +1080,9 @@ func (suite *fileCacheTestSuite) TestDeleteOpenFileCase1() {
 
 	// Test
 	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
-	suite.assert.Error(err)
-	suite.assert.Equal(syscall.EPERM, err)
+	suite.assert.NoError(err)
+	// Path should not be in fake storage
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
 
 	// cleanup
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
@@ -1096,11 +1097,10 @@ func (suite *fileCacheTestSuite) TestDeleteOpenFileCase2() {
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 
 	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
-	suite.assert.Error(err)
-	suite.assert.Equal(syscall.EPERM, err)
+	suite.assert.NoError(err)
 
-	// Path should not be in local cache (since we failed the operation)
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	// Path should not be in local cache (the delete succeeded)
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
 	// Path should not be in fake storage
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
 }
