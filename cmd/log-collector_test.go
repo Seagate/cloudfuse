@@ -36,15 +36,15 @@ func (suite *logCollectTestSuite) SetupTest() {
 	}
 }
 
-func (suite *logCollectTestSuite) cleanupTest(currentDir string) {
+func (suite *logCollectTestSuite) cleanupTest(dir string) {
 	resetCLIFlags(*gatherLogsCmd)
-	os.Remove(currentDir + "/cloudfuse_logs.tar.gz")
+	os.Remove(dir + "/cloudfuse_logs.tar.gz")
 }
 
 // verifyArchive compares original log files with archived log files using a checksum.
 func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) bool {
 
-	//store file name and hash in a map
+	//set up file list and map
 	fileHashMap := make(map[string]string)
 	items, err := os.ReadDir(logPath)
 	suite.assert.NoError(err)
@@ -280,6 +280,33 @@ func (suite *logCollectTestSuite) TestSilentConfig() {
 	//run the log collector
 	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", confFile.Name()))
 	suite.assert.Error(err)
+}
+
+func (suite *logCollectTestSuite) TestOutputPath() {
+
+	// create temp folder for output Path
+	outputPath := "$HOME/"
+	outputPath = common.ExpandPath(outputPath)
+	tempDir, err := os.MkdirTemp(outputPath, "tempArcDir")
+	suite.assert.NoError(err)
+	tempDir, err = filepath.Abs(tempDir)
+	suite.assert.NoError(err)
+	defer suite.cleanupTest(tempDir)
+	defer os.RemoveAll(tempDir)
+
+	// create temp files in default directory $HOME/.cloudfuse/cloudfuse.log
+	baseDefaultDir := "$HOME/.cloudfuse/"
+	baseDefaultDir = common.ExpandPath(baseDefaultDir)
+	os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
+
+	// run gatherLogs command
+	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--output-path=%s", tempDir))
+	suite.assert.NoError(err)
+
+	suite.assert.FileExists(tempDir + "/cloudfuse_logs.tar.gz")
+	isArcValid := suite.verifyArchive(baseDefaultDir, tempDir)
+	suite.assert.True(isArcValid)
+
 }
 
 func TestLogCollectCommand(t *testing.T) {
