@@ -240,7 +240,7 @@ func (suite *logCollectTestSuite) TestInvalidConfig() {
 
 	//set up config file
 	invalidSyslogConfig := logCollectTestConfig{logType: "invalid", level: "invalid"}
-	config := fmt.Sprintf("logging:\n  type: %s\n  lefsvel: %s\n",
+	config := fmt.Sprintf("logging:\n  type: %s\n  level: %s\n",
 		invalidSyslogConfig.logType, invalidSyslogConfig.level)
 	confFile, _ := os.CreateTemp("", "conf*.yaml")
 	defer os.Remove(confFile.Name())
