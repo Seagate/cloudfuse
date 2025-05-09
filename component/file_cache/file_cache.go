@@ -1059,13 +1059,8 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	// do not allow open file to be deleted
-	if flock.Count() > 0 {
-		return syscall.EPERM
-	}
-
 	err := fc.NextComponent().DeleteFile(options)
-	err = fc.validateStorageError(options.Name, err, "DeleteFile", false)
+	err = fc.validateStorageError(options.Name, err, "DeleteFile", true)
 	if err != nil {
 		log.Err("FileCache::DeleteFile : error  %s [%s]", options.Name, err.Error())
 		return err

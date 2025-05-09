@@ -293,7 +293,7 @@ nfpms:
       rpm:
         dependencies:
           - fuse3-devel
-          - libc6 >= 2.24
+          - glibc >= 2.24
 
   - id: linux_no_gui
     package_name: cloudfuse
