@@ -735,7 +735,7 @@ func (fc *FileCache) StreamDir(
 				// and container or not. So we rely on getAttr to tell if entry was cached then it exists in cloud storage too
 				// If entry does not exists on storage then only return a local item here.
 				_, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: entryPath})
-				if err != nil && (err == syscall.ENOENT || os.IsNotExist(err)) {
+				if err != nil && errors.Is(err, os.ErrNotExist) {
 					// get the lock on the file, to allow any pending operation to complete
 					flock := fc.fileLocks.Get(entryPath)
 					flock.Lock()
@@ -1187,7 +1187,7 @@ func (fc *FileCache) validateStorageError(
 	// For methods that take in file name, the goal is to update the path in cloud storage and the local cache.
 	// See comments in GetAttr for the different situations we can run into. This specifically handles case 2.
 	if err != nil {
-		if err == syscall.ENOENT || os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			log.Debug("FileCache::%s : %s does not exist in cloud storage", method, path)
 			if !fc.createEmptyFile {
 				// Check if the file exists in the local cache
@@ -1281,7 +1281,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 
 	fc.policy.CacheValid(localPath)
 	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, handle.Path, flock)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		log.Err(
 			"FileCache::openFileInternal : Failed to check if download is required for %s [%s]",
 			handle.Path,
@@ -1524,7 +1524,7 @@ func (fc *FileCache) isDownloadRequired(
 
 	// get cloud attributes
 	cloudAttr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: objectPath})
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		log.Err(
 			"FileCache::isDownloadRequired : Failed to get attr of %s [%s]",
 			objectPath,
@@ -2004,7 +2004,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		}
 	}
 	if err != nil {
-		if err == syscall.ENOENT || os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			log.Debug("FileCache::GetAttr : %s does not exist in cloud storage", options.Name)
 			exists = false
 		} else {
@@ -2062,7 +2062,7 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	defer dflock.Unlock()
 
 	err := fc.NextComponent().RenameFile(options)
-	localOnly := os.IsNotExist(err)
+	localOnly := errors.Is(err, os.ErrNotExist)
 	err = fc.validateStorageError(options.Src, err, "RenameFile", true)
 	if err != nil {
 		log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
