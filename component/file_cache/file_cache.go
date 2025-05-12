@@ -27,7 +27,6 @@ package file_cache
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -524,7 +523,7 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 		// There is a chance that meta file for directory was not created in which case
 		// rest api delete will fail while we still need to cleanup the local cache for the same
 	} else {
-		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name), nil)
+		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name))
 	}
 
 	return err
@@ -773,23 +772,12 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 			newPath := strings.Replace(path, localSrcPath, localDstPath, 1)
 			if !d.IsDir() {
 				log.Debug("FileCache::RenameDir : Renaming local file %s -> %s", path, newPath)
-				// get object names
+				// get object names and locks
 				srcName := fc.getObjectName(path)
 				dstName := fc.getObjectName(newPath)
-				// get locks
 				sflock := fc.fileLocks.Get(srcName)
 				dflock := fc.fileLocks.Get(dstName)
-				// complete local rename
-				err := fc.renameCachedFile(path, newPath, sflock, dflock)
-				if err != nil {
-					// there's really not much we can do to handle the error, so just log it
-					log.Err(
-						"FileCache::RenameDir : %s file rename failed. Directory state is inconsistent!",
-						path,
-					)
-				}
-				// handle should be updated regardless, for consistency on upload
-				fc.renameOpenHandles(srcName, dstName, sflock, dflock)
+				_ = fc.renameLocalFile(srcName, dstName, sflock, dflock, false)
 			} else {
 				log.Debug("FileCache::RenameDir : Creating local destination directory %s", newPath)
 				// create the new directory
@@ -817,7 +805,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	// clean up leftover source directories in reverse order
 	for i := len(directoriesToPurge) - 1; i >= 0; i-- {
 		log.Debug("FileCache::RenameDir : Removing local directory %s", directoriesToPurge[i])
-		fc.policy.CachePurge(directoriesToPurge[i], nil)
+		fc.policy.CachePurge(directoriesToPurge[i])
 	}
 
 	// update any lazy open handles (which are not in the local listing)
@@ -1067,7 +1055,7 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	}
 
 	localPath := filepath.Join(fc.tmpPath, options.Name)
-	fc.policy.CachePurge(localPath, flock)
+	fc.policy.CachePurge(localPath)
 
 	// update file state
 	flock.LazyOpen = false
@@ -1082,7 +1070,7 @@ func openCompleted(handle *handlemap.Handle) bool {
 	return !found
 }
 
-// the file lock must be acquired before calling this
+// flock must already be locked before calling this function
 func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.LockMapItem) error {
 	log.Trace("FileCache::openFileInternal : name=%s", handle.Path)
 
@@ -1302,6 +1290,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	var openErr error
 	if !downloadRequired {
 		// use the local file to complete the open operation now
+		// flock is already locked, as required by openFileInternal
 		openErr = fc.openFileInternal(handle, flock)
 	} else {
 		// use a lazy open algorithm to avoid downloading unnecessarily (do nothing for now)
@@ -1312,7 +1301,7 @@ func (fc *FileCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	return handle, openErr
 }
 
-// isDownloadRequired: Whether or not the file needs to be downloaded to local cache.
+// flock must already be locked before calling this function
 func (fc *FileCache) isDownloadRequired(
 	localPath string,
 	objectPath string,
@@ -1409,7 +1398,7 @@ func (fc *FileCache) CloseFile(options internal.CloseFileOptions) error {
 	return nil
 }
 
-// closeFileInternal: Actual handling of the close file goes here
+// flock must already be locked before calling this function
 func (fc *FileCache) closeFileInternal(
 	options internal.CloseFileOptions,
 	flock *common.LockMapItem,
@@ -1429,9 +1418,9 @@ func (fc *FileCache) closeFileInternal(
 	_, noCachedHandle := options.Handle.GetValue("openFileOptions")
 
 	if !noCachedHandle {
+		// flock is already locked, as required by flushFileInternal
 		err := fc.flushFileInternal(
 			internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true},
-			flock,
 		) //nolint
 		if err != nil {
 			log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
@@ -1470,7 +1459,7 @@ func (fc *FileCache) closeFileInternal(
 	if options.Handle.Fsynced() {
 		log.Trace("FileCache::closeFileInternal : fsync/sync op, purging %s", options.Handle.Path)
 		localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
-		fc.policy.CachePurge(localPath, flock)
+		fc.policy.CachePurge(localPath)
 		return nil
 	}
 
@@ -1485,6 +1474,7 @@ func (fc *FileCache) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 
 	if !openCompleted(options.Handle) {
 		flock := fc.fileLocks.Get(options.Handle.Path)
+		// openFileInternal requires flock be locked before it's called
 		flock.Lock()
 		err := fc.openFileInternal(options.Handle, flock)
 		flock.Unlock()
@@ -1530,6 +1520,7 @@ func (fc *FileCache) WriteFile(options internal.WriteFileOptions) (int, error) {
 
 	if !openCompleted(options.Handle) {
 		flock := fc.fileLocks.Get(options.Handle.Path)
+		// openFileInternal requires flock be locked before it's called
 		flock.Lock()
 		err := fc.openFileInternal(options.Handle, flock)
 		flock.Unlock()
@@ -1638,13 +1629,12 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 		defer flock.Unlock()
 	}
 
-	return fc.flushFileInternal(options, flock)
+	// flock is locked, as required by flushFileInternal
+	return fc.flushFileInternal(options)
 }
 
-func (fc *FileCache) flushFileInternal(
-	options internal.FlushFileOptions,
-	flock *common.LockMapItem,
-) error {
+// file must be locked before calling this function
+func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error {
 	//defer exectime.StatTimeCurrentBlock("FileCache::FlushFile")()
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
@@ -1771,7 +1761,6 @@ func (fc *FileCache) flushFileInternal(
 			if err == nil {
 				err = fc.chmodInternal(
 					internal.ChmodOptions{Name: options.Handle.Path, Mode: info.Mode()},
-					flock,
 				)
 				if err != nil {
 					// chmod was missed earlier for this file and doing it now also
@@ -1875,70 +1864,65 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 		return err
 	}
 
-	localSrcPath := filepath.Join(fc.tmpPath, options.Src)
-	localDstPath := filepath.Join(fc.tmpPath, options.Dst)
-
-	// in case of git clone multiple rename requests come for which destination files already exists in system
-	// if we do not perform rename operation locally and those destination files are cached then next time they are read
-	// we will be serving the wrong content (as we did not rename locally, we still be having older destination files with
-	// stale content). We either need to remove dest file as well from cache or just run rename to replace the content.
-	localRenameErr := fc.renameCachedFile(localSrcPath, localDstPath, sflock, dflock)
-	if localRenameErr != nil {
-		// renameCachedFile only returns an error when we are at risk for data loss
-		if !localOnly {
-			// we must reverse the cloud rename operation to prevent data loss
-			err := fc.NextComponent().RenameFile(internal.RenameFileOptions{
-				Src: options.Dst,
-				Dst: options.Src,
-			})
-			err = fc.validateStorageError(options.Src, err, "RenameFile", false)
-			if err != nil {
-				log.Err(
-					"FileCache::RenameFile : %s failed to reverse cloud rename to avoid data loss! [%v]",
-					options.Src,
-					err,
-				)
-			}
-			localRenameErr = errors.Join(localRenameErr, err)
-		}
-		return localRenameErr
-	}
-
-	// rename open handles
-	fc.renameOpenHandles(options.Src, options.Dst, sflock, dflock)
-
-	return nil
+	return fc.renameLocalFile(options.Src, options.Dst, sflock, dflock, localOnly)
 }
 
-func (fc *FileCache) renameCachedFile(
-	localSrcPath, localDstPath string,
+// source and destination files should already be locked before calling this function
+func (fc *FileCache) renameLocalFile(
+	srcName, dstName string,
 	sflock, dflock *common.LockMapItem,
+	localOnly bool,
 ) error {
+	localSrcPath := filepath.Join(fc.tmpPath, srcName)
+	localDstPath := filepath.Join(fc.tmpPath, dstName)
+
 	err := os.Rename(localSrcPath, localDstPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// Case 1
-			log.Info("FileCache::renameCachedFile : %s source file not cached", localSrcPath)
-		} else {
-			log.Warn("FileCache::renameCachedFile : %s -> %s Failed to rename local file. Here's why: %v", localSrcPath, localDstPath, err)
-			// if the file is not open, it should be backed up already
-			if sflock.Count() > 0 {
-				// abort rename to prevent data loss!
-				log.Err("FileCache::renameCachedFile : %s Failed rename and src is open! Rename should be aborted...", localSrcPath)
-				return err
-			}
-		}
-	} else if err == nil {
-		log.Debug("FileCache::renameCachedFile : %s -> %s Successfully renamed local file", localSrcPath, localDstPath)
+	switch {
+	case err == nil:
+		log.Debug(
+			"FileCache::renameLocalFile : %s -> %s Successfully renamed local file",
+			localSrcPath,
+			localDstPath,
+		)
 		fc.policy.CacheValid(localDstPath)
+	case os.IsNotExist(err):
+		if localOnly {
+			// neither cloud nor file cache has this file, so return ENOENT
+			log.Err("FileCache::renameLocalFile : %s source file not found", srcName)
+			return syscall.ENOENT
+		} else {
+			// Case 1
+			log.Info("FileCache::renameLocalFile : %s source file not cached", localSrcPath)
+		}
+	default:
+		// unexpected error from os.Rename
+		log.Err(
+			"FileCache::renameLocalFile : os.Rename(%s -> %s) failed. Here's why: %v",
+			localSrcPath,
+			localDstPath,
+			err,
+		)
+		// check if the file is open
+		if sflock.Count() > 0 {
+			log.Warn(
+				"FileCache::renameLocalFile : open local file (%s) will be uploaded as %s on close.",
+				localSrcPath,
+				dstName,
+			)
+		}
 	}
+
 	// delete the source from our cache policy
 	// this will also delete the source file from local storage (if rename failed)
-	fc.policy.CachePurge(localSrcPath, sflock)
+	fc.policy.CachePurge(localSrcPath)
+
+	// rename open handles
+	fc.renameOpenHandles(srcName, dstName, sflock, dflock)
 
 	return nil
 }
 
+// files should already be locked before calling this function
 func (fc *FileCache) renameOpenHandles(
 	srcName, dstName string,
 	sflock, dflock *common.LockMapItem,
@@ -2021,11 +2005,11 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	return fc.chmodInternal(options, flock)
+	return fc.chmodInternal(options)
 }
 
-// Chmod : Update the file with its new permissions
-func (fc *FileCache) chmodInternal(options internal.ChmodOptions, flock *common.LockMapItem) error {
+// file must be locked before calling this function
+func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 	log.Trace("FileCache::Chmod : Change mode of path %s", options.Name)
 
 	// Update the file in cloud storage
