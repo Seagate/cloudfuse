@@ -2023,34 +2023,18 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// To cover case 1, get attributes from storage
 	var exists bool
 	attrs, err := fc.NextComponent().GetAttr(options)
-	// are we offline?
-	if errors.Is(err, &common.CloudUnreachableError{}) {
-		// if offline access is not enabled, return the error
-		if !fc.offlineAccess {
-			return nil, err
-		}
-		// offline access is enabled
-		// but if we have no information to return anyway, just return the error
-		if errors.Is(err, &common.NoCachedDataError{}) {
-			return nil, err
-		}
-		// we have a valid result - clean up the error
-		if errors.Is(err, os.ErrNotExist) {
-			err = syscall.ENOENT
-		} else {
-			err = nil
-		}
-	}
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			log.Debug("FileCache::GetAttr : %s does not exist in cloud storage", options.Name)
-			exists = false
-		} else {
-			log.Err("FileCache::GetAttr : Failed to get attr of %s [%s]", options.Name, err.Error())
-			return nil, err
-		}
-	} else {
+	switch {
+	case !isOffline(err) && os.IsNotExist(err):
+		log.Debug("FileCache::GetAttr : %s does not exist in cloud storage", options.Name)
+	case err == nil:
 		exists = true
+	case offlineDataAvailable(err) && fc.offlineAccess:
+		// we are offline, but we can respond from the attribute cache
+		exists = !errors.Is(err, os.ErrNotExist)
+		log.Debug("FileCache::GetAttr : %s exists=%t from cache (offline)", options.Name, exists)
+	default:
+		log.Err("FileCache::GetAttr : %s GetAttr failed. Here's why: %v", options.Name, err)
+		return nil, err
 	}
 
 	// To cover cases 2 and 3, grab the attributes from the local cache
