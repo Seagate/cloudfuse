@@ -99,6 +99,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y pkg-config fuse3 ${{ matrix.fuselib }}
           if [[ "${{ matrix.job_name }}" == "linux-fuse2" ]] || "${{ matrix.job_name }}" == "linux-fuse2-arm" ]]; then
             sudo apt-get install -y libfuse-dev;
+          fi
 
       - name: Setup CGO environment for Zig
         shell: bash
