@@ -1953,16 +1953,23 @@ func (fc *FileCache) flushFileInternal(
 			}
 		}
 
-		if err != nil {
-			log.Err(
-				"FileCache::FlushFile : %s upload failed [%s]",
-				options.Handle.Path,
-				err.Error(),
-			)
+		switch {
+		case err == nil:
+			options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
+		case isOffline(err) && fc.offlineAccess:
+			log.Warn("FileCache::FlushFile : %s upload delayed (offline)", options.Handle.Path)
+			// add file to upload queue
+			info, err := os.Stat(localPath)
+			if err == nil {
+				fc.offlineOps.Store(
+					options.Handle.Path,
+					internal.CreateObjAttr(options.Handle.Path, info.Size(), info.ModTime()),
+				)
+			}
+		default:
+			log.Err("FileCache::FlushFile : %s upload failed [%v]", options.Handle.Path, err)
 			return err
 		}
-
-		options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
 
 		// If chmod was done on the file before it was uploaded to container then setting up mode would have been missed
 		// Such file names are added to this map and here post upload we try to set the mode correctly
@@ -2278,7 +2285,9 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions, flock *common.
 	err := fc.NextComponent().Chmod(options)
 	err = fc.validateStorageError(options.Name, err, "Chmod", false)
 	if err != nil {
-		if err != syscall.EIO {
+		case2okay := err == syscall.EIO
+		offlineOkay := isOffline(err) && fc.offlineAccess
+		if !case2okay && !offlineOkay {
 			log.Err("FileCache::Chmod : %s failed to change mode [%s]", options.Name, err.Error())
 			return err
 		} else {
