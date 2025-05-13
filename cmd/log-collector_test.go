@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"archive/zip"
 	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -39,6 +41,28 @@ func (suite *logCollectTestSuite) SetupTest() {
 func (suite *logCollectTestSuite) cleanupTest(dir string) {
 	resetCLIFlags(*gatherLogsCmd)
 	os.Remove(dir + "/cloudfuse_logs.tar.gz")
+}
+
+func (suite *logCollectTestSuite) extractZip(srcPath, destPath string) {
+	readCloser, err := zip.OpenReader(srcPath + string(os.PathSeparator) + "cloudfuse_logs.zip")
+	suite.assert.NoError(err)
+	defer readCloser.Close()
+
+	for _, item := range readCloser.File {
+		itemPath := filepath.Join(destPath, item.Name)
+
+		err = os.MkdirAll(filepath.Dir(itemPath), os.ModePerm)
+		suite.assert.NoError(err)
+
+		dstFile, err := os.OpenFile(itemPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, item.Mode())
+		suite.assert.NoError(err)
+
+		srcFile, err := item.Open()
+		suite.assert.NoError(err)
+
+		_, err = io.Copy(dstFile, srcFile)
+		suite.assert.NoError(err)
+	}
 }
 
 // verifyArchive compares original log files with archived log files using a checksum.
@@ -79,9 +103,13 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 
 	defer os.RemoveAll(tempDir)
 
-	cmd := exec.Command("tar", "-xvf", archivePath+"/cloudfuse_logs.tar.gz", "-C", tempDir)
-	err = cmd.Run()
-	suite.assert.NoError(err)
+	if runtime.GOOS == "linux" {
+		cmd := exec.Command("tar", "-xvf", archivePath+"/cloudfuse_logs.tar.gz", "-C", tempDir)
+		err = cmd.Run()
+		suite.assert.NoError(err)
+	} else if runtime.GOOS == "windows" {
+
+	}
 
 	//verify archive contents (compare with original files that were put into archive)
 
