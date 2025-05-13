@@ -664,8 +664,8 @@ func (ac *AttrCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	return ac.NextComponent().IsDirEmpty(options)
 }
 
-func (directory *attrCacheItem) hasExistingChildren() bool {
-	for _, childItem := range directory.children {
+func (value *attrCacheItem) hasExistingChildren() bool {
+	for _, childItem := range value.children {
 		if childItem.exists() {
 			return true
 		}
