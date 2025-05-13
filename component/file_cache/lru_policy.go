@@ -436,6 +436,13 @@ func (p *lruPolicy) deleteItem(name string) {
 		return
 	}
 
+	// check if the file is pending upload (it was modified offline)
+	if flock.SyncPending {
+		log.Warn("lruPolicy::DeleteItem : %s File is not synchronized to cloud storage", name)
+		p.CacheValid(name)
+		return
+	}
+
 	// There are no open handles for this file so it's safe to remove this
 	// Check if the file exists first, since this is often the second time we're calling deleteFile
 	_, err := os.Stat(name)

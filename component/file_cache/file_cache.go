@@ -1162,6 +1162,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 	// if we're offline, record this operation as pending
 	if offline {
 		fc.offlineOps.Store(options.Name, internal.CreateObjAttr(options.Name, 0, time.Now()))
+		flock.SyncPending = true
 	}
 
 	return handle, nil
@@ -1228,6 +1229,7 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	fc.policy.CachePurge(localPath)
 	// update file state
 	flock.LazyOpen = false
+	flock.SyncPending = false
 	// remove deleted file from async upload map
 	fc.offlineOps.Delete(options.Name)
 
@@ -1950,6 +1952,8 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 					options.Handle.Path,
 					internal.CreateObjAttr(options.Handle.Path, info.Size(), info.ModTime()),
 				)
+				flock := fc.fileLocks.Get(options.Handle.Path)
+				flock.SyncPending = true
 			}
 		default:
 			log.Err("FileCache::FlushFile : %s upload failed [%v]", options.Handle.Path, err)
@@ -2173,6 +2177,9 @@ func (fc *FileCache) renameOpenHandles(
 			sflock.Dec()
 			dflock.Inc()
 		}
+		// copy flags
+		dflock.LazyOpen = sflock.LazyOpen
+		dflock.SyncPending = sflock.SyncPending
 	}
 }
 
@@ -2229,6 +2236,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 			} else if offlineOkay {
 				fc.offlineOps.Store(options.Name, internal.CreateObjAttr(options.Name, options.Size, time.Now()))
 				log.Warn("FileCache::TruncateFile : %s operation queued (offline)", options.Name)
+				flock.SyncPending = true
 			}
 		}
 	}
@@ -2283,6 +2291,8 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 				fc.offlineOps.Store(options.Name, internal.CreateObjAttr(options.Name, info.Size(), info.ModTime()))
 				log.Warn("FileCache::Chmod : %s operation queued (offline)", options.Name)
 				fc.missedChmodList.LoadOrStore(options.Name, true)
+				flock := fc.fileLocks.Get(options.Name)
+				flock.SyncPending = true
 			}
 		}
 	}
@@ -2331,6 +2341,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 				// TODO: we have no missedChownList to track this... should we make one? Or should we just ignore this call?
 				fc.offlineOps.Store(options.Name, internal.CreateObjAttr(options.Name, info.Size(), info.ModTime()))
 				log.Warn("FileCache::Chown : %s operation queued (offline)", options.Name)
+				flock.SyncPending = true
 			}
 		}
 	}
