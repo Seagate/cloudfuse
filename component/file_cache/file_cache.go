@@ -1180,7 +1180,7 @@ func (fc *FileCache) validateStorageError(
 ) error {
 	// For methods that take in file name, the goal is to update the path in cloud storage and the local cache.
 	// See comments in GetAttr for the different situations we can run into. This specifically handles case 2.
-	if errors.Is(err, os.ErrNotExist) {
+	if !isOffline(err) && errors.Is(err, os.ErrNotExist) {
 		log.Debug("FileCache::%s : %s does not exist in cloud storage", method, path)
 		if !fc.createEmptyFile {
 			// Check if the file exists in the local cache
@@ -2070,6 +2070,10 @@ func (fc *FileCache) RenameFile(options internal.RenameFileOptions) error {
 	err := fc.NextComponent().RenameFile(options)
 	localOnly := errors.Is(err, os.ErrNotExist)
 	err = fc.validateStorageError(options.Src, err, "RenameFile", true)
+	if isOffline(err) && fc.offlineOperationAllowed(options.Src) {
+		log.Debug("FileCache::RenameFile : %s Offline rename allowed", options.Src)
+		err = nil
+	}
 	if err != nil {
 		log.Err("FileCache::RenameFile : %s failed to rename file [%s]", options.Src, err.Error())
 		return err
@@ -2191,12 +2195,18 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 		}
 	}
 
+	var offlineOkay bool
 	flock := fc.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
 
 	err := fc.NextComponent().TruncateFile(options)
 	err = fc.validateStorageError(options.Name, err, "TruncateFile", true)
+	if isOffline(err) && fc.offlineOperationAllowed(options.Name) {
+		log.Debug("FileCache::TruncateFile : %s Offline truncate allowed", options.Name)
+		offlineOkay = true
+		err = nil
+	}
 	if err != nil {
 		log.Err("FileCache::TruncateFile : %s failed to truncate [%s]", options.Name, err.Error())
 		return err
@@ -2205,9 +2215,8 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 	// Update the size of the file in the local cache
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	info, err := os.Stat(localPath)
-	if err == nil || os.IsExist(err) {
+	if err == nil {
 		fc.policy.CacheValid(localPath)
-
 		if info.Size() != options.Size {
 			err = os.Truncate(localPath, options.Size)
 			if err != nil {
@@ -2217,6 +2226,9 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 					err.Error(),
 				)
 				return err
+			} else if offlineOkay {
+				fc.offlineOps.Store(options.Name, internal.CreateObjAttr(options.Name, options.Size, time.Now()))
+				log.Warn("FileCache::TruncateFile : %s operation queued (offline)", options.Name)
 			}
 		}
 	}
@@ -2238,18 +2250,17 @@ func (fc *FileCache) Chmod(options internal.ChmodOptions) error {
 // file must be locked before calling this function
 func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 	log.Trace("FileCache::Chmod : Change mode of path %s", options.Name)
+	var offlineOkay bool
 
 	// Update the file in cloud storage
 	err := fc.NextComponent().Chmod(options)
 	err = fc.validateStorageError(options.Name, err, "Chmod", false)
 	if err != nil {
 		case2okay := err == syscall.EIO
-		offlineOkay := isOffline(err) && fc.offlineAccess
+		offlineOkay = isOffline(err) && fc.offlineOperationAllowed(options.Name)
 		if !case2okay && !offlineOkay {
 			log.Err("FileCache::Chmod : %s failed to change mode [%s]", options.Name, err.Error())
 			return err
-		} else {
-			fc.missedChmodList.LoadOrStore(options.Name, true)
 		}
 	}
 
@@ -2268,6 +2279,10 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 					err.Error(),
 				)
 				return err
+			} else if offlineOkay {
+				fc.offlineOps.Store(options.Name, internal.CreateObjAttr(options.Name, info.Size(), info.ModTime()))
+				log.Warn("FileCache::Chmod : %s operation queued (offline)", options.Name)
+				fc.missedChmodList.LoadOrStore(options.Name, true)
 			}
 		}
 	}
@@ -2279,6 +2294,7 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	log.Trace("FileCache::Chown : Change owner of path %s", options.Name)
 
+	var offlineOkay bool
 	flock := fc.fileLocks.Get(options.Name)
 	flock.Lock()
 	defer flock.Unlock()
@@ -2286,6 +2302,11 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 	// Update the file in cloud storage
 	err := fc.NextComponent().Chown(options)
 	err = fc.validateStorageError(options.Name, err, "Chown", false)
+	if isOffline(err) && fc.offlineOperationAllowed(options.Name) {
+		log.Debug("FileCache::Chown : %s Offline chown allowed", options.Name)
+		offlineOkay = true
+		err = nil
+	}
 	if err != nil {
 		log.Err("FileCache::Chown : %s failed to change owner [%s]", options.Name, err.Error())
 		return err
@@ -2293,7 +2314,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 
 	// Update the owner and group of the file in the local cache
 	localPath := filepath.Join(fc.tmpPath, options.Name)
-	_, err = os.Stat(localPath)
+	info, err := os.Stat(localPath)
 	if err == nil {
 		fc.policy.CacheValid(localPath)
 
@@ -2306,6 +2327,10 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 					err.Error(),
 				)
 				return err
+			} else if offlineOkay {
+				// TODO: we have no missedChownList to track this... should we make one? Or should we just ignore this call?
+				fc.offlineOps.Store(options.Name, internal.CreateObjAttr(options.Name, info.Size(), info.ModTime()))
+				log.Warn("FileCache::Chown : %s operation queued (offline)", options.Name)
 			}
 		}
 	}
