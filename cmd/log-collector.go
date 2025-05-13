@@ -234,8 +234,7 @@ func createLinuxArchive(logPath string) error {
 	}
 
 	//setup tar.gz file
-	ArchiveName := fmt.Sprintf("cloudfuse_logs")
-	outFile, err := os.Create(dumpPath + "/" + ArchiveName + ".tar.gz")
+	outFile, err := os.Create(dumpPath + "/cloudfuse_logs.tar.gz")
 	if err != nil {
 		return err
 	}
@@ -298,9 +297,7 @@ func createLinuxArchive(logPath string) error {
 
 func createWindowsArchive(logPath string) error {
 
-	ArchiveName := fmt.Sprintf("cloudfuse_logs")
-
-	outFile, err := os.Create(dumpPath + "/" + ArchiveName)
+	outFile, err := os.Create(dumpPath + "/cloudfuse_logs.zip")
 	if err != nil {
 		return nil
 	}
