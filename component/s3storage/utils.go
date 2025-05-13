@@ -145,7 +145,11 @@ func parseS3Err(err error, attemptedAction string) error {
 
 	var maxAttempts *retry.MaxAttemptsError
 	if errors.As(err, &maxAttempts) {
-		log.Err("%s : Failed to %s because cloud storage is unreachable", functionName, attemptedAction)
+		log.Err(
+			"%s : Failed to %s because cloud storage is unreachable",
+			functionName,
+			attemptedAction,
+		)
 		return common.NewCloudUnreachableError(err)
 	}
 
