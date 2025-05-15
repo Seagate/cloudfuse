@@ -987,7 +987,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	err = fc.NextComponent().RenameDir(options)
 	// if we are offline, and offline access is enabled, allow local directories to be renamed
 	if isOffline(err) && fc.offlineOperationAllowed(options.Src) && fc.notInCloud(options.Dst) {
-		log.Debug(
+		log.Warn(
 			"FileCache::RenameDir : %s -> %s Cloud is unreachable but neither directory is in cloud storage. Proceeding with offline rename.",
 			options.Src,
 			options.Dst,
