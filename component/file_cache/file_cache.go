@@ -81,6 +81,8 @@ type FileCache struct {
 
 	lazyWrite    bool
 	fileCloseOpt sync.WaitGroup
+
+	stopAsyncUpload chan struct{}
 }
 
 // Structure defining your config parameters
@@ -184,6 +186,12 @@ func (fc *FileCache) Start(ctx context.Context) error {
 		return fmt.Errorf("config error in %s error [fail to start policy]", fc.Name())
 	}
 
+	if fc.offlineAccess {
+		// since the channel will simply be closed in Stop(), it doesn't need a value type
+		fc.stopAsyncUpload = make(chan struct{})
+		go fc.servicePendingOps()
+	}
+
 	// create stats collector for file cache
 	fileCacheStatsCollector = stats_manager.NewStatsCollector(fc.Name())
 	log.Debug("Starting file cache stats collector")
@@ -207,6 +215,83 @@ func (fc *FileCache) Stop() error {
 	}
 
 	fileCacheStatsCollector.Destroy()
+
+	return nil
+}
+
+func (fc *FileCache) servicePendingOps() {
+	for {
+		time.Sleep(250 * time.Millisecond) // don't run too fast
+		select {
+		case <-fc.stopAsyncUpload:
+			log.Crit("FileCache::servicePendingOps : Stopping")
+			// TODO: Close journal
+			return
+		default:
+			// check if we're connected
+			if !fc.cloudConnected() {
+				break
+			}
+			// Iterate over pending ops
+			fc.offlineOps.Range(func(key, value interface{}) bool {
+				select {
+				case <-fc.stopAsyncUpload:
+					return false // Stop the iteration
+				default:
+					err := fc.uploadPendingFile(key.(string))
+					if isOffline(err) {
+						// we lost connection - stop trying to upload
+						return false
+					}
+					if err != nil {
+						log.Err(
+							"FileCache::servicePendingOps : %s upload failed. Here's why: %v",
+							key.(string),
+							err,
+						)
+					}
+				}
+				return true // Continue the iteration
+			})
+		}
+	}
+}
+
+func (fc *FileCache) uploadPendingFile(name string) error {
+	log.Trace("FileCache::uploadPendingFile : %s", name)
+
+	// lock the file
+	flock := fc.fileLocks.Get(name)
+	flock.Lock()
+	defer flock.Unlock()
+
+	// prepare a handle
+	handle := handlemap.NewHandle(name)
+	// open the cached file
+	localPath := filepath.Join(fc.tmpPath, name)
+	f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
+	if err != nil {
+		log.Err("FileCache::uploadPendingFile : %s failed to open file. Here's why: %v", name, err)
+		return err
+	}
+	// write handle attributes
+	inf, err := f.Stat()
+	if err == nil {
+		handle.Size = inf.Size()
+	}
+	handle.UnixFD = uint64(f.Fd())
+	handle.SetFileObject(f)
+	handle.Flags.Set(handlemap.HandleFlagDirty)
+
+	// upload the file
+	err = fc.closeFileInternal(internal.CloseFileOptions{Handle: handle}, flock)
+	if err != nil {
+		log.Err("FileCache::uploadPendingFile : %s Upload failed. Here's why: %v", name, err)
+		return err
+	}
+	// update state
+	flock.SyncPending = false
+	fc.offlineOps.Delete(name)
 
 	return nil
 }
@@ -377,7 +462,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	}
 
 	log.Crit(
-		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
+		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, !block-offline-access %t, sync-to-flush %t, !ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
 		fc.createEmptyFile,
 		int(fc.cacheTimeout),
 		fc.tmpPath,
@@ -392,6 +477,7 @@ func (fc *FileCache) Configure(_ bool) error {
 		fc.cleanupOnStart,
 		fc.policyTrace,
 		fc.offloadIO,
+		fc.offlineAccess,
 		fc.syncToFlush,
 		fc.syncToDelete,
 		fc.defaultPermission,
