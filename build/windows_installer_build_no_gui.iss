@@ -91,7 +91,7 @@ begin
   if CurStep = ssPostInstall then
   begin
     // Install WinFSP if it is not already installed
-    if not RegValueExists(HKLM, 'SOFTWARE\WOW6432Node\WinFsp\Services', 'InstallDir') then
+    if not RegValueExists(HKLM, 'SOFTWARE\WOW6432Node\WinFsp', 'InstallDir') then
     begin
       if SuppressibleMsgBox('WinFSP is required for Cloudfuse. Do you want to install it now?', mbConfirmation, MB_YESNO, IDYES) = IDYES then
       begin
