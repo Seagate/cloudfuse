@@ -108,7 +108,7 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 		err = cmd.Run()
 		suite.assert.NoError(err)
 	} else if runtime.GOOS == "windows" {
-		suite.extractZip(archivePath+"/cloudfuse_logs.zip", tempDir)
+		suite.extractZip(archivePath, tempDir)
 	}
 
 	//verify archive contents (compare with original files that were put into archive)
@@ -156,7 +156,11 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 	_, err = executeCommandC(rootCmd, "gatherLogs")
 	suite.assert.NoError(err)
 
-	suite.assert.FileExists(currentDir + "/cloudfuse_logs.tar.gz")
+	if runtime.GOOS == "linux" {
+		suite.assert.FileExists(currentDir + "/cloudfuse_logs.tar.gz")
+	} else if runtime.GOOS == "windows" {
+		suite.assert.FileExists(currentDir + "/cloudfuse_logs.zip")
+	}
 	isArcValid := suite.verifyArchive(baseDefaultDir, currentDir)
 	suite.assert.True(isArcValid)
 
