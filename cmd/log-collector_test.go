@@ -283,7 +283,11 @@ func (suite *logCollectTestSuite) TestInvalidConfig() {
 	suite.assert.NoError(err)
 
 	//check archive
-	suite.assert.FileExists(currentDir + "/cloudfuse_logs.tar.gz")
+	if runtime.GOOS == "linux" {
+		suite.assert.FileExists(currentDir + "/cloudfuse_logs.tar.gz")
+	} else if runtime.GOOS == "windows" {
+		suite.assert.FileExists(currentDir + "/cloudfuse_logs.zip")
+	}
 	isArcValid := suite.verifyArchive(baseDefaultDir, currentDir)
 	suite.assert.True(isArcValid)
 }
@@ -336,7 +340,11 @@ func (suite *logCollectTestSuite) TestOutputPath() {
 	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--output-path=%s", tempDir))
 	suite.assert.NoError(err)
 
-	suite.assert.FileExists(tempDir + "/cloudfuse_logs.tar.gz")
+	if runtime.GOOS == "linux" {
+		suite.assert.FileExists(tempDir + "/cloudfuse_logs.tar.gz")
+	} else if runtime.GOOS == "windows" {
+		suite.assert.FileExists(tempDir + "/cloudfuse_logs.zip")
+	}
 	isArcValid := suite.verifyArchive(baseDefaultDir, tempDir)
 	suite.assert.True(isArcValid)
 
