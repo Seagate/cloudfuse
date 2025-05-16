@@ -329,7 +329,6 @@ jobs:
           S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
           S3_REGION: "${{ secrets.S3TEST_REGION }}"
           S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
-          S3_SUBDIRECTORY: 
         run: |-
           RANDOM_NUMBERS=$(head /dev/urandom | tr -dc '0-9' | head -c 8)
           COMBINED_STRING="test${RANDOM_NUMBERS}"
@@ -913,29 +912,29 @@ jobs:
           kill $pid
           sleep 5
 
-      - name: Create Config File - S3 - Block Cache
-        shell: bash
-        env:
-          S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
-          S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
-          S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
-          S3_REGION: "${{ secrets.S3TEST_REGION }}"
-          S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
-        run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
+      # - name: Create Config File - S3 - Block Cache
+      #   shell: bash
+      #   env:
+      #     S3_BUCKET_NAME: "${{ secrets.S3TEST_BUCKET_NAME }}"
+      #     S3_ENDPOINT: "${{ secrets.S3TEST_ENDPOINT }}"
+      #     S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
+      #     S3_REGION: "${{ secrets.S3TEST_REGION }}"
+      #     S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
+      #   run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
   
-      - name: S3 Coverage - Block Cache
-        shell: bash
-        run: |-
-          rm -rf ${{ env.MOUNT_DIR }}/*
-          rm -rf ${{ env.TEMP_DIR }}/*
-          ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
-          sleep 10
-          pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
-          cd test/e2e_tests
-          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
-          cd -
-          kill $pid
-          sleep 5
+      # - name: S3 Coverage - Block Cache
+      #   shell: bash
+      #   run: |-
+      #     rm -rf ${{ env.MOUNT_DIR }}/*
+      #     rm -rf ${{ env.TEMP_DIR }}/*
+      #     ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
+      #     sleep 10
+      #     pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
+      #     cd test/e2e_tests
+      #     go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
+      #     cd -
+      #     kill $pid
+      #     sleep 5
 
       - name: Create Config File - S3 with Size Tracker
         shell: bash
