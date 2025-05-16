@@ -646,9 +646,9 @@ func (s *datalakeTestSuite) TestStreamDirError() {
 
 	entries, _, err := s.az.StreamDir(internal.StreamDirOptions{Name: name})
 
-	s.assert.Error(
+	s.assert.NoError(
 		err,
-	) // Note: See comment in BlockBlob.List. BlockBlob behaves differently from Datalake
+	)
 	s.assert.Empty(entries)
 	// Directory should not be in the account
 	dir := s.containerClient.NewDirectoryClient(name)

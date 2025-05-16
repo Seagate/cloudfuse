@@ -696,6 +696,7 @@ func (bb *BlockBlob) processBlobItems(
 	filterAttr := blobfilter.BlobAttr{}
 
 	for _, blobInfo := range blobItems {
+		blobInfo.Name = bb.getFileName(*blobInfo.Name)
 		blobAttr, err := bb.getBlobAttr(blobInfo)
 		if err != nil {
 			return nil, nil, err

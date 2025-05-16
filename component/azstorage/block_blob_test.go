@@ -766,7 +766,7 @@ func (s *blockBlobTestSuite) TestStreamDirError() {
 
 	s.assert.NoError(
 		err,
-	) // Note: See comment in BlockBlob.List. BlockBlob behaves differently from Datalake
+	)
 	s.assert.Empty(entries)
 	// Directory should not be in the account
 	dir := s.containerClient.NewBlobClient(name)
