@@ -81,7 +81,11 @@ func (suite *lruPolicyTestSuite) cleanupTest() {
 
 	err := os.RemoveAll(cache_path)
 	if err != nil {
-		fmt.Printf("lruPolicyTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n", cache_path, err)
+		fmt.Printf(
+			"lruPolicyTestSuite::cleanupTest : os.RemoveAll(%s) failed [%v]\n",
+			cache_path,
+			err,
+		)
 	}
 }
 
@@ -112,7 +116,9 @@ func (suite *lruPolicyTestSuite) createLocalPath(localPath string, isDir bool) {
 //	ab/c1
 //
 // ac
-func (suite *lruPolicyTestSuite) generateNestedDirectory(aPath string) ([]string, []string, []string) {
+func (suite *lruPolicyTestSuite) generateNestedDirectory(
+	aPath string,
+) ([]string, []string, []string) {
 	localBasePath := filepath.Join(suite.policy.tmpPath, internal.TruncateDirName(aPath))
 	suite.createLocalPath(localBasePath, true)
 	c1 := filepath.Join(localBasePath, "c1")
@@ -205,7 +211,7 @@ func (suite *lruPolicyTestSuite) TestCachePurge() {
 
 	// test policy cache data
 	suite.policy.CacheValid("temp")
-	suite.policy.CachePurge("temp", nil)
+	suite.policy.CachePurge("temp")
 
 	n, ok := suite.policy.nodeMap.Load("temp")
 	suite.assert.False(ok)
@@ -215,7 +221,7 @@ func (suite *lruPolicyTestSuite) TestCachePurge() {
 	// purge all aPaths, in reverse order
 	aPaths, abPaths, acPaths := suite.generateNestedDirectory("temp")
 	for i := len(aPaths) - 1; i >= 0; i-- {
-		suite.policy.CachePurge(aPaths[i], nil)
+		suite.policy.CachePurge(aPaths[i])
 	}
 
 	// validate all aPaths were deleted

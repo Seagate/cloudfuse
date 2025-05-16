@@ -513,7 +513,12 @@ func (suite *dirTestSuite) TestGitStash() {
 		dirName := filepath.Join(suite.testPath, "stash")
 		tarName := filepath.Join(suite.testPath, "tardir.tar.gz")
 
-		cmd := exec.Command("git", "clone", "https://github.com/wastore/azure-storage-samples-for-net", dirName)
+		cmd := exec.Command(
+			"git",
+			"clone",
+			"https://github.com/wastore/azure-storage-samples-for-net",
+			dirName,
+		)
 		_, err := cmd.Output()
 		suite.NoError(err)
 
@@ -601,7 +606,11 @@ func (suite *dirTestSuite) TestReadDirLink() {
 		return
 	}
 	if suite.adlsTest && strings.ToLower(enableSymlinkADLS) != "true" {
-		fmt.Printf("Skipping this test case for adls : %v, enable-symlink-adls : %v\n", suite.adlsTest, enableSymlinkADLS)
+		fmt.Printf(
+			"Skipping this test case for adls : %v, enable-symlink-adls : %v\n",
+			suite.adlsTest,
+			enableSymlinkADLS,
+		)
 		return
 	}
 
@@ -656,14 +665,24 @@ func (suite *dirTestSuite) TestReadDirLink() {
 	}
 
 	// temp cache cleanup
-	suite.dirTestCleanup([]string{filepath.Join(suite.testCachePath, "test_hns", "small_file.txt"), filepath.Join(suite.testCachePath, "dirlink.lnk")})
+	suite.dirTestCleanup(
+		[]string{
+			filepath.Join(suite.testCachePath, "test_hns", "small_file.txt"),
+			filepath.Join(suite.testCachePath, "dirlink.lnk"),
+		},
+	)
 
 	data1, err := os.ReadFile(filepath.Join(symName, "small_file.txt"))
 	suite.NoError(err)
 	suite.Len(suite.minBuff, len(data1))
 
 	// temp cache cleanup
-	suite.dirTestCleanup([]string{filepath.Join(suite.testCachePath, "test_hns", "small_file.txt"), filepath.Join(suite.testCachePath, "dirlink.lnk")})
+	suite.dirTestCleanup(
+		[]string{
+			filepath.Join(suite.testCachePath, "test_hns", "small_file.txt"),
+			filepath.Join(suite.testCachePath, "dirlink.lnk"),
+		},
+	)
 
 	data2, err := os.ReadFile(fileName)
 	suite.NoError(err)
@@ -796,7 +815,10 @@ func TestDirTestSuite(t *testing.T) {
 	//  Wipe out the test directory created for End to End test
 	err = os.RemoveAll(dirTest.testPath)
 	if err != nil {
-		fmt.Printf("TestDirTestSuite : Could not cleanup feature dir after testing. Here's why: %v\n", err)
+		fmt.Printf(
+			"TestDirTestSuite : Could not cleanup feature dir after testing. Here's why: %v\n",
+			err,
+		)
 	}
 }
 
@@ -806,6 +828,11 @@ func init() {
 	regDirTestFlag(&clonePtr, "clone", "", "Git clone test is enable or not")
 	regDirTestFlag(&tempPathPtr, "tmp-path", "", "Cache dir path")
 	regDirTestFlag(&streamDirectPtr, "stream-direct-test", "false", "Run stream direct tests")
-	regDirTestFlag(&enableSymlinkADLS, "enable-symlink-adls", "false", "Enable symlink support for ADLS accounts")
+	regDirTestFlag(
+		&enableSymlinkADLS,
+		"enable-symlink-adls",
+		"false",
+		"Enable symlink support for ADLS accounts",
+	)
 	regDirTestFlag(&sizeTrackerPtr, "size-tracker", "false", "Using size_tracker component")
 }

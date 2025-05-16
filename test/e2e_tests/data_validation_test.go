@@ -156,7 +156,10 @@ func convertFileNameToFilePath(fileName string) (localFilePath string, remoteFil
 }
 
 // creates File in Local and Mounted Directories and returns there file handles the associated fd has O_RDWR mode
-func createFileHandleInLocalAndRemote(suite *dataValidationTestSuite, localFilePath, remoteFilePath string) (lfh *os.File, rfh *os.File) {
+func createFileHandleInLocalAndRemote(
+	suite *dataValidationTestSuite,
+	localFilePath, remoteFilePath string,
+) (lfh *os.File, rfh *os.File) {
 	lfh, err := os.Create(localFilePath)
 	suite.NoError(err)
 
@@ -167,7 +170,11 @@ func createFileHandleInLocalAndRemote(suite *dataValidationTestSuite, localFileP
 }
 
 // Open File in Local and Mounted Directories and returns there file handles the associated fd has O_RDONLY Mode
-func openFileHandleInLocalAndRemote(suite *dataValidationTestSuite, flags int, localFilePath, remoteFilePath string) (lfh *os.File, rfh *os.File) {
+func openFileHandleInLocalAndRemote(
+	suite *dataValidationTestSuite,
+	flags int,
+	localFilePath, remoteFilePath string,
+) (lfh *os.File, rfh *os.File) {
 	lfh, err := os.OpenFile(localFilePath, flags, 0666)
 	suite.NoError(err)
 
@@ -216,7 +223,11 @@ func generateFileWithRandomData(suite *dataValidationTestSuite, filePath string,
 	closeFileHandles(suite, fh)
 }
 
-func compareReadOperInLocalAndRemote(suite *dataValidationTestSuite, lfh, rfh *os.File, offset int64) {
+func compareReadOperInLocalAndRemote(
+	suite *dataValidationTestSuite,
+	lfh, rfh *os.File,
+	offset int64,
+) {
 	buffer1 := make([]byte, 4*int(_1MB))
 	buffer2 := make([]byte, 4*int(_1MB))
 
@@ -227,7 +238,11 @@ func compareReadOperInLocalAndRemote(suite *dataValidationTestSuite, lfh, rfh *o
 	suite.Equal(buffer1[:bytes_read_local], buffer2[:bytes_read_remote])
 }
 
-func compareWriteOperInLocalAndRemote(suite *dataValidationTestSuite, lfh, rfh *os.File, offset int64) {
+func compareWriteOperInLocalAndRemote(
+	suite *dataValidationTestSuite,
+	lfh, rfh *os.File,
+	offset int64,
+) {
 	sizeofbuffer := (mrand.Int() % 4) + 1
 	buffer := make([]byte, sizeofbuffer*int(_1MB))
 	rand.Read(buffer)
@@ -386,7 +401,12 @@ func (suite *dataValidationTestSuite) TestDataValidationNegative() {
 	suite.dataValidationTestCleanup([]string{localFilePath, remoteFilePath, tObj.testCachePath})
 }
 
-func validateMultipleFilesData(jobs <-chan int, results chan<- string, fileSize string, suite *dataValidationTestSuite) {
+func validateMultipleFilesData(
+	jobs <-chan int,
+	results chan<- string,
+	fileSize string,
+	suite *dataValidationTestSuite,
+) {
 	for i := range jobs {
 		fileName := fileSize + strconv.Itoa(i) + ".txt"
 		localFilePath := filepath.Join(tObj.testLocalPath, fileName)
@@ -419,13 +439,20 @@ func validateMultipleFilesData(jobs <-chan int, results chan<- string, fileSize 
 		suite.dataValidationTestCleanup([]string{filepath.Join(tObj.testCachePath, fileName)})
 		suite.validateData(localFilePath, remoteFilePath)
 
-		suite.dataValidationTestCleanup([]string{localFilePath, filepath.Join(tObj.testCachePath, fileName)})
+		suite.dataValidationTestCleanup(
+			[]string{localFilePath, filepath.Join(tObj.testCachePath, fileName)},
+		)
 
 		results <- remoteFilePath
 	}
 }
 
-func createThreadPool(noOfFiles int, noOfWorkers int, fileSize string, suite *dataValidationTestSuite) {
+func createThreadPool(
+	noOfFiles int,
+	noOfWorkers int,
+	fileSize string,
+	suite *dataValidationTestSuite,
+) {
 	jobs := make(chan int, noOfFiles)
 	results := make(chan string, noOfFiles)
 
@@ -496,10 +523,18 @@ func (suite *dataValidationTestSuite) TestSparseFileRandomWrite() {
 	lfh, rfh := createFileHandleInLocalAndRemote(suite, localFilePath, remoteFilePath)
 
 	// write to local file
-	writeSparseData(suite, lfh, []int64{0, 164 * int64(_1MB), 100 * int64(_1MB), 65 * int64(_1MB), 129 * int64(_1MB)})
+	writeSparseData(
+		suite,
+		lfh,
+		[]int64{0, 164 * int64(_1MB), 100 * int64(_1MB), 65 * int64(_1MB), 129 * int64(_1MB)},
+	)
 
 	// write to remote file
-	writeSparseData(suite, rfh, []int64{0, 164 * int64(_1MB), 100 * int64(_1MB), 65 * int64(_1MB), 129 * int64(_1MB)})
+	writeSparseData(
+		suite,
+		rfh,
+		[]int64{0, 164 * int64(_1MB), 100 * int64(_1MB), 65 * int64(_1MB), 129 * int64(_1MB)},
+	)
 
 	closeFileHandles(suite, lfh, rfh)
 	// check size of blob uploaded
@@ -518,10 +553,30 @@ func (suite *dataValidationTestSuite) TestSparseFileRandomWriteBlockOverlap() {
 	lfh, rfh := createFileHandleInLocalAndRemote(suite, localFilePath, remoteFilePath)
 
 	// write to local file
-	writeSparseData(suite, lfh, []int64{0, 170 * int64(_1MB), 63*int64(_1MB) + 1024*512, 129 * int64(_1MB), 100 * int64(_1MB)})
+	writeSparseData(
+		suite,
+		lfh,
+		[]int64{
+			0,
+			170 * int64(_1MB),
+			63*int64(_1MB) + 1024*512,
+			129 * int64(_1MB),
+			100 * int64(_1MB),
+		},
+	)
 
 	// write to remote file
-	writeSparseData(suite, rfh, []int64{0, 170 * int64(_1MB), 63*int64(_1MB) + 1024*512, 129 * int64(_1MB), 100 * int64(_1MB)})
+	writeSparseData(
+		suite,
+		rfh,
+		[]int64{
+			0,
+			170 * int64(_1MB),
+			63*int64(_1MB) + 1024*512,
+			129 * int64(_1MB),
+			100 * int64(_1MB),
+		},
+	)
 
 	closeFileHandles(suite, lfh, rfh)
 
@@ -795,7 +850,8 @@ func TestDataValidationTestSuite(t *testing.T) {
 	fmt.Println("Distro Name: " + fileTestDistro)
 
 	// Ignore data validation test on all distros other than UBN
-	if strings.ToLower(dataValidationQuickTest) == "true" || (!strings.Contains(strings.ToUpper(fileTestDistro), "UBUNTU") && !strings.Contains(strings.ToUpper(fileTestDistro), "UBN")) {
+	if strings.ToLower(dataValidationQuickTest) == "true" ||
+		(!strings.Contains(strings.ToUpper(fileTestDistro), "UBUNTU") && !strings.Contains(strings.ToUpper(fileTestDistro), "UBN")) {
 		fmt.Println("Skipping Data Validation test suite...")
 		return
 	}
@@ -864,7 +920,12 @@ func init() {
 	regDataValidationTestFlag(&dataValidationAdlsPtr, "adls", "", "Account is ADLS or not")
 	regDataValidationTestFlag(&dataValidationTempPathPtr, "tmp-path", "", "Cache dir path")
 	regDataValidationTestFlag(&dataValidationQuickTest, "quick-test", "true", "Run quick tests")
-	regDataValidationTestFlag(&dataValidationStreamDirectTest, "stream-direct-test", "false", "Run stream direct tests")
+	regDataValidationTestFlag(
+		&dataValidationStreamDirectTest,
+		"stream-direct-test",
+		"false",
+		"Run stream direct tests",
+	)
 	regDataValidationTestFlag(&fileTestDistro, "distro-name", "", "Name of the distro")
 	flag.IntVar(&blockSizeMB, "block-size-mb", 16, "Block size MB in block cache")
 }

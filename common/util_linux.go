@@ -35,7 +35,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"golang.org/x/sys/unix"
 )
@@ -56,7 +55,14 @@ func NotifyMountToParent() error {
 	return nil
 }
 
-var duPath []string = []string{"/usr/bin/du", "/usr/local/bin/du", "/usr/sbin/du", "/usr/local/sbin/du", "/sbin/du", "/bin/du"}
+var duPath []string = []string{
+	"/usr/bin/du",
+	"/usr/local/bin/du",
+	"/usr/sbin/du",
+	"/usr/local/sbin/du",
+	"/sbin/du",
+	"/bin/du",
+}
 var selectedDuPath string = ""
 
 // GetUsage: The current disk usage in MB
@@ -122,8 +128,8 @@ var currentUID int = -1
 // GetDiskUsageFromStatfs: Current disk usage of temp path
 func GetDiskUsageFromStatfs(path string) (float64, float64, error) {
 	// We need to compute the disk usage percentage for the temp path
-	var stat syscall.Statfs_t
-	err := syscall.Statfs(path, &stat)
+	var stat unix.Statfs_t
+	err := unix.Statfs(path, &stat)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -148,8 +154,8 @@ func GetDiskUsageFromStatfs(path string) (float64, float64, error) {
 
 // GetAvailFree: Available blocks
 func GetAvailFree(path string) (uint64, uint64, error) {
-	var stat syscall.Statfs_t
-	err := syscall.Statfs(path, &stat)
+	var stat unix.Statfs_t
+	err := unix.Statfs(path, &stat)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -158,8 +164,8 @@ func GetAvailFree(path string) (uint64, uint64, error) {
 
 // GetAvailFree: Available blocks
 func GetFreeRam() (uint64, error) {
-	var sysinfo syscall.Sysinfo_t
-	err := syscall.Sysinfo(&sysinfo)
+	var sysinfo unix.Sysinfo_t
+	err := unix.Sysinfo(&sysinfo)
 	if err != nil {
 		return 0, err
 	}

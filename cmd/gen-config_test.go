@@ -108,7 +108,14 @@ func (suite *genConfig) TestGenConfigPassphrase() {
 
 	confFile.Close()
 
-	_, err = executeCommandC(rootCmd, "gen-config", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile), "--temp-path=/tmp")
+	_, err = executeCommandC(
+		rootCmd,
+		"gen-config",
+		fmt.Sprintf("--config-file=%s", confFile.Name()),
+		fmt.Sprintf("--passphrase=%s", passphrase),
+		fmt.Sprintf("--output-file=%s", outFile),
+		"--temp-path=/tmp",
+	)
 	suite.assert.NoError(err)
 
 	// Out file should exist
@@ -129,14 +136,28 @@ func (suite *genConfig) TestGenConfigGet() {
 
 	confFile.Close()
 
-	_, err = executeCommandC(rootCmd, "gen-config", fmt.Sprintf("--config-file=%s", confFile.Name()), fmt.Sprintf("--passphrase=%s", passphrase), fmt.Sprintf("--output-file=%s", outFile), "--temp-path=/tmp")
+	_, err = executeCommandC(
+		rootCmd,
+		"gen-config",
+		fmt.Sprintf("--config-file=%s", confFile.Name()),
+		fmt.Sprintf("--passphrase=%s", passphrase),
+		fmt.Sprintf("--output-file=%s", outFile),
+		"--temp-path=/tmp",
+	)
 	suite.assert.NoError(err)
 
 	// Out file should exist
 	suite.assert.FileExists(outFile)
 
 	// Gen-config should correctly set the temp path for the file_cache
-	path, err := executeCommandC(rootCmd, "secure", "get", fmt.Sprintf("--config-file=%s", outFile), fmt.Sprintf("--passphrase=%s", passphrase), "--key=file_cache.path")
+	path, err := executeCommandC(
+		rootCmd,
+		"secure",
+		"get",
+		fmt.Sprintf("--config-file=%s", outFile),
+		fmt.Sprintf("--passphrase=%s", passphrase),
+		"--key=file_cache.path",
+	)
 	suite.assert.NoError(err)
 	suite.assert.Equal("Fetching scalar configuration\nfile_cache.path = /tmp\n", path)
 }
@@ -187,7 +208,12 @@ func (suite *genConfig) TestBlockCacheConfigGen() {
 	os.MkdirAll(tempDir, 0777)
 	defer os.RemoveAll(tempDir)
 
-	_, err := executeCommandC(rootCmd, "gen-config", "--block-cache", fmt.Sprintf("--tmp-path=%s", tempDir))
+	_, err := executeCommandC(
+		rootCmd,
+		"gen-config",
+		"--block-cache",
+		fmt.Sprintf("--tmp-path=%s", tempDir),
+	)
 	suite.assert.NoError(err)
 
 	logFilePath := suite.getDefaultLogLocation()
@@ -271,7 +297,14 @@ func (suite *genConfig) TestDirectIOConfigGen() {
 func (suite *genConfig) TestOutputFile() {
 	defer suite.cleanupTest()
 
-	_, err := executeCommandC(rootCmd, "gen-config", "--direct-io", "--o", "1.yaml", "--tmp-path=/tmp")
+	_, err := executeCommandC(
+		rootCmd,
+		"gen-config",
+		"--direct-io",
+		"--o",
+		"1.yaml",
+		"--tmp-path=/tmp",
+	)
 	suite.assert.NoError(err)
 
 	//check if the generated file is not empty
@@ -288,7 +321,14 @@ func (suite *genConfig) TestOutputFile() {
 func (suite *genConfig) TestConsoleOutput() {
 	defer suite.cleanupTest()
 
-	op, err := executeCommandC(rootCmd, "gen-config", "--direct-io", "--o", "console", "--tmp-path=/tmp")
+	op, err := executeCommandC(
+		rootCmd,
+		"gen-config",
+		"--direct-io",
+		"--o",
+		"console",
+		"--tmp-path=/tmp",
+	)
 	suite.assert.NoError(err)
 
 	//check if the generated file has the correct direct io flag

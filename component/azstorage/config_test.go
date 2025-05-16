@@ -42,7 +42,7 @@ type configTestSuite struct {
 	suite.Suite
 }
 
-func (suite *configTestSuite) SetupTest() {
+func (s *configTestSuite) SetupTest() {
 	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
 	if err != nil {
 		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
@@ -166,27 +166,42 @@ func (s *configTestSuite) TestProxyConfig() {
 	opt.HttpsProxyAddress = "127.0.0.1"
 	err := ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
+	assert.Equal(
+		az.stConfig.proxyAddress,
+		formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS),
+	)
 
 	opt.HttpsProxyAddress = "https://128.0.0.1:8080/"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
+	assert.Equal(
+		az.stConfig.proxyAddress,
+		formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS),
+	)
 
 	opt.HttpsProxyAddress = "http://129.0.0.1:8080/"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
+	assert.Equal(
+		az.stConfig.proxyAddress,
+		formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS),
+	)
 
 	opt.HttpProxyAddress = "130.0.0.1"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpProxyAddress, !opt.UseHTTPS))
+	assert.Equal(
+		az.stConfig.proxyAddress,
+		formatEndpointProtocol(opt.HttpProxyAddress, !opt.UseHTTPS),
+	)
 
 	opt.HttpProxyAddress = "http://131.0.0.1:8080/"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpProxyAddress, !opt.UseHTTPS))
+	assert.Equal(
+		az.stConfig.proxyAddress,
+		formatEndpointProtocol(opt.HttpProxyAddress, !opt.UseHTTPS),
+	)
 
 	config.SetBool(compName+".use-https", true)
 	opt.UseHTTPS = true
@@ -200,17 +215,26 @@ func (s *configTestSuite) TestProxyConfig() {
 	opt.HttpsProxyAddress = "133.0.0.1"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
+	assert.Equal(
+		az.stConfig.proxyAddress,
+		formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS),
+	)
 
 	opt.HttpsProxyAddress = "http://134.0.0.1:8080/"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
+	assert.Equal(
+		az.stConfig.proxyAddress,
+		formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS),
+	)
 
 	opt.HttpsProxyAddress = "https://135.0.0.1:8080/"
 	err = ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
-	assert.Equal(az.stConfig.proxyAddress, formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS))
+	assert.Equal(
+		az.stConfig.proxyAddress,
+		formatEndpointProtocol(opt.HttpsProxyAddress, !opt.UseHTTPS),
+	)
 }
 
 func (s *configTestSuite) TestMaxResultsForList() {
@@ -336,13 +360,19 @@ func (s *configTestSuite) TestAuthModeSPN() {
 	err := ParseAndValidateConfig(az, opt)
 	assert.Error(err)
 	assert.Equal(az.stConfig.authConfig.AuthMode, EAuthType.SPN())
-	assert.Contains(err.Error(), "Client ID, Tenant ID or Client Secret, OAuthTokenFilePath, WorkloadIdentityToken not provided")
+	assert.Contains(
+		err.Error(),
+		"client ID, tenant ID or client secret, OAuthTokenFilePath, WorkloadIdentityToken not provided",
+	)
 
 	opt.ClientID = "abc"
 	err = ParseAndValidateConfig(az, opt)
 	assert.Error(err)
 	assert.Equal(az.stConfig.authConfig.AuthMode, EAuthType.SPN())
-	assert.Contains(err.Error(), "Client ID, Tenant ID or Client Secret, OAuthTokenFilePath, WorkloadIdentityToken not provided")
+	assert.Contains(
+		err.Error(),
+		"client ID, tenant ID or client secret, OAuthTokenFilePath, WorkloadIdentityToken not provided",
+	)
 
 	opt.ClientSecret = "123"
 	opt.TenantID = "xyz"
@@ -429,7 +459,15 @@ func (s *configTestSuite) TestSASRefresh() {
 	config.SetBool(compName+".ca-cert-file", true)
 	config.SetBool(compName+".debug-libcurl", true)
 
-	az.storage = &BlockBlob{Auth: &azAuthBlobSAS{azAuthSAS: azAuthSAS{azAuthBase: azAuthBase{config: azAuthConfig{Endpoint: "abcd:://qreq!@#$%^&*()_)(*&^%$#"}}}}}
+	az.storage = &BlockBlob{
+		Auth: &azAuthBlobSAS{
+			azAuthSAS: azAuthSAS{
+				azAuthBase: azAuthBase{
+					config: azAuthConfig{Endpoint: "abcd:://qreq!@#$%^&*()_)(*&^%$#"},
+				},
+			},
+		},
+	}
 	err := ParseAndReadDynamicConfig(az, opt, true)
 	assert.NoError(err)
 }

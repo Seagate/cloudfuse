@@ -148,11 +148,20 @@ func (s *utilsTestSuite) TestGetContentType() {
 		{val: "a.3gp", result: "video/3gpp"},
 		{val: "a.mp4", result: "video/mp4"},
 		{val: "a.doc", result: "application/msword"},
-		{val: "a.docx", result: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+		{
+			val:    "a.docx",
+			result: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		},
 		{val: "a.ppt", result: "application/vnd.ms-powerpoint"},
-		{val: "a.pptx", result: "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+		{
+			val:    "a.pptx",
+			result: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+		},
 		{val: "a.xls", result: "application/vnd.ms-excel"},
-		{val: "a.xlsx", result: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+		{
+			val:    "a.xlsx",
+			result: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		},
 		{val: "a.gz", result: "application/x-gzip"},
 		{val: "a.jar", result: "application/java-archive"},
 		{val: "a.rar", result: "application/vnd.rar"},
@@ -259,9 +268,24 @@ func (s *utilsTestSuite) TestGetFileModeFromACL() {
 	var inputs = []blobACLs{
 		// acl, owner, mode, error string
 		{"", "", 0, "empty permissions from the service"},
-		{"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:r-x,group::r--,mask::r-x,other::rwx", "", 0547, ""},
-		{"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:rwx,group::r--,mask::r--,other::rwx", "", 0447, ""},
-		{"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:rwx,group::rw-,mask::r--,other::rwx", "tmp-obj-id", 0767, ""},
+		{
+			"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:r-x,group::r--,mask::r-x,other::rwx",
+			"",
+			0547,
+			"",
+		},
+		{
+			"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:rwx,group::r--,mask::r--,other::rwx",
+			"",
+			0447,
+			"",
+		},
+		{
+			"user::rwx,user:tmp-obj-1:r--,user:tmp-obj-id:rwx,group::rw-,mask::r--,other::rwx",
+			"tmp-obj-id",
+			0767,
+			"",
+		},
 		{"user::rwx,user:tmp-obj-1:r--,group::rw-,mask::r--,other::rwx", "tmp-obj-id", 0767, ""},
 		{"user::rwx,user:tmp-obj-1:r--,group::rw-,mask::r--,other::rwx", "0", 0067, ""},
 	}
@@ -326,11 +350,11 @@ func (s *utilsTestSuite) TestSanitizeEtag() {
 
 	etagValue := azcore.ETag("\"abcd\"")
 	etag := sanitizeEtag(&etagValue)
-	assert.EqualValues("abcd", etag)
+	assert.Equal("abcd", etag)
 
 	etagValue = azcore.ETag("abcd")
 	etag = sanitizeEtag(&etagValue)
-	assert.EqualValues("abcd", etag)
+	assert.Equal("abcd", etag)
 }
 
 func (s *utilsTestSuite) TestBlockNonProxyOptions() {
@@ -343,17 +367,23 @@ func (s *utilsTestSuite) TestBlockNonProxyOptions() {
 
 func (s *utilsTestSuite) TestBlockProxyOptions() {
 	assert := assert.New(s.T())
-	opt, err := getAzBlobServiceClientOptions(&AzStorageConfig{proxyAddress: "127.0.0.1", maxRetries: 3})
+	opt, err := getAzBlobServiceClientOptions(
+		&AzStorageConfig{proxyAddress: "127.0.0.1", maxRetries: 3},
+	)
 	assert.NoError(err)
 	assert.EqualValues(3, opt.Retry.MaxRetries)
 	assert.GreaterOrEqual(len(opt.Logging.AllowedHeaders), 1)
 
-	opt, err = getAzBlobServiceClientOptions(&AzStorageConfig{proxyAddress: "http://127.0.0.1:8080", maxRetries: 3})
+	opt, err = getAzBlobServiceClientOptions(
+		&AzStorageConfig{proxyAddress: "http://127.0.0.1:8080", maxRetries: 3},
+	)
 	assert.NoError(err)
 	assert.EqualValues(3, opt.Retry.MaxRetries)
 	assert.GreaterOrEqual(len(opt.Logging.AllowedHeaders), 1)
 
-	opt, err = getAzBlobServiceClientOptions(&AzStorageConfig{proxyAddress: "https://128.0.0.1:8080", maxRetries: 3})
+	opt, err = getAzBlobServiceClientOptions(
+		&AzStorageConfig{proxyAddress: "https://128.0.0.1:8080", maxRetries: 3},
+	)
 	assert.NoError(err)
 	assert.EqualValues(3, opt.Retry.MaxRetries)
 	assert.GreaterOrEqual(len(opt.Logging.AllowedHeaders), 1)
@@ -369,17 +399,23 @@ func (s *utilsTestSuite) TestBfsNonProxyOptions() {
 
 func (s *utilsTestSuite) TestBfsProxyOptions() {
 	assert := assert.New(s.T())
-	opt, err := getAzDatalakeServiceClientOptions(&AzStorageConfig{proxyAddress: "127.0.0.1", maxRetries: 3})
+	opt, err := getAzDatalakeServiceClientOptions(
+		&AzStorageConfig{proxyAddress: "127.0.0.1", maxRetries: 3},
+	)
 	assert.NoError(err)
 	assert.EqualValues(3, opt.Retry.MaxRetries)
 	assert.GreaterOrEqual(len(opt.Logging.AllowedHeaders), 1)
 
-	opt, err = getAzDatalakeServiceClientOptions(&AzStorageConfig{proxyAddress: "http://127.0.0.1:8080", maxRetries: 3})
+	opt, err = getAzDatalakeServiceClientOptions(
+		&AzStorageConfig{proxyAddress: "http://127.0.0.1:8080", maxRetries: 3},
+	)
 	assert.NoError(err)
 	assert.EqualValues(3, opt.Retry.MaxRetries)
 	assert.GreaterOrEqual(len(opt.Logging.AllowedHeaders), 1)
 
-	opt, err = getAzDatalakeServiceClientOptions(&AzStorageConfig{proxyAddress: "https://128.0.0.1:8080", maxRetries: 3})
+	opt, err = getAzDatalakeServiceClientOptions(
+		&AzStorageConfig{proxyAddress: "https://128.0.0.1:8080", maxRetries: 3},
+	)
 	assert.NoError(err)
 	assert.EqualValues(3, opt.Retry.MaxRetries)
 	assert.GreaterOrEqual(len(opt.Logging.AllowedHeaders), 1)
@@ -394,57 +430,209 @@ type endpointAccountType struct {
 func (s *utilsTestSuite) TestFormatEndpointAccountType() {
 	assert := assert.New(s.T())
 	var inputs = []endpointAccountType{
-		{endpoint: "https://account.blob.core.windows.net", account: EAccountType.BLOCK(), result: "https://account.blob.core.windows.net"},
-		{endpoint: "https://blobaccount.blob.core.windows.net", account: EAccountType.BLOCK(), result: "https://blobaccount.blob.core.windows.net"},
-		{endpoint: "https://accountblob.blob.core.windows.net", account: EAccountType.BLOCK(), result: "https://accountblob.blob.core.windows.net"},
-		{endpoint: "https://dfsaccount.blob.core.windows.net", account: EAccountType.BLOCK(), result: "https://dfsaccount.blob.core.windows.net"},
-		{endpoint: "https://accountdfs.blob.core.windows.net", account: EAccountType.BLOCK(), result: "https://accountdfs.blob.core.windows.net"},
+		{
+			endpoint: "https://account.blob.core.windows.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://account.blob.core.windows.net",
+		},
+		{
+			endpoint: "https://blobaccount.blob.core.windows.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://blobaccount.blob.core.windows.net",
+		},
+		{
+			endpoint: "https://accountblob.blob.core.windows.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://accountblob.blob.core.windows.net",
+		},
+		{
+			endpoint: "https://dfsaccount.blob.core.windows.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://dfsaccount.blob.core.windows.net",
+		},
+		{
+			endpoint: "https://accountdfs.blob.core.windows.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://accountdfs.blob.core.windows.net",
+		},
 
-		{endpoint: "https://account.dfs.core.windows.net", account: EAccountType.BLOCK(), result: "https://account.blob.core.windows.net"},
-		{endpoint: "https://dfsaccount.dfs.core.windows.net", account: EAccountType.BLOCK(), result: "https://dfsaccount.blob.core.windows.net"},
-		{endpoint: "https://accountdfs.dfs.core.windows.net", account: EAccountType.BLOCK(), result: "https://accountdfs.blob.core.windows.net"},
-		{endpoint: "https://blobaccount.dfs.core.windows.net", account: EAccountType.BLOCK(), result: "https://blobaccount.blob.core.windows.net"},
-		{endpoint: "https://accountblob.dfs.core.windows.net", account: EAccountType.BLOCK(), result: "https://accountblob.blob.core.windows.net"},
+		{
+			endpoint: "https://account.dfs.core.windows.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://account.blob.core.windows.net",
+		},
+		{
+			endpoint: "https://dfsaccount.dfs.core.windows.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://dfsaccount.blob.core.windows.net",
+		},
+		{
+			endpoint: "https://accountdfs.dfs.core.windows.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://accountdfs.blob.core.windows.net",
+		},
+		{
+			endpoint: "https://blobaccount.dfs.core.windows.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://blobaccount.blob.core.windows.net",
+		},
+		{
+			endpoint: "https://accountblob.dfs.core.windows.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://accountblob.blob.core.windows.net",
+		},
 
-		{endpoint: "https://account.blob.core.windows.net", account: EAccountType.ADLS(), result: "https://account.dfs.core.windows.net"},
-		{endpoint: "https://blobaccount.blob.core.windows.net", account: EAccountType.ADLS(), result: "https://blobaccount.dfs.core.windows.net"},
-		{endpoint: "https://accountblob.blob.core.windows.net", account: EAccountType.ADLS(), result: "https://accountblob.dfs.core.windows.net"},
-		{endpoint: "https://dfsaccount.blob.core.windows.net", account: EAccountType.ADLS(), result: "https://dfsaccount.dfs.core.windows.net"},
-		{endpoint: "https://accountdfs.blob.core.windows.net", account: EAccountType.ADLS(), result: "https://accountdfs.dfs.core.windows.net"},
+		{
+			endpoint: "https://account.blob.core.windows.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://account.dfs.core.windows.net",
+		},
+		{
+			endpoint: "https://blobaccount.blob.core.windows.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://blobaccount.dfs.core.windows.net",
+		},
+		{
+			endpoint: "https://accountblob.blob.core.windows.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://accountblob.dfs.core.windows.net",
+		},
+		{
+			endpoint: "https://dfsaccount.blob.core.windows.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://dfsaccount.dfs.core.windows.net",
+		},
+		{
+			endpoint: "https://accountdfs.blob.core.windows.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://accountdfs.dfs.core.windows.net",
+		},
 
-		{endpoint: "https://account.dfs.core.windows.net", account: EAccountType.ADLS(), result: "https://account.dfs.core.windows.net"},
-		{endpoint: "https://dfsaccount.dfs.core.windows.net", account: EAccountType.ADLS(), result: "https://dfsaccount.dfs.core.windows.net"},
-		{endpoint: "https://accountdfs.dfs.core.windows.net", account: EAccountType.ADLS(), result: "https://accountdfs.dfs.core.windows.net"},
-		{endpoint: "https://blobaccount.dfs.core.windows.net", account: EAccountType.ADLS(), result: "https://blobaccount.dfs.core.windows.net"},
-		{endpoint: "https://accountblob.dfs.core.windows.net", account: EAccountType.ADLS(), result: "https://accountblob.dfs.core.windows.net"},
+		{
+			endpoint: "https://account.dfs.core.windows.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://account.dfs.core.windows.net",
+		},
+		{
+			endpoint: "https://dfsaccount.dfs.core.windows.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://dfsaccount.dfs.core.windows.net",
+		},
+		{
+			endpoint: "https://accountdfs.dfs.core.windows.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://accountdfs.dfs.core.windows.net",
+		},
+		{
+			endpoint: "https://blobaccount.dfs.core.windows.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://blobaccount.dfs.core.windows.net",
+		},
+		{
+			endpoint: "https://accountblob.dfs.core.windows.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://accountblob.dfs.core.windows.net",
+		},
 
 		// Private Endpoint
-		{endpoint: "https://myprivateendpoint.net", account: EAccountType.BLOCK(), result: "https://myprivateendpoint.net"},
-		{endpoint: "https://myprivateendpoint.net", account: EAccountType.ADLS(), result: "https://myprivateendpoint.net"},
+		{
+			endpoint: "https://myprivateendpoint.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://myprivateendpoint.net",
+		},
+		{
+			endpoint: "https://myprivateendpoint.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://myprivateendpoint.net",
+		},
 
 		// Zonal DNS endpoint
-		{endpoint: "https://account.z99.blob.storage.azure.net", account: EAccountType.BLOCK(), result: "https://account.z99.blob.storage.azure.net"},
-		{endpoint: "https://account.z99.blob.storage.azure.net", account: EAccountType.ADLS(), result: "https://account.z99.dfs.storage.azure.net"},
-		{endpoint: "https://account.z99.dfs.storage.azure.net", account: EAccountType.BLOCK(), result: "https://account.z99.blob.storage.azure.net"},
-		{endpoint: "https://account.z99.dfs.storage.azure.net", account: EAccountType.ADLS(), result: "https://account.z99.dfs.storage.azure.net"},
+		{
+			endpoint: "https://account.z99.blob.storage.azure.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://account.z99.blob.storage.azure.net",
+		},
+		{
+			endpoint: "https://account.z99.blob.storage.azure.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://account.z99.dfs.storage.azure.net",
+		},
+		{
+			endpoint: "https://account.z99.dfs.storage.azure.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://account.z99.blob.storage.azure.net",
+		},
+		{
+			endpoint: "https://account.z99.dfs.storage.azure.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://account.z99.dfs.storage.azure.net",
+		},
 
 		// China Cloud endpoint
-		{endpoint: "https://account.z99.blob.core.chinacloudapi.cn", account: EAccountType.BLOCK(), result: "https://account.z99.blob.core.chinacloudapi.cn"},
-		{endpoint: "https://account.z99.blob.core.chinacloudapi.cn", account: EAccountType.ADLS(), result: "https://account.z99.dfs.core.chinacloudapi.cn"},
-		{endpoint: "https://account.z99.dfs.core.chinacloudapi.cn", account: EAccountType.BLOCK(), result: "https://account.z99.blob.core.chinacloudapi.cn"},
-		{endpoint: "https://account.z99.dfs.core.chinacloudapi.cn", account: EAccountType.ADLS(), result: "https://account.z99.dfs.core.chinacloudapi.cn"},
+		{
+			endpoint: "https://account.z99.blob.core.chinacloudapi.cn",
+			account:  EAccountType.BLOCK(),
+			result:   "https://account.z99.blob.core.chinacloudapi.cn",
+		},
+		{
+			endpoint: "https://account.z99.blob.core.chinacloudapi.cn",
+			account:  EAccountType.ADLS(),
+			result:   "https://account.z99.dfs.core.chinacloudapi.cn",
+		},
+		{
+			endpoint: "https://account.z99.dfs.core.chinacloudapi.cn",
+			account:  EAccountType.BLOCK(),
+			result:   "https://account.z99.blob.core.chinacloudapi.cn",
+		},
+		{
+			endpoint: "https://account.z99.dfs.core.chinacloudapi.cn",
+			account:  EAccountType.ADLS(),
+			result:   "https://account.z99.dfs.core.chinacloudapi.cn",
+		},
 
 		// Germany endpoint
-		{endpoint: "https://account.z99.blob.core.cloudapi.de", account: EAccountType.BLOCK(), result: "https://account.z99.blob.core.cloudapi.de"},
-		{endpoint: "https://account.z99.blob.core.cloudapi.de", account: EAccountType.ADLS(), result: "https://account.z99.dfs.core.cloudapi.de"},
-		{endpoint: "https://account.z99.dfs.core.cloudapi.de", account: EAccountType.BLOCK(), result: "https://account.z99.blob.core.cloudapi.de"},
-		{endpoint: "https://account.z99.dfs.core.cloudapi.de", account: EAccountType.ADLS(), result: "https://account.z99.dfs.core.cloudapi.de"},
+		{
+			endpoint: "https://account.z99.blob.core.cloudapi.de",
+			account:  EAccountType.BLOCK(),
+			result:   "https://account.z99.blob.core.cloudapi.de",
+		},
+		{
+			endpoint: "https://account.z99.blob.core.cloudapi.de",
+			account:  EAccountType.ADLS(),
+			result:   "https://account.z99.dfs.core.cloudapi.de",
+		},
+		{
+			endpoint: "https://account.z99.dfs.core.cloudapi.de",
+			account:  EAccountType.BLOCK(),
+			result:   "https://account.z99.blob.core.cloudapi.de",
+		},
+		{
+			endpoint: "https://account.z99.dfs.core.cloudapi.de",
+			account:  EAccountType.ADLS(),
+			result:   "https://account.z99.dfs.core.cloudapi.de",
+		},
 
 		// Government endpoint
-		{endpoint: "https://account.z99.blob.core.usgovcloudapi.net", account: EAccountType.BLOCK(), result: "https://account.z99.blob.core.usgovcloudapi.net"},
-		{endpoint: "https://account.z99.blob.core.usgovcloudapi.net", account: EAccountType.ADLS(), result: "https://account.z99.dfs.core.usgovcloudapi.net"},
-		{endpoint: "https://account.z99.dfs.core.usgovcloudapi.net", account: EAccountType.BLOCK(), result: "https://account.z99.blob.core.usgovcloudapi.net"},
-		{endpoint: "https://account.z99.dfs.core.usgovcloudapi.net", account: EAccountType.ADLS(), result: "https://account.z99.dfs.core.usgovcloudapi.net"},
+		{
+			endpoint: "https://account.z99.blob.core.usgovcloudapi.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://account.z99.blob.core.usgovcloudapi.net",
+		},
+		{
+			endpoint: "https://account.z99.blob.core.usgovcloudapi.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://account.z99.dfs.core.usgovcloudapi.net",
+		},
+		{
+			endpoint: "https://account.z99.dfs.core.usgovcloudapi.net",
+			account:  EAccountType.BLOCK(),
+			result:   "https://account.z99.blob.core.usgovcloudapi.net",
+		},
+		{
+			endpoint: "https://account.z99.dfs.core.usgovcloudapi.net",
+			account:  EAccountType.ADLS(),
+			result:   "https://account.z99.dfs.core.usgovcloudapi.net",
+		},
 	}
 	for _, i := range inputs {
 		s.Run(i.endpoint+","+i.account.String(), func() {
@@ -463,19 +651,63 @@ type endpointProtocol struct {
 func (s *utilsTestSuite) TestFormatEndpointProtocol() {
 	assert := assert.New(s.T())
 	var inputs = []endpointProtocol{
-		{endpoint: "https://account.blob.core.windows.net", result: "https://account.blob.core.windows.net/", ustHttp: true},
-		{endpoint: "http://account.blob.core.windows.net", result: "http://account.blob.core.windows.net/", ustHttp: false},
-		{endpoint: "account.blob.core.windows.net", result: "http://account.blob.core.windows.net/", ustHttp: true},
-		{endpoint: "account.blob.core.windows.net", result: "https://account.blob.core.windows.net/", ustHttp: false},
-		{endpoint: "account.bl://ob.core.windows.net", result: "https://account.bl://ob.core.windows.net/", ustHttp: false},
-		{endpoint: "account.bl://ob.core.windows.net", result: "http://account.bl://ob.core.windows.net/", ustHttp: true},
-		{endpoint: "https://account.blob.core.windows.net/", result: "https://account.blob.core.windows.net/", ustHttp: true},
-		{endpoint: "https://account.blob.core.windows.net/abc", result: "https://account.blob.core.windows.net/abc/", ustHttp: true},
+		{
+			endpoint: "https://account.blob.core.windows.net",
+			result:   "https://account.blob.core.windows.net/",
+			ustHttp:  true,
+		},
+		{
+			endpoint: "http://account.blob.core.windows.net",
+			result:   "http://account.blob.core.windows.net/",
+			ustHttp:  false,
+		},
+		{
+			endpoint: "account.blob.core.windows.net",
+			result:   "http://account.blob.core.windows.net/",
+			ustHttp:  true,
+		},
+		{
+			endpoint: "account.blob.core.windows.net",
+			result:   "https://account.blob.core.windows.net/",
+			ustHttp:  false,
+		},
+		{
+			endpoint: "account.bl://ob.core.windows.net",
+			result:   "https://account.bl://ob.core.windows.net/",
+			ustHttp:  false,
+		},
+		{
+			endpoint: "account.bl://ob.core.windows.net",
+			result:   "http://account.bl://ob.core.windows.net/",
+			ustHttp:  true,
+		},
+		{
+			endpoint: "https://account.blob.core.windows.net/",
+			result:   "https://account.blob.core.windows.net/",
+			ustHttp:  true,
+		},
+		{
+			endpoint: "https://account.blob.core.windows.net/abc",
+			result:   "https://account.blob.core.windows.net/abc/",
+			ustHttp:  true,
+		},
 
 		// These are false positive test cases where we are forming the wrong URI and it shall fail for user when used in cloudfuse
-		{endpoint: "://account.blob.core.windows.net", result: "https://://account.blob.core.windows.net/", ustHttp: false},
-		{endpoint: "://account.blob.core.windows.net", result: "http://://account.blob.core.windows.net/", ustHttp: true},
-		{endpoint: "https://://./account.blob.core.windows.net", result: "https://://./account.blob.core.windows.net/", ustHttp: true},
+		{
+			endpoint: "://account.blob.core.windows.net",
+			result:   "https://://account.blob.core.windows.net/",
+			ustHttp:  false,
+		},
+		{
+			endpoint: "://account.blob.core.windows.net",
+			result:   "http://://account.blob.core.windows.net/",
+			ustHttp:  true,
+		},
+		{
+			endpoint: "https://://./account.blob.core.windows.net",
+			result:   "https://://./account.blob.core.windows.net/",
+			ustHttp:  true,
+		},
 	}
 
 	for _, i := range inputs {
@@ -519,10 +751,14 @@ func (s *utilsTestSuite) TestAutoDetectAuthMode() {
 	authType = autoDetectAuthMode(AzStorageOptions{TenantID: "abc"})
 	assert.Equal("spn", authType)
 
-	authType = autoDetectAuthMode(AzStorageOptions{ApplicationID: "abc", AccountKey: "abc", SaSKey: "abc", ClientID: "abc"})
+	authType = autoDetectAuthMode(
+		AzStorageOptions{ApplicationID: "abc", AccountKey: "abc", SaSKey: "abc", ClientID: "abc"},
+	)
 	assert.Equal("msi", authType)
 
-	authType = autoDetectAuthMode(AzStorageOptions{AccountKey: "abc", SaSKey: "abc", ClientID: "abc"})
+	authType = autoDetectAuthMode(
+		AzStorageOptions{AccountKey: "abc", SaSKey: "abc", ClientID: "abc"},
+	)
 	assert.Equal("key", authType)
 
 	authType = autoDetectAuthMode(AzStorageOptions{SaSKey: "abc", ClientID: "abc"})

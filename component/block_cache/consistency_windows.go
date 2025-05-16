@@ -1,3 +1,5 @@
+//go:build windows
+
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
@@ -23,38 +25,14 @@
    SOFTWARE
 */
 
-package cmd
+package block_cache
 
-import (
-	"fmt"
-
-	"github.com/Seagate/cloudfuse/common"
-
-	"github.com/spf13/cobra"
-)
-
-var check bool
-
-var versionCmd = &cobra.Command{
-	Use:               "version",
-	Short:             "Print the current version and optionally check for latest version",
-	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("cloudfuse version:", common.CloudfuseVersion)
-		fmt.Println("git commit:", common.GitCommit)
-		fmt.Println("commit date:", common.CommitDate)
-		fmt.Println("go version:", common.GoVersion)
-		fmt.Println("OS/Arch:", common.OsArch)
-		if check {
-			return VersionCheck()
-		}
-		return nil
-	},
+// setBlockChecksum is a no-op on Windows.
+func setBlockChecksum(localPath string, data []byte, n int) error {
+	return nil
 }
 
-func init() {
-	rootCmd.AddCommand(versionCmd)
-
-	versionCmd.Flags().
-		BoolVar(&check, "check", false, "To check whether latest version exists or not")
+// checkBlockConsistency is a no-op on Windows.
+func checkBlockConsistency(blockCache *BlockCache, item *workItem, numberOfBytes int, localPath, fileName string) bool {
+	return true
 }

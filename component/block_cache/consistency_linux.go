@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
@@ -23,38 +25,52 @@
    SOFTWARE
 */
 
-package cmd
+package block_cache
 
 import (
-	"fmt"
+	"bytes"
+	"os"
 
 	"github.com/Seagate/cloudfuse/common"
-
-	"github.com/spf13/cobra"
+	"github.com/Seagate/cloudfuse/common/log"
+	"golang.org/x/sys/unix"
 )
 
-var check bool
-
-var versionCmd = &cobra.Command{
-	Use:               "version",
-	Short:             "Print the current version and optionally check for latest version",
-	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("cloudfuse version:", common.CloudfuseVersion)
-		fmt.Println("git commit:", common.GitCommit)
-		fmt.Println("commit date:", common.CommitDate)
-		fmt.Println("go version:", common.GoVersion)
-		fmt.Println("OS/Arch:", common.OsArch)
-		if check {
-			return VersionCheck()
-		}
-		return nil
-	},
+// setBlockChecksum sets the checksum as an xattr on Linux.
+func setBlockChecksum(localPath string, data []byte, n int) error {
+	hash := common.GetCRC64(data, n)
+	return unix.Setxattr(localPath, "user.md5sum", hash, 0)
 }
 
-func init() {
-	rootCmd.AddCommand(versionCmd)
+func checkBlockConsistency(
+	blockCache *BlockCache,
+	item *workItem,
+	numberOfBytes int,
+	localPath, fileName string,
+) bool {
+	if !blockCache.consistency {
+		return true
+	}
+	// Calculate MD5 checksum of the read data
+	actualHash := common.GetCRC64(item.block.data, numberOfBytes)
 
-	versionCmd.Flags().
-		BoolVar(&check, "check", false, "To check whether latest version exists or not")
+	// Retrieve MD5 checksum from xattr
+	xattrHash := make([]byte, 8)
+	_, err := unix.Getxattr(localPath, "user.md5sum", xattrHash)
+	if err != nil {
+		log.Err(
+			"BlockCache::download : Failed to get md5sum for file %s [%v]",
+			fileName,
+			err.Error(),
+		)
+	} else {
+		// Compare checksums
+		if !bytes.Equal(actualHash, xattrHash) {
+			log.Err("BlockCache::download : MD5 checksum mismatch for file %s, expected %v, got %v", fileName, xattrHash, actualHash)
+			_ = os.Remove(localPath)
+			return false
+		}
+	}
+
+	return true
 }

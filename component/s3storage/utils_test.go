@@ -217,11 +217,20 @@ func (s *utilsTestSuite) TestGetContentType() {
 		{val: "a.3gp", result: "video/3gpp"},
 		{val: "a.mp4", result: "video/mp4"},
 		{val: "a.doc", result: "application/msword"},
-		{val: "a.docx", result: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+		{
+			val:    "a.docx",
+			result: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		},
 		{val: "a.ppt", result: "application/vnd.ms-powerpoint"},
-		{val: "a.pptx", result: "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+		{
+			val:    "a.pptx",
+			result: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+		},
 		{val: "a.xls", result: "application/vnd.ms-excel"},
-		{val: "a.xlsx", result: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+		{
+			val:    "a.xlsx",
+			result: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		},
 		{val: "a.gz", result: "application/x-gzip"},
 		{val: "a.jar", result: "application/java-archive"},
 		{val: "a.rar", result: "application/vnd.rar"},
