@@ -360,13 +360,19 @@ func (s *configTestSuite) TestAuthModeSPN() {
 	err := ParseAndValidateConfig(az, opt)
 	assert.Error(err)
 	assert.Equal(az.stConfig.authConfig.AuthMode, EAuthType.SPN())
-	assert.Contains(err.Error(), "client ID, tenant ID or client secret not provided")
+	assert.Contains(
+		err.Error(),
+		"client ID, tenant ID or client secret, OAuthTokenFilePath, WorkloadIdentityToken not provided",
+	)
 
 	opt.ClientID = "abc"
 	err = ParseAndValidateConfig(az, opt)
 	assert.Error(err)
 	assert.Equal(az.stConfig.authConfig.AuthMode, EAuthType.SPN())
-	assert.Contains(err.Error(), "client ID, tenant ID or client secret not provided")
+	assert.Contains(
+		err.Error(),
+		"client ID, tenant ID or client secret, OAuthTokenFilePath, WorkloadIdentityToken not provided",
+	)
 
 	opt.ClientSecret = "123"
 	opt.TenantID = "xyz"
