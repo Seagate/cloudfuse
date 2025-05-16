@@ -108,7 +108,7 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 		err = cmd.Run()
 		suite.assert.NoError(err)
 	} else if runtime.GOOS == "windows" {
-
+		suite.extractZip(archivePath+"/cloudfuse_logs.zip", tempDir)
 	}
 
 	//verify archive contents (compare with original files that were put into archive)
