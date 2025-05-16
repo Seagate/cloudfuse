@@ -70,21 +70,21 @@ func CreateObjAttrDir(path string) (attr *ObjAttr) {
 	return attr
 }
 
-func NewDirBitMap() *common.BitMap16 {
-	var bm common.BitMap16
+func NewDirBitMap() common.BitMap16 {
+	bm := common.BitMap16(0)
 	bm.Set(PropFlagIsDir)
-	return &bm
+	return bm
 }
 
-func NewSymlinkBitMap() *common.BitMap16 {
-	var bm common.BitMap16
+func NewSymlinkBitMap() common.BitMap16 {
+	bm := common.BitMap16(0)
 	bm.Set(PropFlagSymlink)
-	return &bm
+	return bm
 }
 
-func NewFileBitMap() *common.BitMap16 {
-	var bm common.BitMap16
-	return &bm
+func NewFileBitMap() common.BitMap16 {
+	bm := common.BitMap16(0)
+	return bm
 }
 
 // Flags represented in common.BitMap16 for various properties of the object
@@ -99,15 +99,15 @@ const (
 
 // ObjAttr : Attributes of any file/directory
 type ObjAttr struct {
-	Mtime    time.Time        // modified time
-	Atime    time.Time        // access time
-	Ctime    time.Time        // change time
-	Crtime   time.Time        // creation time
-	Size     int64            // size of the file/directory
-	Mode     os.FileMode      // permissions in 0xxx format
-	Flags    *common.BitMap16 // flags
-	Path     string           // full path
-	Name     string           // base name of the path
+	Mtime    time.Time       // modified time
+	Atime    time.Time       // access time
+	Ctime    time.Time       // change time
+	Crtime   time.Time       // creation time
+	Size     int64           // size of the file/directory
+	Mode     os.FileMode     // permissions in 0xxx format
+	Flags    common.BitMap16 // flags
+	Path     string          // full path
+	Name     string          // base name of the path
 	MD5      []byte
 	Metadata map[string]*string // extra information to preserve
 }

@@ -55,7 +55,7 @@ type attrCacheItem struct {
 	attr      *internal.ObjAttr
 	cachedAt  time.Time
 	listCache map[string]listCacheSegment
-	attrFlag  *common.BitMap16
+	attrFlag  common.BitMap16
 	children  map[string]*attrCacheItem
 	parent    *attrCacheItem
 }
@@ -91,10 +91,9 @@ func newCacheTreeMap() *cacheTreeMap {
 }
 
 func newAttrCacheItem(attr *internal.ObjAttr, exists bool, cachedAt time.Time) *attrCacheItem {
-	flag := common.BitMap16{}
 	item := &attrCacheItem{
 		attr:     attr,
-		attrFlag: &flag,
+		attrFlag: 0,
 		cachedAt: cachedAt,
 	}
 	item.attrFlag.Set(AttrFlagValid)

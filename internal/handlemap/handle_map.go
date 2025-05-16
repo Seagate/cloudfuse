@@ -29,11 +29,12 @@ import (
 	"container/list"
 	"os"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/cache_policy"
+
+	"go.uber.org/atomic"
 )
 
 type HandleID uint64
@@ -68,24 +69,22 @@ type Handle struct {
 	FObj     *os.File // File object being represented by this handle
 	CacheObj *Cache   // Streaming layer cache for this handle
 	Buffers  *Buffers
-	ID       HandleID      // Cloudfuse assigned unique ID to this handle
-	Size     *atomic.Int64 // Size of the file being handled here
+	ID       HandleID // Cloudfuse assigned unique ID to this handle
+	Size     int64    // Size of the file being handled here
 	Mtime    time.Time
 	UnixFD   uint64                 // Unix FD created by create/open syscall
 	OptCnt   uint64                 // Number of operations done on this file
-	Flags    *common.BitMap16       // Various states of the file
+	Flags    common.BitMap16        // Various states of the file
 	Path     string                 // Always holds path relative to mount dir, same as object name (uses common.JoinUnixFilepath)
 	values   map[string]interface{} // Map to hold other info if application wants to store
 }
 
 func NewHandle(path string) *Handle {
-	size := atomic.Int64{}
-	flags := common.BitMap16{}
 	return &Handle{
 		ID:       InvalidHandleID,
 		Path:     path,
-		Flags:    &flags,
-		Size:     &size,
+		Size:     0,
+		Flags:    0,
 		OptCnt:   0,
 		values:   make(map[string]interface{}),
 		CacheObj: nil,
@@ -149,14 +148,14 @@ func (handle *Handle) Cleanup() {
 
 // defaultHandleMap holds a synchronized map[ HandleID ]*Handle
 var defaultHandleMap sync.Map
-var nextHandleID atomic.Uint64
+var nextHandleID = *atomic.NewUint64(uint64(0))
 
 // Add : Add the newly created handle to map and allocate a handle id
 func Add(handle *Handle) HandleID {
 	var ok = true
 	var key HandleID
 	for ok {
-		key = HandleID(nextHandleID.Add(1))
+		key = HandleID(nextHandleID.Inc())
 		_, ok = defaultHandleMap.LoadOrStore(key, handle)
 	}
 	handle.ID = key

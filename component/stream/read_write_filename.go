@@ -386,10 +386,10 @@ func (rw *ReadWriteFilenameCache) createFileCache(handle *handlemap.Handle) erro
 				return err
 			}
 			handle.CacheObj.BlockOffsetList = offsets
-			atomic.StoreInt64(&handle.CacheObj.Size, handle.Size.Load())
+			atomic.StoreInt64(&handle.CacheObj.Size, handle.Size)
 			handle.CacheObj.Mtime = handle.Mtime
 			if handle.CacheObj.SmallFile() {
-				if uint64(handle.Size.Load()) > memory.FreeMemory() {
+				if uint64(atomic.LoadInt64(&handle.Size)) > memory.FreeMemory() {
 					handle.CacheObj.StreamOnly = true
 					return nil
 				}
@@ -514,7 +514,7 @@ func (rw *ReadWriteFilenameCache) readWriteBlocks(
 				newLastBlockEndIndex := lastBlock.EndIndex + dataLeft + emptyByteLength
 				handle.CacheObj.Resize(lastBlock.StartIndex, newLastBlockEndIndex)
 				lastBlock.Flags.Set(common.DirtyBlock)
-				handle.Size.Store(lastBlock.EndIndex)
+				atomic.StoreInt64(&handle.Size, lastBlock.EndIndex)
 				atomic.StoreInt64(&handle.CacheObj.Size, lastBlock.EndIndex)
 				handle.CacheObj.Mtime = time.Now()
 				dataRead += int(dataLeft)
@@ -533,7 +533,7 @@ func (rw *ReadWriteFilenameCache) readWriteBlocks(
 			if err != nil {
 				return dataRead, err
 			}
-			handle.Size.Store(blk.EndIndex)
+			atomic.StoreInt64(&handle.Size, blk.EndIndex)
 			atomic.StoreInt64(&handle.CacheObj.Size, blk.EndIndex)
 			handle.CacheObj.Mtime = time.Now()
 			dataRead += int(dataCopied)

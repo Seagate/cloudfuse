@@ -28,6 +28,7 @@ package azstorage
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -383,7 +384,7 @@ func (az *AzStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		log.Err("AzStorage::OpenFile : Failed to create handle for %s", options.Name)
 		return nil, syscall.EFAULT
 	}
-	handle.Size.Store(attr.Size)
+	handle.Size = int64(attr.Size)
 	handle.Mtime = attr.Mtime
 
 	// increment open file handles count
@@ -433,14 +434,13 @@ func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
 func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length int, err error) {
 	//log.Trace("AzStorage::ReadInBuffer : Read %s from %d offset", h.Path, offset)
 
-	if options.Offset > options.Handle.Size.Load() {
+	if options.Offset > atomic.LoadInt64(&options.Handle.Size) {
 		return 0, syscall.ERANGE
 	}
 
 	var dataLen = int64(len(options.Data))
-	sizeNow := options.Handle.Size.Load()
-	if sizeNow < (options.Offset + int64(len(options.Data))) {
-		dataLen = sizeNow - options.Offset
+	if atomic.LoadInt64(&options.Handle.Size) < (options.Offset + int64(len(options.Data))) {
+		dataLen = options.Handle.Size - options.Offset
 	}
 
 	if dataLen == 0 {

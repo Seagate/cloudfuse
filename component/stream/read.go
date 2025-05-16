@@ -125,9 +125,8 @@ func (r *ReadCache) getBlock(handle *handlemap.Handle, offset int64) (*common.Bl
 	handle.CacheObj.Lock()
 	block, found := handle.CacheObj.Get(blockKeyObj)
 	if !found {
-		size := handle.Size.Load()
-		if (offset + blockSize) > size {
-			blockSize = size - offset
+		if (offset + blockSize) > handle.Size {
+			blockSize = handle.Size - offset
 		}
 		block = &common.Block{
 			StartIndex: offset,
@@ -164,7 +163,7 @@ func (r *ReadCache) copyCachedBlock(
 	// counter to track how much we have copied into our request buffer thus far
 	dataRead := 0
 	// covers the case if we get a call that is bigger than the file size
-	for dataLeft > 0 && offset < handle.Size.Load() {
+	for dataLeft > 0 && offset < handle.Size {
 		// round all offsets to the specific blocksize offsets
 		cachedBlockStartIndex := (offset - (offset % r.BlockSize))
 		// Lock on requested block and fileName to ensure it is not being rerequested or manipulated

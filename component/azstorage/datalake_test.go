@@ -875,7 +875,7 @@ func (s *datalakeTestSuite) TestCreateFile() {
 	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.Equal(name, h.Path)
-	s.assert.EqualValues(0, h.Size.Load())
+	s.assert.EqualValues(0, h.Size)
 	// File should be in the account
 	file := s.containerClient.NewDirectoryClient(name)
 	props, err := file.GetProperties(ctx, nil)
@@ -908,7 +908,7 @@ func (s *datalakeTestSuite) TestCreateFileWindowsNameConvert() {
 	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.Equal(windowsName, h.Path)
-	s.assert.EqualValues(0, h.Size.Load())
+	s.assert.EqualValues(0, h.Size)
 	// File should be in the account
 	file := s.containerClient.NewDirectoryClient(blobName)
 	props, err := file.GetProperties(ctx, nil)
@@ -1272,7 +1272,7 @@ func (s *datalakeTestSuite) TestOpenFile() {
 	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.Equal(name, h.Path)
-	s.assert.EqualValues(0, h.Size.Load())
+	s.assert.EqualValues(0, h.Size)
 }
 
 func (s *datalakeTestSuite) TestOpenFileError() {
@@ -1298,7 +1298,7 @@ func (s *datalakeTestSuite) TestOpenFileSize() {
 	s.assert.NoError(err)
 	s.assert.NotNil(h)
 	s.assert.Equal(name, h.Path)
-	s.assert.EqualValues(size, h.Size.Load())
+	s.assert.EqualValues(size, h.Size)
 }
 
 func (s *datalakeTestSuite) TestCloseFile() {
@@ -1573,7 +1573,7 @@ func (s *datalakeTestSuite) TestReadInBufferLargeBuffer() {
 	output := make([]byte, 1000) // Testing that passing in a super large buffer will still work
 	len, err := s.az.ReadInBuffer(internal.ReadInBufferOptions{Handle: h, Offset: 0, Data: output})
 	s.assert.NoError(err)
-	s.assert.EqualValues(h.Size.Load(), len)
+	s.assert.EqualValues(h.Size, len)
 	s.assert.EqualValues(testData, output[:h.Size])
 }
 

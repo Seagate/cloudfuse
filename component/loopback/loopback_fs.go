@@ -364,12 +364,10 @@ func (lfs *LoopbackFS) GetAttr(options internal.GetAttrOptions) (*internal.ObjAt
 		log.Err("LoopbackFS::GetAttr : error [%s]", err)
 		return nil, err
 	}
-	flags := common.BitMap16{}
 	attr := &internal.ObjAttr{
 		Path:  options.Name,
 		Name:  common.NormalizeObjectName(info.Name()),
 		Size:  info.Size(),
-		Flags: &flags,
 		Mode:  info.Mode(),
 		Mtime: info.ModTime(),
 	}

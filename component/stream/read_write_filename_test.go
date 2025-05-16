@@ -64,7 +64,7 @@ func (suite *streamTestSuite) TestStreamOnlyFilenameOpenFile() {
 	config := "stream:\n  block-size-mb: 4\n  buffer-size-mb: 32\n  max-buffers: 0\n  file-caching: true\n"
 	suite.setupTestHelper(config, false)
 
-	handle1 := &handlemap.Handle{Path: fileNames[0]}
+	handle1 := &handlemap.Handle{Size: 0, Path: fileNames[0]}
 	openFileOptions := internal.OpenFileOptions{
 		Name:  fileNames[0],
 		Flags: os.O_RDONLY,
@@ -126,7 +126,7 @@ func (suite *streamTestSuite) TestStreamOnlyFilenameCreateFile() {
 	config := "stream:\n  block-size-mb: 0\n  buffer-size-mb: 32\n  max-buffers: 1\n  file-caching: true\n"
 	suite.setupTestHelper(config, false)
 
-	handle1 := &handlemap.Handle{Path: fileNames[0]}
+	handle1 := &handlemap.Handle{Size: 0, Path: fileNames[0]}
 	createFileoptions := internal.CreateFileOptions{Name: handle1.Path, Mode: 0777}
 
 	suite.mock.EXPECT().CreateFile(createFileoptions).Return(handle1, nil)
@@ -141,7 +141,7 @@ func (suite *streamTestSuite) TestCreateFilenameFileError() {
 	config := "stream:\n  block-size-mb: 0\n  buffer-size-mb: 32\n  max-buffers: 1\n  file-caching: true\n"
 	suite.setupTestHelper(config, false)
 
-	handle1 := &handlemap.Handle{Path: fileNames[0]}
+	handle1 := &handlemap.Handle{Size: 0, Path: fileNames[0]}
 	createFileoptions := internal.CreateFileOptions{Name: handle1.Path, Mode: 0777}
 
 	suite.mock.EXPECT().CreateFile(createFileoptions).Return(handle1, syscall.ENOENT)
@@ -156,7 +156,7 @@ func (suite *streamTestSuite) TestStreamOnlyFilenameDeleteFile() {
 	config := "stream:\n  block-size-mb: 0\n  buffer-size-mb: 32\n  max-buffers: 1\n  file-caching: true\n"
 	suite.setupTestHelper(config, false)
 
-	handle1 := &handlemap.Handle{Path: fileNames[0]}
+	handle1 := &handlemap.Handle{Size: 0, Path: fileNames[0]}
 	deleteFileOptions := internal.DeleteFileOptions{Name: handle1.Path}
 
 	suite.mock.EXPECT().DeleteFile(deleteFileOptions).Return(nil)
@@ -171,7 +171,7 @@ func (suite *streamTestSuite) TestStreamOnlyFilenameRenameFile() {
 	config := "stream:\n  block-size-mb: 0\n  buffer-size-mb: 32\n  max-buffers: 1\n  file-caching: true\n"
 	suite.setupTestHelper(config, false)
 
-	handle1 := &handlemap.Handle{Path: fileNames[0]}
+	handle1 := &handlemap.Handle{Size: 0, Path: fileNames[0]}
 	renameFileOptions := internal.RenameFileOptions{Src: handle1.Path, Dst: handle1.Path + "new"}
 
 	suite.mock.EXPECT().RenameFile(renameFileOptions).Return(nil)
@@ -214,7 +214,7 @@ func (suite *streamTestSuite) TestStreamOnlyFilenameTruncateFile() {
 	config := "stream:\n  block-size-mb: 0\n  buffer-size-mb: 32\n  max-buffers: 1\n  file-caching: true\n"
 	suite.setupTestHelper(config, false)
 
-	handle1 := &handlemap.Handle{Path: fileNames[0]}
+	handle1 := &handlemap.Handle{Size: 0, Path: fileNames[0]}
 	truncateFileOptions := internal.TruncateFileOptions{Name: handle1.Path}
 
 	suite.mock.EXPECT().TruncateFile(truncateFileOptions).Return(nil)
@@ -702,7 +702,7 @@ func (suite *streamTestSuite) TestFilenameCreateFile() {
 	config := "stream:\n  block-size-mb: 4\n  buffer-size-mb: 32\n  max-buffers: 1\n  file-caching: true\n"
 	suite.setupTestHelper(config, false)
 
-	handle1 := &handlemap.Handle{Path: fileNames[0]}
+	handle1 := &handlemap.Handle{Size: 0, Path: fileNames[0]}
 	createFileoptions := internal.CreateFileOptions{Name: handle1.Path, Mode: 0777}
 	getFileBlockOffsetsOptions := internal.GetFileBlockOffsetsOptions{Name: fileNames[0]}
 	bol := &common.BlockOffsetList{
@@ -742,7 +742,7 @@ func (suite *streamTestSuite) TestFilenameRenameFile() {
 	config := "stream:\n  block-size-mb: 4\n  buffer-size-mb: 32\n  max-buffers: 1\n  file-caching: true\n"
 	suite.setupTestHelper(config, false)
 
-	handle1 := &handlemap.Handle{Path: fileNames[0]}
+	handle1 := &handlemap.Handle{Size: 0, Path: fileNames[0]}
 	renameFileOptions := internal.RenameFileOptions{Src: handle1.Path, Dst: handle1.Path + "new"}
 
 	suite.mock.EXPECT().RenameFile(renameFileOptions).Return(nil)
