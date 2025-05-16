@@ -1004,6 +1004,25 @@ func (suite *fileCacheTestSuite) TestCreateFileInDirCreateEmptyFile() {
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, path))
 }
 
+func (suite *fileCacheTestSuite) TestChmodNonexistentCreateEmptyFile() {
+	defer suite.cleanupTest()
+	// Set flag high to test bugfix
+	createEmptyFile := true
+	config := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: %t\n\nloopbackfs:\n  path: %s",
+		suite.cache_path,
+		createEmptyFile,
+		suite.fake_storage_path,
+	)
+	suite.setupTestHelper(
+		config,
+	) // setup a new file cache with a custom config (teardown will occur after the test as usual)
+
+	path := "file"
+	err := suite.fileCache.Chmod(internal.ChmodOptions{Name: path, Mode: 0777})
+	suite.assert.ErrorIs(err, os.ErrNotExist)
+}
+
 func (suite *fileCacheTestSuite) TestSyncFile() {
 	defer suite.cleanupTest()
 
@@ -1080,8 +1099,9 @@ func (suite *fileCacheTestSuite) TestDeleteOpenFileCase1() {
 
 	// Test
 	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
-	suite.assert.Error(err)
-	suite.assert.Equal(syscall.EPERM, err)
+	suite.assert.NoError(err)
+	// Path should not be in fake storage
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
 
 	// cleanup
 	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
@@ -1096,11 +1116,10 @@ func (suite *fileCacheTestSuite) TestDeleteOpenFileCase2() {
 	suite.fileCache.CreateFile(internal.CreateFileOptions{Name: path, Mode: 0777})
 
 	err := suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: path})
-	suite.assert.Error(err)
-	suite.assert.Equal(syscall.EPERM, err)
+	suite.assert.NoError(err)
 
-	// Path should not be in local cache (since we failed the operation)
-	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
+	// Path should not be in local cache (the delete succeeded)
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, path))
 	// Path should not be in fake storage
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, path))
 }

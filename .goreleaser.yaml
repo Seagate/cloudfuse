@@ -389,5 +389,17 @@ nfpms:
           - fuse
           - glibc >= 2.24
 
+signs:
+  - cmd: cosign
+    args:
+      - "sign-blob"
+      - "${artifact}"
+      - "--bundle=${signature}"
+      - "--yes"
+    artifacts: checksum
+    signature: "${artifact}.bundle"
+    env:
+      - COSIGN_EXPERIMENTAL=1
+
 metadata:
   mod_timestamp: "{{ .CommitTimestamp }}"
