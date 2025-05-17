@@ -58,6 +58,8 @@ type attrCacheItem struct {
 	attrFlag  common.BitMap16
 	children  map[string]*attrCacheItem
 	parent    *attrCacheItem
+
+	listingComplete bool
 }
 
 // all cache entries are organized into this structure
