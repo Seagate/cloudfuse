@@ -265,29 +265,45 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 	flock.Lock()
 	defer flock.Unlock()
 
-	// prepare a handle
-	handle := handlemap.NewHandle(name)
-	// open the cached file
+	// look up file (or folder!)
 	localPath := filepath.Join(fc.tmpPath, name)
-	f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
+	info, err := os.Stat(localPath)
 	if err != nil {
-		log.Err("FileCache::uploadPendingFile : %s failed to open file. Here's why: %v", name, err)
+		log.Err("FileCache::uploadPendingFile : %s failed to stat file. Here's why: %v", name, err)
 		return err
 	}
-	// write handle attributes
-	inf, err := f.Stat()
-	if err == nil {
-		handle.Size = inf.Size()
-	}
-	handle.UnixFD = uint64(f.Fd())
-	handle.SetFileObject(f)
-	handle.Flags.Set(handlemap.HandleFlagDirty)
+	if info.IsDir() {
+		// upload folder
+		options := internal.CreateDirOptions{Name: name, Mode: info.Mode()}
+		err = fc.NextComponent().CreateDir(options)
+		if err != nil && !os.IsExist(err) {
+			return err
+		}
+	} else {
+		// this is a file
+		// prepare a handle
+		handle := handlemap.NewHandle(name)
+		// open the cached file
+		f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
+		if err != nil {
+			log.Err("FileCache::uploadPendingFile : %s failed to open file. Here's why: %v", name, err)
+			return err
+		}
+		// write handle attributes
+		inf, err := f.Stat()
+		if err == nil {
+			handle.Size = inf.Size()
+		}
+		handle.UnixFD = uint64(f.Fd())
+		handle.SetFileObject(f)
+		handle.Flags.Set(handlemap.HandleFlagDirty)
 
-	// upload the file
-	err = fc.closeFileInternal(internal.CloseFileOptions{Handle: handle}, flock)
-	if err != nil {
-		log.Err("FileCache::uploadPendingFile : %s Upload failed. Here's why: %v", name, err)
-		return err
+		// upload the file
+		err = fc.closeFileInternal(internal.CloseFileOptions{Handle: handle}, flock)
+		if err != nil {
+			log.Err("FileCache::uploadPendingFile : %s Upload failed. Here's why: %v", name, err)
+			return err
+		}
 	}
 	// update state
 	flock.SyncPending = false
