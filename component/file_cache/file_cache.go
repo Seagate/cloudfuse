@@ -648,7 +648,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 			//  The thread that pushes local changes to the cloud will have to account for this
 			//  to avoid creating an entry for this directory in the attribute cache,
 			//  which would give us the false impression that the directory is in the cloud.
-			fc.offlineOps.Store(options.Name, internal.CreateObjAttrDir(options.Name))
+			fc.offlineOps.Store(options.Name, struct{}{})
 			log.Info("FileCache::CreateDir : %s created offline and queued for cloud sync", options.Name)
 		}
 	case err != nil && !isOffline(err):
@@ -1247,7 +1247,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 
 	// if we're offline, record this operation as pending
 	if offline {
-		fc.offlineOps.Store(options.Name, internal.CreateObjAttr(options.Name, 0, time.Now()))
+		fc.offlineOps.Store(options.Name, struct{}{})
 		flock.SyncPending = true
 	}
 
@@ -2032,12 +2032,9 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		case isOffline(err) && fc.offlineAccess:
 			log.Warn("FileCache::FlushFile : %s upload delayed (offline)", options.Handle.Path)
 			// add file to upload queue
-			info, err := os.Stat(localPath)
+			_, err := os.Stat(localPath)
 			if err == nil {
-				fc.offlineOps.Store(
-					options.Handle.Path,
-					internal.CreateObjAttr(options.Handle.Path, info.Size(), info.ModTime()),
-				)
+				fc.offlineOps.Store(options.Handle.Path, struct{}{})
 				flock := fc.fileLocks.Get(options.Handle.Path)
 				flock.SyncPending = true
 			}
@@ -2230,16 +2227,9 @@ func (fc *FileCache) renameLocalFile(
 }
 
 func (fc *FileCache) renamePendingOp(srcName, dstName string) {
-	pendingOp, operationPending := fc.offlineOps.LoadAndDelete(srcName)
+	_, operationPending := fc.offlineOps.LoadAndDelete(srcName)
 	if operationPending {
-		attr, ok := pendingOp.(internal.ObjAttr)
-		if ok {
-			if attr.IsDir() {
-				fc.offlineOps.Store(dstName, internal.CreateObjAttrDir(dstName))
-			} else {
-				fc.offlineOps.Store(dstName, internal.CreateObjAttr(dstName, attr.Size, attr.Mtime))
-			}
-		}
+		fc.offlineOps.Store(dstName, struct{}{})
 	}
 }
 
@@ -2320,7 +2310,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 				)
 				return err
 			} else if offlineOkay {
-				fc.offlineOps.Store(options.Name, internal.CreateObjAttr(options.Name, options.Size, time.Now()))
+				fc.offlineOps.Store(options.Name, struct{}{})
 				log.Warn("FileCache::TruncateFile : %s operation queued (offline)", options.Name)
 				flock.SyncPending = true
 			}
@@ -2374,7 +2364,7 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 				)
 				return err
 			} else if offlineOkay {
-				fc.offlineOps.Store(options.Name, internal.CreateObjAttr(options.Name, info.Size(), info.ModTime()))
+				fc.offlineOps.Store(options.Name, struct{}{})
 				log.Warn("FileCache::Chmod : %s operation queued (offline)", options.Name)
 				fc.missedChmodList.LoadOrStore(options.Name, true)
 				flock := fc.fileLocks.Get(options.Name)
@@ -2410,8 +2400,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 
 	// Update the owner and group of the file in the local cache
 	localPath := filepath.Join(fc.tmpPath, options.Name)
-	info, err := os.Stat(localPath)
-	if err == nil {
+	if _, err = os.Stat(localPath); err == nil {
 		fc.policy.CacheValid(localPath)
 
 		if runtime.GOOS != "windows" {
@@ -2425,7 +2414,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 				return err
 			} else if offlineOkay {
 				// TODO: we have no missedChownList to track this... should we make one? Or should we just ignore this call?
-				fc.offlineOps.Store(options.Name, internal.CreateObjAttr(options.Name, info.Size(), info.ModTime()))
+				fc.offlineOps.Store(options.Name, struct{}{})
 				log.Warn("FileCache::Chown : %s operation queued (offline)", options.Name)
 				flock.SyncPending = true
 			}
