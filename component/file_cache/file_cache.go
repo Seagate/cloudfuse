@@ -657,12 +657,31 @@ func (fc *FileCache) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 		log.Err("FileCache::IsDirEmpty : %s failed while checking local cache [%s]", options.Name, err.Error())
 	}
 
-	log.Debug("FileCache::IsDirEmpty : %s checking with container", options.Name)
-	return fc.NextComponent().IsDirEmpty(options)
+	// Check if directory is empty at remote or not, if container is not empty then return false
+	emptyAtRemote := fc.NextComponent().IsDirEmpty(options)
+	if !emptyAtRemote {
+		log.Debug("FileCache::IsDirEmpty : %s is not empty at remote", options.Name)
+		return false
+	}
+
+	// Remote is empty so we need to check for the local directory
+	// While checking local directory we need to ensure that we delete all empty directories and then
+	// return the result.
+	cleanup, err := fc.deleteEmptyDirs(internal.DeleteDirOptions(options))
+	if err != nil {
+		log.Debug(
+			"FileCache::IsDirEmpty : %s failed to delete empty directories [%s]",
+			options.Name,
+			err.Error(),
+		)
+		return false
+	}
+
+	return cleanup
 }
 
 // DeleteEmptyDirs: delete empty directories in local cache, return error if directory is not empty
-func (fc *FileCache) DeleteEmptyDirs(options internal.DeleteDirOptions) (bool, error) {
+func (fc *FileCache) deleteEmptyDirs(options internal.DeleteDirOptions) (bool, error) {
 	localPath := options.Name
 	if !strings.Contains(options.Name, fc.tmpPath) {
 		localPath = filepath.Join(fc.tmpPath, options.Name)
@@ -672,6 +691,10 @@ func (fc *FileCache) DeleteEmptyDirs(options internal.DeleteDirOptions) (bool, e
 
 	entries, err := os.ReadDir(localPath)
 	if err != nil {
+		if err == syscall.ENOENT || os.IsNotExist(err) {
+			return true, nil
+		}
+
 		log.Debug(
 			"FileCache::DeleteEmptyDirs : Unable to read directory %s [%s]",
 			localPath,
@@ -682,19 +705,19 @@ func (fc *FileCache) DeleteEmptyDirs(options internal.DeleteDirOptions) (bool, e
 
 	for _, entry := range entries {
 		if entry.IsDir() {
-			val, err := fc.DeleteEmptyDirs(internal.DeleteDirOptions{
+			val, err := fc.deleteEmptyDirs(internal.DeleteDirOptions{
 				Name: filepath.Join(localPath, entry.Name()),
 			})
 			if err != nil {
 				log.Err(
-					"FileCache::DeleteEmptyDirs : Unable to delete directory %s [%s]",
+					"FileCache::deleteEmptyDirs : Unable to delete directory %s [%s]",
 					localPath,
 					err.Error(),
 				)
 				return val, err
 			}
 		} else {
-			log.Err("FileCache::DeleteEmptyDirs : Directory %s is not empty, contains file %s", localPath, entry.Name())
+			log.Err("FileCache::deleteEmptyDirs : Directory %s is not empty, contains file %s", localPath, entry.Name())
 			return false, fmt.Errorf("unable to delete directory %s, contains file %s", localPath, entry.Name())
 		}
 	}

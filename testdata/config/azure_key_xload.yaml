@@ -5,7 +5,7 @@ logging:
 
 components:
   - libfuse
-  - file_cache
+  - xload
   - attr_cache
   - azstorage
 
@@ -15,12 +15,11 @@ libfuse:
   negative-entry-expiration-sec: 0
   ignore-open-flags: true
 
-file_cache:
+xload:
+  block-size-mb: 16
   path: { 1 }
-  timeout-sec: 30
-  max-size-mb: 2048
-  allow-non-empty-temp: true
-  cleanup-on-start: true
+  export-progress: true
+  consistency: true
 
 attr_cache:
   timeout-sec: 3600
@@ -28,8 +27,8 @@ attr_cache:
 azstorage:
   type: { ACCOUNT_TYPE }
   endpoint: { ACCOUNT_ENDPOINT }
-  use-http: false
-  account-name: { NIGHTLY_STO_BLOB_ACC_NAME }
-  mode: azcli
+  account-name: { NIGHTLY_STO_ACC_NAME }
+  account-key: { NIGHTLY_STO_ACC_KEY }
+  mode: key
   container: { 0 }
   tier: hot

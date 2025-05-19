@@ -28,7 +28,7 @@
 # -----------------------------------------------------------------------------------------------------------------------
 
 # Daemon configuration
-foreground: true|false <run blobfuse2 in foreground or background>
+foreground: true|false <run cloudfuse in foreground or background>
 
 # Common configurations
 allow-other: true|false <allow other users to access the mounted directory - used for FUSE and File Cache>
@@ -44,7 +44,7 @@ profiler-ip: <IP address for dynamic-profiler to listen for REST calls. Default 
 logging:
   type: syslog|silent|base <type of logger to be used by the system. silent = no logger, base = file based logger. Default - syslog>
   level: log_off|log_crit|log_err|log_warning|log_info|log_trace|log_debug <log level. Default - log_warning> <log_debug will also enable sdk-trace logs>
-  file-path: <path where log files shall be stored. Default - '$HOME/.blobfuse2/blobfuse2.log'>
+  file-path: <path where log files shall be stored. Default - '$HOME/.cloudfuse/cloudfuse.log'>
   max-file-size-mb: <maximum allowed size for each log file (in MB). Default - 512 MB>
   file-count: <maximum number of files to be rotated to preserve old logs. Default - 10>
   track-time: true|false <track time taken by important operations>
@@ -53,6 +53,7 @@ logging:
 components:
   - libfuse
   - entry_cache
+  - xload
   - block_cache
   - file_cache
   - attr_cache
@@ -87,7 +88,14 @@ stream:
 entry_cache:
   timeout-sec: <cache eviction timeout (in sec). Default - 30 sec>
 
-# Block cache related configuration. Block cache is only supported on Linux.
+# Xload configuration
+xload:
+  block-size-mb: <size of each block to be cached in memory (in MB). Default - 16 MB>
+  path: <path to local disk cache where downloaded files will be stored>
+  export-progress: <preload progress will be exported to a json fil. Default output file is '~/.cloudfuse/xload_stats_{PID}.json'. Default - not exported>
+  validate-md5: <if md5 sum is present in the blob, validate it post download. Default - false>
+
+# Block cache related configuration
 block_cache:
   block-size-mb: <size of each block to be cached in memory (in MB). Default - 16 MB>
   mem-size-mb: <total amount of memory to be preallocated for block cache (in MB). Default - 80% of free memory>
@@ -209,13 +217,13 @@ mountall:
 # Health Monitor configuration
 health_monitor:
   enable-monitoring: true|false <enable health monitor>
-  stats-poll-interval-sec: <Blobfuse2 stats polling interval (in sec). Default - 10 sec>
+  stats-poll-interval-sec: <Cloudfuse stats polling interval (in sec). Default - 10 sec>
   process-monitor-interval-sec: <CPU, memory and network usage polling interval (in sec). Default - 30 sec>
   output-path: <Path where health monitor will generate its output file. File name will be monitor_<pid>.json>
   # list of monitors to be disabled
   monitor-disable-list:
-    - cloudfuse_stats <Disable blobfuse2 stats polling>
+    - cloudfuse_stats <Disable cloudfuse stats polling>
     - file_cache_monitor <Disable file cache directory monitor>
-    - cpu_profiler <Disable CPU monitoring on blobfuse2 process>
-    - memory_profiler <Disable memory monitoring on blobfuse2 process>
-    - network_profiler <Disable network monitoring on blobfuse2 process>
+    - cpu_profiler <Disable CPU monitoring on cloudfuse process>
+    - memory_profiler <Disable memory monitoring on cloudfuse process>
+    - network_profiler <Disable network monitoring on cloudfuse process>

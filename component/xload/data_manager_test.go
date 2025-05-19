@@ -31,51 +31,75 @@
    SOFTWARE
 */
 
-package azstorage
+package xload
 
 import (
-	"fmt"
-	"net/http"
+	"context"
+	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
-	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/component/loopback"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-// cloudfuseTelemetryPolicy is a custom pipeline policy to prepend the cloudfuse user agent string to the one coming from SDK.
-// This is added in the PerCallPolicies which executes after the SDK's default telemetry policy.
-type cloudfuseTelemetryPolicy struct {
-	telemetryValue string
+type dataManagerTestSuite struct {
+	suite.Suite
+	assert *assert.Assertions
 }
 
-// newCloudfuseTelemetryPolicy creates an object which prepends the cloudfuse user agent string to the User-Agent request header
-func newCloudfuseTelemetryPolicy(telemetryValue string) policy.Policy {
-	return &cloudfuseTelemetryPolicy{telemetryValue: telemetryValue}
+func (suite *dataManagerTestSuite) SetupSuite() {
+	suite.assert = assert.New(suite.T())
 }
 
-func (p cloudfuseTelemetryPolicy) Do(req *policy.Request) (*http.Response, error) {
-	userAgent := p.telemetryValue
+func (suite *dataManagerTestSuite) TestNewRemoteDataManager() {
+	rdm, err := newRemoteDataManager(nil)
+	suite.assert.NotNil(err)
+	suite.assert.Nil(rdm)
+	suite.assert.Contains(err.Error(), "invalid parameters sent to create remote data manager")
 
-	// prepend the cloudfuse user agent string
-	if ua := req.Raw().Header.Get(common.UserAgentHeader); ua != "" {
-		userAgent = fmt.Sprintf("%s %s", userAgent, ua)
+	rdm, err = newRemoteDataManager(&remoteDataManagerOptions{})
+	suite.assert.NotNil(err)
+	suite.assert.Nil(rdm)
+	suite.assert.Contains(err.Error(), "invalid parameters sent to create remote data manager")
+
+	remote := loopback.NewLoopbackFSComponent()
+	statsMgr, err := NewStatsManager(1, false)
+	suite.assert.Nil(err)
+	suite.assert.NotNil(statsMgr)
+
+	rdm, err = newRemoteDataManager(&remoteDataManagerOptions{
+		workerCount: 4,
+		remote:      remote,
+		statsMgr:    statsMgr,
+	})
+	suite.assert.Nil(err)
+	suite.assert.NotNil(rdm)
+}
+
+func (suite *dataManagerTestSuite) TestProcessErrors() {
+	rdm := &remoteDataManager{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	item := &WorkItem{
+		CompName: DATA_MANAGER,
+		Path:     "test",
+		Block:    &Block{},
+		Download: false,
+		Ctx:      ctx,
 	}
-	req.Raw().Header.Set(common.UserAgentHeader, userAgent)
-	return req.Next()
+
+	dataLength, err := rdm.Process(item)
+	suite.assert.NotNil(err)
+	suite.assert.Equal(dataLength, 0)
+
+	// cancel the context
+	cancel()
+
+	dataLength, err = rdm.Process(item)
+	suite.assert.NotNil(err)
+	suite.assert.Equal(dataLength, 0)
 }
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-// Policy to override the service version if requested by user
-type serviceVersionPolicy struct {
-	serviceApiVersion string
-}
-
-func newServiceVersionPolicy(version string) policy.Policy {
-	return &serviceVersionPolicy{
-		serviceApiVersion: version,
-	}
-}
-
-func (r *serviceVersionPolicy) Do(req *policy.Request) (*http.Response, error) {
-	req.Raw().Header["x-ms-version"] = []string{r.serviceApiVersion}
-	return req.Next()
+func TestDatamanagerSuite(t *testing.T) {
+	suite.Run(t, new(dataManagerTestSuite))
 }

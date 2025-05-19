@@ -29,10 +29,12 @@ import (
 	_ "github.com/Seagate/cloudfuse/component/attr_cache"
 	_ "github.com/Seagate/cloudfuse/component/azstorage"
 	_ "github.com/Seagate/cloudfuse/component/block_cache"
+   _ "github.com/Seagate/cloudfuse/component/custom"
 	_ "github.com/Seagate/cloudfuse/component/file_cache"
 	_ "github.com/Seagate/cloudfuse/component/libfuse"
 	_ "github.com/Seagate/cloudfuse/component/loopback"
 	_ "github.com/Seagate/cloudfuse/component/s3storage"
 	_ "github.com/Seagate/cloudfuse/component/size_tracker"
 	_ "github.com/Seagate/cloudfuse/component/stream"
+   _ "github.com/Seagate/cloudfuse/component/xload"
 )
