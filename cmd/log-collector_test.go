@@ -244,7 +244,7 @@ func (suite *logCollectTestSuite) TestValidSyslogConfig() {
 	confFile.Close()
 
 	//run the log collector
-	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", confFile.Name())) //understand why there is a panic on windows. might be involved with the cleanup function.
+	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", confFile.Name()))
 	if runtime.GOOS == "linux" {
 		suite.assert.NoError(err)
 
