@@ -102,7 +102,7 @@ var gatherLogsCmd = &cobra.Command{
 				}
 			} else if runtime.GOOS == "windows" {
 				fmt.Println("Please refer to the windows event viewer for your cloudfuse logs")
-				return fmt.Errorf("no log files to collect. system logging for windows are stored in the event viewer: [%s]", err.Error())
+				return fmt.Errorf("no log files to collect. system logging for windows are stored in the event viewer")
 			}
 		}
 		// TODO: check if any 'base' logging or syslog filters are being used to redirect to a separate file. do this by checking for /etc/rsyslog.d and /etc/logrotate.d files
