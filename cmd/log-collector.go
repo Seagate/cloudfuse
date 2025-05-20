@@ -77,7 +77,7 @@ var gatherLogsCmd = &cobra.Command{
 					return fmt.Errorf("unable to create archive: [%s]", err.Error())
 				}
 			} else if runtime.GOOS == "windows" {
-				//add the system app data system32 thing if there is no filepath in the config.
+				//TODO: add the system app data system32 if there is no filepath in the config.
 				if strings.HasPrefix(logPath, ".cloudfuse") {
 					err = createWindowsArchive("path/to/cloudfuse/app/data/system32/thing")
 				} else {
