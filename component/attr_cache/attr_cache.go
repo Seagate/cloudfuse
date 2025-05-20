@@ -1055,6 +1055,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	switch {
 	case err == nil:
 		// Retrieved attributes so cache them
+		log.Debug("AttrCache::GetAttr : %s Caching record from cloud", options.Name)
 		ac.cache.insert(insertOptions{
 			attr:     pathAttr,
 			exists:   true,
@@ -1065,6 +1066,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		}
 	case err == syscall.ENOENT:
 		// cache this entity not existing
+		log.Debug("AttrCache::GetAttr : %s Caching ENOENT from cloud", options.Name)
 		ac.cache.insert(insertOptions{
 			attr:     internal.CreateObjAttr(options.Name, 0, time.Now()),
 			exists:   false,
@@ -1076,8 +1078,10 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		if found && value.valid() {
 			// Serve the request from the attribute cache
 			if !value.exists() {
+				log.Debug("AttrCache::GetAttr : %s ENOENT found in cache (offline)", options.Name)
 				return value.attr, errors.Join(syscall.ENOENT, err)
 			} else {
+				log.Debug("AttrCache::GetAttr : %s Entry found in cache (offline)", options.Name)
 				return value.attr, err
 			}
 		} else {
@@ -1085,6 +1089,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 			// but do we have a complete listing for its parent directory?
 			entry, found := ac.cache.get(getParentDir(options.Name))
 			if found && entry.listingComplete {
+				log.Debug("AttrCache::GetAttr : %s Not in directory (offline)", options.Name)
 				return nil, errors.Join(syscall.ENOENT, err)
 			} else {
 				// we have no way of knowing whether the requested item is in the directory in the cloud
@@ -1092,6 +1097,7 @@ func (ac *AttrCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 				// the OS can call GetAttr on a file without listing its parent directory
 				// so having a valid file entry in cache does not mean we have a complete listing of its parent
 				// so we can't just check if the directory has any children as a proxy for whether it's been listed
+				log.Err("AttrCache::GetAttr : %s No cached data (offline)", options.Name)
 				return nil, common.NewNoCachedDataError(err)
 			}
 		}
