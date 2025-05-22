@@ -1,8 +1,22 @@
 # Cloudfuse Changelog #
 
+## **1.11.2** ##
+
+May 15th 2025
+This version is based on [blobfuse2 2.4.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.4.0) (upstream).
+
+### Bug Fixes ###
+
+- [#553](https://github.com/Seagate/cloudfuse/pull/553) Fix prompt to install WinFSP when already installed
+- [#542](https://github.com/Seagate/cloudfuse/pull/542) Improve rename file and prevent data loss in rare cases
+
+### Features ###
+
+- [#554](https://github.com/Seagate/cloudfuse/pull/554) Checksum on release is now signed
+
 ## **1.11.1** ##
 
-April 29h 2025
+April 29th 2025
 This version is based on [blobfuse2 2.4.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.4.0) (upstream).
 
 ### Bug Fixes ###
