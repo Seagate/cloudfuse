@@ -723,7 +723,7 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 func (fc *FileCache) cloudConnected() bool {
 	// TODO: create a new component API function to check this (SRGDEV-614), instead of using StatFs
 	_, _, err := fc.NextComponent().StatFs()
-	return !isOffline(err)
+	return err == nil
 }
 
 // this returns true when offline access is enabled, and it's safe to access this object offline
