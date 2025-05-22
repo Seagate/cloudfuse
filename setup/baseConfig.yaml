@@ -93,10 +93,7 @@ block_cache:
 
 # Disk cache related configuration
 file_cache:
-  # Required
-  path: <path to local disk cache>
-
-  # Optional
+  path: <path to local disk cache. Default $HOME/.cloudfuse/file_cache>
   timeout-sec: <default cache eviction timeout (in sec). Default - 216000 sec>
   max-eviction: <number of files that can be evicted at once. Default - 5000>
   max-size-mb: <maximum cache size allowed. Default - 80% of free disk space>
