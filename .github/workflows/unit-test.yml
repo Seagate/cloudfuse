@@ -96,39 +96,7 @@ jobs:
       - name: Install libfuse on Linux
         shell: bash
         run: |
-          sudo apt-get update && sudo apt-get install -y pkg-config fuse3 ${{ matrix.fuselib }}
-          if [[ "${{ matrix.job_name }}" == "linux-fuse2" ]] || "${{ matrix.job_name }}" == "linux-fuse2-arm" ]]; then
-            sudo apt-get install -y libfuse-dev;
-          fi
-
-      - name: Setup CGO environment for Zig
-        shell: bash
-        run: |
-          if [[ "${{ matrix.job_name }}" == "linux-fuse2" || "${{ matrix.job_name }}" == "linux-fuse2-arm" ]]; then
-            echo "Using FUSE2 (${{ matrix.fuselib }})"
-            PKG_CONFIG_CFLAGS=$(pkg-config fuse --cflags)
-            PKG_CONFIG_LDFLAGS=$(pkg-config fuse --libs)
-            echo "pkg-config fuse --cflags: $PKG_CONFIG_CFLAGS"
-            echo "pkg-config fuse --libs: $PKG_CONFIG_LDFLAGS"
-            echo "CGO_CFLAGS=$PKG_CONFIG_CFLAGS $CGO_EXTRA_CFLAGS" >> $GITHUB_ENV
-            echo "CGO_LDFLAGS=$PKG_CONFIG_LDFLAGS" >> $GITHUB_ENV
-          else # FUSE3
-            echo "Using FUSE3 (${{ matrix.fuselib }})"
-            PKG_CONFIG_CFLAGS=$(pkg-config fuse3 --cflags)
-            PKG_CONFIG_LDFLAGS=$(pkg-config fuse3 --libs)
-            echo "pkg-config fuse3 --cflags: $PKG_CONFIG_CFLAGS"
-            echo "pkg-config fuse3 --libs: $PKG_CONFIG_LDFLAGS"
-            echo "CGO_CFLAGS=$PKG_CONFIG_CFLAGS $CGO_EXTRA_CFLAGS" >> $GITHUB_ENV
-            echo "CGO_LDFLAGS=$PKG_CONFIG_LDFLAGS" >> $GITHUB_ENV
-          fi
-          echo "CGO environment variables set."
-          echo "--- Current CGO Environment ---"
-          echo "CGO_ENABLED=${CGO_ENABLED}"
-          echo "CC=${CC}"
-          echo "CXX=${CXX}"
-          echo "CGO_CFLAGS=${CGO_CFLAGS}"
-          echo "CGO_LDFLAGS=${CGO_LDFLAGS}"
-          echo "-------------------------------"
+          sudo apt-get update && sudo apt-get upgrade && sudo apt-get install -y pkg-config fuse3 ${{ matrix.fuselib }}
 
       - name: Build
         run: |
