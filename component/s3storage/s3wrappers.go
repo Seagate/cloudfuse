@@ -466,13 +466,12 @@ func (cl *Client) List(
 	// fetch and process a single result page
 	output, err := paginator.NextPage(context.Background())
 	if err != nil {
-		log.Err(
-			"Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v",
-			prefix,
+		attemptedAction := fmt.Sprintf(
+			"list objects in bucket %v with prefix %v",
 			bucketName,
-			err,
+			prefix,
 		)
-		return objectAttrList, nil, err
+		return objectAttrList, nil, parseS3Err(err, attemptedAction)
 	}
 
 	if output.IsTruncated != nil && *output.IsTruncated {
