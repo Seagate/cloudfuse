@@ -315,11 +315,7 @@ func (p *lruPolicy) updateMarker() {
 	p.Lock()
 	p.extractNode(p.lastMarker)
 	p.setHead(p.lastMarker)
-	// swap lastMarker with currMarker
-	swap := p.lastMarker
-	p.lastMarker = p.currMarker
-	p.currMarker = swap
-
+	p.lastMarker, p.currMarker = p.currMarker, p.lastMarker
 	p.Unlock()
 }
 
@@ -357,7 +353,7 @@ func (p *lruPolicy) deleteExpiredNodes() {
 		return
 	}
 
-	delItems := make([]*lruNode, 0)
+	delItems := make([]*lruNode, 0, p.maxEviction)
 	count := uint32(0)
 
 	p.Lock()
@@ -389,13 +385,11 @@ func (p *lruPolicy) deleteExpiredNodes() {
 	log.Debug("lruPolicy::deleteExpiredNodes : List generated %d items", count)
 
 	for _, item := range delItems {
-		item.RLock()
-		restored := !item.deleted
-		item.RUnlock()
-		if !restored {
-			p.removeNode(item.name)
-			p.deleteItem(item.name)
-		}
+		node.Lock()
+		node.deleted = true
+		node.Unlock()
+		p.nodeMap.Delete(item.name)
+		p.deleteItem(item.name)
 	}
 
 	log.Debug("lruPolicy::deleteExpiredNodes : Ends")

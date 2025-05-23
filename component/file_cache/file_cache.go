@@ -747,7 +747,7 @@ func (fc *FileCache) RenameDir(options internal.RenameDirOptions) error {
 	sort.Strings(objectNames)
 
 	// acquire a file lock on each entry (and defer unlock)
-	var flocks []*common.LockMapItem
+	flocks := make([]*common.LockMapItem, 0, len(objectNames))
 	for _, objectName := range objectNames {
 		flock := fc.fileLocks.Get(objectName)
 		flocks = append(flocks, flock)
@@ -1657,27 +1657,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		}
 
 		// Flush all data to disk that has been buffered by the kernel.
-		// We cannot close the incoming handle since the user called flush, note close and flush can be called on the same handle multiple times.
-		// To ensure the data is flushed to disk before writing to storage, we duplicate the handle and close that handle.
-		// f.fsync() is another option but dup+close does it quickly compared to sync
-		// dupFd, err := syscall.Dup(int(f.Fd()))
-		// if err != nil {
-		// 	log.Err("FileCache::FlushFile : error [couldn't duplicate the fd] %s", options.Handle.Path)
-		// 	return syscall.EIO
-		// }
-
-		// err = syscall.Close(dupFd)
-		// if err != nil {
-		// 	log.Err("FileCache::FlushFile : error [unable to close duplicate fd] %s", options.Handle.Path)
-		// 	return syscall.EIO
-		// }
-
-		// Replace above with Sync since Dup is not supported on Windows
-		err := f.Sync()
-		if err != nil {
-			log.Err("FileCache::FlushFile : error [unable to sync file] %s", options.Handle.Path)
-			return syscall.EIO
-		}
+		fc.syncFile(f, options.Handle.Path)
 
 		// Write to storage
 		// Create a new handle for the SDK to use to upload (read local file)
@@ -1787,7 +1767,6 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	flock := fc.fileLocks.Get(options.Name)
 	// TODO: should we add RLock and RUnlock to the lock map for GetAttr?
 	flock.Lock()
-	defer flock.Unlock()
 
 	// To cover case 1, get attributes from storage
 	var exists bool
@@ -1807,10 +1786,10 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// To cover cases 2 and 3, grab the attributes from the local cache
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	info, err := os.Stat(localPath)
+	flock.Unlock()
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
 	if err == nil && !info.IsDir() {
 		if exists { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
-			log.Debug("FileCache::GetAttr : updating %s from local cache", options.Name)
 			// attrs is a pointer returned by NextComponent
 			// modifying attrs could corrupt cached directory listings
 			// to update properties, we need to make a deep copy first

@@ -1407,7 +1407,7 @@ func (bb *BlockBlob) stageAndCommitModifiedBlocks(
 ) error {
 	blobClient := bb.getBlockBlobClient(name)
 	blockOffset := int64(0)
-	var blockIDList []string
+	blockIDList := make([]string, 0, len(offsetList.BlockList))
 	for _, blk := range offsetList.BlockList {
 		blockIDList = append(blockIDList, blk.Id)
 		if blk.Dirty() {
@@ -1461,7 +1461,7 @@ func (bb *BlockBlob) StageAndCommit(name string, bol *common.BlockOffsetList) er
 	blobMtx.Lock()
 	defer blobMtx.Unlock()
 	blobClient := bb.getBlockBlobClient(name)
-	var blockIDList []string
+	blockIDList := make([]string, 0, len(bol.BlockList))
 	var data []byte
 	staged := false
 	for _, blk := range bol.BlockList {

@@ -52,6 +52,7 @@ import (
 	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -65,8 +66,10 @@ const (
 
 type Client struct {
 	Connection
-	awsS3Client *s3.Client // S3 client library supplied by AWS
-	blockLocks  common.KeyedMutex
+	awsS3Client       *s3.Client // S3 client library supplied by AWS
+	blockLocks        common.KeyedMutex
+	downloader        *manager.Downloader
+	uploader          *manager.Uploader
 }
 
 // Verify that Client implements S3Connection interface
@@ -255,6 +258,17 @@ func (cl *Client) Configure(cfg Config) error {
 		log.Err("Client::Configure : listing objects failed. Here's why: %v", err)
 		return err
 	}
+
+	// Create downloader and uploader to be reused for multipart downloads
+	cl.downloader = manager.NewDownloader(cl.awsS3Client, func(u *manager.Downloader) {
+		u.PartSize = cl.Config.partSize
+		u.Concurrency = cl.Config.concurrency
+	})
+
+	cl.uploader = manager.NewUploader(cl.awsS3Client, func(u *manager.Uploader) {
+		u.PartSize = cl.Config.partSize
+		u.Concurrency = cl.Config.concurrency
+	})
 
 	return nil
 }
