@@ -191,6 +191,7 @@ jobs:
       zig: 0.14.0
     permissions:
       contents: write
+      id-token: write
 
     steps:
       # libfuse-dev is required to build our command-line program and enable GoReleaser to build for ARM64
@@ -219,6 +220,9 @@ jobs:
           go-version: ${{ env.go }}
           check-latest: true
           cache: false
+
+      - name: Set up Cosign
+        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3.8.2
 
       - name: Set Version
         id: get_version

@@ -103,7 +103,7 @@ file_cache:
   high-threshold: <% disk space consumed which triggers eviction. This parameter overrides 'timeout-sec' parameter and cached files will be removed even if they have not expired. Default - 80>
   low-threshold: <% disk space consumed which triggers eviction to stop when previously triggered by the high-threshold. Default - 60>
   create-empty-file: true|false <create an empty file on container when create call is received from kernel>
-  allow-non-empty-temp: true|false <allow non empty temp directory at startup. Set true to persist local cache across reboots.>
+  allow-non-empty-temp: true|false <allow non empty temp directory at startup. This should not be used in production.>
   cleanup-on-start: true|false <cleanup the temp directory on startup, if it's not empty>
   block-offline-access: true|false <stop local file accesses while cloud storage is inaccessible>
   policy-trace: true|false <generate eviction policy logs showing which files will expire soon>
