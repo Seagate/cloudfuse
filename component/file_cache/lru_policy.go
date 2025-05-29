@@ -240,7 +240,9 @@ func (ss *LRUPolicySnapshot) writeToFile(tmpPath string) error {
 }
 
 func readSnapshotFromFile(tmpPath string) (*LRUPolicySnapshot, error) {
-	snapshotData, err := os.ReadFile(filepath.Join(tmpPath, snapshotPath))
+	fullSnapshotPath := filepath.Join(tmpPath, snapshotPath)
+	defer os.Remove(fullSnapshotPath)
+	snapshotData, err := os.ReadFile(fullSnapshotPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			log.Crit(
