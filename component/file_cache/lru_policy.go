@@ -26,7 +26,10 @@
 package file_cache
 
 import (
+	"bytes"
+	"encoding/gob"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -71,9 +74,19 @@ type lruPolicy struct {
 	duPresent bool
 }
 
+// LRUPolicySnapshot represents the *persisted state* of lruPolicy.
+// It contains only the fields that need to be saved, and they are exported.
+type LRUPolicySnapshot struct {
+	NodeList           []string // Just node names, *without their fc.tmp prefix*, in linked list order
+	CurrMarkerPosition uint64   // Node index of currMarker
+	LastMarkerPosition uint64   // Node index of lastMarker
+}
+
 const (
 	// Check for disk usage in below number of minutes
 	DiskUsageCheckInterval = 1
+	// Cache snapshot relative filepath
+	snapshotPath = ".fileCacheSnapshot.gob"
 )
 
 var _ cachePolicy = &lruPolicy{}
@@ -103,12 +116,16 @@ func (p *lruPolicy) StartPolicy() error {
 	p.lastMarker.prev = p.currMarker
 	p.lastMarker.next = nil
 	p.head = p.currMarker
+	snapshot, err := readSnapshotFromFile(p.tmpPath)
+	if err == nil && snapshot != nil {
+		p.loadSnapshot(*snapshot)
+	}
 
 	p.closeSignal = make(chan int)
 	p.closeSignalValidate = make(chan int)
 	p.validateChan = make(chan string, 10000)
 
-	_, err := common.GetUsage(p.tmpPath)
+	_, err = common.GetUsage(p.tmpPath)
 	if err == nil {
 		p.duPresent = true
 	} else {
@@ -135,7 +152,116 @@ func (p *lruPolicy) ShutdownPolicy() error {
 	log.Trace("lruPolicy::ShutdownPolicy")
 	p.closeSignal <- 1
 	p.closeSignalValidate <- 1
-	return nil
+	return p.createSnapshot().writeToFile(p.tmpPath)
+}
+
+func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
+	log.Trace("lruPolicy::saveSnapshot")
+	var snapshot LRUPolicySnapshot
+	var index uint64
+	p.Lock()
+	defer p.Unlock()
+	// walk the list and write the entries into a SerializableLRUPolicy
+	current := p.head
+	for current != nil {
+		// check for and remove the prefix (which should always be present)
+		if strings.HasPrefix(current.name, p.tmpPath) {
+			snapshot.NodeList = append(snapshot.NodeList, current.name[len(p.tmpPath):])
+		}
+		if current == p.currMarker {
+			snapshot.CurrMarkerPosition = index
+		}
+		if current == p.lastMarker {
+			snapshot.LastMarkerPosition = index
+		}
+		current = current.next
+		index++
+	}
+	return &snapshot
+}
+
+func (p *lruPolicy) loadSnapshot(snapshot LRUPolicySnapshot) {
+	p.Lock()
+	defer p.Unlock()
+	// walk the slice and write the entries into the policy
+	// remember that the markers are actual nodes, with indices preceding the item at the same NodeList index
+	currentIndex := 0
+	insertPosition := p.head
+	tail := p.lastMarker
+	for _, v := range snapshot.NodeList {
+		// recreate the node
+		fullPath := filepath.Join(p.tmpPath, v)
+		newNode := &lruNode{
+			name:    fullPath,
+			next:    nil,
+			prev:    nil,
+			usage:   0,
+			deleted: false,
+		}
+		p.nodeMap.Store(fullPath, newNode)
+		// let markers stay in place
+		for currentIndex == int(snapshot.CurrMarkerPosition) ||
+			currentIndex == int(snapshot.LastMarkerPosition) {
+			insertPosition = insertPosition.next
+			currentIndex++
+		}
+		// insert the new node
+		newNode.next = insertPosition
+		prevNode := tail
+		if insertPosition != nil {
+			prevNode = insertPosition.prev
+			insertPosition.prev = newNode
+		}
+		newNode.prev = prevNode
+		if prevNode != nil {
+			prevNode.next = newNode
+		}
+		// adjust the head and tail
+		for p.head.prev != nil {
+			p.head = p.head.prev
+		}
+		for tail.next != nil {
+			tail = tail.next
+		}
+		currentIndex++
+	}
+}
+
+func (ss *LRUPolicySnapshot) writeToFile(tmpPath string) error {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	gob.Register(&LRUPolicySnapshot{})
+	err := enc.Encode(ss)
+	if err != nil {
+		log.Crit("lruPolicy::ShutdownPolicy : Failed to encode policy snapshot")
+		return err
+	}
+	return os.WriteFile(filepath.Join(tmpPath, snapshotPath), buf.Bytes(), 0644)
+}
+
+func readSnapshotFromFile(tmpPath string) (*LRUPolicySnapshot, error) {
+	snapshotData, err := os.ReadFile(filepath.Join(tmpPath, snapshotPath))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Crit(
+				"lruPolicy::readSnapshotFromFile : Failed to read snapshot file. Here's why: %v",
+				err,
+			)
+		}
+		return nil, err
+	}
+	var snapshot LRUPolicySnapshot
+	dec := gob.NewDecoder(bytes.NewReader(snapshotData))
+	gob.Register(LRUPolicySnapshot{})
+	err = dec.Decode(&snapshot)
+	if err != nil {
+		log.Crit(
+			"lruPolicy::readSnapshotFromFile : Failed to decode snapshot data. Here's why: %v",
+			err,
+		)
+		return nil, err
+	}
+	return &snapshot, nil
 }
 
 func (p *lruPolicy) UpdateConfig(c cachePolicyConfig) error {
