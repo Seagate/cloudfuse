@@ -597,10 +597,6 @@ func (bc *BlockCache) CloseFile(options internal.CloseFileOptions) error {
 func (bc *BlockCache) closeFileInternal(options internal.CloseFileOptions) error {
 	log.Trace("BlockCache::CloseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
 
-	flock := bc.fileLocks.Get(options.Handle.Path)
-	flock.Lock()
-	defer flock.Unlock()
-
 	defer bc.fileCloseOpt.Done()
 
 	if options.Handle.Dirty() {
