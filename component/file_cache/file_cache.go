@@ -567,10 +567,10 @@ func (fc *FileCache) StreamDir(
 			// Case 3: Item is in both local cache and cloud
 			if !attr.IsDir() {
 				flock := fc.fileLocks.Get(attr.Path)
-				flock.Lock()
+				flock.RLock()
 				// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
 				info, err := os.Stat(filepath.Join(localPath, dirent.Name())) // Grab local cache attributes
-				flock.Unlock()
+				flock.RUnlock()
 				if err == nil {
 					// attr is a pointer returned by NextComponent
 					// modifying attr could corrupt cached directory listings
@@ -599,12 +599,12 @@ func (fc *FileCache) StreamDir(
 				if err != nil && (err == syscall.ENOENT || os.IsNotExist(err)) {
 					// get the lock on the file, to allow any pending operation to complete
 					flock := fc.fileLocks.Get(entryPath)
-					flock.Lock()
+					flock.RLock()
 					// use os.Stat instead of entry.Info() to be sure we get good info (with flock locked)
 					info, err := os.Stat(
 						filepath.Join(localPath, entry.Name()),
 					) // Grab local cache attributes
-					flock.Unlock()
+					flock.RUnlock()
 					// If local file is not locked then only use its attributes otherwise rely on container attributes
 					if err == nil {
 						// Case 2 (file only in local cache) so create a new attributes and add them to the storage attributes
@@ -1766,7 +1766,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// wait for download or deletion to complete before getting local file info
 	flock := fc.fileLocks.Get(options.Name)
 	// TODO: should we add RLock and RUnlock to the lock map for GetAttr?
-	flock.Lock()
+	flock.RLock()
 
 	// To cover case 1, get attributes from storage
 	var exists bool
@@ -1786,7 +1786,7 @@ func (fc *FileCache) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 	// To cover cases 2 and 3, grab the attributes from the local cache
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	info, err := os.Stat(localPath)
-	flock.Unlock()
+	flock.RUnlock()
 	// All directory operations are guaranteed to be synced with storage so they cannot be in a case 2 or 3 state.
 	if err == nil && !info.IsDir() {
 		if exists { // Case 3 (file in cloud storage and in local cache) so update the relevant attributes
