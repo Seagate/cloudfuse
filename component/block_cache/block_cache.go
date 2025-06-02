@@ -409,6 +409,10 @@ func (bc *BlockCache) getDefaultMemSize() uint64 {
 func (bc *BlockCache) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	log.Trace("BlockCache::CreateFile : name=%s, mode=%d", options.Name, options.Mode)
 
+	flock := bc.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
 	f, err := bc.NextComponent().CreateFile(options)
 	if err != nil {
 		log.Err("BlockCache::CreateFile : Failed to create file %s", options.Name)
@@ -435,6 +439,10 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 		options.Flags,
 		options.Mode,
 	)
+
+	flock := bc.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
 
 	attr, err := bc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 	if err != nil {
@@ -549,6 +557,10 @@ func (bc *BlockCache) FlushFile(options internal.FlushFileOptions) error {
 		return nil
 	}
 
+	flock := bc.fileLocks.Get(options.Handle.Path)
+	flock.Lock()
+	defer flock.Unlock()
+
 	options.Handle.Lock()
 	defer options.Handle.Unlock()
 
@@ -584,6 +596,10 @@ func (bc *BlockCache) CloseFile(options internal.CloseFileOptions) error {
 // closeFileInternal: Actual handling of the close file goes here
 func (bc *BlockCache) closeFileInternal(options internal.CloseFileOptions) error {
 	log.Trace("BlockCache::CloseFile : name=%s, handle=%d", options.Handle.Path, options.Handle.ID)
+
+	flock := bc.fileLocks.Get(options.Handle.Path)
+	flock.Lock()
+	defer flock.Unlock()
 
 	defer bc.fileCloseOpt.Done()
 

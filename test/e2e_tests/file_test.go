@@ -313,7 +313,7 @@ func (suite *fileTestSuite) TestFileReadSmall() {
 
 	data, err := os.ReadFile(fileName)
 	suite.NoError(err)
-	suite.Len(suite.minBuff, len(data))
+	suite.Len(data, len(suite.minBuff))
 
 	suite.fileTestCleanup([]string{fileName})
 }
