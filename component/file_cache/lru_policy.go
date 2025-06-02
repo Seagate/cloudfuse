@@ -162,19 +162,17 @@ func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
 	p.Lock()
 	defer p.Unlock()
 	// walk the list and write the entries into a SerializableLRUPolicy
-	current := p.head
-	for current != nil {
+
+	for current := p.head; current != nil; current = current.next {
 		// check for and remove the prefix (which should always be present)
-		if strings.HasPrefix(current.name, p.tmpPath) {
+		switch {
+		case strings.HasPrefix(current.name, p.tmpPath):
 			snapshot.NodeList = append(snapshot.NodeList, current.name[len(p.tmpPath):])
-		}
-		if current == p.currMarker {
+		case current == p.currMarker:
 			snapshot.CurrMarkerPosition = index
-		}
-		if current == p.lastMarker {
+		case current == p.lastMarker:
 			snapshot.LastMarkerPosition = index
 		}
-		current = current.next
 		index++
 	}
 	return &snapshot
@@ -185,8 +183,8 @@ func (p *lruPolicy) loadSnapshot(snapshot LRUPolicySnapshot) {
 	defer p.Unlock()
 	// walk the slice and write the entries into the policy
 	// remember that the markers are actual nodes, with indices preceding the item at the same NodeList index
-	currentIndex := 0
-	insertPosition := p.head
+	nodeIndex := 0
+	nextNode := p.head
 	tail := p.lastMarker
 	for _, v := range snapshot.NodeList {
 		// recreate the node
@@ -200,30 +198,37 @@ func (p *lruPolicy) loadSnapshot(snapshot LRUPolicySnapshot) {
 		}
 		p.nodeMap.Store(fullPath, newNode)
 		// let markers stay in place
-		for currentIndex == int(snapshot.CurrMarkerPosition) ||
-			currentIndex == int(snapshot.LastMarkerPosition) {
-			insertPosition = insertPosition.next
-			currentIndex++
+		if nodeIndex == int(snapshot.CurrMarkerPosition) {
+			nextNode = nextNode.next
+			nodeIndex++
 		}
-		// insert the new node
-		newNode.next = insertPosition
+		if nodeIndex == int(snapshot.LastMarkerPosition) {
+			nextNode = nextNode.next
+			nodeIndex++
+		}
+		// find prevNode
 		prevNode := tail
-		if insertPosition != nil {
-			prevNode = insertPosition.prev
-			insertPosition.prev = newNode
+		if nextNode != nil {
+			prevNode = nextNode.prev
 		}
+		// set newNode's pointers
 		newNode.prev = prevNode
+		newNode.next = nextNode
+		// set surrounding pointers
+		if nextNode != nil {
+			nextNode.prev = newNode
+		}
 		if prevNode != nil {
 			prevNode.next = newNode
 		}
 		// adjust the head and tail
-		for p.head.prev != nil {
-			p.head = p.head.prev
+		if p.head == nextNode {
+			p.head = newNode
 		}
-		for tail.next != nil {
-			tail = tail.next
+		if tail == prevNode {
+			tail = newNode
 		}
-		currentIndex++
+		nodeIndex++
 	}
 }
 
