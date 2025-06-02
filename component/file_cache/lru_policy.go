@@ -166,12 +166,14 @@ func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
 	for current := p.head; current != nil; current = current.next {
 		// check for and remove the prefix (which should always be present)
 		switch {
-		case strings.HasPrefix(current.name, p.tmpPath):
-			snapshot.NodeList = append(snapshot.NodeList, current.name[len(p.tmpPath):])
 		case current == p.currMarker:
 			snapshot.CurrMarkerPosition = index
 		case current == p.lastMarker:
 			snapshot.LastMarkerPosition = index
+		case strings.HasPrefix(current.name, p.tmpPath):
+			snapshot.NodeList = append(snapshot.NodeList, current.name[len(p.tmpPath):])
+		default:
+			log.Err("lruPolicy::saveSnapshot : %s Ignoring unrecognized cache path", current.name)
 		}
 		index++
 	}
