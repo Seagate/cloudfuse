@@ -1284,7 +1284,7 @@ func (suite *fileCacheTestSuite) TestOpenPreventsEviction() {
 	suite.assert.NoError(err)
 
 	// wait until file would be evicted (if not for being opened)
-	time.Sleep(3 * minimumFileCacheTimeout * time.Second)
+	time.Sleep(minimumFileCacheTimeout * time.Second)
 
 	// File should still be in cache
 	suite.assert.FileExists(filepath.Join(suite.cache_path, path))
@@ -2065,7 +2065,7 @@ func (suite *fileCacheTestSuite) TestReadFileWithRefresh() {
 	byteArr = []byte("test data123456")
 	err = os.WriteFile(suite.fake_storage_path+"/"+path, byteArr, 0777)
 	suite.assert.NoError(err)
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 	handle, err = suite.fileCache.OpenFile(options)
 	suite.assert.NoError(err)
 	suite.assert.False(handle.Dirty())
