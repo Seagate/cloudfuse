@@ -159,7 +159,7 @@ jobs:
         env:
           JOB_NAME: ${{ matrix.job_name }}
         run: |
-          if [ "${JOB_NAME" == "linux-fuse2" ]; then
+          if [ "${JOB_NAME}" == "linux-fuse2" ]; then
             go test -coverpkg="./..." -covermode=count -c -o cloudfuse.test
           else
             go test -coverpkg="./..." -tags=fuse3 -covermode=count -c -o cloudfuse.test

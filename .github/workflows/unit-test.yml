@@ -122,7 +122,7 @@ jobs:
           echo "\"secret-key\"": "\"${AWS_SECRET_ACCESS_KEY}\"", >> $cnfFile
           echo "\"endpoint\"": "\"${AWS_ENDPOINT}\"", >> $cnfFile
           echo "\"region\"": "\"${AWS_REGION}\"", >> $cnfFile
-          echo "\"use-path-style\"": true, >> $cnfFile
+          echo "\"use-path-style\"": true\ >> $cnfFile
           echo "}" >> $cnfFile
 
       - name: Start LocalStack
