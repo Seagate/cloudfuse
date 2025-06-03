@@ -116,9 +116,10 @@ func (p *lruPolicy) StartPolicy() error {
 	p.lastMarker.prev = p.currMarker
 	p.lastMarker.next = nil
 	p.head = p.currMarker
+	gob.Register(LRUPolicySnapshot{})
 	snapshot, err := readSnapshotFromFile(p.tmpPath)
 	if err == nil && snapshot != nil {
-		p.loadSnapshot(*snapshot)
+		p.loadSnapshot(snapshot)
 	}
 
 	p.closeSignal = make(chan int)
@@ -180,7 +181,10 @@ func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
 	return &snapshot
 }
 
-func (p *lruPolicy) loadSnapshot(snapshot LRUPolicySnapshot) {
+func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
+	if snapshot == nil {
+		return
+	}
 	p.Lock()
 	defer p.Unlock()
 	// walk the slice and write the entries into the policy
@@ -237,7 +241,6 @@ func (p *lruPolicy) loadSnapshot(snapshot LRUPolicySnapshot) {
 func (ss *LRUPolicySnapshot) writeToFile(tmpPath string) error {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
-	gob.Register(&LRUPolicySnapshot{})
 	err := enc.Encode(ss)
 	if err != nil {
 		log.Crit("lruPolicy::ShutdownPolicy : Failed to encode policy snapshot")
@@ -261,7 +264,6 @@ func readSnapshotFromFile(tmpPath string) (*LRUPolicySnapshot, error) {
 	}
 	var snapshot LRUPolicySnapshot
 	dec := gob.NewDecoder(bytes.NewReader(snapshotData))
-	gob.Register(LRUPolicySnapshot{})
 	err = dec.Decode(&snapshot)
 	if err != nil {
 		log.Crit(
