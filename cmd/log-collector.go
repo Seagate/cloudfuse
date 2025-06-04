@@ -308,7 +308,6 @@ func createLinuxArchive(logPath string) error {
 }
 
 func createWindowsArchive(archPath string) error {
-
 	outFile, err := os.Create(dumpPath + "/cloudfuse_logs.zip")
 	if err != nil {
 		return nil
@@ -318,37 +317,31 @@ func createWindowsArchive(archPath string) error {
 	zipWriter := zip.NewWriter(outFile)
 	defer zipWriter.Close()
 
-	items, err := os.ReadDir(archPath)
-	if err != nil {
-		return err
-	}
-
 	var amountLogs int
-	for _, item := range items {
+	err = filepath.Walk(archPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 
-		if strings.HasPrefix(item.Name(), "cloudfuse") && strings.HasSuffix(item.Name(), ".log") {
-			itemPath := filepath.Join(archPath, item.Name())
-			itemPath = filepath.Clean(itemPath)
+		if info.IsDir() {
+			return nil
+		}
 
-			file, err := os.Open(itemPath)
+		var relPath string
+		relPath, err = filepath.Rel(archPath, path)
+		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(relPath, "cloudfuse") && strings.HasSuffix(relPath, ".log") {
+			var file *os.File
+			file, err = os.Open(path)
 			if err != nil {
 				return err
 			}
 			defer file.Close()
 
-			info, err := file.Stat()
-			if err != nil {
-				return err
-			}
-
-			header, err := zip.FileInfoHeader(info)
-			if err != nil {
-				return err
-			}
-
-			header.Name = item.Name()
-
-			zipEntry, err := zipWriter.Create(item.Name())
+			var zipEntry io.Writer
+			zipEntry, err = zipWriter.Create(relPath)
 			if err != nil {
 				return err
 			}
@@ -358,14 +351,14 @@ func createWindowsArchive(archPath string) error {
 				return err
 			}
 			amountLogs++
-		} else {
-			continue
 		}
-	}
+		return err
+	})
+
 	if amountLogs == 0 {
 		return fmt.Errorf("no cloudfuse log file were found in %s", archPath)
 	}
-	return nil
+	return err
 }
 
 func init() {
