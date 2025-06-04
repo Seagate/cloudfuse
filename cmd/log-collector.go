@@ -90,6 +90,40 @@ var gatherLogsCmd = &cobra.Command{
 				preArchPath, err = os.MkdirTemp(dumpPath, "PreZip*") // temp folder to copy files to
 				defer os.RemoveAll(preArchPath)
 				// copied over the service log files from servicePath -> preArchPath
+				var items []os.DirEntry
+				items, err = os.ReadDir(servicePath)
+				if err != nil {
+					return fmt.Errorf("failed read the service path directory: [%s]", err.Error())
+				}
+
+				for _, item := range items {
+					if item.IsDir() {
+						continue
+					}
+
+					srcFilePath := filepath.Join(servicePath, item.Name())
+					dstFilePath := filepath.Join(preArchPath, item.Name())
+
+					var srcFile *os.File
+					srcFile, err = os.Open(srcFilePath)
+					defer srcFile.Close()
+					if err != nil {
+						return fmt.Errorf("failed to open file in service path to copy: [%s]", err.Error())
+					}
+
+					var dstFile *os.File
+					dstFile, err = os.Create(dstFilePath)
+					defer dstFile.Close()
+					if err != nil {
+						return fmt.Errorf("failed to create file to copy service file: [%s]", err.Error())
+					}
+
+					_, err = io.Copy(dstFile, srcFile)
+					if err != nil {
+						return fmt.Errorf("failed to copy file %s: [%s]", item.Name(), err.Error())
+					}
+
+				}
 
 				// fetch provided or default logPath
 				logPath = common.ExpandPath(logPath)
