@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 
 	"github.com/stretchr/testify/assert"
@@ -49,10 +50,10 @@ type lruPolicyTestSuite struct {
 var cache_path = filepath.Join(home_dir, "file_cache")
 
 func (suite *lruPolicyTestSuite) SetupTest() {
-	// err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
-	// if err != nil {
-	// 	panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
-	// }
+	err := log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
+	if err != nil {
+		panic(fmt.Sprintf("Unable to set silent logger as default: %v", err))
+	}
 	suite.assert = assert.New(suite.T())
 
 	os.Mkdir(cache_path, fs.FileMode(0777))
@@ -303,6 +304,190 @@ func (suite *lruPolicyTestSuite) TestMaxEviction() {
 	for i := 1; i < 5; i++ {
 		suite.assert.False(suite.policy.IsCached("temp" + fmt.Sprint(i)))
 	}
+}
+
+func (suite *lruPolicyTestSuite) verifyPolicy(expectedPolicy, actualPolicy *lruPolicy) {
+	for expected, actual := expectedPolicy.head, actualPolicy.head; expected != nil || actual != nil; expected, actual = expected.next, actual.next {
+		if expected == expectedPolicy.currMarker {
+			suite.assert.Same(actualPolicy.currMarker, actual)
+		} else if expected == expectedPolicy.lastMarker {
+			suite.assert.Same(actualPolicy.lastMarker, actual)
+		} else {
+			suite.assert.Equal(expected.name, actual.name)
+		}
+		suite.assert.NotNil(actual, "actual list is shorter than expected")
+		suite.assert.NotNil(expected, "actual list is longer than expected")
+	}
+}
+
+func (suite *lruPolicyTestSuite) TestCreateSnapshotEmpty() {
+	defer suite.cleanupTest()
+	originalPolicy := suite.policy
+	// test
+	snapshot := suite.policy.createSnapshot()
+	suite.cleanupTest()
+	suite.setupTestHelper(originalPolicy.cachePolicyConfig)
+	suite.policy.loadSnapshot(snapshot)
+	// assert
+	suite.assert.NotNil(snapshot)
+	suite.assert.Empty(snapshot.NodeList)
+	suite.assert.Zero(snapshot.CurrMarkerPosition)
+	suite.assert.EqualValues(1, snapshot.LastMarkerPosition)
+	suite.verifyPolicy(originalPolicy, suite.policy)
+}
+
+func (suite *lruPolicyTestSuite) TestCreateSnapshotWithTrailingMarkers() {
+	defer suite.cleanupTest()
+	// setup
+	numFiles := 5
+	pathPrefix := filepath.Join(cache_path, "temp")
+	for i := 1; i <= numFiles; i++ {
+		suite.policy.CacheValid(pathPrefix + fmt.Sprint(i))
+	}
+	originalPolicy := suite.policy
+	// test
+	snapshot := suite.policy.createSnapshot()
+	suite.cleanupTest()
+	suite.setupTestHelper(originalPolicy.cachePolicyConfig)
+	suite.policy.loadSnapshot(snapshot)
+	// assert
+	suite.assert.NotNil(snapshot)
+	suite.assert.Len(snapshot.NodeList, numFiles)
+	for i, v := range snapshot.NodeList {
+		suite.assert.Equal(pathPrefix+fmt.Sprint(numFiles-i), filepath.Join(cache_path, v))
+	}
+	suite.assert.EqualValues(numFiles, snapshot.CurrMarkerPosition)
+	suite.assert.EqualValues(numFiles+1, snapshot.LastMarkerPosition)
+	suite.verifyPolicy(originalPolicy, suite.policy)
+}
+
+func (suite *lruPolicyTestSuite) TestCreateSnapshotWithSurroundingMarkers() {
+	defer suite.cleanupTest()
+	// setup
+	numFiles := 5
+	pathPrefix := filepath.Join(cache_path, "temp")
+	for i := 1; i <= numFiles; i++ {
+		suite.policy.CacheValid(pathPrefix + fmt.Sprint(i))
+	}
+	time.Sleep(1200 * time.Millisecond) // let timer elapse once
+	originalPolicy := suite.policy
+	// test
+	snapshot := suite.policy.createSnapshot()
+	suite.cleanupTest()
+	suite.setupTestHelper(originalPolicy.cachePolicyConfig)
+	suite.policy.loadSnapshot(snapshot)
+	// assert
+	suite.assert.NotNil(snapshot)
+	suite.assert.Len(snapshot.NodeList, numFiles)
+	for i, v := range snapshot.NodeList {
+		suite.assert.Equal(pathPrefix+fmt.Sprint(numFiles-i), filepath.Join(cache_path, v))
+	}
+	suite.assert.EqualValues(0, snapshot.CurrMarkerPosition)
+	suite.assert.EqualValues(numFiles+1, snapshot.LastMarkerPosition)
+	suite.verifyPolicy(originalPolicy, suite.policy)
+}
+
+func (suite *lruPolicyTestSuite) TestCreateSnapshotWithMixedMarkers() {
+	defer suite.cleanupTest()
+	// setup
+	numFiles := 5
+	pathPrefix := filepath.Join(cache_path, "temp")
+	for i := 1; i <= numFiles; i++ {
+		suite.policy.CacheValid(pathPrefix + fmt.Sprint(i))
+	}
+	time.Sleep(1200 * time.Millisecond) // let timer elapse once
+	for i := numFiles + 1; i <= numFiles*2; i++ {
+		suite.policy.CacheValid(pathPrefix + fmt.Sprint(i))
+	}
+	originalPolicy := suite.policy
+	// test
+	snapshot := suite.policy.createSnapshot()
+	suite.cleanupTest()
+	suite.setupTestHelper(originalPolicy.cachePolicyConfig)
+	suite.policy.loadSnapshot(snapshot)
+	// assert
+	suite.assert.NotNil(snapshot)
+	suite.assert.Len(snapshot.NodeList, numFiles*2)
+	for i, v := range snapshot.NodeList {
+		suite.assert.Equal(pathPrefix+fmt.Sprint(numFiles*2-i), filepath.Join(cache_path, v))
+	}
+	suite.assert.EqualValues(numFiles, snapshot.CurrMarkerPosition)
+	suite.assert.EqualValues(numFiles*2+1, snapshot.LastMarkerPosition)
+	suite.verifyPolicy(originalPolicy, suite.policy)
+}
+
+func (suite *lruPolicyTestSuite) TestCreateSnapshotPendingEviction() {
+	defer suite.cleanupTest()
+	// setup
+	numFiles := 5
+	pathPrefix := filepath.Join(cache_path, "temp")
+	for i := 1; i <= numFiles; i++ {
+		suite.policy.CacheValid(pathPrefix + fmt.Sprint(i))
+	}
+	time.Sleep(1200 * time.Millisecond) // let timer elapse once
+	for i := numFiles + 1; i <= numFiles*2; i++ {
+		suite.policy.CacheValid(pathPrefix + fmt.Sprint(i))
+	}
+	suite.policy.updateMarker() // simulate pending eviction
+	originalPolicy := suite.policy
+	// test
+	snapshot := suite.policy.createSnapshot()
+	suite.cleanupTest()
+	suite.setupTestHelper(originalPolicy.cachePolicyConfig)
+	suite.policy.loadSnapshot(snapshot)
+	// assert
+	suite.assert.NotNil(snapshot)
+	suite.assert.Len(snapshot.NodeList, numFiles*2)
+	for i, v := range snapshot.NodeList {
+		suite.assert.Equal(pathPrefix+fmt.Sprint(numFiles*2-i), filepath.Join(cache_path, v))
+	}
+	suite.assert.EqualValues(0, snapshot.CurrMarkerPosition)
+	suite.assert.EqualValues(numFiles+1, snapshot.LastMarkerPosition)
+	suite.verifyPolicy(originalPolicy, suite.policy)
+}
+
+func (suite *lruPolicyTestSuite) TestCreateSnapshotLeadingMarkers() {
+	defer suite.cleanupTest()
+	// setup
+	numFiles := 5
+	pathPrefix := filepath.Join(cache_path, "temp")
+	for i := 1; i <= numFiles; i++ {
+		suite.policy.CacheValid(pathPrefix + fmt.Sprint(i))
+	}
+	time.Sleep(1200 * time.Millisecond) // let timer elapse once
+	suite.policy.updateMarker()         // simulate pending eviction (so both markers lead)
+	originalPolicy := suite.policy
+	// test
+	snapshot := suite.policy.createSnapshot()
+	suite.cleanupTest()
+	suite.setupTestHelper(originalPolicy.cachePolicyConfig)
+	suite.policy.loadSnapshot(snapshot)
+	// assert
+	suite.assert.NotNil(snapshot)
+	suite.assert.Len(snapshot.NodeList, numFiles)
+	for i, v := range snapshot.NodeList {
+		suite.assert.Equal(pathPrefix+fmt.Sprint(numFiles-i), filepath.Join(cache_path, v))
+	}
+	suite.assert.EqualValues(0, snapshot.CurrMarkerPosition)
+	suite.assert.EqualValues(1, snapshot.LastMarkerPosition)
+	suite.verifyPolicy(originalPolicy, suite.policy)
+}
+
+func (suite *lruPolicyTestSuite) TestSnapshotSerialization() {
+	defer suite.cleanupTest()
+	// setup
+	snapshot := &LRUPolicySnapshot{
+		NodeList:           []string{"a", "b", "c"},
+		CurrMarkerPosition: 1,
+		LastMarkerPosition: 2,
+	}
+	// test
+	err := snapshot.writeToFile(cache_path)
+	suite.assert.NoError(err)
+	snapshotFromFile, err := readSnapshotFromFile(cache_path)
+	suite.assert.NoError(err)
+	// assert
+	suite.assert.Equal(snapshot, snapshotFromFile) // this checks deep equality
 }
 
 func TestLRUPolicyTestSuite(t *testing.T) {
