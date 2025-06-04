@@ -67,7 +67,7 @@ func IsDirectoryMounted(path string) bool {
 	// removing trailing / from the path
 	path = strings.TrimRight(path, "/")
 
-	for _, line := range strings.Split(string(mntList), "\n") {
+	for line := range strings.SplitSeq(string(mntList), "\n") {
 		if strings.TrimSpace(line) != "" {
 			mntPoint := strings.Split(line, " ")[1]
 			if path == mntPoint {
@@ -101,8 +101,8 @@ func IsMountActive(path string) (bool, error) {
 
 	// out contains the list of pids of the processes that are running
 	pidString := strings.ReplaceAll(out.String(), "\n", " ")
-	pids := strings.Split(pidString, " ")
-	for _, pid := range pids {
+	pids := strings.SplitSeq(pidString, " ")
+	for pid := range pids {
 		// Get the mount path for this pid
 		// For this we need to check the command line arguments given to this command
 		// If the path is same then we need to return true

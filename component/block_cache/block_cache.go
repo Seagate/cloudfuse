@@ -35,7 +35,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +44,8 @@ import (
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+
+	"slices"
 
 	"github.com/vibhansa-msft/tlru"
 )
@@ -1769,7 +1770,7 @@ func (bc *BlockCache) commitBlocks(handle *handlemap.Handle) error {
 
 	// Make three attempts to upload all pending blocks
 	cnt := 0
-	for cnt = 0; cnt < 3; cnt++ {
+	for cnt = range 3 {
 		if handle.Buffers.Cooking.Len() == 0 {
 			break
 		}
@@ -1850,7 +1851,7 @@ func (bc *BlockCache) getBlockIDList(handle *handlemap.Handle) ([]string, error)
 	for k := range listMap {
 		offsets = append(offsets, k)
 	}
-	sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
+	slices.Sort(offsets)
 
 	zeroBlockStaged := false
 	zeroBlockID := ""

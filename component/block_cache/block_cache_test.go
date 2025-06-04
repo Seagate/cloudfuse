@@ -411,7 +411,7 @@ func (suite *blockCacheTestSuite) TestValidateBlockList() {
 	//Generate blocklist, blocks with size equal to configured block size
 	blockLst = nil
 	startOffset = 0
-	for i := 0; i < noOfBlocks; i++ {
+	for range noOfBlocks {
 		blockSize := tobj.blockCache.blockSize
 		blk := internal.CommittedBlock{
 			Id:     base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(32)),
@@ -427,7 +427,7 @@ func (suite *blockCacheTestSuite) TestValidateBlockList() {
 	//Generate blocklist, blocks with size equal to configured block size and last block size <= config's block size
 	blockLst = nil
 	startOffset = 0
-	for i := 0; i < noOfBlocks; i++ {
+	for i := range noOfBlocks {
 		blockSize := tobj.blockCache.blockSize
 		if i == noOfBlocks-1 {
 			blockSize = mrand.Uint64N(tobj.blockCache.blockSize)
@@ -446,7 +446,7 @@ func (suite *blockCacheTestSuite) TestValidateBlockList() {
 	//Generate Blocklist, blocks with size equal to configured block size and last block size > config's block size
 	blockLst = nil
 	startOffset = 0
-	for i := 0; i < noOfBlocks; i++ {
+	for i := range noOfBlocks {
 		blockSize := tobj.blockCache.blockSize
 		if i == noOfBlocks-1 {
 			blockSize = tobj.blockCache.blockSize + mrand.Uint64N(100) + 1
@@ -465,7 +465,7 @@ func (suite *blockCacheTestSuite) TestValidateBlockList() {
 	//Generate Blocklist, blocks with random size
 	blockLst = nil
 	startOffset = 0
-	for i := 0; i < noOfBlocks; i++ {
+	for range noOfBlocks {
 		blockSize := mrand.Uint64N(tobj.blockCache.blockSize + 1)
 		blk := internal.CommittedBlock{
 			Id:     base64.StdEncoding.EncodeToString(common.NewUUIDWithLength(32)),
@@ -698,7 +698,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandom() {
 
 	data = make([]byte, 100)
 	max := int64(100 * _1MB)
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		offset := mrand.Int64N(max)
 		n, _ := tobj.blockCache.ReadInBuffer(
 			internal.ReadInBufferOptions{Handle: h, Offset: offset, Data: data},
@@ -741,7 +741,7 @@ func (suite *blockCacheTestSuite) TestFileReadRandomNoPrefetch() {
 
 	data = make([]byte, 100)
 	max := int64(100 * _1MB)
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		offset := mrand.Int64N(max)
 		n, _ := tobj.blockCache.ReadInBuffer(
 			internal.ReadInBufferOptions{Handle: h, Offset: offset, Data: data},
@@ -781,13 +781,13 @@ func (suite *blockCacheTestSuite) TestDiskUsageCheck() {
 	}
 
 	localfiles := make([]diskusagedata, 0)
-	for i := 0; i < 13; i++ {
+	for i := range 13 {
 		fname := randomString(5)
 		diskFile := filepath.Join(tobj.disk_cache_path, fname)
 		localfiles = append(localfiles, diskusagedata{name: diskFile, diskflag: i >= 7})
 	}
 
-	for i := 0; i < 13; i++ {
+	for i := range 13 {
 		os.WriteFile(localfiles[i].name, data, 0777)
 		usage, err := common.GetUsage(tobj.disk_cache_path)
 		suite.assert.NoError(err)
@@ -802,11 +802,11 @@ func (suite *blockCacheTestSuite) TestDiskUsageCheck() {
 		suite.assert.Equal(tobj.blockCache.checkDiskUsage(), localfiles[i].diskflag)
 	}
 
-	for i := 0; i < 13; i++ {
+	for i := range 13 {
 		localfiles[i].diskflag = i < 8
 	}
 
-	for i := 0; i < 13; i++ {
+	for i := range 13 {
 		os.Remove(localfiles[i].name)
 		usage, err := common.GetUsage(tobj.disk_cache_path)
 		suite.assert.NoError(err)
@@ -1243,9 +1243,9 @@ func (suite *blockCacheTestSuite) TestTempCacheCleanup() {
 	suite.assert.Empty(items)
 	_ = common.TempCacheCleanup(tobj.blockCache.tmpPath)
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_ = os.Mkdir(filepath.Join(tobj.disk_cache_path, fmt.Sprintf("temp_%d", i)), 0777)
-		for j := 0; j < 5; j++ {
+		for j := range 5 {
 			f, _ := os.Create(
 				filepath.Join(
 					tobj.disk_cache_path,
@@ -1821,7 +1821,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteUncommittedBlockValidation() {
 	}(fh)
 
 	// write 62MB data
-	for i := 0; i < prefetch+50; i++ {
+	for i := range prefetch + 50 {
 		n, err := fh.WriteAt(dataBuff[:_1MB], int64(i*int(_1MB)))
 		suite.assert.NoError(err)
 		suite.assert.Equal(n, int(_1MB))
@@ -1849,7 +1849,7 @@ func (suite *blockCacheTestSuite) TestRandomWriteUncommittedBlockValidation() {
 	suite.assert.Equal(int64(0), h.Size)
 	suite.assert.False(h.Dirty())
 
-	for i := 0; i < prefetch+50; i++ {
+	for i := range prefetch + 50 {
 		n, err := tobj.blockCache.WriteFile(
 			internal.WriteFileOptions{
 				Handle: h,
@@ -2637,7 +2637,7 @@ func (suite *blockCacheTestSuite) TestReadUncommittedBlockValidation() {
 
 	// write 62MB data
 	ind := uint64(0)
-	for i := 0; i < prefetch+50; i++ {
+	for i := range prefetch + 50 {
 		n, err := fh.WriteAt(dataBuff[ind*_1MB:(ind+1)*_1MB], int64(i*int(_1MB)))
 		suite.assert.NoError(err)
 		suite.assert.Equal(n, int(_1MB))
@@ -2657,7 +2657,7 @@ func (suite *blockCacheTestSuite) TestReadUncommittedBlockValidation() {
 	suite.assert.False(h.Dirty())
 
 	ind = 0
-	for i := 0; i < prefetch+50; i++ {
+	for i := range prefetch + 50 {
 		n, err := tobj.blockCache.WriteFile(
 			internal.WriteFileOptions{
 				Handle: h,

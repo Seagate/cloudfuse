@@ -64,7 +64,7 @@ func (handler ConfigChangeEventHandlerFunc) OnConfigChange() {
 	handler()
 }
 
-type KeysTree map[string]interface{}
+type KeysTree map[string]any
 
 type options struct {
 	path              string
@@ -222,7 +222,7 @@ func BindPFlag(key string, flag *pflag.Flag) {
 //		name: value
 //
 // the key parameter should take on the value "auth.key"
-func UnmarshalKey(key string, obj interface{}) error {
+func UnmarshalKey(key string, obj any) error {
 	err := viper.UnmarshalKey(
 		key,
 		obj,
@@ -231,7 +231,7 @@ func UnmarshalKey(key string, obj interface{}) error {
 	if err != nil {
 		return fmt.Errorf("config error: unmarshalling [%v]", err)
 	}
-	userOptions.envTree.MergeWithKey(key, obj, func(val interface{}) (interface{}, bool) {
+	userOptions.envTree.MergeWithKey(key, obj, func(val any) (any, bool) {
 		envVar := val.(string)
 		res, ok := os.LookupEnv(envVar)
 		if ok {
@@ -240,7 +240,7 @@ func UnmarshalKey(key string, obj interface{}) error {
 			return "", false
 		}
 	})
-	userOptions.flagTree.MergeWithKey(key, obj, func(val interface{}) (interface{}, bool) {
+	userOptions.flagTree.MergeWithKey(key, obj, func(val any) (any, bool) {
 		flag := val.(*pflag.Flag)
 		if flag.Changed {
 			return flag.Value.String(), true
@@ -253,7 +253,7 @@ func UnmarshalKey(key string, obj interface{}) error {
 
 // Unmarshal populates the passed object and all the exported fields.
 // use lower case attribute names to ignore a particular field
-func Unmarshal(obj interface{}) error {
+func Unmarshal(obj any) error {
 	err := viper.Unmarshal(
 		obj,
 		func(decodeConfig *mapstructure.DecoderConfig) { decodeConfig.TagName = STRUCT_TAG },
@@ -261,7 +261,7 @@ func Unmarshal(obj interface{}) error {
 	if err != nil {
 		return fmt.Errorf("config error: unmarshalling [%v]", err)
 	}
-	userOptions.envTree.Merge(obj, func(val interface{}) (interface{}, bool) {
+	userOptions.envTree.Merge(obj, func(val any) (any, bool) {
 		envVar := val.(string)
 		res, ok := os.LookupEnv(envVar)
 		if ok {
@@ -270,7 +270,7 @@ func Unmarshal(obj interface{}) error {
 			return "", false
 		}
 	})
-	userOptions.flagTree.Merge(obj, func(val interface{}) (interface{}, bool) {
+	userOptions.flagTree.Merge(obj, func(val any) (any, bool) {
 		flag := val.(*pflag.Flag)
 		if flag.Changed {
 			return flag.Value.String(), true

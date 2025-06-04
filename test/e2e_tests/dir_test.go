@@ -473,7 +473,7 @@ func (suite *dirTestSuite) TestDirRenameFull() {
 	err = os.Mkdir(filepath.Join(dirName, "tmp"), 0777)
 	suite.NoError(err)
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.medBuff, 0777)
 		suite.NoError(err)
@@ -630,7 +630,7 @@ func (suite *dirTestSuite) TestReadDirLink() {
 	suite.NoError(err)
 
 	// Write three more files so one block, 4096 bytes, is filled
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.minBuff, 0777)
 		suite.NoError(err)
@@ -712,7 +712,7 @@ func (suite *dirTestSuite) TestStatfs() {
 	suite.NoError(err)
 
 	fileName := filepath.Join(dirName, "small_file_")
-	for i := 0; i < numberOfFiles; i++ {
+	for i := range numberOfFiles {
 		newFile := fileName + strconv.Itoa(i)
 		err := os.WriteFile(newFile, suite.minBuff, 0777)
 		suite.NoError(err)
@@ -723,7 +723,7 @@ func (suite *dirTestSuite) TestStatfs() {
 	// 	suite.EqualValues(numberOfFiles*len(suite.minBuff), DiskSize(pathPtr))
 	// }
 
-	for i := 0; i < numberOfFiles; i++ {
+	for i := range numberOfFiles {
 		file := fileName + strconv.Itoa(i)
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)
@@ -733,7 +733,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		suite.Equal(numberOfFiles*4096, DiskSize(pathPtr))
 	}
 
-	for i := 0; i < numberOfFiles; i++ {
+	for i := range numberOfFiles {
 		file := fileName + strconv.Itoa(i)
 		err := os.WriteFile(file, suite.medBuff, 0777)
 		suite.NoError(err)
@@ -744,7 +744,7 @@ func (suite *dirTestSuite) TestStatfs() {
 	}
 
 	renameFile := filepath.Join(dirName, "small_file_rename")
-	for i := 0; i < numberOfFiles; i++ {
+	for i := range numberOfFiles {
 		oldFile := fileName + strconv.Itoa(i)
 		newFile := renameFile + strconv.Itoa(i)
 		err := os.Rename(oldFile, newFile)
@@ -755,7 +755,7 @@ func (suite *dirTestSuite) TestStatfs() {
 		suite.Equal(numberOfFiles*len(suite.medBuff), DiskSize(pathPtr))
 	}
 
-	for i := 0; i < numberOfFiles; i++ {
+	for i := range numberOfFiles {
 		file := renameFile + strconv.Itoa(i)
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)

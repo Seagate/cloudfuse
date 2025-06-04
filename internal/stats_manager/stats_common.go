@@ -31,6 +31,7 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
+	"maps"
 )
 
 const (
@@ -47,30 +48,30 @@ type StatsCollector struct {
 }
 
 type PipeMsg struct {
-	Timestamp     string                 `json:"timestamp"`
-	ComponentName string                 `json:"componentName,omitempty"`
-	Operation     string                 `json:"operation,omitempty"`
-	Path          string                 `json:"path,omitempty"`
-	Value         map[string]interface{} `json:"value,omitempty"`
+	Timestamp     string         `json:"timestamp"`
+	ComponentName string         `json:"componentName,omitempty"`
+	Operation     string         `json:"operation,omitempty"`
+	Path          string         `json:"path,omitempty"`
+	Value         map[string]any `json:"value,omitempty"`
 }
 
 type Events struct {
 	Timestamp string
 	Operation string
 	Path      string
-	Value     map[string]interface{}
+	Value     map[string]any
 }
 
 type Stats struct {
 	Timestamp string
 	Operation string
 	Key       string
-	Value     interface{}
+	Value     any
 }
 
 type ChannelMsg struct {
 	IsEvent bool
-	CompMsg interface{}
+	CompMsg any
 }
 
 type statsManagerOpt struct {
@@ -99,7 +100,7 @@ func NewStatsCollector(componentName string) *StatsCollector {
 			Timestamp:     time.Now().Format(time.RFC3339),
 			ComponentName: componentName,
 			Operation:     "",
-			Value:         make(map[string]interface{}),
+			Value:         make(map[string]any),
 		}
 		stMgrOpt.statsList = append(stMgrOpt.statsList, &cmpSt)
 
@@ -133,7 +134,7 @@ func (sc *StatsCollector) Destroy() {
 	}
 }
 
-func (sc *StatsCollector) PushEvents(op string, path string, mp map[string]interface{}) {
+func (sc *StatsCollector) PushEvents(op string, path string, mp map[string]any) {
 	if common.MonitorCfs() {
 		event := Events{
 			Timestamp: time.Now().Format(time.RFC3339),
@@ -142,10 +143,8 @@ func (sc *StatsCollector) PushEvents(op string, path string, mp map[string]inter
 		}
 
 		if mp != nil {
-			event.Value = make(map[string]interface{})
-			for k, v := range mp {
-				event.Value[k] = v
-			}
+			event.Value = make(map[string]any)
+			maps.Copy(event.Value, mp)
 		}
 
 		// check if the channel is full
@@ -161,7 +160,7 @@ func (sc *StatsCollector) PushEvents(op string, path string, mp map[string]inter
 	}
 }
 
-func (sc *StatsCollector) UpdateStats(op string, key string, val interface{}) {
+func (sc *StatsCollector) UpdateStats(op string, key string, val any) {
 	if common.MonitorCfs() {
 		st := Stats{
 			Timestamp: time.Now().Format(time.RFC3339),
