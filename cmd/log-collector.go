@@ -53,7 +53,7 @@ var gatherLogsCmd = &cobra.Command{
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		err := checkOutputPath(dumpPath)
+		err := checkPath(dumpPath)
 		if err != nil {
 			return fmt.Errorf("could not use the output path %s, [%s]", dumpPath, err)
 		}
@@ -66,7 +66,6 @@ var gatherLogsCmd = &cobra.Command{
 		if err != nil {
 			fmt.Errorf("failed to parse config file [%s]", err.Error())
 		}
-
 		if logType == "silent" {
 			return fmt.Errorf("no logs were generated due to log type being silent")
 		} else if logType == "base" {
@@ -77,20 +76,40 @@ var gatherLogsCmd = &cobra.Command{
 					return fmt.Errorf("unable to create archive: [%s]", err.Error())
 				}
 			} else if runtime.GOOS == "windows" {
-				//TODO: add the system app data system32 if there is no filepath in the config.
-				if strings.HasPrefix(logPath, ".cloudfuse") {
-					err = createWindowsArchive("path/to/cloudfuse/app/data/system32/thing")
-				} else {
-					err = createWindowsArchive(logPath)
-				}
-				if err != nil {
-					return fmt.Errorf("unable to create archive: [%s]", err.Error())
-				}
-			}
 
+				// get the system profile logs regardless of what the config values are
+				// put this in a wrapper function
+				systemRoot := os.Getenv("SystemRoot")
+				if systemRoot == "" {
+					return errors.New("Could not find system root")
+				}
+				systemRoot = filepath.Clean(systemRoot)
+				servicePath := filepath.Join(systemRoot, "System32", "config", "systemprofile", ".cloudfuse")
+				// TODO: copy the .cloudfuse folder to a temporary folder and name it preArchPath
+				var preArchPath string
+				preArchPath, err = os.MkdirTemp(dumpPath, "PreZip*") // temp folder to copy files to
+				defer os.RemoveAll(preArchPath)
+				// copied over the service log files from servicePath -> preArchPath
+
+				// fetch provided or default logPath
+				logPath = common.ExpandPath(logPath)
+				logPath, err = filepath.Abs(logPath)
+				if err != nil {
+					return fmt.Errorf("failed get absolute path for logs directory: [%s]", err.Error())
+				}
+
+				// copied over the user base logs from logPath -> preArchPath
+
+				// run the archive to archive the two folders.
+
+				err = createWindowsArchive(preArchPath)
+				if err != nil {
+					return fmt.Errorf("unable to create archive [%s]", err.Error())
+				}
+
+			}
 		} else if logType == "syslog" {
 			if runtime.GOOS == "linux" {
-
 				filteredSyslogPath, err := createFilteredLog(logPath)
 				if err != nil {
 					return fmt.Errorf("failed to crate a filtered log from the syslog: [%s]", err.Error())
@@ -105,14 +124,12 @@ var gatherLogsCmd = &cobra.Command{
 				return fmt.Errorf("no log files to collect. system logging for windows are stored in the event viewer")
 			}
 		}
-		// TODO: check if any 'base' logging or syslog filters are being used to redirect to a separate file. do this by checking for /etc/rsyslog.d and /etc/logrotate.d files
-
 		return nil
 	},
 }
 
-// checkOutputPath makes sure the path for archive creation is valid.
-func checkOutputPath(outPath string) error {
+// checkPath makes sure the path for archive creation is valid.
+func checkPath(outPath string) error {
 	var err error
 	if outPath == "" {
 		dumpPath, err = os.Getwd()
@@ -141,7 +158,7 @@ func checkOutputPath(outPath string) error {
 	return nil
 }
 
-// getLoginfo populates the logType, and logPath values found in the config file.
+// getLogInfo populates the logType, and logPath values found in the config file.
 func getLogInfo(configFile string) (string, string, error) {
 	logPath := "$HOME/.cloudfuse/cloudfuse.log"
 	logPath = common.ExpandPath(logPath)
@@ -171,6 +188,9 @@ func getLogInfo(configFile string) (string, string, error) {
 						logPath = common.ExpandPath(logPath)
 					}
 					logPath, err = filepath.Abs(logPath)
+					if err != nil {
+						return "", "", err
+					}
 				} else {
 					fmt.Printf("Warning, file path for base log not found. using default.")
 				}
@@ -179,9 +199,6 @@ func getLogInfo(configFile string) (string, string, error) {
 				logType = "base"
 			}
 		}
-		if err != nil {
-			return "", "", fmt.Errorf("failed to get absolute path for the log path: [%s]", err.Error())
-		}
 	}
 	return logType, logPath, nil
 }
@@ -189,13 +206,9 @@ func getLogInfo(configFile string) (string, string, error) {
 // createFilteredLog creates a new log file containing only the cloudfuse logs from the input log file.
 // It only runs for linux when the configured logging type is set to "syslog"
 func createFilteredLog(logFile string) (string, error) {
-
 	keyword := "cloudfuse"
-
 	os.Mkdir("/tmp/cloudfuseSyslog", 0760)
-
 	outPath := "/tmp/cloudfuseSyslog/cloudfuseSyslog.log"
-
 	inFile, err := os.Open(logFile)
 	if err != nil {
 		return "", err
@@ -226,7 +239,6 @@ func createFilteredLog(logFile string) (string, error) {
 }
 
 func createLinuxArchive(logPath string) error {
-
 	//first check logPath is valid
 	_, err := os.Stat(logPath)
 	if err != nil {
@@ -295,7 +307,7 @@ func createLinuxArchive(logPath string) error {
 	return nil
 }
 
-func createWindowsArchive(logPath string) error {
+func createWindowsArchive(archPath string) error {
 
 	outFile, err := os.Create(dumpPath + "/cloudfuse_logs.zip")
 	if err != nil {
@@ -306,15 +318,16 @@ func createWindowsArchive(logPath string) error {
 	zipWriter := zip.NewWriter(outFile)
 	defer zipWriter.Close()
 
-	items, err := os.ReadDir(logPath)
+	items, err := os.ReadDir(archPath)
 	if err != nil {
 		return err
 	}
 
 	var amountLogs int
 	for _, item := range items {
+
 		if strings.HasPrefix(item.Name(), "cloudfuse") && strings.HasSuffix(item.Name(), ".log") {
-			itemPath := filepath.Join(logPath, item.Name())
+			itemPath := filepath.Join(archPath, item.Name())
 			itemPath = filepath.Clean(itemPath)
 
 			file, err := os.Open(itemPath)
@@ -350,7 +363,7 @@ func createWindowsArchive(logPath string) error {
 		}
 	}
 	if amountLogs == 0 {
-		return fmt.Errorf("no cloudfuse log file were found in %s", logPath)
+		return fmt.Errorf("no cloudfuse log file were found in %s", archPath)
 	}
 	return nil
 }
