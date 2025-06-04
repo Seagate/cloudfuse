@@ -37,6 +37,7 @@ jobs:
       cloudfuse_ADLS_CFG: "./cloudfuse.adls.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
+      cloudfuse_BLOCK_CFG: "./cloudfuse_blockyaml"
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -307,13 +308,14 @@ jobs:
           S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
           S3_REGION: "${{ secrets.S3TEST_REGION }}"
           S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
-        run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
+        run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_BLOCK_CFG }}"
 
       - name: S3 Coverage - Block Cache
         run: |-
           rm -rf ${{ env.MOUNT_DIR }}/*
           rm -rf ${{ env.TEMP_DIR }}/*
-          ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
+          sleep 1
+          ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_BLOCK_CFG }} --foreground=true &
           sleep 10
           ps -aux | grep cloudfuse
           cd test/e2e_tests
