@@ -56,8 +56,8 @@ type cachePolicy interface {
 
 	UpdateConfig(cachePolicyConfig) error
 
-	CacheValid(name string)                            // Mark the file as hit
-	CachePurge(name string, flock *common.LockMapItem) // Delete the file from cache
+	CacheValid(name string) // Mark the file as hit
+	CachePurge(name string) // Delete the file from cache
 
 	IsCached(name string) bool // Whether or not the cache policy considers this file cached
 
@@ -73,7 +73,11 @@ func getUsagePercentage(path string, maxSize float64) float64 {
 	if maxSize == 0 {
 		currSize, usagePercent, err = common.GetDiskUsageFromStatfs(path)
 		if err != nil {
-			log.Err("cachePolicy::getUsagePercentage : failed to get disk usage for %s [%v]", path, err.Error)
+			log.Err(
+				"cachePolicy::getUsagePercentage : failed to get disk usage for %s [%v]",
+				path,
+				err.Error,
+			)
 		}
 	} else {
 		// We need to compute % usage of temp directory against configured limit
@@ -87,8 +91,16 @@ func getUsagePercentage(path string, maxSize float64) float64 {
 
 	log.Debug("cachePolicy::getUsagePercentage : current cache usage : %f%%", usagePercent)
 
-	fileCacheStatsCollector.UpdateStats(stats_manager.Replace, cacheUsage, fmt.Sprintf("%f MB", currSize))
-	fileCacheStatsCollector.UpdateStats(stats_manager.Replace, usgPer, fmt.Sprintf("%f%%", usagePercent))
+	fileCacheStatsCollector.UpdateStats(
+		stats_manager.Replace,
+		cacheUsage,
+		fmt.Sprintf("%f MB", currSize),
+	)
+	fileCacheStatsCollector.UpdateStats(
+		stats_manager.Replace,
+		usgPer,
+		fmt.Sprintf("%f%%", usagePercent),
+	)
 
 	return usagePercent
 }

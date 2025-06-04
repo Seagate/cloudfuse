@@ -40,21 +40,21 @@ import (
 var errInvalidConfigField = errors.New("config field is invalid")
 
 type Options struct {
-	BucketName                string                  `config:"bucket-name" yaml:"bucket-name,omitempty"`
-	Region                    string                  `config:"region" yaml:"region,omitempty"`
-	Profile                   string                  `config:"profile" yaml:"region,omitempty"`
-	Endpoint                  string                  `config:"endpoint" yaml:"endpoint,omitempty"`
-	PrefixPath                string                  `config:"subdirectory" yaml:"subdirectory,omitempty"`
+	BucketName                string                  `config:"bucket-name"                   yaml:"bucket-name,omitempty"`
+	Region                    string                  `config:"region"                        yaml:"region,omitempty"`
+	Profile                   string                  `config:"profile"                       yaml:"region,omitempty"`
+	Endpoint                  string                  `config:"endpoint"                      yaml:"endpoint,omitempty"`
+	PrefixPath                string                  `config:"subdirectory"                  yaml:"subdirectory,omitempty"`
 	RestrictedCharsWin        bool                    `config:"restricted-characters-windows" yaml:"-"`
-	PartSizeMb                int64                   `config:"part-size-mb" yaml:"part-size-mb,omitempty"`
-	UploadCutoffMb            int64                   `config:"upload-cutoff-mb" yaml:"upload-cutoff-mb,omitempty"`
-	Concurrency               int                     `config:"concurrency" yaml:"concurrency,omitempty"`
-	DisableConcurrentDownload bool                    `config:"disable-concurrent-download" yaml:"disable-concurrent-download,omitempty"`
-	EnableChecksum            bool                    `config:"enable-checksum" yaml:"enable-checksum,omitempty"`
-	ChecksumAlgorithm         types.ChecksumAlgorithm `config:"checksum-algorithm" yaml:"checksum-algorithm,omitempty"`
-	UsePathStyle              bool                    `config:"use-path-style" yaml:"use-path-style,omitempty"`
-	DisableUsage              bool                    `config:"disable-usage" yaml:"disable-usage,omitempty"`
-	EnableDirMarker           bool                    `config:"enable-dir-marker" yaml:"enable-dir-marker,omitempty"`
+	PartSizeMb                int64                   `config:"part-size-mb"                  yaml:"part-size-mb,omitempty"`
+	UploadCutoffMb            int64                   `config:"upload-cutoff-mb"              yaml:"upload-cutoff-mb,omitempty"`
+	Concurrency               int                     `config:"concurrency"                   yaml:"concurrency,omitempty"`
+	DisableConcurrentDownload bool                    `config:"disable-concurrent-download"   yaml:"disable-concurrent-download,omitempty"`
+	EnableChecksum            bool                    `config:"enable-checksum"               yaml:"enable-checksum,omitempty"`
+	ChecksumAlgorithm         types.ChecksumAlgorithm `config:"checksum-algorithm"            yaml:"checksum-algorithm,omitempty"`
+	UsePathStyle              bool                    `config:"use-path-style"                yaml:"use-path-style,omitempty"`
+	DisableUsage              bool                    `config:"disable-usage"                 yaml:"disable-usage,omitempty"`
+	EnableDirMarker           bool                    `config:"enable-dir-marker"             yaml:"enable-dir-marker,omitempty"`
 }
 
 type ConfigSecrets struct {
@@ -89,7 +89,10 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 	// Part size must be at least 5 MB and smaller than 5GB. Otherwise, set to default.
 	if opt.PartSizeMb < 5 || opt.PartSizeMb > MaxPartSizeMb {
 		if opt.PartSizeMb != 0 {
-			log.Warn("ParseAndValidateConfig : Part size must be between 5MB and 5GB. Defaulting to %dMB.", DefaultPartSize/common.MbToBytes)
+			log.Warn(
+				"ParseAndValidateConfig : Part size must be between 5MB and 5GB. Defaulting to %dMB.",
+				DefaultPartSize/common.MbToBytes,
+			)
 		}
 		s3.stConfig.partSize = DefaultPartSize
 	} else {
@@ -130,7 +133,10 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 			opt.ChecksumAlgorithm != types.ChecksumAlgorithmCrc32c &&
 			opt.ChecksumAlgorithm != types.ChecksumAlgorithmSha1 &&
 			opt.ChecksumAlgorithm != types.ChecksumAlgorithmSha256 {
-			return fmt.Errorf("%w: checksum is not a valid checksum. valid values are CRC32, CRC32C, SHA1, SHA256", errInvalidConfigField)
+			return fmt.Errorf(
+				"%w: checksum is not a valid checksum. valid values are CRC32, CRC32C, SHA1, SHA256",
+				errInvalidConfigField,
+			)
 		}
 		s3.stConfig.checksumAlgorithm = opt.ChecksumAlgorithm
 	}
