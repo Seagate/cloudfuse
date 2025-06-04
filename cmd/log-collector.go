@@ -77,52 +77,21 @@ var gatherLogsCmd = &cobra.Command{
 				}
 			} else if runtime.GOOS == "windows" {
 
-				// get the system profile logs regardless of what the config values are
-				// put this in a wrapper function
+				// get the service logs regardless of what the config values are
 				systemRoot := os.Getenv("SystemRoot")
 				if systemRoot == "" {
 					return errors.New("Could not find system root")
 				}
 				systemRoot = filepath.Clean(systemRoot)
 				servicePath := filepath.Join(systemRoot, "System32", "config", "systemprofile", ".cloudfuse")
-				// TODO: copy the .cloudfuse folder to a temporary folder and name it preArchPath
 				var preArchPath string
-				preArchPath, err = os.MkdirTemp(dumpPath, "PreZip*") // temp folder to copy files to
+				preArchPath, err = os.MkdirTemp(dumpPath, "PreZip*")
 				defer os.RemoveAll(preArchPath)
+
 				// copied over the service log files from servicePath -> preArchPath
-				var items []os.DirEntry
-				items, err = os.ReadDir(servicePath)
+				err = copyFiles(servicePath, preArchPath)
 				if err != nil {
-					return fmt.Errorf("failed read the service path directory: [%s]", err.Error())
-				}
-
-				for _, item := range items {
-					if item.IsDir() {
-						continue
-					}
-
-					srcFilePath := filepath.Join(servicePath, item.Name())
-					dstFilePath := filepath.Join(preArchPath, item.Name())
-
-					var srcFile *os.File
-					srcFile, err = os.Open(srcFilePath)
-					defer srcFile.Close()
-					if err != nil {
-						return fmt.Errorf("failed to open file in service path to copy: [%s]", err.Error())
-					}
-
-					var dstFile *os.File
-					dstFile, err = os.Create(dstFilePath)
-					defer dstFile.Close()
-					if err != nil {
-						return fmt.Errorf("failed to create file to copy service file: [%s]", err.Error())
-					}
-
-					_, err = io.Copy(dstFile, srcFile)
-					if err != nil {
-						return fmt.Errorf("failed to copy file %s: [%s]", item.Name(), err.Error())
-					}
-
+					return fmt.Errorf("unable to copy files: [%s]", err.Error())
 				}
 
 				// fetch provided or default logPath
@@ -133,9 +102,12 @@ var gatherLogsCmd = &cobra.Command{
 				}
 
 				// copied over the user base logs from logPath -> preArchPath
+				err = copyFiles(logPath, preArchPath)
+				if err != nil {
+					return fmt.Errorf("unable to copy files: [%s]", err.Error())
+				}
 
 				// run the archive to archive the two folders.
-
 				err = createWindowsArchive(preArchPath)
 				if err != nil {
 					return fmt.Errorf("unable to create archive [%s]", err.Error())
@@ -393,6 +365,46 @@ func createWindowsArchive(archPath string) error {
 		return fmt.Errorf("no cloudfuse log file were found in %s", archPath)
 	}
 	return err
+}
+
+func copyFiles(srcPath, dstPath string) error {
+	var items []os.DirEntry
+	items, err := os.ReadDir(srcPath)
+	if err != nil {
+		return fmt.Errorf("failed read the service path directory: [%s]", err.Error())
+	}
+
+	for _, item := range items {
+		if item.IsDir() {
+			continue
+		}
+
+		srcFilePath := filepath.Join(srcPath, item.Name())
+		dstFilePath := filepath.Join(dstPath, item.Name())
+
+		var srcFile *os.File
+		srcFile, err = os.Open(srcFilePath)
+		defer srcFile.Close()
+		if err != nil {
+			return fmt.Errorf("failed to open file in service path to copy: [%s]", err.Error())
+		}
+
+		var dstFile *os.File
+		dstFile, err = os.Create(dstFilePath)
+		defer dstFile.Close()
+		if err != nil {
+			return fmt.Errorf("failed to create file to copy service file: [%s]", err.Error())
+		}
+
+		_, err = io.Copy(dstFile, srcFile)
+		if err != nil {
+			return fmt.Errorf("failed to copy file %s: [%s]", item.Name(), err.Error())
+		}
+
+	}
+	//question: when is it noisy to nest error messages in other error messages?
+	return err
+
 }
 
 func init() {
