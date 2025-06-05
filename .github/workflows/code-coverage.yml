@@ -37,7 +37,7 @@ jobs:
       cloudfuse_ADLS_CFG: "./cloudfuse.adls.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
-      cloudfuse_BLOCK_CFG: "./cloudfuse_blockyaml"
+      cloudfuse_BLOCK_CFG: "./cloudfuse_block.yaml"
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
