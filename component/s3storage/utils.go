@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -113,7 +113,12 @@ func parseS3Err(err error, attemptedAction string) error {
 		if errorCode == "InvalidRange" {
 			// the range string sent with getObject is invalid
 			// InvalidRange is an un-modeled service error response (it is a *smithy.GenericAPIError)
-			log.Err("%s : Failed to %s with error %s because range is invalid", functionName, attemptedAction, errorCode)
+			log.Err(
+				"%s : Failed to %s with error %s because range is invalid",
+				functionName,
+				attemptedAction,
+				errorCode,
+			)
 			// TODO: identify cases where this may come up in deployment, and identify which syscall.errno() is most appropriate
 			// this should not come up in normal operation, so for now we just return it without translating to a system error code
 			return err
@@ -122,7 +127,12 @@ func parseS3Err(err error, attemptedAction string) error {
 			// HeadObject's 404 is not modeled (it is a *smithy.GenericAPIError)
 			// GetObject's 404 is modeled (it is a *types.NoSuchKey)
 			// CopyObject's 404 is not modeled (it is a *smithy.GenericAPIError)
-			message := fmt.Sprintf("%s : Failed to %s with error %s because key does not exist", functionName, attemptedAction, errorCode)
+			message := fmt.Sprintf(
+				"%s : Failed to %s with error %s because key does not exist",
+				functionName,
+				attemptedAction,
+				errorCode,
+			)
 			if strings.HasPrefix(attemptedAction, "HeadObject") {
 				log.Warn(message)
 			} else {

@@ -16,7 +16,7 @@ libfuse:
 file_cache:
   path: /<PATH>/<TO>/<CACHE_DIR>
   timeout-sec: 64000000
-  allow-non-empty-temp: true
+  cleanup-on-start: true
   ignore-sync: true
 
 attr_cache:
@@ -26,6 +26,5 @@ azstorage:
   type: block
   account-name: <ACCOUNT_NAME>
   sas: <SAS_TOKEN>
-  endpoint: https://<ACCOUNT_NAME>.blob.core.windows.net
   mode: sas
   container: <CONTAINER_NAME>

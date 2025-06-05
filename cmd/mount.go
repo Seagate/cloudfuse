@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -54,12 +54,12 @@ import (
 )
 
 type LogOptions struct {
-	Type           string `config:"type" yaml:"type,omitempty"`
-	LogLevel       string `config:"level" yaml:"level,omitempty"`
-	LogFilePath    string `config:"file-path" yaml:"file-path,omitempty"`
+	Type           string `config:"type"             yaml:"type,omitempty"`
+	LogLevel       string `config:"level"            yaml:"level,omitempty"`
+	LogFilePath    string `config:"file-path"        yaml:"file-path,omitempty"`
 	MaxLogFileSize uint64 `config:"max-file-size-mb" yaml:"max-file-size-mb,omitempty"`
-	LogFileCount   uint64 `config:"file-count" yaml:"file-count,omitempty"`
-	TimeTracker    bool   `config:"track-time" yaml:"track-time,omitempty"`
+	LogFileCount   uint64 `config:"file-count"       yaml:"file-count,omitempty"`
+	TimeTracker    bool   `config:"track-time"       yaml:"track-time,omitempty"`
 }
 
 type mountOptions struct {
@@ -86,10 +86,11 @@ type mountOptions struct {
 	EnableRemountSystem bool
 
 	// v1 support
-	Streaming      bool     `config:"streaming"`
-	AttrCache      bool     `config:"use-attr-cache"`
-	LibfuseOptions []string `config:"libfuse-options"`
-	BlockCache     bool     `config:"block-cache"`
+	Streaming         bool     `config:"streaming"`
+	AttrCache         bool     `config:"use-attr-cache"`
+	LibfuseOptions    []string `config:"libfuse-options"`
+	BlockCache        bool     `config:"block-cache"`
+	EntryCacheTimeout int      `config:"list-cache-timeout"`
 }
 
 var options mountOptions
@@ -156,7 +157,10 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 		if opt.Logging.LogFilePath == common.DefaultLogFilePath {
 			// If default-working-dir is set then default log path shall be set to that path
 			// Ignore if specific log-path is provided by user
-			opt.Logging.LogFilePath = common.JoinUnixFilepath(common.DefaultWorkDir, "cloudfuse.log")
+			opt.Logging.LogFilePath = common.JoinUnixFilepath(
+				common.DefaultWorkDir,
+				"cloudfuse.log",
+			)
 		}
 
 		common.DefaultLogFilePath = common.JoinUnixFilepath(common.DefaultWorkDir, "cloudfuse.log")
@@ -164,7 +168,7 @@ func (opt *mountOptions) validate(skipNonEmptyMount bool) error {
 
 	err := common.CreateDefaultDirectory()
 	if err != nil {
-		return fmt.Errorf("Failed to create default work dir [%s]", err.Error())
+		return fmt.Errorf("failed to create default work dir [%s]", err.Error())
 	}
 
 	opt.Logging.LogFilePath = common.ExpandPath(opt.Logging.LogFilePath)
@@ -225,7 +229,9 @@ func parseConfig() error {
 		if options.PassPhrase == "" {
 			options.PassPhrase = os.Getenv(SecureConfigEnvName)
 			if options.PassPhrase == "" {
-				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+				return errors.New(
+					"no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable",
+				)
 			}
 
 			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
@@ -238,12 +244,20 @@ func parseConfig() error {
 
 		cipherText, err := os.ReadFile(options.ConfigFile)
 		if err != nil {
-			return fmt.Errorf("failed to read encrypted config file %s [%s]", options.ConfigFile, err.Error())
+			return fmt.Errorf(
+				"failed to read encrypted config file %s [%s]",
+				options.ConfigFile,
+				err.Error(),
+			)
 		}
 
 		plainText, err := common.DecryptData(cipherText, encryptedPassphrase)
 		if err != nil {
-			return fmt.Errorf("failed to decrypt config file %s [%s]", options.ConfigFile, err.Error())
+			return fmt.Errorf(
+				"failed to decrypt config file %s [%s]",
+				options.ConfigFile,
+				err.Error(),
+			)
 		}
 
 		config.SetConfigFile(options.ConfigFile)
@@ -356,6 +370,12 @@ var mountCmd = &cobra.Command{
 			options.Components = pipeline
 		}
 
+		if config.IsSet("entry_cache.timeout-sec") || options.EntryCacheTimeout > 0 {
+			options.Components = append(
+				options.Components[:1],
+				append([]string{"entry_cache"}, options.Components[1:]...)...)
+		}
+
 		if config.IsSet("libfuse-options") {
 			for _, v := range options.LibfuseOptions {
 				parameter := strings.Split(v, "=")
@@ -404,6 +424,7 @@ var mountCmd = &cobra.Command{
 					config.Set("lfuse.gid", fmt.Sprint(val))
 				} else if v == "direct_io" || v == "direct_io=true" {
 					config.Set("lfuse.direct-io", "true")
+					config.Set("direct-io", "true")
 				} else {
 					return errors.New(common.FuseAllowedFlags)
 				}
@@ -450,13 +471,19 @@ var mountCmd = &cobra.Command{
 
 		// TODO: remove v1 switches, which were never used as part of cloudfuse.
 		if config.IsSet("invalidate-on-sync") {
-			log.Warn("mount: unsupported v1 CLI parameter: invalidate-on-sync is always true in cloudfuse.")
+			log.Warn(
+				"mount: unsupported v1 CLI parameter: invalidate-on-sync is always true in cloudfuse.",
+			)
 		}
 		if config.IsSet("pre-mount-validate") {
-			log.Warn("mount: unsupported v1 CLI parameter: pre-mount-validate is always true in cloudfuse.")
+			log.Warn(
+				"mount: unsupported v1 CLI parameter: pre-mount-validate is always true in cloudfuse.",
+			)
 		}
 		if config.IsSet("basic-remount-check") {
-			log.Warn("mount: unsupported v1 CLI parameter: basic-remount-check is always true in cloudfuse.")
+			log.Warn(
+				"mount: unsupported v1 CLI parameter: basic-remount-check is always true in cloudfuse.",
+			)
 		}
 
 		common.EnableMonitoring = options.MonitorOpt.EnableMon
@@ -473,10 +500,29 @@ var mountCmd = &cobra.Command{
 
 		var pipeline *internal.Pipeline
 
-		log.Crit("Starting Cloudfuse Mount : %s on [%s]", common.CloudfuseVersion, common.GetCurrentDistro())
+		log.Crit(
+			"Starting Cloudfuse Mount : %s on [%s]",
+			common.CloudfuseVersion,
+			common.GetCurrentDistro(),
+		)
 		log.Info("Mount Command: %s", os.Args)
 		log.Crit("Logging level set to : %s", logLevel.String())
 		log.Debug("Mount allowed on nonempty path : %v", options.NonEmpty)
+
+		directIO := false
+		_ = config.UnmarshalKey("direct-io", &directIO)
+		if directIO {
+			// Directio is enabled, so remove the attr-cache from the pipeline
+			for i, name := range options.Components {
+				if name == "attr_cache" {
+					options.Components = append(options.Components[:i], options.Components[i+1:]...)
+					log.Crit(
+						"Mount::runPipeline : Direct IO enabled, removing attr_cache from pipeline",
+					)
+					break
+				}
+			}
+		}
 
 		// If on Linux start with the go daemon
 		// If on Windows, don't use the daemon since it is not supported
@@ -488,12 +534,22 @@ var mountCmd = &cobra.Command{
 
 		if err != nil {
 			if err.Error() == "Azure CLI not found on path" {
-				log.Err("mount : failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%v]", err)
-				return Destroy(fmt.Sprintf("failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%s]", err.Error()))
+				log.Err(
+					"mount : failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%v]",
+					err,
+				)
+				return Destroy(
+					fmt.Sprintf(
+						"failed to initialize new pipeline :: To authenticate using MSI with object-ID, ensure Azure CLI is installed. Alternatively, use app/client ID or resource ID for authentication. [%s]",
+						err.Error(),
+					),
+				)
 			}
 
 			log.Err("mount :  failed to initialize new pipeline [%v]", err)
-			return Destroy(fmt.Sprintf("mount : failed to initialize new pipeline [%s]", err.Error()))
+			return Destroy(
+				fmt.Sprintf("mount : failed to initialize new pipeline [%s]", err.Error()),
+			)
 		}
 
 		// Dry run ends here
@@ -507,7 +563,7 @@ var mountCmd = &cobra.Command{
 		log.Info("mount: Mounting cloudfuse on %s", options.MountPath)
 		// handle background mount on Linux
 		if !options.Foreground && runtime.GOOS != "windows" {
-			pidFile := strings.Replace(options.MountPath, "/", "_", -1) + ".pid"
+			pidFile := strings.ReplaceAll(options.MountPath, "/", "_") + ".pid"
 			pidFileName := filepath.Join(os.ExpandEnv(common.DefaultWorkDir), pidFile)
 
 			// Delete the pidFile if it already exists which prevents a failed to daemonize error
@@ -582,7 +638,12 @@ func runPipeline(pipeline *internal.Pipeline, ctx context.Context) error {
 	pid := fmt.Sprintf("%v", os.Getpid())
 	common.TransferPipe += "_" + pid
 	common.PollingPipe += "_" + pid
-	log.Debug("Mount::runPipeline : cloudfuse pid = %v, transfer pipe = %v, polling pipe = %v", pid, common.TransferPipe, common.PollingPipe)
+	log.Debug(
+		"Mount::runPipeline : cloudfuse pid = %v, transfer pipe = %v, polling pipe = %v",
+		pid,
+		common.TransferPipe,
+		common.PollingPipe,
+	)
 
 	go startMonitor(os.Getpid())
 
@@ -608,7 +669,13 @@ func startMonitor(pid int) {
 		buf := new(bytes.Buffer)
 		rootCmd.SetOut(buf)
 		rootCmd.SetErr(buf)
-		rootCmd.SetArgs([]string{"health-monitor", fmt.Sprintf("--pid=%v", pid), fmt.Sprintf("--config-file=%s", options.ConfigFile)})
+		rootCmd.SetArgs(
+			[]string{
+				"health-monitor",
+				fmt.Sprintf("--pid=%v", pid),
+				fmt.Sprintf("--config-file=%s", options.ConfigFile),
+			},
+		)
 		err := rootCmd.Execute()
 		if err != nil {
 			common.EnableMonitoring = false
@@ -678,40 +745,62 @@ func init() {
 	mountCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
 		"Base64 encoded key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\n Decoded key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 
-	mountCmd.PersistentFlags().String("log-type", "syslog", "Type of logger to be used by the system. Set to syslog by default. Allowed values are silent|syslog|base.")
+	mountCmd.PersistentFlags().
+		String("log-type", "base", "Type of logger to be used by the system. Set to base by default. Allowed values are silent|syslog|base.")
 	config.BindPFlag("logging.type", mountCmd.PersistentFlags().Lookup("log-type"))
-	_ = mountCmd.RegisterFlagCompletionFunc("log-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"silent", "base", "syslog"}, cobra.ShellCompDirectiveNoFileComp
-	})
+	_ = mountCmd.RegisterFlagCompletionFunc(
+		"log-type",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{"silent", "base", "syslog"}, cobra.ShellCompDirectiveNoFileComp
+		},
+	)
 
 	mountCmd.PersistentFlags().String("log-level", "LOG_WARNING",
 		"Enables logs written to syslog. Set to LOG_WARNING by default. Allowed values are LOG_OFF|LOG_CRIT|LOG_ERR|LOG_WARNING|LOG_INFO|LOG_DEBUG")
 	config.BindPFlag("logging.level", mountCmd.PersistentFlags().Lookup("log-level"))
-	_ = mountCmd.RegisterFlagCompletionFunc("log-level", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"LOG_OFF", "LOG_CRIT", "LOG_ERR", "LOG_WARNING", "LOG_INFO", "LOG_TRACE", "LOG_DEBUG"}, cobra.ShellCompDirectiveNoFileComp
-	})
+	_ = mountCmd.RegisterFlagCompletionFunc(
+		"log-level",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{
+				"LOG_OFF",
+				"LOG_CRIT",
+				"LOG_ERR",
+				"LOG_WARNING",
+				"LOG_INFO",
+				"LOG_TRACE",
+				"LOG_DEBUG",
+			}, cobra.ShellCompDirectiveNoFileComp
+		},
+	)
 
 	mountCmd.PersistentFlags().String("log-file-path",
 		common.DefaultLogFilePath, "Configures the path for log files. Default is "+common.DefaultLogFilePath)
 	config.BindPFlag("logging.file-path", mountCmd.PersistentFlags().Lookup("log-file-path"))
 	_ = mountCmd.MarkPersistentFlagDirname("log-file-path")
 
-	mountCmd.PersistentFlags().Bool("foreground", false, "Mount the system in foreground mode. Default value false.")
+	mountCmd.PersistentFlags().
+		Bool("foreground", false, "Mount the system in foreground mode. Default value false.")
 	config.BindPFlag("foreground", mountCmd.PersistentFlags().Lookup("foreground"))
 
-	mountCmd.PersistentFlags().Bool("read-only", false, "Mount the system in read only mode. Default value false.")
+	mountCmd.PersistentFlags().
+		Bool("read-only", false, "Mount the system in read only mode. Default value false.")
 	config.BindPFlag("read-only", mountCmd.PersistentFlags().Lookup("read-only"))
 
 	mountCmd.Flags().BoolVar(&options.DryRun, "dry-run", false,
 		"Test mount configuration, credentials, etc., but don't make any changes to the container or the local file system. Implies foreground.")
 	config.BindPFlag("dry-run", mountCmd.Flags().Lookup("dry-run"))
 
-	mountCmd.PersistentFlags().Bool("lazy-write", false, "Async write to storage container after file handle is closed.")
+	mountCmd.PersistentFlags().
+		Bool("lazy-write", false, "Async write to storage container after file handle is closed.")
 	config.BindPFlag("lazy-write", mountCmd.PersistentFlags().Lookup("lazy-write"))
 
-	mountCmd.PersistentFlags().String("default-working-dir", "", "Default working directory for storing log files and other cloudfuse information")
+	mountCmd.PersistentFlags().
+		String("default-working-dir", "", "Default working directory for storing log files and other cloudfuse information")
 	mountCmd.PersistentFlags().Lookup("default-working-dir").Hidden = true
-	config.BindPFlag("default-working-dir", mountCmd.PersistentFlags().Lookup("default-working-dir"))
+	config.BindPFlag(
+		"default-working-dir",
+		mountCmd.PersistentFlags().Lookup("default-working-dir"),
+	)
 	_ = mountCmd.MarkPersistentFlagDirname("default-working-dir")
 
 	mountCmd.Flags().BoolVar(&options.Streaming, "streaming", false, "Enable Streaming.")
@@ -734,23 +823,28 @@ func init() {
 	config.BindPFlag("pre-mount-validate", mountCmd.Flags().Lookup("pre-mount-validate"))
 	mountCmd.Flags().Lookup("pre-mount-validate").Hidden = true
 
-	mountCmd.Flags().Bool("basic-remount-check", true, "Validate cloudfuse is mounted by reading /etc/mtab.")
+	mountCmd.Flags().
+		Bool("basic-remount-check", true, "Validate cloudfuse is mounted by reading /etc/mtab.")
 	config.BindPFlag("basic-remount-check", mountCmd.Flags().Lookup("basic-remount-check"))
 	mountCmd.Flags().Lookup("basic-remount-check").Hidden = true
 
 	if runtime.GOOS == "windows" {
-		mountCmd.Flags().BoolVar(&options.EnableRemountSystem, "enable-remount-system", false, "Remount container on server restart. Mount will restart on reboot.")
+		mountCmd.Flags().
+			BoolVar(&options.EnableRemountSystem, "enable-remount-system", false, "Remount container on server restart. Mount will restart on reboot.")
 		config.BindPFlag("enable-remount-system", mountCmd.Flags().Lookup("enable-remount-system"))
 
-		mountCmd.Flags().BoolVar(&options.EnableRemountUser, "enable-remount-user", false, "Remount container on server restart for current user. Mount will restart on current user log in.")
+		mountCmd.Flags().
+			BoolVar(&options.EnableRemountUser, "enable-remount-user", false, "Remount container on server restart for current user. Mount will restart on current user log in.")
 		config.BindPFlag("enable-remount-user", mountCmd.Flags().Lookup("enable-remount-user"))
 	}
 
-	mountCmd.PersistentFlags().StringSliceVarP(&options.LibfuseOptions, "o", "o", []string{}, "FUSE options.")
+	mountCmd.PersistentFlags().
+		StringSliceVarP(&options.LibfuseOptions, "o", "o", []string{}, "FUSE options.")
 	config.BindPFlag("libfuse-options", mountCmd.PersistentFlags().ShorthandLookup("o"))
 	mountCmd.PersistentFlags().ShorthandLookup("o").Hidden = true
 
-	mountCmd.PersistentFlags().DurationVar(&options.WaitForMount, "wait-for-mount", 5*time.Second, "Let parent process wait for given timeout before exit")
+	mountCmd.PersistentFlags().
+		DurationVar(&options.WaitForMount, "wait-for-mount", 5*time.Second, "Let parent process wait for given timeout before exit")
 
 	config.AttachToFlagSet(mountCmd.PersistentFlags())
 	config.AttachFlagCompletions(mountCmd)

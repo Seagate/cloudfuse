@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -165,7 +165,9 @@ func processCommand() error {
 		if options.PassPhrase == "" {
 			options.PassPhrase = os.Getenv(SecureConfigEnvName)
 			if options.PassPhrase == "" {
-				return errors.New("no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
+				return errors.New(
+					"no passphrase provided to decrypt the config file.\n Either use --passphrase cli option or store passphrase in CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable",
+				)
 			}
 
 			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
@@ -192,7 +194,12 @@ func processCommand() error {
 
 	if len(containerList) > 0 {
 		containerList = filterAllowedContainerList(containerList)
-		err = mountAllContainers(containerList, options.ConfigFile, options.MountPath, configFileExists)
+		err = mountAllContainers(
+			containerList,
+			options.ConfigFile,
+			options.MountPath,
+			configFileExists,
+		)
 		if err != nil {
 			return err
 		}
@@ -268,10 +275,7 @@ func getBucketListS3() ([]string, error) {
 
 // FiterAllowedContainer : Filter which containers are allowed to be mounted
 func filterAllowedContainerList(containers []string) []string {
-	allowListing := false
-	if len(mountAllOpts.AllowList) > 0 {
-		allowListing = true
-	}
+	allowListing := len(mountAllOpts.AllowList) > 0
 
 	// Convert the entire container list into a map
 	var filterContainer = make(map[string]bool)
@@ -310,7 +314,12 @@ func filterAllowedContainerList(containers []string) []string {
 }
 
 // mountAllContainers : Iterate allowed container list and create config file and mount path for them
-func mountAllContainers(containerList []string, configFile string, mountPath string, configFileExists bool) error {
+func mountAllContainers(
+	containerList []string,
+	configFile string,
+	mountPath string,
+	configFileExists bool,
+) error {
 	// Now iterate filtered container list and prepare mount path, temp path, and config file for them
 	fileCachePath := ""
 	_ = config.UnmarshalKey("file_cache.path", &fileCachePath)
@@ -332,15 +341,30 @@ func mountAllContainers(containerList []string, configFile string, mountPath str
 
 	failCount := 0
 	for _, container := range containerList {
-		contMountPath := filepath.Join(mountPath, container)
+		contMountPath := filepath.Clean(filepath.Join(mountPath, container))
 		contConfigFile := configFileName + "_" + container + ext
 
 		if options.SecureConfig {
 			contConfigFile = contConfigFile + SecureConfigExtension
 		}
 
-		if _, err := os.Stat(contMountPath); os.IsNotExist(err) {
-			err = os.MkdirAll(contMountPath, 0777)
+		root, err := os.OpenRoot(mountPath)
+		if err != nil {
+			err = os.MkdirAll(mountPath, 0755)
+			if err != nil {
+				fmt.Printf("Failed to create directory %s : %s\n", contMountPath, err.Error())
+				return err
+			}
+			root, err = os.OpenRoot(mountPath)
+		}
+		if err != nil {
+			fmt.Printf("Failed to open root directory %s : %s\n", mountPath, err.Error())
+			return err
+		}
+		defer root.Close()
+
+		if _, err := root.Stat(container); os.IsNotExist(err) {
+			err = root.Mkdir(container, 0777)
 			if err != nil {
 				fmt.Printf("Failed to create directory %s : %s\n", contMountPath, err.Error())
 			}
@@ -387,7 +411,11 @@ func mountAllContainers(containerList []string, configFile string, mountPath str
 		}
 	}
 
-	fmt.Printf("%d of %d containers were successfully mounted\n", (len(containerList) - failCount), len(containerList))
+	fmt.Printf(
+		"%d of %d containers were successfully mounted\n",
+		(len(containerList) - failCount),
+		len(containerList),
+	)
 	return nil
 }
 

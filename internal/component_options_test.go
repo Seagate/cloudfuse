@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -49,7 +49,7 @@ func (s *componentOptionsTestSuite) TestExtendDirName() {
 	for _, tt := range tests {
 		s.Run(tt.input, func() {
 			output := ExtendDirName(tt.input)
-			assert.EqualValues(tt.expectedOutput, output)
+			assert.Equal(tt.expectedOutput, output)
 		})
 	}
 }
@@ -67,7 +67,7 @@ func (s *componentOptionsTestSuite) TestTruncateDirName() {
 	for _, tt := range tests {
 		s.Run(tt.input, func() {
 			output := TruncateDirName(tt.input)
-			assert.EqualValues(tt.expectedOutput, output)
+			assert.Equal(tt.expectedOutput, output)
 		})
 	}
 }

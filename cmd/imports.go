@@ -1,10 +1,8 @@
-//go:build windows
-
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +28,7 @@ package cmd
 import (
 	_ "github.com/Seagate/cloudfuse/component/attr_cache"
 	_ "github.com/Seagate/cloudfuse/component/azstorage"
+	_ "github.com/Seagate/cloudfuse/component/block_cache"
 	_ "github.com/Seagate/cloudfuse/component/file_cache"
 	_ "github.com/Seagate/cloudfuse/component/libfuse"
 	_ "github.com/Seagate/cloudfuse/component/loopback"

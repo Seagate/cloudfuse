@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -26,15 +26,11 @@
 package cmd
 
 import (
-	"encoding/base64"
-	"errors"
 	"fmt"
 	"os"
 	"regexp"
 	"strings"
 
-	"github.com/Seagate/cloudfuse/common"
-	"github.com/awnumar/memguard"
 	"github.com/spf13/cobra"
 )
 
@@ -43,7 +39,6 @@ type configGenOptions struct {
 	outputConfigPath string
 	containerName    string
 	tempDirPath      string
-	passphrase       string
 }
 
 var opts configGenOptions
@@ -102,89 +97,13 @@ var generateTestConfig = &cobra.Command{
 	},
 }
 
-// Command used by plugins to generate encrypted config file based on a provided template.
-var generateConfig = &cobra.Command{
-	Use:               "gen-config",
-	Short:             "Generate encrypted config file based on template.",
-	Long:              "Generate encrypted config file based on template.",
-	SuggestFor:        []string{"gen-config"},
-	Hidden:            true,
-	Args:              cobra.ExactArgs(0),
-	FlagErrorHandling: cobra.ExitOnError,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var templateConfig []byte
-
-		err := validateGenConfigOptions()
-		if err != nil {
-			return fmt.Errorf("failed to validate options [%s]", err.Error())
-		}
-
-		templateConfig, err = os.ReadFile(opts.configFilePath)
-		if err != nil {
-			return fmt.Errorf("failed to read file [%s]", err.Error())
-		}
-
-		// match all parameters in { }
-		re := regexp.MustCompile("{.*?}")
-		templateParams := re.FindAll(templateConfig, -1)
-		newConfig := string(templateConfig)
-
-		for _, param := range templateParams {
-			// { 0 } -> temp path
-			if string(param) == "{ 0 }" {
-				re := regexp.MustCompile(string(param))
-				newConfig = re.ReplaceAllString(newConfig, opts.tempDirPath)
-			} else {
-				envVar := os.Getenv(string(param)[2 : len(string(param))-2])
-				re := regexp.MustCompile(string(param))
-				newConfig = re.ReplaceAllString(newConfig, envVar)
-			}
-		}
-
-		cipherText, err := common.EncryptData([]byte(newConfig), encryptedPassphrase)
-		if err != nil {
-			return err
-		}
-
-		// write the config with the params to the output file
-		err = os.WriteFile(opts.outputConfigPath, cipherText, 0700)
-		if err != nil {
-			return fmt.Errorf("failed to write file [%s]", err.Error())
-		}
-
-		return nil
-	},
-}
-
-func validateGenConfigOptions() error {
-	if opts.passphrase == "" {
-		opts.passphrase = os.Getenv(SecureConfigEnvName)
-		if opts.passphrase == "" {
-			return errors.New("provide the passphrase as a cli parameter or configure the CLOUDFUSE_SECURE_CONFIG_PASSPHRASE environment variable")
-		}
-	}
-
-	_, err := base64.StdEncoding.DecodeString(string(opts.passphrase))
-	if err != nil {
-		return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
-	}
-
-	encryptedPassphrase = memguard.NewEnclave([]byte(opts.passphrase))
-
-	return nil
-}
-
 func init() {
 	rootCmd.AddCommand(generateTestConfig)
-	generateTestConfig.Flags().StringVar(&opts.configFilePath, "config-file", "", "Input config file.")
-	generateTestConfig.Flags().StringVar(&opts.outputConfigPath, "output-file", "", "Output config file path.")
-	generateTestConfig.Flags().StringVar(&opts.containerName, "container-name", "", "Container name.")
+	generateTestConfig.Flags().
+		StringVar(&opts.configFilePath, "config-file", "", "Input config file.")
+	generateTestConfig.Flags().
+		StringVar(&opts.outputConfigPath, "output-file", "", "Output config file path.")
+	generateTestConfig.Flags().
+		StringVar(&opts.containerName, "container-name", "", "Container name.")
 	generateTestConfig.Flags().StringVar(&opts.tempDirPath, "temp-path", "", "Temporary file path.")
-
-	rootCmd.AddCommand(generateConfig)
-	generateConfig.Flags().StringVar(&opts.configFilePath, "config-file", "", "Input config file.")
-	generateConfig.Flags().StringVar(&opts.outputConfigPath, "output-file", "", "Output config file path.")
-	generateConfig.Flags().StringVar(&opts.tempDirPath, "temp-path", "", "Temporary file path.")
-	generateConfig.Flags().StringVar(&opts.passphrase, "passphrase", "",
-		"Key to be used for encryption / decryption. Key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 }

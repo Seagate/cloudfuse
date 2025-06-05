@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -131,21 +131,21 @@ func ReadFromConfigBuffer(configData []byte) error {
 func DecryptConfigFile(fileName string, passphrase *memguard.Enclave) error {
 	cipherText, err := os.ReadFile(fileName)
 	if err != nil {
-		return fmt.Errorf("Failed to read encrypted config file [%s]", err.Error())
+		return fmt.Errorf("failed to read encrypted config file [%s]", err.Error())
 	}
 
 	if len(cipherText) == 0 {
-		return fmt.Errorf("Encrypted config file is empty")
+		return fmt.Errorf("encrypted config file is empty")
 	}
 
 	plainText, err := common.DecryptData(cipherText, passphrase)
 	if err != nil {
-		return fmt.Errorf("Failed to decrypt config file [%s]", err.Error())
+		return fmt.Errorf("failed to decrypt config file [%s]", err.Error())
 	}
 
 	err = loadConfigFromBufferToViper(plainText)
 	if err != nil {
-		return fmt.Errorf("Failed to load decrypted config file [%s]", err.Error())
+		return fmt.Errorf("failed to load decrypted config file [%s]", err.Error())
 	}
 
 	return nil
@@ -223,7 +223,11 @@ func BindPFlag(key string, flag *pflag.Flag) {
 //
 // the key parameter should take on the value "auth.key"
 func UnmarshalKey(key string, obj interface{}) error {
-	err := viper.UnmarshalKey(key, obj, func(decodeConfig *mapstructure.DecoderConfig) { decodeConfig.TagName = STRUCT_TAG })
+	err := viper.UnmarshalKey(
+		key,
+		obj,
+		func(decodeConfig *mapstructure.DecoderConfig) { decodeConfig.TagName = STRUCT_TAG },
+	)
 	if err != nil {
 		return fmt.Errorf("config error: unmarshalling [%v]", err)
 	}
@@ -250,7 +254,10 @@ func UnmarshalKey(key string, obj interface{}) error {
 // Unmarshal populates the passed object and all the exported fields.
 // use lower case attribute names to ignore a particular field
 func Unmarshal(obj interface{}) error {
-	err := viper.Unmarshal(obj, func(decodeConfig *mapstructure.DecoderConfig) { decodeConfig.TagName = STRUCT_TAG })
+	err := viper.Unmarshal(
+		obj,
+		func(decodeConfig *mapstructure.DecoderConfig) { decodeConfig.TagName = STRUCT_TAG },
+	)
 	if err != nil {
 		return fmt.Errorf("config error: unmarshalling [%v]", err)
 	}
@@ -386,7 +393,10 @@ func AddDurationFlag(name string, value time.Duration, usage string) *pflag.Flag
 	return userOptions.flags.Lookup(name)
 }
 
-func RegisterFlagCompletionFunc(flagName string, completionFunc func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)) {
+func RegisterFlagCompletionFunc(
+	flagName string,
+	completionFunc func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective),
+) {
 	userOptions.completionFuncMap[flagName] = completionFunc
 }
 
@@ -406,5 +416,7 @@ func init() {
 
 	userOptions.flagTree = NewTree()
 	userOptions.envTree = NewTree()
-	userOptions.completionFuncMap = make(map[string]func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective))
+	userOptions.completionFuncMap = make(
+		map[string]func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective),
+	)
 }

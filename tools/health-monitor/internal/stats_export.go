@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -166,15 +166,19 @@ func (se *StatsExporter) StatsExporter() {
 }
 
 func (se *StatsExporter) addToList(st *ExportedStat, idx int) {
-	if st.MonitorName == hmcommon.CloudfuseStats {
+	switch st.MonitorName {
+	case hmcommon.CloudfuseStats:
 		se.outputList[idx].Cfs = append(se.outputList[idx].Cfs, st.Stat.(stats_manager.PipeMsg))
-	} else if st.MonitorName == hmcommon.FileCacheMon {
-		se.outputList[idx].FcEvent = append(se.outputList[idx].FcEvent, st.Stat.(*hmcommon.CacheEvent))
-	} else if st.MonitorName == hmcommon.CpuProfiler {
+	case hmcommon.FileCacheMon:
+		se.outputList[idx].FcEvent = append(
+			se.outputList[idx].FcEvent,
+			st.Stat.(*hmcommon.CacheEvent),
+		)
+	case hmcommon.CpuProfiler:
 		se.outputList[idx].Cpu = st.Stat.(string)
-	} else if st.MonitorName == hmcommon.MemoryProfiler {
+	case hmcommon.MemoryProfiler:
 		se.outputList[idx].Mem = st.Stat.(string)
-	} else if st.MonitorName == hmcommon.NetworkProfiler {
+	case hmcommon.NetworkProfiler:
 		se.outputList[idx].Net = st.Stat.(string)
 	}
 }
@@ -258,12 +262,24 @@ func (se *StatsExporter) getNewFile() error {
 	baseName := filepath.Join(hmcommon.OutputPath, hmcommon.OutputFileName)
 
 	// Remove the oldest file
-	fname = fmt.Sprintf("%v_%v_%v.%v", baseName, hmcommon.Pid, (hmcommon.OutputFileCount - 1), hmcommon.OutputFileExtension)
+	fname = fmt.Sprintf(
+		"%v_%v_%v.%v",
+		baseName,
+		hmcommon.Pid,
+		(hmcommon.OutputFileCount - 1),
+		hmcommon.OutputFileExtension,
+	)
 	_ = os.Remove(fname)
 
 	for i := hmcommon.OutputFileCount - 2; i > 0; i-- {
 		fname = fmt.Sprintf("%v_%v_%v.%v", baseName, hmcommon.Pid, i, hmcommon.OutputFileExtension)
-		fnameNew = fmt.Sprintf("%v_%v_%v.%v", baseName, hmcommon.Pid, (i + 1), hmcommon.OutputFileExtension)
+		fnameNew = fmt.Sprintf(
+			"%v_%v_%v.%v",
+			baseName,
+			hmcommon.Pid,
+			(i + 1),
+			hmcommon.OutputFileExtension,
+		)
 
 		// Move each file to next number 8 -> 9, 7 -> 8, 6 -> 7 ...
 		_ = os.Rename(fname, fnameNew)
@@ -293,7 +309,10 @@ func (se *StatsExporter) getNewFile() error {
 func CloseExporter() error {
 	se, err := NewStatsExporter()
 	if err != nil || se == nil {
-		log.Err("stats_exporter::CloseExporter : Error in creating stats exporter instance [%v]", err)
+		log.Err(
+			"stats_exporter::CloseExporter : Error in creating stats exporter instance [%v]",
+			err,
+		)
 		return err
 	}
 

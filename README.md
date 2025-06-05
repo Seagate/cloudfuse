@@ -1,6 +1,23 @@
 
 # Cloudfuse - An S3 and Azure Storage FUSE driver
 
+[![License][license-badge]][license-url]
+[![Release][release-badge]][release-url]
+[![GitHub Releases Stats of cloudfuse][stats-badge]][stats-url]
+[![Go Report Card][go-report-badge]][go-report-url]
+[![OpenSSF Scorecard][openssf-badge]][openssf-url]
+
+[license-badge]: https://img.shields.io/github/license/Seagate/cloudfuse
+[license-url]: https://github.com/Seagate/cloudfuse/blob/main/LICENSE
+[release-badge]: https://img.shields.io/github/release/Seagate/cloudfuse.svg
+[release-url]: https://github.com/Seagate/cloudfuse/releases/latest
+[stats-badge]: https://img.shields.io/github/downloads/Seagate/cloudfuse/total.svg?logo=github
+[stats-url]: https://somsubhra.github.io/github-release-stats/?username=Seagate&repository=cloudfuse
+[go-report-badge]: https://goreportcard.com/badge/github.com/Seagate/cloudfuse
+[go-report-url]: https://goreportcard.com/report/github.com/Seagate/cloudfuse
+[openssf-badge]: https://img.shields.io/ossf-scorecard/github.com/Seagate/cloudfuse?label=openssf%20scorecard
+[openssf-url]: https://scorecard.dev/viewer/?uri=github.com/Seagate/cloudfuse
+
 Cloudfuse provides the ability to mount a cloud bucket in your local filesystem on Linux and Windows with a GUI for easy configuration.
 With Cloudfuse you can easily read and write to the cloud, and connect programs on your computer to the cloud even if they're not cloud-aware.
 Cloudfuse uses file caching to provide the performance of local storage, or you can use streaming mode to efficiently access small parts of large files (e.g. video playback).
@@ -146,6 +163,17 @@ To use security options the general format for cloudfuse commands is:
 To see a list of commands, type `cloudfuse -h`.
 To learn about a specific command, just include the name of the command (For example: `cloudfuse mount -h`).
 
+### Verifying Authenticity
+
+Cloudfuse releases are signed keylessly using Cosign. To verify that the checksum file is genuine, use the following command where {tag} is the version of cloudfuse.
+
+```bash
+cosign verify-blob ./checksums_sha256.txt --bundle ./checksums_sha256.txt.bundle --certificate-identity https://github.com/Seagate/cloudfuse/.github/workflows/publish-release.yml@refs/tags/{tag} --certificate-oidc-is
+suer https://token.actions.githubusercontent.com
+```
+
+This command should then print out "Verified OK" is the checksum file is valid. You can then use these checksums to verify that the cloudfuse version downloaded matches the expected checksum.
+
 ## Limitations
 
 ### NOTICE
@@ -196,12 +224,6 @@ Kindly avoid using this feature for write while we investigate and resolve it.
 
     `docker run -it --rm --cap-add=SYS_ADMIN --device=/dev/fuse --security-opt
     apparmor:unconfined <environment variables> <docker image>`
-
-### Syslog security warning
-
-By default, Cloudfuse will log to syslog. The default settings will, in some
-cases, log relevant file paths to syslog. If this is sensitive information, turn
-off logging or set log-level to LOG_ERR.
 
 ## License
 

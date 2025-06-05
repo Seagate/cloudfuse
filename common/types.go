@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -40,7 +40,7 @@ import (
 
 // Standard config default values
 const (
-	cloudfuseVersion_ = "1.10.0"
+	cloudfuseVersion_ = "1.11.2"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
@@ -59,14 +59,14 @@ const (
 	MbToBytes         = 1024 * 1024
 	GbToBytes         = 1024 * 1024 * 1024
 	TbToBytes         = 1024 * 1024 * 1024 * 1024
-	DefaultCapacityMb = TbToBytes / MbToBytes
+	DefaultCapacityMb = 1024 * TbToBytes / MbToBytes // 1 PB
 	CfuseStats        = "cloudfuse_stats"
 
 	FuseAllowedFlags = "invalid FUSE options. Allowed FUSE configurations are: `-o attr_timeout=TIMEOUT`, `-o negative_timeout=TIMEOUT`, `-o entry_timeout=TIMEOUT` `-o allow_other`, `-o allow_root`, `-o umask=PERMISSIONS -o default_permissions`, `-o ro`"
 
 	UserAgentHeader = "User-Agent"
 
-	BlockCacheRWErrMsg = "Notice: The random write flow using block cache is temporarily blocked due to potential data integrity issues. This is a precautionary measure. \nIf you see this message, contact blobfusedev@microsoft.com or create a GitHub issue. We're working on a fix. More details: https://aka.ms/blobfuse2warnings."
+	BlockCacheRWErrMsg = "Notice: The random write flow using block cache is temporarily blocked due to potential data integrity issues. This is a precautionary measure."
 )
 
 var GitCommit = "**local_build**"
@@ -75,7 +75,21 @@ var GoVersion = runtime.Version()
 var OsArch = fmt.Sprintf("%s %s", runtime.GOOS, runtime.GOARCH)
 
 func FuseIgnoredFlags() []string {
-	return []string{"default_permissions", "rw", "dev", "nodev", "suid", "nosuid", "delay_connect", "auto", "noauto", "user", "nouser", "exec", "noexec"}
+	return []string{
+		"default_permissions",
+		"rw",
+		"dev",
+		"nodev",
+		"suid",
+		"nosuid",
+		"delay_connect",
+		"auto",
+		"noauto",
+		"user",
+		"nouser",
+		"exec",
+		"noexec",
+	}
 }
 
 var CloudfuseVersion = CloudfuseVersion_()
@@ -232,7 +246,8 @@ func (bol BlockOffsetList) BinarySearch(offset int64) (bool, int) {
 	for lowerBound <= higherBound {
 		middleIndex := (lowerBound + higherBound) / 2
 		// we found the starting block that changes are being applied to
-		if bol.BlockList[middleIndex].EndIndex > offset && bol.BlockList[middleIndex].StartIndex <= offset {
+		if bol.BlockList[middleIndex].EndIndex > offset &&
+			bol.BlockList[middleIndex].StartIndex <= offset {
 			return true, middleIndex
 			// if the end index is smaller or equal then we need to increase our lower bound
 		} else if bol.BlockList[middleIndex].EndIndex <= offset {
@@ -259,7 +274,8 @@ func (bol BlockOffsetList) FindBlocks(offset, length int64) ([]*Block, bool) {
 		if blk.StartIndex > offset+length {
 			break
 		}
-		if currentBlockOffset >= blk.StartIndex && currentBlockOffset < blk.EndIndex && currentBlockOffset <= offset+length {
+		if currentBlockOffset >= blk.StartIndex && currentBlockOffset < blk.EndIndex &&
+			currentBlockOffset <= offset+length {
 			blocks = append(blocks, blk)
 			currentBlockOffset = blk.EndIndex
 		}
@@ -282,7 +298,8 @@ func (bol BlockOffsetList) FindBlocksToModify(offset, length int64) (int, int64,
 		if blk.StartIndex > offset+length {
 			break
 		}
-		if currentBlockOffset >= blk.StartIndex && currentBlockOffset < blk.EndIndex && currentBlockOffset <= offset+length {
+		if currentBlockOffset >= blk.StartIndex && currentBlockOffset < blk.EndIndex &&
+			currentBlockOffset <= offset+length {
 			appendOnly = false
 			blk.Flags.Set(DirtyBlock)
 			currentBlockOffset = blk.EndIndex

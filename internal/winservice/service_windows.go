@@ -31,6 +31,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -51,16 +52,15 @@ const (
 
 // StartMount starts the mount if the name exists in the WinFsp Windows registry.
 func StartMount(mountPath string, configFile string, passphrase *memguard.Enclave) error {
+	instanceName := strings.ToLower(mountPath)
+
 	// get the current user uid and gid to set file permissions
 	userId, groupId, err := common.GetCurrentUser()
 	if err != nil {
-		log.Err("StartMount : GetCurrentUser() failed with error: %v", err)
+		log.Err("startMountHelper : GetCurrentUser() failed with error: %v", err)
 		return err
 	}
 
-	instanceName := mountPath
-
-	var passphraseStr string
 	if passphrase != nil {
 		buff, err := passphrase.Open()
 		if err != nil || buff == nil {
@@ -68,21 +68,17 @@ func StartMount(mountPath string, configFile string, passphrase *memguard.Enclav
 		}
 
 		// Encode back to base64 when sending passphrase to cloudfuse
-		passphraseStr = buff.String()
+		_, err = winFspCommand(writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), buff.String()))
 		defer buff.Destroy()
+	} else {
+		_, err = winFspCommand(writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), ""))
 	}
-
-	buf := writeCommandToUtf16(startCmd, SvcName, instanceName, mountPath, configFile, fmt.Sprint(userId), fmt.Sprint(groupId), passphraseStr)
-	_, err = winFspCommand(buf)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // StopMount stops the mount if the name exists in the WinFsp Windows registry.
 func StopMount(mountPath string) error {
-	instanceName := mountPath
+	instanceName := strings.ToLower(mountPath)
 
 	buf := writeCommandToUtf16(stopCmd, SvcName, instanceName, mountPath)
 	_, err := winFspCommand(buf)
@@ -94,21 +90,15 @@ func StopMount(mountPath string) error {
 
 // IsMounted determines if the given path is mounted.
 func IsMounted(mountPath string) (bool, error) {
-	buf := writeCommandToUtf16(listCmd)
-	list, err := winFspCommand(buf)
+	instanceName := strings.ToLower(mountPath)
+	list, err := getMountList()
 	if err != nil {
 		return false, err
 	}
 
-	// Everything in the list is a name of a service using WinFsp, like cloudfuse and then
-	// the name of the mount which is the mount path
-	if len(list)%2 != 0 {
-		return false, errors.New("unable to get list from Winfsp because received odd number of elements")
-	}
-
 	for i := 0; i < len(list); i += 2 {
 		// Check if the mountpath is associated with our service
-		if list[i] == SvcName && list[i+1] == mountPath {
+		if list[i] == SvcName && list[i+1] == instanceName {
 			return true, nil
 		}
 	}
@@ -151,6 +141,23 @@ func StopMounts(useSystem bool) error {
 	}
 
 	return nil
+}
+
+func getMountList() ([]string, error) {
+	var emptyList []string
+	buf := writeCommandToUtf16(listCmd)
+	list, err := winFspCommand(buf)
+	if err != nil {
+		return emptyList, err
+	}
+
+	// Everything in the list is a name of a service using WinFsp, like cloudfuse and then
+	// the name of the mount which is the mount path
+	if len(list)%2 != 0 {
+		return emptyList, errors.New("unable to get list from Winfsp because received odd number of elements")
+	}
+
+	return list, nil
 }
 
 // writeCommandToUtf16 writes a given cmd and arguments as a byte array in UTF16.

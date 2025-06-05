@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -68,7 +68,9 @@ var rootCmd = &cobra.Command{
 				return err
 			}
 		}
-		return errors.New("missing command options\n\nDid you mean this?\n\tcloudfuse mount\n\nRun 'cloudfuse --help' for usage")
+		return errors.New(
+			"missing command options\n\nDid you mean this?\n\tcloudfuse mount\n\nRun 'cloudfuse --help' for usage",
+		)
 	},
 }
 
@@ -81,7 +83,11 @@ func getRemoteVersion(req string) (string, error) {
 	}
 	if resp.StatusCode != 200 {
 		log.Err("getRemoteVersion: [got status %d from URL %s]", resp.StatusCode, req)
-		return "", fmt.Errorf("unable to get latest version: GET %s failed with status %d", req, resp.StatusCode)
+		return "", fmt.Errorf(
+			"unable to get latest version: GET %s failed with status %d",
+			req,
+			resp.StatusCode,
+		)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -135,11 +141,22 @@ func beginDetectNewVersion() chan interface{} {
 		}
 
 		if local.OlderThan(*remote) {
-			executablePathSegments := strings.Split(strings.Replace(os.Args[0], "\\", "/", -1), "/")
+			executablePathSegments := strings.Split(strings.ReplaceAll(os.Args[0], "\\", "/"), "/")
 			executableName := executablePathSegments[len(executablePathSegments)-1]
-			log.Info("beginDetectNewVersion: A new version of Cloudfuse is available. Current Version=%s, Latest Version=%s", common.CloudfuseVersion, remoteVersion)
-			fmt.Fprintf(stderr, "*** "+executableName+": A new version [%s] is available. Consider upgrading to latest version for bug-fixes & new features. ***\n", remoteVersion)
-			log.Info("*** "+executableName+": A new version [%s] is available. Consider upgrading to latest version for bug-fixes & new features. ***\n", remoteVersion)
+			log.Info(
+				"beginDetectNewVersion: A new version of Cloudfuse is available. Current Version=%s, Latest Version=%s",
+				common.CloudfuseVersion,
+				remoteVersion,
+			)
+			fmt.Fprintf(
+				stderr,
+				"*** "+executableName+": A new version [%s] is available. Consider upgrading to latest version for bug-fixes & new features. ***\n",
+				remoteVersion,
+			)
+			log.Info(
+				"*** "+executableName+": A new version [%s] is available. Consider upgrading to latest version for bug-fixes & new features. ***\n",
+				remoteVersion,
+			)
 			completed <- "A new version of Cloudfuse is available"
 		}
 	}()
@@ -152,7 +169,9 @@ func VersionCheck() error {
 	//either wait till this routine completes or timeout if it exceeds 8 secs
 	case <-beginDetectNewVersion():
 	case <-time.After(8 * time.Second):
-		return fmt.Errorf("unable to obtain latest version information. please check your internet connection")
+		return fmt.Errorf(
+			"unable to obtain latest version information. please check your internet connection",
+		)
 	}
 	return nil
 }
@@ -244,5 +263,6 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.PersistentFlags().BoolVar(&disableVersionCheck, "disable-version-check", false, "To disable version check that is performed automatically")
+	rootCmd.PersistentFlags().
+		BoolVar(&disableVersionCheck, "disable-version-check", false, "To disable version check that is performed automatically")
 }

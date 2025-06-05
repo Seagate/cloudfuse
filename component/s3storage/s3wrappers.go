@@ -2,7 +2,7 @@
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
    Copyright © 2023-2025 Seagate Technology LLC and/or its Affiliates
-   Copyright © 2020-2024 Microsoft Corporation. All rights reserved.
+   Copyright © 2020-2025 Microsoft Corporation. All rights reserved.
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -230,9 +230,17 @@ func (cl *Client) deleteObjects(objects []*internal.ObjAttr) error {
 		},
 	})
 	if err != nil {
-		log.Err("Client::DeleteDirectory : Failed to delete %d files. Here's why: %v", len(objects), err)
+		log.Err(
+			"Client::DeleteDirectory : Failed to delete %d files. Here's why: %v",
+			len(objects),
+			err,
+		)
 		for i := 0; i < len(result.Errors); i++ {
-			log.Err("Client::DeleteDirectory : Failed to delete key %s. Here's why: %s", result.Errors[i].Key, result.Errors[i].Message)
+			log.Err(
+				"Client::DeleteDirectory : Failed to delete key %s. Here's why: %s",
+				result.Errors[i].Key,
+				result.Errors[i].Message,
+			)
 		}
 	}
 
@@ -283,9 +291,11 @@ func (cl *Client) copyObject(options copyObjectOptions) error {
 	targetKey := cl.getKey(options.target, options.isSymLink, options.isDir)
 
 	copyObjectInput := &s3.CopyObjectInput{
-		Bucket:     aws.String(cl.Config.authConfig.BucketName),
-		CopySource: aws.String(fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, url.PathEscape(sourceKey))),
-		Key:        aws.String(targetKey),
+		Bucket: aws.String(cl.Config.authConfig.BucketName),
+		CopySource: aws.String(
+			fmt.Sprintf("%v/%v", cl.Config.authConfig.BucketName, url.PathEscape(sourceKey)),
+		),
+		Key: aws.String(targetKey),
 	}
 
 	if cl.Config.enableChecksum {
@@ -303,9 +313,16 @@ func (cl *Client) copyObject(options copyObjectOptions) error {
 }
 
 func (cl *Client) renameObject(options renameObjectOptions) error {
-	err := cl.copyObject(copyObjectOptions{source: options.source, target: options.target, isSymLink: options.isSymLink, isDir: options.isDir}) //nolint
+	err := cl.copyObject(
+		copyObjectOptions(options),
+	) //nolint
 	if err != nil {
-		log.Err("Client::renameObject : copyObject(%s->%s) failed. Here's why: %v", options.source, options.target, err)
+		log.Err(
+			"Client::renameObject : copyObject(%s->%s) failed. Here's why: %v",
+			options.source,
+			options.target,
+			err,
+		)
 		return err
 	}
 	// Copy of the file is done so now delete the older file
@@ -313,7 +330,11 @@ func (cl *Client) renameObject(options renameObjectOptions) error {
 	// this is what S3's DeleteObject spec is meant for: to make sure the object doesn't exist anymore
 	err = cl.deleteObject(options.source, options.isSymLink, options.isDir)
 	if err != nil {
-		log.Err("Client::renameObject : deleteObject(%s) failed. Here's why: %v", options.source, err)
+		log.Err(
+			"Client::renameObject : deleteObject(%s) failed. Here's why: %v",
+			options.source,
+			err,
+		)
 	}
 
 	return err
@@ -321,11 +342,14 @@ func (cl *Client) renameObject(options renameObjectOptions) error {
 
 // abortMultipartUpload stops a multipart upload and verifys that the parts are deleted.
 func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
-	_, abortErr := cl.awsS3Client.AbortMultipartUpload(context.Background(), &s3.AbortMultipartUploadInput{
-		Bucket:   aws.String(cl.Config.authConfig.BucketName),
-		Key:      aws.String(key),
-		UploadId: &uploadID,
-	})
+	_, abortErr := cl.awsS3Client.AbortMultipartUpload(
+		context.Background(),
+		&s3.AbortMultipartUploadInput{
+			Bucket:   aws.String(cl.Config.authConfig.BucketName),
+			Key:      aws.String(key),
+			UploadId: &uploadID,
+		},
+	)
 	if abortErr != nil {
 		log.Err("Client::StageAndCommit : Error aborting multipart upload: ", abortErr.Error())
 	}
@@ -337,10 +361,19 @@ func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
 		UploadId: &uploadID,
 	})
 	if len(resp.Parts) != 0 {
-		log.Err("Client::StageAndCommit : Error aborting multipart upload. There are parts remaining in the object with key: %s, uploadId: %s ", key, uploadID)
+		log.Err(
+			"Client::StageAndCommit : Error aborting multipart upload. There are parts remaining in the object with key: %s, uploadId: %s ",
+			key,
+			uploadID,
+		)
 	}
 	if listErr != nil {
-		log.Err("Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted with key: %s, uploadId: %s, error: ", key, uploadID, abortErr.Error())
+		log.Err(
+			"Client::StageAndCommit : Error calling list parts. Unable to verify if multipart upload was properly aborted with key: %s, uploadId: %s, error: ",
+			key,
+			uploadID,
+			abortErr.Error(),
+		)
 	}
 	return errors.Join(abortErr, listErr)
 }
@@ -372,7 +405,11 @@ func (cl *Client) ListBuckets() ([]string, error) {
 // This fetches the list using a marker so the caller code should handle marker logic.
 // If count=0 - fetch max entries.
 // the *string being returned is the token / marker and will be nil when the listing is complete.
-func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error) {
+func (cl *Client) List(
+	prefix string,
+	marker *string,
+	count int32,
+) ([]*internal.ObjAttr, *string, error) {
 	log.Trace("Client::List : prefix %s, marker %s, count %d", prefix, func(marker *string) string {
 		if marker != nil {
 			return *marker
@@ -389,7 +426,8 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// combine the configured prefix and the prefix being given to List to get a full listPath
 	listPath := cl.getKey(prefix, false, false)
 	// replace any trailing forward slash stripped by common.JoinUnixFilepath
-	if (prefix != "" && prefix[len(prefix)-1] == '/') || (prefix == "" && cl.Config.prefixPath != "") {
+	if (prefix != "" && prefix[len(prefix)-1] == '/') ||
+		(prefix == "" && cl.Config.prefixPath != "") {
 		listPath += "/"
 	}
 
@@ -428,7 +466,12 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 	// fetch and process a single result page
 	output, err := paginator.NextPage(context.Background())
 	if err != nil {
-		log.Err("Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v", prefix, bucketName, err)
+		log.Err(
+			"Client::List : Failed to list objects in bucket %v with prefix %v. Here's why: %v",
+			prefix,
+			bucketName,
+			err,
+		)
 		return objectAttrList, nil, err
 	}
 
@@ -514,7 +557,12 @@ func (cl *Client) List(prefix string, marker *string, count int32) ([]*internal.
 }
 
 // create an object attributes struct
-func createObjAttr(path string, size int64, lastModified time.Time, isSymLink bool) (attr *internal.ObjAttr) {
+func createObjAttr(
+	path string,
+	size int64,
+	lastModified time.Time,
+	isSymLink bool,
+) (attr *internal.ObjAttr) {
 	attr = &internal.ObjAttr{
 		Path:   path,
 		Name:   filepath.Base(path),
@@ -527,7 +575,6 @@ func createObjAttr(path string, size int64, lastModified time.Time, isSymLink bo
 		Flags:  internal.NewFileBitMap(),
 	}
 	// set flags
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	attr.Metadata = make(map[string]*string)
@@ -552,7 +599,6 @@ func createObjAttrDir(path string) (attr *internal.ObjAttr) { //nolint
 	attr.Mode = os.ModeDir
 	// set flags
 	attr.Flags = internal.NewDirBitMap()
-	attr.Flags.Set(internal.PropFlagMetadataRetrieved)
 	attr.Flags.Set(internal.PropFlagModeDefault)
 
 	return attr

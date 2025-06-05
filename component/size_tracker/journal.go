@@ -28,7 +28,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -36,8 +35,6 @@ import (
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
 )
-
-var journalFile string
 
 type MountSize struct {
 	size        atomic.Uint64
@@ -48,13 +45,18 @@ type MountSize struct {
 }
 
 func CreateSizeJournal(filename string) (*MountSize, error) {
-	journalFile = filepath.Join(common.ExpandPath(common.DefaultWorkDir), filename)
 	err := common.CreateDefaultDirectory()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create default work dir [%s]", err.Error())
+		return nil, fmt.Errorf("failed to create default work dir [%s]", err.Error())
 	}
 
-	f, err := os.OpenFile(journalFile, os.O_CREATE|os.O_RDWR, 0644)
+	root, err := os.OpenRoot(common.ExpandPath(common.DefaultWorkDir))
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+
+	f, err := root.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +101,10 @@ func (ms *MountSize) runJournalWriter() {
 			}
 		case <-ms.stopCh:
 			if err := ms.writeSizeToFile(); err != nil {
-				log.Err("SizeTracker::runJournalWriter : Unable to journal final size before closing channel. Error: %v", err)
+				log.Err(
+					"SizeTracker::runJournalWriter : Unable to journal final size before closing channel. Error: %v",
+					err,
+				)
 			}
 			return
 		}
