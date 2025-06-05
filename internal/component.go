@@ -71,6 +71,8 @@ type Component interface {
 	Start(context.Context) error
 	Stop() error
 
+	CloudConnected() bool
+
 	// Directory operations
 	CreateDir(CreateDirOptions) error
 	DeleteDir(DeleteDirOptions) error

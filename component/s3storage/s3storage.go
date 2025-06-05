@@ -46,8 +46,10 @@ import (
 // S3Storage Wrapper type around aws-sdk-go-v2/service/s3
 type S3Storage struct {
 	internal.BaseComponent
-	storage  S3Connection
-	stConfig Config
+	storage               S3Connection
+	stConfig              Config
+	firstOffline          time.Time
+	lastConnectionAttempt time.Time
 }
 
 const compName = "s3storage"
@@ -176,6 +178,55 @@ func (s3 *S3Storage) Stop() error {
 	log.Trace("S3Storage::Stop : Stopping component %s", s3.Name())
 	s3StatsCollector.Destroy()
 	return nil
+}
+
+// Online check
+func (s3 *S3Storage) CloudConnected() bool {
+	log.Trace("S3Storage::IsOnline")
+	if !s3.timeToRetry() {
+		log.Debug("S3Storage::IsOnline : Exponential backoff triggered")
+		return false
+	}
+	// Use ListBuckets to check if the S3 connection is online
+	_, err := s3.ListBuckets()
+	currentTime := time.Now()
+	if err != nil {
+		log.Err("S3Storage::IsOnline : S3 connection is offline [%v]", err)
+		s3.lastConnectionAttempt = currentTime
+		if s3.firstOffline.IsZero() {
+			s3.firstOffline = currentTime
+		}
+		return false
+	}
+	// update state
+	s3.firstOffline = time.Time{}
+	s3.lastConnectionAttempt = currentTime
+	return true
+}
+
+func (s3 *S3Storage) timeToRetry() bool {
+	// If the firstOffline is not set, it means we are online
+	if s3.firstOffline.IsZero() {
+		return true
+	}
+	// If we haven't checked for over 30 seconds, we can retry
+	timeSinceLastAttempt := time.Since(s3.lastConnectionAttempt)
+	if timeSinceLastAttempt > 30*time.Second {
+		// Reset the firstOffline time if we are retrying after a long time
+		s3.firstOffline = time.Time{}
+		return true
+	}
+	// Minimum delay before retrying
+	initialDelay := 5 * time.Second
+	if timeSinceLastAttempt < initialDelay {
+		return false
+	}
+	// Formula between 5 seconds and 30 seconds
+	timeOffline := s3.lastConnectionAttempt.Sub(s3.firstOffline)
+	if time.Since(s3.lastConnectionAttempt) < timeOffline {
+		return false
+	}
+	return true
 }
 
 // ------------------------- Bucket listing -------------------------------------------
