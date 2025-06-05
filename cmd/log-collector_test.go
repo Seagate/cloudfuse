@@ -43,6 +43,18 @@ func (suite *logCollectTestSuite) cleanupTest(dir string) {
 	os.Remove(dir + "/cloudfuse_logs.tar.gz")
 }
 
+func (suite *logCollectTestSuite) setupConfig(logInfo logCollectTestConfig) *os.File {
+	config := fmt.Sprintf("logging:\n  type: %s\n  level: %s\n  file-path: %s\n",
+		logInfo.logType, logInfo.level, logInfo.filePath)
+	var configFile *os.File
+	configFile, err := os.CreateTemp("", "conf*.yaml")
+	defer os.Remove(configFile.Name())
+	_, err = configFile.WriteString(config)
+	suite.assert.NoError(err)
+	configFile.Close()
+	return configFile
+}
+
 func (suite *logCollectTestSuite) extractZip(srcPath, destPath string) {
 	readCloser, err := zip.OpenReader(srcPath + string(os.PathSeparator) + "cloudfuse_logs.zip")
 	suite.assert.NoError(err)
@@ -183,13 +195,7 @@ func (suite *logCollectTestSuite) TestValidBaseConfig() {
 
 	//set up config file
 	validBaseConfig := logCollectTestConfig{logType: "base", level: "log_debug", filePath: tempLogDir + "/cloudfuse.log"}
-	config := fmt.Sprintf("logging:\n  type: %s\n  level: %s\n  file-path: %s\n",
-		validBaseConfig.logType, validBaseConfig.level, validBaseConfig.filePath)
-	confFile, _ := os.CreateTemp("", "conf*.yaml")
-	defer os.Remove(confFile.Name())
-	_, err = confFile.WriteString(config)
-	suite.assert.NoError(err)
-	confFile.Close()
+	configFile := suite.setupConfig(validBaseConfig)
 
 	//put stub log files in test log directory
 	tempLog, err := os.CreateTemp(tempLogDir, "cloudfuse*.log")
@@ -197,7 +203,7 @@ func (suite *logCollectTestSuite) TestValidBaseConfig() {
 	defer os.RemoveAll(tempLog.Name())
 
 	//run the log collector
-	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", confFile.Name()))
+	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
 	suite.assert.NoError(err)
 
 	//verify the archive
@@ -214,16 +220,10 @@ func (suite *logCollectTestSuite) TestInvalidBaseConfig() {
 
 	//set up config file
 	invalidBaseConfig := logCollectTestConfig{logType: "base", level: "log_debug", filePath: "/home/fakeUser/cloudfuse.log"}
-	config := fmt.Sprintf("logging:\n  type: %s\n  level: %s\n  file-path: %s\n",
-		invalidBaseConfig.logType, invalidBaseConfig.level, invalidBaseConfig.filePath)
-	confFile, _ := os.CreateTemp("", "conf*.yaml")
-	defer os.Remove(confFile.Name())
-	_, err = confFile.WriteString(config)
-	suite.assert.NoError(err)
-	confFile.Close()
+	configFile := suite.setupConfig(invalidBaseConfig)
 
 	//run the log collector
-	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", confFile.Name()))
+	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
 	suite.assert.Error(err)
 }
 
@@ -234,17 +234,11 @@ func (suite *logCollectTestSuite) TestValidSyslogConfig() {
 	defer suite.cleanupTest(currentDir)
 
 	//set up config file
-	validSyslogConfig := logCollectTestConfig{logType: "syslog", level: "log_debug"}
-	config := fmt.Sprintf("logging:\n  type: %s\n  level: %s\n",
-		validSyslogConfig.logType, validSyslogConfig.level)
-	confFile, _ := os.CreateTemp("", "conf*.yaml")
-	defer os.Remove(confFile.Name())
-	_, err = confFile.WriteString(config)
-	suite.assert.NoError(err)
-	confFile.Close()
+	validSyslogConfig := logCollectTestConfig{logType: "syslog", level: "log_debug", filePath: ""}
+	configFile := suite.setupConfig(validSyslogConfig)
 
 	//run the log collector
-	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", confFile.Name()))
+	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
 	if runtime.GOOS == "linux" {
 		suite.assert.NoError(err)
 
@@ -267,22 +261,19 @@ func (suite *logCollectTestSuite) TestInvalidConfig() {
 	defer suite.cleanupTest(currentDir)
 
 	//set up config file
-	invalidSyslogConfig := logCollectTestConfig{logType: "invalid", level: "invalid"}
-	config := fmt.Sprintf("logging:\n  type: %s\n  level: %s\n",
-		invalidSyslogConfig.logType, invalidSyslogConfig.level)
-	confFile, _ := os.CreateTemp("", "conf*.yaml")
-	defer os.Remove(confFile.Name())
-	_, err = confFile.WriteString(config)
-	suite.assert.NoError(err)
-	confFile.Close()
+	invalidSyslogConfig := logCollectTestConfig{logType: "invalid", level: "invalid", filePath: "invalid"}
+	configFile := suite.setupConfig(invalidSyslogConfig)
 
 	//set up test log
 	baseDefaultDir := "$HOME/.cloudfuse/"
 	baseDefaultDir = common.ExpandPath(baseDefaultDir)
-	os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
+	var tempLog *os.File
+	tempLog, err = os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
+	suite.assert.NoError(err)
+	defer os.Remove(tempLog.Name())
 
 	//run the log collector
-	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", confFile.Name()))
+	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
 	suite.assert.NoError(err)
 
 	//check archive
@@ -302,22 +293,17 @@ func (suite *logCollectTestSuite) TestSilentConfig() {
 	defer suite.cleanupTest(currentDir)
 
 	//set up config file
-	silentConfig := logCollectTestConfig{logType: "silent", level: "log_debug"}
-	config := fmt.Sprintf("logging:\n  type: %s\n  level: %s\n",
-		silentConfig.logType, silentConfig.level)
-	confFile, _ := os.CreateTemp("", "conf*.yaml")
-	defer os.Remove(confFile.Name())
-	_, err = confFile.WriteString(config)
-	suite.assert.NoError(err)
-	confFile.Close()
+	silentConfig := logCollectTestConfig{logType: "silent", level: "log_debug", filePath: ""}
+	configFile := suite.setupConfig(silentConfig)
 
 	//set up test log
 	baseDefaultDir := "$HOME/.cloudfuse/"
 	baseDefaultDir = common.ExpandPath(baseDefaultDir)
 	os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
+	defer os.RemoveAll(baseDefaultDir)
 
 	//run the log collector
-	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", confFile.Name()))
+	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
 	suite.assert.Error(err)
 }
 
@@ -337,7 +323,10 @@ func (suite *logCollectTestSuite) TestOutputPath() {
 	// create temp files in default directory $HOME/.cloudfuse/cloudfuse.log
 	baseDefaultDir := "$HOME/.cloudfuse/"
 	baseDefaultDir = common.ExpandPath(baseDefaultDir)
-	os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
+	var logFile *os.File
+	logFile, err = os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
+	suite.assert.NoError(err)
+	defer os.Remove(logFile.Name())
 
 	// run gatherLogs command
 	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--output-path=%s", tempDir))
