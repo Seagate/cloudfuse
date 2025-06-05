@@ -50,6 +50,7 @@ import (
 	"github.com/Seagate/cloudfuse/component/loopback"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/golang/mock/gomock"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -64,6 +65,9 @@ type fileCacheTestSuite struct {
 	loopback          internal.Component
 	cache_path        string // uses os.Separator (filepath.Join)
 	fake_storage_path string // uses os.Separator (filepath.Join)
+	useMock           bool
+	mockCtrl          *gomock.Controller
+	mock              *internal.MockComponent
 }
 
 func newLoopbackFS() internal.Component {
@@ -104,6 +108,7 @@ func (suite *fileCacheTestSuite) SetupTest() {
 		suite.cache_path,
 		suite.fake_storage_path,
 	)
+	suite.useMock = false
 	log.Debug(defaultConfig)
 
 	// Delete the temp directories created
@@ -130,13 +135,21 @@ func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 	suite.assert = assert.New(suite.T())
 
 	config.ReadConfigFromReader(strings.NewReader(configuration))
-	suite.loopback = newLoopbackFS()
-	suite.fileCache = newTestFileCache(suite.loopback)
-	err := suite.loopback.Start(context.Background())
-	if err != nil {
-		panic(fmt.Sprintf("Unable to start loopback [%s]", err.Error()))
+	if suite.useMock {
+		suite.mockCtrl = gomock.NewController(suite.T())
+		suite.mock = internal.NewMockComponent(suite.mockCtrl)
+		suite.fileCache = newTestFileCache(suite.mock)
+		// always simulate being offline
+		suite.mock.EXPECT().StatFs().AnyTimes().Return(nil, false, &common.CloudUnreachableError{})
+	} else {
+		suite.loopback = newLoopbackFS()
+		suite.fileCache = newTestFileCache(suite.loopback)
+		err := suite.loopback.Start(context.Background())
+		if err != nil {
+			panic(fmt.Sprintf("Unable to start next component [%s]", err.Error()))
+		}
 	}
-	err = suite.fileCache.Start(context.Background())
+	err := suite.fileCache.Start(context.Background())
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start file cache [%s]", err.Error()))
 	}
@@ -144,10 +157,14 @@ func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 }
 
 func (suite *fileCacheTestSuite) cleanupTest() {
-	suite.loopback.Stop()
 	err := suite.fileCache.Stop()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to stop file cache [%s]", err.Error()))
+	}
+	if suite.useMock {
+		suite.mockCtrl.Finish()
+	} else {
+		suite.loopback.Stop()
 	}
 
 	// Delete the temp directories created
@@ -427,10 +444,43 @@ func (suite *fileCacheTestSuite) TestCreateDir() {
 	err := suite.fileCache.CreateDir(options)
 	suite.assert.NoError(err)
 
-	// Path should not be added to the file cache
-	suite.assert.NoDirExists(filepath.Join(suite.cache_path, path))
+	// Path should be added to the file cache
+	suite.assert.DirExists(filepath.Join(suite.cache_path, path))
 	// Path should be in fake storage
 	suite.assert.DirExists(filepath.Join(suite.fake_storage_path, path))
+}
+
+// Tests CreateDir
+func (suite *fileCacheTestSuite) TestCreateDirErrExist() {
+	defer suite.cleanupTest()
+	path := "a"
+	options := internal.CreateDirOptions{Name: path}
+	err := suite.fileCache.CreateDir(options)
+	// test
+	err = suite.fileCache.CreateDir(options)
+	suite.assert.ErrorIs(err, os.ErrExist)
+}
+
+// Tests CreateDir
+func (suite *fileCacheTestSuite) TestCreateDirOffline() {
+	// enable mock component
+	suite.cleanupTest()
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+	// setup
+	path := "a"
+	options := internal.CreateDirOptions{Name: path}
+	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path}).Return(nil, os.ErrNotExist)
+	err := suite.fileCache.CreateDir(options)
+	suite.assert.NoError(err)
+
+	// Path should be added to the file cache
+	suite.assert.DirExists(filepath.Join(suite.cache_path, path))
 }
 
 func (suite *fileCacheTestSuite) TestDeleteDir() {
