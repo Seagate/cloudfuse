@@ -33,6 +33,7 @@ jobs:
     env:
       MOUNT_DIR: "$HOME/blob_mnt"
       TEMP_DIR: "$HOME/cloudfuse_tmp"
+      BLOCK_TEMP_DIR: "$HOME/cloudfuse_block_tmp"
       WORK_DIR: "."
       cloudfuse_ADLS_CFG: "./cloudfuse.adls.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
@@ -188,18 +189,18 @@ jobs:
           ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
-        run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key_block_cache.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
+        run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key_block_cache.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.BLOCK_TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
 
       - name: Block Blob Coverage - Block Cache
         run: |-
           rm -rf ${{ env.MOUNT_DIR }}/*
-          rm -rf ${{ env.TEMP_DIR }}/*
+          rm -rf ${{ env.BLOCK_TEMP_DIR }}/*
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
           sleep 10
           ps -aux | grep cloudfuse
           rm -rf ${{ env.MOUNT_DIR }}/*
           cd test/e2e_tests
-          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
+          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.BLOCK_TEMP_DIR }}
           cd -
           sudo fusermount -u ${{ env.MOUNT_DIR }}
           sleep 5
@@ -308,17 +309,17 @@ jobs:
           S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
           S3_REGION: "${{ secrets.S3TEST_REGION }}"
           S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
-        run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
+        run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${{ env.BLOCK_TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
 
       - name: S3 Coverage - Block Cache
         run: |-
           rm -rf ${{ env.MOUNT_DIR }}/*
-          rm -rf ${{ env.TEMP_DIR }}/*
+          rm -rf ${{ env.BLOCK_TEMP_DIR }}/*
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
           sleep 10
           ps -aux | grep cloudfuse
           cd test/e2e_tests
-          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }}
+          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.BLOCK_TEMP_DIR }}
           cd -
           sudo fusermount -u ${{ env.MOUNT_DIR }}
           sleep 5
@@ -634,6 +635,7 @@ jobs:
     env:
       MOUNT_DIR: "$HOME/blob_mnt"
       TEMP_DIR: "$HOME/cloudfuse_tmp"
+      BLOCK_TEMP_DIR: "$HOME/cloudfuse_block_tmp"
       WORK_DIR: "."
       cloudfuse_ADLS_CFG: "./cloudfuse.adls.yaml"
       cloudfuse_ADLS_CFG_HMON: "./cloudfuse.adls.hmon.yaml"
@@ -791,18 +793,18 @@ jobs:
           ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
-        run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key_block_cache.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
+        run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key_block_cache.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.BLOCK_TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
 
       - name: Block Blob Coverage - Block Cache
         shell: bash
         run: |-
-          rm -rf ${{ env.TEMP_DIR }}/*
+          rm -rf ${{ env.BLOCK_TEMP_DIR }}/*
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
           sleep 10
           pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
           rm -rf ${{ env.MOUNT_DIR }}/*
           cd test/e2e_tests
-          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
+          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.BLOCK_TEMP_DIR }} -quick-test=true -stream-direct-test=true
           cd -
           kill $pid
           sleep 5
@@ -921,18 +923,18 @@ jobs:
           S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
           S3_REGION: "${{ secrets.S3TEST_REGION }}"
           S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
-        run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${{ env.TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
+        run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${{ env.BLOCK_TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
   
       - name: S3 Coverage - Block Cache
         shell: bash
         run: |-
           rm -rf ${{ env.MOUNT_DIR }}/*
-          rm -rf ${{ env.TEMP_DIR }}/*
+          rm -rf ${{ env.BLOCK_TEMP_DIR }}/*
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
           sleep 10
           pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
           cd test/e2e_tests
-          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.TEMP_DIR }} -quick-test=true -stream-direct-test=true
+          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.BLOCK_TEMP_DIR }} -quick-test=true -stream-direct-test=true
           cd -
           kill $pid
           sleep 5
