@@ -188,7 +188,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       go: "1.24"
-      zig: 0.14.0
+      zig: 0.14.1
     permissions:
       contents: write
       id-token: write
