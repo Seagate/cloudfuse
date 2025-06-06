@@ -32,6 +32,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
+	"runtime/pprof"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common/config"
@@ -85,6 +87,32 @@ func createDaemon(
 				log.Err("Unable to release pid-file: %s", err.Error())
 			}
 		}()
+
+		if options.CPUProfile != "" {
+			os.Remove(options.CPUProfile)
+			f, err := os.Create(options.CPUProfile)
+			if err != nil {
+				fmt.Printf("Error opening file for cpuprofile [%s]", err.Error())
+			}
+			defer f.Close()
+			if err := pprof.StartCPUProfile(f); err != nil {
+				fmt.Printf("Failed to start cpuprofile [%s]", err.Error())
+			}
+			defer pprof.StopCPUProfile()
+		}
+
+		if options.MemProfile != "" {
+			os.Remove(options.MemProfile)
+			f, err := os.Create(options.MemProfile)
+			if err != nil {
+				fmt.Printf("Error opening file for memprofile [%s]", err.Error())
+			}
+			defer f.Close()
+			runtime.GC()
+			if err = pprof.WriteHeapProfile(f); err != nil {
+				fmt.Printf("Error memory profiling [%s]", err.Error())
+			}
+		}
 
 		setGOConfig()
 		go startDynamicProfiler()
