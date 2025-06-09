@@ -65,6 +65,7 @@ type FileCache struct {
 	policyTrace     bool
 	missedChmodList sync.Map // uses object name (common.JoinUnixFilepath)
 	offlineOps      sync.Map // uses object name (common.JoinUnixFilepath)
+	offlineOpAdded chan struct{} // signals when an offline operation is queued
 	mountPath       string   // uses os.Separator (filepath.Join)
 	allowOther      bool
 	offloadIO       bool
@@ -189,6 +190,7 @@ func (fc *FileCache) Start(ctx context.Context) error {
 	if fc.offlineAccess {
 		// since the channel will simply be closed in Stop(), it doesn't need a value type
 		fc.stopAsyncUpload = make(chan struct{})
+		fc.offlineOpAdded = make(chan struct{}, 1)
 		go fc.servicePendingOps()
 	}
 
@@ -219,21 +221,37 @@ func (fc *FileCache) Stop() error {
 	return nil
 }
 
+func (fc *FileCache) addOfflineOp(name string, flock *common.LockMapItem) {
+	log.Trace("FileCache::addOfflineOp : %s", name)
+	fc.offlineOps.Store(name, struct{}{})
+	flock.SyncPending = true
+	select {
+	case fc.offlineOpAdded <- struct{}{}:
+	default: // do not block
+	}
+}
+
 func (fc *FileCache) servicePendingOps() {
 	for {
-		time.Sleep(250 * time.Millisecond) // don't run too fast
 		select {
 		case <-fc.stopAsyncUpload:
 			log.Crit("FileCache::servicePendingOps : Stopping")
-			// TODO: Close journal
+			// TODO: Persist pending ops
 			return
 		default:
 			// check if we're connected
 			if !fc.NextComponent().CloudConnected() {
+				// we are offline, wait for a while before checking again
+				select {
+				case <-time.After(time.Second):
+				case <-fc.stopAsyncUpload:
+				}
 				break
 			}
+			anyPending := false
 			// Iterate over pending ops
 			fc.offlineOps.Range(func(key, value interface{}) bool {
+				anyPending = true
 				select {
 				case <-fc.stopAsyncUpload:
 					return false // Stop the iteration
@@ -253,6 +271,14 @@ func (fc *FileCache) servicePendingOps() {
 				}
 				return true // Continue the iteration
 			})
+			if !anyPending {
+				// we're online but there's nothing to do
+				// wait for a task to be added
+				select {
+				case <-fc.offlineOpAdded:
+				case <-fc.stopAsyncUpload:
+				}
+			}
 		}
 	}
 }
@@ -664,7 +690,10 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 			//  The thread that pushes local changes to the cloud will have to account for this
 			//  to avoid creating an entry for this directory in the attribute cache,
 			//  which would give us the false impression that the directory is in the cloud.
-			fc.offlineOps.Store(options.Name, struct{}{})
+			flock := fc.fileLocks.Get(options.Name)
+			flock.Lock()
+			defer flock.Unlock()
+			fc.addOfflineOp(options.Name, flock)
 			log.Info("FileCache::CreateDir : %s created offline and queued for cloud sync", options.Name)
 		}
 	case err != nil && !isOffline(err):
@@ -1256,8 +1285,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 
 	// if we're offline, record this operation as pending
 	if offline {
-		fc.offlineOps.Store(options.Name, struct{}{})
-		flock.SyncPending = true
+		fc.addOfflineOp(options.Name, flock)
 	}
 
 	return handle, nil
@@ -2043,9 +2071,8 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			// add file to upload queue
 			_, err := os.Stat(localPath)
 			if err == nil {
-				fc.offlineOps.Store(options.Handle.Path, struct{}{})
 				flock := fc.fileLocks.Get(options.Handle.Path)
-				flock.SyncPending = true
+				fc.addOfflineOp(options.Handle.Path, flock)
 			}
 		default:
 			log.Err("FileCache::FlushFile : %s upload failed [%v]", options.Handle.Path, err)
@@ -2319,9 +2346,8 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 				)
 				return err
 			} else if offlineOkay {
-				fc.offlineOps.Store(options.Name, struct{}{})
+				fc.addOfflineOp(options.Name, flock)
 				log.Warn("FileCache::TruncateFile : %s operation queued (offline)", options.Name)
-				flock.SyncPending = true
 			}
 		}
 	}
@@ -2373,11 +2399,10 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 				)
 				return err
 			} else if offlineOkay {
-				fc.offlineOps.Store(options.Name, struct{}{})
 				log.Warn("FileCache::Chmod : %s operation queued (offline)", options.Name)
 				fc.missedChmodList.LoadOrStore(options.Name, true)
 				flock := fc.fileLocks.Get(options.Name)
-				flock.SyncPending = true
+				fc.addOfflineOp(options.Name, flock)
 			}
 		}
 	}
@@ -2423,9 +2448,8 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 				return err
 			} else if offlineOkay {
 				// TODO: we have no missedChownList to track this... should we make one? Or should we just ignore this call?
-				fc.offlineOps.Store(options.Name, struct{}{})
 				log.Warn("FileCache::Chown : %s operation queued (offline)", options.Name)
-				flock.SyncPending = true
+				fc.addOfflineOp(options.Name, flock)
 			}
 		}
 	}
