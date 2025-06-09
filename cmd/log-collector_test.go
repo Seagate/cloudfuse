@@ -265,14 +265,6 @@ func (suite *logCollectTestSuite) TestInvalidConfig() {
 	invalidSyslogConfig := logCollectTestConfig{logType: "invalid", level: "invalid", filePath: "invalid"}
 	configFile := suite.setupConfig(invalidSyslogConfig)
 
-	//set up test log
-	baseDefaultDir := "$HOME/.cloudfuse/"
-	baseDefaultDir = common.ExpandPath(baseDefaultDir)
-	var tempLog *os.File
-	tempLog, err = os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
-	suite.assert.NoError(err)
-	defer os.Remove(tempLog.Name())
-
 	//run the log collector
 	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
 	suite.assert.Error(err)
