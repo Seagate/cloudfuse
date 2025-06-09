@@ -238,10 +238,7 @@ func (az *AzStorage) timeToRetry() bool {
 	}
 	// Formula between 5 seconds and 30 seconds
 	timeOffline := az.lastConnectionAttempt.Sub(az.firstOffline)
-	if time.Since(az.lastConnectionAttempt) < timeOffline {
-		return false
-	}
-	return true
+	return time.Since(az.lastConnectionAttempt) >= timeOffline
 }
 
 // ------------------------- Container listing -------------------------------------------

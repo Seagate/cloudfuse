@@ -223,10 +223,7 @@ func (s3 *S3Storage) timeToRetry() bool {
 	}
 	// Formula between 5 seconds and 30 seconds
 	timeOffline := s3.lastConnectionAttempt.Sub(s3.firstOffline)
-	if time.Since(s3.lastConnectionAttempt) < timeOffline {
-		return false
-	}
-	return true
+	return time.Since(s3.lastConnectionAttempt) >= timeOffline
 }
 
 // ------------------------- Bucket listing -------------------------------------------
