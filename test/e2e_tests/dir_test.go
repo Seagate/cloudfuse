@@ -45,7 +45,7 @@ import (
 )
 
 const (
-    defaultPollTimeout  = 10 * time.Second // Adjusted for potentially slower E2E operations
+    defaultPollTimeout  = 10 * time.Second
     defaultPollInterval = 100 * time.Millisecond
 )
 

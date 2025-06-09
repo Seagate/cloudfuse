@@ -1567,16 +1567,7 @@ jobs:
           sleep 5
           pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
           kill $pid
-          
-          PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
-          SECONDS_WAITED_EXIT=0
-          while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
-              break
-            fi
-            sleep $POLL_INTERVAL
-            SECONDS_WAITED_EXIT=$((SECONDS_WAITED_EXIT + POLL_INTERVAL))
-          done
+          sleep 5
 
       - name: "CLI : Secure Config"
         shell: bash {0}
@@ -1616,7 +1607,6 @@ jobs:
           rm -rf ${{ env.TEMP_DIR }}/*
           cat ${{ env.cloudfuse_ADLS_CFG_HMON }}
           ./cloudfuse.test mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG_HMON }} --foreground=true &
-          CFL_PID=$!
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1  # Seconds between checks
@@ -1639,7 +1629,7 @@ jobs:
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
+            if ! ps -p $pid > /dev/null; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1654,7 +1644,6 @@ jobs:
           rm -rf ${{ env.TEMP_DIR }}/*
           cat ${{ env.cloudfuse_ADLS_CFG_HMON }}
           ./cloudfuse.test mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG_HMON }} --foreground=true &
-          CFL_PID=$!
           
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1  # Seconds between checks
@@ -1676,7 +1665,7 @@ jobs:
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
+            if ! ps -p $pid > /dev/null; then
               break
             fi
             sleep $POLL_INTERVAL
