@@ -182,16 +182,16 @@ func (s3 *S3Storage) Stop() error {
 
 // Online check
 func (s3 *S3Storage) CloudConnected() bool {
-	log.Trace("S3Storage::IsOnline")
+	log.Trace("S3Storage::CloudConnected")
 	if !s3.timeToRetry() {
-		log.Debug("S3Storage::IsOnline : Exponential backoff triggered")
+		log.Debug("S3Storage::CloudConnected : Exponential backoff triggered")
 		return false
 	}
 	// Use ListBuckets to check if the S3 connection is online
 	_, err := s3.ListBuckets()
 	currentTime := time.Now()
 	if err != nil {
-		log.Err("S3Storage::IsOnline : S3 connection is offline [%v]", err)
+		log.Err("S3Storage::CloudConnected : S3 connection is offline [%v]", err)
 		s3.lastConnectionAttempt = currentTime
 		if s3.firstOffline.IsZero() {
 			s3.firstOffline = currentTime
