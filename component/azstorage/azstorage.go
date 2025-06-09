@@ -51,6 +51,8 @@ type AzStorage struct {
 	stConfig    AzStorageConfig
 	startTime   time.Time
 	listBlocked bool
+	firstOffline          time.Time
+	lastConnectionAttempt time.Time
 }
 
 const compName = "azstorage"
@@ -189,6 +191,57 @@ func (az *AzStorage) Stop() error {
 	log.Trace("AzStorage::Stop : Stopping component %s", az.Name())
 	azStatsCollector.Destroy()
 	return nil
+}
+
+// ------------------------- Connectivity check -------------------------------------------
+
+// Online check
+func (az *AzStorage) CloudConnected() bool {
+	log.Trace("AzStorage::CloudConnected")
+	if !az.timeToRetry() {
+		log.Debug("AzStorage::CloudConnected : Exponential backoff triggered")
+		return false
+	}
+	// Use ListContainers to check if the connection is online
+	_, err := az.ListContainers()
+	currentTime := time.Now()
+	if err != nil {
+		log.Err("AzStorage::CloudConnected : Connection is offline [%v]", err)
+		az.lastConnectionAttempt = currentTime
+		if az.firstOffline.IsZero() {
+			az.firstOffline = currentTime
+		}
+		return false
+	}
+	// update state
+	az.firstOffline = time.Time{}
+	az.lastConnectionAttempt = currentTime
+	return true
+}
+
+func (az *AzStorage) timeToRetry() bool {
+	// If the firstOffline is not set, it means we are online
+	if az.firstOffline.IsZero() {
+		return true
+	}
+	// If we haven't checked for over 30 seconds, we can retry
+	timeSinceLastAttempt := time.Since(az.lastConnectionAttempt)
+	if timeSinceLastAttempt > 30*time.Second {
+		// Reset the firstOffline time if we are retrying after a long time
+		az.firstOffline = time.Time{}
+		return true
+	}
+	// Minimum delay before retrying
+	initialDelay := 5 * time.Second
+	if timeSinceLastAttempt < initialDelay {
+		return false
+	}
+	// Formula between 5 seconds and 30 seconds
+	timeOffline := az.lastConnectionAttempt.Sub(az.firstOffline)
+	if time.Since(az.lastConnectionAttempt) < timeOffline {
+		return false
+	}
+	return true
 }
 
 // ------------------------- Container listing -------------------------------------------
