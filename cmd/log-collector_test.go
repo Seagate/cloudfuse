@@ -192,16 +192,16 @@ func (suite *logCollectTestSuite) TestValidBaseConfig() {
 	suite.assert.NoError(err)
 	tempLogDir, err = filepath.Abs(tempLogDir)
 	suite.assert.NoError(err)
-	defer os.RemoveAll(tempLogDir)
 
-	//set up config file
-	validBaseConfig := logCollectTestConfig{logType: "base", level: "log_debug", filePath: tempLogDir + "/cloudfuse.log"}
-	configFile := suite.setupConfig(validBaseConfig)
-	defer os.Remove(configFile.Name())
 	//put stub log files in test log directory
 	tempLog, err := os.CreateTemp(tempLogDir, "cloudfuse*.log")
 	suite.assert.NoError(err)
 	defer os.RemoveAll(tempLog.Name())
+
+	//set up config file
+	validBaseConfig := logCollectTestConfig{logType: "base", level: "log_debug", filePath: tempLog.Name()}
+	configFile := suite.setupConfig(validBaseConfig)
+	defer os.Remove(configFile.Name())
 
 	//run the log collector
 	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
