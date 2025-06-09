@@ -64,7 +64,7 @@ var gatherLogsCmd = &cobra.Command{
 
 		logType, logPath, err := getLogInfo(logConfigFile)
 		if err != nil {
-			fmt.Errorf("cannot use this config file [%s]", err.Error())
+			return fmt.Errorf("cannot use this config file [%s]", err.Error())
 		}
 		if logType == "silent" {
 			return fmt.Errorf("no logs were generated due to log type being silent")
