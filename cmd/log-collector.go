@@ -200,13 +200,52 @@ func getLogInfo(configFile string) (string, string, error) {
 				} else {
 					fmt.Printf("Warning, file path for base log not found. using default.")
 				}
-			} else {
+			} else { // TODO: this should be a failure
 				fmt.Printf("Warning, logging type not found. using default.")
 				logType = "base"
 			}
 		}
 	}
 	return logType, logPath, nil
+}
+
+func copyFiles(srcPath, dstPath string) error {
+	var items []os.DirEntry
+	items, err := os.ReadDir(srcPath)
+	if err != nil {
+		return fmt.Errorf("failed read the service path directory: [%s]", err.Error())
+	}
+
+	for _, item := range items {
+		if item.IsDir() {
+			continue
+		}
+
+		srcFilePath := filepath.Join(srcPath, item.Name())
+		dstFilePath := filepath.Join(dstPath, item.Name())
+
+		var srcFile *os.File
+		srcFile, err = os.Open(srcFilePath)
+		defer srcFile.Close()
+		if err != nil {
+			return fmt.Errorf("failed to open file in service path to copy: [%s]", err.Error())
+		}
+
+		var dstFile *os.File
+		dstFile, err = os.Create(dstFilePath)
+		defer dstFile.Close()
+		if err != nil {
+			return fmt.Errorf("failed to create file to copy service file: [%s]", err.Error())
+		}
+
+		_, err = io.Copy(dstFile, srcFile)
+		if err != nil {
+			return fmt.Errorf("failed to copy file %s: [%s]", item.Name(), err.Error())
+		}
+
+	}
+	//question: when is it noisy to nest error messages in other error messages?
+	return err
 }
 
 // createFilteredLog creates a new log file containing only the cloudfuse logs from the input log file.
@@ -365,46 +404,6 @@ func createWindowsArchive(archPath string) error {
 		return fmt.Errorf("no cloudfuse log file were found in %s", archPath)
 	}
 	return err
-}
-
-func copyFiles(srcPath, dstPath string) error {
-	var items []os.DirEntry
-	items, err := os.ReadDir(srcPath)
-	if err != nil {
-		return fmt.Errorf("failed read the service path directory: [%s]", err.Error())
-	}
-
-	for _, item := range items {
-		if item.IsDir() {
-			continue
-		}
-
-		srcFilePath := filepath.Join(srcPath, item.Name())
-		dstFilePath := filepath.Join(dstPath, item.Name())
-
-		var srcFile *os.File
-		srcFile, err = os.Open(srcFilePath)
-		defer srcFile.Close()
-		if err != nil {
-			return fmt.Errorf("failed to open file in service path to copy: [%s]", err.Error())
-		}
-
-		var dstFile *os.File
-		dstFile, err = os.Create(dstFilePath)
-		defer dstFile.Close()
-		if err != nil {
-			return fmt.Errorf("failed to create file to copy service file: [%s]", err.Error())
-		}
-
-		_, err = io.Copy(dstFile, srcFile)
-		if err != nil {
-			return fmt.Errorf("failed to copy file %s: [%s]", item.Name(), err.Error())
-		}
-
-	}
-	//question: when is it noisy to nest error messages in other error messages?
-	return err
-
 }
 
 func init() {
