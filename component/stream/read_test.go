@@ -778,7 +778,7 @@ func (suite *streamTestSuite) TestAsyncReadAndEviction() {
 	)
 	go asyncReadInBuffer(suite, readInBufferOptions)
 	// wait a little so we can guarantee block offset 0 is evicted
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	// call 3: get missing block causing an eviction to block 1 with offset 0 - this ensures our data from block 1 is still copied correctly
 	_, readInBufferOptions, _ = suite.getRequestOptions(

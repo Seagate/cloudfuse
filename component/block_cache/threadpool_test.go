@@ -102,7 +102,6 @@ func (suite *threadPoolTestSuite) TestSchedule() {
 	tp.Schedule(false, &workItem{failCnt: 1})
 	tp.Schedule(true, &workItem{failCnt: 1})
 
-	time.Sleep(1 * time.Second)
 	tp.Stop()
 }
 
@@ -127,7 +126,7 @@ func (suite *threadPoolTestSuite) TestPrioritySchedule() {
 		tp.Schedule(i < 20, &workItem{failCnt: 5})
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 	suite.assert.Equal(int32(100), callbackCnt)
 	tp.Stop()
 }
@@ -159,7 +158,7 @@ func (suite *threadPoolTestSuite) TestPriorityScheduleWithWriter() {
 		tp.Schedule(i < 20, &workItem{failCnt: 5, upload: true, blockId: "test"})
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 	suite.assert.Equal(int32(100), callbackWCnt)
 	suite.assert.Equal(int32(0), callbackRCnt)
 	tp.Stop()
