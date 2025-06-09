@@ -197,7 +197,7 @@ func (suite *entryCacheTestSuite) TestCachedEntry() {
 	suite.assert.Equal("", token)
 	suite.assert.Equal(1, len(objs))
 
-	time.Sleep(40 * time.Second)
+	time.Sleep(30 * time.Second)
 	_, found = suite.entryCache.pathMap.Load("##")
 	suite.assert.False(found)
 
