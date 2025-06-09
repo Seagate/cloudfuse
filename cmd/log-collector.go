@@ -209,80 +209,6 @@ func getLogInfo(configFile string) (string, string, error) {
 	return logType, logPath, nil
 }
 
-func copyFiles(srcPath, dstPath string) error {
-	var items []os.DirEntry
-	items, err := os.ReadDir(srcPath)
-	if err != nil {
-		return fmt.Errorf("failed read the service path directory: [%s]", err.Error())
-	}
-
-	for _, item := range items {
-		if item.IsDir() {
-			continue
-		}
-
-		srcFilePath := filepath.Join(srcPath, item.Name())
-		dstFilePath := filepath.Join(dstPath, item.Name())
-
-		var srcFile *os.File
-		srcFile, err = os.Open(srcFilePath)
-		defer srcFile.Close()
-		if err != nil {
-			return fmt.Errorf("failed to open file in service path to copy: [%s]", err.Error())
-		}
-
-		var dstFile *os.File
-		dstFile, err = os.Create(dstFilePath)
-		defer dstFile.Close()
-		if err != nil {
-			return fmt.Errorf("failed to create file to copy service file: [%s]", err.Error())
-		}
-
-		_, err = io.Copy(dstFile, srcFile)
-		if err != nil {
-			return fmt.Errorf("failed to copy file %s: [%s]", item.Name(), err.Error())
-		}
-
-	}
-	//question: when is it noisy to nest error messages in other error messages?
-	return err
-}
-
-// createFilteredLog creates a new log file containing only the cloudfuse logs from the input log file.
-// It only runs for linux when the configured logging type is set to "syslog"
-func createFilteredLog(logFile string) (string, error) {
-	keyword := "cloudfuse"
-	os.Mkdir("/tmp/cloudfuseSyslog", 0760)
-	outPath := "/tmp/cloudfuseSyslog/cloudfuseSyslog.log"
-	inFile, err := os.Open(logFile)
-	if err != nil {
-		return "", err
-	}
-	defer inFile.Close()
-
-	outFile, err := os.Create(outPath)
-	if err != nil {
-		return "", err
-	}
-	defer outFile.Close()
-
-	scanner := bufio.NewScanner(inFile)
-	writer := bufio.NewWriter(outFile)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.Contains(line, keyword) {
-			_, err := writer.WriteString(line + "\n")
-			if err != nil {
-				return "", err
-			}
-		}
-	}
-	writer.Flush()
-
-	return outPath, scanner.Err()
-}
-
 func createLinuxArchive(logPath string) error {
 	//first check logPath is valid
 	_, err := os.Stat(logPath)
@@ -352,6 +278,45 @@ func createLinuxArchive(logPath string) error {
 	return nil
 }
 
+func copyFiles(srcPath, dstPath string) error {
+	var items []os.DirEntry
+	items, err := os.ReadDir(srcPath)
+	if err != nil {
+		return fmt.Errorf("failed read the service path directory: [%s]", err.Error())
+	}
+
+	for _, item := range items {
+		if item.IsDir() {
+			continue
+		}
+
+		srcFilePath := filepath.Join(srcPath, item.Name())
+		dstFilePath := filepath.Join(dstPath, item.Name())
+
+		var srcFile *os.File
+		srcFile, err = os.Open(srcFilePath)
+		defer srcFile.Close()
+		if err != nil {
+			return fmt.Errorf("failed to open file in service path to copy: [%s]", err.Error())
+		}
+
+		var dstFile *os.File
+		dstFile, err = os.Create(dstFilePath)
+		defer dstFile.Close()
+		if err != nil {
+			return fmt.Errorf("failed to create file to copy service file: [%s]", err.Error())
+		}
+
+		_, err = io.Copy(dstFile, srcFile)
+		if err != nil {
+			return fmt.Errorf("failed to copy file %s: [%s]", item.Name(), err.Error())
+		}
+
+	}
+	//question: when is it noisy to nest error messages in other error messages?
+	return err
+}
+
 func createWindowsArchive(archPath string) error {
 	outFile, err := os.Create(dumpPath + "/cloudfuse_logs.zip")
 	if err != nil {
@@ -404,6 +369,41 @@ func createWindowsArchive(archPath string) error {
 		return fmt.Errorf("no cloudfuse log file were found in %s", archPath)
 	}
 	return err
+}
+
+// createFilteredLog creates a new log file containing only the cloudfuse logs from the input log file.
+// It only runs for linux when the configured logging type is set to "syslog"
+func createFilteredLog(logFile string) (string, error) {
+	keyword := "cloudfuse"
+	os.Mkdir("/tmp/cloudfuseSyslog", 0760)
+	outPath := "/tmp/cloudfuseSyslog/cloudfuseSyslog.log"
+	inFile, err := os.Open(logFile)
+	if err != nil {
+		return "", err
+	}
+	defer inFile.Close()
+
+	outFile, err := os.Create(outPath)
+	if err != nil {
+		return "", err
+	}
+	defer outFile.Close()
+
+	scanner := bufio.NewScanner(inFile)
+	writer := bufio.NewWriter(outFile)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, keyword) {
+			_, err := writer.WriteString(line + "\n")
+			if err != nil {
+				return "", err
+			}
+		}
+	}
+	writer.Flush()
+
+	return outPath, scanner.Err()
 }
 
 func init() {
