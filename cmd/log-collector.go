@@ -64,7 +64,7 @@ var gatherLogsCmd = &cobra.Command{
 
 		logType, logPath, err := getLogInfo(logConfigFile)
 		if err != nil {
-			fmt.Errorf("failed to parse config file [%s]", err.Error())
+			fmt.Errorf("cannot use this config file [%s]", err.Error())
 		}
 		if logType == "silent" {
 			return fmt.Errorf("no logs were generated due to log type being silent")
@@ -197,13 +197,18 @@ func getLogInfo(configFile string) (string, string, error) {
 					if err != nil {
 						return "", "", err
 					}
+					_, err = os.Stat(logPath)
+					if err != nil {
+						return logType, logPath, fmt.Errorf("the file path, %s, for cannot be found: [%s]", logPath, err.Error())
+					}
 				} else {
-					fmt.Printf("Warning, file path for base log not found. using default.")
+					return logType, logPath, fmt.Errorf("the logging file-path is not provided")
 				}
 			} else { // TODO: this should be a failure
-				fmt.Printf("Warning, logging type not found. using default.")
-				logType = "base"
+				return logType, logPath, fmt.Errorf("the logging type is not valid. Must be 'base', or 'syslog'.")
 			}
+		} else {
+			return "", "", fmt.Errorf("the logging type is not provided")
 		}
 	}
 	return logType, logPath, nil
