@@ -89,7 +89,7 @@ var gatherLogsCmd = &cobra.Command{
 				defer os.RemoveAll(preArchPath)
 
 				// create a sub folder for the service logs
-				sysProfDir := fmt.Sprintf(preArchPath, "\\", "systemprofile")
+				sysProfDir := fmt.Sprintf("%s/systemprofile", preArchPath)
 				err = os.Mkdir(sysProfDir, 0760)
 				if err != nil {
 					return fmt.Errorf("unable to create folder, %s: [%s]", sysProfDir, err.Error())
@@ -109,7 +109,7 @@ var gatherLogsCmd = &cobra.Command{
 				}
 
 				// create a sub folder for the user base logs
-				userDir := fmt.Sprintf(logPath, "\\", "user")
+				userDir := fmt.Sprintf("%s/user", logPath)
 				err = os.Mkdir(userDir, 0760)
 				if err != nil {
 					return fmt.Errorf("unable to create folder, %s: [%s]", userDir, err.Error())
