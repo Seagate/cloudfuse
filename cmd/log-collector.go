@@ -199,7 +199,7 @@ func getLogInfo(configFile string) (string, string, error) {
 					}
 					_, err = os.Stat(logPath)
 					if err != nil {
-						return logType, logPath, fmt.Errorf("the file path, %s, for cannot be found: [%s]", logPath, err.Error())
+						return logType, logPath, fmt.Errorf("the file path, %s, cannot be found: [%s]", logPath, err.Error())
 					}
 				} else {
 					return logType, logPath, fmt.Errorf("the logging file-path is not provided")
