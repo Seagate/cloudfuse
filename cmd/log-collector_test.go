@@ -48,7 +48,6 @@ func (suite *logCollectTestSuite) setupConfig(logInfo logCollectTestConfig) *os.
 		logInfo.logType, logInfo.level, logInfo.filePath)
 	var configFile *os.File
 	configFile, err := os.CreateTemp("", "conf*.yaml")
-	defer os.Remove(configFile.Name())
 	_, err = configFile.WriteString(config)
 	suite.assert.NoError(err)
 	configFile.Close()
@@ -162,7 +161,9 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 
 	baseDefaultDir := "$HOME/.cloudfuse/"
 	baseDefaultDir = common.ExpandPath(baseDefaultDir)
-	os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
+	var logFile *os.File
+	logFile, err = os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
+	defer os.Remove(logFile.Name())
 
 	//run gatherLogs command
 	_, err = executeCommandC(rootCmd, "gatherLogs")
@@ -196,7 +197,7 @@ func (suite *logCollectTestSuite) TestValidBaseConfig() {
 	//set up config file
 	validBaseConfig := logCollectTestConfig{logType: "base", level: "log_debug", filePath: tempLogDir + "/cloudfuse.log"}
 	configFile := suite.setupConfig(validBaseConfig)
-
+	defer os.Remove(configFile.Name())
 	//put stub log files in test log directory
 	tempLog, err := os.CreateTemp(tempLogDir, "cloudfuse*.log")
 	suite.assert.NoError(err)
@@ -274,16 +275,7 @@ func (suite *logCollectTestSuite) TestInvalidConfig() {
 
 	//run the log collector
 	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
-	suite.assert.NoError(err)
-
-	//check archive
-	if runtime.GOOS == "linux" {
-		suite.assert.FileExists(currentDir + "/cloudfuse_logs.tar.gz")
-	} else if runtime.GOOS == "windows" {
-		suite.assert.FileExists(currentDir + "/cloudfuse_logs.zip")
-	}
-	isArcValid := suite.verifyArchive(baseDefaultDir, currentDir)
-	suite.assert.True(isArcValid)
+	suite.assert.Error(err)
 }
 
 // Log collection test using 'silent' for the logging type in the config.
@@ -295,12 +287,6 @@ func (suite *logCollectTestSuite) TestSilentConfig() {
 	//set up config file
 	silentConfig := logCollectTestConfig{logType: "silent", level: "log_debug", filePath: ""}
 	configFile := suite.setupConfig(silentConfig)
-
-	//set up test log
-	baseDefaultDir := "$HOME/.cloudfuse/"
-	baseDefaultDir = common.ExpandPath(baseDefaultDir)
-	os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
-	defer os.RemoveAll(baseDefaultDir)
 
 	//run the log collector
 	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
@@ -339,7 +325,6 @@ func (suite *logCollectTestSuite) TestOutputPath() {
 	}
 	isArcValid := suite.verifyArchive(baseDefaultDir, tempDir)
 	suite.assert.True(isArcValid)
-
 }
 
 func TestLogCollectCommand(t *testing.T) {
