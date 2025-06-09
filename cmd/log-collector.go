@@ -88,8 +88,15 @@ var gatherLogsCmd = &cobra.Command{
 				preArchPath, err = os.MkdirTemp(dumpPath, "PreZip*")
 				defer os.RemoveAll(preArchPath)
 
+				// create a sub folder for the service logs
+				sysProfDir := fmt.Sprintf(preArchPath, "\\", "systemprofile")
+				err = os.Mkdir(sysProfDir, 0760)
+				if err != nil {
+					return fmt.Errorf("unable to create folder, %s: [%s]", sysProfDir, err.Error())
+				}
+
 				// copied over the service log files from servicePath -> preArchPath
-				err = copyFiles(servicePath, preArchPath)
+				err = copyFiles(servicePath, sysProfDir)
 				if err != nil {
 					return fmt.Errorf("unable to copy files: [%s]", err.Error())
 				}
@@ -101,8 +108,15 @@ var gatherLogsCmd = &cobra.Command{
 					return fmt.Errorf("failed get absolute path for logs directory: [%s]", err.Error())
 				}
 
+				// create a sub folder for the user base logs
+				userDir := fmt.Sprintf(logPath, "\\", "user")
+				err = os.Mkdir(userDir, 0760)
+				if err != nil {
+					return fmt.Errorf("unable to create folder, %s: [%s]", userDir, err.Error())
+				}
+
 				// copied over the user base logs from logPath -> preArchPath
-				err = copyFiles(logPath, preArchPath)
+				err = copyFiles(userDir, preArchPath)
 				if err != nil {
 					return fmt.Errorf("unable to copy files: [%s]", err.Error())
 				}
