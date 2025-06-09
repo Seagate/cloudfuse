@@ -241,7 +241,7 @@ func parseConfig() error {
 			}
 		} else if options.PassphrasePipe != "" && runtime.GOOS == "windows" {
 			var err error
-			options.PassPhrase, err = readPassphraseFromPipe(options.PassphrasePipe, 10 *time.Second)
+			options.PassPhrase, err = readPassphraseFromPipe(options.PassphrasePipe, 10*time.Second)
 			if err != nil {
 				return errors.New(
 					"no passphrase read from named pipe",
