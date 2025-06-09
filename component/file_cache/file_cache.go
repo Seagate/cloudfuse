@@ -63,10 +63,10 @@ type FileCache struct {
 	cacheTimeout    float64
 	cleanupOnStart  bool
 	policyTrace     bool
-	missedChmodList sync.Map // uses object name (common.JoinUnixFilepath)
-	offlineOps      sync.Map // uses object name (common.JoinUnixFilepath)
-	offlineOpAdded chan struct{} // signals when an offline operation is queued
-	mountPath       string   // uses os.Separator (filepath.Join)
+	missedChmodList sync.Map      // uses object name (common.JoinUnixFilepath)
+	offlineOps      sync.Map      // uses object name (common.JoinUnixFilepath)
+	offlineOpAdded  chan struct{} // signals when an offline operation is queued
+	mountPath       string        // uses os.Separator (filepath.Join)
 	allowOther      bool
 	offloadIO       bool
 	offlineAccess   bool

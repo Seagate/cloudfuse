@@ -317,7 +317,9 @@ func (s3 *S3Storage) StreamDir(
 	objectList := make([]*internal.ObjAttr, 0)
 	if !s3.timeToRetry() {
 		log.Debug("S3Storage::StreamDir : Exponential backoff triggered")
-		return objectList, "", common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
+		return objectList, "", common.NewCloudUnreachableError(
+			fmt.Errorf("Exponential backoff triggered"),
+		)
 	}
 
 	path := formatListDirName(options.Name)
@@ -734,7 +736,9 @@ func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
 	// improve offline performance
 	if !s3.timeToRetry() {
 		log.Debug("S3Storage::StatFs : Exponential backoff triggered")
-		return nil, false, common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
+		return nil, false, common.NewCloudUnreachableError(
+			fmt.Errorf("Exponential backoff triggered"),
+		)
 	}
 	// cache_size = f_blocks * f_frsize/1024
 	// cache_size - used = f_frsize * f_bavail/1024

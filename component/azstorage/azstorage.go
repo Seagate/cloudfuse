@@ -47,10 +47,10 @@ import (
 // AzStorage Wrapper type around azure go-sdk (track-1)
 type AzStorage struct {
 	internal.BaseComponent
-	storage     AzConnection
-	stConfig    AzStorageConfig
-	startTime   time.Time
-	listBlocked bool
+	storage               AzConnection
+	stConfig              AzStorageConfig
+	startTime             time.Time
+	listBlocked           bool
 	firstOffline          time.Time
 	lastConnectionAttempt time.Time
 }
