@@ -388,9 +388,15 @@ func (fc *FileCache) Configure(_ bool) error {
 	}
 
 	fc.tmpPath = filepath.Clean(common.ExpandPath(conf.TmpPath))
-	if fc.tmpPath == "" {
-		log.Err("FileCache: config error [tmp-path not set]")
-		return fmt.Errorf("config error in %s error [tmp-path not set]", fc.Name())
+	if fc.tmpPath == "" || fc.tmpPath == "." {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Err("FileCache: Failed to get user home directory [%s]", err.Error())
+		}
+		log.Warn(
+			"FileCache: tmp-path not set in config file, defaulting to $HOME/.cloudfuse/file_cache",
+		)
+		fc.tmpPath = filepath.Join(homeDir, ".cloudfuse", "file_cache")
 	}
 
 	err = config.UnmarshalKey("mount-path", &fc.mountPath)
