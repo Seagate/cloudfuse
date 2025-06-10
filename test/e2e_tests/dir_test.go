@@ -444,17 +444,10 @@ func (suite *dirTestSuite) TestDirList() {
 	suite.NoError(err)
 	srcFile.Close()
 
-	var files []os.DirEntry
-    var listErr error
-    suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
-        files, listErr = os.ReadDir(testDir)
-        if listErr != nil {
-            return false, listErr
-        }
-        return len(files) == 4, nil
-    }, "directory %s to list %d items. Got %d. Last error: %v", testDir, 4, len(files), listErr)
-    suite.NoError(listErr)
-    suite.Len(files, 4)
+	time.Sleep(1 * time.Second)
+	files, err := os.ReadDir(testDir)
+	suite.NoError(err)
+	suite.Len(files, 4)
 
 	if suite.sizeTracker {
 		suite.Equal(0, DiskSize(pathPtr))
