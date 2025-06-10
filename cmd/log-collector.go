@@ -81,6 +81,8 @@ var gatherLogsCmd = &cobra.Command{
 				var sysProfDir string
 				var userDir string
 				sysProfDir, userDir, err = setupPreZip()
+				preArchPath := filepath.Dir(userDir)
+				defer os.RemoveAll(preArchPath)
 
 				// get the service logs regardless of what the config values are
 				systemRoot := os.Getenv("SystemRoot")
@@ -111,7 +113,6 @@ var gatherLogsCmd = &cobra.Command{
 				}
 
 				// archive the two folders.
-				preArchPath := filepath.Dir(userDir)
 				err = createWindowsArchive(preArchPath)
 				if err != nil {
 					return fmt.Errorf("unable to create archive [%s]", err.Error())
@@ -288,7 +289,6 @@ func createLinuxArchive(logPath string) error {
 
 func setupPreZip() (string, string, error) {
 	preArchPath, err := os.MkdirTemp(dumpPath, "PreZip*")
-	defer os.RemoveAll(preArchPath)
 
 	// create a sub folder for the service logs
 	sysProfDir := fmt.Sprintf("%s/systemprofile", preArchPath)
