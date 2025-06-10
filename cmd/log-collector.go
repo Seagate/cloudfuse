@@ -80,7 +80,7 @@ var gatherLogsCmd = &cobra.Command{
 				// set up temporary location to collect logs
 				var sysProfDir string
 				var userDir string
-				sysProfDir, userDir, err = setupPreZipDir()
+				sysProfDir, userDir, err = setupPreZip()
 
 				// get the service logs regardless of what the config values are
 				systemRoot := os.Getenv("SystemRoot")
