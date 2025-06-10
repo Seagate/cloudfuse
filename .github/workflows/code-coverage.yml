@@ -149,15 +149,11 @@ jobs:
           rm -rf ${{ env.MOUNT_DIR }}/*
           rm -rf ${{ env.TEMP_DIR }}/*
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
-          CFL_PID=$!
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
-              exit 1
-            fi
             if mount | grep -q "${{ env.MOUNT_DIR }}"; then
               break
             fi
@@ -196,15 +192,11 @@ jobs:
           echo "    - cloudfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
           cat /tmp/configBlockProfilerTemp.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
-          CFL_PID=$!
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
-              exit 1
-            fi
             if mount | grep -q "${{ env.MOUNT_DIR }}"; then
               break
             fi
@@ -244,15 +236,11 @@ jobs:
           rm -rf ${{ env.MOUNT_DIR }}/*
           rm -rf ${{ env.BLOCK_TEMP_DIR }}/*
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
-          CFL_PID=$!
           
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
-              exit 1
-            fi
             if mount | grep -q "${{ env.MOUNT_DIR }}"; then
               break
             fi
@@ -292,15 +280,11 @@ jobs:
           rm -rf ${{ env.MOUNT_DIR }}/*
           rm -rf ${{ env.TEMP_DIR }}/*
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG }} --foreground=true &
-          CFL_PID=$!
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
-              exit 1
-            fi
             if mount | grep -q "${{ env.MOUNT_DIR }}"; then
               break
             fi
@@ -339,15 +323,11 @@ jobs:
           echo "    - cloudfuse_stats" >> /tmp/configAdlsProfilerTemp.yaml
           cat /tmp/configAdlsProfilerTemp.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configAdlsProfilerTemp.yaml --foreground=true &
-          CFL_PID=$!
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
-              exit 1
-            fi
             if mount | grep -q "${{ env.MOUNT_DIR }}"; then
               break
             fi
@@ -392,15 +372,11 @@ jobs:
           rm -rf ${{ env.MOUNT_DIR }}/*
           rm -rf ${{ env.TEMP_DIR }}/*
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
-          CFL_PID=$!
           
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
-              exit 1
-            fi
             if mount | grep -q "${{ env.MOUNT_DIR }}"; then
               break
             fi
@@ -438,15 +414,11 @@ jobs:
           echo "    - cloudfuse_stats" >> /tmp/configBlockProfilerTemp.yaml
           cat /tmp/configBlockProfilerTemp.yaml
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_profiler.cov mount ${{ env.MOUNT_DIR }} --config-file=/tmp/configBlockProfilerTemp.yaml --foreground=true &
-          CFL_PID=$!
           
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
-              exit 1
-            fi
             if mount | grep -q "${{ env.MOUNT_DIR }}"; then
               break
             fi
@@ -484,15 +456,11 @@ jobs:
           rm -rf ${{ env.MOUNT_DIR }}/*
           rm -rf ${{ env.BLOCK_TEMP_DIR }}/*
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
-          CFL_PID=$!
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
-              exit 1
-            fi
             if mount | grep -q "${{ env.MOUNT_DIR }}"; then
               break
             fi
@@ -536,15 +504,11 @@ jobs:
           rm -rf ${{ env.MOUNT_DIR }}/*
           rm -rf ${{ env.TEMP_DIR }}/*
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
-          CFL_PID=$!
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
-              exit 1
-            fi
             if mount | grep -q "${{ env.MOUNT_DIR }}"; then
               break
             fi
@@ -739,15 +703,11 @@ jobs:
           ls -l /usr/local/bin/cfusemon*
           cat /tmp/configAdlsProfilerTemp.yaml
           ./cloudfuse.test mount ${{ env.MOUNT_DIR }}/hmon_test --config-file=/tmp/configAdlsProfilerTemp.yaml
-          CFL_PID=$!
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
-              exit 1
-            fi
             if mount | grep -q "${{ env.MOUNT_DIR }}"; then
               break
             fi
@@ -771,15 +731,11 @@ jobs:
           mkdir -p ${{ env.MOUNT_DIR }}/hmon_test
           cat /tmp/configAdlsProfilerTemp.yaml
           ./cloudfuse.test mount ${{ env.MOUNT_DIR }}/hmon_test --config-file=/tmp/configAdlsProfilerTemp.yaml
-          CFL_PID=$!
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
-              exit 1
-            fi
             if mount | grep -q "${{ env.MOUNT_DIR }}"; then
               break
             fi
@@ -837,15 +793,11 @@ jobs:
           rm -rf ${{ env.MOUNT_DIR }}/*
           rm -rf ${{ env.TEMP_DIR }}/*
           ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_adls_proxy.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_ADLS_CFG }} --foreground=true &
-          CFL_PID=$!
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
-              exit 1
-            fi
             if mount | grep -q "${{ env.MOUNT_DIR }}"; then
               break
             fi
@@ -1524,7 +1476,7 @@ jobs:
           PROCESS_EXIT_TIMEOUT=10 # Total timeout for graceful process exit
           SECONDS_WAITED_EXIT=0
           while [ $SECONDS_WAITED_EXIT -lt $PROCESS_EXIT_TIMEOUT ]; do
-            if ! ps -p $CFL_PID > /dev/null; then
+            if ! ps -p $pid > /dev/null; then
               break
             fi
             sleep $POLL_INTERVAL
