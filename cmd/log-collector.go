@@ -77,23 +77,19 @@ var gatherLogsCmd = &cobra.Command{
 				}
 			} else if runtime.GOOS == "windows" {
 
+				// set up temporary location to collect logs
+				var sysProfDir string
+				var userDir string
+				sysProfDir, userDir, err = setupPreZipDir()
+
 				// get the service logs regardless of what the config values are
 				systemRoot := os.Getenv("SystemRoot")
 				if systemRoot == "" {
 					return errors.New("Could not find system root")
 				}
+
 				systemRoot = filepath.Clean(systemRoot)
 				servicePath := filepath.Join(systemRoot, "System32", "config", "systemprofile", ".cloudfuse")
-				var preArchPath string
-				preArchPath, err = os.MkdirTemp(dumpPath, "PreZip*")
-				defer os.RemoveAll(preArchPath)
-
-				// create a sub folder for the service logs
-				sysProfDir := fmt.Sprintf("%s/systemprofile", preArchPath)
-				err = os.Mkdir(sysProfDir, 0760)
-				if err != nil {
-					return fmt.Errorf("unable to create folder, %s: [%s]", sysProfDir, err.Error())
-				}
 
 				// copied over the service log files from servicePath -> preArchPath
 				err = copyFiles(servicePath, sysProfDir)
@@ -108,25 +104,18 @@ var gatherLogsCmd = &cobra.Command{
 					return fmt.Errorf("failed get absolute path for logs directory: [%s]", err.Error())
 				}
 
-				// create a sub folder for the user base logs
-				userDir := fmt.Sprintf("%s/user", logPath)
-				err = os.Mkdir(userDir, 0760)
-				if err != nil {
-					return fmt.Errorf("unable to create folder, %s: [%s]", userDir, err.Error())
-				}
-
 				// copied over the user base logs from logPath -> preArchPath
-				err = copyFiles(userDir, preArchPath)
+				err = copyFiles(userDir, logPath)
 				if err != nil {
 					return fmt.Errorf("unable to copy files: [%s]", err.Error())
 				}
 
-				// run the archive to archive the two folders.
+				// archive the two folders.
+				preArchPath := filepath.Dir(userDir)
 				err = createWindowsArchive(preArchPath)
 				if err != nil {
 					return fmt.Errorf("unable to create archive [%s]", err.Error())
 				}
-
 			}
 		} else if logType == "syslog" {
 			if runtime.GOOS == "linux" {
@@ -295,6 +284,28 @@ func createLinuxArchive(logPath string) error {
 	}
 
 	return nil
+}
+
+func setupPreZip() (string, string, error) {
+	preArchPath, err := os.MkdirTemp(dumpPath, "PreZip*")
+	defer os.RemoveAll(preArchPath)
+
+	// create a sub folder for the service logs
+	sysProfDir := fmt.Sprintf("%s/systemprofile", preArchPath)
+	err = os.Mkdir(sysProfDir, 0760)
+	if err != nil {
+		return "", "", fmt.Errorf("unable to create folder, %s: [%s]", sysProfDir, err.Error())
+	}
+
+	// create a sub folder for the user logs
+	userDir := fmt.Sprintf("%s/user", preArchPath)
+	err = os.Mkdir(userDir, 0760)
+	if err != nil {
+		return "", "", fmt.Errorf("unable to create folder, %s: [%s]", userDir, err.Error())
+	}
+
+	return sysProfDir, userDir, nil
+
 }
 
 func copyFiles(srcPath, dstPath string) error {
