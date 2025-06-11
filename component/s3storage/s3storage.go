@@ -556,6 +556,18 @@ func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 	return s3.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
 }
 
+func (s3 *S3Storage) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
+	return s3.storage.GetCommittedBlockList(name)
+}
+
+func (s3 *S3Storage) StageData(opt internal.StageDataOptions) error {
+	return s3.storage.StageBlock(opt.Name, opt.Data, opt.Id)
+}
+
+func (s3 *S3Storage) CommitData(opt internal.CommitDataOptions) error {
+	return s3.storage.CommitBlocks(opt.Name, opt.List)
+}
+
 const blockSize = 4096
 
 func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
