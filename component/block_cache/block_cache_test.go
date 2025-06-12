@@ -1286,7 +1286,7 @@ func (suite *blockCacheTestSuite) TestZZZZLazyWrite() {
 	suite.assert.True(handle.Dirty())
 
 	_ = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: handle})
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 	tobj.blockCache.lazyWrite = false
 
 	// As lazy write is enabled flush shall not upload the file
