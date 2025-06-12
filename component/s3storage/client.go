@@ -179,18 +179,11 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	// Create an Amazon S3 service client
-	if cl.Config.usePathStyle {
-		cl.awsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
-			o.UsePathStyle = true
-			o.BaseEndpoint = aws.String(cl.Config.authConfig.Endpoint)
-			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
-		})
-	} else {
-		cl.awsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
-			o.BaseEndpoint = aws.String(cl.Config.authConfig.Endpoint)
-			o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
-		})
-	}
+	cl.awsS3Client = s3.NewFromConfig(defaultConfig, func(o *s3.Options) {
+		o.UsePathStyle = cl.Config.usePathStyle
+		o.BaseEndpoint = aws.String(cl.Config.authConfig.Endpoint)
+		o.DisableLogOutputChecksumValidationSkipped = true // Disable warning messages
+	})
 
 	// ListBuckets here to test connection to S3 backend
 	bucketList, err := cl.ListBuckets()
