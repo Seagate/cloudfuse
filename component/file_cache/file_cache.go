@@ -1397,7 +1397,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, handle.Path, flock)
 
 	// handle offline cases
-	if isOffline(err) || !fc.NextComponent().CloudConnected() {
+	if isOffline(err) || (fc.offlineAccess && !fc.NextComponent().CloudConnected()) {
 		if !fc.offlineAccess {
 			// offline access is not allowed
 			if downloadRequired || !cachedData(err) {
