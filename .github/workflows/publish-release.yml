@@ -200,7 +200,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       go: "1.24"
-      zig: 0.14.0
+      zig: 0.14.1
     permissions:
       contents: write
       id-token: write
@@ -222,10 +222,10 @@ jobs:
         env:
           ZIG: ${{ env.zig }}
         run: |
-          curl -L https://ziglang.org/download/${ZIG}/zig-linux-x86_64-${ZIG}.tar.xz -o zig.tar.xz
+          curl -L https://ziglang.org/download/${ZIG}/zig-x86_64-linux-${ZIG}.tar.xz -o zig.tar.xz
           mkdir -p $HOME/.local/bin
           tar -xf zig.tar.xz -C $HOME/.local/bin
-          echo "$HOME/.local/bin/zig-linux-x86_64-${ZIG}" >> $GITHUB_PATH
+          echo "$HOME/.local/bin/zig-x86_64-linux-${ZIG}" >> $GITHUB_PATH
           rm zig.tar.xz
 
       - name: Install Go
