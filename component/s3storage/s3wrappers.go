@@ -83,6 +83,19 @@ type renameObjectOptions struct {
 const symlinkStr = ".rclonelink"
 const maxResultsPerListCall = 1000
 
+// check the connection to the S3 service by calling GetCallerIdentity
+func (cl *Client) ConnectionOkay() bool {
+	log.Trace("Client::checkConnection : checking connection to S3 service")
+	// use HeadBucket to check if the bucket exists and we have access to it
+	ctx, cancelFn := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancelFn()
+	_, err := cl.awsS3Client.HeadBucket(
+		ctx,
+		&s3.HeadBucketInput{Bucket: aws.String(cl.Config.authConfig.BucketName)},
+	)
+	return err == nil
+}
+
 // getObjectMultipartDownload downloads an object to a file using multipart download
 // which can be much faster for large objects.
 func (cl *Client) getObjectMultipartDownload(name string, fi *os.File) error {

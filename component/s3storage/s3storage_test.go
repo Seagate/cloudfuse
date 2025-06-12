@@ -448,6 +448,11 @@ func (s *s3StorageTestSuite) TestListBuckets() {
 	s.assert.Contains(buckets, storageTestConfigurationParameters.BucketName)
 }
 
+func (s *s3StorageTestSuite) TestCloudConnected() {
+	defer s.cleanupTest()
+	s.assert.True(s.s3Storage.CloudConnected())
+}
+
 func (s *s3StorageTestSuite) TestCreateDir() {
 	defer s.cleanupTest()
 	// Testing dir and dir/

@@ -82,6 +82,7 @@ type S3Connection interface {
 	Configure(cfg Config) error
 	UpdateConfig(cfg Config) error
 
+	ConnectionOkay() bool
 	ListBuckets() ([]string, error)
 
 	// This is just for test, shall not be used otherwise
