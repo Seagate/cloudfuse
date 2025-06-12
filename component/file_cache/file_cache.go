@@ -1663,7 +1663,11 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		}
 
 		// Flush all data to disk that has been buffered by the kernel.
-		fc.syncFile(f, options.Handle.Path)
+		err := fc.syncFile(f, options.Handle.Path)
+		if err != nil {
+			log.Err("FileCache::FlushFile : error [unable to sync file] %s", options.Handle.Path)
+			return syscall.EIO
+		}
 
 		// Write to storage
 		// Create a new handle for the SDK to use to upload (read local file)
