@@ -209,7 +209,7 @@ jobs:
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
-            if ! mount | grep -q "${{ env.MOUNT_DIR }}"; then
+            if ! mount | grep -q "${MOUNT_DIR}"; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -256,7 +256,7 @@ jobs:
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
-            if ! mount | grep -q "${{ env.MOUNT_DIR }}"; then
+            if ! mount | grep -q "${MOUNT_DIR}"; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -271,19 +271,28 @@ jobs:
           ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
-        run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key_block_cache.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.BLOCK_TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
+          BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
+          WORK_DIR: ${{ env.WORK_DIR }}
+          cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
+          containerName: ${{ matrix.containerName }}
+        run: "./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key_block_cache.yaml --container-name=${containerName} --temp-path=${BLOCK_TEMP_DIR} --output-file=${cloudfuse_CFG}"
 
       - name: Block Blob Coverage - Block Cache
+        env:
+          MOUNT_DIR: ${{ env.MOUNT_DIR }}
+          WORK_DIR: ${{ env.WORK_DIR }}
+          cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
+          BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
         run: |-
-          rm -rf ${{ env.MOUNT_DIR }}/*
-          rm -rf ${{ env.BLOCK_TEMP_DIR }}/*
-          ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
+          rm -rf ${MOUNT_DIR}/*
+          rm -rf ${BLOCK_TEMP_DIR}/*
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
           
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if mount | grep -q "${{ env.MOUNT_DIR }}"; then
+            if mount | grep -q "${MOUNT_DIR}"; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -291,16 +300,16 @@ jobs:
           done
 
           ps -aux | grep cloudfuse
-          rm -rf ${{ env.MOUNT_DIR }}/*
+          rm -rf ${MOUNT_DIR}/*
           cd test/e2e_tests
-          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.BLOCK_TEMP_DIR }}
+          go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${BLOCK_TEMP_DIR}
           cd -
-          sudo fusermount -u ${{ env.MOUNT_DIR }} -z
+          sudo fusermount -u ${MOUNT_DIR} -z
           
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
-            if ! mount | grep -q "${{ env.MOUNT_DIR }}"; then
+            if ! mount | grep -q "${MOUNT_DIR}"; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -353,7 +362,7 @@ jobs:
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
-            if ! mount | grep -q "${{ env.MOUNT_DIR }}"; then
+            if ! mount | grep -q "${MOUNT_DIR}"; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -400,7 +409,7 @@ jobs:
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
-            if ! mount | grep -q "${{ env.MOUNT_DIR }}"; then
+            if ! mount | grep -q "${MOUNT_DIR}"; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -454,7 +463,7 @@ jobs:
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
-            if ! mount | grep -q "${{ env.MOUNT_DIR }}"; then
+            if ! mount | grep -q "${MOUNT_DIR}"; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -499,7 +508,7 @@ jobs:
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
-            if ! mount | grep -q "${{ env.MOUNT_DIR }}"; then
+            if ! mount | grep -q "${MOUNT_DIR}"; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -513,19 +522,26 @@ jobs:
           S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
           S3_REGION: "${{ secrets.S3TEST_REGION }}"
           S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
-        run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${{ env.BLOCK_TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
+          cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
+          BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
+        run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${BLOCK_TEMP_DIR} --output-file=${cloudfuse_CFG}"
 
       - name: S3 Coverage - Block Cache
+        env:
+          MOUNT_DIR: ${{ env.MOUNT_DIR }}
+          WORK_DIR: ${{ env.WORK_DIR }}
+          cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
+          BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
         run: |-
-          rm -rf ${{ env.MOUNT_DIR }}/*
-          rm -rf ${{ env.BLOCK_TEMP_DIR }}/*
-          ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
+          rm -rf ${MOUNT_DIR}/*
+          rm -rf ${BLOCK_TEMP_DIR}/*
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if mount | grep -q "${{ env.MOUNT_DIR }}"; then
+            if mount | grep -q "${MOUNT_DIR}"; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -534,14 +550,14 @@ jobs:
 
           ps -aux | grep cloudfuse
           cd test/e2e_tests
-          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.BLOCK_TEMP_DIR }}
+          go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${BLOCK_TEMP_DIR}
           cd -
-          sudo fusermount -u ${{ env.MOUNT_DIR }} -z
+          sudo fusermount -u ${MOUNT_DIR} -z
           
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
-            if ! mount | grep -q "${{ env.MOUNT_DIR }}"; then
+            if ! mount | grep -q "${MOUNT_DIR}"; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -595,7 +611,7 @@ jobs:
           UNMOUNT_TIMEOUT=30
           SECONDS_WAITED_UNMOUNT=0
           while [ $SECONDS_WAITED_UNMOUNT -lt $UNMOUNT_TIMEOUT ]; do
-            if ! mount | grep -q "${{ env.MOUNT_DIR }}"; then
+            if ! mount | grep -q "${MOUNT_DIR}"; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1156,7 +1172,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${{ env.MOUNT_DIR }}" >/dev/null 2>&1; then
+            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1204,7 +1220,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${{ env.MOUNT_DIR }}" >/dev/null 2>&1; then
+            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1236,20 +1252,29 @@ jobs:
           ACCOUNT_ENDPOINT: https://${{ secrets.NIGHTLY_STO_BLOB_ACC_NAME }}.blob.core.windows.net
           VERBOSE_LOG: false
           USE_HTTP: false
-        run: "./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key_block_cache.yaml --container-name=${{ matrix.containerName }} --temp-path=${{ env.BLOCK_TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
+          WORK_DIR: ${{ env.WORK_DIR }}
+          containerName: ${{ matrix.containerName }}
+          cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
+          BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
+        run: "./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_gentest1.cov gen-test-config --config-file=azure_key_block_cache.yaml --container-name=${containerName} --temp-path=${BLOCK_TEMP_DIR} --output-file=${cloudfuse_CFG}"
 
       - name: Block Blob Coverage - Block Cache
         shell: bash
+        env:
+          MOUNT_DIR: ${{ env.MOUNT_DIR }}
+          WORK_DIR: ${{ env.WORK_DIR }}
+          cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
+          BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
         run: |-
-          rm -rf ${{ env.BLOCK_TEMP_DIR }}/*
-          ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_block_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
+          rm -rf ${BLOCK_TEMP_DIR}/*
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
           CFL_PID=$!
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1  # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${{ env.MOUNT_DIR }}" >/dev/null 2>&1; then
+            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1257,9 +1282,9 @@ jobs:
           done
 
           pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
-          rm -rf ${{ env.MOUNT_DIR }}/*
+          rm -rf ${MOUNT_DIR}/*
           cd test/e2e_tests
-          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.BLOCK_TEMP_DIR }} -quick-test=true -stream-direct-test=true
+          go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${BLOCK_TEMP_DIR} -quick-test=true -stream-direct-test=true
           cd -
           kill $pid
           
@@ -1303,7 +1328,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${{ env.MOUNT_DIR }}" >/dev/null 2>&1; then
+            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1351,7 +1376,7 @@ jobs:
           POLL_INTERVAL=1  # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${{ env.MOUNT_DIR }}" >/dev/null 2>&1; then
+            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1411,7 +1436,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${{ env.MOUNT_DIR }}" >/dev/null 2>&1; then
+            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1458,7 +1483,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${{ env.MOUNT_DIR }}" >/dev/null 2>&1; then
+            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1488,21 +1513,28 @@ jobs:
           S3_KEY_ID: "${{ secrets.S3TEST_ACCESS_KEY }}"
           S3_REGION: "${{ secrets.S3TEST_REGION }}"
           S3_SECRET_KEY: "${{ secrets.S3TEST_SECRET_KEY }}"
-        run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${{ env.BLOCK_TEMP_DIR }} --output-file=${{ env.cloudfuse_CFG }}"
+          cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
+          BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
+        run: "./cloudfuse.test gen-test-config --config-file=s3_key_block_cache.yaml --temp-path=${BLOCK_TEMP_DIR} --output-file=${cloudfuse_CFG}"
   
       - name: S3 Coverage - Block Cache
         shell: bash
+        env:
+          MOUNT_DIR: ${{ env.MOUNT_DIR }}
+          WORK_DIR: ${{ env.WORK_DIR }}
+          cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
+          BLOCK_TEMP_DIR: ${{ env.BLOCK_TEMP_DIR }}
         run: |-
-          rm -rf ${{ env.MOUNT_DIR }}/*
-          rm -rf ${{ env.BLOCK_TEMP_DIR }}/*
-          ./cloudfuse.test -test.v -test.coverprofile=${{ env.WORK_DIR }}/cloudfuse_s3_block_cache.cov mount ${{ env.MOUNT_DIR }} --config-file=${{ env.cloudfuse_CFG }} --foreground=true &
+          rm -rf ${MOUNT_DIR}/*
+          rm -rf ${BLOCK_TEMP_DIR}/*
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
           CFL_PID=$!
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1  # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${{ env.MOUNT_DIR }}" >/dev/null 2>&1; then
+            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1511,7 +1543,7 @@ jobs:
 
           pid=`ps -a | grep cloudfuse | tr -s ' ' | cut -d ' ' -f2`
           cd test/e2e_tests
-          go test -v -timeout=7200s ./... -args -mnt-path=${{ env.MOUNT_DIR }} -tmp-path=${{ env.BLOCK_TEMP_DIR }} -quick-test=true -stream-direct-test=true
+          go test -v -timeout=7200s ./... -args -mnt-path=${MOUNT_DIR} -tmp-path=${BLOCK_TEMP_DIR} -quick-test=true -stream-direct-test=true
           cd -
           kill $pid
           
@@ -1562,7 +1594,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${{ env.MOUNT_DIR }}" >/dev/null 2>&1; then
+            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1803,7 +1835,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${{ env.MOUNT_DIR }}" >/dev/null 2>&1; then
+            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
               break
             fi
             sleep $POLL_INTERVAL
@@ -1843,7 +1875,7 @@ jobs:
           POLL_INTERVAL=1   # Seconds between checks
           SECONDS_WAITED=0
           while [ $SECONDS_WAITED -lt $READY_TIMEOUT ]; do
-            if ls "${{ env.MOUNT_DIR }}" >/dev/null 2>&1; then
+            if ls "${MOUNT_DIR}" >/dev/null 2>&1; then
               break
             fi
             sleep $POLL_INTERVAL
