@@ -101,7 +101,7 @@ func (suite *blockpoolTestSuite) TestGetRelease() {
 	suite.assert.Len(bp.blocksCh, 3)
 
 	bp.Release(b)
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 	suite.assert.Len(bp.blocksCh, 4)
 
 	b = bp.TryGet()
@@ -109,7 +109,7 @@ func (suite *blockpoolTestSuite) TestGetRelease() {
 	suite.assert.Len(bp.blocksCh, 3)
 
 	bp.Release(b)
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 	suite.assert.Len(bp.blocksCh, 4)
 
 	bp.Terminate()
