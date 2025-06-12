@@ -48,8 +48,8 @@ type S3Storage struct {
 	internal.BaseComponent
 	storage               S3Connection
 	stConfig              Config
-	firstOffline          time.Time
-	lastConnectionAttempt time.Time
+	firstOffline          *time.Time
+	lastConnectionAttempt *time.Time
 }
 
 const compName = "s3storage"
@@ -187,33 +187,31 @@ func (s3 *S3Storage) CloudConnected() bool {
 		log.Debug("S3Storage::CloudConnected : Exponential backoff triggered")
 		return false
 	}
-	// Use ListBuckets to check if the S3 connection is online
-	_, err := s3.ListBuckets()
+	connected := s3.storage.ConnectionOkay()
 	currentTime := time.Now()
-	if err != nil {
-		log.Err("S3Storage::CloudConnected : S3 connection is offline [%v]", err)
-		s3.lastConnectionAttempt = currentTime
-		if s3.firstOffline.IsZero() {
-			s3.firstOffline = currentTime
+	s3.lastConnectionAttempt = &currentTime
+	if !connected {
+		log.Err("S3Storage::CloudConnected : S3 connection is offline")
+		if s3.firstOffline == nil {
+			s3.firstOffline = &currentTime
 		}
-		return false
+	} else {
+		// update state
+		s3.firstOffline = nil
 	}
-	// update state
-	s3.firstOffline = time.Time{}
-	s3.lastConnectionAttempt = currentTime
-	return true
+	return connected
 }
 
 func (s3 *S3Storage) timeToRetry() bool {
 	// If the firstOffline is not set, it means we are online
-	if s3.firstOffline.IsZero() {
+	if s3.firstOffline == nil || s3.lastConnectionAttempt == nil {
 		return true
 	}
 	// If we haven't checked for over 30 seconds, we can retry
-	timeSinceLastAttempt := time.Since(s3.lastConnectionAttempt)
+	timeSinceLastAttempt := time.Since(*s3.lastConnectionAttempt)
 	if timeSinceLastAttempt > 30*time.Second {
 		// Reset the firstOffline time if we are retrying after a long time
-		s3.firstOffline = time.Time{}
+		s3.firstOffline = nil
 		return true
 	}
 	// Minimum delay before retrying
@@ -222,8 +220,8 @@ func (s3 *S3Storage) timeToRetry() bool {
 		return false
 	}
 	// Formula between 5 seconds and 30 seconds
-	timeOffline := s3.lastConnectionAttempt.Sub(s3.firstOffline)
-	return time.Since(s3.lastConnectionAttempt) >= timeOffline
+	timeOffline := s3.lastConnectionAttempt.Sub(*s3.firstOffline)
+	return time.Since(*s3.lastConnectionAttempt) >= timeOffline
 }
 
 // ------------------------- Bucket listing -------------------------------------------
