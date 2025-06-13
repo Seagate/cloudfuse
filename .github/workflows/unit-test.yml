@@ -54,7 +54,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
-          go-version: ${{ env.go }}
+          go-version: ${{ matrix.go }}
           check-latest: true
       - run: go version
 
@@ -64,48 +64,64 @@ jobs:
           python-version: "3.10"
 
       - name: Set CGO
+        env:
+          ENV_CGO: ${{ env.cgo }}
         shell: bash
         run: |
-          if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
+          if [[ "${ENV_CGO}" != "" ]]; then echo 'CGO_ENABLED=${ENV_CGO}' >> $GITHUB_ENV ; fi
 
       - name: Install libfuse on Linux
         shell: bash
+        env:
+          FUSELIB: ${{ matrix.fuselib }}
         run: |
-          sudo apt-get install fuse3 ${{ matrix.fuselib }}
+          sudo apt-get install fuse3 ${FUSELIB}
 
       - name: Build
+        env:
+          JOB_NAME: ${{ matrix.job_name }}
         run: |
-          if [[ "${{ matrix.job_name }}" == "linux-fuse2" ]]; then
+          if [[ "${JOB_NAME}" == "linux-fuse2" ]]; then
             ./build.sh fuse2;
           else
             ./build.sh;
           fi
 
       - name: Create Azure Configuration File on Linux
+        env:
+          BLOB_ACCOUNT: ${{ env.BLOB_ACCOUNT }}
+          BLOB_KEY: ${{ env.BLOB_KEY }}
+          BLOB_ENDPOINT: ${{ env.BLOB_ENDPOINT }}
         run: |-
           cnfFile=$HOME/azuretest.json
           echo $cnfFile
           touch $cnfFile
           echo "{" > $cnfFile
-          echo "\"block-acct\"": "\"${{ env.BLOB_ACCOUNT }}\"", >> $cnfFile
-          echo "\"block-key\"": "\"${{ env.BLOB_KEY }}\"", >> $cnfFile
-          echo "\"endpoint\"": "\"${{ env.BLOB_ENDPOINT }}\"", >> $cnfFile
+          echo "\"block-acct\"": "\"${BLOB_ACCOUNT}\"", >> $cnfFile
+          echo "\"block-key\"": "\"${BLOB_KEY}\"", >> $cnfFile
+          echo "\"endpoint\"": "\"${BLOB_ENDPOINT}\"", >> $cnfFile
           echo "\"skip-msi\"": "true", >> $cnfFile
           echo "\"skip-azcli\"": "true", >> $cnfFile
           echo "\"proxy-address\"": "\"\"" >> $cnfFile
           echo "}" >> $cnfFile
 
       - name: Create S3 Configuration File on Linux
+        env:
+          AWS_BUCKET_NAME: ${{ env.AWS_BUCKET_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT: ${{ env.AWS_ENDPOINT }}
+          AWS_REGION: ${{ env.AWS_REGION }}
         run: |-
           cnfFile=$HOME/s3test.json
           echo $cnfFile
           touch $cnfFile
           echo "{" > $cnfFile
-          echo "\"bucket-name\"": "\"${{ env.AWS_BUCKET_NAME }}\"", >> $cnfFile
-          echo "\"access-key\"": "\"${{ env.AWS_ACCESS_KEY_ID }}\"", >> $cnfFile
-          echo "\"secret-key\"": "\"${{ env.AWS_SECRET_ACCESS_KEY }}\"", >> $cnfFile
-          echo "\"endpoint\"": "\"${{ env.AWS_ENDPOINT }}\"", >> $cnfFile
-          echo "\"region\"": "\"${{ env.AWS_REGION }}\"", >> $cnfFile
+          echo "\"bucket-name\"": "\"${AWS_BUCKET_NAME}\"", >> $cnfFile
+          echo "\"access-key\"": "\"${AWS_ACCESS_KEY_ID}\"", >> $cnfFile
+          echo "\"secret-key\"": "\"${AWS_SECRET_ACCESS_KEY}\"", >> $cnfFile
+          echo "\"endpoint\"": "\"${AWS_ENDPOINT}\"", >> $cnfFile
+          echo "\"region\"": "\"${AWS_REGION}\"", >> $cnfFile
           echo "\"use-path-style\"": true\ >> $cnfFile
           echo "}" >> $cnfFile
 
@@ -131,8 +147,10 @@ jobs:
           awslocal s3 ls
 
       - name: Run unit tests
+        env:
+          JOB_NAME: ${{ matrix.job_name }}
         run: |
-          if [ "${{ matrix.job_name }}" == "linux-fuse2" ]; then
+          if [ "${JOB_NAME}" == "linux-fuse2" ]; then
             go test -v -timeout=1h ./... --tags=unittest,azurite
           else
             go test -v -timeout=1h ./... --tags=unittest,azurite,fuse3
@@ -162,7 +180,7 @@ jobs:
       - name: Set CGO
         shell: bash
         run: |
-          if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
+          echo 'CGO_ENABLED=0' >> $GITHUB_ENV
 
       - name: Build
         shell: bash
@@ -192,8 +210,10 @@ jobs:
 
       - name: Set CGO
         shell: bash
+        env:
+          CGO: ${{ env.go }}
         run: |
-          if [[ "${{ env.go }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.go }}' >> $GITHUB_ENV ; fi
+          if [[ "${CGO}" != "" ]]; then echo 'CGO_ENABLED=${CGO}' >> $GITHUB_ENV ; fi
 
       - name: Install libfuse on Linux
         shell: bash
