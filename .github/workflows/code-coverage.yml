@@ -31,9 +31,9 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     env:
-      MOUNT_DIR: "$HOME/blob_mnt"
-      TEMP_DIR: "$HOME/cloudfuse_tmp"
-      BLOCK_TEMP_DIR: "$HOME/cloudfuse_block_tmp"
+      MOUNT_DIR: "/home/runner/blob_mnt"
+      TEMP_DIR: "/home/runner/cloudfuse_tmp"
+      BLOCK_TEMP_DIR: "/home/runner/cloudfuse_block_tmp"
       WORK_DIR: "."
       cloudfuse_ADLS_CFG: "./cloudfuse.adls.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
@@ -194,19 +194,6 @@ jobs:
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_CFG: ${{ env.cloudfuse_CFG }}
         run: |-
-          echo "--- Debug: Start of Block Blob Coverage ---"
-          echo "Current user: $(whoami)"
-          echo "HOME directory: $HOME"
-          echo "MOUNT_DIR is: ${MOUNT_DIR}"
-          echo "TEMP_DIR is: ${TEMP_DIR}"
-          echo "WORK_DIR is: ${WORK_DIR}"
-          echo "cloudfuse_CFG is: ${cloudfuse_CFG}"
-          echo "Listing MOUNT_DIR before rm:"
-          ls -ld ${MOUNT_DIR} || echo "MOUNT_DIR not found before rm"
-          echo "Listing TEMP_DIR before rm:"
-          ls -ld ${TEMP_DIR} || echo "TEMP_DIR not found before rm"
-          echo "-------------------------------------------"
-          
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_block.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
@@ -1037,9 +1024,9 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     env:
-      MOUNT_DIR: "$HOME/blob_mnt"
-      TEMP_DIR: "$HOME/cloudfuse_tmp"
-      BLOCK_TEMP_DIR: "$HOME/cloudfuse_block_tmp"
+      MOUNT_DIR: "C:\\Users\\runneradmin\\blob_mnt"
+      TEMP_DIR: "C:\\Users\\runneradmin\\cloudfuse_tmp"
+      BLOCK_TEMP_DIR: "C:\\Users\\runneradmin\\cloudfuse_block_tmp"
       WORK_DIR: "."
       cloudfuse_ADLS_CFG: "./cloudfuse.adls.yaml"
       cloudfuse_ADLS_CFG_HMON: "./cloudfuse.adls.hmon.yaml"
