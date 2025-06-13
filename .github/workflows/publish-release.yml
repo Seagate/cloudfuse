@@ -73,7 +73,7 @@ jobs:
     env:
       go: "1.24"
       cgo: "0"
-      winfsp: winfsp-2.0.23075.msi
+      winfsp: winfsp-2.1.25156.msi
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -124,8 +124,7 @@ jobs:
         env:
           WINFSP: ${{ env.winfsp }}
         run: |
-          curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.0/${WINFSP}
-
+          curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${WINFSP}
       - name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
         uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
