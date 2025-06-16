@@ -387,7 +387,7 @@ jobs:
         run: |-
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
-          cp ${cloudfuse_ADLS_CFG}/tmp/configAdlsProfilerTemp.yaml
+          cp ${cloudfuse_ADLS_CFG} /tmp/configAdlsProfilerTemp.yaml
           echo "dynamic-profile: true" >> /tmp/configAdlsProfilerTemp.yaml
           echo "cpu-profile: /tmp/cpuAdlsProfTmp" >> /tmp/configAdlsProfilerTemp.yaml
           echo "mem-profile: /tmp/memAdlsProfTmp" >> /tmp/configAdlsProfilerTemp.yaml
@@ -1366,11 +1366,12 @@ jobs:
           MOUNT_DIR: ${{ env.MOUNT_DIR }}
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
+          cloudfuse_ADLS_CFG: ${{ env.cloudfuse_ADLS_CFG }}
           CLOUDFUSE_ADLS_CFG_HMON: ${{ env.cloudfuse_ADLS_CFG_HMON }}
         run: |-
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
-          cp ${cloudfuse_ADLS_CFG}${CLOUDFUSE_ADLS_CFG_HMON}
+          cp ${cloudfuse_ADLS_CFG} ${CLOUDFUSE_ADLS_CFG_HMON}
           echo "dynamic-profile: true" >> ${CLOUDFUSE_ADLS_CFG_HMON}
           echo "cpu-profile: $HOME/hmontemp/cpuAdlsProfTmp" >> ${CLOUDFUSE_ADLS_CFG_HMON}
           echo "mem-profile: $HOME/hmontemp/memAdlsProfTmp" >> ${CLOUDFUSE_ADLS_CFG_HMON}
