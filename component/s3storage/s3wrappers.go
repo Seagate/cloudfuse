@@ -84,7 +84,7 @@ const symlinkStr = ".rclonelink"
 const maxResultsPerListCall = 1000
 
 // check the connection to the S3 service by calling GetCallerIdentity
-func (cl *Client) ConnectionOkay() bool {
+func (cl *Client) ConnectionOkay(ctx context.Context) bool {
 	log.Trace("Client::checkConnection : checking connection to S3 service")
 	// use HeadBucket to check if the bucket exists and we have access to it
 	ctx, cancelFn := context.WithTimeout(context.Background(), 200*time.Millisecond)
@@ -392,12 +392,12 @@ func (cl *Client) abortMultipartUpload(key string, uploadID string) error {
 }
 
 // Wrapper for awsS3Client.ListBuckets
-func (cl *Client) ListBuckets() ([]string, error) {
+func (cl *Client) ListBuckets(ctx context.Context) ([]string, error) {
 	log.Trace("Client::ListBuckets : Listing buckets")
 
 	cntList := make([]string, 0)
 
-	result, err := cl.awsS3Client.ListBuckets(context.Background(), &s3.ListBucketsInput{})
+	result, err := cl.awsS3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
 
 	if err != nil {
 		log.Err("Client::ListBuckets : Failed to list buckets. Here's why: %v", err)
@@ -419,6 +419,7 @@ func (cl *Client) ListBuckets() ([]string, error) {
 // If count=0 - fetch max entries.
 // the *string being returned is the token / marker and will be nil when the listing is complete.
 func (cl *Client) List(
+	ctx context.Context,
 	prefix string,
 	marker *string,
 	count int32,

@@ -26,6 +26,7 @@
 package s3storage
 
 import (
+	"context"
 	"net/url"
 	"os"
 
@@ -82,43 +83,59 @@ type S3Connection interface {
 	Configure(cfg Config) error
 	UpdateConfig(cfg Config) error
 
-	ConnectionOkay() bool
-	ListBuckets() ([]string, error)
+	ConnectionOkay(ctx context.Context) bool
+	ListBuckets(ctx context.Context) ([]string, error)
 
 	// This is just for test, shall not be used otherwise
 	SetPrefixPath(string) error
 
-	CreateFile(name string, mode os.FileMode) error
-	CreateDirectory(name string) error
-	CreateLink(source string, target string, isSymlink bool) error
+	CreateFile(ctx context.Context, name string, mode os.FileMode) error
+	CreateDirectory(ctx context.Context, name string) error
+	CreateLink(ctx context.Context, source string, target string, isSymlink bool) error
 
-	DeleteFile(name string) error
-	DeleteDirectory(name string) error
+	DeleteFile(ctx context.Context, name string) error
+	DeleteDirectory(ctx context.Context, name string) error
 
-	RenameFile(string, string, bool) error
-	RenameDirectory(string, string) error
+	RenameFile(ctx context.Context, source string, target string, isSymLink bool) error
+	RenameDirectory(ctx context.Context, source string, target string) error
 
-	GetAttr(name string) (attr *internal.ObjAttr, err error)
+	GetAttr(ctx context.Context, name string) (attr *internal.ObjAttr, err error)
 
 	// Standard operations to be supported by any account type
-	List(prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error)
+	List(
+		ctx context.Context,
+		prefix string,
+		marker *string,
+		count int32,
+	) ([]*internal.ObjAttr, *string, error)
 
-	ReadToFile(name string, offset int64, count int64, fi *os.File) error
-	ReadBuffer(name string, offset int64, length int64, isSymlink bool) ([]byte, error)
-	ReadInBuffer(name string, offset int64, length int64, data []byte) error
+	ReadToFile(ctx context.Context, name string, offset int64, count int64, fi *os.File) error
+	ReadBuffer(
+		ctx context.Context,
+		name string,
+		offset int64,
+		length int64,
+		isSymlink bool,
+	) ([]byte, error)
+	ReadInBuffer(ctx context.Context, name string, offset int64, length int64, data []byte) error
 
-	WriteFromFile(name string, metadata map[string]*string, fi *os.File) error
-	WriteFromBuffer(name string, metadata map[string]*string, data []byte) error
-	Write(options internal.WriteFileOptions) error
-	GetFileBlockOffsets(name string) (*common.BlockOffsetList, error)
+	WriteFromFile(ctx context.Context, name string, metadata map[string]*string, fi *os.File) error
+	WriteFromBuffer(
+		ctx context.Context,
+		name string,
+		metadata map[string]*string,
+		data []byte,
+	) error
+	Write(ctx context.Context, options internal.WriteFileOptions) error
+	GetFileBlockOffsets(ctx context.Context, name string) (*common.BlockOffsetList, error)
 
-	TruncateFile(string, int64) error
-	StageAndCommit(name string, bol *common.BlockOffsetList) error
+	TruncateFile(ctx context.Context, name string, size int64) error
+	StageAndCommit(ctx context.Context, name string, bol *common.BlockOffsetList) error
 
-	GetCommittedBlockList(string) (*internal.CommittedBlockList, error)
-	StageBlock(string, []byte, string) error
-	CommitBlocks(string, []string) error
+	GetCommittedBlockList(ctx context.Context, name string) (*internal.CommittedBlockList, error)
+	StageBlock(name string, data []byte, id string) error
+	CommitBlocks(ctx context.Context, name string, blockList []string) error
 
 	NewCredentialKey(_, _ string) error
-	GetUsedSize() (uint64, error)
+	GetUsedSize(ctx context.Context) (uint64, error)
 }

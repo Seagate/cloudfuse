@@ -3072,6 +3072,7 @@ func (s *s3StorageTestSuite) TestFlushFileUpdateChunkedFile() {
 	rand.Read(updatedBlock)
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSizeBytes)
 	s.s3Storage.storage.ReadInBuffer(
+		context.Background(),
 		name,
 		int64(blockSizeBytes),
 		int64(blockSizeBytes),
@@ -3133,6 +3134,7 @@ func (s *s3StorageTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSizeBytes/2)
 	h.CacheObj.BlockOffsetList.BlockList[1].EndIndex = int64(blockSizeBytes + blockSizeBytes/2)
 	s.s3Storage.storage.ReadInBuffer(
+		context.Background(),
 		name,
 		int64(blockSizeBytes),
 		int64(blockSizeBytes)/2,

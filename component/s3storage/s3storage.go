@@ -48,6 +48,8 @@ type S3Storage struct {
 	internal.BaseComponent
 	storage               S3Connection
 	stConfig              Config
+	requestCtx            context.Context
+	requestCancelFunc     context.CancelFunc
 	firstOffline          *time.Time
 	lastConnectionAttempt *time.Time
 }
@@ -169,7 +171,8 @@ func (s3 *S3Storage) Start(ctx context.Context) error {
 	// create stats collector for s3storage
 	s3StatsCollector = stats_manager.NewStatsCollector(s3.Name())
 	log.Debug("Starting s3 stats collector")
-
+	// create a shared context for all S3 operations, with ability to cancel
+	s3.requestCtx, s3.requestCancelFunc = context.WithCancel(ctx)
 	return nil
 }
 
@@ -187,7 +190,7 @@ func (s3 *S3Storage) CloudConnected() bool {
 		log.Debug("S3Storage::CloudConnected : Exponential backoff triggered")
 		return false
 	}
-	connected := s3.storage.ConnectionOkay()
+	connected := s3.storage.ConnectionOkay(context.Background())
 	currentTime := time.Now()
 	s3.lastConnectionAttempt = &currentTime
 	if !connected {
@@ -226,7 +229,7 @@ func (s3 *S3Storage) timeToRetry() bool {
 
 // ------------------------- Bucket listing -------------------------------------------
 func (s3 *S3Storage) ListBuckets() ([]string, error) {
-	return s3.storage.ListBuckets()
+	return s3.storage.ListBuckets(s3.requestCtx)
 }
 
 // ------------------------- Core Operations -------------------------------------------
@@ -240,7 +243,7 @@ func (s3 *S3Storage) CreateDir(options internal.CreateDirOptions) error {
 		return common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
 
-	err := s3.storage.CreateDirectory(internal.TruncateDirName(options.Name))
+	err := s3.storage.CreateDirectory(s3.requestCtx, internal.TruncateDirName(options.Name))
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
@@ -261,7 +264,7 @@ func (s3 *S3Storage) DeleteDir(options internal.DeleteDirOptions) error {
 		log.Debug("S3Storage::DeleteDir : Exponential backoff triggered")
 		return common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
-	err := s3.storage.DeleteDirectory(internal.TruncateDirName(options.Name))
+	err := s3.storage.DeleteDirectory(s3.requestCtx, internal.TruncateDirName(options.Name))
 
 	if err == nil {
 		s3StatsCollector.PushEvents(deleteDir, options.Name, nil)
@@ -290,7 +293,7 @@ func (s3 *S3Storage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 		return false
 	}
 	// List up to two objects, since one could be the directory with a trailing slash
-	list, _, err := s3.storage.List(formatListDirName(options.Name), nil, 2)
+	list, _, err := s3.storage.List(s3.requestCtx, formatListDirName(options.Name), nil, 2)
 	if err != nil {
 		log.Err("S3Storage::IsDirEmpty : error listing [%s]", err)
 		return false
@@ -326,7 +329,7 @@ func (s3 *S3Storage) StreamDir(
 		entriesRemaining = maxResultsPerListCall
 	}
 	for entriesRemaining > 0 {
-		newList, nextMarker, err := s3.storage.List(path, marker, entriesRemaining)
+		newList, nextMarker, err := s3.storage.List(s3.requestCtx, path, marker, entriesRemaining)
 		if err != nil {
 			log.Err("S3Storage::StreamDir : %s Failed to read dir [%s]", options.Name, err)
 			return objectList, "", err
@@ -380,7 +383,7 @@ func (s3 *S3Storage) RenameDir(options internal.RenameDirOptions) error {
 		return common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
 
-	err := s3.storage.RenameDirectory(options.Src, options.Dst)
+	err := s3.storage.RenameDirectory(s3.requestCtx, options.Src, options.Dst)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
@@ -409,7 +412,7 @@ func (s3 *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		return nil, syscall.EFAULT
 	}
 
-	err := s3.storage.CreateFile(options.Name, options.Mode)
+	err := s3.storage.CreateFile(s3.requestCtx, options.Name, options.Mode)
 	if err != nil {
 		return nil, err
 	}
@@ -435,7 +438,7 @@ func (s3 *S3Storage) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 		return nil, common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
 
-	attr, err := s3.storage.GetAttr(options.Name)
+	attr, err := s3.storage.GetAttr(s3.requestCtx, options.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -476,7 +479,7 @@ func (s3 *S3Storage) DeleteFile(options internal.DeleteFileOptions) error {
 		return common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
 
-	err := s3.storage.DeleteFile(options.Name)
+	err := s3.storage.DeleteFile(s3.requestCtx, options.Name)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(deleteFile, options.Name, nil)
@@ -493,7 +496,7 @@ func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 		log.Debug("S3Storage::RenameFile : Exponential backoff triggered")
 		return common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
-	err := s3.storage.RenameFile(options.Src, options.Dst, false)
+	err := s3.storage.RenameFile(s3.requestCtx, options.Src, options.Dst, false)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
@@ -528,7 +531,13 @@ func (s3 *S3Storage) ReadInBuffer(options internal.ReadInBufferOptions) (int, er
 		return 0, nil
 	}
 
-	err := s3.storage.ReadInBuffer(options.Handle.Path, options.Offset, dataLen, options.Data)
+	err := s3.storage.ReadInBuffer(
+		s3.requestCtx,
+		options.Handle.Path,
+		options.Offset,
+		dataLen,
+		options.Data,
+	)
 	if err != nil {
 		log.Err(
 			"S3Storage::ReadInBuffer : Failed to read %s [%s]",
@@ -548,15 +557,14 @@ func (s3 *S3Storage) WriteFile(options internal.WriteFileOptions) (int, error) {
 		return 0, common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
 
-	err := s3.storage.Write(options)
+	err := s3.storage.Write(s3.requestCtx, options)
 	return len(options.Data), err
 }
 
 func (s3 *S3Storage) GetFileBlockOffsets(
 	options internal.GetFileBlockOffsetsOptions,
 ) (*common.BlockOffsetList, error) {
-	return s3.storage.GetFileBlockOffsets(options.Name)
-
+	return s3.storage.GetFileBlockOffsets(s3.requestCtx, options.Name)
 }
 
 func (s3 *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
@@ -567,7 +575,7 @@ func (s3 *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
 		return common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
 
-	err := s3.storage.TruncateFile(options.Name, options.Size)
+	err := s3.storage.TruncateFile(s3.requestCtx, options.Name, options.Size)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
@@ -587,7 +595,13 @@ func (s3 *S3Storage) CopyToFile(options internal.CopyToFileOptions) error {
 		log.Debug("S3Storage::CopyToFile : Exponential backoff triggered")
 		return common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
-	return s3.storage.ReadToFile(options.Name, options.Offset, options.Count, options.File)
+	return s3.storage.ReadToFile(
+		s3.requestCtx,
+		options.Name,
+		options.Offset,
+		options.Count,
+		options.File,
+	)
 }
 
 func (s3 *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
@@ -597,7 +611,7 @@ func (s3 *S3Storage) CopyFromFile(options internal.CopyFromFileOptions) error {
 		log.Debug("S3Storage::CopyFromFile : Exponential backoff triggered")
 		return common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
-	return s3.storage.WriteFromFile(options.Name, options.Metadata, options.File)
+	return s3.storage.WriteFromFile(s3.requestCtx, options.Name, options.Metadata, options.File)
 }
 
 // Symlink operations
@@ -617,7 +631,7 @@ func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 		return common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
 
-	err := s3.storage.CreateLink(options.Name, options.Target, true)
+	err := s3.storage.CreateLink(s3.requestCtx, options.Name, options.Target, true)
 
 	if err == nil {
 		s3StatsCollector.PushEvents(
@@ -643,7 +657,7 @@ func (s3 *S3Storage) ReadLink(options internal.ReadLinkOptions) (string, error) 
 		return "", common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
 
-	data, err := s3.storage.ReadBuffer(options.Name, 0, 0, true)
+	data, err := s3.storage.ReadBuffer(s3.requestCtx, options.Name, 0, 0, true)
 
 	if err != nil {
 		s3StatsCollector.PushEvents(readLink, options.Name, nil)
@@ -662,7 +676,7 @@ func (s3 *S3Storage) GetAttr(options internal.GetAttrOptions) (*internal.ObjAttr
 		return nil, common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
 
-	return s3.storage.GetAttr(options.Name)
+	return s3.storage.GetAttr(s3.requestCtx, options.Name)
 }
 
 func (s3 *S3Storage) Chmod(options internal.ChmodOptions) error {
@@ -705,11 +719,15 @@ func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 		log.Debug("S3Storage::FlushFile : Exponential backoff triggered")
 		return common.NewCloudUnreachableError(fmt.Errorf("Exponential backoff triggered"))
 	}
-	return s3.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
+	return s3.storage.StageAndCommit(
+		s3.requestCtx,
+		options.Handle.Path,
+		options.Handle.CacheObj.BlockOffsetList,
+	)
 }
 
 func (s3 *S3Storage) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
-	return s3.storage.GetCommittedBlockList(name)
+	return s3.storage.GetCommittedBlockList(s3.requestCtx, name)
 }
 
 func (s3 *S3Storage) StageData(opt internal.StageDataOptions) error {
@@ -717,7 +735,7 @@ func (s3 *S3Storage) StageData(opt internal.StageDataOptions) error {
 }
 
 func (s3 *S3Storage) CommitData(opt internal.CommitDataOptions) error {
-	return s3.storage.CommitBlocks(opt.Name, opt.List)
+	return s3.storage.CommitBlocks(s3.requestCtx, opt.Name, opt.List)
 }
 
 const blockSize = 4096
@@ -739,7 +757,7 @@ func (s3 *S3Storage) StatFs() (*common.Statfs_t, bool, error) {
 	// cache_size - used = f_frsize * f_bavail/1024
 	// cache_size - used = vfs.f_bfree * vfs.f_frsize / 1024
 	// if cache size is set to 0 then we have the root mount usage
-	sizeUsed, err := s3.storage.GetUsedSize()
+	sizeUsed, err := s3.storage.GetUsedSize(s3.requestCtx)
 	if err != nil {
 		// TODO: will returning EIO break any applications that depend on StatFs?
 		return nil, true, err
