@@ -349,7 +349,7 @@ jobs:
         run: |-
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG}--foreground=true &
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG} --foreground=true &
           
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
@@ -969,7 +969,7 @@ jobs:
         run: |-
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls_proxy.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG}--foreground=true &
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls_proxy.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG} --foreground=true &
           
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
@@ -1331,7 +1331,7 @@ jobs:
         run: |-
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG}--foreground=true &
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG} --foreground=true &
           
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
