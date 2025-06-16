@@ -1367,20 +1367,20 @@ jobs:
           TEMP_DIR: ${{ env.TEMP_DIR }}
           WORK_DIR: ${{ env.WORK_DIR }}
           cloudfuse_ADLS_CFG: ${{ env.cloudfuse_ADLS_CFG }}
-          CLOUDFUSE_ADLS_CFG_HMON: ${{ env.cloudfuse_ADLS_CFG_HMON }}
+          cloudfuse_ADLS_CFG_HMON: ${{ env.cloudfuse_ADLS_CFG_HMON }}
         run: |-
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
-          cp ${cloudfuse_ADLS_CFG} ${CLOUDFUSE_ADLS_CFG_HMON}
-          echo "dynamic-profile: true" >> ${CLOUDFUSE_ADLS_CFG_HMON}
-          echo "cpu-profile: $HOME/hmontemp/cpuAdlsProfTmp" >> ${CLOUDFUSE_ADLS_CFG_HMON}
-          echo "mem-profile: $HOME/hmontemp/memAdlsProfTmp" >> ${CLOUDFUSE_ADLS_CFG_HMON}
-          echo "health_monitor:" >> ${CLOUDFUSE_ADLS_CFG_HMON}
-          echo "  enable-monitoring: true" >> ${CLOUDFUSE_ADLS_CFG_HMON}
-          echo "  monitor-disable-list:" >> ${CLOUDFUSE_ADLS_CFG_HMON}
-          echo "    - cloudfuse_stats" >> ${CLOUDFUSE_ADLS_CFG_HMON}
-          cat ${CLOUDFUSE_ADLS_CFG_HMON}
-          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls_profiler.cov mount ${MOUNT_DIR} --config-file=${CLOUDFUSE_ADLS_CFG_HMON} --foreground=true &
+          cp ${cloudfuse_ADLS_CFG} ${cloudfuse_ADLS_CFG_HMON}
+          echo "dynamic-profile: true" >> ${cloudfuse_ADLS_CFG_HMON}
+          echo "cpu-profile: $HOME/hmontemp/cpuAdlsProfTmp" >> ${cloudfuse_ADLS_CFG_HMON}
+          echo "mem-profile: $HOME/hmontemp/memAdlsProfTmp" >> ${cloudfuse_ADLS_CFG_HMON}
+          echo "health_monitor:" >> ${cloudfuse_ADLS_CFG_HMON}
+          echo "  enable-monitoring: true" >> ${cloudfuse_ADLS_CFG_HMON}
+          echo "  monitor-disable-list:" >> ${cloudfuse_ADLS_CFG_HMON}
+          echo "    - cloudfuse_stats" >> ${cloudfuse_ADLS_CFG_HMON}
+          cat ${cloudfuse_ADLS_CFG_HMON}
+          ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_adls_profiler.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG_HMON} --foreground=true &
 
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1  # Seconds between checks
@@ -1833,13 +1833,13 @@ jobs:
         env:
           MOUNT_DIR: ${{ env.MOUNT_DIR }}
           TEMP_DIR: ${{ env.TEMP_DIR }}
-          CLOUDFUSE_ADLS_CFG_HMON: ${{ env.cloudfuse_ADLS_CFG_HMON }}
+          cloudfuse_ADLS_CFG_HMON: ${{ env.cloudfuse_ADLS_CFG_HMON }}
         run: |-
           set +x
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
-          cat ${CLOUDFUSE_ADLS_CFG_HMON}
-          ./cloudfuse.test mount ${MOUNT_DIR} --config-file=${CLOUDFUSE_ADLS_CFG_HMON} --foreground=true &
+          cat ${cloudfuse_ADLS_CFG_HMON}
+          ./cloudfuse.test mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG_HMON} --foreground=true &
           
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
@@ -1873,13 +1873,13 @@ jobs:
         env:
           MOUNT_DIR: ${{ env.MOUNT_DIR }}
           TEMP_DIR: ${{ env.TEMP_DIR }}
-          CLOUDFUSE_ADLS_CFG_HMON: ${{ env.cloudfuse_ADLS_CFG_HMON }}
+          cloudfuse_ADLS_CFG_HMON: ${{ env.cloudfuse_ADLS_CFG_HMON }}
         run: |-
           set +x
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${TEMP_DIR}/*
-          cat ${CLOUDFUSE_ADLS_CFG_HMON}
-          ./cloudfuse.test mount ${MOUNT_DIR} --config-file=${CLOUDFUSE_ADLS_CFG_HMON} --foreground=true &
+          cat ${cloudfuse_ADLS_CFG_HMON}
+          ./cloudfuse.test mount ${MOUNT_DIR} --config-file=${cloudfuse_ADLS_CFG_HMON} --foreground=true &
           
           READY_TIMEOUT=20  # Seconds to wait for mount to be ready
           POLL_INTERVAL=1   # Seconds between checks
