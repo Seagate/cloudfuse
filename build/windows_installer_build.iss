@@ -8,7 +8,7 @@
 #define MyAppURL "https://github.com/Seagate/cloudfuse"
 #define MyAppExeName "cloudfuseGUI.exe"
 #define MyAppExeCLIName "cloudfuse.exe"
-#define WinFSPInstaller "winfsp-2.0.23075.msi"
+#define WinFSPInstaller "winfsp-2.1.25156.msi"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
@@ -64,7 +64,7 @@ Source: "..\sample_configs\sampleStreamingConfigS3.yaml"; DestDir: "{userappdata
 ; Deploy default config
 Source: "..\sample_configs\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; DestName: "config.yaml"; Flags: onlyifdoesntexist
 
-Source: "..\winfsp-2.0.23075.msi"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\winfsp-2.1.25156.msi"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
