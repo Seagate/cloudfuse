@@ -237,8 +237,8 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	// Check that the provided bucket exists and that user has access to bucket
-	exists, err := cl.bucketExists(ctx)
-	if err != nil || !exists {
+	_, err = cl.headBucket(ctx)
+	if err != nil {
 		// From the aws-sdk-go-v2 documentation
 		// If the bucket does not exist or you do not have permission to access it,
 		// the HEAD request returns a generic 400 Bad Request , 403 Forbidden or 404 Not Found code.
@@ -309,11 +309,6 @@ func (cl *Client) SetPrefixPath(path string) error {
 	log.Trace("Client::SetPrefixPath : path %s", path)
 	cl.Config.prefixPath = path
 	return nil
-}
-
-func (cl *Client) bucketExists(ctx context.Context) (bool, error) {
-	_, err := cl.headBucket(ctx)
-	return err != syscall.ENOENT, err
 }
 
 // CreateFile : Create a new file in the bucket/virtual directory
