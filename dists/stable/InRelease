@@ -1,0 +1,51 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Architectures: amd64 arm64
+Codename: stable
+Components: main
+Date: Fri, 20 Jun 2025 16:40:13 +0000
+Description: APT repository for cloudfuse
+Label: cloudfuse
+Origin: Seagate Technology
+Suite: stable
+MD5Sum:
+ 1aef86dbc8494e96f3f456d2edcea719              199 Release
+ cd904a8fef31e746dc22f2eae946bc7b             1883 main/binary-amd64/Packages
+ 62eb5c2ecaab94003f0ce49e97e71624              859 main/binary-amd64/Packages.gz
+ 8a7091a2ef6e43b2750c1635b092d962              945 main/binary-arm64/Packages
+ 806e97af74d0fdc20b03c27bb0e8bc22              659 main/binary-arm64/Packages.gz
+SHA1:
+ 434e210af50758a13d4816fb31fa98ad853cce10              199 Release
+ e7a0cb6a05ec3b4609fcf176e29d210ac6537c05             1883 main/binary-amd64/Packages
+ 9c192852d59f85d9ed816f4bf40478914ad93707              859 main/binary-amd64/Packages.gz
+ 7680900db7280e5b931a0cfa2a6a4d28cb5be478              945 main/binary-arm64/Packages
+ fe1fa46e6ea1dfb05868e1aadcb063f495e07a42              659 main/binary-arm64/Packages.gz
+SHA256:
+ 2fea7d781d7a846c02d09ecf6817b6007b2b836684dbb10b7ff6d96b776cb497              199 Release
+ ab050a643eb43ab7d4a749c0d1ef653199087c787ae374cf70da74bd2398121e             1883 main/binary-amd64/Packages
+ 87678b688a0c9bead0fe3df90c54f91d12a1892465c3221e08b26d7dc7725e63              859 main/binary-amd64/Packages.gz
+ 894b9aa2b637e230ead8f25637f5e1d0d10c83c58067f8a90da37ff155b3eb02              945 main/binary-arm64/Packages
+ 519c632fd5634cc34c0c5c997b95f9fbee2aaba96f528ae44f100d8ba0cf5e64              659 main/binary-arm64/Packages.gz
+SHA512:
+ 1ae95cc4a1c06336e295382cecaabe5b5023a0491b65fc64a98b842c7ecf6c60d8b5fa4267a9da3213ff45539d2531497bce5224e220bbe1377b2e6591743361              199 Release
+ b89054cc6c7047099240a6b56ed48647ca8dbe7710adccaae8e6b351fca5a7f7525da05c9ce7ce080f127024198e76bb89a5bc529d7c2839dabac3ea2bb1e7d3             1883 main/binary-amd64/Packages
+ 4226c1684a73eb5a20c69cc7ab20751f768dd51e4c7349d64c3244f58845515497e8abd63d27065c678f036395e272448bd235d3545217497d7f6537780a06ef              859 main/binary-amd64/Packages.gz
+ ac5a409988c22e6b35c3cf5691207a0000a820d3e3733a95b4d9b490f0fbad5aafbd600342cf7004cd2428daf86bb7bd5ba132eca920dc62ecc74dc67928779c              945 main/binary-arm64/Packages
+ 32874958e450afc09b336441ae11027f80a0416f713a8fc13bfaa6ce3510c70aa95a75abe6ac89701ba4d065600c18c7dc08f93312c6adcb46ccb97e1c621dd5              659 main/binary-arm64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEEet9V7TO+/KOOIB5as6eyCx5LkAEFAmhVju8ACgkQs6eyCx5L
+kAEL9BAAxD9svqRcuFlW947dVoIz8yO4KnEhbTEX3iWAcYgHjq0jcgfwHfrQa3gi
+1WsJ/WPM51vmdArWDJnM1Or+JDIE9MeBIgPGWsRYez1b/jyJBNO6wf3A4Sa5i6vb
+Q3bsuagLLa9KW7POa47IcxXo5y7NMDQwT2mb5T4s1vq5XGfdBldf5z2GqytAaTmH
+85wtsDvzD2A1LpUc582h6q1uKkYxI3m2AiBqn6dr5U0NjgAdtIeZW+sMsT0M1871
+MeIhMd4RW4F0u3GlGhdJvsxof9VCBJNn9QJFw5U3RGvScDRbekupUZgUflTb1HEo
+ewBJlC2ypqn6REP3GmpJ/SewRgn6NUzP9fVz+uVc1o9ky926zfeeFDjU9TGxobru
+Ex/df9JuD2oJwMf49oCzXegSMa6HIPDBnJAhVlMkEwgczJRu0bO//D+WXoxHNEgO
++OQYA66qdLrNM8zJySloXKdTpBP+6BYP8n4cLVseULrRCu04bBjl2O0jy2KSod2l
+eeF9Jt0/mAAerZu4amiO+6zc69dqzGl7Bza/OUHyav9coOwS4ufYnKG6yAxHKfFh
+KGJj6yTB17mZPDMGcHeqkawJ3dO/AgYEZVMAF1YJvsY4AkX3xl86XeXre+Venb4i
+cYkAImdqruq4AzAgNzR0oO3OvcOYj/LwdfZCwkYUKF6IQ+zeoTY=
+=zkYy
+-----END PGP SIGNATURE-----
