@@ -190,7 +190,9 @@ func (s3 *S3Storage) CloudConnected() bool {
 		log.Debug("S3Storage::CloudConnected : Exponential backoff triggered")
 		return false
 	}
-	connected := s3.storage.ConnectionOkay(context.Background())
+	ctx, cancelFun := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancelFun()
+	connected := s3.storage.ConnectionOkay(ctx)
 	currentTime := time.Now()
 	s3.lastConnectionAttempt = &currentTime
 	if !connected {
