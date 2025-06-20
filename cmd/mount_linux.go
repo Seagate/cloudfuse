@@ -311,3 +311,8 @@ func startService(serviceName string) error {
 	}
 	return nil
 }
+
+// stub for compilation
+func readPassphraseFromPipe(pipeName string, timeout time.Duration) (string, error) {
+	return "", nil
+}

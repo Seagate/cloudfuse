@@ -85,6 +85,7 @@ type mountOptions struct {
 	EnableRemountUser   bool
 	EnableRemountSystem bool
 	ServiceUser         string
+	PassphrasePipe      string
 
 	// v1 support
 	Streaming         bool     `config:"streaming"`
@@ -227,7 +228,7 @@ func parseConfig() error {
 		filepath.Ext(options.ConfigFile) == SecureConfigExtension {
 
 		// Validate config is to be secured on write or not
-		if options.PassPhrase == "" {
+		if options.PassPhrase == "" && options.PassphrasePipe == "" {
 			options.PassPhrase = os.Getenv(SecureConfigEnvName)
 			if options.PassPhrase == "" {
 				return errors.New(
@@ -238,6 +239,14 @@ func parseConfig() error {
 			_, err := base64.StdEncoding.DecodeString(string(options.PassPhrase))
 			if err != nil {
 				return fmt.Errorf("passphrase is not valid base64 encoded [%s]", err.Error())
+			}
+		} else if options.PassphrasePipe != "" && runtime.GOOS == "windows" {
+			var err error
+			options.PassPhrase, err = readPassphraseFromPipe(options.PassphrasePipe, 10*time.Second)
+			if err != nil {
+				return errors.New(
+					"no passphrase read from named pipe",
+				)
 			}
 		}
 
@@ -867,6 +876,10 @@ func init() {
 		mountCmd.Flags().
 			BoolVar(&options.EnableRemountUser, "enable-remount-user", false, "Remount container on server restart for current user. Mount will restart on current user log in.")
 		config.BindPFlag("enable-remount-user", mountCmd.Flags().Lookup("enable-remount-user"))
+
+		mountCmd.Flags().
+			StringVar(&options.PassphrasePipe, "passphrase-pipe", "", "Specifies a named pipe to read the passphrase from.")
+		config.BindPFlag("passphrase-pipe", mountCmd.Flags().Lookup("passphrase-pipe"))
 	}
 
 	if runtime.GOOS == "linux" {
