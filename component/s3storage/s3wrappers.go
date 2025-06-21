@@ -83,10 +83,10 @@ type renameObjectOptions struct {
 const symlinkStr = ".rclonelink"
 const maxResultsPerListCall = 1000
 
-// check the connection to the S3 service by calling GetCallerIdentity
+// check the connection to the S3 service by calling HeadBucket.
 func (cl *Client) ConnectionOkay(ctx context.Context) bool {
 	log.Trace("Client::checkConnection : checking connection to S3 service")
-	// use HeadBucket to check if the bucket exists and we have access to it
+	// use a 200ms timeout
 	ctx, cancelFn := context.WithTimeout(ctx, 200*time.Millisecond)
 	defer cancelFn()
 	_, err := cl.awsS3Client.HeadBucket(
