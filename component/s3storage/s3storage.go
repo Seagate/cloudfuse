@@ -338,7 +338,6 @@ func (s3 *S3Storage) StreamDir(
 		options.Offset,
 		options.Count,
 	)
-	// improve offline performance
 	objectList := make([]*internal.ObjAttr, 0)
 
 	path := formatListDirName(options.Name)
