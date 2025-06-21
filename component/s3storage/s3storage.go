@@ -127,6 +127,9 @@ func (s3 *S3Storage) Configure(isParent bool) error {
 		log.Err("S3Storage::Configure : Failed to validate storage account [%s]", err.Error())
 		return err
 	}
+	// first connection attempt is now
+	currentTime := time.Now()
+	s3.lastConnectionAttempt = &currentTime
 
 	return nil
 }
