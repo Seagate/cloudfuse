@@ -29,6 +29,7 @@ import (
 	"context"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/internal"
@@ -56,6 +57,7 @@ type Config struct {
 	disableSymlink            bool
 	disableUsage              bool
 	enableDirMarker           bool
+	healthCheckInterval       time.Duration
 }
 
 // TODO: move s3AuthConfig to s3auth.go

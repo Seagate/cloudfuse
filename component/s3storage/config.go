@@ -28,6 +28,7 @@ package s3storage
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -152,6 +153,9 @@ func ParseAndValidateConfig(s3 *S3Storage, opt Options, secrets ConfigSecrets) e
 		}
 	}
 	s3.stConfig.disableSymlink = !enableSymlinks
+
+	// hardcoded health check interval (for now)
+	s3.stConfig.healthCheckInterval = 10 * time.Second
 
 	// TODO: add more config options to customize AWS SDK behavior and import them here
 
