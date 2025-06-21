@@ -186,47 +186,53 @@ func (s3 *S3Storage) Stop() error {
 // Online check
 func (s3 *S3Storage) CloudConnected() bool {
 	log.Trace("S3Storage::CloudConnected")
+	// return cached information if we are not ready to retry
 	if !s3.timeToRetry() {
-		log.Debug("S3Storage::CloudConnected : Exponential backoff triggered")
-		return false
+		return s3.firstOffline == nil
 	}
+	// check connection
 	ctx, cancelFun := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancelFun()
 	connected := s3.storage.ConnectionOkay(ctx)
-	currentTime := time.Now()
-	s3.lastConnectionAttempt = &currentTime
-	if !connected {
-		log.Err("S3Storage::CloudConnected : S3 connection is offline")
-		if s3.firstOffline == nil {
-			s3.firstOffline = &currentTime
-		}
-	} else {
-		// update state
-		s3.firstOffline = nil
-	}
+	s3.updateConnectionState(connected)
 	return connected
 }
 
 func (s3 *S3Storage) timeToRetry() bool {
-	// If the firstOffline is not set, it means we are online
-	if s3.firstOffline == nil || s3.lastConnectionAttempt == nil {
-		return true
-	}
-	// If we haven't checked for over 30 seconds, we can retry
+	connected := s3.firstOffline == nil
 	timeSinceLastAttempt := time.Since(*s3.lastConnectionAttempt)
-	if timeSinceLastAttempt > 30*time.Second {
-		// Reset the firstOffline time if we are retrying after a long time
-		s3.firstOffline = nil
-		return true
-	}
-	// Minimum delay before retrying
-	initialDelay := 5 * time.Second
-	if timeSinceLastAttempt < initialDelay {
+	switch {
+	case timeSinceLastAttempt < s3.stConfig.healthCheckInterval:
+		// minimum delay before retrying
 		return false
+	case connected:
+		// when connected, just use the health check interval
+		return true
+	case timeSinceLastAttempt > 90*time.Second:
+		// maximum delay
+		return true
+	default:
+		// when between the minimum and maximum delay, we use an exponential backoff
+		timeOfflineAtLastAttempt := s3.lastConnectionAttempt.Sub(*s3.firstOffline)
+		return timeSinceLastAttempt > timeOfflineAtLastAttempt
 	}
-	// Formula between 5 seconds and 30 seconds
-	timeOffline := s3.lastConnectionAttempt.Sub(*s3.firstOffline)
-	return time.Since(*s3.lastConnectionAttempt) >= timeOffline
+}
+
+func (s3 *S3Storage) updateConnectionState(connected bool) {
+	currentTime := time.Now()
+	s3.lastConnectionAttempt = &currentTime
+	if !connected && s3.firstOffline == nil {
+		log.Info(
+			"S3Storage::updateConnectionState : S3 connection is offline - cancelling all outstanding requests",
+		)
+		s3.firstOffline = &currentTime
+		// cancel all outstanding requests
+		s3.requestCancelFunc()
+	} else if connected && s3.firstOffline != nil {
+		s3.firstOffline = nil
+		// reset the cancel function to allow new requests
+		s3.requestCtx, s3.requestCancelFunc = context.WithCancel(context.Background())
+	}
 }
 
 // ------------------------- Bucket listing -------------------------------------------
