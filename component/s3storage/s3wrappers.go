@@ -84,7 +84,7 @@ const symlinkStr = ".rclonelink"
 const maxResultsPerListCall = 1000
 
 // check the connection to the S3 service by calling HeadBucket.
-func (cl *Client) ConnectionOkay(ctx context.Context) bool {
+func (cl *Client) ConnectionOkay(ctx context.Context) error {
 	log.Trace("Client::checkConnection : checking connection to S3 service")
 	// use a 200ms timeout
 	ctx, cancelFn := context.WithTimeout(ctx, 200*time.Millisecond)
@@ -93,7 +93,7 @@ func (cl *Client) ConnectionOkay(ctx context.Context) bool {
 		ctx,
 		&s3.HeadBucketInput{Bucket: aws.String(cl.Config.authConfig.BucketName)},
 	)
-	return err == nil
+	return parseS3Err(err, "HeadBucket "+cl.Config.authConfig.BucketName)
 }
 
 // getObjectMultipartDownload downloads an object to a file using multipart download

@@ -196,8 +196,9 @@ func (s3 *S3Storage) CloudConnected() bool {
 	// check connection
 	ctx, cancelFun := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancelFun()
-	connected := s3.storage.ConnectionOkay(ctx)
-	s3.updateConnectionState(connected)
+	err := s3.storage.ConnectionOkay(ctx)
+	s3.updateConnectionState(err)
+	connected := s3.firstOffline == nil
 	return connected
 }
 
@@ -221,20 +222,24 @@ func (s3 *S3Storage) timeToRetry() bool {
 	}
 }
 
-func (s3 *S3Storage) updateConnectionState(connected bool) {
+func (s3 *S3Storage) updateConnectionState(err error) {
 	currentTime := time.Now()
 	s3.lastConnectionAttempt = &currentTime
-	if !connected && s3.firstOffline == nil {
-		log.Info(
-			"S3Storage::updateConnectionState : S3 connection is offline - cancelling all outstanding requests",
-		)
-		s3.firstOffline = &currentTime
-		// cancel all outstanding requests
-		s3.requestCancelFunc()
-	} else if connected && s3.firstOffline != nil {
-		s3.firstOffline = nil
-		// reset the cancel function to allow new requests
-		s3.requestCtx, s3.requestCancelFunc = context.WithCancel(context.Background())
+	connected := !errors.Is(err, &common.CloudUnreachableError{})
+	wasConnected := s3.firstOffline == nil
+	stateChanged := connected != wasConnected
+	if stateChanged {
+		log.Warn("S3Storage::updateConnectionState : connected is now: %t", connected)
+		if connected {
+			s3.firstOffline = nil
+			// reset the context to allow new requests
+			s3.requestCtx, s3.requestCancelFunc = context.WithCancel(context.Background())
+		} else {
+			s3.firstOffline = &currentTime
+			// cancel all outstanding requests
+			s3.requestCancelFunc()
+			log.Warn("S3Storage::updateConnectionState : cancelled all outstanding requests")
+		}
 	}
 }
 
