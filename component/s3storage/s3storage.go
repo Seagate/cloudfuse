@@ -275,6 +275,7 @@ func (s3 *S3Storage) ListBuckets() ([]string, error) {
 // Directory operations
 func (s3 *S3Storage) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("S3Storage::CreateDir : %s", options.Name)
+
 	err := s3.storage.CreateDirectory(s3.ctx, internal.TruncateDirName(options.Name))
 	if s3.stConfig.enableDirMarker {
 		s3.updateConnectionState(err)
@@ -294,6 +295,7 @@ func (s3 *S3Storage) CreateDir(options internal.CreateDirOptions) error {
 
 func (s3 *S3Storage) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("S3Storage::DeleteDir : %s", options.Name)
+
 	err := s3.storage.DeleteDirectory(s3.ctx, internal.TruncateDirName(options.Name))
 	s3.updateConnectionState(err)
 
@@ -416,6 +418,7 @@ func (s3 *S3Storage) RenameDir(options internal.RenameDirOptions) error {
 // File operations
 func (s3 *S3Storage) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	log.Trace("S3Storage::CreateFile : %s", options.Name)
+
 	// Create a handle object for the file being created
 	// This handle will be added to handlemap by the first component in pipeline
 	handle := handlemap.NewHandle(options.Name)
@@ -451,6 +454,7 @@ func (s3 *S3Storage) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 	if err != nil {
 		return nil, err
 	}
+
 	// Create a handle object for the file being opened
 	// This handle will be added to handlemap by the first component in pipeline
 	handle := handlemap.NewHandle(options.Name)
@@ -469,6 +473,7 @@ func (s3 *S3Storage) OpenFile(options internal.OpenFileOptions) (*handlemap.Hand
 
 func (s3 *S3Storage) CloseFile(options internal.CloseFileOptions) error {
 	log.Trace("S3Storage::CloseFile : %s", options.Handle.Path)
+
 	// decrement open file handles count
 	s3StatsCollector.UpdateStats(stats_manager.Decrement, openHandles, (int64)(1))
 
@@ -491,7 +496,9 @@ func (s3 *S3Storage) DeleteFile(options internal.DeleteFileOptions) error {
 
 func (s3 *S3Storage) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("S3Storage::RenameFile : %s to %s", options.Src, options.Dst)
+
 	err := s3.storage.RenameFile(s3.ctx, options.Src, options.Dst, false)
+
 	s3.updateConnectionState(err)
 	if err == nil {
 		s3StatsCollector.PushEvents(
@@ -551,6 +558,7 @@ func (s3 *S3Storage) GetFileBlockOffsets(
 	options internal.GetFileBlockOffsetsOptions,
 ) (*common.BlockOffsetList, error) {
 	return s3.storage.GetFileBlockOffsets(s3.ctx, options.Name)
+
 }
 
 func (s3 *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
@@ -571,13 +579,7 @@ func (s3 *S3Storage) TruncateFile(options internal.TruncateFileOptions) error {
 
 func (s3 *S3Storage) CopyToFile(options internal.CopyToFileOptions) error {
 	log.Trace("S3Storage::CopyToFile : Read file %s", options.Name)
-	err := s3.storage.ReadToFile(
-		s3.ctx,
-		options.Name,
-		options.Offset,
-		options.Count,
-		options.File,
-	)
+	err := s3.storage.ReadToFile(s3.ctx, options.Name, options.Offset, options.Count, options.File)
 	s3.updateConnectionState(err)
 	return err
 }
@@ -600,10 +602,9 @@ func (s3 *S3Storage) CreateLink(options internal.CreateLinkOptions) error {
 		return syscall.ENOTSUP
 	}
 	log.Trace("S3Storage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
-
 	err := s3.storage.CreateLink(s3.ctx, options.Name, options.Target, true)
-	s3.updateConnectionState(err)
 
+	s3.updateConnectionState(err)
 	if err == nil {
 		s3StatsCollector.PushEvents(
 			createLink,
