@@ -193,6 +193,7 @@ s3storage:
   checksum-algorithm: CRC32|CRC32C|SHA1|SHA256 <checksum algorithm to use on writes to cloud. Default - CRC32>
   usePathStyle: true|false <enable the client to use path-style addressing. Only use if required by your S3 cloud>
   enable-dir-marker: true|false <enable support for empty directory markers (empty objects ending in a trailing slash) to indicate directories.>
+  health-check-interval-sec: <minimum interval in seconds to check the health of the S3 connection. Default - 10 sec>
 
 # Mount all configuration
 mountall:
