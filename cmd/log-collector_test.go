@@ -54,24 +54,37 @@ func (suite *logCollectTestSuite) setupConfig(logInfo logCollectTestConfig) *os.
 	return configFile
 }
 
-func (suite *logCollectTestSuite) extractZip(srcPath, destPath string) {
-	readCloser, err := zip.OpenReader(srcPath + string(os.PathSeparator) + "cloudfuse_logs.zip")
+func (suite *logCollectTestSuite) extractZip(srcZipPath, destPath string) {
+	zipDir := fmt.Sprintf("%s\\cloudfuse_logs.zip", srcZipPath)
+	zipDir = filepath.Clean(zipDir)
+	readCloser, err := zip.OpenReader(zipDir)
 	suite.assert.NoError(err)
 	defer readCloser.Close()
 
 	for _, item := range readCloser.File {
 		itemPath := filepath.Join(destPath, item.Name)
 
+		if item.FileInfo().IsDir() {
+			err = os.MkdirAll(itemPath, item.Mode())
+			suite.assert.NoError(err)
+			continue
+		}
+
 		err = os.MkdirAll(filepath.Dir(itemPath), os.ModePerm)
 		suite.assert.NoError(err)
 
-		dstFile, err := os.OpenFile(itemPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, item.Mode())
+		var dstFile *os.File
+		dstFile, err = os.OpenFile(itemPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, item.Mode())
 		suite.assert.NoError(err)
 
-		srcFile, err := item.Open()
+		var srcFile io.ReadCloser
+		srcFile, err = item.Open()
 		suite.assert.NoError(err)
+		defer srcFile.Close()
 
 		_, err = io.Copy(dstFile, srcFile)
+		suite.assert.NoError(err)
+		err = dstFile.Close()
 		suite.assert.NoError(err)
 	}
 }
