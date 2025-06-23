@@ -34,6 +34,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -388,7 +389,7 @@ func createWindowsArchive(archPath string) error {
 			return nil
 		}
 
-		if strings.HasPrefix(relPath, "cloudfuse") && strings.HasSuffix(relPath, ".log") {
+		if strings.Contains(relPath, "cloudfuse") && regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(relPath) {
 			var file *os.File
 			file, err = os.Open(path)
 			if err != nil {
