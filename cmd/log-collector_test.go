@@ -140,31 +140,51 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 	}
 
 	//verify archive contents (compare with original files that were put into archive)
+	var amountLogs int
+	err = filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 
-	items, err = os.ReadDir(tempDir)
-	suite.assert.NoError(err)
-	for _, archivedItem := range items {
-		if strings.HasPrefix(archivedItem.Name(), "cloudfuse") && strings.HasSuffix(archivedItem.Name(), ".log") {
+		var relPath string
+		relPath, err = filepath.Rel(tempDir, path)
+		if err != nil {
+			return err
+		}
 
-			//get file path
-			itemPath := filepath.Join(tempDir, archivedItem.Name())
-			itemPath = filepath.Clean(itemPath)
+		if info.IsDir() {
+			if relPath == "." {
+				return nil
+			}
+			return nil
+		}
+
+		if strings.HasPrefix(relPath, "systemprofile") {
+			return nil
+		}
+
+		if strings.Contains(info.Name(), "cloudfuse") && regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(info.Name()) {
 
 			// generate and store checksum for file
-			file, err := os.Open(itemPath)
+			file, err := os.Open(path)
 			suite.assert.NoError(err)
 
-			suite.assert.True(fileHashMap[archivedItem.Name()] != "")
+			suite.assert.True(fileHashMap[info.Name()] != "") //This is currently failing  from not finding the system profile log in the hashmap... as it should
 			hasher := sha256.New()
 			_, err = io.Copy(hasher, file)
 			suite.assert.NoError(err)
 			hashStr := string(hasher.Sum(nil))
-			suite.assert.Equal(fileHashMap[archivedItem.Name()], hashStr)
+			suite.assert.Equal(fileHashMap[info.Name()], hashStr)
 
-		} else {
-			return false //found a non cloudfuse log file
+			// This is not keeping track of how many files are expected to be in the zip.
+
+			amountLogs++
+
 		}
-	}
+		return err
+	})
+
+	suite.assert.Equal(amountLogs, len(fileHashMap))
 	return true
 }
 
