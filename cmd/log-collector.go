@@ -358,6 +358,8 @@ func createWindowsArchive(archPath string) error {
 	if err != nil {
 		return nil
 	}
+
+	defer outFile.Sync()
 	defer outFile.Close()
 
 	zipWriter := zip.NewWriter(outFile)
@@ -369,15 +371,23 @@ func createWindowsArchive(archPath string) error {
 			return err
 		}
 
-		if info.IsDir() {
-			return nil
-		}
-
 		var relPath string
 		relPath, err = filepath.Rel(archPath, path)
 		if err != nil {
 			return err
 		}
+
+		if info.IsDir() {
+			if relPath == "." {
+				return nil
+			}
+			_, err := zipWriter.Create(relPath + "/")
+			if err != nil {
+				return fmt.Errorf("failed to create directory in zip %w", err)
+			}
+			return nil
+		}
+
 		if strings.HasPrefix(relPath, "cloudfuse") && strings.HasSuffix(relPath, ".log") {
 			var file *os.File
 			file, err = os.Open(path)
