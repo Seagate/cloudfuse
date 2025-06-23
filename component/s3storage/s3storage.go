@@ -205,29 +205,25 @@ func (s3 *S3Storage) Stop() error {
 // Online check
 func (s3 *S3Storage) CloudConnected() bool {
 	log.Trace("S3Storage::CloudConnected")
-	// return cached information if we are not ready to retry
-	if !s3.timeToRetry() {
-		return s3.state.firstOffline == nil
+	connected := s3.state.firstOffline == nil
+	// don't check the connection when it's up, or if we are not ready to retry
+	if connected || !s3.timeToRetry() {
+		return connected
 	}
 	// check connection
 	ctx, cancelFun := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancelFun()
 	err := s3.storage.ConnectionOkay(ctx)
-	s3.updateConnectionState(err)
-	connected := s3.state.firstOffline == nil
-	return connected
+	nowConnected := s3.updateConnectionState(err)
+	return nowConnected
 }
 
 func (s3 *S3Storage) timeToRetry() bool {
-	connected := s3.state.firstOffline == nil
 	timeSinceLastAttempt := time.Since(*s3.state.lastConnectionAttempt)
 	switch {
 	case timeSinceLastAttempt < s3.stConfig.healthCheckInterval:
 		// minimum delay before retrying
 		return false
-	case connected:
-		// when connected, just use the health check interval
-		return true
 	case timeSinceLastAttempt > 90*time.Second:
 		// maximum delay
 		return true
@@ -238,7 +234,7 @@ func (s3 *S3Storage) timeToRetry() bool {
 	}
 }
 
-func (s3 *S3Storage) updateConnectionState(err error) {
+func (s3 *S3Storage) updateConnectionState(err error) bool {
 	s3.state.Lock()
 	defer s3.state.Unlock()
 	currentTime := time.Now()
@@ -263,6 +259,7 @@ func (s3 *S3Storage) updateConnectionState(err error) {
 			s3.state.retryTicker.Reset(s3.stConfig.healthCheckInterval)
 		}
 	}
+	return connected
 }
 
 // ------------------------- Bucket listing -------------------------------------------
