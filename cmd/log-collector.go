@@ -384,7 +384,8 @@ func createWindowsArchive(archPath string) error {
 			}
 			_, err := zipWriter.Create(relPath + "/")
 			if err != nil {
-				return fmt.Errorf("failed to create directory in zip %w", err)
+				zipWriter.Close()
+				return err
 			}
 			return nil
 		}
@@ -400,18 +401,19 @@ func createWindowsArchive(archPath string) error {
 			var zipEntry io.Writer
 			zipEntry, err = zipWriter.Create(relPath)
 			if err != nil {
+				zipWriter.Close()
 				return err
 			}
 
 			_, err = io.Copy(zipEntry, file)
 			if err != nil {
+				zipWriter.Close()
 				return err
 			}
 			amountLogs++
 		}
 		return err
 	})
-
 	if amountLogs == 0 {
 		return fmt.Errorf("no cloudfuse log file were found in %s", archPath)
 	}
