@@ -81,6 +81,9 @@ var gatherLogsCmd = &cobra.Command{
 				var sysProfDir string
 				var userDir string
 				sysProfDir, userDir, err = setupPreZip()
+				if err != nil {
+					return fmt.Errorf("could not set up the temporary folder where logs will be collected")
+				}
 				preArchPath := filepath.Dir(userDir)
 				defer os.RemoveAll(preArchPath)
 
@@ -288,7 +291,10 @@ func createLinuxArchive(logPath string) error {
 }
 
 func setupPreZip() (string, string, error) {
-	preArchPath, err := os.MkdirTemp(dumpPath, "PreZip*")
+	preArchPath, err := os.MkdirTemp(dumpPath, "tmpPreZip*")
+	if err != nil {
+		return "", "", fmt.Errorf("could not create temporary path, %s,  to extract data", preArchPath)
+	}
 
 	// create a sub folder for the service logs
 	sysProfDir := fmt.Sprintf("%s/systemprofile", preArchPath)
