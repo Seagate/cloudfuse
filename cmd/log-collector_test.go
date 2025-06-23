@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -99,7 +100,7 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 
 	//collect file and hash values into the map
 	for _, item := range items {
-		if strings.HasPrefix(item.Name(), "cloudfuse") && strings.HasSuffix(item.Name(), ".log") {
+		if strings.Contains(item.Name(), "cloudfuse") && regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(item.Name()) {
 
 			//get file path
 			itemPath := filepath.Join(logPath, item.Name())
