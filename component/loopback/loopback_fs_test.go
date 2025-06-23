@@ -489,6 +489,30 @@ func (suite *LoopbackFSTestSuite) TestStageAndCommitData() {
 	assert.NoError(err)
 }
 
+// This test is for opening the file in O_TRUNC on the existing file
+// must result in resetting the filesize to 0
+func (suite *LoopbackFSTestSuite) TestCommitNilDataToExistingFile() {
+	defer suite.cleanupTest()
+	assert := assert.New(suite.T())
+
+	lfs := &LoopbackFS{}
+
+	lfs.path = common.ExpandPath("~/blocklfstest")
+	err := os.MkdirAll(lfs.path, os.FileMode(0777))
+	assert.NoError(err)
+	defer os.RemoveAll(lfs.path)
+	Filepath := filepath.Join(lfs.path, "testFile")
+	os.WriteFile(Filepath, []byte("hello"), 0777)
+
+	blockList := []string{}
+	err = lfs.CommitData(internal.CommitDataOptions{Name: "testFile", List: blockList})
+	assert.NoError(err)
+
+	info, err := os.Stat(Filepath)
+	assert.NoError(err)
+	assert.Equal(int64(0), info.Size())
+}
+
 func TestLoopbackFSTestSuite(t *testing.T) {
 	suite.Run(t, new(LoopbackFSTestSuite))
 }

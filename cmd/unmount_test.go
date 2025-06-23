@@ -80,7 +80,7 @@ func (suite *unmountTestSuite) cleanupTest() {
 	resetCLIFlags(*rootCmd)
 }
 
-// mount failure test where the mount directory does not exists
+// mount failure test where the mount directory does not exist
 func (suite *unmountTestSuite) TestUnmountCmd() {
 	defer suite.cleanupTest()
 
