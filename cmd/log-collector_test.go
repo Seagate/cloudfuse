@@ -166,24 +166,19 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 		if strings.Contains(info.Name(), "cloudfuse") && regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(info.Name()) {
 
 			// generate and store checksum for file
-			file, err := os.Open(path)
+			var file *os.File
+			file, err = os.Open(path)
 			suite.assert.NoError(err)
-
-			suite.assert.True(fileHashMap[info.Name()] != "") //This is currently failing  from not finding the system profile log in the hashmap... as it should
+			suite.assert.True(fileHashMap[info.Name()] != "")
 			hasher := sha256.New()
 			_, err = io.Copy(hasher, file)
 			suite.assert.NoError(err)
 			hashStr := string(hasher.Sum(nil))
 			suite.assert.Equal(fileHashMap[info.Name()], hashStr)
-
-			// This is not keeping track of how many files are expected to be in the zip.
-
 			amountLogs++
-
 		}
 		return err
 	})
-
 	suite.assert.Equal(amountLogs, len(fileHashMap))
 	return true
 }
@@ -200,7 +195,8 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 	baseDefaultDir = common.ExpandPath(baseDefaultDir)
 	var logFile *os.File
 	logFile, err = os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
-	defer os.Remove(logFile.Name())
+	suite.assert.NoError(err)
+	defer os.Remove(logFile.Name()) //TODO: this isn't working
 
 	//run gatherLogs command
 	_, err = executeCommandC(rootCmd, "gatherLogs")
