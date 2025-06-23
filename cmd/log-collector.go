@@ -110,7 +110,7 @@ var gatherLogsCmd = &cobra.Command{
 				}
 
 				// copied over the user base logs from logPath -> preArchPath
-				err = copyFiles(userDir, logPath)
+				err = copyFiles(logPath, userDir)
 				if err != nil {
 					return fmt.Errorf("unable to copy files: [%s]", err.Error())
 				}
