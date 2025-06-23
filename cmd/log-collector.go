@@ -331,17 +331,17 @@ func copyFiles(srcPath, dstPath string) error {
 
 		var srcFile *os.File
 		srcFile, err = os.Open(srcFilePath)
-		defer srcFile.Close()
 		if err != nil {
 			return fmt.Errorf("failed to open file in service path to copy: [%s]", err.Error())
 		}
+		defer srcFile.Close()
 
 		var dstFile *os.File
 		dstFile, err = os.Create(dstFilePath)
-		defer dstFile.Close()
 		if err != nil {
 			return fmt.Errorf("failed to create file to copy service file: [%s]", err.Error())
 		}
+		defer dstFile.Close()
 
 		_, err = io.Copy(dstFile, srcFile)
 		if err != nil {
