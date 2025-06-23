@@ -50,10 +50,12 @@ jobs:
       - name: Compile GUI
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         shell: bash
+        env:
+          OS: ${{ runner.os }}
         run: |
           cd gui
           ./create_gui.sh
-          mv dist/cloudfuseGUI dist/cloudfuseGUI_${{ runner.os }}
+          mv dist/cloudfuseGUI dist/cloudfuseGUI_${OS}
 
       - name: Cache compiled GUI
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
@@ -87,14 +89,18 @@ jobs:
 
       - name: Set CGO
         shell: bash
+        env:
+          CGO: ${{ env.cgo }}
         run: |
-          if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
+          if [[ "${CGO}" != "" ]]; then echo 'CGO_ENABLED=${CGO}' >> $GITHUB_ENV ; fi
 
       - name: Build
         shell: bash
+        env:
+          SHA: ${{ github.sha }}
         run: |
           commitDate=$(TZ=UTC0 git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)
-          ldflags="-s -w -X github.com/Seagate/cloudfuse/common.GitCommit=${{ github.sha }} -X github.com/Seagate/cloudfuse/common.CommitDate=$commitDate"
+          ldflags="-s -w -X github.com/Seagate/cloudfuse/common.GitCommit=${SHA} -X github.com/Seagate/cloudfuse/common.CommitDate=$commitDate"
           go build -trimpath -ldflags ''"$ldflags"'' -o cloudfuse.exe
           go build -trimpath -ldflags ''"$ldflags"'' -o cfusemon.exe ./tools/health-monitor/
           go build -trimpath -ldflags ''"$ldflags"'' -o windows-startup.exe ./tools/windows-startup/
@@ -115,8 +121,10 @@ jobs:
       - name: Download WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
         shell: bash
+        env:
+          WINFSP: ${{ env.winfsp }}
         run: |
-          curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${{ env.winfsp }}
+          curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${WINFSP}
       - name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
         uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
@@ -151,8 +159,10 @@ jobs:
           "C:/Program Files (x86)/Inno Setup 6/iscc.exe" windows_installer_build.iss
 
       - name: Rename installer
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
-          mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
+          mv build/Output/cloudfuse.exe build/Output/cloudfuse_${VERSION}_windows_amd64.exe
 
       - name: Run Inno Setup for No Gui
         working-directory: ./build
@@ -163,8 +173,10 @@ jobs:
           "C:/Program Files (x86)/Inno Setup 6/iscc.exe" windows_installer_build_no_gui.iss
 
       - name: Rename installer No Gui
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
-          mv build/Output/cloudfuse.exe build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
+          mv build/Output/cloudfuse.exe build/Output/cloudfuse_no_gui_${VERSION}_windows_amd64.exe
 
       - name: Cache windows installer
         uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
@@ -206,11 +218,13 @@ jobs:
           persist-credentials: false
 
       - name: Install Zig
+        env:
+          ZIG: ${{ env.zig }}
         run: |
-          curl -L https://ziglang.org/download/${{ env.zig }}/zig-x86_64-linux-${{ env.zig }}.tar.xz -o zig.tar.xz
+          curl -L https://ziglang.org/download/${ZIG}/zig-x86_64-linux-${ZIG}.tar.xz -o zig.tar.xz
           mkdir -p $HOME/.local/bin
           tar -xf zig.tar.xz -C $HOME/.local/bin
-          echo "$HOME/.local/bin/zig-x86_64-linux-${{ env.zig }}" >> $GITHUB_PATH
+          echo "$HOME/.local/bin/zig-x86_64-linux-${ZIG}" >> $GITHUB_PATH
           rm zig.tar.xz
 
       - name: Install Go
