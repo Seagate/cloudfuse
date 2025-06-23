@@ -107,8 +107,10 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 			itemPath = filepath.Clean(itemPath)
 
 			// generate and store checksum for file
-			file, err := os.Open(itemPath)
+			var file *os.File
+			file, err = os.Open(itemPath)
 			suite.assert.NoError(err)
+			defer file.Close()
 			hasher := sha256.New()
 			_, err = io.Copy(hasher, file)
 			suite.assert.NoError(err)
@@ -118,11 +120,12 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 		}
 	}
 
-	currentDir, err := os.Getwd()
+	var currentDir string
+	currentDir, err = os.Getwd()
 	suite.assert.NoError(err)
-	tempDir, err := os.MkdirTemp(currentDir, "tmpLogData")
+	var tempDir string
+	tempDir, err = os.MkdirTemp(currentDir, "verifyArchive")
 	suite.assert.NoError(err)
-
 	tempDir, err = filepath.Abs(tempDir)
 	suite.assert.NoError(err)
 
