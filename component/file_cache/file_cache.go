@@ -65,7 +65,7 @@ type FileCache struct {
 	cleanupOnStart  bool
 	policyTrace     bool
 	missedChmodList sync.Map // uses object name (common.JoinUnixFilepath)
-	offlineOps      sync.Map // uses object name (common.JoinUnixFilepath)
+	scheduleOps     sync.Map // uses object name (common.JoinUnixFilepath)
 	mountPath       string   // uses os.Separator (filepath.Join)
 	allowOther      bool
 	offloadIO       bool
@@ -581,7 +581,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 			//  The thread that pushes local changes to the cloud will have to account for this
 			//  to avoid creating an entry for this directory in the attribute cache,
 			//  which would give us the false impression that the directory is in the cloud.
-			fc.offlineOps.Store(options.Name, struct{}{})
+			fc.scheduleOps.Store(options.Name, struct{}{})
 			log.Info("FileCache::CreateDir : %s created offline and queued for cloud sync", options.Name)
 		}
 	case err != nil && !isOffline(err):
@@ -626,7 +626,7 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 		// this is a local directory
 		// remove it from the deferred cloud operations
 		// TODO: protect this with a semaphore (probably flock)
-		fc.offlineOps.Delete(options.Name)
+		fc.scheduleOps.Delete(options.Name)
 		// delete it locally
 		fc.policy.CachePurge(filepath.Join(fc.tmpPath, options.Name))
 		// clear the error
@@ -1180,7 +1180,7 @@ func (fc *FileCache) CreateFile(options internal.CreateFileOptions) (*handlemap.
 
 	// if we're offline, record this operation as pending
 	if offline {
-		fc.offlineOps.Store(options.Name, struct{}{})
+		fc.scheduleOps.Store(options.Name, struct{}{})
 		flock.SyncPending = true
 	}
 
@@ -1250,7 +1250,7 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	flock.LazyOpen = false
 	flock.SyncPending = false
 	// remove deleted file from async upload map
-	fc.offlineOps.Delete(options.Name)
+	fc.scheduleOps.Delete(options.Name)
 
 	return nil
 }
@@ -1948,14 +1948,14 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 				}
 			}
 		default:
-			//push to offlineOPS as default since we don't want to upload to the cloud
+			//push to scheduleOps as default since we don't want to upload to the cloud
 			log.Info(
 				"FileCache::FlushFile : %s upload deferred (Offline Scheduling)",
 				options.Handle.Path,
 			)
 			_, statErr := os.Stat(localPath)
 			if statErr == nil {
-				fc.offlineOps.Store(options.Handle.Path, struct{}{})
+				fc.scheduleOps.Store(options.Handle.Path, struct{}{})
 				flock := fc.fileLocks.Get(options.Handle.Path)
 				flock.SyncPending = true
 			}
@@ -2145,9 +2145,9 @@ func (fc *FileCache) renameLocalFile(
 }
 
 func (fc *FileCache) renamePendingOp(srcName, dstName string) {
-	_, operationPending := fc.offlineOps.LoadAndDelete(srcName)
+	_, operationPending := fc.scheduleOps.LoadAndDelete(srcName)
 	if operationPending {
-		fc.offlineOps.Store(dstName, struct{}{})
+		fc.scheduleOps.Store(dstName, struct{}{})
 	}
 }
 
@@ -2228,7 +2228,7 @@ func (fc *FileCache) TruncateFile(options internal.TruncateFileOptions) error {
 				)
 				return err
 			} else if offlineOkay {
-				fc.offlineOps.Store(options.Name, struct{}{})
+				fc.scheduleOps.Store(options.Name, struct{}{})
 				log.Warn("FileCache::TruncateFile : %s operation queued (offline)", options.Name)
 				flock.SyncPending = true
 			}
@@ -2282,7 +2282,7 @@ func (fc *FileCache) chmodInternal(options internal.ChmodOptions) error {
 				)
 				return err
 			} else if offlineOkay {
-				fc.offlineOps.Store(options.Name, struct{}{})
+				fc.scheduleOps.Store(options.Name, struct{}{})
 				log.Warn("FileCache::Chmod : %s operation queued (offline)", options.Name)
 				fc.missedChmodList.LoadOrStore(options.Name, true)
 				flock := fc.fileLocks.Get(options.Name)
@@ -2332,7 +2332,7 @@ func (fc *FileCache) Chown(options internal.ChownOptions) error {
 				return err
 			} else if offlineOkay {
 				// TODO: we have no missedChownList to track this... should we make one? Or should we just ignore this call?
-				fc.offlineOps.Store(options.Name, struct{}{})
+				fc.scheduleOps.Store(options.Name, struct{}{})
 				log.Warn("FileCache::Chown : %s operation queued (offline)", options.Name)
 				flock.SyncPending = true
 			}

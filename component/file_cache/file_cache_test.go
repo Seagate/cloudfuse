@@ -1650,32 +1650,32 @@ func (suite *fileCacheTestSuite) TestServicePendingOpsAndUploadPendingFile() {
 	)
 	suite.assert.NoError(err)
 
-	// Add the file to the offlineOps map to mark it as pending
-	suite.fileCache.offlineOps.Store(file, true) // properly store the key-value pair
-	value, exists := suite.fileCache.offlineOps.Load(file)
+	// Add the file to the scheduleOps map to mark it as pending
+	suite.fileCache.scheduleOps.Store(file, true) // properly store the key-value pair
+	value, exists := suite.fileCache.scheduleOps.Load(file)
 	if exists {
 		print(value)
 	} else {
 		print("Value not found")
 	}
 
-	suite.fileCache.offlineOps.Store(file, true)
-	print(suite.fileCache.offlineOps.Load(file))
+	suite.fileCache.scheduleOps.Store(file, true)
+	print(suite.fileCache.scheduleOps.Load(file))
 	// Get the file lock and mark it as pending sync
 	flock := suite.fileCache.fileLocks.Get(file)
 	flock.SyncPending = true
-	suite.fileCache.offlineOps.Range(func(key, value interface{}) bool {
-		print(suite.fileCache.offlineOps.Load(file))
+	suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
+		print(suite.fileCache.scheduleOps.Load(file))
 		return true
 	})
 
 	suite.fileCache.servicePendingOps()
-	print(suite.fileCache.offlineOps.Load(file))
+	print(suite.fileCache.scheduleOps.Load(file))
 
 	uploaded := false
 
 	if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file)); err == nil {
-		if _, exists := suite.fileCache.offlineOps.Load(file); !exists {
+		if _, exists := suite.fileCache.scheduleOps.Load(file); !exists {
 			if !flock.SyncPending {
 				uploaded = true
 			}
@@ -1706,7 +1706,7 @@ func (suite *fileCacheTestSuite) TestScheduleUploadsCronIntegration2() {
 	err := log.SetDefaultLogger("silent", common.LogConfig{})
 	suite.assert.NoError(err)
 
-	// Create a file and add it to offlineOps
+	// Create a file and add it to scheduleOps
 	file := "scheduled_file_cron.txt"
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	suite.assert.NoError(err)
@@ -1727,8 +1727,8 @@ func (suite *fileCacheTestSuite) TestScheduleUploadsCronIntegration2() {
 	suite.assert.FileExists(filepath.Join(suite.cache_path, file))
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
 
-	// Add the file to offlineOps map (as if it was deferred for upload)
-	suite.fileCache.offlineOps.Store(file, struct{}{})
+	// Add the file to scheduleOps map (as if it was deferred for upload)
+	suite.fileCache.scheduleOps.Store(file, struct{}{})
 	flock := suite.fileCache.fileLocks.Get(file)
 	flock.SyncPending = true
 
@@ -1799,7 +1799,7 @@ func (suite *fileCacheTestSuite) TestScheduleUploadsCronIntegration2() {
 			break
 		default:
 			if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file)); err == nil {
-				if _, exists := suite.fileCache.offlineOps.Load(file); !exists {
+				if _, exists := suite.fileCache.scheduleOps.Load(file); !exists {
 					fileUploaded = true
 					break
 				}
@@ -1925,7 +1925,7 @@ func (suite *fileCacheTestSuite) TestMultipleFilesScheduleUploads() {
 		suite.assert.NoError(err)
 
 		// Mark file as pending upload
-		suite.fileCache.offlineOps.Store(files[i], struct{}{})
+		suite.fileCache.scheduleOps.Store(files[i], struct{}{})
 		flock := suite.fileCache.fileLocks.Get(files[i])
 		flock.SyncPending = true
 
@@ -1939,7 +1939,7 @@ func (suite *fileCacheTestSuite) TestMultipleFilesScheduleUploads() {
 	// Print the initial pending files
 	pendingCount := 0
 	suite.T().Log("Initial pending files:")
-	suite.fileCache.offlineOps.Range(func(key, value interface{}) bool {
+	suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
 		pendingCount++
 		suite.T().Logf("  ⏳ %s", key)
 		return true
@@ -1959,7 +1959,7 @@ func (suite *fileCacheTestSuite) TestMultipleFilesScheduleUploads() {
 
 		// Display number of pending files before upload
 		pendingCount := 0
-		suite.fileCache.offlineOps.Range(func(key, value interface{}) bool {
+		suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
 			pendingCount++
 			return true
 		})
@@ -1997,7 +1997,7 @@ func (suite *fileCacheTestSuite) TestMultipleFilesScheduleUploads() {
 
 		// Check if any files are still pending
 		remainingCount := 0
-		suite.fileCache.offlineOps.Range(func(key, value interface{}) bool {
+		suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
 			remainingCount++
 			fmt.Printf("  ⏳ File still pending: %s", key)
 			return true
@@ -2096,13 +2096,13 @@ func (suite *fileCacheTestSuite) TestMultipleFilesScheduleUploads() {
 	time.Sleep(10 * time.Second)
 	suite.assert.True(endCallbackExecuted, "End callback should have been executed")
 
-	// Final verification of offlineOps map - should be empty
+	// Final verification of scheduleOps map - should be empty
 	remainingCount := 0
-	suite.fileCache.offlineOps.Range(func(key, value interface{}) bool {
+	suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
 		remainingCount++
 		return true
 	})
-	suite.assert.Equal(0, remainingCount, "No files should remain in the offlineOps map")
+	suite.assert.Equal(0, remainingCount, "No files should remain in the scheduleOps map")
 
 	for _, file := range files {
 		flock := suite.fileCache.fileLocks.Get(file)
@@ -2117,21 +2117,19 @@ func (suite *fileCacheTestSuite) TestDaySpecificSchedulerFromYAML() {
 	defer suite.cleanupTest()
 
 	configPath := filepath.Join(suite.cache_path, "day_schedule_config.yaml")
-	configContent := `
-		schedule:
-		Monday:
-			cron: "0 0 10 * * 1"    # 10:00 AM on Mondays only (1=Monday)
-			duration: "30m"
-			repeat: true
-		Wednesday:
-			cron: "0 0 14 * * 3"    # 2:00 PM on Wednesdays only (3=Wednesday)
-			duration: "45m"
-			repeat: false
-		Friday:
-			cron: "0 0 16 * * 5"    # 4:00 PM on Fridays only (5=Friday)
-			duration: "1h"
-			repeat: true
-		`
+	configContent := `schedule:
+  Monday:
+    cron: "0 0 10 * * 1"    # 10:00 AM on Mondays only (1=Monday)
+    duration: "30m"
+    repeat: true
+  Wednesday:
+    cron: "0 0 14 * * 3"    # 2:00 PM on Wednesdays only (3=Wednesday)
+    duration: "45m"
+    repeat: false
+  Friday:
+    cron: "0 0 16 * * 5"    # 4:00 PM on Fridays only (5=Friday)
+    duration: "1h"
+    repeat: true`
 	err := os.MkdirAll(suite.cache_path, 0755)
 	suite.assert.NoError(err)
 
@@ -2212,7 +2210,7 @@ func (suite *fileCacheTestSuite) TestDaySpecificSchedulerFromYAML() {
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
-	suite.fileCache.offlineOps.Store(testFile, struct{}{})
+	suite.fileCache.scheduleOps.Store(testFile, struct{}{})
 	flock := suite.fileCache.fileLocks.Get(testFile)
 	flock.SyncPending = true
 
@@ -2229,8 +2227,8 @@ func (suite *fileCacheTestSuite) TestDaySpecificSchedulerFromYAML() {
 	suite.assert.Equal(testData, uploadedData, "Uploaded file content should match original")
 
 	// Verify file was removed from pending operations
-	_, exists = suite.fileCache.offlineOps.Load(testFile)
-	suite.assert.False(exists, "File should have been removed from offlineOps")
+	_, exists = suite.fileCache.scheduleOps.Load(testFile)
+	suite.assert.False(exists, "File should have been removed from scheduleOps")
 
 	// File lock's sync pending flag should be cleared
 	flock = suite.fileCache.fileLocks.Get(testFile)
@@ -2250,25 +2248,23 @@ func (suite *fileCacheTestSuite) TestPrintScheduleFromYAML() {
 
 	// Create a temporary config file with day-specific schedules
 	configPath := filepath.Join(suite.cache_path, "print_schedule_config.yaml")
-	configContent := `
-		schedule:
-		Tuesday:
-			cron: "0 45 13 * * 2"    # 12:00 PM on Tuesdays only (2=Tuesday)
-			duration: "30m"
-			repeat: true
-		Wednesday:
-			cron: "0 0 14 * * 3"    # 2:00 PM on Wednesdays only (3=Wednesday)
-			duration: "45m"
-			repeat: false
-		Friday:
-			cron: "0 0 16 * * 5"    # 4:00 PM on Fridays only (5=Friday)
-			duration: "1h"
-			repeat: true
-		daily:
-			cron: "0 0 2 * * *"     # 2:00 AM every day
-			duration: "20m"
-			repeat: true
-		`
+	configContent := `schedule:
+  Tuesday:
+    cron: "0 45 13 * * 2"    # 12:00 PM on Tuesdays only (2=Tuesday)
+    duration: "30m"
+    repeat: true
+  Wednesday:
+    cron: "0 0 14 * * 3"    # 2:00 PM on Wednesdays only (3=Wednesday)
+    duration: "45m"
+    repeat: false
+  Friday:
+    cron: "0 0 16 * * 5"    # 4:00 PM on Fridays only (5=Friday)
+    duration: "1h"
+    repeat: true
+  Saturday:
+    cron: "0 0 2 * * *"     # 2:00 AM every day
+    duration: "20m"
+    repeat: true`
 	err := os.MkdirAll(suite.cache_path, 0755)
 	suite.assert.NoError(err)
 
@@ -2289,7 +2285,6 @@ func (suite *fileCacheTestSuite) TestPrintScheduleFromYAML() {
 	}
 	sort.Strings(keys)
 
-	// Print each schedule entry with all fields
 	for _, day := range keys {
 		config := schedule[day]
 		fmt.Printf("\nDay: %s\n", day)
@@ -2299,16 +2294,12 @@ func (suite *fileCacheTestSuite) TestPrintScheduleFromYAML() {
 	}
 	fmt.Println("===============================")
 
-	// Verify we loaded the correct number of day-specific entries
 	suite.assert.Equal(4, len(schedule), "Should have loaded 4 schedule entries")
 
-	// Create a cron scheduler that we can inspect
-	// Create a logger adapter that implements the Printf method
 	logAdapter := &loggerAdapter{}
 	cronScheduler := cron.New(cron.WithSeconds(), cron.WithLogger(
 		cron.PrintfLogger(logAdapter)))
 
-	// Set up callbacks for testing with additional logging
 	uploadCount := 0
 	startFunc := func() {
 		fmt.Println("Start callback executed")
@@ -2342,7 +2333,6 @@ func (suite *fileCacheTestSuite) TestPrintScheduleFromYAML() {
 		return entries[i].Next.Before(entries[j].Next)
 	})
 
-	// Print detailed information about each scheduled job
 	now := time.Now()
 	for i, entry := range entries {
 		nextRun := entry.Next
@@ -2376,13 +2366,13 @@ func (suite *fileCacheTestSuite) TestPrintScheduleFromYAML() {
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
-	suite.fileCache.offlineOps.Store(testFile, struct{}{})
+	suite.fileCache.scheduleOps.Store(testFile, struct{}{})
 	flock := suite.fileCache.fileLocks.Get(testFile)
 	flock.SyncPending = true
 
 	fmt.Println("\n=== PENDING FILES FOR UPLOAD ===")
 	pendingCount := 0
-	suite.fileCache.offlineOps.Range(func(key, value interface{}) bool {
+	suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
 		pendingCount++
 		fmt.Printf("  %d. %s\n", pendingCount, key)
 		return true
@@ -2393,7 +2383,6 @@ func (suite *fileCacheTestSuite) TestPrintScheduleFromYAML() {
 	}
 	fmt.Println("===================================")
 
-	// Manually trigger servicePendingOps to verify it works
 	fmt.Println("\n=== MANUAL UPLOAD TEST ===")
 	fmt.Println("Triggering servicePendingOps manually...")
 	suite.fileCache.servicePendingOps()
@@ -2411,7 +2400,7 @@ func (suite *fileCacheTestSuite) TestPrintScheduleFromYAML() {
 		}
 
 		// Check if file was removed from pending operations
-		if _, exists := suite.fileCache.offlineOps.Load(testFile); !exists {
+		if _, exists := suite.fileCache.scheduleOps.Load(testFile); !exists {
 			fmt.Println("File was removed from pending operations")
 		} else {
 			fmt.Println("File still exists in pending operations")
@@ -2438,7 +2427,7 @@ func (suite *fileCacheTestSuite) TestSimpleScheduledUpload() {
 	suite.assert.NoError(err)
 
 	// Mark file as pending upload
-	suite.fileCache.offlineOps.Store(file, struct{}{})
+	suite.fileCache.scheduleOps.Store(file, struct{}{})
 	flock := suite.fileCache.fileLocks.Get(file)
 	flock.SyncPending = true
 
@@ -2537,7 +2526,7 @@ func (suite *fileCacheTestSuite) TestScheduledUploadsFromYamlConfig2() {
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
-	suite.fileCache.offlineOps.Store(file, struct{}{})
+	suite.fileCache.scheduleOps.Store(file, struct{}{})
 	flock := suite.fileCache.fileLocks.Get(file)
 	flock.SyncPending = true
 
@@ -2595,9 +2584,9 @@ func (suite *fileCacheTestSuite) TestScheduledUploadsFromYamlConfig2() {
 				// Print diagnostics each tick
 				fmt.Printf("Still waiting... Time: %s\n", time.Now().Format("15:04:05"))
 
-				// Check if file is still in offlineOps map
-				_, exists := suite.fileCache.offlineOps.Load(file)
-				fmt.Printf("File still in offlineOps map: %v\n", exists)
+				// Check if file is still in scheduleOps map
+				_, exists := suite.fileCache.scheduleOps.Load(file)
+				fmt.Printf("File still in scheduleOps map: %v\n", exists)
 
 				if flock := suite.fileCache.fileLocks.Get(file); flock != nil {
 					fmt.Printf("File SyncPending flag: %v\n", flock.SyncPending)
@@ -2616,8 +2605,8 @@ func (suite *fileCacheTestSuite) TestScheduledUploadsFromYamlConfig2() {
 		suite.assert.Equal(testData, uploadedData, "Uploaded file content should match original")
 
 		// Check state was cleaned up
-		_, exists := suite.fileCache.offlineOps.Load(file)
-		suite.assert.False(exists, "File should have been removed from offlineOps")
+		_, exists := suite.fileCache.scheduleOps.Load(file)
+		suite.assert.False(exists, "File should have been removed from scheduleOps")
 
 		flock = suite.fileCache.fileLocks.Get(file)
 		suite.assert.False(flock.SyncPending, "SyncPending flag should be cleared")
@@ -2679,7 +2668,7 @@ func (suite *fileCacheTestSuite) TestScheduledUploadsWithLoadConfig() {
 	suite.assert.NoError(err)
 
 	// Mark file as pending upload and verify initial state
-	suite.fileCache.offlineOps.Store(file, struct{}{})
+	suite.fileCache.scheduleOps.Store(file, struct{}{})
 	flock := suite.fileCache.fileLocks.Get(file)
 	flock.SyncPending = true
 
@@ -2714,9 +2703,9 @@ func (suite *fileCacheTestSuite) TestScheduledUploadsWithLoadConfig() {
 				// Print diagnostics each tick
 				fmt.Printf("Still waiting... Time: %s\n", time.Now().Format("15:04:05"))
 
-				// Check if file is still in offlineOps map
-				_, exists := suite.fileCache.offlineOps.Load(file)
-				fmt.Printf("File still in offlineOps map: %v\n", exists)
+				// Check if file is still in scheduleOps map
+				_, exists := suite.fileCache.scheduleOps.Load(file)
+				fmt.Printf("File still in scheduleOps map: %v\n", exists)
 
 				if flock := suite.fileCache.fileLocks.Get(file); flock != nil {
 					fmt.Printf("File SyncPending flag: %v\n", flock.SyncPending)
@@ -2734,8 +2723,8 @@ func (suite *fileCacheTestSuite) TestScheduledUploadsWithLoadConfig() {
 		suite.assert.NoError(err)
 		suite.assert.Equal(testData, uploadedData, "Uploaded file content should match original")
 
-		_, exists := suite.fileCache.offlineOps.Load(file)
-		suite.assert.False(exists, "File should have been removed from offlineOps")
+		_, exists := suite.fileCache.scheduleOps.Load(file)
+		suite.assert.False(exists, "File should have been removed from scheduleOps")
 
 		flock = suite.fileCache.fileLocks.Get(file)
 		suite.assert.False(flock.SyncPending, "SyncPending flag should be cleared")

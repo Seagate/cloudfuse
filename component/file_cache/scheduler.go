@@ -96,8 +96,8 @@ func (fc *FileCache) scheduleUploads(
 			startFunc() // Also servicing all current pending uploads first
 			log.Info("[%s] Starting upload at %s\n", day, time.Now().Format(time.Kitchen))
 			window, cancel := context.WithTimeout(context.Background(), durationParsed)
-			ticker := time.NewTicker(1 * time.Minute)
-			defer ticker.Stop()
+			// ticker := time.NewTicker(1 * time.Minute)
+			// defer ticker.Stop()
 			go func() {
 				defer cancel()
 				for {
@@ -111,7 +111,8 @@ func (fc *FileCache) scheduleUploads(
 							time.Now().Format(time.Kitchen),
 						)
 						return
-					case <-ticker.C:
+					// case <-ticker.C:
+					default:
 						log.Debug(
 							"[%s] Checking for pending uploads at %s\n",
 							day,
@@ -142,7 +143,7 @@ func (fc *FileCache) servicePendingOps() {
 	}
 
 	// Process pending operations
-	fc.offlineOps.Range(func(key, value interface{}) bool {
+	fc.scheduleOps.Range(func(key, value interface{}) bool {
 		select {
 		case <-fc.stopAsyncUpload:
 			log.Info("FileCache::servicePendingOps : Upload processing interrupted")
@@ -217,9 +218,9 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 	}
 	// update state
 	flock.SyncPending = false
-	// Successfully uploaded, removing from offlineOps
+	// Successfully uploaded, removing from scheduleOps
 	fmt.Println("File uploaded:", name)
-	fc.offlineOps.Delete(name)
+	fc.scheduleOps.Delete(name)
 
 	return nil
 }
