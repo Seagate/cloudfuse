@@ -46,6 +46,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
+	"github.com/robfig/cron/v3"
 
 	"github.com/spf13/cobra"
 )
@@ -83,6 +84,8 @@ type FileCache struct {
 	fileCloseOpt sync.WaitGroup
 
 	stopAsyncUpload chan struct{}
+
+	scheduler *cron.Cron
 }
 
 // Structure defining your config parameters
@@ -169,6 +172,7 @@ func (fc *FileCache) Priority() internal.ComponentPriority {
 //	this shall not block the call otherwise pipeline will not start
 func (fc *FileCache) Start(ctx context.Context) error {
 	log.Trace("Starting component : %s", fc.Name())
+	configPath := filepath.Join(os.Getenv("HOME"), "cloudfuse", "config.yaml")
 
 	if fc.cleanupOnStart {
 		err := common.TempCacheCleanup(fc.tmpPath)
@@ -196,6 +200,11 @@ func (fc *FileCache) Start(ctx context.Context) error {
 	fileCacheStatsCollector = stats_manager.NewStatsCollector(fc.Name())
 	log.Debug("Starting file cache stats collector")
 
+	err = fc.SetupScheduler(configPath)
+	if err != nil {
+		log.Warn("FileCache::Start : Failed to setup scheduler [%s]", err.Error())
+	}
+
 	return nil
 }
 
@@ -215,99 +224,6 @@ func (fc *FileCache) Stop() error {
 	}
 
 	fileCacheStatsCollector.Destroy()
-
-	return nil
-}
-
-func (fc *FileCache) servicePendingOps() {
-	for {
-		time.Sleep(250 * time.Millisecond) // don't run too fast
-		select {
-		case <-fc.stopAsyncUpload:
-			log.Crit("FileCache::servicePendingOps : Stopping")
-			// TODO: Close journal
-			return
-		default:
-			// check if we're connected
-			if !fc.cloudConnected() {
-				break
-			}
-			// Iterate over pending ops
-			fc.offlineOps.Range(func(key, value interface{}) bool {
-				select {
-				case <-fc.stopAsyncUpload:
-					return false // Stop the iteration
-				default:
-					err := fc.uploadPendingFile(key.(string))
-					if isOffline(err) {
-						// we lost connection - stop trying to upload
-						return false
-					}
-					if err != nil {
-						log.Err(
-							"FileCache::servicePendingOps : %s upload failed. Here's why: %v",
-							key.(string),
-							err,
-						)
-					}
-				}
-				return true // Continue the iteration
-			})
-		}
-	}
-}
-
-func (fc *FileCache) uploadPendingFile(name string) error {
-	log.Trace("FileCache::uploadPendingFile : %s", name)
-
-	// lock the file
-	flock := fc.fileLocks.Get(name)
-	flock.Lock()
-	defer flock.Unlock()
-
-	// look up file (or folder!)
-	localPath := filepath.Join(fc.tmpPath, name)
-	info, err := os.Stat(localPath)
-	if err != nil {
-		log.Err("FileCache::uploadPendingFile : %s failed to stat file. Here's why: %v", name, err)
-		return err
-	}
-	if info.IsDir() {
-		// upload folder
-		options := internal.CreateDirOptions{Name: name, Mode: info.Mode()}
-		err = fc.NextComponent().CreateDir(options)
-		if err != nil && !os.IsExist(err) {
-			return err
-		}
-	} else {
-		// this is a file
-		// prepare a handle
-		handle := handlemap.NewHandle(name)
-		// open the cached file
-		f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
-		if err != nil {
-			log.Err("FileCache::uploadPendingFile : %s failed to open file. Here's why: %v", name, err)
-			return err
-		}
-		// write handle attributes
-		inf, err := f.Stat()
-		if err == nil {
-			handle.Size = inf.Size()
-		}
-		handle.UnixFD = uint64(f.Fd())
-		handle.SetFileObject(f)
-		handle.Flags.Set(handlemap.HandleFlagDirty)
-
-		// upload the file
-		err = fc.closeFileInternal(internal.CloseFileOptions{Handle: handle}, flock)
-		if err != nil {
-			log.Err("FileCache::uploadPendingFile : %s Upload failed. Here's why: %v", name, err)
-			return err
-		}
-	}
-	// update state
-	flock.SyncPending = false
-	fc.offlineOps.Delete(name)
 
 	return nil
 }
@@ -650,6 +566,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 
 	// we are offline
 	// check if the directory exists in cloud storage
+	// make this opposite!!
 	notInCloud, err := fc.checkCloud(options.Name)
 	switch {
 	case notInCloud:
@@ -719,47 +636,47 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	return err
 }
 
-// checks if we are offline by requesting state information from the cloud storage component
-func (fc *FileCache) cloudConnected() bool {
-	// TODO: create a new component API function to check this (SRGDEV-614), instead of using StatFs
-	_, _, err := fc.NextComponent().StatFs()
-	return !isOffline(err)
-}
+// // checks if we are offline by requesting state information from the cloud storage component //moved
+// func (fc *FileCache) cloudConnected() bool {
+// 	// TODO: create a new component API function to check this (SRGDEV-614), instead of using StatFs
+// 	_, _, err := fc.NextComponent().StatFs()
+// 	return !isOffline(err)
+// }
 
-// this returns true when offline access is enabled, and it's safe to access this object offline
-func (fc *FileCache) offlineOperationAllowed(name string) bool {
-	return fc.offlineAccess && fc.notInCloud(name)
-}
+// // this returns true when offline access is enabled, and it's safe to access this object offline
+// func (fc *FileCache) offlineOperationAllowed(name string) bool {
+// 	return fc.offlineAccess && fc.notInCloud(name)
+// }
 
-// returns true if we *know* that this entity does not exist in cloud storage
-// otherwise returns false (including ambiguous cases)
-func (fc *FileCache) notInCloud(name string) bool {
-	notInCloud, _ := fc.checkCloud(name)
-	return notInCloud
-}
+// // returns true if we *know* that this entity does not exist in cloud storage
+// // otherwise returns false (including ambiguous cases)
+// func (fc *FileCache) notInCloud(name string) bool {
+// 	notInCloud, _ := fc.checkCloud(name)
+// 	return notInCloud
+// }
 
-// notInCloud is true if we *know* that this entity does not exist in cloud storage
-// and getAttrErr is the error returned from GetAttr
-func (fc *FileCache) checkCloud(name string) (notInCloud bool, getAttrErr error) {
-	_, getAttrErr = fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
-	notInCloud = errors.Is(getAttrErr, os.ErrNotExist)
-	return notInCloud, getAttrErr
-}
+// // notInCloud is true if we *know* that this entity does not exist in cloud storage
+// // and getAttrErr is the error returned from GetAttr
+// func (fc *FileCache) checkCloud(name string) (notInCloud bool, getAttrErr error) {
+// 	_, getAttrErr = fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
+// 	notInCloud = errors.Is(getAttrErr, os.ErrNotExist)
+// 	return notInCloud, getAttrErr
+// }
 
-// checks if the error returned from cloud storage means we're offline
-func isOffline(err error) bool {
-	return errors.Is(err, &common.CloudUnreachableError{})
-}
+// // checks if the error returned from cloud storage means we're offline
+// func isOffline(err error) bool {
+// 	return errors.Is(err, &common.CloudUnreachableError{})
+// }
 
-// checks whether we have usable metadata, despite being offline
-func offlineDataAvailable(err error) bool {
-	return isOffline(err) && cachedData(err)
-}
+// // checks whether we have usable metadata, despite being offline
+// func offlineDataAvailable(err error) bool {
+// 	return isOffline(err) && cachedData(err)
+// }
 
-// checks whether we have usable metadata, despite being offline
-func cachedData(err error) bool {
-	return !errors.Is(err, &common.NoCachedDataError{}) || !isOffline(err)
-}
+// // checks whether we have usable metadata, despite being offline
+// func cachedData(err error) bool {
+// 	return !errors.Is(err, &common.NoCachedDataError{}) || !isOffline(err)
+// }
 
 // StreamDir : Add local files to the list retrieved from storage container
 func (fc *FileCache) StreamDir(
@@ -1726,7 +1643,11 @@ func (fc *FileCache) closeFileInternal(
 	if !noCachedHandle {
 		// flock is already locked, as required by flushFileInternal
 		err := fc.flushFileInternal(
-			internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true},
+			internal.FlushFileOptions{
+				Handle:          options.Handle,
+				CloseInProgress: true,
+				ImmediateUpload: false,
+			},
 		) //nolint
 		if err != nil {
 			log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
@@ -1939,9 +1860,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 	return fc.flushFileInternal(options)
 }
 
-// file must be locked before calling this function
 func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error {
-	//defer exectime.StatTimeCurrentBlock("FileCache::FlushFile")()
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
@@ -1968,97 +1887,81 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			return syscall.EBADF
 		}
 
-		// Flush all data to disk that has been buffered by the kernel.
-		// We cannot close the incoming handle since the user called flush, note close and flush can be called on the same handle multiple times.
-		// To ensure the data is flushed to disk before writing to storage, we duplicate the handle and close that handle.
-		// f.fsync() is another option but dup+close does it quickly compared to sync
-		// dupFd, err := syscall.Dup(int(f.Fd()))
-		// if err != nil {
-		// 	log.Err("FileCache::FlushFile : error [couldn't duplicate the fd] %s", options.Handle.Path)
-		// 	return syscall.EIO
-		// }
-
-		// err = syscall.Close(dupFd)
-		// if err != nil {
-		// 	log.Err("FileCache::FlushFile : error [unable to close duplicate fd] %s", options.Handle.Path)
-		// 	return syscall.EIO
-		// }
-
-		// Replace above with Sync since Dup is not supported on Windows
 		err := f.Sync()
 		if err != nil {
 			log.Err("FileCache::FlushFile : error [unable to sync file] %s", options.Handle.Path)
 			return syscall.EIO
 		}
-
-		// Write to storage
-		// Create a new handle for the SDK to use to upload (read local file)
-		// The local handle can still be used for read and write.
 		var orgMode fs.FileMode
 		modeChanged := false
+		notInCloud := fc.notInCloud(
+			options.Handle.Path,
+		)
+		// Figure out if we should upload immediately or append to pending OPS
+		switch {
+		case options.ImmediateUpload || !notInCloud:
+			uploadHandle, err := common.Open(localPath)
+			if err != nil {
+				if os.IsPermission(err) {
+					info, _ := os.Stat(localPath)
+					orgMode = info.Mode()
+					newMode := orgMode | 0444
+					err = os.Chmod(localPath, newMode)
+					if err == nil {
+						modeChanged = true
+						uploadHandle, err = common.Open(localPath)
+						log.Info(
+							"FileCache::FlushFile : read mode added to file %s",
+							options.Handle.Path,
+						)
+					}
+				}
 
-		uploadHandle, err := common.Open(localPath)
-		if err != nil {
-			if os.IsPermission(err) {
-				info, _ := os.Stat(localPath)
-				orgMode = info.Mode()
-				newMode := orgMode | 0444
-				err = os.Chmod(localPath, newMode)
-				if err == nil {
-					modeChanged = true
-					uploadHandle, err = common.Open(localPath)
-					log.Info(
-						"FileCache::FlushFile : read mode added to file %s",
+				if err != nil {
+					log.Err(
+						"FileCache::FlushFile : error [unable to open upload handle] %s [%s]",
 						options.Handle.Path,
+						err.Error(),
+					)
+					return err
+				}
+			}
+			err = fc.NextComponent().CopyFromFile(
+				internal.CopyFromFileOptions{
+					Name: options.Handle.Path,
+					File: uploadHandle,
+				})
+
+			uploadHandle.Close()
+			if err == nil {
+				// Clear dirty flag since file was successfully uploaded
+				options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
+			}
+			if modeChanged {
+				err1 := os.Chmod(localPath, orgMode)
+				if err1 != nil {
+					log.Err(
+						"FileCache::FlushFile : Failed to remove read mode from file %s [%s]",
+						options.Handle.Path,
+						err1.Error(),
 					)
 				}
 			}
-
-			if err != nil {
-				log.Err(
-					"FileCache::FlushFile : error [unable to open upload handle] %s [%s]",
-					options.Handle.Path,
-					err.Error(),
-				)
-				return err
-			}
-		}
-		err = fc.NextComponent().CopyFromFile(
-			internal.CopyFromFileOptions{
-				Name: options.Handle.Path,
-				File: uploadHandle,
-			})
-
-		uploadHandle.Close()
-
-		if modeChanged {
-			err1 := os.Chmod(localPath, orgMode)
-			if err1 != nil {
-				log.Err(
-					"FileCache::FlushFile : Failed to remove read mode from file %s [%s]",
-					options.Handle.Path,
-					err1.Error(),
-				)
-			}
-		}
-
-		switch {
-		case err == nil:
-			options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
-		case isOffline(err) && fc.offlineAccess:
-			log.Warn("FileCache::FlushFile : %s upload delayed (offline)", options.Handle.Path)
-			// add file to upload queue
-			_, err := os.Stat(localPath)
-			if err == nil {
+		default:
+			//push to offlineOPS as default since we don't want to upload to the cloud
+			log.Info(
+				"FileCache::FlushFile : %s upload deferred (Offline Scheduling)",
+				options.Handle.Path,
+			)
+			_, statErr := os.Stat(localPath)
+			if statErr == nil {
 				fc.offlineOps.Store(options.Handle.Path, struct{}{})
 				flock := fc.fileLocks.Get(options.Handle.Path)
 				flock.SyncPending = true
 			}
-		default:
-			log.Err("FileCache::FlushFile : %s upload failed [%v]", options.Handle.Path, err)
-			return err
-		}
+			options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
 
+		}
 		// If chmod was done on the file before it was uploaded to container then setting up mode would have been missed
 		// Such file names are added to this map and here post upload we try to set the mode correctly
 		// Delete the entry from map so that any further flush do not try to update the mode again
@@ -2086,7 +1989,6 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			}
 		}
 	}
-
 	return nil
 }
 
