@@ -23,15 +23,17 @@
    SOFTWARE
 */
 
-package main
+package cmd
 
 import (
 	"fmt"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"gopkg.in/yaml.v3"
@@ -47,6 +49,7 @@ var (
 	cacheModes = []string {"stream", "file_cache", "block_cache"} 
 	cacheMode = "file_cache" 
 	bucketName = "my-bucket" 
+	containerList = []string {}
 	cacheLocation = "/var/cache/s3storage" 
 	cacheSize = "80" 
 	cacheRetentionDuration = "30" 
@@ -54,8 +57,8 @@ var (
 	endpointURL = "https://s3.sv15.seagate.com"
 	region = "us-east-1"
 	previewPage = "page1"
-	accessKey = "STX11NXL2MJ9OKXCQVWKHS41"
-	secretKey = "IC3iz6sL+/fEB1MUaKln2lAsQW2FPU+ySM5/xndGy8m"
+	accessKey = ""
+	secretKey = ""
 	menuButtonColor = tcell.GetColor("#6EBE49")
 	menuButtonTextColor = tcell.ColorBlack
 	menuButtonAlignment = tview.AlignLeft
@@ -63,15 +66,15 @@ var (
 
 
 type Config struct {
-    Logging    LoggingConfig      `yaml:"logging"`
-    Components []string           `yaml:"components"`
-    Libfuse    LibfuseConfig      `yaml:"libfuse"`
-    Stream     StreamConfig       `yaml:"stream"`
-	FileCache  FileCacheConfig    `yaml:"file_cache"`
-	BlockCache BlockCacheConfig   `yaml:"block_cache"`
-    AttrCache  AttrCacheConfig    `yaml:"attr_cache"`
-    S3Storage  S3StorageConfig 	  `yaml:"s3storage"`
-	AzStorage  AzureStorageConfig `yaml:"azstorage"` // Optional field for Azure storage
+    Logging    LoggingConfig       `yaml:"logging"`
+    Components []string            `yaml:"components"`
+    Libfuse    LibfuseConfig       `yaml:"libfuse"`
+    Stream     StreamConfig        `yaml:"stream,omitempty"`
+	FileCache  FileCacheConfig     `yaml:"file_cache,omitempty"`
+	BlockCache BlockCacheConfig    `yaml:"block_cache,omitempty"`
+    AttrCache  AttrCacheConfig     `yaml:"attr_cache"`
+    S3Storage  S3StorageConfig 	   `yaml:"s3storage"`
+	AzStorage  *AzureStorageConfig `yaml:"azstorage,omitempty"` 
 }
 
 type LoggingConfig struct {
@@ -131,7 +134,7 @@ type AzureStorageConfig struct {
 }
 
 
-func main() {
+func runTUI() error{
 	app := tview.NewApplication()
 	app.EnableMouse(true)
 	app.EnablePaste(true)
@@ -144,6 +147,8 @@ func main() {
 
 	// After the TUI is done, create the YAML config file
 	createYAMLConfig()
+
+	return nil
 }
 
 
@@ -163,7 +168,7 @@ func buildTUI(app *tview.Application) {
 	page3 := buildCredentialsPage(app, pages)
 
 	// --- Page 4: Bucket Name Entry ---
-	page4 := buildBucketNamePage(app, pages)
+	page4 := buildContainerSelectPage(app, pages)
 
 	// --- Page 5: Caching Settings ---
 	page5 := buildCachingPage(app, pages)
@@ -727,6 +732,87 @@ Refer to your provider’s documentation for valid formats.`
 // }
 
 
+// func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
+// 	// Instructional text with consistent style
+// 	pageText := tview.NewTextView().
+// 		SetTextAlign(tview.AlignCenter).
+// 		SetWrap(true).
+// 		SetDynamicColors(true).
+// 		SetText(`[#6EBE49::b]Step 3: Enter Your Cloud Storage Credentials[-]
+// [#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// [white]
+// [#FFD700::b]Access Key:[-] This is your unique identifier for accessing your cloud storage.
+// [#FFD700::b]Secret Key:[-] This is your secret password for accessing your cloud storage.
+
+// [::i]Please keep these credentials secure and do not share them with anyone.[-]`)
+
+// 	// Access key input field
+// 	accessKeyField := tview.NewInputField().
+// 		SetLabel("🔑 Access Key: ").
+// 		SetText(accessKey). // For testing – remove in production
+// 		SetFieldWidth(24).
+// 		SetLabelColor(tcell.ColorYellow).
+// 		SetFieldTextColor(tcell.ColorWhite).
+// 		SetFieldBackgroundColor(tcell.ColorBlue)
+
+// 	// Secret key input field
+// 	secretKeyField := tview.NewInputField().
+// 		SetLabel("🔑 Secret Key: ").
+// 		SetText(secretKey). // For testing – remove in production
+// 		SetFieldWidth(43).
+// 		SetMaskCharacter('*').
+// 		SetLabelColor(tcell.ColorYellow).
+// 		SetFieldTextColor(tcell.ColorWhite).
+// 		SetFieldBackgroundColor(tcell.ColorBlue)
+
+// 	// Credential form
+// 	form := tview.NewForm().
+// 		AddFormItem(accessKeyField).
+// 		AddFormItem(secretKeyField).
+// 		AddButton("🏠 Home", func() {
+// 			pages.SwitchToPage("home")
+// 		}).
+// 		AddButton("➡ Next", func() {
+// 			accessKey := strings.ToUpper(accessKeyField.GetText())
+// 			secretKey := secretKeyField.GetText()
+
+// 			if len(accessKey) != 24 || len(secretKey) != 43 {
+// 				showModal(app, pages, "Invalid credentials.\nPlease try again.", func() {
+// 					pages.SwitchToPage("page3")
+// 				})
+// 				return
+// 			}
+// 			// Dry run 
+// 			pages.SwitchToPage("page4")
+// 		}).
+// 		AddButton("⬅ Back", func() {
+// 			pages.SwitchToPage("page2")
+// 		}).
+// 		AddButton("📄 Preview", func() {
+// 			summaryPage := buildSummaryPage(app, pages)
+// 			pages.AddPage("summaryPage", summaryPage, true, false)
+// 			pages.SwitchToPage("summaryPage")
+// 		}).
+// 		AddButton("❌ Quit", func() {
+// 			app.Stop()
+// 		}).
+// 		SetButtonBackgroundColor(menuButtonColor).
+// 		SetButtonTextColor(menuButtonTextColor).
+// 		SetButtonsAlign(tview.AlignCenter)
+
+// 	// Final layout
+// 	layout := tview.NewFlex().
+// 		SetDirection(tview.FlexRow).
+// 		AddItem(nil, 1, 0, false).            // Top padding
+// 		AddItem(pageText, 9, 0, false).       // Instructional text
+// 		AddItem(nil, 1, 0, false).
+// 		AddItem(form, 9, 0, true).            // Credential input form
+// 		AddItem(nil, 1, 0, false)             // Bottom padding
+
+// 	return layout
+// }
+
+
 func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 	// Instructional text with consistent style
 	pageText := tview.NewTextView().
@@ -777,6 +863,56 @@ func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Prim
 				})
 				return
 			}
+
+			// Step 1: Write a temp config.yaml with provided credentials
+		// 	tempConfig := `
+		// components: ["s3storage"]
+		// s3storage:
+		// access_key: "` + accessKey + `"
+		// secret_key: "` + secretKey + `"
+		// region: "us-east-1"
+		// `
+			// tmpFile := "config-tui-temp.yaml"
+			// err := os.WriteFile(tmpFile, []byte(tempConfig), 0600)
+			// if err != nil {
+			// 	showModal(app, pages, "Failed to write config file:\n"+err.Error(), nil)
+			// 	return
+			// }
+
+			tmpFile := "config-tui-temp.yaml"
+			options.ConfigFile = tmpFile
+
+			// Step 2: Parse the config
+			err := parseConfig()
+			if err != nil {
+				showModal(app, pages, "Failed to parse config:\n"+err.Error(), nil)
+				return
+			}
+
+			err = config.Unmarshal(&options)
+			if err != nil {
+				showModal(app, pages, "Failed to unmarshal config:\n"+err.Error(), nil)
+				return
+			}
+
+			// Step 3: Try to fetch container/bucket list
+			// var containerList []string
+			if slices.Contains(options.Components, "azstorage") {
+				containerList, err = getContainerListAzure()
+			} else if slices.Contains(options.Components, "s3storage") {
+				containerList, err = getBucketListS3()
+			} else {
+				err = fmt.Errorf("unsupported storage backend")
+			}
+
+			if err != nil {
+				showModal(app, pages, "Failed to connect:\n"+err.Error(), nil)
+				return
+			}
+
+			// Step 4: Pass containerList to page4 (next page)
+			page4 := buildContainerSelectPage(app, pages)
+			pages.AddPage("page4", page4, true, false)
 			pages.SwitchToPage("page4")
 		}).
 		AddButton("⬅ Back", func() {
@@ -865,7 +1001,7 @@ func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Prim
 // }
 
 
-func buildBucketNamePage(app *tview.Application, pages *tview.Pages) tview.Primitive {
+func buildContainerSelectPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 
 	pageText := tview.NewTextView().
 		SetTextAlign(tview.AlignLeft).
@@ -878,28 +1014,39 @@ Enter the name of your storage bucket or container. These should be accessible
 based on the credentials you entered in the previous step.`)
 
 	// Bucket name input
-	bucketNameField := tview.NewInputField().
+	// bucketNameField := tview.NewInputField().
+	// 	SetLabel("🪣 Bucket/Container Name: ").
+	// 	SetText("my-bucket").
+	// 	SetFieldWidth(30).
+	// 	SetLabelColor(tcell.ColorYellow).
+	// 	SetFieldTextColor(tcell.ColorWhite).
+	// 	SetFieldBackgroundColor(tcell.ColorBlue)
+	containerNameDropdown := tview.NewDropDown().
 		SetLabel("🪣 Bucket/Container Name: ").
-		SetText("my-bucket").
-		SetFieldWidth(30).
+		SetOptions(containerList, func(text string, index int) {
+			bucketName = text
+		}).
+		SetCurrentOption(0).
 		SetLabelColor(tcell.ColorYellow).
 		SetFieldTextColor(tcell.ColorWhite).
-		SetFieldBackgroundColor(tcell.ColorBlue)
+		SetFieldBackgroundColor(tcell.ColorBlue).
+		SetFieldWidth(30)
 
 	// Form with navigation
 	form := tview.NewForm().
-		AddFormItem(bucketNameField).
+		// AddFormItem(bucketNameField).
+		AddFormItem(containerNameDropdown).
 		AddButton("🏠 Home", func() {
 			pages.SwitchToPage("home")
 		}).
 		AddButton("➡ Next", func() {
-			bucketName = bucketNameField.GetText()
-			if strings.TrimSpace(bucketName) == "" {
-				showModal(app, pages, "Bucket/container name cannot be empty.\nPlease try again.", func() {
-					pages.SwitchToPage("page4")
-				})
-				return
-			}
+			// bucketName = containerName.GetText()
+			// if strings.TrimSpace(bucketName) == "" {
+			// 	showModal(app, pages, "Bucket/container name cannot be empty.\nPlease try again.", func() {
+			// 		pages.SwitchToPage("page4")
+			// 	})
+			// 	return
+			// }
 			pages.SwitchToPage("page5")
 		}).
 		AddButton("⬅ Back", func() {
@@ -1369,11 +1516,11 @@ func createYAMLConfig() {
 			NetworkShare:               true,
 		},
 		
-		Stream: StreamConfig{
-			BlockSizeMB:   8,
-			BlocksPerFile: 3,
-			CacheSizeMB:   1024,
-		},
+		// Stream: StreamConfig{
+		// 	BlockSizeMB:   8,
+		// 	BlocksPerFile: 3,
+		// 	CacheSizeMB:   1024,
+		// },
 
 		AttrCache: AttrCacheConfig{
 			TimeoutSec: 7200,
@@ -1381,14 +1528,14 @@ func createYAMLConfig() {
 	}
 
 	switch cacheMode {
-		case "fileCache":
+		case "file_cache":
 			config.FileCache = FileCacheConfig{
 				Path:           "Path/to/cache/dir",
 				TimeOutSec:     64000000,
 				CleanUpOnStart: true,
 				IgnoreSync:     true,
 			}
-		case "blockCache":
+		case "block_cache":
 			config.BlockCache = BlockCacheConfig{
 				BlockSizeMB:  8,
 				MemorySizeMB: 1024,
@@ -1414,7 +1561,7 @@ func createYAMLConfig() {
 			EnableDirMarker: true, // Default to true, can be changed in the TUI
 		}
 	} else {
-		config.AzStorage = AzureStorageConfig{
+		config.AzStorage = &AzureStorageConfig{
 			Type:        "block",
 			AccountName: accountName, // This should be set from the account name input
 			AccountKey:  secretKey, // This should be set from the account key input
