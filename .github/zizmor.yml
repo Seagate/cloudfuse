@@ -1,7 +1,4 @@
 rules:
-  template-injection:
-    ignore:
-      - publish-release.yml:87
   excessive-permissions:
     ignore:
       - scorecard.yml:18
