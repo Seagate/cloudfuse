@@ -49,15 +49,67 @@ Download and run the .exe installer from our latest release [here](https://githu
 
 #### Debian /Ubuntu
 
+##### Using Release on GitHub
+
 Download the .deb file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal:
 
 `sudo apt-get install ./cloudfuse*.deb`
 
-#### CentOS / RHEL
+##### Using APT Repository
+
+1. **Add the GPG key for the repository:**
+
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y curl gpg
+    curl -fsSL https://seagate.github.io/cloudfuse/public.key | sudo gpg --dearmor -o /usr/share/keyrings/cloudfuse-archive-keyring.gpg
+    ```
+
+2. **Add the repository to your APT sources:**
+
+    ```bash
+    echo "deb [signed-by=/usr/share/keyrings/cloudfuse-archive-keyring.gpg] https://seagate.github.io/cloudfuse stable main" | sudo tee /etc/apt/sources.list.d/cloudfuse.list > /dev/null
+    ```
+
+3. **Install `cloudfuse`:**
+
+    ```bash
+    sudo apt-get update
+    sudo apt-get install cloudfuse
+    ```
+
+#### Fedora / RHEL
+
+##### Using Release on GitHub
 
 Download the .rpm file from our latest release [here](https://github.com/Seagate/cloudfuse/releases) and run the following command in your terminal:
 
 `sudo rpm -i ./cloudfuse*.rpm`
+
+##### Using YUM/DNF Repository
+
+1. **Add the `cloudfuse` repository:**
+
+    ```bash
+    sudo tee /etc/yum.repos.d/cloudfuse.repo <<EOF
+    [cloudfuse]
+    name=cloudfuse Repository
+    baseurl=https://seagate.github.io/cloudfuse/rpm-repo/
+    enabled=1
+    gpgcheck=1
+    gpgkey=https://seagate.github.io/cloudfuse/public.key
+    EOF
+    ```
+
+2. **Install `cloudfuse`:**
+
+    ```bash
+    # For Fedora, RHEL 8+
+    sudo dnf install cloudfuse
+
+    # For RHEL 7
+    sudo yum install cloudfuse
+    ```
 
 #### Enable Running With Systemd
 
