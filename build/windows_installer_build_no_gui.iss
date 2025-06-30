@@ -3,11 +3,11 @@
 ; https://jrsoftware.org/ishelp/index.php
 
 #define MyAppName "Cloudfuse"
-#define MyAppVersion "1.11.1"
+#define MyAppVersion "1.12.0"
 #define MyAppPublisher "SEAGATE TECHNOLOGY LLC"
 #define MyAppURL "https://github.com/Seagate/cloudfuse"
 #define MyAppExeCLIName "cloudfuse.exe"
-#define WinFSPInstaller "winfsp-2.0.23075.msi"
+#define WinFSPInstaller "winfsp-2.1.25156.msi"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
@@ -58,7 +58,7 @@ Source: "..\sample_configs\sampleStreamingConfigS3.yaml"; DestDir: "{userappdata
 ; Deploy default config
 Source: "..\sample_configs\sampleFileCacheConfigS3.yaml"; DestDir: "{userappdata}\{#MyAppName}"; DestName: "config.yaml"; Flags: onlyifdoesntexist
 
-Source: "..\winfsp-2.0.23075.msi"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\winfsp-2.1.25156.msi"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Registry]
@@ -91,7 +91,7 @@ begin
   if CurStep = ssPostInstall then
   begin
     // Install WinFSP if it is not already installed
-    if not RegValueExists(HKLM, 'SOFTWARE\WOW6432Node\WinFsp\Services', 'InstallDir') then
+    if not RegValueExists(HKLM, 'SOFTWARE\WOW6432Node\WinFsp', 'InstallDir') then
     begin
       if SuppressibleMsgBox('WinFSP is required for Cloudfuse. Do you want to install it now?', mbConfirmation, MB_YESNO, IDYES) = IDYES then
       begin
