@@ -215,18 +215,24 @@ jobs:
             -o APT::FTPArchive::Release::Components="main" \
             -o APT::FTPArchive::Release::Description="APT repository for cloudfuse" \
             release dists/stable > dists/stable/Release
-          gpg --clearsign -u "${{ steps.import_gpg.outputs.fingerprint }}" --batch --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" -o dists/stable/InRelease dists/stable/Release
-          gpg -u "${{ steps.import_gpg.outputs.fingerprint }}" --batch --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" -abs -o dists/stable/Release.gpg dists/stable/Release
+          gpg --clearsign -u "${STEPS_IMPORT_GPG_OUTPUTS_FINGERPRINT}" --batch --pinentry-mode loopback --passphrase "${SECRET_GPG_PASSPHRASE}" -o dists/stable/InRelease dists/stable/Release
+          gpg -u "${STEPS_IMPORT_GPG_OUTPUTS_FINGERPRINT}" --batch --pinentry-mode loopback --passphrase "${SECRET_GPG_PASSPHRASE}" -abs -o dists/stable/Release.gpg dists/stable/Release
+        env:
+          STEPS_IMPORT_GPG_OUTPUTS_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          SECRET_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Update RPM repository
         working-directory: ./gh-pages
         run: |
           # Move new .rpm files
-          find ../packages -name "*.rpm" -exec mv {} rpm/ \;
+          find ../packages -name "*.rpm" -exec mv {} rpm-repo/ \;
           # Create/update repository metadata
-          createrepo_c --database rpm/
+          createrepo_c --database rpm-repo/
           # Sign the repository metadata
-          gpg --detach-sign --armor -u "${{ steps.import_gpg.outputs.fingerprint }}" --batch --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" rpm/repodata/repomd.xml
+          gpg --detach-sign --armor -u "${STEPS_IMPORT_GPG_OUTPUTS_FINGERPRINT}" --batch --pinentry-mode loopback --passphrase "${SECRET_GPG_PASSPHRASE}" rpm/repodata/repomd.xml
+        env:
+          STEPS_IMPORT_GPG_OUTPUTS_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          SECRET_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Commit and push repository updates
         working-directory: ./gh-pages
