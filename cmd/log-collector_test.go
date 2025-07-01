@@ -131,11 +131,12 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 
 	defer os.RemoveAll(tempDir)
 
-	if runtime.GOOS == "linux" {
+	switch runtime.GOOS {
+	case "linux":
 		cmd := exec.Command("tar", "-xvf", archivePath+"/cloudfuse_logs.tar.gz", "-C", tempDir)
 		err = cmd.Run()
 		suite.assert.NoError(err)
-	} else if runtime.GOOS == "windows" {
+	case "windows":
 		suite.extractZip(archivePath, tempDir)
 	}
 
@@ -202,9 +203,10 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 	_, err = executeCommandC(rootCmd, "gatherLogs")
 	suite.assert.NoError(err)
 
-	if runtime.GOOS == "linux" {
+	switch runtime.GOOS {
+	case "linux":
 		suite.assert.FileExists(currentDir + "/cloudfuse_logs.tar.gz")
-	} else if runtime.GOOS == "windows" {
+	case "windows":
 		suite.assert.FileExists(currentDir + "/cloudfuse_logs.zip")
 	}
 	isArcValid := suite.verifyArchive(baseDefaultDir, currentDir)
@@ -273,7 +275,8 @@ func (suite *logCollectTestSuite) TestValidSyslogConfig() {
 
 	//run the log collector
 	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
-	if runtime.GOOS == "linux" {
+	switch runtime.GOOS {
+	case "linux":
 		suite.assert.NoError(err)
 
 		// look for temp cloudfuse.log file generated from syslog
@@ -282,7 +285,7 @@ func (suite *logCollectTestSuite) TestValidSyslogConfig() {
 		// use validate archive between those two files.
 		isArcValid := suite.verifyArchive(filteredLogPath, currentDir)
 		suite.assert.True(isArcValid)
-	} else if runtime.GOOS == "windows" {
+	case "windows":
 		suite.assert.Error(err)
 	}
 
@@ -343,9 +346,10 @@ func (suite *logCollectTestSuite) TestOutputPath() {
 	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--output-path=%s", tempDir))
 	suite.assert.NoError(err)
 
-	if runtime.GOOS == "linux" {
+	switch runtime.GOOS {
+	case "linux":
 		suite.assert.FileExists(tempDir + "/cloudfuse_logs.tar.gz")
-	} else if runtime.GOOS == "windows" {
+	case "windows":
 		suite.assert.FileExists(tempDir + "/cloudfuse_logs.zip")
 	}
 	isArcValid := suite.verifyArchive(baseDefaultDir, tempDir)

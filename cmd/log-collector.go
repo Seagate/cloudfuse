@@ -67,16 +67,18 @@ var gatherLogsCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("cannot use this config file [%s]", err.Error())
 		}
-		if logType == "silent" {
+		switch logType {
+		case "silent":
 			return fmt.Errorf("no logs were generated due to log type being silent")
-		} else if logType == "base" {
+		case "base":
 			logPath = filepath.Dir(logPath)
-			if runtime.GOOS == "linux" {
+			switch runtime.GOOS {
+			case "linux":
 				err = createLinuxArchive(logPath)
 				if err != nil {
 					return fmt.Errorf("unable to create archive: [%s]", err.Error())
 				}
-			} else if runtime.GOOS == "windows" {
+			case "windows":
 
 				// set up temporary location to collect logs
 				var sysProfDir string
@@ -122,8 +124,9 @@ var gatherLogsCmd = &cobra.Command{
 					return fmt.Errorf("unable to create archive [%s]", err.Error())
 				}
 			}
-		} else if logType == "syslog" {
-			if runtime.GOOS == "linux" {
+		case "syslog":
+			switch runtime.GOOS {
+			case "linux":
 				filteredSyslogPath, err := createFilteredLog(logPath)
 				if err != nil {
 					return fmt.Errorf("failed to crate a filtered log from the syslog: [%s]", err.Error())
@@ -133,7 +136,7 @@ var gatherLogsCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("unable to create archive: [%s]", err.Error())
 				}
-			} else if runtime.GOOS == "windows" {
+			case "windows":
 				fmt.Println("Please refer to the windows event viewer for your cloudfuse logs")
 				return fmt.Errorf("no log files to collect. system logging for windows are stored in the event viewer")
 			}
@@ -188,11 +191,12 @@ func getLogInfo(configFile string) (string, string, error) {
 			if err != nil {
 				return "", "", err
 			}
-			if logType == "silent" {
+			switch logType {
+			case "silent":
 				return logType, logPath, nil
-			} else if logType == "syslog" {
+			case "syslog":
 				logPath = "/var/log/syslog"
-			} else if logType == "base" {
+			case "base":
 				if config.IsSet("logging.file-path") {
 					err = config.UnmarshalKey("logging.file-path", &logPath)
 					if err != nil {
@@ -212,7 +216,7 @@ func getLogInfo(configFile string) (string, string, error) {
 				} else {
 					return logType, logPath, fmt.Errorf("the logging file-path is not provided")
 				}
-			} else { // TODO: this should be a failure
+			default: // TODO: this should be a failure
 				return logType, logPath, fmt.Errorf("the logging type is not valid. Must be 'base', or 'syslog'.")
 			}
 		} else {
