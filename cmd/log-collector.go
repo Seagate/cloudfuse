@@ -350,11 +350,10 @@ func copyFiles(srcPath, dstPath string) error {
 
 		_, err = io.Copy(dstFile, srcFile)
 		if err != nil {
-			return fmt.Errorf("failed to copy file %s: [%s]", item.Name(), err.Error())
+			return err
 		}
 
 	}
-	//question: when is it noisy to nest error messages in other error messages?
 	return err
 }
 
