@@ -80,29 +80,29 @@ var gatherLogsCmd = &cobra.Command{
 				}
 			case "windows":
 
-				// set up temporary location to collect logs
-				var sysProfDir string
-				var userDir string
-				sysProfDir, userDir, err = setupPreZip()
+				// set up temporary destination to collect logs
+				var dstSysprofPath string
+				var dstUserPath string
+				dstSysprofPath, dstUserPath, err = setupPreZip()
 				if err != nil {
 					return fmt.Errorf("could not set up the temporary folder where logs will be collected")
 				}
-				preArchPath := filepath.Dir(userDir)
+				preArchPath := filepath.Dir(dstUserPath)
 				defer os.RemoveAll(preArchPath)
 
-				// get the service logs regardless of what the config values are
+				// get the service logs
 				systemRoot := os.Getenv("SystemRoot")
 				if systemRoot == "" {
 					return errors.New("Could not find system root")
 				}
 
 				systemRoot = filepath.Clean(systemRoot)
-				servicePath := filepath.Join(systemRoot, "System32", "config", "systemprofile", ".cloudfuse")
+				srcSrvPath := filepath.Join(systemRoot, "System32", "config", "systemprofile", ".cloudfuse")
 
 				// copied over the service log files from servicePath -> preArchPath
-				err = copyFiles(servicePath, sysProfDir)
+				err = copyFiles(srcSrvPath, dstSysprofPath)
 				if err != nil {
-					return fmt.Errorf("unable to copy files: [%s]", err.Error())
+					return fmt.Errorf("unable to copy files from source path %s to destination %s: [%s]", srcSrvPath, dstSysprofPath, err.Error())
 				}
 
 				// fetch provided or default logPath
@@ -113,9 +113,9 @@ var gatherLogsCmd = &cobra.Command{
 				}
 
 				// copied over the user base logs from logPath -> preArchPath
-				err = copyFiles(logPath, userDir)
+				err = copyFiles(logPath, dstUserPath)
 				if err != nil {
-					return fmt.Errorf("unable to copy files: [%s]", err.Error())
+					return fmt.Errorf("unable to copy files from source path %s to destination %s: [%s]", logPath, dstUserPath, err.Error())
 				}
 
 				// archive the two folders.
@@ -216,7 +216,7 @@ func getLogInfo(configFile string) (string, string, error) {
 				} else {
 					return logType, logPath, fmt.Errorf("the logging file-path is not provided")
 				}
-			default: // TODO: this should be a failure
+			default:
 				return logType, logPath, fmt.Errorf("the logging type is not valid. Must be 'base', or 'syslog'.")
 			}
 		} else {
@@ -323,7 +323,7 @@ func copyFiles(srcPath, dstPath string) error {
 	var items []os.DirEntry
 	items, err := os.ReadDir(srcPath)
 	if err != nil {
-		return fmt.Errorf("failed read the service path directory: [%s]", err.Error())
+		return err
 	}
 
 	for _, item := range items {
@@ -337,14 +337,14 @@ func copyFiles(srcPath, dstPath string) error {
 		var srcFile *os.File
 		srcFile, err = os.Open(srcFilePath)
 		if err != nil {
-			return fmt.Errorf("failed to open file in service path to copy: [%s]", err.Error())
+			return err
 		}
 		defer srcFile.Close()
 
 		var dstFile *os.File
 		dstFile, err = os.Create(dstFilePath)
 		if err != nil {
-			return fmt.Errorf("failed to create file to copy service file: [%s]", err.Error())
+			return err
 		}
 		defer dstFile.Close()
 
