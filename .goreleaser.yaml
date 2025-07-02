@@ -293,7 +293,7 @@ nfpms:
       rpm:
         dependencies:
           - fuse3-devel
-          - libc6 >= 2.24
+          - glibc >= 2.24
 
   - id: linux_no_gui
     package_name: cloudfuse
@@ -306,7 +306,7 @@ nfpms:
     homepage: https://github.com/Seagate/cloudfuse
     maintainer: Seagate Technology <cloudfuse@seagate.com>
     description: |-
-      FUSE file system for interacting with S3 and Azure storage.
+      FUSE file system for interacting with S3 and Azure storage
       Cloudfuse provides the ability to mount a cloud bucket in your local file
       system. You can easily read and write to the cloud, and connect programs
       on your computer to the cloud even if they're not cloud-aware.
@@ -359,7 +359,19 @@ nfpms:
       rpm:
         dependencies:
           - fuse3-devel
-          - libc6 >= 2.24
+          - glibc >= 2.24
+
+signs:
+  - cmd: cosign
+    args:
+      - "sign-blob"
+      - "${artifact}"
+      - "--bundle=${signature}"
+      - "--yes"
+    artifacts: checksum
+    signature: "${artifact}.bundle"
+    env:
+      - COSIGN_EXPERIMENTAL=1
 
 metadata:
   mod_timestamp: "{{ .CommitTimestamp }}"

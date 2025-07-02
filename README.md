@@ -163,6 +163,17 @@ To use security options the general format for cloudfuse commands is:
 To see a list of commands, type `cloudfuse -h`.
 To learn about a specific command, just include the name of the command (For example: `cloudfuse mount -h`).
 
+### Verifying Authenticity
+
+Cloudfuse releases are signed keylessly using Cosign. To verify that the checksum file is genuine, use the following command where {tag} is the version of cloudfuse.
+
+```bash
+cosign verify-blob ./checksums_sha256.txt --bundle ./checksums_sha256.txt.bundle --certificate-identity https://github.com/Seagate/cloudfuse/.github/workflows/publish-release.yml@refs/tags/{tag} --certificate-oidc-is
+suer https://token.actions.githubusercontent.com
+```
+
+This command should then print out "Verified OK" is the checksum file is valid. You can then use these checksums to verify that the cloudfuse version downloaded matches the expected checksum.
+
 ## Limitations
 
 ### NOTICE

@@ -1,5 +1,60 @@
 # Cloudfuse Changelog #
 
+## **1.12.0** ##
+
+June 6th 2025
+This version is based on [blobfuse2 2.4.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.4.0) (upstream).
+
+### Bug Fixes ###
+
+- [#539](https://github.com/Seagate/cloudfuse/pull/539) Fix issues with block cache and s3
+- [#566](https://github.com/Seagate/cloudfuse/pull/566) Fix race conditions with block cache on Windows
+- [#562](https://github.com/Seagate/cloudfuse/pull/562) A default file cache path is now set if not in config file
+
+### Features ###
+
+- [#565](https://github.com/Seagate/cloudfuse/pull/565) Data cached in the file cache is now persisted on remounts
+
+## **1.11.2** ##
+
+May 15th 2025
+This version is based on [blobfuse2 2.4.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.4.0) (upstream).
+
+### Bug Fixes ###
+
+- [#553](https://github.com/Seagate/cloudfuse/pull/553) Fix prompt to install WinFSP when already installed
+- [#542](https://github.com/Seagate/cloudfuse/pull/542) Improve rename file and prevent data loss in rare cases
+
+### Features ###
+
+- [#554](https://github.com/Seagate/cloudfuse/pull/554) Checksum on release is now signed
+
+## **1.11.1** ##
+
+April 29th 2025
+This version is based on [blobfuse2 2.4.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.4.0) (upstream).
+
+### Bug Fixes ###
+
+- [#532](https://github.com/Seagate/cloudfuse/pull/532) Fix releases for RHEL that did not correctly link to glibc
+
+## **1.11.0** ##
+
+April 25th 2025
+This version is based on [blobfuse2 2.4.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.4.0) (upstream).
+
+### Features ###
+
+- [#494](https://github.com/Seagate/cloudfuse/pull/494) Adds initial support for block cache on Windows
+- [#507](https://github.com/Seagate/cloudfuse/pull/507) Change default display capacity and other defaults to more
+sensible values
+- [#478](https://github.com/Seagate/cloudfuse/pull/478) Improve checksum support when using s3storage
+
+### Bug Fixes ###
+
+- [#520](https://github.com/Seagate/cloudfuse/pull/520) Unmount on Windows is no longer case sensitive
+- [#513](https://github.com/Seagate/cloudfuse/pull/513) Change default log level of GUI
+
 ## **1.10.0** ##
 
 March 28th 2025

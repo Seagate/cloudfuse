@@ -87,7 +87,10 @@ func (suite *entryCacheTestSuite) SetupTest() {
 	}
 	rand := randomString(8)
 	suite.fake_storage_path = filepath.Join(home_dir, "fake_storage"+rand)
-	defaultConfig := fmt.Sprintf("read-only: true\n\nentry_cache:\n  timeout-sec: 7\n\nloopbackfs:\n  path: %s", suite.fake_storage_path)
+	defaultConfig := fmt.Sprintf(
+		"read-only: true\n\nentry_cache:\n  timeout-sec: 7\n\nloopbackfs:\n  path: %s",
+		suite.fake_storage_path,
+	)
 	log.Debug(defaultConfig)
 
 	// Delete the temp directories created
@@ -124,17 +127,19 @@ func (suite *entryCacheTestSuite) TestEmpty() {
 	defer suite.cleanupTest()
 
 	objs, token, err := suite.entryCache.StreamDir(internal.StreamDirOptions{Name: "", Token: ""})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(objs)
-	suite.assert.Equal(token, "")
+	suite.assert.Equal("", token)
 
 	_, found := suite.entryCache.pathMap.Load("##")
 	suite.assert.False(found)
 
-	objs, token, err = suite.entryCache.StreamDir(internal.StreamDirOptions{Name: "ABCD", Token: ""})
-	suite.assert.NotNil(err)
+	objs, token, err = suite.entryCache.StreamDir(
+		internal.StreamDirOptions{Name: "ABCD", Token: ""},
+	)
+	suite.assert.Error(err)
 	suite.assert.Nil(objs)
-	suite.assert.Equal(token, "")
+	suite.assert.Equal("", token)
 }
 
 func (suite *entryCacheTestSuite) TestWithEntry() {
@@ -143,18 +148,18 @@ func (suite *entryCacheTestSuite) TestWithEntry() {
 	// Create a file
 	filePath := filepath.Join(suite.fake_storage_path, "testfile1")
 	h, err := os.Create(filePath)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
 	h.Close()
 
 	objs, token, err := suite.entryCache.StreamDir(internal.StreamDirOptions{Name: "", Token: ""})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(objs)
-	suite.assert.Equal(token, "")
+	suite.assert.Equal("", token)
 
 	cachedObjs, found := suite.entryCache.pathMap.Load("##")
 	suite.assert.True(found)
-	suite.assert.Equal(len(objs), 1)
+	suite.assert.Equal(1, len(objs))
 
 	suite.assert.Equal(objs, cachedObjs.(pathCacheItem).children)
 }
@@ -165,42 +170,42 @@ func (suite *entryCacheTestSuite) TestCachedEntry() {
 	// Create a file
 	filePath := filepath.Join(suite.fake_storage_path, "testfile1")
 	h, err := os.Create(filePath)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
 	h.Close()
 
 	objs, token, err := suite.entryCache.StreamDir(internal.StreamDirOptions{Name: "", Token: ""})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(objs)
-	suite.assert.Equal(token, "")
+	suite.assert.Equal("", token)
 
 	cachedObjs, found := suite.entryCache.pathMap.Load("##")
 	suite.assert.True(found)
-	suite.assert.Equal(len(objs), 1)
+	suite.assert.Equal(1, len(objs))
 
 	suite.assert.Equal(objs, cachedObjs.(pathCacheItem).children)
 
 	filePath = filepath.Join(suite.fake_storage_path, "testfile2")
 	h, err = os.Create(filePath)
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(h)
 	h.Close()
 
 	objs, token, err = suite.entryCache.StreamDir(internal.StreamDirOptions{Name: "", Token: ""})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(objs)
-	suite.assert.Equal(token, "")
-	suite.assert.Equal(len(objs), 1)
+	suite.assert.Equal("", token)
+	suite.assert.Equal(1, len(objs))
 
-	time.Sleep(40 * time.Second)
+	time.Sleep(30 * time.Second)
 	_, found = suite.entryCache.pathMap.Load("##")
 	suite.assert.False(found)
 
 	objs, token, err = suite.entryCache.StreamDir(internal.StreamDirOptions{Name: "", Token: ""})
-	suite.assert.Nil(err)
+	suite.assert.NoError(err)
 	suite.assert.NotNil(objs)
-	suite.assert.Equal(token, "")
-	suite.assert.Equal(len(objs), 2)
+	suite.assert.Equal("", token)
+	suite.assert.Equal(2, len(objs))
 
 }
 

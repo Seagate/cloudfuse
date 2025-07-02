@@ -32,6 +32,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
+	"runtime/pprof"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common/config"
@@ -42,7 +44,14 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName string, pidFilePerm os.FileMode, umask int, fname string) error {
+func createDaemon(
+	pipeline *internal.Pipeline,
+	ctx context.Context,
+	pidFileName string,
+	pidFilePerm os.FileMode,
+	umask int,
+	fname string,
+) error {
 	dmnCtx := &daemon.Context{
 		PidFileName: pidFileName,
 		PidFilePerm: pidFilePerm,
@@ -78,6 +87,32 @@ func createDaemon(pipeline *internal.Pipeline, ctx context.Context, pidFileName 
 				log.Err("Unable to release pid-file: %s", err.Error())
 			}
 		}()
+
+		if options.CPUProfile != "" {
+			os.Remove(options.CPUProfile)
+			f, err := os.Create(options.CPUProfile)
+			if err != nil {
+				fmt.Printf("Error opening file for cpuprofile [%s]", err.Error())
+			}
+			defer f.Close()
+			if err := pprof.StartCPUProfile(f); err != nil {
+				fmt.Printf("Failed to start cpuprofile [%s]", err.Error())
+			}
+			defer pprof.StopCPUProfile()
+		}
+
+		if options.MemProfile != "" {
+			os.Remove(options.MemProfile)
+			f, err := os.Create(options.MemProfile)
+			if err != nil {
+				fmt.Printf("Error opening file for memprofile [%s]", err.Error())
+			}
+			defer f.Close()
+			runtime.GC()
+			if err = pprof.WriteHeapProfile(f); err != nil {
+				fmt.Printf("Error memory profiling [%s]", err.Error())
+			}
+		}
 
 		setGOConfig()
 		go startDynamicProfiler()
@@ -133,4 +168,9 @@ func sigusrHandler(pipeline *internal.Pipeline, ctx context.Context) daemon.Sign
 // stub for compilation
 func createMountInstance(bool, bool) error {
 	return nil
+}
+
+// stub for compilation
+func readPassphraseFromPipe(pipeName string, timeout time.Duration) (string, error) {
+	return "", nil
 }

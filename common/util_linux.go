@@ -56,7 +56,14 @@ func NotifyMountToParent() error {
 	return nil
 }
 
-var duPath []string = []string{"/usr/bin/du", "/usr/local/bin/du", "/usr/sbin/du", "/usr/local/sbin/du", "/sbin/du", "/bin/du"}
+var duPath []string = []string{
+	"/usr/bin/du",
+	"/usr/local/bin/du",
+	"/usr/sbin/du",
+	"/usr/local/sbin/du",
+	"/sbin/du",
+	"/bin/du",
+}
 var selectedDuPath string = ""
 
 // GetUsage: The current disk usage in MB

@@ -80,7 +80,8 @@ func (azmsi *azAuthMSI) getTokenCredentialUsingCLI() (azcore.TokenCredential, er
 	if err != nil {
 		msg := stderr.String()
 		var exErr *exec.ExitError
-		if errors.As(err, &exErr) && exErr.ExitCode() == 127 || strings.HasPrefix(msg, "'az' is not recognized") {
+		if errors.As(err, &exErr) && exErr.ExitCode() == 127 ||
+			strings.HasPrefix(msg, "'az' is not recognized") {
 			msg = "Azure CLI not found on path"
 		}
 		if msg == "" {
@@ -105,19 +106,28 @@ type azAuthBlobMSI struct {
 func (azmsi *azAuthBlobMSI) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	cred, err := azmsi.getTokenCredential()
 	if err != nil {
-		log.Err("azAuthBlobMSI::getServiceClient : Failed to get token credential from MSI [%s]", err.Error())
+		log.Err(
+			"azAuthBlobMSI::getServiceClient : Failed to get token credential from MSI [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	opts, err := getAzBlobServiceClientOptions(stConfig)
 	if err != nil {
-		log.Err("azAuthBlobMSI::getServiceClient : Failed to create client options [%s]", err.Error())
+		log.Err(
+			"azAuthBlobMSI::getServiceClient : Failed to create client options [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	svcClient, err := service.NewClient(azmsi.config.Endpoint, cred, opts)
 	if err != nil {
-		log.Err("azAuthBlobMSI::getServiceClient : Failed to create service client [%s]", err.Error())
+		log.Err(
+			"azAuthBlobMSI::getServiceClient : Failed to create service client [%s]",
+			err.Error(),
+		)
 	}
 
 	return svcClient, err
@@ -131,19 +141,28 @@ type azAuthDatalakeMSI struct {
 func (azmsi *azAuthDatalakeMSI) getServiceClient(stConfig *AzStorageConfig) (interface{}, error) {
 	cred, err := azmsi.getTokenCredential()
 	if err != nil {
-		log.Err("azAuthDatalakeMSI::getServiceClient : Failed to get token credential from MSI [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeMSI::getServiceClient : Failed to get token credential from MSI [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	opts, err := getAzDatalakeServiceClientOptions(stConfig)
 	if err != nil {
-		log.Err("azAuthDatalakeMSI::getServiceClient : Failed to create client options [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeMSI::getServiceClient : Failed to create client options [%s]",
+			err.Error(),
+		)
 		return nil, err
 	}
 
 	svcClient, err := serviceBfs.NewClient(azmsi.config.Endpoint, cred, opts)
 	if err != nil {
-		log.Err("azAuthDatalakeMSI::getServiceClient : Failed to create service client [%s]", err.Error())
+		log.Err(
+			"azAuthDatalakeMSI::getServiceClient : Failed to create service client [%s]",
+			err.Error(),
+		)
 	}
 
 	return svcClient, err

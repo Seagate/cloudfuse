@@ -44,6 +44,11 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const (
+    defaultPollTimeout  = 10 * time.Second
+    defaultPollInterval = 100 * time.Millisecond
+)
+
 type dirTestSuite struct {
 	suite.Suite
 	testPath      string
@@ -98,19 +103,57 @@ func (suite *dirTestSuite) dirTestCleanup(toRemove []string) {
 	}
 }
 
+func formatMessage(msgAndArgs ...interface{}) string {
+    if len(msgAndArgs) == 0 {
+        return ""
+    }
+    if len(msgAndArgs) == 1 {
+        if msg, ok := msgAndArgs[0].(string); ok {
+            return msg
+        }
+        return fmt.Sprintf("%v", msgAndArgs[0])
+    }
+    if msgFormat, ok := msgAndArgs[0].(string); ok {
+        return fmt.Sprintf(msgFormat, msgAndArgs[1:]...)
+    }
+    return fmt.Sprintf("invalid message format: first argument not a string with multiple arguments. Args: %v", msgAndArgs)
+}
+
+// waitForCondition polls for a condition to be true, failing the test on timeout.
+func (suite *dirTestSuite) waitForCondition(timeout time.Duration, interval time.Duration, condition func() (bool, error), msgAndArgs ...interface{}) {
+    startTime := time.Now()
+    var lastErr error
+    for {
+        var met bool
+        met, lastErr = condition()
+        if met {
+            return
+        }
+        if time.Since(startTime) > timeout {
+            errMsg := fmt.Sprintf("Timeout waiting for condition: %s", formatMessage(msgAndArgs...))
+            if lastErr != nil {
+                errMsg = fmt.Sprintf("%s. Last error: %v", errMsg, lastErr)
+            }
+            suite.FailNow(errMsg) // Use FailNow to stop the current test immediately
+            return
+        }
+        time.Sleep(interval)
+    }
+}
+
 // -------------- Directory Tests -------------------
 
 // # Create Directory with a simple name
 func (suite *dirTestSuite) TestDirCreateSimple() {
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "test1")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	// cleanup
 	suite.dirTestCleanup([]string{dirName})
@@ -119,7 +162,7 @@ func (suite *dirTestSuite) TestDirCreateSimple() {
 // # Create Directory that already exists
 func (suite *dirTestSuite) TestDirCreateDuplicate() {
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "test1")
 	err := os.Mkdir(dirName, 0777)
@@ -134,7 +177,7 @@ func (suite *dirTestSuite) TestDirCreateDuplicate() {
 	}
 
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	// cleanup
 	suite.dirTestCleanup([]string{dirName})
@@ -147,14 +190,14 @@ func (suite *dirTestSuite) TestDirCreateSplChar() {
 		return
 	}
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "@#$^&*()_+=-{}[]|?><.,~")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	// cleanup
 	suite.dirTestCleanup([]string{dirName})
@@ -167,14 +210,14 @@ func (suite *dirTestSuite) TestDirCreateSlashChar() {
 		return
 	}
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "PRQ\\STUV")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	// cleanup
 	suite.dirTestCleanup([]string{dirName})
@@ -183,7 +226,7 @@ func (suite *dirTestSuite) TestDirCreateSlashChar() {
 // # Rename a directory
 func (suite *dirTestSuite) TestDirRename() {
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "test1")
 	err := os.Mkdir(dirName, 0777)
@@ -196,7 +239,7 @@ func (suite *dirTestSuite) TestDirRename() {
 	suite.NoDirExists(dirName)
 
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	// cleanup
 	suite.dirTestCleanup([]string{newName})
@@ -205,7 +248,7 @@ func (suite *dirTestSuite) TestDirRename() {
 // # Move an empty directory
 func (suite *dirTestSuite) TestDirMoveEmpty() {
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	dir2Name := filepath.Join(suite.testPath, "test2")
 	err := os.Mkdir(dir2Name, 0777)
@@ -216,11 +259,10 @@ func (suite *dirTestSuite) TestDirMoveEmpty() {
 	suite.NoError(err)
 
 	err = os.Rename(dir2Name, filepath.Join(dir3Name, "test2"))
-	time.Sleep(1 * time.Second)
 	suite.NoError(err)
 
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	// cleanup
 	suite.dirTestCleanup([]string{dir3Name})
@@ -229,7 +271,7 @@ func (suite *dirTestSuite) TestDirMoveEmpty() {
 // # Move an non-empty directory
 func (suite *dirTestSuite) TestDirMoveNonEmpty() {
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	dir2Name := filepath.Join(suite.testPath, "test2NE")
 	err := os.Mkdir(dir2Name, 0777)
@@ -248,11 +290,10 @@ func (suite *dirTestSuite) TestDirMoveNonEmpty() {
 	suite.NoError(err)
 
 	err = os.Rename(dir2Name, filepath.Join(dir3Name, "test2"))
-	time.Sleep(1 * time.Second)
 	suite.NoError(err)
 
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	// cleanup
 	suite.dirTestCleanup([]string{file1Name, dir3Name})
@@ -261,14 +302,14 @@ func (suite *dirTestSuite) TestDirMoveNonEmpty() {
 // # Delete non-empty directory
 func (suite *dirTestSuite) TestDirDeleteEmpty() {
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "test1_new")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
 
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	suite.dirTestCleanup([]string{dirName})
 }
@@ -276,7 +317,7 @@ func (suite *dirTestSuite) TestDirDeleteEmpty() {
 // # Delete non-empty directory
 func (suite *dirTestSuite) TestDirDeleteNonEmpty() {
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	dir3Name := filepath.Join(suite.testPath, "test3NE")
 	err := os.Mkdir(dir3Name, 0777)
@@ -295,7 +336,7 @@ func (suite *dirTestSuite) TestDirDeleteNonEmpty() {
 	}
 
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	// cleanup
 	suite.dirTestCleanup([]string{dir3Name})
@@ -327,12 +368,11 @@ func (suite *dirTestSuite) TestDirDeleteNonEmpty() {
 // # Get stats of a directory
 func (suite *dirTestSuite) TestDirGetStats() {
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "test3")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
-	// time.Sleep(2 * time.Second)
 
 	stat, err := os.Stat(dirName)
 	suite.NoError(err)
@@ -347,7 +387,7 @@ func (suite *dirTestSuite) TestDirGetStats() {
 	}
 
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	// Cleanup
 	suite.dirTestCleanup([]string{dirName})
@@ -361,7 +401,7 @@ func (suite *dirTestSuite) TestDirChmod() {
 	}
 	if suite.adlsTest == true {
 		if suite.sizeTracker {
-			suite.EqualValues(0, DiskSize(pathPtr))
+			suite.Equal(0, DiskSize(pathPtr))
 		}
 		dirName := filepath.Join(suite.testPath, "testchmod")
 		err := os.Mkdir(dirName, 0777)
@@ -375,7 +415,7 @@ func (suite *dirTestSuite) TestDirChmod() {
 		suite.Equal("-rwxr--r--", stat.Mode().Perm().String())
 
 		if suite.sizeTracker {
-			suite.EqualValues(0, DiskSize(pathPtr))
+			suite.Equal(0, DiskSize(pathPtr))
 		}
 		suite.dirTestCleanup([]string{dirName})
 	}
@@ -384,7 +424,7 @@ func (suite *dirTestSuite) TestDirChmod() {
 // # List directory
 func (suite *dirTestSuite) TestDirList() {
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	testDir := filepath.Join(suite.testPath, "bigTestDir")
 	err := os.Mkdir(testDir, 0777)
@@ -410,7 +450,7 @@ func (suite *dirTestSuite) TestDirList() {
 	suite.Len(files, 4)
 
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	// Cleanup
 	suite.dirTestCleanup([]string{testDir})
@@ -461,7 +501,7 @@ func (suite *dirTestSuite) TestDirRenameFull() {
 	}
 
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "full_dir")
 	newName := filepath.Join(suite.testPath, "full_dir_rename")
@@ -480,14 +520,14 @@ func (suite *dirTestSuite) TestDirRenameFull() {
 	}
 
 	if suite.sizeTracker {
-		suite.EqualValues(10*len(suite.medBuff), DiskSize(pathPtr))
+		suite.Equal(10*len(suite.medBuff), DiskSize(pathPtr))
 	}
 
 	err = os.Rename(dirName, newName)
 	suite.NoError(err)
 
 	if suite.sizeTracker {
-		suite.EqualValues(10*len(suite.medBuff), DiskSize(pathPtr))
+		suite.Equal(10*len(suite.medBuff), DiskSize(pathPtr))
 	}
 
 	//  Deleted directory shall not be present in the container now
@@ -513,7 +553,12 @@ func (suite *dirTestSuite) TestGitStash() {
 		dirName := filepath.Join(suite.testPath, "stash")
 		tarName := filepath.Join(suite.testPath, "tardir.tar.gz")
 
-		cmd := exec.Command("git", "clone", "https://github.com/wastore/azure-storage-samples-for-net", dirName)
+		cmd := exec.Command(
+			"git",
+			"clone",
+			"https://github.com/wastore/azure-storage-samples-for-net",
+			dirName,
+		)
 		_, err := cmd.Output()
 		suite.NoError(err)
 
@@ -543,12 +588,12 @@ func (suite *dirTestSuite) TestGitStash() {
 		suite.NotZero(f)
 		new_info, err := f.Stat()
 		suite.NoError(err)
-		suite.EqualValues(info.Size()+10, new_info.Size())
+		suite.Equal(info.Size()+10, new_info.Size())
 		data := make([]byte, 10)
 		n, err := f.ReadAt(data, info.Size())
 		suite.NoError(err)
-		suite.EqualValues(10, n)
-		suite.EqualValues("TestString", string(data))
+		suite.Equal(10, n)
+		suite.Equal("TestString", string(data))
 		_ = f.Close()
 
 		cmd = exec.Command("git", "status")
@@ -601,12 +646,16 @@ func (suite *dirTestSuite) TestReadDirLink() {
 		return
 	}
 	if suite.adlsTest && strings.ToLower(enableSymlinkADLS) != "true" {
-		fmt.Printf("Skipping this test case for adls : %v, enable-symlink-adls : %v\n", suite.adlsTest, enableSymlinkADLS)
+		fmt.Printf(
+			"Skipping this test case for adls : %v, enable-symlink-adls : %v\n",
+			suite.adlsTest,
+			enableSymlinkADLS,
+		)
 		return
 	}
 
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 	dirName := filepath.Join(suite.testPath, "test_hns")
 	err := os.Mkdir(dirName, 0777)
@@ -628,7 +677,7 @@ func (suite *dirTestSuite) TestReadDirLink() {
 	}
 
 	if suite.sizeTracker {
-		suite.EqualValues(4*len(suite.minBuff), DiskSize(pathPtr))
+		suite.Equal(4*len(suite.minBuff), DiskSize(pathPtr))
 	}
 
 	symName := filepath.Join(suite.testPath, "dirlink.lnk")
@@ -648,7 +697,7 @@ func (suite *dirTestSuite) TestReadDirLink() {
 	suite.NoError(err)
 	suite.NotEmpty(dirList)
 
-	suite.Equal(len(dirLinkList), len(dirList))
+	suite.Len(dirList, len(dirLinkList))
 
 	// comparing list values since they are sorted by file name
 	for i := range dirLinkList {
@@ -656,24 +705,34 @@ func (suite *dirTestSuite) TestReadDirLink() {
 	}
 
 	// temp cache cleanup
-	suite.dirTestCleanup([]string{filepath.Join(suite.testCachePath, "test_hns", "small_file.txt"), filepath.Join(suite.testCachePath, "dirlink.lnk")})
+	suite.dirTestCleanup(
+		[]string{
+			filepath.Join(suite.testCachePath, "test_hns", "small_file.txt"),
+			filepath.Join(suite.testCachePath, "dirlink.lnk"),
+		},
+	)
 
 	data1, err := os.ReadFile(filepath.Join(symName, "small_file.txt"))
 	suite.NoError(err)
-	suite.Equal(len(data1), len(suite.minBuff))
+	suite.Len(suite.minBuff, len(data1))
 
 	// temp cache cleanup
-	suite.dirTestCleanup([]string{filepath.Join(suite.testCachePath, "test_hns", "small_file.txt"), filepath.Join(suite.testCachePath, "dirlink.lnk")})
+	suite.dirTestCleanup(
+		[]string{
+			filepath.Join(suite.testCachePath, "test_hns", "small_file.txt"),
+			filepath.Join(suite.testCachePath, "dirlink.lnk"),
+		},
+	)
 
 	data2, err := os.ReadFile(fileName)
 	suite.NoError(err)
-	suite.Equal(len(data2), len(suite.minBuff))
+	suite.Len(suite.minBuff, len(data2))
 
 	// validating data
 	suite.Equal(data1, data2)
 
 	if suite.sizeTracker {
-		suite.EqualValues(4*len(suite.minBuff), DiskSize(pathPtr))
+		suite.Equal(4*len(suite.minBuff), DiskSize(pathPtr))
 	}
 
 	suite.dirTestCleanup([]string{dirName})
@@ -683,7 +742,7 @@ func (suite *dirTestSuite) TestReadDirLink() {
 
 func (suite *dirTestSuite) TestStatfs() {
 	if suite.sizeTracker {
-		suite.EqualValues(0, DiskSize(pathPtr))
+		suite.Equal(0, DiskSize(pathPtr))
 	}
 
 	numberOfFiles := 5
@@ -698,31 +757,40 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.WriteFile(newFile, suite.minBuff, 0777)
 		suite.NoError(err)
 	}
-	time.Sleep(time.Second * 4)
-	// TODO: Fix this flaky test
+	// flaky test
 	// if suite.sizeTracker {
-	// 	suite.EqualValues(numberOfFiles*len(suite.minBuff), DiskSize(pathPtr))
-	// }
+	// 	expectedSize := numberOfFiles * len(suite.minBuff)
+    //     suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
+    //         currentSize := DiskSize(pathPtr)
+    //         return currentSize == numberOfFiles*len(suite.minBuff), fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+    //     }, "DiskSize to be %d after initial writes", expectedSize)
+    // }
 
 	for i := 0; i < numberOfFiles; i++ {
 		file := fileName + strconv.Itoa(i)
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)
 	}
-	time.Sleep(time.Second * 4)
 	if suite.sizeTracker {
-		suite.EqualValues(numberOfFiles*4096, DiskSize(pathPtr))
-	}
+		expectedSize := numberOfFiles * 4096
+        suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
+            currentSize := DiskSize(pathPtr)
+            return currentSize == expectedSize, fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+        }, "DiskSize to be %d after first truncate", expectedSize)
+    }
 
 	for i := 0; i < numberOfFiles; i++ {
 		file := fileName + strconv.Itoa(i)
 		err := os.WriteFile(file, suite.medBuff, 0777)
 		suite.NoError(err)
 	}
-	time.Sleep(time.Second * 4)
 	if suite.sizeTracker {
-		suite.EqualValues(numberOfFiles*len(suite.medBuff), DiskSize(pathPtr))
-	}
+		expectedSize := numberOfFiles * len(suite.medBuff)
+        suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
+            currentSize := DiskSize(pathPtr)
+            return currentSize == expectedSize, fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+        }, "DiskSize to be %d after first truncate", expectedSize)
+    }
 
 	renameFile := filepath.Join(dirName, "small_file_rename")
 	for i := 0; i < numberOfFiles; i++ {
@@ -731,20 +799,26 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.Rename(oldFile, newFile)
 		suite.NoError(err)
 	}
-	time.Sleep(time.Second * 4)
 	if suite.sizeTracker {
-		suite.EqualValues(numberOfFiles*len(suite.medBuff), DiskSize(pathPtr))
-	}
+		expectedSize := numberOfFiles * len(suite.medBuff)
+        suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
+            currentSize := DiskSize(pathPtr)
+            return currentSize == expectedSize, fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+        }, "DiskSize to be %d after first truncate", expectedSize)
+    }
 
 	for i := 0; i < numberOfFiles; i++ {
 		file := renameFile + strconv.Itoa(i)
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)
 	}
-	time.Sleep(time.Second * 4)
 	if suite.sizeTracker {
-		suite.EqualValues(numberOfFiles*4096, DiskSize(pathPtr))
-	}
+		expectedSize := numberOfFiles*4096
+        suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
+            currentSize := DiskSize(pathPtr)
+            return currentSize == expectedSize, fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+        }, "DiskSize to be %d after first truncate", expectedSize)
+    }
 
 	suite.dirTestCleanup([]string{dirName})
 }
@@ -796,7 +870,10 @@ func TestDirTestSuite(t *testing.T) {
 	//  Wipe out the test directory created for End to End test
 	err = os.RemoveAll(dirTest.testPath)
 	if err != nil {
-		fmt.Printf("TestDirTestSuite : Could not cleanup feature dir after testing. Here's why: %v\n", err)
+		fmt.Printf(
+			"TestDirTestSuite : Could not cleanup feature dir after testing. Here's why: %v\n",
+			err,
+		)
 	}
 }
 
@@ -806,6 +883,11 @@ func init() {
 	regDirTestFlag(&clonePtr, "clone", "", "Git clone test is enable or not")
 	regDirTestFlag(&tempPathPtr, "tmp-path", "", "Cache dir path")
 	regDirTestFlag(&streamDirectPtr, "stream-direct-test", "false", "Run stream direct tests")
-	regDirTestFlag(&enableSymlinkADLS, "enable-symlink-adls", "false", "Enable symlink support for ADLS accounts")
+	regDirTestFlag(
+		&enableSymlinkADLS,
+		"enable-symlink-adls",
+		"false",
+		"Enable symlink support for ADLS accounts",
+	)
 	regDirTestFlag(&sizeTrackerPtr, "size-tracker", "false", "Using size_tracker component")
 }

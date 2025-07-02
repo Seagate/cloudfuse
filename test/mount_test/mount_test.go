@@ -37,6 +37,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,6 +49,11 @@ var cloudfuseBinary string = "cloudfuse"
 var mntDir string = "mntdir"
 var configFile, tags string
 
+const (
+    pollTimeout  = 10 * time.Second
+    pollInterval = 100 * time.Millisecond
+)
+
 type mountSuite struct {
 	suite.Suite
 }
@@ -58,7 +64,6 @@ func remountCheck(suite *mountSuite) {
 	mountCmd.Stderr = &errb
 	_, err := mountCmd.Output()
 	suite.Error(err)
-	fmt.Println(errb.String())
 	suite.NotEmpty(errb.String())
 	suite.Contains(errb.String(), "directory is already mounted")
 }
@@ -67,7 +72,6 @@ func remountCheck(suite *mountSuite) {
 func listCloudfuseMounts(suite *mountSuite) []byte {
 	mntListCmd := exec.Command(cloudfuseBinary, "mount", "list")
 	cliOut, err := mntListCmd.Output()
-	fmt.Println(string(cliOut))
 	suite.NoError(err)
 	return cliOut
 }
@@ -76,17 +80,21 @@ func listCloudfuseMounts(suite *mountSuite) []byte {
 func cloudfuseUnmount(suite *mountSuite, unmountOutput string) {
 	unmountCmd := exec.Command(cloudfuseBinary, "unmount", "all")
 	cliOut, err := unmountCmd.Output()
-	fmt.Println(string(cliOut))
 	suite.NotEmpty(cliOut)
 	suite.NoError(err)
 	suite.Contains(string(cliOut), unmountOutput)
 
 	// wait after unmount
-	time.Sleep(5 * time.Second)
-
-	// validate unmount
-	cliOut = listCloudfuseMounts(suite)
-	suite.Empty(cliOut)
+	unmountVerified := false
+    for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
+        currentMountsList := listCloudfuseMounts(suite)
+        if len(bytes.TrimSpace(currentMountsList)) == 0 {
+            unmountVerified = true
+            break
+        }
+        time.Sleep(pollInterval)
+    }
+	suite.True(unmountVerified)
 }
 
 // mount command test along with remount on the same path
@@ -105,7 +113,17 @@ func (suite *mountSuite) TestMountCmd() {
 	suite.NoError(err)
 
 	// wait for mount
-	time.Sleep(5 * time.Second)
+	mounted := false
+    var listOutput []byte
+    for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
+        listOutput = listCloudfuseMounts(suite)
+        if strings.Contains(string(listOutput), mntDir) {
+            mounted = true
+            break
+        }
+        time.Sleep(pollInterval)
+    }
+	suite.True(mounted)
 
 	// validate mount
 	cliOut = listCloudfuseMounts(suite)
@@ -128,7 +146,6 @@ func (suite *mountSuite) TestMountDirNotExists() {
 		mountCmd.Stderr = &errb
 		_, err := mountCmd.Output()
 		suite.Error(err)
-		fmt.Println(errb.String())
 		suite.NotEmpty(errb.String())
 		suite.Contains(errb.String(), "Cannot create WinFsp-FUSE file system")
 
@@ -146,7 +163,6 @@ func (suite *mountSuite) TestMountDirNotExists() {
 		mountCmd.Stderr = &errb
 		_, err := mountCmd.Output()
 		suite.Error(err)
-		fmt.Println(errb.String())
 		suite.NotEmpty(errb.String())
 		suite.Contains(errb.String(), "mount directory does not exists")
 
@@ -168,7 +184,6 @@ func (suite *mountSuite) TestMountDirNotEmptyFailure() {
 	mountCmd.Stderr = &errb
 	_, err := mountCmd.Output()
 	suite.Error(err)
-	fmt.Println(errb.String())
 	suite.NotEmpty(errb.String())
 
 	if runtime.GOOS == "windows" {
@@ -197,13 +212,30 @@ func (suite *mountSuite) TestMountDirNotEmptySuccess() {
 	tempDir := filepath.Join(mntDir, "tempdir")
 	_ = os.Mkdir(tempDir, 0777)
 
-	mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--config-file="+configFile, "-o", "nonempty")
+	mountCmd := exec.Command(
+		cloudfuseBinary,
+		"mount",
+		mntDir,
+		"--config-file="+configFile,
+		"-o",
+		"nonempty",
+	)
 	cliOut, err := mountCmd.Output()
 	suite.Empty(cliOut)
 	suite.NoError(err)
 
 	// wait for mount
-	time.Sleep(5 * time.Second)
+	mounted := false
+    var listOutput []byte
+    for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
+        listOutput = listCloudfuseMounts(suite)
+        if strings.Contains(string(listOutput), mntDir) {
+            mounted = true
+            break
+        }
+        time.Sleep(pollInterval)
+    }
+	suite.True(mounted)
 
 	// validate mount
 	cliOut = listCloudfuseMounts(suite)
@@ -225,7 +257,6 @@ func (suite *mountSuite) TestMountPathNotProvided() {
 	mountCmd.Stderr = &errb
 	_, err := mountCmd.Output()
 	suite.Error(err)
-	fmt.Println(errb.String())
 	suite.NotEmpty(errb.String())
 	suite.Contains(errb.String(), "mount path not provided")
 
@@ -244,7 +275,6 @@ func (suite *mountSuite) TestConfigFileNotProvided() {
 	mountCmd.Stderr = &errb
 	_, err := mountCmd.Output()
 	suite.Error(err)
-	fmt.Println(errb.String())
 	suite.NotEmpty(errb.String())
 	suite.Contains(errb.String(), "failed to initialize new pipeline")
 
@@ -266,9 +296,14 @@ func (suite *mountSuite) TestEnvVarMountFailure() {
 	os.Setenv("AZURE_STORAGE_ACCESS_KEY", "myKey")
 	os.Setenv("AZURE_STORAGE_BLOB_ENDPOINT", "https://myAccount.dfs.core.windows.net")
 
-	mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--tmp-path="+tempDir, "--container-name=myContainer")
+	mountCmd := exec.Command(
+		cloudfuseBinary,
+		"mount",
+		mntDir,
+		"--tmp-path="+tempDir,
+		"--container-name=myContainer",
+	)
 	cliOut, err := mountCmd.Output()
-	fmt.Println(string(cliOut))
 	suite.Error(err)
 
 	// list cloudfuse mounted directories
@@ -312,11 +347,22 @@ func (suite *mountSuite) TestEnvVarMount() {
 	mountCmd := exec.Command(cloudfuseBinary, "mount", mntDir, "--tmp-path="+tempCachePath)
 	cliOut, err := mountCmd.Output()
 	fmt.Println(string(cliOut))
+	fmt.Println(err)
 	suite.Empty(cliOut)
 	suite.NoError(err)
 
 	// wait for mount
-	time.Sleep(5 * time.Second)
+	mounted := false
+    var listOutput []byte
+    for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
+        listOutput = listCloudfuseMounts(suite)
+        if strings.Contains(string(listOutput), mntDir) {
+            mounted = true
+            break
+        }
+        time.Sleep(pollInterval)
+    }
+	suite.True(mounted)
 
 	// list cloudfuse mounted directories
 	cliOut = listCloudfuseMounts(suite)
@@ -326,7 +372,13 @@ func (suite *mountSuite) TestEnvVarMount() {
 	// unmount
 	cloudfuseUnmount(suite, mntDir)
 
-	mountAllCmd := exec.Command(cloudfuseBinary, "mount", "all", mntDir, "--tmp-path="+tempCachePath)
+	mountAllCmd := exec.Command(
+		cloudfuseBinary,
+		"mount",
+		"all",
+		mntDir,
+		"--tmp-path="+tempCachePath,
+	)
 	cliOut, err = mountAllCmd.Output()
 	fmt.Println(string(cliOut))
 	suite.NotEmpty(cliOut)
@@ -411,12 +463,21 @@ func mountAndValidate(suite *mountSuite, args ...string) {
 	args = append([]string{"mount", mntDir, "--config-file=" + configFile}, args...)
 	mountCmd := exec.Command(cloudfuseBinary, args...)
 	cliOut, err := mountCmd.Output()
-	fmt.Println(string(cliOut))
 	suite.Empty(cliOut)
 	suite.NoError(err)
 
 	// wait for mount
-	time.Sleep(5 * time.Second)
+	mounted := false
+    var listOutput []byte
+    for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
+        listOutput = listCloudfuseMounts(suite)
+        if strings.Contains(string(listOutput), mntDir) {
+            mounted = true
+            break
+        }
+        time.Sleep(pollInterval)
+    }
+	suite.True(mounted)
 
 	// validate mount
 	cliOut = listCloudfuseMounts(suite)
@@ -497,7 +558,10 @@ func TestMain(m *testing.M) {
 
 	err := os.RemoveAll(mntDir)
 	if err != nil {
-		fmt.Printf("MountTest : Could not cleanup mount directory before testing. Here's why: %v\n", err)
+		fmt.Printf(
+			"MountTest : Could not cleanup mount directory before testing. Here's why: %v\n",
+			err,
+		)
 	}
 
 	// On Linux the folder must exist so we need to create it, on Windows it cannot exist.

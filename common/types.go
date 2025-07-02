@@ -40,7 +40,7 @@ import (
 
 // Standard config default values
 const (
-	cloudfuseVersion_ = "1.10.0"
+	cloudfuseVersion_ = "1.12.0"
 
 	DefaultMaxLogFileSize = 512
 	DefaultLogFileCount   = 10
@@ -75,7 +75,21 @@ var GoVersion = runtime.Version()
 var OsArch = fmt.Sprintf("%s %s", runtime.GOOS, runtime.GOARCH)
 
 func FuseIgnoredFlags() []string {
-	return []string{"default_permissions", "rw", "dev", "nodev", "suid", "nosuid", "delay_connect", "auto", "noauto", "user", "nouser", "exec", "noexec"}
+	return []string{
+		"default_permissions",
+		"rw",
+		"dev",
+		"nodev",
+		"suid",
+		"nosuid",
+		"delay_connect",
+		"auto",
+		"noauto",
+		"user",
+		"nouser",
+		"exec",
+		"noexec",
+	}
 }
 
 var CloudfuseVersion = CloudfuseVersion_()
@@ -232,7 +246,8 @@ func (bol BlockOffsetList) BinarySearch(offset int64) (bool, int) {
 	for lowerBound <= higherBound {
 		middleIndex := (lowerBound + higherBound) / 2
 		// we found the starting block that changes are being applied to
-		if bol.BlockList[middleIndex].EndIndex > offset && bol.BlockList[middleIndex].StartIndex <= offset {
+		if bol.BlockList[middleIndex].EndIndex > offset &&
+			bol.BlockList[middleIndex].StartIndex <= offset {
 			return true, middleIndex
 			// if the end index is smaller or equal then we need to increase our lower bound
 		} else if bol.BlockList[middleIndex].EndIndex <= offset {
@@ -259,7 +274,8 @@ func (bol BlockOffsetList) FindBlocks(offset, length int64) ([]*Block, bool) {
 		if blk.StartIndex > offset+length {
 			break
 		}
-		if currentBlockOffset >= blk.StartIndex && currentBlockOffset < blk.EndIndex && currentBlockOffset <= offset+length {
+		if currentBlockOffset >= blk.StartIndex && currentBlockOffset < blk.EndIndex &&
+			currentBlockOffset <= offset+length {
 			blocks = append(blocks, blk)
 			currentBlockOffset = blk.EndIndex
 		}
@@ -282,7 +298,8 @@ func (bol BlockOffsetList) FindBlocksToModify(offset, length int64) (int, int64,
 		if blk.StartIndex > offset+length {
 			break
 		}
-		if currentBlockOffset >= blk.StartIndex && currentBlockOffset < blk.EndIndex && currentBlockOffset <= offset+length {
+		if currentBlockOffset >= blk.StartIndex && currentBlockOffset < blk.EndIndex &&
+			currentBlockOffset <= offset+length {
 			appendOnly = false
 			blk.Flags.Set(DirtyBlock)
 			currentBlockOffset = blk.EndIndex
