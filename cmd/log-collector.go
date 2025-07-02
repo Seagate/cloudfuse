@@ -274,7 +274,8 @@ func createLinuxArchive(logPath string) error {
 	return nil
 }
 
-// setupPreZip will create a temporary directory
+// setupPreZip will create a temporary folder that will contain the logs and be the source path for creating the archive
+// This will only run on windows.
 func setupPreZip() (string, string, error) {
 	preArchPath, err := os.MkdirTemp(dumpPath, "tmpPreZip*")
 	if err != nil {
@@ -341,25 +342,21 @@ func createWindowsArchive(archPath string) error {
 	if err != nil {
 		return nil
 	}
-
 	defer outFile.Sync()
 	defer outFile.Close()
 
 	zipWriter := zip.NewWriter(outFile)
 	defer zipWriter.Close()
-
 	var amountLogs int
 	err = filepath.Walk(archPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-
 		var relPath string
 		relPath, err = filepath.Rel(archPath, path)
 		if err != nil {
 			return err
 		}
-
 		if info.IsDir() {
 			if relPath == "." {
 				return nil
@@ -371,7 +368,6 @@ func createWindowsArchive(archPath string) error {
 			}
 			return nil
 		}
-
 		if strings.Contains(relPath, "cloudfuse") && regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(relPath) {
 			var file *os.File
 			file, err = os.Open(path)
@@ -386,7 +382,6 @@ func createWindowsArchive(archPath string) error {
 				zipWriter.Close()
 				return err
 			}
-
 			_, err = io.Copy(zipEntry, file)
 			if err != nil {
 				zipWriter.Close()
@@ -402,7 +397,7 @@ func createWindowsArchive(archPath string) error {
 	return err
 }
 
-// createFilteredLog creates a new log file containing only cloudfuse logs from the logFile parameter.
+// createFilteredLog creates a new log file containing only cloudfuse logs from the logFile input.
 // It only runs for linux when the logging type is set to "syslog" in the config
 func createFilteredLog(logFile string) (string, error) {
 	keyword := "cloudfuse"
@@ -422,7 +417,6 @@ func createFilteredLog(logFile string) (string, error) {
 
 	scanner := bufio.NewScanner(inFile)
 	writer := bufio.NewWriter(outFile)
-
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.Contains(line, keyword) {
@@ -433,7 +427,6 @@ func createFilteredLog(logFile string) (string, error) {
 		}
 	}
 	writer.Flush()
-
 	return outPath, scanner.Err()
 }
 
