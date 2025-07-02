@@ -182,7 +182,7 @@ func getLogInfo(configFile string) (string, string, error) {
 	logType := "base"
 	_, err := os.Stat(configFile)
 	if errors.Is(err, fs.ErrNotExist) {
-		fmt.Printf("Warning, the config file was not found. Defaults will be used ")
+		fmt.Printf("Warning, the config file was not found. Defaults will be used\n")
 	} else {
 		config.SetConfigFile(configFile)
 		config.ReadFromConfigFile(configFile)
@@ -211,7 +211,7 @@ func getLogInfo(configFile string) (string, string, error) {
 					}
 					_, err = os.Stat(logPath)
 					if err != nil {
-						return logType, logPath, fmt.Errorf("the file path, %s, cannot be found: [%s]", logPath, err.Error())
+						return logType, logPath, err
 					}
 				} else {
 					return logType, logPath, fmt.Errorf("the logging file-path is not provided")
@@ -289,16 +289,17 @@ func createLinuxArchive(logPath string) error {
 		}
 	}
 	if amountLogs == 0 {
-		return fmt.Errorf("no cloudfuse log file were found in %s", logPath)
+		return fmt.Errorf("no log files were found in %s", logPath)
 	}
 
 	return nil
 }
 
+// setupPreZip will create a temporary directory and collect
 func setupPreZip() (string, string, error) {
 	preArchPath, err := os.MkdirTemp(dumpPath, "tmpPreZip*")
 	if err != nil {
-		return "", "", fmt.Errorf("could not create temporary path, %s,  to extract data", preArchPath)
+		return "", "", fmt.Errorf("could not create temporary path, %s, to extract data", preArchPath)
 	}
 
 	// create a sub folder for the service logs
@@ -316,7 +317,6 @@ func setupPreZip() (string, string, error) {
 	}
 
 	return sysProfDir, userDir, nil
-
 }
 
 func copyFiles(srcPath, dstPath string) error {
@@ -423,8 +423,8 @@ func createWindowsArchive(archPath string) error {
 	return err
 }
 
-// createFilteredLog creates a new log file containing only the cloudfuse logs from the input log file.
-// It only runs for linux when the configured logging type is set to "syslog"
+// createFilteredLog creates a new log file containing only cloudfuse logs from the logFile parameter.
+// It only runs for linux when the logging type is set to "syslog" in the config
 func createFilteredLog(logFile string) (string, error) {
 	keyword := "cloudfuse"
 	os.Mkdir("/tmp/cloudfuseSyslog", 0760)
