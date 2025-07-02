@@ -249,7 +249,7 @@ func (suite *logCollectTestSuite) TestValidBaseConfig() {
 }
 
 // Log collection test using 'base' for the logging type with a nonexisting file path in the config.
-func (suite *logCollectTestSuite) TestInvalidBaseConfig() {
+func (suite *logCollectTestSuite) TestInvalidFilePathBaseConfig() {
 	currentDir, err := os.Getwd()
 	suite.assert.NoError(err)
 	defer suite.cleanupTest(currentDir)
@@ -298,12 +298,40 @@ func (suite *logCollectTestSuite) TestInvalidConfig() {
 	defer suite.cleanupTest(currentDir)
 
 	//set up config file
-	invalidSyslogConfig := logCollectTestConfig{logType: "invalid", level: "invalid", filePath: "invalid"}
+	invalidSyslogConfig := logCollectTestConfig{logType: "inv$!^alid", level: "log_#@^%$debug", filePath: "inv#%^&!alid"}
 	configFile := suite.setupConfig(invalidSyslogConfig)
 
 	//run the log collector
 	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
 	suite.assert.Error(err)
+	suite.assert.Contains(err.Error(), "logging type is not valid")
+	// test error has "the logging type is not valid"
+}
+
+func (suite *logCollectTestSuite) TestNoLogTypeConfig() {
+	//set up config file
+	TestNoLogTypeConfig := logCollectTestConfig{logType: "", level: "log_debug", filePath: "/home/fakeUser/cloudfuse.log"}
+	configFile := suite.setupConfig(TestNoLogTypeConfig)
+
+	//run the log collector
+	_, err := executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
+	suite.assert.Error(err)
+	suite.assert.Contains(err.Error(), "logging type is not provided")
+
+}
+
+func (suite *logCollectTestSuite) TestNoLogPathConfig() {
+
+	//set up config file
+	TestNoLogTypeConfig := logCollectTestConfig{logType: "base", level: "log_debug", filePath: ""}
+	configFile := suite.setupConfig(TestNoLogTypeConfig)
+
+	//run the log collector
+	_, err := executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
+
+	suite.assert.Error(err)
+	suite.assert.Contains(err.Error(), "file-path is not provided")
+
 }
 
 // Log collection test using 'silent' for the logging type in the config.
