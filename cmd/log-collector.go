@@ -53,7 +53,6 @@ var gatherLogsCmd = &cobra.Command{
 	Example:           "cloudfuse gatherLogs ",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
 		err := checkPath(dumpPath)
 		if err != nil {
 			return fmt.Errorf("could not use the output path %s, [%s]", dumpPath, err)
@@ -79,7 +78,6 @@ var gatherLogsCmd = &cobra.Command{
 					return fmt.Errorf("unable to create archive: [%s]", err.Error())
 				}
 			case "windows":
-
 				// set up temporary destination to collect logs
 				var dstSysprofPath string
 				var dstUserPath string
@@ -95,24 +93,17 @@ var gatherLogsCmd = &cobra.Command{
 				if systemRoot == "" {
 					return errors.New("Could not find system root")
 				}
-
 				systemRoot = filepath.Clean(systemRoot)
 				srcSrvPath := filepath.Join(systemRoot, "System32", "config", "systemprofile", ".cloudfuse")
-
-				// copied over the service log files from servicePath -> preArchPath
 				err = copyFiles(srcSrvPath, dstSysprofPath)
 				if err != nil {
 					return fmt.Errorf("unable to copy files from source path %s to destination %s: [%s]", srcSrvPath, dstSysprofPath, err.Error())
 				}
-
-				// fetch provided or default logPath
 				logPath = common.ExpandPath(logPath)
 				logPath, err = filepath.Abs(logPath)
 				if err != nil {
 					return fmt.Errorf("failed get absolute path for logs directory: [%s]", err.Error())
 				}
-
-				// copied over the user base logs from logPath -> preArchPath
 				err = copyFiles(logPath, dstUserPath)
 				if err != nil {
 					return fmt.Errorf("unable to copy files from source path %s to destination %s: [%s]", logPath, dstUserPath, err.Error())
@@ -157,17 +148,14 @@ func checkPath(outPath string) error {
 		if !common.DirectoryExists(outPath) {
 			return err
 		}
-
 		dumpInfo, err := os.Stat(outPath)
 		if err != nil {
 			return err
 		}
-
 		if !dumpInfo.IsDir() {
 			return fmt.Errorf("the provided output path needs to be a directory")
 		}
 	}
-
 	dumpPath, err = filepath.Abs(dumpPath)
 	if err != nil {
 		return fmt.Errorf("couldn't determine absolute path for logs [%s]", err.Error())
@@ -227,13 +215,11 @@ func getLogInfo(configFile string) (string, string, error) {
 }
 
 func createLinuxArchive(logPath string) error {
-	//first check logPath is valid
 	_, err := os.Stat(logPath)
 	if err != nil {
 		return err
 	}
 
-	//setup tar.gz file
 	outFile, err := os.Create(dumpPath + "/cloudfuse_logs.tar.gz")
 	if err != nil {
 		return err
@@ -245,15 +231,13 @@ func createLinuxArchive(logPath string) error {
 
 	tarWriter := tar.NewWriter(gzWriter)
 	defer tarWriter.Close()
-
-	//populate tar.gz file
 	var amountLogs int
 	items, err := os.ReadDir(logPath)
 	if err != nil {
 		return err
 	}
 	for _, item := range items {
-		if strings.HasPrefix(item.Name(), "cloudfuse") && strings.HasSuffix(item.Name(), ".log") {
+		if strings.Contains(item.Name(), "cloudfuse") && regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(item.Name()) {
 			itemPath := filepath.Join(logPath, item.Name())
 			itemPath = filepath.Clean(itemPath)
 			file, err := os.Open(itemPath)
@@ -266,19 +250,15 @@ func createLinuxArchive(logPath string) error {
 			if err != nil {
 				return err
 			}
-
 			header, err := tar.FileInfoHeader(info, "")
 			if err != nil {
 				return err
 			}
-
 			header.Name = item.Name()
-
 			err = tarWriter.WriteHeader(header)
 			if err != nil {
 				return err
 			}
-
 			_, err = io.Copy(tarWriter, file)
 			if err != nil {
 				return err
@@ -291,11 +271,10 @@ func createLinuxArchive(logPath string) error {
 	if amountLogs == 0 {
 		return fmt.Errorf("no log files were found in %s", logPath)
 	}
-
 	return nil
 }
 
-// setupPreZip will create a temporary directory and collect
+// setupPreZip will create a temporary directory
 func setupPreZip() (string, string, error) {
 	preArchPath, err := os.MkdirTemp(dumpPath, "tmpPreZip*")
 	if err != nil {
