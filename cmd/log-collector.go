@@ -83,7 +83,9 @@ var gatherLogsCmd = &cobra.Command{
 				var dstUserPath string
 				dstSysprofPath, dstUserPath, err = setupPreZip()
 				if err != nil {
-					return fmt.Errorf("could not set up the temporary folder where logs will be collected")
+					return fmt.Errorf(
+						"could not set up the temporary folder where logs will be collected",
+					)
 				}
 				preArchPath := filepath.Dir(dstUserPath)
 				defer os.RemoveAll(preArchPath)
@@ -94,19 +96,38 @@ var gatherLogsCmd = &cobra.Command{
 					return errors.New("Could not find system root")
 				}
 				systemRoot = filepath.Clean(systemRoot)
-				srcSrvPath := filepath.Join(systemRoot, "System32", "config", "systemprofile", ".cloudfuse")
+				srcSrvPath := filepath.Join(
+					systemRoot,
+					"System32",
+					"config",
+					"systemprofile",
+					".cloudfuse",
+				)
 				err = copyFiles(srcSrvPath, dstSysprofPath)
 				if err != nil {
-					return fmt.Errorf("unable to copy files from source path %s to destination %s: [%s]", srcSrvPath, dstSysprofPath, err.Error())
+					return fmt.Errorf(
+						"unable to copy files from source path %s to destination %s: [%s]",
+						srcSrvPath,
+						dstSysprofPath,
+						err.Error(),
+					)
 				}
 				logPath = common.ExpandPath(logPath)
 				logPath, err = filepath.Abs(logPath)
 				if err != nil {
-					return fmt.Errorf("failed get absolute path for logs directory: [%s]", err.Error())
+					return fmt.Errorf(
+						"failed get absolute path for logs directory: [%s]",
+						err.Error(),
+					)
 				}
 				err = copyFiles(logPath, dstUserPath)
 				if err != nil {
-					return fmt.Errorf("unable to copy files from source path %s to destination %s: [%s]", logPath, dstUserPath, err.Error())
+					return fmt.Errorf(
+						"unable to copy files from source path %s to destination %s: [%s]",
+						logPath,
+						dstUserPath,
+						err.Error(),
+					)
 				}
 
 				// archive the two folders.
@@ -120,7 +141,10 @@ var gatherLogsCmd = &cobra.Command{
 			case "linux":
 				filteredSyslogPath, err := createFilteredLog(logPath)
 				if err != nil {
-					return fmt.Errorf("failed to crate a filtered log from the syslog: [%s]", err.Error())
+					return fmt.Errorf(
+						"failed to crate a filtered log from the syslog: [%s]",
+						err.Error(),
+					)
 				}
 				filteredSyslogPath = filepath.Dir(filteredSyslogPath)
 				err = createLinuxArchive(filteredSyslogPath)
@@ -129,7 +153,9 @@ var gatherLogsCmd = &cobra.Command{
 				}
 			case "windows":
 				fmt.Println("Please refer to the windows event viewer for your cloudfuse logs")
-				return fmt.Errorf("no log files to collect. system logging for windows are stored in the event viewer")
+				return fmt.Errorf(
+					"no log files to collect. system logging for windows are stored in the event viewer",
+				)
 			}
 		}
 		return nil
@@ -237,7 +263,8 @@ func createLinuxArchive(logPath string) error {
 		return err
 	}
 	for _, item := range items {
-		if strings.Contains(item.Name(), "cloudfuse") && regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(item.Name()) {
+		if strings.Contains(item.Name(), "cloudfuse") &&
+			regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(item.Name()) {
 			itemPath := filepath.Join(logPath, item.Name())
 			itemPath = filepath.Clean(itemPath)
 			file, err := os.Open(itemPath)
@@ -279,7 +306,10 @@ func createLinuxArchive(logPath string) error {
 func setupPreZip() (string, string, error) {
 	preArchPath, err := os.MkdirTemp(dumpPath, "tmpPreZip*")
 	if err != nil {
-		return "", "", fmt.Errorf("could not create temporary path, %s, to extract data", preArchPath)
+		return "", "", fmt.Errorf(
+			"could not create temporary path, %s, to extract data",
+			preArchPath,
+		)
 	}
 
 	// create a sub folder for the service logs
@@ -368,7 +398,8 @@ func createWindowsArchive(archPath string) error {
 			}
 			return nil
 		}
-		if strings.Contains(relPath, "cloudfuse") && regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(relPath) {
+		if strings.Contains(relPath, "cloudfuse") &&
+			regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(relPath) {
 			var file *os.File
 			file, err = os.Open(path)
 			if err != nil {
@@ -433,5 +464,6 @@ func createFilteredLog(logFile string) (string, error) {
 func init() {
 	rootCmd.AddCommand(gatherLogsCmd)
 	gatherLogsCmd.Flags().StringVar(&dumpPath, "output-path", "", "Input archive creation path")
-	gatherLogsCmd.Flags().StringVar(&logConfigFile, "config-file", common.DefaultConfigFilePath, "config-file input path")
+	gatherLogsCmd.Flags().
+		StringVar(&logConfigFile, "config-file", common.DefaultConfigFilePath, "config-file input path")
 }

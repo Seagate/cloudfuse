@@ -100,7 +100,8 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 
 	//collect file and hash values into the map
 	for _, item := range items {
-		if strings.Contains(item.Name(), "cloudfuse") && regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(item.Name()) {
+		if strings.Contains(item.Name(), "cloudfuse") &&
+			regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(item.Name()) {
 
 			//get file path
 			itemPath := filepath.Join(logPath, item.Name())
@@ -164,7 +165,8 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 			return nil
 		}
 
-		if strings.Contains(info.Name(), "cloudfuse") && regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(info.Name()) {
+		if strings.Contains(info.Name(), "cloudfuse") &&
+			regexp.MustCompile(`\.log(?:\.\d)?$`).MatchString(info.Name()) {
 
 			// generate and store checksum for file
 			var file *os.File
@@ -234,12 +236,20 @@ func (suite *logCollectTestSuite) TestValidBaseConfig() {
 	defer os.RemoveAll(tempLog.Name())
 
 	//set up config file
-	validBaseConfig := logCollectTestConfig{logType: "base", level: "log_debug", filePath: tempLog.Name()}
+	validBaseConfig := logCollectTestConfig{
+		logType:  "base",
+		level:    "log_debug",
+		filePath: tempLog.Name(),
+	}
 	configFile := suite.setupConfig(validBaseConfig)
 	defer os.Remove(configFile.Name())
 
 	//run the log collector
-	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"gatherLogs",
+		fmt.Sprintf("--config-file=%s", configFile.Name()),
+	)
 	suite.assert.NoError(err)
 
 	//verify the archive
@@ -255,11 +265,19 @@ func (suite *logCollectTestSuite) TestInvalidFilePathBaseConfig() {
 	defer suite.cleanupTest(currentDir)
 
 	//set up config file
-	invalidBaseConfig := logCollectTestConfig{logType: "base", level: "log_debug", filePath: "/home/fakeUser/cloudfuse.log"}
+	invalidBaseConfig := logCollectTestConfig{
+		logType:  "base",
+		level:    "log_debug",
+		filePath: "/home/fakeUser/cloudfuse.log",
+	}
 	configFile := suite.setupConfig(invalidBaseConfig)
 
 	//run the log collector
-	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"gatherLogs",
+		fmt.Sprintf("--config-file=%s", configFile.Name()),
+	)
 	suite.assert.Error(err)
 }
 
@@ -274,7 +292,11 @@ func (suite *logCollectTestSuite) TestValidSyslogConfig() {
 	configFile := suite.setupConfig(validSyslogConfig)
 
 	//run the log collector
-	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"gatherLogs",
+		fmt.Sprintf("--config-file=%s", configFile.Name()),
+	)
 	switch runtime.GOOS {
 	case "linux":
 		suite.assert.NoError(err)
@@ -298,11 +320,19 @@ func (suite *logCollectTestSuite) TestInvalidConfig() {
 	defer suite.cleanupTest(currentDir)
 
 	//set up config file
-	invalidSyslogConfig := logCollectTestConfig{logType: "inv$!^alid", level: "log_#@^%$debug", filePath: "inv#%^&!alid"}
+	invalidSyslogConfig := logCollectTestConfig{
+		logType:  "inv$!^alid",
+		level:    "log_#@^%$debug",
+		filePath: "inv#%^&!alid",
+	}
 	configFile := suite.setupConfig(invalidSyslogConfig)
 
 	//run the log collector
-	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"gatherLogs",
+		fmt.Sprintf("--config-file=%s", configFile.Name()),
+	)
 	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "logging type is not valid")
 	// test error has "the logging type is not valid"
@@ -310,11 +340,19 @@ func (suite *logCollectTestSuite) TestInvalidConfig() {
 
 func (suite *logCollectTestSuite) TestNoLogTypeConfig() {
 	//set up config file
-	TestNoLogTypeConfig := logCollectTestConfig{logType: "", level: "log_debug", filePath: "/home/fakeUser/cloudfuse.log"}
+	TestNoLogTypeConfig := logCollectTestConfig{
+		logType:  "",
+		level:    "log_debug",
+		filePath: "/home/fakeUser/cloudfuse.log",
+	}
 	configFile := suite.setupConfig(TestNoLogTypeConfig)
 
 	//run the log collector
-	_, err := executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
+	_, err := executeCommandC(
+		rootCmd,
+		"gatherLogs",
+		fmt.Sprintf("--config-file=%s", configFile.Name()),
+	)
 	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "logging type is not provided")
 
@@ -327,7 +365,11 @@ func (suite *logCollectTestSuite) TestNoLogPathConfig() {
 	configFile := suite.setupConfig(TestNoLogTypeConfig)
 
 	//run the log collector
-	_, err := executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
+	_, err := executeCommandC(
+		rootCmd,
+		"gatherLogs",
+		fmt.Sprintf("--config-file=%s", configFile.Name()),
+	)
 
 	suite.assert.Error(err)
 	suite.assert.Contains(err.Error(), "file-path is not provided")
@@ -345,7 +387,11 @@ func (suite *logCollectTestSuite) TestSilentConfig() {
 	configFile := suite.setupConfig(silentConfig)
 
 	//run the log collector
-	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--config-file=%s", configFile.Name()))
+	_, err = executeCommandC(
+		rootCmd,
+		"gatherLogs",
+		fmt.Sprintf("--config-file=%s", configFile.Name()),
+	)
 	suite.assert.Error(err)
 }
 
