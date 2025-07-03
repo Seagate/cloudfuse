@@ -229,15 +229,14 @@ func (cl *Client) Configure(cfg Config) error {
 
 	// if no bucket-name was set, default to the first accessible bucket in the list
 	if cl.Config.authConfig.BucketName == "" {
+		bucketList = cl.filterAccessibleBuckets(bucketList)
 		for _, bucketName := range bucketList {
 			cl.Config.authConfig.BucketName = bucketName
-			if _, err := cl.bucketExists(); err == nil {
-				log.Warn(
-					"Client::Configure : Bucket defaulted to first accessible listed bucket: %s",
-					bucketName,
-				)
-				break
-			}
+			log.Warn(
+				"Client::Configure : Bucket defaulted to first accessible listed bucket: %s",
+				bucketName,
+			)
+			break
 		}
 		// if no accessible bucket was found, return an error
 		if cl.Config.authConfig.BucketName == "" {
@@ -247,8 +246,8 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	// Check that the provided bucket exists and that user has access to bucket
-	exists, err := cl.bucketExists()
-	if err != nil || !exists {
+	_, err = cl.headBucket(cl.Config.authConfig.BucketName)
+	if err != nil {
 		// From the aws-sdk-go-v2 documentation
 		// If the bucket does not exist or you do not have permission to access it,
 		// the HEAD request returns a generic 400 Bad Request , 403 Forbidden or 404 Not Found code.
@@ -265,6 +264,35 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	return nil
+}
+
+// filter out buckets for which we do not have permissions
+func (cl *Client) filterAccessibleBuckets(bucketList []string) (accessibleBucketList []string) {
+	if len(bucketList) == 0 {
+		return bucketList
+	}
+	// use parallel requests
+	var wg sync.WaitGroup
+	accessibleBuckets := make(chan string, len(bucketList))
+	for _, bucketName := range bucketList {
+		wg.Add(1)
+		go func(bucketName string) {
+			defer wg.Done()
+			if _, err := cl.headBucket(bucketName); err == nil {
+				accessibleBuckets <- bucketName
+			}
+		}(bucketName)
+	}
+	// use a go routine to close the channel after all workers finish
+	go func() {
+		wg.Wait()
+		close(accessibleBuckets)
+	}()
+	// get the accessible buckets from the channel
+	for bucketName := range accessibleBuckets {
+		accessibleBucketList = append(accessibleBucketList, bucketName)
+	}
+	return accessibleBucketList
 }
 
 func getRegionFromEndpoint(endpoint string) (string, error) {
@@ -319,11 +347,6 @@ func (cl *Client) SetPrefixPath(path string) error {
 	log.Trace("Client::SetPrefixPath : path %s", path)
 	cl.Config.prefixPath = path
 	return nil
-}
-
-func (cl *Client) bucketExists() (bool, error) {
-	_, err := cl.headBucket()
-	return err != syscall.ENOENT, err
 }
 
 // CreateFile : Create a new file in the bucket/virtual directory
@@ -1304,7 +1327,7 @@ func (cl *Client) combineSmallBlocks(
 }
 
 func (cl *Client) GetUsedSize() (uint64, error) {
-	headBucketOutput, err := cl.headBucket()
+	headBucketOutput, err := cl.headBucket(cl.Config.authConfig.BucketName)
 	if err != nil {
 		return 0, err
 	}
