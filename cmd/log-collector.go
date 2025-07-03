@@ -438,22 +438,16 @@ func createWindowsArchive(archPath string) error {
 // It only runs for linux when the logging type is set to "syslog" in the config
 func createFilteredLog(logFile string) (string, error) {
 	keyword := "cloudfuse"
-	err := os.Mkdir("/tmp/cloudfuseSyslog", 0760)
+	outFile, err := os.CreateTemp("", "cloudfuseSyslog*.log")
 	if err != nil {
 		return "", err
 	}
-	outPath := "/tmp/cloudfuseSyslog/cloudfuseSyslog.log"
 	var inFile *os.File
 	inFile, err = os.Open(logFile)
 	if err != nil {
 		return "", err
 	}
 	defer inFile.Close()
-
-	outFile, err := os.Create(outPath)
-	if err != nil {
-		return "", err
-	}
 	defer outFile.Close()
 
 	scanner := bufio.NewScanner(inFile)
@@ -468,7 +462,7 @@ func createFilteredLog(logFile string) (string, error) {
 		}
 	}
 	writer.Flush()
-	return outPath, scanner.Err()
+	return outFile.Name(), scanner.Err()
 }
 
 func init() {
