@@ -172,7 +172,7 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 			var file *os.File
 			file, err = os.Open(path)
 			suite.assert.NoError(err)
-			suite.assert.True(fileHashMap[info.Name()] != "")
+			suite.assert.NotEqual(fileHashMap[info.Name()], "")
 			hasher := sha256.New()
 			_, err = io.Copy(hasher, file)
 			suite.assert.NoError(err)
