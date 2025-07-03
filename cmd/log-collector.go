@@ -199,7 +199,10 @@ func getLogInfo(configFile string) (string, string, error) {
 		fmt.Printf("Warning, the config file was not found. Defaults will be used\n")
 	} else {
 		config.SetConfigFile(configFile)
-		config.ReadFromConfigFile(configFile)
+		err = config.ReadFromConfigFile(configFile)
+		if err != nil {
+			return "", "", err
+		}
 		if config.IsSet("logging.type") {
 			err := config.UnmarshalKey("logging.type", &logType)
 			if err != nil {
@@ -372,7 +375,10 @@ func createWindowsArchive(archPath string) error {
 	if err != nil {
 		return nil
 	}
-	defer outFile.Sync()
+	err = outFile.Sync()
+	if err != nil {
+		return err
+	}
 	defer outFile.Close()
 
 	zipWriter := zip.NewWriter(outFile)
@@ -432,9 +438,13 @@ func createWindowsArchive(archPath string) error {
 // It only runs for linux when the logging type is set to "syslog" in the config
 func createFilteredLog(logFile string) (string, error) {
 	keyword := "cloudfuse"
-	os.Mkdir("/tmp/cloudfuseSyslog", 0760)
+	err := os.Mkdir("/tmp/cloudfuseSyslog", 0760)
+	if err != nil {
+		return "", err
+	}
 	outPath := "/tmp/cloudfuseSyslog/cloudfuseSyslog.log"
-	inFile, err := os.Open(logFile)
+	var inFile *os.File
+	inFile, err = os.Open(logFile)
 	if err != nil {
 		return "", err
 	}
