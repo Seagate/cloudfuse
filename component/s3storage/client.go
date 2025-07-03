@@ -227,16 +227,21 @@ func (cl *Client) Configure(cfg Config) error {
 		return err
 	}
 
-	// if no bucket-name was set, default to the first bucket in the list
+	// if no bucket-name was set, default to the first accessible bucket in the list
 	if cl.Config.authConfig.BucketName == "" {
-		if len(bucketList) > 0 {
-			cl.Config.authConfig.BucketName = bucketList[0]
-			log.Warn(
-				"Client::Configure : Bucket defaulted to first listed bucket: %s",
-				bucketList[0],
-			)
-		} else {
-			log.Err("Client::Configure : Error no bucket exists in account: %v", err)
+		for _, bucketName := range bucketList {
+			cl.Config.authConfig.BucketName = bucketName
+			if _, err := cl.bucketExists(); err == nil {
+				log.Warn(
+					"Client::Configure : Bucket defaulted to first accessible listed bucket: %s",
+					bucketName,
+				)
+				break
+			}
+		}
+		// if no accessible bucket was found, return an error
+		if cl.Config.authConfig.BucketName == "" {
+			log.Err("Client::Configure : Error no accessible bucket exists in account: %v", err)
 			return errNoBucketInAccount
 		}
 	}
