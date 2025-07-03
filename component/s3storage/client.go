@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -92,9 +93,6 @@ var (
 	)
 	errNoBucketInAccount = errors.New(
 		"Bucket Error: No bucket exists in S3 account, please create a bucket in your account",
-	)
-	errBucketNotSpecified = errors.New(
-		"Multiple Buckets Error: The given credentials grant access to multiple buckets, please specify bucket-name to select one",
 	)
 )
 
@@ -232,26 +230,28 @@ func (cl *Client) Configure(cfg Config) error {
 
 	// if no bucket-name was set, default to the first accessible bucket in the list
 	if cl.Config.authConfig.BucketName == "" {
-		bucketList = cl.filterAccessibleBuckets(bucketList)
-		switch len(bucketList) {
+		// which buckets does the user have access to?
+		authorizedBucketList := cl.filterAccessibleBuckets(bucketList)
+		switch len(authorizedBucketList) {
+		case 0:
+			// if there are none, return an error
+			log.Err("Client::Configure : Error no authorized bucket exists in account: %v", err)
+			return errNoBucketInAccount
 		case 1:
-			cl.Config.authConfig.BucketName = bucketList[0]
 			log.Warn(
-				"Client::Configure : Bucket defaulted to the only accessible listed bucket: %s",
+				"Client::Configure : Bucket defaulted to the only authorized one: %s",
 				bucketList[0],
 			)
-		case 0:
-			// if no accessible bucket was found, return an error
-			log.Err("Client::Configure : Error no accessible bucket exists in account: %v", err)
-			return errNoBucketInAccount
 		default:
-			// multiple accessible buckets were found, return an error to prevent unpredictable behavior
-			log.Err(
-				"Client::Configure : Please specify a bucket name. Multiple accessible buckets found: %#v",
-				bucketList,
+			// multiple accessible buckets were found, choose the first one, alphabetically
+			slices.Sort(bucketList)
+			log.Warn(
+				"Client::Configure : Bucket defaulted to the first authorized one, alphabetically: %s",
+				bucketList[0],
 			)
-			return errBucketNotSpecified
 		}
+		cl.Config.authConfig.BucketName = bucketList[0]
+		return nil
 	}
 
 	// Check that the provided bucket exists and that user has access to bucket
