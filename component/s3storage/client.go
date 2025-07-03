@@ -93,6 +93,9 @@ var (
 	errNoBucketInAccount = errors.New(
 		"Bucket Error: No bucket exists in S3 account, please create a bucket in your account",
 	)
+	errBucketNotSpecified = errors.New(
+		"Multiple Buckets Error: The given credentials grant access to multiple buckets, please specify bucket-name to select one",
+	)
 )
 
 // getSymlinkBool returns true if the symlink flag is set in the metadata map, false otherwise.
@@ -230,18 +233,24 @@ func (cl *Client) Configure(cfg Config) error {
 	// if no bucket-name was set, default to the first accessible bucket in the list
 	if cl.Config.authConfig.BucketName == "" {
 		bucketList = cl.filterAccessibleBuckets(bucketList)
-		for _, bucketName := range bucketList {
-			cl.Config.authConfig.BucketName = bucketName
+		switch len(bucketList) {
+		case 1:
+			cl.Config.authConfig.BucketName = bucketList[0]
 			log.Warn(
-				"Client::Configure : Bucket defaulted to first accessible listed bucket: %s",
-				bucketName,
+				"Client::Configure : Bucket defaulted to the only accessible listed bucket: %s",
+				bucketList[0],
 			)
-			break
-		}
-		// if no accessible bucket was found, return an error
-		if cl.Config.authConfig.BucketName == "" {
+		case 0:
+			// if no accessible bucket was found, return an error
 			log.Err("Client::Configure : Error no accessible bucket exists in account: %v", err)
 			return errNoBucketInAccount
+		default:
+			// multiple accessible buckets were found, return an error to prevent unpredictable behavior
+			log.Err(
+				"Client::Configure : Please specify a bucket name. Multiple accessible buckets found: %#v",
+				bucketList,
+			)
+			return errBucketNotSpecified
 		}
 	}
 
@@ -264,6 +273,18 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	return nil
+}
+
+// Use ListBuckets and filterAccessibleBuckets to get a list of buckets that the user has access to
+func (cl *Client) ListAccessibleBuckets() ([]string, error) {
+	log.Trace("Client::ListAccessibleBuckets")
+	allBuckets, err := cl.ListBuckets()
+	if err != nil {
+		log.Err("Client::ListAccessibleBuckets : Failed to list buckets. Here's why: %v", err)
+		return allBuckets, err
+	}
+	accessibleBuckets := cl.filterAccessibleBuckets(allBuckets)
+	return accessibleBuckets, nil
 }
 
 // filter out buckets for which we do not have permissions
