@@ -85,10 +85,7 @@ const maxResultsPerListCall = 1000
 
 // check the connection to the S3 service by calling HeadBucket.
 func (cl *Client) ConnectionOkay(ctx context.Context) error {
-	log.Trace("Client::checkConnection : checking connection to S3 service")
-	// use a 200ms timeout
-	ctx, cancelFn := context.WithTimeout(ctx, 200*time.Millisecond)
-	defer cancelFn()
+	log.Trace("Client::ConnectionOkay : checking connection to S3 service")
 	_, err := cl.awsS3Client.HeadBucket(
 		ctx,
 		&s3.HeadBucketInput{Bucket: aws.String(cl.Config.authConfig.BucketName)},

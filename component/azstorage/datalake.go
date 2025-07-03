@@ -198,6 +198,12 @@ func (dl *Datalake) TestPipeline() error {
 	return dl.BlockBlob.TestPipeline()
 }
 
+// check the connection to the service by calling GetProperties on the container
+func (dl *Datalake) ConnectionOkay(ctx context.Context) error {
+	log.Trace("BlockBlob::ConnectionOkay : checking connection to cloud service")
+	return dl.BlockBlob.ConnectionOkay(ctx)
+}
+
 func (dl *Datalake) ListContainers() ([]string, error) {
 	log.Trace("Datalake::ListContainers : Listing containers")
 	return dl.BlockBlob.ListContainers()

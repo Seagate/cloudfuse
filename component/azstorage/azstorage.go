@@ -27,7 +27,9 @@ package azstorage
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -47,12 +49,20 @@ import (
 // AzStorage Wrapper type around azure go-sdk (track-1)
 type AzStorage struct {
 	internal.BaseComponent
-	storage               AzConnection
-	stConfig              AzStorageConfig
-	startTime             time.Time
-	listBlocked           bool
-	firstOffline          time.Time
-	lastConnectionAttempt time.Time
+	storage     AzConnection
+	stConfig    AzStorageConfig
+	startTime   time.Time
+	listBlocked bool
+	state       connectionState
+	ctx         context.Context
+	cancelFn    context.CancelFunc
+}
+
+type connectionState struct {
+	sync.Mutex
+	lastConnectionAttempt *time.Time
+	firstOffline          *time.Time
+	retryTicker           *time.Ticker
 }
 
 const compName = "azstorage"
@@ -182,6 +192,16 @@ func (az *AzStorage) Start(ctx context.Context) error {
 	// create stats collector for azstorage
 	azStatsCollector = stats_manager.NewStatsCollector(az.Name())
 	log.Debug("Starting azstorage stats collector")
+	// create a shared context for all cloud operations, with ability to cancel
+	az.ctx, az.cancelFn = context.WithCancel(ctx)
+	// create the retry ticker
+	az.state.retryTicker = time.NewTicker(time.Duration(az.stConfig.backoffTime))
+	az.state.retryTicker.Stop() // stop it for now, we will start it when we are offline
+	go func() {
+		for range az.state.retryTicker.C {
+			az.CloudConnected()
+		}
+	}()
 
 	return nil
 }
@@ -198,47 +218,61 @@ func (az *AzStorage) Stop() error {
 // Online check
 func (az *AzStorage) CloudConnected() bool {
 	log.Trace("AzStorage::CloudConnected")
-	if !az.timeToRetry() {
-		log.Debug("AzStorage::CloudConnected : Exponential backoff triggered")
-		return false
+	connected := az.state.firstOffline == nil
+	// don't check the connection when it's up, or if we are not ready to retry
+	if connected || !az.timeToRetry() {
+		return connected
 	}
-	// Use ListContainers to check if the connection is online
-	_, err := az.ListContainers()
-	currentTime := time.Now()
-	if err != nil {
-		log.Err("AzStorage::CloudConnected : Connection is offline [%v]", err)
-		az.lastConnectionAttempt = currentTime
-		if az.firstOffline.IsZero() {
-			az.firstOffline = currentTime
-		}
-		return false
-	}
-	// update state
-	az.firstOffline = time.Time{}
-	az.lastConnectionAttempt = currentTime
-	return true
+	// check connection
+	ctx, cancelFun := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancelFun()
+	err := az.storage.ConnectionOkay(ctx)
+	nowConnected := az.updateConnectionState(err)
+	return nowConnected
 }
 
 func (az *AzStorage) timeToRetry() bool {
-	// If the firstOffline is not set, it means we are online
-	if az.firstOffline.IsZero() {
-		return true
-	}
-	// If we haven't checked for over 30 seconds, we can retry
-	timeSinceLastAttempt := time.Since(az.lastConnectionAttempt)
-	if timeSinceLastAttempt > 30*time.Second {
-		// Reset the firstOffline time if we are retrying after a long time
-		az.firstOffline = time.Time{}
-		return true
-	}
-	// Minimum delay before retrying
-	initialDelay := 5 * time.Second
-	if timeSinceLastAttempt < initialDelay {
+	timeSinceLastAttempt := time.Since(*az.state.lastConnectionAttempt)
+	switch {
+	case timeSinceLastAttempt < time.Duration(az.stConfig.backoffTime):
+		// minimum delay before retrying
 		return false
+	case timeSinceLastAttempt > 90*time.Second:
+		// maximum delay
+		return true
+	default:
+		// when between the minimum and maximum delay, we use an exponential backoff
+		timeOfflineAtLastAttempt := az.state.lastConnectionAttempt.Sub(*az.state.firstOffline)
+		return timeSinceLastAttempt > timeOfflineAtLastAttempt
 	}
-	// Formula between 5 seconds and 30 seconds
-	timeOffline := az.lastConnectionAttempt.Sub(az.firstOffline)
-	return time.Since(az.lastConnectionAttempt) >= timeOffline
+}
+
+func (az *AzStorage) updateConnectionState(err error) bool {
+	az.state.Lock()
+	defer az.state.Unlock()
+	currentTime := time.Now()
+	az.state.lastConnectionAttempt = &currentTime
+	connected := !errors.Is(err, &common.CloudUnreachableError{})
+	wasConnected := az.state.firstOffline == nil
+	stateChanged := connected != wasConnected
+	if stateChanged {
+		log.Warn("AzStorage::updateConnectionState : connected is now: %t", connected)
+		if connected {
+			az.state.firstOffline = nil
+			// reset the context to allow new requests
+			az.ctx, az.cancelFn = context.WithCancel(context.Background())
+			// stop the retry ticker
+			az.state.retryTicker.Stop()
+		} else {
+			az.state.firstOffline = &currentTime
+			// cancel all outstanding requests
+			az.cancelFn()
+			log.Warn("AzStorage::updateConnectionState : cancelled all outstanding requests")
+			// reset the ticker to retry the connection
+			az.state.retryTicker.Reset(time.Duration(az.stConfig.backoffTime))
+		}
+	}
+	return connected
 }
 
 // ------------------------- Container listing -------------------------------------------

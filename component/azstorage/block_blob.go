@@ -207,13 +207,13 @@ func (bb *BlockBlob) TestPipeline() error {
 	return nil
 }
 
-func (bb *BlockBlob) ListContainers() ([]string, error) {
+func (bb *BlockBlob) ListContainers(ctx context.Context) ([]string, error) {
 	log.Trace("BlockBlob::ListContainers : Listing containers")
 	cntList := make([]string, 0)
 
 	pager := bb.Service.NewListContainersPager(nil)
 	for pager.More() {
-		resp, err := pager.NextPage(context.Background())
+		resp, err := pager.NextPage(ctx)
 		if err != nil {
 			log.Err("BlockBlob::ListContainers : Failed to get container list [%s]", err.Error())
 			return cntList, err
@@ -226,6 +226,17 @@ func (bb *BlockBlob) ListContainers() ([]string, error) {
 	return cntList, nil
 }
 
+// check the connection to the service by calling GetProperties on the container
+func (bb *BlockBlob) ConnectionOkay(ctx context.Context) error {
+	log.Trace("BlockBlob::ConnectionOkay : checking connection to cloud service")
+	_, err := bb.Container.GetProperties(ctx, nil)
+	if isOffline(err) {
+		return common.CloudUnreachableError{}
+	} else {
+		return nil
+	}
+}
+
 func (bb *BlockBlob) SetPrefixPath(path string) error {
 	log.Trace("BlockBlob::SetPrefixPath : path %s", path)
 	bb.Config.prefixPath = path
@@ -233,38 +244,38 @@ func (bb *BlockBlob) SetPrefixPath(path string) error {
 }
 
 // CreateFile : Create a new file in the container/virtual directory
-func (bb *BlockBlob) CreateFile(name string, mode os.FileMode) error {
+func (bb *BlockBlob) CreateFile(ctx context.Context, name string, mode os.FileMode) error {
 	log.Trace("BlockBlob::CreateFile : name %s", name)
 	var data []byte
-	return bb.WriteFromBuffer(name, nil, data)
+	return bb.WriteFromBuffer(ctx, name, nil, data)
 }
 
 // CreateDirectory : Create a new directory in the container/virtual directory
-func (bb *BlockBlob) CreateDirectory(name string) error {
+func (bb *BlockBlob) CreateDirectory(ctx context.Context, name string) error {
 	log.Trace("BlockBlob::CreateDirectory : name %s", name)
 
 	var data []byte
 	metadata := make(map[string]*string)
 	metadata[folderKey] = to.Ptr("true")
 
-	return bb.WriteFromBuffer(name, metadata, data)
+	return bb.WriteFromBuffer(ctx, name, metadata, data)
 }
 
 // CreateLink : Create a symlink in the container/virtual directory
-func (bb *BlockBlob) CreateLink(source string, target string) error {
+func (bb *BlockBlob) CreateLink(ctx context.Context, source string, target string) error {
 	log.Trace("BlockBlob::CreateLink : %s -> %s", source, target)
 	data := []byte(target)
 	metadata := make(map[string]*string)
 	metadata[symlinkKey] = to.Ptr("true")
-	return bb.WriteFromBuffer(source, metadata, data)
+	return bb.WriteFromBuffer(ctx, source, metadata, data)
 }
 
 // DeleteFile : Delete a blob in the container/virtual directory
-func (bb *BlockBlob) DeleteFile(name string) (err error) {
+func (bb *BlockBlob) DeleteFile(ctx context.Context, name string) (err error) {
 	log.Trace("BlockBlob::DeleteFile : name %s", name)
 
 	blobClient := bb.getBlobClient(name)
-	_, err = blobClient.Delete(context.Background(), &blob.DeleteOptions{
+	_, err = blobClient.Delete(ctx, &blob.DeleteOptions{
 		DeleteSnapshots: to.Ptr(blob.DeleteSnapshotsOptionTypeInclude),
 	})
 	if err != nil {
@@ -1521,7 +1532,7 @@ func (bb *BlockBlob) StageAndCommit(name string, bol *common.BlockOffsetList) er
 }
 
 // ChangeMod : Change mode of a blob
-func (bb *BlockBlob) ChangeMod(name string, _ os.FileMode) error {
+func (bb *BlockBlob) ChangeMod(ctx context.Context, name string, _ os.FileMode) error {
 	log.Trace("BlockBlob::ChangeMod : name %s", name)
 
 	if bb.Config.ignoreAccessModifiers {
@@ -1535,7 +1546,7 @@ func (bb *BlockBlob) ChangeMod(name string, _ os.FileMode) error {
 }
 
 // ChangeOwner : Change owner of a blob
-func (bb *BlockBlob) ChangeOwner(name string, _ int, _ int) error {
+func (bb *BlockBlob) ChangeOwner(ctx context.Context, name string, _ int, _ int) error {
 	log.Trace("BlockBlob::ChangeOwner : name %s", name)
 
 	if bb.Config.ignoreAccessModifiers {

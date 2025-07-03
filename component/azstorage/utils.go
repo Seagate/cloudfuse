@@ -26,6 +26,7 @@
 package azstorage
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/json"
 	"errors"
@@ -291,6 +292,11 @@ func storeDatalakeErrToErr(err error) uint16 {
 		}
 	}
 	return ErrNoErr
+}
+
+// Detect offline errors
+func isOffline(err error) bool {
+	return errors.Is(err, context.Canceled)
 }
 
 //	----------- Metadata handling  ---------------

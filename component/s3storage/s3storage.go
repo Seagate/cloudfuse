@@ -181,7 +181,7 @@ func (s3 *S3Storage) Start(ctx context.Context) error {
 	// create stats collector for s3storage
 	s3StatsCollector = stats_manager.NewStatsCollector(s3.Name())
 	log.Debug("Starting s3 stats collector")
-	// create a shared context for all S3 operations, with ability to cancel
+	// create a shared context for all cloud operations, with ability to cancel
 	s3.ctx, s3.cancelFn = context.WithCancel(ctx)
 	// create the retry ticker
 	s3.state.retryTicker = time.NewTicker(s3.stConfig.healthCheckInterval)
