@@ -238,19 +238,20 @@ func (cl *Client) Configure(cfg Config) error {
 			log.Err("Client::Configure : Error no authorized bucket exists in account: %v", err)
 			return errNoBucketInAccount
 		case 1:
+			cl.Config.authConfig.BucketName = bucketList[0]
 			log.Warn(
 				"Client::Configure : Bucket defaulted to the only authorized one: %s",
-				bucketList[0],
+				cl.Config.authConfig.BucketName,
 			)
 		default:
 			// multiple accessible buckets were found, choose the first one, alphabetically
 			slices.Sort(bucketList)
+			cl.Config.authConfig.BucketName = bucketList[0]
 			log.Warn(
 				"Client::Configure : Bucket defaulted to the first authorized one, alphabetically: %s",
-				bucketList[0],
+				cl.Config.authConfig.BucketName,
 			)
 		}
-		cl.Config.authConfig.BucketName = bucketList[0]
 		return nil
 	}
 
