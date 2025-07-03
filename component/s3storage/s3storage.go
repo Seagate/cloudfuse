@@ -183,6 +183,10 @@ func (s3 *S3Storage) ListBuckets() ([]string, error) {
 	return s3.storage.ListBuckets()
 }
 
+func (s3 *S3Storage) ListAuthorizedBuckets() ([]string, error) {
+	return s3.storage.ListAuthorizedBuckets()
+}
+
 // ------------------------- Core Operations -------------------------------------------
 
 // Directory operations
