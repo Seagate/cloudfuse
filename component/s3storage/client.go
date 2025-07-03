@@ -228,10 +228,10 @@ func (cl *Client) Configure(cfg Config) error {
 		return err
 	}
 
-	// if no bucket-name was set, default to the first accessible bucket in the list
+	// if no bucket-name was set, default to the first authorized bucket in the list
 	if cl.Config.authConfig.BucketName == "" {
 		// which buckets does the user have access to?
-		authorizedBucketList := cl.filterAccessibleBuckets(bucketList)
+		authorizedBucketList := cl.filterAuthorizedBuckets(bucketList)
 		switch len(authorizedBucketList) {
 		case 0:
 			// if there are none, return an error
@@ -244,7 +244,7 @@ func (cl *Client) Configure(cfg Config) error {
 				cl.Config.authConfig.BucketName,
 			)
 		default:
-			// multiple accessible buckets were found, choose the first one, alphabetically
+			// multiple authorized buckets were found, choose the first one, alphabetically
 			slices.Sort(bucketList)
 			cl.Config.authConfig.BucketName = bucketList[0]
 			log.Warn(
@@ -276,45 +276,45 @@ func (cl *Client) Configure(cfg Config) error {
 	return nil
 }
 
-// Use ListBuckets and filterAccessibleBuckets to get a list of buckets that the user has access to
-func (cl *Client) ListAccessibleBuckets() ([]string, error) {
-	log.Trace("Client::ListAccessibleBuckets")
+// Use ListBuckets and filterAuthorizedBuckets to get a list of buckets that the user has access to
+func (cl *Client) ListAuthorizedBuckets() ([]string, error) {
+	log.Trace("Client::ListAuthorizedBuckets")
 	allBuckets, err := cl.ListBuckets()
 	if err != nil {
-		log.Err("Client::ListAccessibleBuckets : Failed to list buckets. Here's why: %v", err)
+		log.Err("Client::ListAuthorizedBuckets : Failed to list buckets. Here's why: %v", err)
 		return allBuckets, err
 	}
-	accessibleBuckets := cl.filterAccessibleBuckets(allBuckets)
-	return accessibleBuckets, nil
+	authorizedBuckets := cl.filterAuthorizedBuckets(allBuckets)
+	return authorizedBuckets, nil
 }
 
 // filter out buckets for which we do not have permissions
-func (cl *Client) filterAccessibleBuckets(bucketList []string) (accessibleBucketList []string) {
+func (cl *Client) filterAuthorizedBuckets(bucketList []string) (authorizedBucketList []string) {
 	if len(bucketList) == 0 {
 		return bucketList
 	}
 	// use parallel requests
 	var wg sync.WaitGroup
-	accessibleBuckets := make(chan string, len(bucketList))
+	authorizedBuckets := make(chan string, len(bucketList))
 	for _, bucketName := range bucketList {
 		wg.Add(1)
 		go func(bucketName string) {
 			defer wg.Done()
 			if _, err := cl.headBucket(bucketName); err == nil {
-				accessibleBuckets <- bucketName
+				authorizedBuckets <- bucketName
 			}
 		}(bucketName)
 	}
 	// use a go routine to close the channel after all workers finish
 	go func() {
 		wg.Wait()
-		close(accessibleBuckets)
+		close(authorizedBuckets)
 	}()
-	// get the accessible buckets from the channel
-	for bucketName := range accessibleBuckets {
-		accessibleBucketList = append(accessibleBucketList, bucketName)
+	// get the authorized buckets from the channel
+	for bucketName := range authorizedBuckets {
+		authorizedBucketList = append(authorizedBucketList, bucketName)
 	}
-	return accessibleBucketList
+	return authorizedBucketList
 }
 
 func getRegionFromEndpoint(endpoint string) (string, error) {
