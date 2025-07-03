@@ -183,7 +183,10 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 		return err
 	})
 	suite.assert.NoError(err)
-	suite.assert.Len(fileHashMap, amountLogs)
+	suite.assert.Len(
+		fileHashMap,
+		amountLogs,
+	)
 	return true
 }
 
@@ -303,7 +306,7 @@ func (suite *logCollectTestSuite) TestValidSyslogConfig() {
 		suite.assert.NoError(err)
 
 		// look for temp cloudfuse.log file generated from syslog
-		filteredLogPath := "/tmp/cloudfuseSyslog"
+		filteredLogPath := "/tmp/"
 
 		// use validate archive between those two files.
 		isArcValid := suite.verifyArchive(filteredLogPath, currentDir)
