@@ -182,6 +182,7 @@ func (suite *logCollectTestSuite) verifyArchive(logPath, archivePath string) boo
 		}
 		return err
 	})
+	suite.assert.NoError(err)
 	suite.assert.Equal(amountLogs, len(fileHashMap))
 	return true
 }
