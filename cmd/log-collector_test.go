@@ -47,8 +47,8 @@ func (suite *logCollectTestSuite) cleanupTest(dir string) {
 func (suite *logCollectTestSuite) setupConfig(logInfo logCollectTestConfig) *os.File {
 	config := fmt.Sprintf("logging:\n  type: %s\n  level: %s\n  file-path: %s\n",
 		logInfo.logType, logInfo.level, logInfo.filePath)
-	var configFile *os.File
 	configFile, err := os.CreateTemp("", "conf*.yaml")
+	suite.assert.NoError(err)
 	_, err = configFile.WriteString(config)
 	suite.assert.NoError(err)
 	configFile.Close()
