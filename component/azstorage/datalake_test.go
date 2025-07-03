@@ -2416,6 +2416,7 @@ func (s *datalakeTestSuite) TestFlushFileUpdateChunkedFile() {
 	rand.Read(updatedBlock)
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize)
 	s.az.storage.ReadInBuffer(
+		ctx,
 		name,
 		int64(blockSize),
 		int64(blockSize),
@@ -2470,6 +2471,7 @@ func (s *datalakeTestSuite) TestFlushFileTruncateUpdateChunkedFile() {
 	h.CacheObj.BlockOffsetList.BlockList[1].Data = make([]byte, blockSize/2)
 	h.CacheObj.BlockOffsetList.BlockList[1].EndIndex = int64(blockSize + blockSize/2)
 	s.az.storage.ReadInBuffer(
+		ctx,
 		name,
 		int64(blockSize),
 		int64(blockSize)/2,
@@ -2971,21 +2973,21 @@ func (s *datalakeTestSuite) TestDownloadWithCPKEnabled() {
 	s.assert.NoError(err)
 	s.assert.NotNil(f)
 
-	err = s.az.storage.ReadToFile(name, 0, int64(len(data)), f)
+	err = s.az.storage.ReadToFile(ctx, name, 0, int64(len(data)), f)
 	s.assert.NoError(err)
 	fileData, err := os.ReadFile(name)
 	s.assert.NoError(err)
 	s.assert.Equal(data, fileData)
 
 	buf := make([]byte, len(data))
-	err = s.az.storage.ReadInBuffer(name, 0, int64(len(data)), buf)
+	err = s.az.storage.ReadInBuffer(ctx, name, 0, int64(len(data)), buf)
 	s.assert.NoError(err)
 	s.assert.Equal(data, buf)
 
-	rbuf, err := s.az.storage.ReadBuffer(name, 0, int64(len(data)))
+	rbuf, err := s.az.storage.ReadBuffer(ctx, name, 0, int64(len(data)))
 	s.assert.NoError(err)
 	s.assert.Equal(data, rbuf)
-	_ = s.az.storage.DeleteFile(name)
+	_ = s.az.storage.DeleteFile(ctx, name)
 	_ = os.Remove(name)
 }
 
@@ -3022,12 +3024,12 @@ func (s *datalakeTestSuite) TestUploadWithCPKEnabled() {
 	s.assert.NoError(err)
 	_, _ = f.Seek(0, 0)
 
-	err = s.az.storage.WriteFromFile(name1, nil, f)
+	err = s.az.storage.WriteFromFile(ctx, name1, nil, f)
 	s.assert.NoError(err)
 
 	// Blob should have updated data
 	fileClient := s.containerClient.NewFileClient(name1)
-	attr, err := s.az.storage.(*Datalake).GetAttr(name1)
+	attr, err := s.az.storage.(*Datalake).GetAttr(ctx, name1)
 	s.assert.NoError(err)
 	s.assert.NotNil(attr)
 
@@ -3045,7 +3047,7 @@ func (s *datalakeTestSuite) TestUploadWithCPKEnabled() {
 	s.assert.NotNil(resp.RequestID)
 
 	name2 := generateFileName()
-	err = s.az.storage.WriteFromBuffer(name2, nil, data)
+	err = s.az.storage.WriteFromBuffer(ctx, name2, nil, data)
 	s.assert.NoError(err)
 
 	fileClient = s.containerClient.NewFileClient(name2)
@@ -3062,8 +3064,8 @@ func (s *datalakeTestSuite) TestUploadWithCPKEnabled() {
 	s.assert.NoError(err)
 	s.assert.NotNil(resp.RequestID)
 
-	_ = s.az.storage.DeleteFile(name1)
-	_ = s.az.storage.DeleteFile(name2)
+	_ = s.az.storage.DeleteFile(ctx, name1)
+	_ = s.az.storage.DeleteFile(ctx, name2)
 	_ = os.Remove(name1)
 }
 

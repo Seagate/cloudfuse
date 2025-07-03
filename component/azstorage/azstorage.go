@@ -277,7 +277,7 @@ func (az *AzStorage) updateConnectionState(err error) bool {
 
 // ------------------------- Container listing -------------------------------------------
 func (az *AzStorage) ListContainers() ([]string, error) {
-	return az.storage.ListContainers()
+	return az.storage.ListContainers(az.ctx)
 }
 
 // ------------------------- Core Operations -------------------------------------------
@@ -286,7 +286,7 @@ func (az *AzStorage) ListContainers() ([]string, error) {
 func (az *AzStorage) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("AzStorage::CreateDir : %s", options.Name)
 
-	err := az.storage.CreateDirectory(internal.TruncateDirName(options.Name))
+	err := az.storage.CreateDirectory(az.ctx, internal.TruncateDirName(options.Name))
 
 	if err == nil {
 		azStatsCollector.PushEvents(
@@ -303,7 +303,7 @@ func (az *AzStorage) CreateDir(options internal.CreateDirOptions) error {
 func (az *AzStorage) DeleteDir(options internal.DeleteDirOptions) error {
 	log.Trace("AzStorage::DeleteDir : %s", options.Name)
 
-	err := az.storage.DeleteDirectory(internal.TruncateDirName(options.Name))
+	err := az.storage.DeleteDirectory(az.ctx, internal.TruncateDirName(options.Name))
 
 	if err == nil {
 		azStatsCollector.PushEvents(deleteDir, options.Name, nil)
@@ -326,7 +326,7 @@ func formatListDirName(path string) string {
 
 func (az *AzStorage) IsDirEmpty(options internal.IsDirEmptyOptions) bool {
 	log.Trace("AzStorage::IsDirEmpty : %s", options.Name)
-	list, _, err := az.storage.List(formatListDirName(options.Name), nil, 1)
+	list, _, err := az.storage.List(az.ctx, formatListDirName(options.Name), nil, 1)
 	if err != nil {
 		log.Err("AzStorage::IsDirEmpty : error listing [%s]", err)
 		return false
@@ -363,7 +363,7 @@ func (az *AzStorage) StreamDir(
 		options.Count = common.MaxDirListCount
 	}
 
-	new_list, new_marker, err := az.storage.List(path, &options.Token, options.Count)
+	new_list, new_marker, err := az.storage.List(az.ctx, path, &options.Token, options.Count)
 	if err != nil {
 		log.Err("AzStorage::StreamDir : Failed to read dir [%s]", err)
 		return new_list, "", err
@@ -410,7 +410,7 @@ func (az *AzStorage) RenameDir(options internal.RenameDirOptions) error {
 	options.Src = internal.TruncateDirName(options.Src)
 	options.Dst = internal.TruncateDirName(options.Dst)
 
-	err := az.storage.RenameDirectory(options.Src, options.Dst)
+	err := az.storage.RenameDirectory(az.ctx, options.Src, options.Dst)
 
 	if err == nil {
 		azStatsCollector.PushEvents(
@@ -435,7 +435,7 @@ func (az *AzStorage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 		return nil, syscall.EFAULT
 	}
 
-	err := az.storage.CreateFile(options.Name, options.Mode)
+	err := az.storage.CreateFile(az.ctx, options.Name, options.Mode)
 	if err != nil {
 		return nil, err
 	}
@@ -456,7 +456,7 @@ func (az *AzStorage) CreateFile(options internal.CreateFileOptions) (*handlemap.
 func (az *AzStorage) OpenFile(options internal.OpenFileOptions) (*handlemap.Handle, error) {
 	log.Trace("AzStorage::OpenFile : %s", options.Name)
 
-	attr, err := az.storage.GetAttr(options.Name)
+	attr, err := az.storage.GetAttr(az.ctx, options.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +489,7 @@ func (az *AzStorage) CloseFile(options internal.CloseFileOptions) error {
 func (az *AzStorage) DeleteFile(options internal.DeleteFileOptions) error {
 	log.Trace("AzStorage::DeleteFile : %s", options.Name)
 
-	err := az.storage.DeleteFile(options.Name)
+	err := az.storage.DeleteFile(az.ctx, options.Name)
 
 	if err == nil {
 		azStatsCollector.PushEvents(deleteFile, options.Name, nil)
@@ -502,7 +502,7 @@ func (az *AzStorage) DeleteFile(options internal.DeleteFileOptions) error {
 func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("AzStorage::RenameFile : %s to %s", options.Src, options.Dst)
 
-	err := az.storage.RenameFile(options.Src, options.Dst)
+	err := az.storage.RenameFile(az.ctx, options.Src, options.Dst)
 
 	if err == nil {
 		azStatsCollector.PushEvents(
@@ -531,7 +531,13 @@ func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length 
 		return 0, nil
 	}
 
-	err = az.storage.ReadInBuffer(options.Handle.Path, options.Offset, dataLen, options.Data)
+	err = az.storage.ReadInBuffer(
+		az.ctx,
+		options.Handle.Path,
+		options.Offset,
+		dataLen,
+		options.Data,
+	)
 	if err != nil {
 		log.Err(
 			"AzStorage::ReadInBuffer : Failed to read %s [%s]",
@@ -545,20 +551,20 @@ func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length 
 }
 
 func (az *AzStorage) WriteFile(options internal.WriteFileOptions) (int, error) {
-	err := az.storage.Write(options)
+	err := az.storage.Write(az.ctx, options)
 	return len(options.Data), err
 }
 
 func (az *AzStorage) GetFileBlockOffsets(
 	options internal.GetFileBlockOffsetsOptions,
 ) (*common.BlockOffsetList, error) {
-	return az.storage.GetFileBlockOffsets(options.Name)
+	return az.storage.GetFileBlockOffsets(az.ctx, options.Name)
 
 }
 
 func (az *AzStorage) TruncateFile(options internal.TruncateFileOptions) error {
 	log.Trace("AzStorage::TruncateFile : %s to %d bytes", options.Name, options.Size)
-	err := az.storage.TruncateFile(options.Name, options.Size)
+	err := az.storage.TruncateFile(az.ctx, options.Name, options.Size)
 
 	if err == nil {
 		azStatsCollector.PushEvents(
@@ -573,12 +579,12 @@ func (az *AzStorage) TruncateFile(options internal.TruncateFileOptions) error {
 
 func (az *AzStorage) CopyToFile(options internal.CopyToFileOptions) error {
 	log.Trace("AzStorage::CopyToFile : Read file %s", options.Name)
-	return az.storage.ReadToFile(options.Name, options.Offset, options.Count, options.File)
+	return az.storage.ReadToFile(az.ctx, options.Name, options.Offset, options.Count, options.File)
 }
 
 func (az *AzStorage) CopyFromFile(options internal.CopyFromFileOptions) error {
 	log.Trace("AzStorage::CopyFromFile : Upload file %s", options.Name)
-	return az.storage.WriteFromFile(options.Name, options.Metadata, options.File)
+	return az.storage.WriteFromFile(az.ctx, options.Name, options.Metadata, options.File)
 }
 
 // Symlink operations
@@ -592,7 +598,7 @@ func (az *AzStorage) CreateLink(options internal.CreateLinkOptions) error {
 		return syscall.ENOTSUP
 	}
 	log.Trace("AzStorage::CreateLink : Create symlink %s -> %s", options.Name, options.Target)
-	err := az.storage.CreateLink(options.Name, options.Target)
+	err := az.storage.CreateLink(az.ctx, options.Name, options.Target)
 
 	if err == nil {
 		azStatsCollector.PushEvents(
@@ -612,7 +618,7 @@ func (az *AzStorage) ReadLink(options internal.ReadLinkOptions) (string, error) 
 		return "", syscall.ENOENT
 	}
 	log.Trace("AzStorage::ReadLink : Read symlink %s", options.Name)
-	data, err := az.storage.ReadBuffer(options.Name, 0, options.Size)
+	data, err := az.storage.ReadBuffer(az.ctx, options.Name, 0, options.Size)
 
 	if err != nil {
 		azStatsCollector.PushEvents(readLink, options.Name, nil)
@@ -625,12 +631,12 @@ func (az *AzStorage) ReadLink(options internal.ReadLinkOptions) (string, error) 
 // Attribute operations
 func (az *AzStorage) GetAttr(options internal.GetAttrOptions) (attr *internal.ObjAttr, err error) {
 	//log.Trace("AzStorage::GetAttr : Get attributes of file %s", name)
-	return az.storage.GetAttr(options.Name)
+	return az.storage.GetAttr(az.ctx, options.Name)
 }
 
 func (az *AzStorage) Chmod(options internal.ChmodOptions) error {
 	log.Trace("AzStorage::Chmod : Change mod of file %s", options.Name)
-	err := az.storage.ChangeMod(options.Name, options.Mode)
+	err := az.storage.ChangeMod(az.ctx, options.Name, options.Mode)
 
 	if err == nil {
 		azStatsCollector.PushEvents(
@@ -651,24 +657,28 @@ func (az *AzStorage) Chown(options internal.ChownOptions) error {
 		options.Owner,
 		options.Group,
 	)
-	return az.storage.ChangeOwner(options.Name, options.Owner, options.Group)
+	return az.storage.ChangeOwner(az.ctx, options.Name, options.Owner, options.Group)
 }
 
 func (az *AzStorage) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("AzStorage::FlushFile : Flush file %s", options.Handle.Path)
-	return az.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
+	return az.storage.StageAndCommit(
+		az.ctx,
+		options.Handle.Path,
+		options.Handle.CacheObj.BlockOffsetList,
+	)
 }
 
 func (az *AzStorage) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
-	return az.storage.GetCommittedBlockList(name)
+	return az.storage.GetCommittedBlockList(az.ctx, name)
 }
 
 func (az *AzStorage) StageData(opt internal.StageDataOptions) error {
-	return az.storage.StageBlock(opt.Name, opt.Data, opt.Id)
+	return az.storage.StageBlock(az.ctx, opt.Name, opt.Data, opt.Id)
 }
 
 func (az *AzStorage) CommitData(opt internal.CommitDataOptions) error {
-	return az.storage.CommitBlocks(opt.Name, opt.List)
+	return az.storage.CommitBlocks(az.ctx, opt.Name, opt.List)
 }
 
 // TODO : Below methods are pending to be implemented
