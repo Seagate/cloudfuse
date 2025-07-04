@@ -195,7 +195,7 @@ func (az *AzStorage) Start(ctx context.Context) error {
 	// create a shared context for all cloud operations, with ability to cancel
 	az.ctx, az.cancelFn = context.WithCancel(ctx)
 	// create the retry ticker
-	az.state.retryTicker = time.NewTicker(time.Duration(az.stConfig.backoffTime))
+	az.state.retryTicker = time.NewTicker(time.Duration(az.stConfig.backoffTime) * time.Second)
 	az.state.retryTicker.Stop() // stop it for now, we will start it when we are offline
 	go func() {
 		for range az.state.retryTicker.C {
@@ -234,7 +234,7 @@ func (az *AzStorage) CloudConnected() bool {
 func (az *AzStorage) timeToRetry() bool {
 	timeSinceLastAttempt := time.Since(*az.state.lastConnectionAttempt)
 	switch {
-	case timeSinceLastAttempt < time.Duration(az.stConfig.backoffTime):
+	case timeSinceLastAttempt < time.Duration(az.stConfig.backoffTime)*time.Second:
 		// minimum delay before retrying
 		return false
 	case timeSinceLastAttempt > 90*time.Second:
@@ -269,7 +269,7 @@ func (az *AzStorage) updateConnectionState(err error) bool {
 			az.cancelFn()
 			log.Warn("AzStorage::updateConnectionState : cancelled all outstanding requests")
 			// reset the ticker to retry the connection
-			az.state.retryTicker.Reset(time.Duration(az.stConfig.backoffTime))
+			az.state.retryTicker.Reset(time.Duration(az.stConfig.backoffTime) * time.Second)
 		}
 	}
 	return connected
