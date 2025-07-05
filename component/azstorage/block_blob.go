@@ -230,11 +230,7 @@ func (bb *BlockBlob) ListContainers(ctx context.Context) ([]string, error) {
 func (bb *BlockBlob) ConnectionOkay(ctx context.Context) error {
 	log.Trace("BlockBlob::ConnectionOkay : checking connection to cloud service")
 	_, err := bb.Container.GetProperties(ctx, nil)
-	if isOffline(err) {
-		return common.CloudUnreachableError{}
-	} else {
-		return nil
-	}
+	return err
 }
 
 func (bb *BlockBlob) SetPrefixPath(path string) error {

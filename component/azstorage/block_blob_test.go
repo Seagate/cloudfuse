@@ -416,6 +416,37 @@ func (s *blockBlobTestSuite) TestListContainers() {
 	s.assert.Equal(num, count)
 }
 
+func (s *blockBlobTestSuite) TestCloudConnected() {
+	defer s.cleanupTest()
+	s.assert.True(s.az.CloudConnected())
+}
+
+func (s *blockBlobTestSuite) TestUpdateConnectionState() {
+	defer s.cleanupTest()
+	connected := s.az.updateConnectionState(&common.CloudUnreachableError{})
+	s.assert.False(connected)
+	s.assert.False(s.az.CloudConnected())
+	connected = s.az.updateConnectionState(nil)
+	s.assert.True(connected)
+	s.assert.True(s.az.CloudConnected())
+}
+
+func (s *blockBlobTestSuite) TestCloudOfflineCached() {
+	defer s.cleanupTest()
+	s.az.updateConnectionState(&common.CloudUnreachableError{})
+	s.assert.False(s.az.CloudConnected())
+	s.az.updateConnectionState(nil)
+}
+
+func (s *blockBlobTestSuite) TestCloudOfflineContext() {
+	defer s.cleanupTest()
+	s.az.updateConnectionState(&common.CloudUnreachableError{})
+	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: "file" + randomString(8)})
+	s.assert.Nil(h)
+	s.assert.True(isOfflineError(err))
+	s.az.updateConnectionState(nil)
+}
+
 // TODO : ListContainersHuge: Maybe this is overkill?
 
 func checkMetadata(metadata map[string]*string, key string, val string) bool {
@@ -1071,6 +1102,16 @@ func (s *blockBlobTestSuite) TestCreateFile() {
 	name := generateFileName()
 
 	h, err := s.az.CreateFile(internal.CreateFileOptions{Name: name})
+	// log error information to debug log
+	unwrappedErr := err
+	for unwrappedErr != nil {
+		fmt.Printf(
+			"Uncaught AZ error is of type \"%T\" and value %v.\n",
+			unwrappedErr,
+			unwrappedErr,
+		)
+		unwrappedErr = errors.Unwrap(unwrappedErr)
+	}
 
 	s.assert.NoError(err)
 	s.assert.NotNil(h)
