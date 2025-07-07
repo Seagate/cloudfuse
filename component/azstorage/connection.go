@@ -109,14 +109,24 @@ type AzConnection interface {
 	GetAttr(ctx context.Context, name string) (attr *internal.ObjAttr, err error)
 
 	// Standard operations to be supported by any account type
-	List(ctx context.Context, prefix string, marker *string, count int32) ([]*internal.ObjAttr, *string, error)
+	List(
+		ctx context.Context,
+		prefix string,
+		marker *string,
+		count int32,
+	) ([]*internal.ObjAttr, *string, error)
 
 	ReadToFile(ctx context.Context, name string, offset int64, count int64, fi *os.File) error
 	ReadBuffer(ctx context.Context, name string, offset int64, length int64) ([]byte, error)
 	ReadInBuffer(ctx context.Context, name string, offset int64, length int64, data []byte) error
 
 	WriteFromFile(ctx context.Context, name string, metadata map[string]*string, fi *os.File) error
-	WriteFromBuffer(ctx context.Context, name string, metadata map[string]*string, data []byte) error
+	WriteFromBuffer(
+		ctx context.Context,
+		name string,
+		metadata map[string]*string,
+		data []byte,
+	) error
 	Write(ctx context.Context, options internal.WriteFileOptions) error
 	GetFileBlockOffsets(ctx context.Context, name string) (*common.BlockOffsetList, error)
 
