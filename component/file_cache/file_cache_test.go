@@ -476,6 +476,7 @@ func (suite *fileCacheTestSuite) TestCreateDirOffline() {
 	path := "a"
 	options := internal.CreateDirOptions{Name: path}
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path}).Return(nil, os.ErrNotExist)
+	suite.mock.EXPECT().CloudConnected().AnyTimes()
 	err := suite.fileCache.CreateDir(options)
 	suite.assert.NoError(err)
 
