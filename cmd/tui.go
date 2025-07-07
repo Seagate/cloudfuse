@@ -54,7 +54,7 @@ var (
 	cacheSize = "80" 
 	cacheRetentionDuration = "30" 
 	cacheRetentionUnit = "Days"
-	endpointURL = "https://s3.sv15.seagate.com"
+	endpointURL = "https://s3.us-east-1.sv15.lyve.seagate.com"
 	region = "us-east-1"
 	previewPage = "page1"
 	accessKey = ""
@@ -66,14 +66,14 @@ var (
 
 
 type Config struct {
-    Logging    LoggingConfig       `yaml:"logging"`
-    Components []string            `yaml:"components"`
-    Libfuse    LibfuseConfig       `yaml:"libfuse"`
+    Logging    LoggingConfig       `yaml:"logging,omitempty"`
+    Components []string            `yaml:"components,omitempty"`
+    Libfuse    LibfuseConfig       `yaml:"libfuse,omitempty"`
     Stream     StreamConfig        `yaml:"stream,omitempty"`
 	FileCache  FileCacheConfig     `yaml:"file_cache,omitempty"`
 	BlockCache BlockCacheConfig    `yaml:"block_cache,omitempty"`
-    AttrCache  AttrCacheConfig     `yaml:"attr_cache"`
-    S3Storage  S3StorageConfig 	   `yaml:"s3storage"`
+    AttrCache  AttrCacheConfig     `yaml:"attr_cache,omitempty"`
+    S3Storage  S3StorageConfig 	   `yaml:"s3storage,omitempty"`
 	AzStorage  *AzureStorageConfig `yaml:"azstorage,omitempty"` 
 }
 
@@ -115,7 +115,7 @@ type AttrCacheConfig struct {
 }
 
 type S3StorageConfig struct {
-    BucketName       string `yaml:"bucket-name"`
+    BucketName       string `yaml:"bucket-name,omitempty"`
     KeyID            string `yaml:"key-id"`
     SecretKey        string `yaml:"secret-key"`
     Endpoint         string `yaml:"endpoint"`
@@ -280,10 +280,10 @@ func buildHomePage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 
 func buildStorageSelectionPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 	// Header / section banner
-	headerText := "[#6EBE49::b]Step 1: Select Your Cloud Storage Provider[-]\n" +
-			  "[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" + 
-			  "[white]Choose your cloud storage provider from the dropdown below.\n\n" +
-			  "If your provider is not listed, choose [::b]Other[::-] and you’ll be prompted " +
+	headerText := "[#6EBE49::b]Step 1: Select Your Cloud Storage Provider[-::-]\n" +
+			  "[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n\n" + 
+			  "[white::b]Choose your cloud storage provider from the dropdown below.[-::-]\n\n" +
+			  "If your provider is not listed, choose [darkmagenta::b]Other[-::-] and you’ll be prompted " +
 			  "to enter the endpoint URL and region manually."
 
 	pageText := tview.NewTextView().
@@ -358,144 +358,6 @@ func buildStorageSelectionPage(app *tview.Application, pages *tview.Pages) tview
 }
 
 
-// func buildEndpointRegionPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
-
-// 	var regions []string
-// 	var regionInput tview.FormItem
-	
-// 	// Switch case to set the default URL and region based on the selected storage provider
-// 	switch storageProvider {
-// 	case "LyveCloud":
-// 		urlRegionHelpText = "For LyveCloud, the endpoint URL general format is: \n\n" +
-// 							"\t[darkmagenta::b]https://s3.<[-][darkcyan::b]region[-][darkmagenta::b]>.lyvecloud.seagate.com[-]\n\n" + 
-// 							"For example, if your region is \"us-east-1\", the endpoint URL would be:\n\n" +
-// 							"\t[darkmagenta::b]https://s3.us-east-1.seagate.com[-]\n\n" +
-// 							"You can also use the LyveCloud portal to find your storage account endpoint.\n" +
-// 							"The available regions for Seagate LyveCloud are listed in the dropdown below."
-// 		urlText = "https://s3.sv15.seagate.com"
-// 		regionText = "us-east-1"
-// 		regions = lyvecloudRegions
-// 	case "Microsoft":
-// 		urlRegionHelpText = "For Microsoft Azure, the endpoint URL general format is:\n\n" +
-// 							"\t[darkmagenta::b]https://<[-][darkcyan::b]storage-account-name[-][darkmagenta::b]>.<[-][darkcyan::b]service[-][darkmagenta::b]>.core.windows.net[-]\n\n" +
-// 							"For example, if your storage account name is \"mystorageaccount\" and the\n" +
-// 							"service is \"file\", the endpoint URL would be:\n\n" +
-// 							"\t[darkmagenta::b]https://mystorageaccount.file.core.windows.net[-]\n\n" +
-// 							"You can also use the Azure portal to find your storage account endpoint.\n" +
-// 							"The available regions for Microsoft Azure are listed in the dropdown below."
-// 		urlText = "https://<account>.file.core.windows.net"
-// 		regionText = "us-east"
-// 		regions = azureRegions
-// 	case "AWS":
-// 		urlRegionHelpText = "For AWS S3, the endpoint URL general format is:\n\n" +
-// 							"\t[darkmagenta::b]https://s3.<[-][darkcyan::b]region[-][darkmagenta::b]>.amazonaws.com[-]\n\n" +
-// 							"For example, if your region is \"us-east-1\", the endpoint URL would be:\n\n" +
-// 							"\t[darkmagenta::b]https://s3.us-east-1.amazonaws.com[-]\n\n" +
-// 							"You can also use the AWS Management Console to find your S3 bucket endpoint.\n" +
-// 							"The available regions for AWS S3 are listed in the dropdown below."
-// 		urlText = "https://s3.amazonaws.com"
-// 		regionText = "us-east-1"
-// 		regions = awsRegions
-// 	case "Other":
-// 		urlText = "https://your-storage-endpoint.com"
-// 		regionText = "your-region" // Default for 'Other'
-// 	default:
-// 		urlText = "https://s3.sv15.seagate.com" // Default for LyveCloud
-// 		regionText = "us-east-1" // Default region
-// 	}
-
-// 	pageText := tview.NewTextView().
-// 		SetTextAlign(tview.AlignLeft).
-// 		SetWrap(true).
-// 		SetDynamicColors(true).
-// 		SetText(fmt.Sprintf("[green::b]Endpoint URL and Region for %s:[-] \n\n%s", storageProvider, urlRegionHelpText))
-	
-// 	urlInput := tview.NewInputField().
-// 		SetLabel("Endpoint URL:").
-// 		SetText(urlText).
-// 		SetFieldWidth(60).
-// 		SetChangedFunc(func(text string) {
-// 			urlText = text
-// 		})
-
-// 	// Dropdown for region selection based on storage type
-// 	// var regions []string
-// 	// var regionInput tview.FormItem
-
-// 	if storageProvider != "Other" {
-// 		regionInput = tview.NewDropDown().
-// 			SetLabel("Region:").
-// 			SetOptions(regions, func(text string, index int) {
-// 				regionText = text
-// 			}).
-// 			SetCurrentOption(0)
-
-// 	} else {
-// 		regionInput = tview.NewInputField().
-// 			SetLabel("Region:").
-// 			SetText("Enter Region (i.e., us-east-1)").
-// 			SetFieldWidth(30).
-// 			SetChangedFunc(func(text string) {
-// 				regionText = text
-// 			})
-// 		}
-
-// 	form := tview.NewForm().
-// 		AddFormItem(urlInput).
-// 		AddFormItem(regionInput).
-// 		AddButton("Home", func() {
-// 			pages.SwitchToPage("home")
-// 		}).
-// 		AddButton("Next", func() {
-// 			// Normalize and validate the URL
-// 			_, err := validateURL(urlText)
-// 			if err != nil {
-// 				showModal(app, pages, "Invalid URL format.\nPlease try again.", func() {
-// 					pages.SwitchToPage("page2")
-// 				})
-// 				return
-// 			}
-		
-// 			// Move to the next page
-// 			pages.SwitchToPage("page3")
-// 		}).
-// 		AddButton("Back", func() {
-// 			pages.SwitchToPage("page1")
-// 		}).
-// 		AddButton("Preview", func() {
-// 			// Normalize and validate URL
-// 			_, err := validateURL(urlText)
-// 			if err != nil {
-// 				showModal(app, pages, "Invalid URL format.\nPlease try again.", func() {
-// 					pages.SwitchToPage("page2")
-// 				})
-// 				return
-// 			}
-			
-// 			previewPage = "page2"
-// 			summaryPage := buildSummaryPage(app, pages)
-// 			pages.AddPage("summaryPage", summaryPage, true, false)
-// 			pages.SwitchToPage("summaryPage") // Switch to Page 3
-// 		}).
-// 		AddButton("Quit", func() {
-// 			app.Stop()
-// 		})
-
-// 	// form.SetBorder(true).SetTitle("[ Endpoint and Region ]").SetTitleAlign(tview.AlignLeft)
-// 	form.SetButtonBackgroundColor(menuButtonColor).SetButtonTextColor(menuButtonTextColor)
-
-// 	layout := tview.NewFlex().
-// 		SetDirection(tview.FlexRow).
-// 		AddItem(nil, 1, 1, false).           	// Top padding
-// 		AddItem(pageText, 13, 1, false).      	// Main content
-// 		AddItem(form, 10, 1, false).           	// Form for endpoint
-// 		AddItem(nil, 1, 1, false)             	// Bottom padding
-
-// 	return layout
-// }
-
-
-
 func buildEndpointRegionPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 	var regions []string
 	var regionInput tview.FormItem
@@ -504,52 +366,36 @@ func buildEndpointRegionPage(app *tview.Application, pages *tview.Pages) tview.P
 	// Determine URL, region, and help text based on selected provider
 	switch storageProvider {
 	case "LyveCloud":
-		urlRegionHelpText = `[::b]For LyveCloud, the endpoint URL format is:[-]
-
-  [darkmagenta::b]  https://s3.<[darkcyan::b]region[darkmagenta::b]>.lyvecloud.seagate.com[-]
-
-Example:
-  [darkmagenta::b]  https://s3.us-east-1.seagate.com[-]
-
-Find more info in your LyveCloud portal.
-Available regions are shown in the dropdown below.`
-		endpointURL = "https://s3.sv15.seagate.com"
+		urlRegionHelpText = "[::b]For LyveCloud, the endpoint URL format is:[-]\n" +
+  							"[darkmagenta::b]  https://s3.<[darkcyan::b]region[darkmagenta::b]>.sv15.lyve.seagate.com[-]\n\n" +
+							"Example:\n[darkmagenta::b]  https://s3.us-east-1.sv15.lyve.seagate.com[-]\n\n"	+
+							"Find more info in your LyveCloud portal.\nAvailable regions are listed below in the dropdown."
+		endpointURL = "https://s3.us-east-1.sv15.lyve.seagate.com"
 		region = "us-east-1"
 		regions = lyvecloudRegions
 
 	case "Microsoft":
-		urlRegionHelpText = `[::b]For Microsoft Azure, the endpoint URL format is:[-]
-
-  [darkmagenta::b]  https://<[darkcyan::b]account-name[darkmagenta::b]>.<[darkcyan::b]service[darkmagenta::b]>.core.windows.net[-]
-
-Example:
-  [darkmagenta::b]  https://mystorageaccount.file.core.windows.net[-]
-
-Find more info in the Azure portal.
-Available regions are listed below.`
+		urlRegionHelpText = "[::b]For Microsoft Azure, the endpoint URL format is:[-]\n" +
+  							"[darkmagenta::b]  https://<[darkcyan::b]account-name[darkmagenta::b]>.<[darkcyan::b]service[darkmagenta::b]>.core.windows.net[-]\n\n" +
+							"Example:\n[darkmagenta::b]  https://mystorageaccount.file.core.windows.net[-]\n\n" +
+							"Find more info in the Azure portal. Available regions are listed below in the dropdown."
 		endpointURL = "https://<account>.file.core.windows.net"
 		region = "us-east"
 		regions = azureRegions
 
 	case "AWS":
-		urlRegionHelpText = `[::b]For AWS S3, the endpoint URL format is:[-]
-
-  [darkmagenta::b]  https://s3.<[darkcyan::b]region[darkmagenta::b]>.amazonaws.com[-]
-
-Example:
-  [darkmagenta::b]  https://s3.us-east-1.amazonaws.com[-]
-
-Use the AWS Console to find your bucket endpoint.
-Available regions are listed in the dropdown.`
+		urlRegionHelpText = "[::b]For AWS S3, the endpoint URL format is:[-]\n" +
+							"[darkmagenta::b]  https://s3.<[darkcyan::b]region[darkmagenta::b]>.amazonaws.com[-]\n\n" +
+							"Example:\n[darkmagenta::b]  https://s3.us-east-1.amazonaws.com[-]\n\n" +
+							"Use the AWS Console to find your bucket endpoint. Available regions are listed below in the dropdown."
 		endpointURL = "https://s3.amazonaws.com"
 		region = "us-east-1"
 		regions = awsRegions
 
 	case "Other":
-		urlRegionHelpText = `[::b]You selected a custom provider.[-]
-
-Enter the endpoint URL and region manually.
-Refer to your provider’s documentation for valid formats.`
+		urlRegionHelpText = "[::b]You selected a custom provider.[-]\n" +
+							"Enter the endpoint URL and region manually.\n" +
+							"Refer to your provider’s documentation for valid formats."
 		endpointURL = "https://your-storage-endpoint.com"
 		region = "your-region"
 	default:
@@ -558,10 +404,9 @@ Refer to your provider’s documentation for valid formats.`
 	}
 
 	// Header and help text
-	header := fmt.Sprintf(`[#6EBE49::b]Step 2: Enter Endpoint & Region for %s[-]
-[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[white]
-%s`, storageProvider, urlRegionHelpText)
+	header := fmt.Sprintf("[#6EBE49::b]Step 2: Enter Endpoint & Region for %s[-]\n" +
+						  "[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+						  "[white]\n%s", storageProvider, urlRegionHelpText)
 
 	pageText := tview.NewTextView().
 		SetText(header).
@@ -656,176 +501,17 @@ Refer to your provider’s documentation for valid formats.`
 }
 
 
-// func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
-// 	// Placeholder for credentials page
-// 	pageText := tview.NewTextView().
-// 		SetTextAlign(tview.AlignLeft).
-// 		SetWrap(true).
-// 		SetDynamicColors(true).
-// 		SetText(`[green::b]Enter your Cloud Storage Credentials:[-]
-		
-// 	[yellow::b]Access Key:[-] This is your unique identifier for accessing your cloud storage.
-// 	[yellow::b]Secret Key:[-] This is your secret password for accessing your cloud storage.
-// 	[::i](Make sure to keep these credentials secure and do not share them with anyone.)[-]`)
-	
-// 	form := tview.NewForm()
-
-// 	accessKeyField := tview.NewInputField().
-// 		SetLabel("Access Key:").
-// 		SetText(accessKey). // needs to be deleted after testing
-// 		SetFieldWidth(24)
-
-// 	secretKeyField := tview.NewInputField().
-// 		SetLabel("Secret Key:").
-// 		SetText(secretKey). // needs to be deleted after testing 
-// 		SetFieldWidth(43).
-// 		SetMaskCharacter('*')
-
-// 	form.
-// 		AddFormItem(accessKeyField).
-// 		AddFormItem(secretKeyField).
-// 		AddButton("Home", func() {
-// 			pages.SwitchToPage("home")
-// 		}).
-// 		AddButton("Next", func() {
-// 			// Validate credentials here: make sure that the keys are 20 characters long, only alphanumeric characters, no special characters
-// 			accessKey := accessKeyField.GetText()
-// 			secretKey := secretKeyField.GetText()
-// 			// Convert to uppercase
-// 			accessKey = strings.ToUpper(accessKey)
-// 			// Check prefixes
-// 			// if !strings.HasPrefix(accessKey, "AKIA") {
-// 			// 	accessKey = "AKIA" + accessKey
-// 			// }
-
-// 			if len(accessKey) != 24 || len(secretKey) != 43 {
-// 				showModal(app, pages, "Invalid credentials.\nPlease try again.", func() {
-// 					pages.SwitchToPage("page3")
-// 				})
-// 				return
-// 			}
-// 			pages.SwitchToPage("page4")
-// 		}).
-// 		AddButton("Back", func() {
-// 			pages.SwitchToPage("page2")
-// 		}).
-// 		AddButton("Preview", func() {
-// 			summaryPage := buildSummaryPage(app, pages)
-// 			pages.AddPage("summaryPage", summaryPage, true, false)
-// 			pages.SwitchToPage("summaryPage") 
-// 		}).
-// 		AddButton("Quit", func() {
-// 			app.Stop()
-// 		})
-
-// 	// form.SetBorder(true).SetTitle("[ Credentials ]").SetTitleAlign(tview.AlignLeft)
-// 	form.SetButtonBackgroundColor(menuButtonColor).SetButtonTextColor(menuButtonTextColor)
-
-// 	layout := tview.NewFlex().
-// 		SetDirection(tview.FlexRow).
-// 		AddItem(nil, 1, 1, false).           	// Top padding
-// 		AddItem(pageText, 5, 1, false).      	// Main content
-// 		AddItem(form, 8, 1, false).           	// Form for credentials
-// 		AddItem(nil, 1, 1, false)             	// Bottom padding
-
-// 	return layout
-// }
-
-
-// func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
-// 	// Instructional text with consistent style
-// 	pageText := tview.NewTextView().
-// 		SetTextAlign(tview.AlignCenter).
-// 		SetWrap(true).
-// 		SetDynamicColors(true).
-// 		SetText(`[#6EBE49::b]Step 3: Enter Your Cloud Storage Credentials[-]
-// [#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// [white]
-// [#FFD700::b]Access Key:[-] This is your unique identifier for accessing your cloud storage.
-// [#FFD700::b]Secret Key:[-] This is your secret password for accessing your cloud storage.
-
-// [::i]Please keep these credentials secure and do not share them with anyone.[-]`)
-
-// 	// Access key input field
-// 	accessKeyField := tview.NewInputField().
-// 		SetLabel("🔑 Access Key: ").
-// 		SetText(accessKey). // For testing – remove in production
-// 		SetFieldWidth(24).
-// 		SetLabelColor(tcell.ColorYellow).
-// 		SetFieldTextColor(tcell.ColorWhite).
-// 		SetFieldBackgroundColor(tcell.ColorBlue)
-
-// 	// Secret key input field
-// 	secretKeyField := tview.NewInputField().
-// 		SetLabel("🔑 Secret Key: ").
-// 		SetText(secretKey). // For testing – remove in production
-// 		SetFieldWidth(43).
-// 		SetMaskCharacter('*').
-// 		SetLabelColor(tcell.ColorYellow).
-// 		SetFieldTextColor(tcell.ColorWhite).
-// 		SetFieldBackgroundColor(tcell.ColorBlue)
-
-// 	// Credential form
-// 	form := tview.NewForm().
-// 		AddFormItem(accessKeyField).
-// 		AddFormItem(secretKeyField).
-// 		AddButton("🏠 Home", func() {
-// 			pages.SwitchToPage("home")
-// 		}).
-// 		AddButton("➡ Next", func() {
-// 			accessKey := strings.ToUpper(accessKeyField.GetText())
-// 			secretKey := secretKeyField.GetText()
-
-// 			if len(accessKey) != 24 || len(secretKey) != 43 {
-// 				showModal(app, pages, "Invalid credentials.\nPlease try again.", func() {
-// 					pages.SwitchToPage("page3")
-// 				})
-// 				return
-// 			}
-// 			// Dry run 
-// 			pages.SwitchToPage("page4")
-// 		}).
-// 		AddButton("⬅ Back", func() {
-// 			pages.SwitchToPage("page2")
-// 		}).
-// 		AddButton("📄 Preview", func() {
-// 			summaryPage := buildSummaryPage(app, pages)
-// 			pages.AddPage("summaryPage", summaryPage, true, false)
-// 			pages.SwitchToPage("summaryPage")
-// 		}).
-// 		AddButton("❌ Quit", func() {
-// 			app.Stop()
-// 		}).
-// 		SetButtonBackgroundColor(menuButtonColor).
-// 		SetButtonTextColor(menuButtonTextColor).
-// 		SetButtonsAlign(tview.AlignCenter)
-
-// 	// Final layout
-// 	layout := tview.NewFlex().
-// 		SetDirection(tview.FlexRow).
-// 		AddItem(nil, 1, 0, false).            // Top padding
-// 		AddItem(pageText, 9, 0, false).       // Instructional text
-// 		AddItem(nil, 1, 0, false).
-// 		AddItem(form, 9, 0, true).            // Credential input form
-// 		AddItem(nil, 1, 0, false)             // Bottom padding
-
-// 	return layout
-// }
-
-
 func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 	// Instructional text with consistent style
 	pageText := tview.NewTextView().
 		SetTextAlign(tview.AlignCenter).
 		SetWrap(true).
 		SetDynamicColors(true).
-		SetText(`[#6EBE49::b]Step 3: Enter Your Cloud Storage Credentials[-]
-[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[white]
-[#FFD700::b]Access Key:[-] This is your unique identifier for accessing your cloud storage.
-[#FFD700::b]Secret Key:[-] This is your secret password for accessing your cloud storage.
-
-[::i]Please keep these credentials secure and do not share them with anyone.[-]`)
+		SetText("[#6EBE49::b]Step 3: Enter Your Cloud Storage Credentials[-]\n" + 
+				"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
+				"[#FFD700::b]Access Key:[-] This is your unique identifier for accessing your cloud storage.\n" +
+				"[#FFD700::b]Secret Key:[-] This is your secret password for accessing your cloud storage.\n\n" +
+				"[::i]Please keep these credentials secure and do not share them with anyone.[-]")
 
 	// Access key input field
 	accessKeyField := tview.NewInputField().
@@ -864,23 +550,7 @@ func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Prim
 				return
 			}
 
-			// Step 1: Write a temp config.yaml with provided credentials
-		// 	tempConfig := `
-		// components: ["s3storage"]
-		// s3storage:
-		// access_key: "` + accessKey + `"
-		// secret_key: "` + secretKey + `"
-		// region: "us-east-1"
-		// `
-			// tmpFile := "config-tui-temp.yaml"
-			// err := os.WriteFile(tmpFile, []byte(tempConfig), 0600)
-			// if err != nil {
-			// 	showModal(app, pages, "Failed to write config file:\n"+err.Error(), nil)
-			// 	return
-			// }
-
-			tmpFile := "config-tui-temp.yaml"
-			options.ConfigFile = tmpFile
+			createTmpConfigFile()
 
 			// Step 2: Parse the config
 			err := parseConfig()
@@ -941,64 +611,6 @@ func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Prim
 
 	return layout
 }
-
-// func buildBucketNamePage(app *tview.Application, pages *tview.Pages) tview.Primitive {
-	
-// 	pageText := tview.NewTextView().
-// 		SetTextAlign(tview.AlignLeft).
-// 		SetWrap(true).
-// 		SetDynamicColors(true).
-// 		SetText(`[green::b]Select your Bucket/Container Name:[-]
-
-// 	The bucket/container names available for your cloud storage provider are 
-// 	listed below in the dropdown. The available bucket/container names are based 
-// 	on the credentials you entered in the previous step.`)
-	
-// 	bucketNameField := tview.NewInputField().
-// 		SetLabel("Bucket/Container Name:").
-// 		SetText("my-bucket").
-// 		SetFieldWidth(30)
-
-// 	form := tview.NewForm().
-// 		AddFormItem(bucketNameField).
-// 		AddButton("Home", func() {
-// 			pages.SwitchToPage("home")
-// 		}).
-// 		AddButton("Next", func() {
-// 			bucketName = bucketNameField.GetText()
-// 			if bucketName == "" {
-// 				showModal(app, pages, "Bucket/container name cannot be empty.\nPlease try again.", func() {
-// 					pages.SwitchToPage("page4")
-// 				})
-// 				return
-// 			}
-// 			// Proceed to the next step or page
-// 			pages.SwitchToPage("page5")
-// 		}).
-// 		AddButton("Back", func() {
-// 			pages.SwitchToPage("page3")
-// 		}).
-// 		AddButton("Preview", func() {
-// 			summaryPage := buildSummaryPage(app, pages)
-// 			pages.AddPage("summaryPage", summaryPage, true, false)
-// 			pages.SwitchToPage("summaryPage") // Switch to Page 3
-// 		}).
-// 		AddButton("Quit", func() {
-// 			app.Stop()
-// 		})
-
-// 	// form.SetBorder(true).SetTitle("[ Bucket/Container Name ]").SetTitleAlign(tview.AlignLeft)
-// 	form.SetButtonBackgroundColor(menuButtonColor).SetButtonTextColor(menuButtonTextColor)
-
-// 	layout := tview.NewFlex().
-// 		SetDirection(tview.FlexRow).
-// 		AddItem(nil, 1, 1, false).           	// Top padding
-// 		AddItem(pageText, 5, 1, false).      	// Main content
-// 		AddItem(form, 8, 1, false).           	// Form for bucket
-// 		AddItem(nil, 1, 1, false)             	// Bottom padding
-
-// 	return layout
-// }
 
 
 func buildContainerSelectPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
@@ -1075,161 +687,6 @@ based on the credentials you entered in the previous step.`)
 
 	return layout
 }
-
-// func buildCachingPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
-// 	// Placeholder for caching page
-// 	pageText := tview.NewTextView().
-// 		SetTextAlign(tview.AlignLeft).
-// 		SetWrap(true).
-// 		SetDynamicColors(true).
-// 		SetText(`[green::b]Configure Caching Settings:[-]
-
-// 	To help Cloudfuse work best for you, let's determine how you'd like to use your local storage.`)
-
-
-// 	localCacheText := tview.NewTextView().
-// 		SetTextAlign(tview.AlignLeft).
-// 		SetWrap(true).
-// 		SetDynamicColors(true).
-// 		SetText(`Do you have available local storage that you'd like 
-// Cloudfuse to use for improved performance and reliability?`)
-
-// 	cacheToDisk := tview.NewDropDown().
-// 		SetLabel("Cache to local disk? ").
-// 		SetOptions([]string{" Yes ", " No "}, func(text string, index int) {
-// 			if text == "Yes" {
-// 				// Enable disk caching settings
-// 			} else {
-// 				// Disable disk caching settings
-// 			}
-// 		}).
-// 		SetCurrentOption(0)
-
-// 	cacheLocationText := tview.NewTextView().
-// 		SetTextAlign(tview.AlignLeft).
-// 		SetWrap(true).
-// 		SetDynamicColors(true).
-// 		SetText(`If you selected "Yes" above, please enter the location of the cache directory.
-// 		For example, /var/cache/s3storage or /tmp/s3cache.`)
-
-// 	cacheLocationField := tview.NewInputField().
-// 		SetLabel("Cache Location:").
-// 		SetText("/var/cache/s3storage").
-// 		SetFieldWidth(30).
-// 		SetChangedFunc(func(text string) {
-// 			// Validate cache location input
-// 			if text == "" {
-// 				showModal(app, pages, "Cache location cannot be empty.\nPlease try again.", func() {
-// 					pages.SwitchToPage("page5")
-// 				})
-// 				return
-// 			}
-// 			// Update cache location if needed
-// 			cacheLocation = text
-			
-// 		})
-
-// 	cacheSizeText := tview.NewTextView().
-// 		SetTextAlign(tview.AlignLeft).
-// 		SetWrap(true).
-// 		SetDynamicColors(true).
-// 		SetText(`We've detected [X GB] available at this location. 
-// 		By default, Cloudfuse will use up to [80% of X GB] for its cache. 
-// 		Would you like to specify a different cache size (in GB)?`)
-
-// 	// Cache size input field. How much space (at most) do they want the cache to take up (default is 80% of available space on the drive which contains the directory they entered above)
-// 	cacheSizeField := tview.NewInputField().
-// 		SetLabel("Cache Size:").
-// 		SetText("80"). // Default to 80%
-// 		SetFieldWidth(10).
-// 		SetChangedFunc(func(text string) {
-// 			// Validate cache size input
-// 			if size, err := strconv.Atoi(text); err != nil || size < 1 || size > 100 {
-// 				showModal(app, pages, "Cache size must be between 1 and 100.\nPlease try again.", func() {
-// 					pages.SwitchToPage("page5")
-// 				})
-// 				return
-// 			}
-// 			cacheSize = text // Update cache size
-// 		})	
-
-// 	cacheRetentionText := tview.NewTextView().
-// 		SetTextAlign(tview.AlignLeft).
-// 		SetWrap(true).
-// 		SetDynamicColors(true).
-// 		SetText(`Do you need cached data to be automatically removed from 
-// 		local storage after a certain amount of time since its last access?`)
-
-
-// 	cacheRetention := tview.NewCheckbox().
-// 		SetLabel("Enable Cache Retention?").
-// 		SetChecked(false).
-// 		SetChangedFunc(func(checked bool) {
-// 			if checked {
-// 				// Enable cache retention settings
-// 			} else {
-// 				// Disable cache retention settings
-// 			}
-// 		})
-
-// 	cacheRetentionDurationText := tview.NewTextView().
-// 		SetTextAlign(tview.AlignLeft).
-// 		SetWrap(true).
-// 		SetDynamicColors(true).
-// 		SetText(`If you selected "Yes" above, please enter the duration and 
-// 		select the unit for cache retention from the dropdown`)
-
-// 	cacheRetentionDurationUnit := tview.NewForm().
-// 		AddInputField("Cache Retention Duration:", "30", 10, nil, func(text string) {
-// 			// Validate cache retention duration input
-// 			cacheRetentionDuration = text
-// 		}).
-// 		AddDropDown("Unit:", []string{"Seconds", "Minutes", "Hours", "Days"}, 0, func(option string, index int) {
-// 			retentionUnit = option
-// 		})
-
-
-// 	menuButtons := tview.NewForm().
-// 		AddButton("Home", func() {
-// 			pages.SwitchToPage("home")
-// 		}).
-// 		AddButton("Finish", func() {
-// 			app.Stop()
-// 		}).
-// 		AddButton("Back", func() {
-// 			pages.SwitchToPage("page4")
-// 		}).
-// 		AddButton("Preview", func() {
-// 			summaryPage := buildSummaryPage(app, pages)
-// 			pages.AddPage("summaryPage", summaryPage, true, false)
-// 			pages.SwitchToPage("summaryPage") 
-// 		}).
-// 		AddButton("Quit", func() {
-// 			app.Stop()
-// 		})
-
-// 	// form.SetBorder(true).SetTitle("[ Caching Settings ]").SetTitleAlign(tview.AlignLeft)
-// 	menuButtons.SetButtonBackgroundColor(menuButtonColor).SetButtonTextColor(menuButtonTextColor)
-
-// 	layout := tview.NewFlex().
-// 		SetDirection(tview.FlexRow).
-// 		AddItem(nil, 1, 1, false).           	// Top padding
-// 		AddItem(pageText, 5, 1, false).      	// Main content
-// 		AddItem(localCacheText, 3, 1, false). 	// Local
-// 		AddItem(cacheToDisk, 3, 1, false).    	// Cache to disk dropdown
-// 		AddItem(cacheLocationText, 3, 1, false). // Cache location text
-// 		AddItem(cacheLocationField, 3, 1, false).  	// Cache location
-// 		AddItem(cacheSizeText, 3, 1, false).  	// Cache
-// 		AddItem(cacheSizeField, 3, 1, false). 	// Cache size input
-// 		AddItem(cacheRetentionText, 3, 1, false). // Cache retention text
-// 		AddItem(cacheRetention, 3, 1, false).  	// Cache retention
-// 		AddItem(cacheRetentionDurationText, 3, 1, false). // Cache retention
-// 		AddItem(cacheRetentionDurationUnit, 5, 1, false).  	// Cache retention
-// 		AddItem(menuButtons, 3, 1, false).     	// Menu buttons
-// 		AddItem(nil, 1, 1, false)             	// Bottom padding
-
-// 	return layout
-// }
 
 
 func buildCachingPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
@@ -1495,6 +952,51 @@ func validateURL(rawURL string) (string, error) {
 	}
 
 	return rawURL, nil
+}
+
+
+// Create a temporary YAML configuration file with the provided information
+// up to credentials page
+func createTmpConfigFile() error {
+	config := Config{
+		
+		Components: []string{storageProtocol},
+	}
+
+	
+	if storageProtocol == "azstorage" {
+		config.AzStorage = &AzureStorageConfig{
+			Type:        "block",
+			AccountName: accountName,
+			AccountKey:  secretKey,
+			Endpoint:    endpointURL,
+			Mode:        "key",
+			Container:   bucketName,
+		}
+	} else if storageProtocol == "s3storage" {
+		config.S3Storage = S3StorageConfig{
+			KeyID:      accessKey,
+			SecretKey:  secretKey,
+			Endpoint:   endpointURL,
+			Region:     region,
+			EnableDirMarker: true,
+		}
+	}
+
+	yamlData, err := yaml.Marshal(&config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal YAML: %v", err)
+	}
+
+	tmpFile := "config-temp.yaml"
+	if err := os.WriteFile(tmpFile, yamlData, 0644); err != nil {
+		return fmt.Errorf("failed to write YAML to file: %v", err)
+	}
+
+	// Update options.ConfigFile to point to the temporary file
+	options.ConfigFile = "config-temp.yaml"
+	fmt.Printf("Temporary YAML config written to %s\n", tmpFile)
+	return nil
 }
 
 
