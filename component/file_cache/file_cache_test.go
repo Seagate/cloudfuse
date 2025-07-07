@@ -1706,7 +1706,6 @@ func (suite *fileCacheTestSuite) TestScheduleUploadsCronIntegration2() {
 	err := log.SetDefaultLogger("silent", common.LogConfig{})
 	suite.assert.NoError(err)
 
-	// Create a file and add it to scheduleOps
 	file := "scheduled_file_cron.txt"
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	suite.assert.NoError(err)
@@ -1719,7 +1718,6 @@ func (suite *fileCacheTestSuite) TestScheduleUploadsCronIntegration2() {
 	suite.assert.NoError(err)
 	suite.assert.Equal(len(testData), n)
 
-	// Close the handle
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
@@ -1732,13 +1730,10 @@ func (suite *fileCacheTestSuite) TestScheduleUploadsCronIntegration2() {
 	flock := suite.fileCache.fileLocks.Get(file)
 	flock.SyncPending = true
 
-	// Create a cron scheduler with seconds-level precision
 	cronScheduler := cron.New(cron.WithSeconds())
 
-	// Get current time
 	now := time.Now()
 
-	// Set the cron to run a few seconds in the future
 	second := now.Second() + 5 // Schedule for 5 seconds from now
 	minute := now.Minute()
 	hour := now.Hour()
@@ -1755,7 +1750,6 @@ func (suite *fileCacheTestSuite) TestScheduleUploadsCronIntegration2() {
 		}
 	}
 
-	// Cron expression that includes seconds
 	cronExpr := fmt.Sprintf("%d %d %d * * *", second, minute, hour)
 
 	// Create a schedule with the correct field names
@@ -1763,7 +1757,6 @@ func (suite *fileCacheTestSuite) TestScheduleUploadsCronIntegration2() {
 		"test": UploadWindow{
 			CronExpr: cronExpr, // Run at specific time
 			Duration: "10s",    // Run for 10 seconds (lowercase field name)
-			Repeat:   false,
 		},
 	}
 
@@ -1783,7 +1776,6 @@ func (suite *fileCacheTestSuite) TestScheduleUploadsCronIntegration2() {
 		fmt.Printf("[test] Upload window ended at %s\n", time.Now().Format("15:04:05"))
 	}
 
-	// Use the unexported scheduleUploads method
 	suite.fileCache.scheduleUploads(cronScheduler, schedule, startFunc, endFunc)
 	cronScheduler.Start()
 	defer cronScheduler.Stop()
@@ -1835,17 +1827,13 @@ func (suite *fileCacheTestSuite) TestScheduleUploadsCronIntegration2() {
 	suite.assert.False(flock.SyncPending, "SyncPending flag should be cleared after upload")
 }
 
-// Test to verify that the correct tasks are added to the cron scheduler
 func (suite *fileCacheTestSuite) TestSetupSchedulerAddsTasks() {
 	defer suite.cleanupTest()
 
-	// Create a custom cron scheduler that we can inspect
 	cronScheduler := cron.New(cron.WithSeconds())
 
-	// Create tracking variables to verify callbacks are executed
 	startCallbackExecuted := false
 
-	// Setup the test callbacks
 	startFunc := func() {
 		startCallbackExecuted = true
 	}
@@ -1859,18 +1847,14 @@ func (suite *fileCacheTestSuite) TestSetupSchedulerAddsTasks() {
 		"default": UploadWindow{
 			CronExpr: "0 * * * * *",
 			Duration: "5m",
-			Repeat:   true,
 		},
 	}
 
-	// Call the scheduleUploads method
 	suite.fileCache.scheduleUploads(cronScheduler, hardcodedSchedule, startFunc, endFunc)
 
-	// Start the scheduler
 	cronScheduler.Start()
 	defer cronScheduler.Stop()
 
-	// Verify that a task was added to the scheduler
 	entries := cronScheduler.Entries()
 	suite.assert.Equal(1, len(entries), "Expected exactly one scheduled task")
 
@@ -1884,9 +1868,7 @@ func (suite *fileCacheTestSuite) TestSetupSchedulerAddsTasks() {
 	}
 
 	if len(entries) > 0 && time.Until(entries[0].Next) < 5*time.Second {
-		// Wait until after the next scheduled run
 		time.Sleep(time.Until(entries[0].Next) + 2*time.Second)
-
 		// Check that the start callback was executed
 		suite.assert.True(startCallbackExecuted, "Start callback should have been executed")
 
@@ -1941,7 +1923,7 @@ func (suite *fileCacheTestSuite) TestMultipleFilesScheduleUploads() {
 	suite.T().Log("Initial pending files:")
 	suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
 		pendingCount++
-		suite.T().Logf("  ⏳ %s", key)
+		suite.T().Logf("%s", key)
 		return true
 	})
 	suite.assert.Equal(fileCount, pendingCount, "All files should be pending upload initially")
@@ -1984,9 +1966,9 @@ func (suite *fileCacheTestSuite) TestMultipleFilesScheduleUploads() {
 				uploadedData, err := os.ReadFile(filePath)
 				if err == nil {
 					if bytes.Equal(uploadedData, testData[i]) {
-						fmt.Printf("    Content verification: PASSED (%d bytes)", len(uploadedData))
+						fmt.Printf("Content verification: PASSED (%d bytes)", len(uploadedData))
 					} else {
-						fmt.Printf("    Content verification: FAILED (expected %d bytes, got %d bytes)",
+						fmt.Printf("Content verification: FAILED (expected %d bytes, got %d bytes)",
 							len(testData[i]), len(uploadedData))
 					}
 				}
@@ -1999,10 +1981,10 @@ func (suite *fileCacheTestSuite) TestMultipleFilesScheduleUploads() {
 		remainingCount := 0
 		suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
 			remainingCount++
-			fmt.Printf("  ⏳ File still pending: %s", key)
+			fmt.Printf("File still pending: %s", key)
 			return true
 		})
-		suite.T().Logf("  Upload summary: %d/%d files uploaded, %d still pending",
+		suite.T().Logf("Upload summary: %d/%d files uploaded, %d still pending",
 			len(uploadedFiles), fileCount, remainingCount)
 	}
 
@@ -2015,7 +1997,6 @@ func (suite *fileCacheTestSuite) TestMultipleFilesScheduleUploads() {
 		"default": UploadWindow{
 			CronExpr: cronExpr,
 			Duration: "10s",
-			Repeat:   true,
 		},
 	}
 	fmt.Printf("Scheduling uploads to run at second %d of each minute", second)
@@ -2071,7 +2052,7 @@ func (suite *fileCacheTestSuite) TestMultipleFilesScheduleUploads() {
 	suite.assert.True(startCallbackExecuted, "Start callback should have been executed")
 
 	if !uploadCompleted {
-		suite.T().Log("⚠️ Not all files were uploaded within timeout period")
+		suite.T().Log("Not all files were uploaded within timeout period")
 	}
 
 	// Verify all files were uploaded
@@ -2174,19 +2155,16 @@ func (suite *fileCacheTestSuite) TestDaySpecificSchedulerFromYAML() {
 	suite.assert.True(exists, "Monday schedule should exist")
 	suite.assert.Equal("0 0 10 * * 1", mondayConfig.CronExpr)
 	suite.assert.Equal("30m", mondayConfig.Duration)
-	suite.assert.True(mondayConfig.Repeat)
 
 	wednesdayConfig, exists := schedule["Wednesday"]
 	suite.assert.True(exists, "Wednesday schedule should exist")
 	suite.assert.Equal("0 0 14 * * 3", wednesdayConfig.CronExpr)
 	suite.assert.Equal("45m", wednesdayConfig.Duration)
-	suite.assert.False(wednesdayConfig.Repeat)
 
 	fridayConfig, exists := schedule["Friday"]
 	suite.assert.True(exists, "Friday schedule should exist")
 	suite.assert.Equal("0 0 16 * * 5", fridayConfig.CronExpr)
 	suite.assert.Equal("1h", fridayConfig.Duration)
-	suite.assert.True(fridayConfig.Repeat)
 
 	entries := cronScheduler.Entries()
 	suite.assert.Equal(3, len(entries), "Scheduler should have 3 entries, one for each day")
@@ -2235,8 +2213,6 @@ func (suite *fileCacheTestSuite) TestDaySpecificSchedulerFromYAML() {
 	suite.assert.False(flock.SyncPending, "SyncPending flag should be cleared")
 }
 
-// TestPrintScheduleFromYAML verifies YAML schedule loading by printing the parsed schedule map
-// loggerAdapter implements the cron.Logger interface
 type loggerAdapter struct{}
 
 func (l *loggerAdapter) Printf(format string, v ...interface{}) {
@@ -2288,9 +2264,8 @@ func (suite *fileCacheTestSuite) TestPrintScheduleFromYAML() {
 	for _, day := range keys {
 		config := schedule[day]
 		fmt.Printf("\nDay: %s\n", day)
-		fmt.Printf("  Cron Expression: %s\n", config.CronExpr)
-		fmt.Printf("  Duration: %s\n", config.Duration)
-		fmt.Printf("  Repeat: %t\n", config.Repeat)
+		fmt.Printf("Cron Expression: %s\n", config.CronExpr)
+		fmt.Printf("Duration: %s\n", config.Duration)
 	}
 	fmt.Println("===============================")
 
@@ -2339,10 +2314,10 @@ func (suite *fileCacheTestSuite) TestPrintScheduleFromYAML() {
 		timeUntil := nextRun.Sub(now).Round(time.Second)
 
 		fmt.Printf("\nJob #%d:\n", i+1)
-		fmt.Printf("  ID: %v\n", entry.ID)
-		fmt.Printf("  Next run: %s\n", nextRun.Format("Mon Jan 2 15:04:05"))
-		fmt.Printf("  Time until next run: %s\n", timeUntil)
-		fmt.Printf("  Cron expression: %s\n", entry.Schedule)
+		fmt.Printf("ID: %v\n", entry.ID)
+		fmt.Printf("Next run: %s\n", nextRun.Format("Mon Jan 2 15:04:05"))
+		fmt.Printf("Time until next run: %s\n", timeUntil)
+		fmt.Printf("Cron expression: %s\n", entry.Schedule)
 
 		// Find which day this entry corresponds to
 		for day, config := range schedule {
@@ -2379,7 +2354,7 @@ func (suite *fileCacheTestSuite) TestPrintScheduleFromYAML() {
 	})
 
 	if pendingCount == 0 {
-		fmt.Println("  No files pending upload")
+		fmt.Println("No files pending upload")
 	}
 	fmt.Println("===================================")
 
@@ -2396,7 +2371,7 @@ func (suite *fileCacheTestSuite) TestPrintScheduleFromYAML() {
 		if err == nil && bytes.Equal(uploadedData, testData) {
 			fmt.Println("Uploaded file content matches original")
 		} else {
-			fmt.Println("✗ Uploaded file content differs from original")
+			fmt.Println("Uploaded file content differs from original")
 		}
 
 		// Check if file was removed from pending operations
@@ -2426,7 +2401,6 @@ func (suite *fileCacheTestSuite) TestSimpleScheduledUpload() {
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
-	// Mark file as pending upload
 	suite.fileCache.scheduleOps.Store(file, struct{}{})
 	flock := suite.fileCache.fileLocks.Get(file)
 	flock.SyncPending = true
@@ -2445,7 +2419,7 @@ func (suite *fileCacheTestSuite) TestSimpleScheduledUpload() {
 	uploadExecuted := false
 
 	startFunc := func() {
-		fmt.Println("⭐ Upload window starting now")
+		fmt.Println("Upload window starting now")
 		uploadExecuted = true
 		suite.fileCache.servicePendingOps() // Direct call
 	}
@@ -2456,7 +2430,6 @@ func (suite *fileCacheTestSuite) TestSimpleScheduledUpload() {
 		"test": UploadWindow{
 			CronExpr: cronExpr,
 			Duration: "5s",
-			Repeat:   false,
 		},
 	}
 
@@ -2547,14 +2520,14 @@ func (suite *fileCacheTestSuite) TestScheduledUploadsFromYamlConfig2() {
 	if len(cfg.Schedule) > 0 {
 		fmt.Printf("Found %d schedule entries\n", len(cfg.Schedule))
 		for day, schedule := range cfg.Schedule {
-			fmt.Printf("Day: %s, Cron: %s, Duration: %s, Repeat: %t\n",
-				day, schedule.CronExpr, schedule.Duration, schedule.Repeat)
+			fmt.Printf("Day: %s, Cron: %s, Duration: %s",
+				day, schedule.CronExpr, schedule.Duration)
 		}
 	} else {
 		fmt.Println("No schedule entries found in config file")
 	}
 
-	err = suite.fileCache.SetupScheduler(configPath)
+	err = suite.fileCache.SetupScheduler()
 	if err != nil {
 		fmt.Printf("Error setting up scheduler: %v\n", err)
 	}
@@ -2617,9 +2590,9 @@ func (suite *fileCacheTestSuite) TestScheduledUploadsFromYamlConfig2() {
 		// Check if YAML was loaded correctly
 		schedule, err := LoadConfig(configPath)
 		if err != nil {
-			fmt.Printf("❌ Error loading config: %v\n", err)
+			fmt.Printf("Error loading config: %v\n", err)
 		} else {
-			fmt.Printf("✅ Config loaded successfully with %d entries\n", len(schedule))
+			fmt.Printf("Config loaded successfully with %d entries\n", len(schedule))
 			for key, val := range schedule {
 				fmt.Printf("   Schedule entry: %s -> %+v\n", key, val)
 			}
@@ -2629,7 +2602,7 @@ func (suite *fileCacheTestSuite) TestScheduledUploadsFromYamlConfig2() {
 		suite.fileCache.servicePendingOps()
 
 		// Check if manual trigger worked
-		time.Sleep(1 * time.Second) // Give it a moment to complete
+		time.Sleep(1 * time.Second)
 		if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file)); err == nil {
 			fmt.Println(" Manual trigger succeeded - issue is with scheduling")
 			suite.T().Log("File was uploaded after manual servicePendingOps call, but not via scheduler")
@@ -2645,16 +2618,6 @@ func (suite *fileCacheTestSuite) TestScheduledUploadsFromYamlConfig2() {
 
 func (suite *fileCacheTestSuite) TestScheduledUploadsWithLoadConfig() {
 	defer suite.cleanupTest()
-
-	configPath := filepath.Join(os.Getenv("HOME"), "cloudfuse", "config.yaml")
-
-	fmt.Println("\n=== SCHEDULED UPLOADS WITH SETUP SCHEDULER TEST ===")
-	fmt.Printf("Config path: %s\n", configPath)
-
-	configContent, err := os.ReadFile(configPath)
-	suite.assert.NoError(err, "Should be able to read the config file")
-	fmt.Println("Config file contents:")
-	fmt.Println(string(configContent))
 
 	file := "setup_scheduler_test_file.txt"
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
@@ -2676,7 +2639,7 @@ func (suite *fileCacheTestSuite) TestScheduledUploadsWithLoadConfig() {
 	suite.assert.FileExists(filepath.Join(suite.cache_path, file))
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
 
-	err = suite.fileCache.SetupScheduler(configPath)
+	err = suite.fileCache.SetupScheduler()
 	suite.assert.NoError(err, "Should be able to set up scheduler")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -2729,20 +2692,6 @@ func (suite *fileCacheTestSuite) TestScheduledUploadsWithLoadConfig() {
 		flock = suite.fileCache.fileLocks.Get(file)
 		suite.assert.False(flock.SyncPending, "SyncPending flag should be cleared")
 	} else {
-		fmt.Println("\n=== TROUBLESHOOTING ===")
-
-		// Try to load the config directly for verification
-		schedule, err := LoadConfig(configPath)
-		if err != nil {
-			fmt.Printf("Error loading config: %v\n", err)
-		} else {
-			fmt.Printf("Config loaded successfully with %d entries\n", len(schedule))
-			for day, config := range schedule {
-				fmt.Printf("   Schedule entry: %s -> Cron: %s, Duration: %s, Repeat: %t\n",
-					day, config.CronExpr, config.Duration, config.Repeat)
-			}
-		}
-
 		fmt.Println("\nManually triggering servicePendingOps...")
 		suite.fileCache.servicePendingOps()
 

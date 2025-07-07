@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
+	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
@@ -19,7 +20,6 @@ import (
 type UploadWindow struct {
 	CronExpr string `yaml:"cron"`
 	Duration string `yaml:"duration"`
-	Repeat   bool   `yaml:"repeat"`
 }
 
 type Config struct {
@@ -40,20 +40,45 @@ func LoadConfig(path string) (WeeklySchedule, error) {
 	return cfg.Schedule, nil
 }
 
-func (fc *FileCache) SetupScheduler(configPath string) error {
-	schedule, err := LoadConfig(configPath)
-	if err != nil {
-		log.Err(
-			"FileCache::SetupScheduler : Failed to load schedule configuration [%s]",
-			err.Error(),
-		)
-		return fmt.Errorf("failed to load scheduler config: %w", err)
-	}
-	if len(schedule) == 0 {
+func (fc *FileCache) SetupScheduler() error {
+	// Check if schedule configuration exists
+	if !config.IsSet("schedule") {
 		log.Info("FileCache::SetupScheduler : No schedule configuration found")
 		return nil
 	}
 
+	// Parse the schedule configuration
+	var rawSchedule map[string]map[string]interface{}
+	err := config.UnmarshalKey("schedule", &rawSchedule)
+	if err != nil {
+		log.Err(
+			"FileCache::SetupScheduler : Failed to parse schedule configuration [%s]",
+			err.Error(),
+		)
+		return fmt.Errorf("failed to parse scheduler config: %w", err)
+	}
+
+	// Convert raw schedule to WeeklySchedule
+	schedule := make(WeeklySchedule)
+	for day, rawWindow := range rawSchedule {
+		window := UploadWindow{}
+		if cronStr, ok := rawWindow["cron"].(string); ok {
+			window.CronExpr = cronStr
+		}
+		if durStr, ok := rawWindow["duration"].(string); ok {
+			window.Duration = durStr
+		}
+		schedule[day] = window
+		log.Info("FileCache::SetupScheduler : Parsed schedule %s: cron=%s, duration=%s",
+			day, window.CronExpr, window.Duration)
+	}
+
+	if len(schedule) == 0 {
+		log.Info("FileCache::SetupScheduler : Empty schedule configuration")
+		return nil
+	}
+
+	// Setup the cron scheduler
 	cronScheduler := cron.New(cron.WithSeconds())
 
 	startFunc := func() {
@@ -66,8 +91,8 @@ func (fc *FileCache) SetupScheduler(configPath string) error {
 	}
 
 	fc.scheduleUploads(cronScheduler, schedule, startFunc, endFunc)
+	log.Info("FileCache::SetupScheduler : Scheduler entries: %v", cronScheduler.Entries())
 
-	// Start the scheduler
 	cronScheduler.Start()
 
 	log.Info("FileCache::SetupScheduler : Scheduler started successfully")
@@ -82,7 +107,6 @@ func (fc *FileCache) scheduleUploads(
 ) {
 	for day, config := range sched {
 		currentDay := day
-		uploadConfig := config
 
 		durationParsed, err := time.ParseDuration(config.Duration)
 		if err != nil {
@@ -90,42 +114,36 @@ func (fc *FileCache) scheduleUploads(
 			continue
 		}
 
-		var entryID cron.EntryID
-		entryID, _ = c.AddFunc(config.CronExpr, func() {
-			// Call the startFunc callback to notify upload window is starting
-			startFunc() // Also servicing all current pending uploads first
-			log.Info("[%s] Starting upload at %s\n", day, time.Now().Format(time.Kitchen))
-			window, cancel := context.WithTimeout(context.Background(), durationParsed)
-			// ticker := time.NewTicker(1 * time.Minute)
-			// defer ticker.Stop()
-			go func() {
-				defer cancel()
-				for {
-					select {
-					case <-window.Done():
-						// Call the endFunc callback to notify upload window is ending
-						endFunc()
-						fmt.Printf(
-							"[%s] Upload window ended at %s\n",
-							day,
-							time.Now().Format(time.Kitchen),
-						)
-						return
-					// case <-ticker.C:
-					default:
-						log.Debug(
-							"[%s] Checking for pending uploads at %s\n",
-							day,
-							time.Now().Format(time.Kitchen),
-						)
-						fc.servicePendingOps()
-					}
-				}
-			}()
+		c.AddFunc(config.CronExpr, func() {
+			startFunc()
+			log.Info("[%s] Starting upload at %s\n", currentDay, time.Now().Format(time.Kitchen))
 
-			if !uploadConfig.Repeat {
-				fmt.Printf("[%s] One-time schedule, removing\n", currentDay)
-				c.Remove(entryID)
+			// Create a context with timeout for the duration of the window
+			window, cancel := context.WithTimeout(context.Background(), durationParsed)
+			defer cancel()
+
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-window.Done():
+					// Call the endFunc callback to notify upload window is ending
+					endFunc()
+					fmt.Printf(
+						"[%s] Upload window ended at %s\n",
+						currentDay,
+						time.Now().Format(time.Kitchen),
+					)
+
+				case <-ticker.C:
+					log.Debug(
+						"[%s] Checking for pending uploads at %s\n",
+						currentDay,
+						time.Now().Format(time.Kitchen),
+					)
+					fc.servicePendingOps()
+				}
 			}
 		})
 	}
@@ -147,7 +165,7 @@ func (fc *FileCache) servicePendingOps() {
 		select {
 		case <-fc.stopAsyncUpload:
 			log.Info("FileCache::servicePendingOps : Upload processing interrupted")
-			return false // Stop the iteration
+			return false
 		default:
 			path := key.(string)
 			err := fc.uploadPendingFile(path)
@@ -159,7 +177,7 @@ func (fc *FileCache) servicePendingOps() {
 				)
 			}
 		}
-		return true // Continue the iteration
+		return true
 	})
 
 	log.Info("FileCache::servicePendingOps : Completed upload cycle, processed %d files")
@@ -219,7 +237,7 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 	// update state
 	flock.SyncPending = false
 	// Successfully uploaded, removing from scheduleOps
-	fmt.Println("File uploaded:", name)
+	log.Info("FileCache::uploadPendingFile : File uploaded: %s", name)
 	fc.scheduleOps.Delete(name)
 
 	return nil

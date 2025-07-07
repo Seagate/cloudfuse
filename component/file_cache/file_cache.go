@@ -172,7 +172,7 @@ func (fc *FileCache) Priority() internal.ComponentPriority {
 //	this shall not block the call otherwise pipeline will not start
 func (fc *FileCache) Start(ctx context.Context) error {
 	log.Trace("Starting component : %s", fc.Name())
-	configPath := filepath.Join(os.Getenv("HOME"), "cloudfuse", "config.yaml")
+	// configPath := filepath.Join(os.Getenv("HOME"), "cloudfuse", "config.yaml")
 
 	if fc.cleanupOnStart {
 		err := common.TempCacheCleanup(fc.tmpPath)
@@ -200,7 +200,7 @@ func (fc *FileCache) Start(ctx context.Context) error {
 	fileCacheStatsCollector = stats_manager.NewStatsCollector(fc.Name())
 	log.Debug("Starting file cache stats collector")
 
-	err = fc.SetupScheduler(configPath)
+	err = fc.SetupScheduler()
 	if err != nil {
 		log.Warn("FileCache::Start : Failed to setup scheduler [%s]", err.Error())
 	}
