@@ -140,7 +140,7 @@ func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 		suite.mock = internal.NewMockComponent(suite.mockCtrl)
 		suite.fileCache = newTestFileCache(suite.mock)
 		// always simulate being offline
-		suite.mock.EXPECT().StatFs().AnyTimes().Return(nil, false, &common.CloudUnreachableError{})
+		suite.mock.EXPECT().CloudConnected().AnyTimes().Return(false)
 	} else {
 		suite.loopback = newLoopbackFS()
 		suite.fileCache = newTestFileCache(suite.loopback)
@@ -476,7 +476,6 @@ func (suite *fileCacheTestSuite) TestCreateDirOffline() {
 	path := "a"
 	options := internal.CreateDirOptions{Name: path}
 	suite.mock.EXPECT().GetAttr(internal.GetAttrOptions{Name: path}).Return(nil, os.ErrNotExist)
-	suite.mock.EXPECT().CloudConnected().AnyTimes()
 	err := suite.fileCache.CreateDir(options)
 	suite.assert.NoError(err)
 
