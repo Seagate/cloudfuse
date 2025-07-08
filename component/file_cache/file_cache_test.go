@@ -140,7 +140,7 @@ func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 		suite.mock = internal.NewMockComponent(suite.mockCtrl)
 		suite.fileCache = newTestFileCache(suite.mock)
 		// always simulate being offline
-		suite.mock.EXPECT().StatFs().AnyTimes().Return(nil, false, &common.CloudUnreachableError{})
+		suite.mock.EXPECT().CloudConnected().AnyTimes().Return(false)
 	} else {
 		suite.loopback = newLoopbackFS()
 		suite.fileCache = newTestFileCache(suite.loopback)

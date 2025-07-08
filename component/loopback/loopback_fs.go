@@ -95,6 +95,10 @@ func (lfs *LoopbackFS) Priority() internal.ComponentPriority {
 	return internal.EComponentPriority.Consumer()
 }
 
+func (lfs *LoopbackFS) CloudConnected() bool {
+	return true
+}
+
 func (lfs *LoopbackFS) CreateDir(options internal.CreateDirOptions) error {
 	log.Trace("LoopbackFS::CreateDir : name=%s", options.Name)
 	dirPath := filepath.Join(lfs.path, options.Name)

@@ -240,7 +240,7 @@ func (fc *FileCache) servicePendingOps() {
 			return
 		default:
 			// check if we're connected
-			if !fc.cloudConnected() {
+			if !fc.NextComponent().CloudConnected() {
 				// we are offline, wait for a while before checking again
 				select {
 				case <-time.After(time.Second):
@@ -662,7 +662,7 @@ func (fc *FileCache) CreateDir(options internal.CreateDirOptions) error {
 
 	// Do not call nextComponent.CreateDir when we are offline.
 	// Otherwise the attribute cache could go out of sync with the cloud.
-	if fc.cloudConnected() {
+	if fc.NextComponent().CloudConnected() {
 		// we have a cloud connection, so it's safe to call the next component
 		err := fc.NextComponent().CreateDir(options)
 		if err == nil || errors.Is(err, os.ErrExist) {
@@ -752,13 +752,6 @@ func (fc *FileCache) DeleteDir(options internal.DeleteDirOptions) error {
 	}
 
 	return err
-}
-
-// checks if we are offline by requesting state information from the cloud storage component
-func (fc *FileCache) cloudConnected() bool {
-	// TODO: create a new component API function to check this (SRGDEV-614), instead of using StatFs
-	_, _, err := fc.NextComponent().StatFs()
-	return err == nil
 }
 
 // this returns true when offline access is enabled, and it's safe to access this object offline
@@ -1404,7 +1397,7 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 	downloadRequired, fileExists, attr, err := fc.isDownloadRequired(localPath, handle.Path, flock)
 
 	// handle offline cases
-	if isOffline(err) || (fc.offlineAccess && !fc.cloudConnected()) {
+	if isOffline(err) || !fc.NextComponent().CloudConnected() {
 		if !fc.offlineAccess {
 			// offline access is not allowed
 			if downloadRequired || !cachedData(err) {
