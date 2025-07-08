@@ -98,6 +98,29 @@ func CloudfuseVersion_() string {
 	return cloudfuseVersion_
 }
 
+// custom errors shared by different components
+type CloudUnreachableError struct {
+	Message           string
+	CloudStorageError error
+}
+
+func NewCloudUnreachableError(originalError error) CloudUnreachableError {
+	return CloudUnreachableError{
+		Message:           "Failed to connect to cloud storage",
+		CloudStorageError: originalError,
+	}
+}
+func (e CloudUnreachableError) Error() string {
+	return fmt.Sprintf("%s. Here's why: %v", e.Message, e.CloudStorageError)
+}
+func (e CloudUnreachableError) Unwrap() error {
+	return e.CloudStorageError
+}
+func (e CloudUnreachableError) Is(target error) bool {
+	_, ok := target.(*CloudUnreachableError)
+	return ok
+}
+
 var DefaultWorkDir string
 var DefaultLogFilePath string
 var StatsConfigFilePath string

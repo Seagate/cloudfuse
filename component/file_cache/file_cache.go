@@ -45,6 +45,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
+	"github.com/robfig/cron/v3"
 
 	"github.com/spf13/cobra"
 )
@@ -64,6 +65,7 @@ type FileCache struct {
 	policyTrace     bool
 	missedChmodList sync.Map // uses object name (common.JoinUnixFilepath)
 	mountPath       string   // uses os.Separator (filepath.Join)
+	scheduleOps     sync.Map // uses object name (common.JoinUnixFilepath)
 	allowOther      bool
 	offloadIO       bool
 	syncToFlush     bool
@@ -78,6 +80,10 @@ type FileCache struct {
 
 	lazyWrite    bool
 	fileCloseOpt sync.WaitGroup
+
+	stopAsyncUpload chan struct{}
+
+	scheduler *cron.Cron
 }
 
 // Structure defining your config parameters
@@ -183,6 +189,11 @@ func (fc *FileCache) Start(ctx context.Context) error {
 	// create stats collector for file cache
 	fileCacheStatsCollector = stats_manager.NewStatsCollector(fc.Name())
 	log.Debug("Starting file cache stats collector")
+
+	err = fc.SetupScheduler()
+	if err != nil {
+		log.Warn("FileCache::Start : Failed to setup scheduler [%s]", err.Error())
+	}
 
 	return nil
 }
@@ -1414,7 +1425,11 @@ func (fc *FileCache) closeFileInternal(
 	if !noCachedHandle {
 		// flock is already locked, as required by flushFileInternal
 		err := fc.flushFileInternal(
-			internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true},
+			internal.FlushFileOptions{
+				Handle:          options.Handle,
+				CloseInProgress: true,
+				ImmediateUpload: false,
+			},
 		) //nolint
 		if err != nil {
 			log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
@@ -1627,15 +1642,13 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 	return fc.flushFileInternal(options)
 }
 
-// file must be locked before calling this function
 func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error {
-	//defer exectime.StatTimeCurrentBlock("FileCache::FlushFile")()
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 	fc.policy.CacheValid(localPath)
-	// if our handle is dirty then that means we wrote to the file
+
 	if options.Handle.Dirty() {
 		if fc.lazyWrite && !options.CloseInProgress {
 			// As lazy-write is enable, upload will be scheduled when file is closed.
@@ -1656,91 +1669,81 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			return syscall.EBADF
 		}
 
-		// Flush all data to disk that has been buffered by the kernel.
-		// We cannot close the incoming handle since the user called flush, note close and flush can be called on the same handle multiple times.
-		// To ensure the data is flushed to disk before writing to storage, we duplicate the handle and close that handle.
-		// f.fsync() is another option but dup+close does it quickly compared to sync
-		// dupFd, err := syscall.Dup(int(f.Fd()))
-		// if err != nil {
-		// 	log.Err("FileCache::FlushFile : error [couldn't duplicate the fd] %s", options.Handle.Path)
-		// 	return syscall.EIO
-		// }
-
-		// err = syscall.Close(dupFd)
-		// if err != nil {
-		// 	log.Err("FileCache::FlushFile : error [unable to close duplicate fd] %s", options.Handle.Path)
-		// 	return syscall.EIO
-		// }
-
-		// Replace above with Sync since Dup is not supported on Windows
 		err := f.Sync()
 		if err != nil {
 			log.Err("FileCache::FlushFile : error [unable to sync file] %s", options.Handle.Path)
 			return syscall.EIO
 		}
-
-		// Write to storage
-		// Create a new handle for the SDK to use to upload (read local file)
-		// The local handle can still be used for read and write.
 		var orgMode fs.FileMode
 		modeChanged := false
+		notInCloud := fc.notInCloud(
+			options.Handle.Path,
+		)
+		// Figure out if we should upload immediately or append to pending OPS
+		switch {
+		case options.ImmediateUpload || !notInCloud:
+			uploadHandle, err := common.Open(localPath)
+			if err != nil {
+				if os.IsPermission(err) {
+					info, _ := os.Stat(localPath)
+					orgMode = info.Mode()
+					newMode := orgMode | 0444
+					err = os.Chmod(localPath, newMode)
+					if err == nil {
+						modeChanged = true
+						uploadHandle, err = common.Open(localPath)
+						log.Info(
+							"FileCache::FlushFile : read mode added to file %s",
+							options.Handle.Path,
+						)
+					}
+				}
 
-		uploadHandle, err := common.Open(localPath)
-		if err != nil {
-			if os.IsPermission(err) {
-				info, _ := os.Stat(localPath)
-				orgMode = info.Mode()
-				newMode := orgMode | 0444
-				err = os.Chmod(localPath, newMode)
-				if err == nil {
-					modeChanged = true
-					uploadHandle, err = common.Open(localPath)
-					log.Info(
-						"FileCache::FlushFile : read mode added to file %s",
+				if err != nil {
+					log.Err(
+						"FileCache::FlushFile : error [unable to open upload handle] %s [%s]",
 						options.Handle.Path,
+						err.Error(),
+					)
+					return err
+				}
+			}
+			err = fc.NextComponent().CopyFromFile(
+				internal.CopyFromFileOptions{
+					Name: options.Handle.Path,
+					File: uploadHandle,
+				})
+
+			uploadHandle.Close()
+			if err == nil {
+				// Clear dirty flag since file was successfully uploaded
+				options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
+			}
+			if modeChanged {
+				err1 := os.Chmod(localPath, orgMode)
+				if err1 != nil {
+					log.Err(
+						"FileCache::FlushFile : Failed to remove read mode from file %s [%s]",
+						options.Handle.Path,
+						err1.Error(),
 					)
 				}
 			}
-
-			if err != nil {
-				log.Err(
-					"FileCache::FlushFile : error [unable to open upload handle] %s [%s]",
-					options.Handle.Path,
-					err.Error(),
-				)
-				return err
-			}
-		}
-		err = fc.NextComponent().CopyFromFile(
-			internal.CopyFromFileOptions{
-				Name: options.Handle.Path,
-				File: uploadHandle,
-			})
-
-		uploadHandle.Close()
-
-		if modeChanged {
-			err1 := os.Chmod(localPath, orgMode)
-			if err1 != nil {
-				log.Err(
-					"FileCache::FlushFile : Failed to remove read mode from file %s [%s]",
-					options.Handle.Path,
-					err1.Error(),
-				)
-			}
-		}
-
-		if err != nil {
-			log.Err(
-				"FileCache::FlushFile : %s upload failed [%s]",
+		default:
+			//push to scheduleOps as default since we don't want to upload to the cloud
+			log.Info(
+				"FileCache::FlushFile : %s upload deferred (Offline Scheduling)",
 				options.Handle.Path,
-				err.Error(),
 			)
-			return err
+			_, statErr := os.Stat(localPath)
+			if statErr == nil {
+				fc.scheduleOps.Store(options.Handle.Path, struct{}{})
+				flock := fc.fileLocks.Get(options.Handle.Path)
+				flock.SyncPending = true
+			}
+			options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
+
 		}
-
-		options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
-
 		// If chmod was done on the file before it was uploaded to container then setting up mode would have been missed
 		// Such file names are added to this map and here post upload we try to set the mode correctly
 		// Delete the entry from map so that any further flush do not try to update the mode again
@@ -1768,7 +1771,6 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			}
 		}
 	}
-
 	return nil
 }
 

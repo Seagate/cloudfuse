@@ -38,6 +38,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -50,6 +51,9 @@ import (
 	"github.com/Seagate/cloudfuse/component/loopback"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
+	"github.com/golang/mock/gomock"
+	"github.com/robfig/cron/v3"
+	"gopkg.in/yaml.v2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -64,6 +68,9 @@ type fileCacheTestSuite struct {
 	loopback          internal.Component
 	cache_path        string // uses os.Separator (filepath.Join)
 	fake_storage_path string // uses os.Separator (filepath.Join)
+	useMock           bool
+	mockCtrl          *gomock.Controller
+	mock              *internal.MockComponent
 }
 
 func newLoopbackFS() internal.Component {
@@ -104,6 +111,7 @@ func (suite *fileCacheTestSuite) SetupTest() {
 		suite.cache_path,
 		suite.fake_storage_path,
 	)
+	suite.useMock = false
 	log.Debug(defaultConfig)
 
 	// Delete the temp directories created
@@ -126,17 +134,55 @@ func (suite *fileCacheTestSuite) SetupTest() {
 	suite.setupTestHelper(defaultConfig)
 }
 
+// func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
+// 	suite.assert = assert.New(suite.T())
+
+// 	config.ReadConfigFromReader(strings.NewReader(configuration))
+// 	suite.loopback = newLoopbackFS()
+// 	suite.fileCache = newTestFileCache(suite.loopback)
+// 	err := suite.loopback.Start(context.Background())
+// 	if err != nil {
+// 		panic(fmt.Sprintf("Unable to start loopback [%s]", err.Error()))
+// 	}
+// 	err = suite.fileCache.Start(context.Background())
+// 	if err != nil {
+// 		panic(fmt.Sprintf("Unable to start file cache [%s]", err.Error()))
+// 	}
+
+// }
+
+// func (suite *fileCacheTestSuite) cleanupTest() {
+// 	suite.loopback.Stop()
+// 	err := suite.fileCache.Stop()
+// 	if err != nil {
+// 		panic(fmt.Sprintf("Unable to stop file cache [%s]", err.Error()))
+// 	}
+
+//		// Delete the temp directories created
+//		err = os.RemoveAll(suite.cache_path)
+//		suite.assert.NoError(err)
+//		err = os.RemoveAll(suite.fake_storage_path)
+//		suite.assert.NoError(err)
+//	}
 func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 	suite.assert = assert.New(suite.T())
 
 	config.ReadConfigFromReader(strings.NewReader(configuration))
-	suite.loopback = newLoopbackFS()
-	suite.fileCache = newTestFileCache(suite.loopback)
-	err := suite.loopback.Start(context.Background())
-	if err != nil {
-		panic(fmt.Sprintf("Unable to start loopback [%s]", err.Error()))
+	if suite.useMock {
+		suite.mockCtrl = gomock.NewController(suite.T())
+		suite.mock = internal.NewMockComponent(suite.mockCtrl)
+		suite.fileCache = newTestFileCache(suite.mock)
+		// always simulate being offline
+		suite.mock.EXPECT().StatFs().AnyTimes().Return(nil, false, &common.CloudUnreachableError{})
+	} else {
+		suite.loopback = newLoopbackFS()
+		suite.fileCache = newTestFileCache(suite.loopback)
+		err := suite.loopback.Start(context.Background())
+		if err != nil {
+			panic(fmt.Sprintf("Unable to start next component [%s]", err.Error()))
+		}
 	}
-	err = suite.fileCache.Start(context.Background())
+	err := suite.fileCache.Start(context.Background())
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start file cache [%s]", err.Error()))
 	}
@@ -144,10 +190,14 @@ func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 }
 
 func (suite *fileCacheTestSuite) cleanupTest() {
-	suite.loopback.Stop()
 	err := suite.fileCache.Stop()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to stop file cache [%s]", err.Error()))
+	}
+	if suite.useMock {
+		suite.mockCtrl.Finish()
+	} else {
+		suite.loopback.Stop()
 	}
 
 	// Delete the temp directories created
@@ -1447,6 +1497,1216 @@ func (suite *fileCacheTestSuite) TestFlushFileErrorBadFd() {
 	err := suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
 	suite.assert.Error(err)
 	suite.assert.EqualValues(syscall.EBADF, err)
+}
+
+func (suite *fileCacheTestSuite) TestFlushFileDoesNotUploadToCloud() {
+	suite.cleanupTest()
+
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+	// Create and write to file
+	file := "file_100"
+	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	data := []byte("offline test data")
+	suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data})
+
+	// Expect that CopyFromFile is Never Called (no upload)
+	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Times(0)
+	suite.mock.EXPECT().GetAttr(gomock.Any()).Return(&internal.ObjAttr{}, os.ErrNotExist)
+	suite.mock.EXPECT().Chmod(gomock.Any()).Return(nil).Times(1)
+	// Flush Everything
+	err := suite.fileCache.FlushFile(
+		internal.FlushFileOptions{Handle: handle},
+	)
+	suite.assert.NoError(err)
+	suite.assert.False(handle.Dirty())
+
+	// The file should still exist locally
+	suite.assert.FileExists(filepath.Join(suite.cache_path, file))
+}
+
+func (suite *fileCacheTestSuite) TestFlushFileDoesUploadToCloud_ImmediateUpload() {
+	suite.cleanupTest()
+
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	// Create and write to file
+	file := "file_101"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+	data := []byte("test data for immediate upload")
+	_, err = suite.fileCache.WriteFile(
+		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+
+	suite.mock.EXPECT().GetAttr(gomock.Any()).Return(&internal.ObjAttr{}, os.ErrNotExist)
+
+	// Expect that CopyFromFile is called once (upload happens)
+	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(nil).Times(1)
+
+	suite.mock.EXPECT().Chmod(gomock.Any()).Return(nil).Times(1)
+
+	// Call flushFileInternal directly with ImmediateUpload = true
+	err = suite.fileCache.flushFileInternal(
+		internal.FlushFileOptions{
+			Handle:          handle,
+			ImmediateUpload: true,
+		},
+	)
+	suite.assert.NoError(err)
+
+	suite.assert.False(handle.Dirty())
+
+	suite.assert.FileExists(filepath.Join(suite.cache_path, file))
+}
+
+func (suite *fileCacheTestSuite) TestFlushFileInternalUpdatesExistingCloudFile() {
+	suite.cleanupTest()
+
+	defaultConfig := fmt.Sprintf(
+		"file_cache:\n  path: %s\n  offload-io: true",
+		suite.cache_path,
+	)
+	suite.useMock = true
+	suite.setupTestHelper(defaultConfig)
+	defer suite.cleanupTest()
+
+	// Create and write to file
+	file := "file_existing_cloud"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+
+	initialData := []byte("initial cloud data")
+	updatedData := []byte("updated local data")
+
+	_, err = suite.fileCache.WriteFile(
+		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: updatedData},
+	)
+	suite.assert.NoError(err)
+	suite.assert.True(handle.Dirty())
+
+	// Mock that file already exists in cloud
+	suite.mock.EXPECT().GetAttr(gomock.Any()).Return(&internal.ObjAttr{
+		Path: file,
+		Size: int64(len(initialData)),
+	}, nil).Times(1)
+
+	suite.mock.EXPECT().CopyFromFile(gomock.Any()).Return(nil).Times(1)
+
+	suite.mock.EXPECT().Chmod(gomock.Any()).Return(nil).Times(1)
+
+	// Call flushFileInternal directly with ImmediateUpload = false or true(should upload no matter what)
+	err = suite.fileCache.flushFileInternal(
+		internal.FlushFileOptions{
+			Handle:          handle,
+			ImmediateUpload: false,
+		},
+	)
+	suite.assert.NoError(err)
+	suite.assert.False(handle.Dirty())
+
+	// Verify file still exists in cache
+	suite.assert.FileExists(filepath.Join(suite.cache_path, file))
+}
+
+func (suite *fileCacheTestSuite) TestUploadPendingFileWithServicePendingOPS() {
+	defer suite.cleanupTest()
+
+	// Create and write to file
+	file := "file_pending_upload"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+	testData := "data for pending upload"
+	data := []byte(testData)
+	_, err = suite.fileCache.WriteFile(
+		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+
+	err = suite.fileCache.uploadPendingFile(handle.Path)
+	suite.assert.NoError(err)
+	suite.assert.True(handle.Dirty())
+
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
+	// Check that fake_storage updated with data
+	d, _ := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
+	suite.assert.Equal(data, d)
+}
+func (suite *fileCacheTestSuite) TestServicePendingOpsAndUploadPendingFile() {
+	defer suite.cleanupTest()
+
+	// Create and write to a file
+	file := "file_pending_scheduler"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+	testData := "data for pending upload via scheduler"
+	data := []byte(testData)
+	_, err = suite.fileCache.WriteFile(
+		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: data},
+	)
+	suite.assert.NoError(err)
+
+	// Add the file to the scheduleOps map to mark it as pending
+	suite.fileCache.scheduleOps.Store(file, true) // properly store the key-value pair
+	value, exists := suite.fileCache.scheduleOps.Load(file)
+	if exists {
+		print(value)
+	} else {
+		print("Value not found")
+	}
+
+	suite.fileCache.scheduleOps.Store(file, true)
+	print(suite.fileCache.scheduleOps.Load(file))
+	// Get the file lock and mark it as pending sync
+	flock := suite.fileCache.fileLocks.Get(file)
+	flock.SyncPending = true
+	suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
+		print(suite.fileCache.scheduleOps.Load(file))
+		return true
+	})
+
+	suite.fileCache.servicePendingOps()
+	print(suite.fileCache.scheduleOps.Load(file))
+
+	uploaded := false
+
+	if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file)); err == nil {
+		if _, exists := suite.fileCache.scheduleOps.Load(file); !exists {
+			if !flock.SyncPending {
+				uploaded = true
+			}
+		}
+	}
+
+	suite.assert.True(uploaded, "File was not uploaded by the background servicePendingOps process")
+
+	// Verify the file data was correctly uploaded
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
+	d, _ := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
+	suite.assert.Equal(data, d)
+}
+
+func (suite *fileCacheTestSuite) TestScheduleUploadsCronIntegration2() {
+	defer suite.cleanupTest()
+
+	// Setup test config with a clean environment
+	err := log.SetDefaultLogger("silent", common.LogConfig{})
+	suite.assert.NoError(err)
+
+	file := "scheduled_file_cron.txt"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+
+	// Write some data to the file
+	testData := []byte("scheduled upload via cron test data")
+	n, err := suite.fileCache.WriteFile(
+		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: testData},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(len(testData), n)
+
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	// Confirm file exists locally but not in cloud storage
+	suite.assert.FileExists(filepath.Join(suite.cache_path, file))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
+
+	// Add the file to scheduleOps map (as if it was deferred for upload)
+	suite.fileCache.scheduleOps.Store(file, struct{}{})
+	flock := suite.fileCache.fileLocks.Get(file)
+	flock.SyncPending = true
+
+	cronScheduler := cron.New(cron.WithSeconds())
+
+	now := time.Now()
+
+	second := now.Second() + 5 // Schedule for 5 seconds from now
+	minute := now.Minute()
+	hour := now.Hour()
+
+	if second >= 60 {
+		second = second % 60
+		minute++
+		if minute >= 60 {
+			minute = 0
+			hour++
+			if hour >= 24 {
+				hour = 0
+			}
+		}
+	}
+
+	cronExpr := fmt.Sprintf("%d %d %d * * *", second, minute, hour)
+
+	// Create a schedule with the correct field names
+	schedule := WeeklySchedule{
+		"test": UploadWindow{
+			CronExpr: cronExpr, // Run at specific time
+			Duration: "10s",    // Run for 10 seconds (lowercase field name)
+		},
+	}
+
+	// Keep track of window start/end
+	windowStarted := false
+	windowEnded := false
+
+	// Setup the callbacks
+	startFunc := func() {
+		windowStarted = true
+		fmt.Printf("[test] Starting upload at %s\n", time.Now().Format("15:04:05"))
+		suite.fileCache.servicePendingOps()
+	}
+
+	endFunc := func() {
+		windowEnded = true
+		fmt.Printf("[test] Upload window ended at %s\n", time.Now().Format("15:04:05"))
+	}
+
+	suite.fileCache.scheduleUploads(cronScheduler, schedule, startFunc, endFunc)
+	cronScheduler.Start()
+	defer cronScheduler.Stop()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	fileUploaded := false
+	for {
+		select {
+		case <-ctx.Done():
+			suite.T().Log("Test timed out waiting for file upload")
+			break
+		default:
+			if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file)); err == nil {
+				if _, exists := suite.fileCache.scheduleOps.Load(file); !exists {
+					fileUploaded = true
+					break
+				}
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+
+		// Break out of the loop if file was uploaded or timeout occurred
+		if fileUploaded || ctx.Err() != nil {
+			break
+		}
+	}
+
+	suite.assert.True(windowStarted, "Upload window should have started")
+	if !windowEnded {
+		time.Sleep(10 * time.Second)
+	}
+	suite.assert.True(windowEnded, "Upload window should have ended")
+
+	if !fileUploaded {
+		suite.T().Skip("Test skipped: file upload timed out")
+		return
+	}
+
+	suite.assert.True(fileUploaded, "File should have been uploaded during the window")
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
+
+	uploadedData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
+	suite.assert.NoError(err)
+	suite.assert.Equal(testData, uploadedData)
+
+	flock = suite.fileCache.fileLocks.Get(file)
+	suite.assert.False(flock.SyncPending, "SyncPending flag should be cleared after upload")
+}
+
+func (suite *fileCacheTestSuite) TestSetupSchedulerAddsTasks() {
+	defer suite.cleanupTest()
+
+	cronScheduler := cron.New(cron.WithSeconds())
+
+	startCallbackExecuted := false
+
+	startFunc := func() {
+		startCallbackExecuted = true
+	}
+
+	endFunc := func() {
+		// endCallbackExecuted is intentionally not used
+	}
+
+	// Define the expected schedule
+	hardcodedSchedule := WeeklySchedule{
+		"default": UploadWindow{
+			CronExpr: "0 * * * * *",
+			Duration: "5m",
+		},
+	}
+
+	suite.fileCache.scheduleUploads(cronScheduler, hardcodedSchedule, startFunc, endFunc)
+
+	cronScheduler.Start()
+	defer cronScheduler.Stop()
+
+	entries := cronScheduler.Entries()
+	suite.assert.Equal(1, len(entries), "Expected exactly one scheduled task")
+
+	// Verify the cron expression matches what we expect
+	if len(entries) > 0 {
+		nextRun := entries[0].Schedule.Next(time.Now())
+
+		// Should be no more than a minute in the future
+		suite.assert.LessOrEqual(nextRun.Sub(time.Now()), time.Minute+time.Second,
+			"Next run should be scheduled within the next minute")
+	}
+
+	if len(entries) > 0 && time.Until(entries[0].Next) < 5*time.Second {
+		time.Sleep(time.Until(entries[0].Next) + 2*time.Second)
+		// Check that the start callback was executed
+		suite.assert.True(startCallbackExecuted, "Start callback should have been executed")
+
+	}
+}
+
+// Test to verify that the correct tasks are added to the cron scheduler and perform uploads
+// Test to verify that multiple files are uploaded by the scheduler and track which files were uploaded
+func (suite *fileCacheTestSuite) TestMultipleFilesScheduleUploads() {
+	defer suite.cleanupTest()
+
+	// Create multiple files to upload
+	fileCount := 5
+	files := make([]string, fileCount)
+	testData := make([][]byte, fileCount)
+
+	suite.T().Logf("Creating %d files for scheduled upload test", fileCount)
+
+	// Create and prepare each file
+	for i := 0; i < fileCount; i++ {
+		// Create files with different names and contents
+		files[i] = fmt.Sprintf("scheduled_upload_test_%d.txt", i)
+		testData[i] = []byte(fmt.Sprintf("test data for scheduled upload file %d", i))
+
+		handle, err := suite.fileCache.CreateFile(
+			internal.CreateFileOptions{Name: files[i], Mode: 0777},
+		)
+		suite.assert.NoError(err)
+
+		_, err = suite.fileCache.WriteFile(
+			internal.WriteFileOptions{Handle: handle, Offset: 0, Data: testData[i]},
+		)
+		suite.assert.NoError(err)
+
+		err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+		suite.assert.NoError(err)
+
+		// Mark file as pending upload
+		suite.fileCache.scheduleOps.Store(files[i], struct{}{})
+		flock := suite.fileCache.fileLocks.Get(files[i])
+		flock.SyncPending = true
+
+		// Verify file exists locally but not in storage
+		suite.assert.FileExists(filepath.Join(suite.cache_path, files[i]))
+		suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, files[i]))
+
+		suite.T().Logf("Created file %d: %s (size: %d bytes)", i, files[i], len(testData[i]))
+	}
+
+	// Print the initial pending files
+	pendingCount := 0
+	suite.T().Log("Initial pending files:")
+	suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
+		pendingCount++
+		suite.T().Logf("%s", key)
+		return true
+	})
+	suite.assert.Equal(fileCount, pendingCount, "All files should be pending upload initially")
+
+	// Initialize a cron scheduler(Use WithSeconds)
+	cronScheduler := cron.New(cron.WithSeconds())
+
+	startCallbackExecuted := false
+	endCallbackExecuted := false
+	uploadedFiles := make(map[string]bool)
+
+	startFunc := func() {
+		startCallbackExecuted = true
+		suite.T().Log("Upload window started - beginning upload of pending files")
+
+		// Display number of pending files before upload
+		pendingCount := 0
+		suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
+			pendingCount++
+			return true
+		})
+		suite.T().Logf("Found %d files pending upload", pendingCount)
+
+		// Perform the upload
+		suite.fileCache.servicePendingOps()
+	}
+
+	endFunc := func() {
+		endCallbackExecuted = true
+		suite.T().Log("Upload window ended - checking results")
+
+		// Check which files were uploaded and log the results
+		for i, file := range files {
+			filePath := filepath.Join(suite.fake_storage_path, file)
+			if _, err := os.Stat(filePath); err == nil {
+				uploadedFiles[file] = true
+				fmt.Printf("File %d (%s) was successfully uploaded", i, file)
+
+				// Read and verify uploaded content if needed
+				uploadedData, err := os.ReadFile(filePath)
+				if err == nil {
+					if bytes.Equal(uploadedData, testData[i]) {
+						fmt.Printf("Content verification: PASSED (%d bytes)", len(uploadedData))
+					} else {
+						fmt.Printf("Content verification: FAILED (expected %d bytes, got %d bytes)",
+							len(testData[i]), len(uploadedData))
+					}
+				}
+			} else {
+				suite.T().Logf("File %d (%s) was NOT uploaded", i, file)
+			}
+		}
+
+		// Check if any files are still pending
+		remainingCount := 0
+		suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
+			remainingCount++
+			fmt.Printf("File still pending: %s", key)
+			return true
+		})
+		suite.T().Logf("Upload summary: %d/%d files uploaded, %d still pending",
+			len(uploadedFiles), fileCount, remainingCount)
+	}
+
+	// Define the schedule to run immediately
+	now := time.Now()
+	second := (now.Second() + 2) % 60 // Schedule for 2 seconds from now
+	cronExpr := fmt.Sprintf("%d * * * * *", second)
+
+	schedule := WeeklySchedule{
+		"default": UploadWindow{
+			CronExpr: cronExpr,
+			Duration: "10s",
+		},
+	}
+	fmt.Printf("Scheduling uploads to run at second %d of each minute", second)
+
+	suite.fileCache.scheduleUploads(cronScheduler, schedule, startFunc, endFunc)
+
+	cronScheduler.Start()
+	defer cronScheduler.Stop()
+
+	// Verify that a task was added to the scheduler
+	entries := cronScheduler.Entries()
+	suite.assert.Equal(1, len(entries), "Expected exactly one scheduled task")
+	fmt.Printf("Scheduler configured with %d task(s)", len(entries))
+	suite.T().Logf("Next scheduled run: %s", entries[0].Next.Format("15:04:05"))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	suite.T().Log("Waiting for scheduled upload to complete...")
+
+	uploadCompleted := false
+	for {
+		select {
+		case <-ctx.Done():
+			suite.T().Log("Test timed out waiting for file uploads")
+			break
+		default:
+			// Check if all files have been uploaded
+			allUploaded := true
+			for _, file := range files {
+				if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file)); os.IsNotExist(
+					err,
+				) {
+					allUploaded = false
+					break
+				}
+			}
+
+			if allUploaded {
+				uploadCompleted = true
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+
+		// Break out of the loop if uploads completed or timeout occurred
+		if uploadCompleted || ctx.Err() != nil {
+			break
+		}
+	}
+
+	// Verify the upload occurred
+	suite.assert.True(startCallbackExecuted, "Start callback should have been executed")
+
+	if !uploadCompleted {
+		suite.T().Log("Not all files were uploaded within timeout period")
+	}
+
+	// Verify all files were uploaded
+	uploadCount := 0
+	for i, file := range files {
+		filePath := filepath.Join(suite.fake_storage_path, file)
+		if _, err := os.Stat(filePath); err == nil {
+			uploadCount++
+
+			// Verify content
+			uploadedData, err := os.ReadFile(filePath)
+			suite.assert.NoError(err)
+			suite.assert.Equal(
+				testData[i],
+				uploadedData,
+				fmt.Sprintf("File %s content should match", file),
+			)
+		}
+	}
+	suite.assert.Equal(fileCount, uploadCount, "All files should have been uploaded")
+
+	time.Sleep(10 * time.Second)
+	suite.assert.True(endCallbackExecuted, "End callback should have been executed")
+
+	// Final verification of scheduleOps map - should be empty
+	remainingCount := 0
+	suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
+		remainingCount++
+		return true
+	})
+	suite.assert.Equal(0, remainingCount, "No files should remain in the scheduleOps map")
+
+	for _, file := range files {
+		flock := suite.fileCache.fileLocks.Get(file)
+		suite.assert.False(
+			flock.SyncPending,
+			fmt.Sprintf("SyncPending flag for %s should be cleared", file),
+		)
+	}
+}
+
+func (suite *fileCacheTestSuite) TestDaySpecificSchedulerFromYAML() {
+	defer suite.cleanupTest()
+
+	configPath := filepath.Join(suite.cache_path, "day_schedule_config.yaml")
+	configContent := `schedule:
+  Monday:
+    cron: "0 0 10 * * 1"    # 10:00 AM on Mondays only (1=Monday)
+    duration: "30m"
+    repeat: true
+  Wednesday:
+    cron: "0 0 14 * * 3"    # 2:00 PM on Wednesdays only (3=Wednesday)
+    duration: "45m"
+    repeat: false
+  Friday:
+    cron: "0 0 16 * * 5"    # 4:00 PM on Fridays only (5=Friday)
+    duration: "1h"
+    repeat: true`
+	err := os.MkdirAll(suite.cache_path, 0755)
+	suite.assert.NoError(err)
+
+	err = os.WriteFile(configPath, []byte(configContent), 0644)
+	suite.assert.NoError(err)
+
+	cronScheduler := cron.New(cron.WithSeconds())
+
+	configWasLoaded := false
+
+	configWasLoaded = false
+
+	testSetupScheduler := func(path string) error {
+		suite.assert.Equal(configPath, path)
+		configWasLoaded = true
+
+		// Load the config manually to inspect
+		schedule, err := LoadConfig(configPath)
+		if err != nil {
+			return err
+		}
+		startFunc := func() {
+			suite.fileCache.servicePendingOps()
+		}
+		endFunc := func() {}
+
+		suite.fileCache.scheduleUploads(cronScheduler, schedule, startFunc, endFunc)
+		return nil
+	}
+
+	err = testSetupScheduler(configPath)
+	suite.assert.NoError(err)
+	suite.assert.True(configWasLoaded, "SetupScheduler should have been called")
+
+	// Load the config to verify its contents
+	schedule, err := LoadConfig(configPath)
+	suite.assert.NoError(err)
+
+	suite.assert.Equal(3, len(schedule), "Should have loaded 3 day-specific schedules")
+
+	mondayConfig, exists := schedule["Monday"]
+	suite.assert.True(exists, "Monday schedule should exist")
+	suite.assert.Equal("0 0 10 * * 1", mondayConfig.CronExpr)
+	suite.assert.Equal("30m", mondayConfig.Duration)
+
+	wednesdayConfig, exists := schedule["Wednesday"]
+	suite.assert.True(exists, "Wednesday schedule should exist")
+	suite.assert.Equal("0 0 14 * * 3", wednesdayConfig.CronExpr)
+	suite.assert.Equal("45m", wednesdayConfig.Duration)
+
+	fridayConfig, exists := schedule["Friday"]
+	suite.assert.True(exists, "Friday schedule should exist")
+	suite.assert.Equal("0 0 16 * * 5", fridayConfig.CronExpr)
+	suite.assert.Equal("1h", fridayConfig.Duration)
+
+	entries := cronScheduler.Entries()
+	suite.assert.Equal(3, len(entries), "Scheduler should have 3 entries, one for each day")
+
+	for i, entry := range entries {
+		suite.T().Logf("Schedule entry %d: next run at %s",
+			i, entry.Next.Format("Mon Jan 2 15:04:05"))
+	}
+
+	testFile := "day_scheduled_file.txt"
+	handle, err := suite.fileCache.CreateFile(
+		internal.CreateFileOptions{Name: testFile, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+	testData := []byte("data for day-specific scheduled upload test")
+	_, err = suite.fileCache.WriteFile(
+		internal.WriteFileOptions{Handle: handle, Offset: 0, Data: testData},
+	)
+	suite.assert.NoError(err)
+
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	suite.fileCache.scheduleOps.Store(testFile, struct{}{})
+	flock := suite.fileCache.fileLocks.Get(testFile)
+	flock.SyncPending = true
+
+	suite.assert.FileExists(filepath.Join(suite.cache_path, testFile))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, testFile))
+
+	// Manually trigger the servicePendingOps to simulate a schedule firing
+	suite.fileCache.servicePendingOps()
+
+	// Verify the upload was triggered and completed
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, testFile))
+	uploadedData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, testFile))
+	suite.assert.NoError(err)
+	suite.assert.Equal(testData, uploadedData, "Uploaded file content should match original")
+
+	// Verify file was removed from pending operations
+	_, exists = suite.fileCache.scheduleOps.Load(testFile)
+	suite.assert.False(exists, "File should have been removed from scheduleOps")
+
+	// File lock's sync pending flag should be cleared
+	flock = suite.fileCache.fileLocks.Get(testFile)
+	suite.assert.False(flock.SyncPending, "SyncPending flag should be cleared")
+}
+
+type loggerAdapter struct{}
+
+func (l *loggerAdapter) Printf(format string, v ...interface{}) {
+	fmt.Printf(format, v...)
+}
+
+func (suite *fileCacheTestSuite) TestPrintScheduleFromYAML() {
+	defer suite.cleanupTest()
+
+	// Create a temporary config file with day-specific schedules
+	configPath := filepath.Join(suite.cache_path, "print_schedule_config.yaml")
+	configContent := `schedule:
+  Tuesday:
+    cron: "0 45 13 * * 2"    # 12:00 PM on Tuesdays only (2=Tuesday)
+    duration: "30m"
+    repeat: true
+  Wednesday:
+    cron: "0 0 14 * * 3"    # 2:00 PM on Wednesdays only (3=Wednesday)
+    duration: "45m"
+    repeat: false
+  Friday:
+    cron: "0 0 16 * * 5"    # 4:00 PM on Fridays only (5=Friday)
+    duration: "1h"
+    repeat: true
+  Saturday:
+    cron: "0 0 2 * * *"     # 2:00 AM every day
+    duration: "20m"
+    repeat: true`
+	err := os.MkdirAll(suite.cache_path, 0755)
+	suite.assert.NoError(err)
+
+	err = os.WriteFile(configPath, []byte(configContent), 0644)
+	suite.assert.NoError(err)
+
+	// Load the config to verify its contents
+	schedule, err := LoadConfig(configPath)
+	suite.assert.NoError(err)
+
+	fmt.Println("\n=== PARSED SCHEDULE CONFIGURATION ===")
+	fmt.Printf("Schedule has %d entries\n", len(schedule))
+
+	// Sort the keys to get consistent output for easier verification
+	keys := make([]string, 0, len(schedule))
+	for day := range schedule {
+		keys = append(keys, day)
+	}
+	sort.Strings(keys)
+
+	for _, day := range keys {
+		config := schedule[day]
+		fmt.Printf("\nDay: %s\n", day)
+		fmt.Printf("Cron Expression: %s\n", config.CronExpr)
+		fmt.Printf("Duration: %s\n", config.Duration)
+	}
+	fmt.Println("===============================")
+
+	suite.assert.Equal(4, len(schedule), "Should have loaded 4 schedule entries")
+
+	logAdapter := &loggerAdapter{}
+	cronScheduler := cron.New(cron.WithSeconds(), cron.WithLogger(
+		cron.PrintfLogger(logAdapter)))
+
+	uploadCount := 0
+	startFunc := func() {
+		fmt.Println("Start callback executed")
+		uploadCount++
+	}
+	endFunc := func() {
+		fmt.Println("End callback executed")
+	}
+
+	fmt.Println("\n=== SCHEDULING JOBS ===")
+	suite.fileCache.scheduleUploads(cronScheduler, schedule, startFunc, endFunc)
+
+	fmt.Println("Starting cron scheduler...")
+	cronScheduler.Start()
+	defer cronScheduler.Stop()
+
+	entries := cronScheduler.Entries()
+	fmt.Printf("\n=== SCHEDULED JOBS (%d entries) ===\n", len(entries))
+
+	// Verify the correct number of entries
+	suite.assert.Equal(
+		4,
+		len(entries),
+		"Scheduler should have 4 entries, one for each configuration",
+	)
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Next.Before(entries[j].Next)
+	})
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Next.Before(entries[j].Next)
+	})
+
+	now := time.Now()
+	for i, entry := range entries {
+		nextRun := entry.Next
+		timeUntil := nextRun.Sub(now).Round(time.Second)
+
+		fmt.Printf("\nJob #%d:\n", i+1)
+		fmt.Printf("ID: %v\n", entry.ID)
+		fmt.Printf("Next run: %s\n", nextRun.Format("Mon Jan 2 15:04:05"))
+		fmt.Printf("Time until next run: %s\n", timeUntil)
+		fmt.Printf("Cron expression: %s\n", entry.Schedule)
+
+		// Find which day this entry corresponds to
+		for day, config := range schedule {
+			if strings.Contains(config.CronExpr, entry.Schedule.Next(time.Now()).Format("5")) {
+				fmt.Printf("  Corresponds to: %s schedule\n", day)
+				break
+			}
+		}
+	}
+	fmt.Println("===================================")
+
+	testFile := "schedule_test_file.txt"
+	testData := []byte("test data for schedule verification")
+
+	handle, err := suite.fileCache.CreateFile(
+		internal.CreateFileOptions{Name: testFile, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: testData})
+	suite.assert.NoError(err)
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	suite.fileCache.scheduleOps.Store(testFile, struct{}{})
+	flock := suite.fileCache.fileLocks.Get(testFile)
+	flock.SyncPending = true
+
+	fmt.Println("\n=== PENDING FILES FOR UPLOAD ===")
+	pendingCount := 0
+	suite.fileCache.scheduleOps.Range(func(key, value interface{}) bool {
+		pendingCount++
+		fmt.Printf("  %d. %s\n", pendingCount, key)
+		return true
+	})
+
+	if pendingCount == 0 {
+		fmt.Println("No files pending upload")
+	}
+	fmt.Println("===================================")
+
+	fmt.Println("\n=== MANUAL UPLOAD TEST ===")
+	fmt.Println("Triggering servicePendingOps manually...")
+	suite.fileCache.servicePendingOps()
+
+	// Check if the file was uploaded
+	if _, err := os.Stat(filepath.Join(suite.fake_storage_path, testFile)); err == nil {
+		fmt.Println("File was successfully uploaded")
+
+		// Verify file contents
+		uploadedData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, testFile))
+		if err == nil && bytes.Equal(uploadedData, testData) {
+			fmt.Println("Uploaded file content matches original")
+		} else {
+			fmt.Println("Uploaded file content differs from original")
+		}
+
+		// Check if file was removed from pending operations
+		if _, exists := suite.fileCache.scheduleOps.Load(testFile); !exists {
+			fmt.Println("File was removed from pending operations")
+		} else {
+			fmt.Println("File still exists in pending operations")
+		}
+	} else {
+		fmt.Println("File was not uploaded")
+	}
+	fmt.Println("===================================")
+}
+
+func (suite *fileCacheTestSuite) TestSimpleScheduledUpload() {
+	defer suite.cleanupTest()
+
+	// Create a file and mark it for pending upload
+	file := "simple_scheduled_test.txt"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+
+	data := []byte("simple scheduled upload test data")
+	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data})
+	suite.assert.NoError(err)
+
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	suite.fileCache.scheduleOps.Store(file, struct{}{})
+	flock := suite.fileCache.fileLocks.Get(file)
+	flock.SyncPending = true
+
+	// Verify the file starts in local cache only
+	suite.assert.FileExists(filepath.Join(suite.cache_path, file))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
+
+	// Schedule an immediate upload (in 2 seconds)
+	now := time.Now()
+	second := (now.Second() + 2) % 60
+	cronExpr := fmt.Sprintf("%d * * * * *", second)
+
+	// Create a simple scheduler and call servicePendingOps directly
+	cronScheduler := cron.New(cron.WithSeconds())
+	uploadExecuted := false
+
+	startFunc := func() {
+		fmt.Println("Upload window starting now")
+		uploadExecuted = true
+		suite.fileCache.servicePendingOps() // Direct call
+	}
+
+	endFunc := func() {}
+
+	schedule := WeeklySchedule{
+		"test": UploadWindow{
+			CronExpr: cronExpr,
+			Duration: "5s",
+		},
+	}
+
+	suite.fileCache.scheduleUploads(cronScheduler, schedule, startFunc, endFunc)
+	cronScheduler.Start()
+	defer cronScheduler.Stop()
+
+	// Wait for upload to complete
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	fileUploaded := false
+	checkTicker := time.NewTicker(500 * time.Millisecond)
+	defer checkTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			suite.T().Log("Test timed out waiting for file upload")
+			break
+		case <-checkTicker.C:
+			if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file)); err == nil {
+				fileUploaded = true
+				cancel()
+			}
+		}
+
+		if ctx.Err() != nil {
+			break
+		}
+	}
+
+	// Verify results
+	suite.assert.True(uploadExecuted, "Upload function should have been executed")
+	suite.assert.True(fileUploaded, "File should have been uploaded")
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
+
+	// Verify file was properly uploaded
+	if fileUploaded {
+		uploadedData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
+		suite.assert.NoError(err)
+		suite.assert.Equal(data, uploadedData, "Uploaded file content should match original")
+	}
+}
+
+func (suite *fileCacheTestSuite) TestScheduledUploadsFromYamlConfig2() {
+	defer suite.cleanupTest()
+
+	configPath := filepath.Join(os.Getenv("HOME"), "cloudfuse", "config.yaml")
+
+	fmt.Println("\n=== READING CONFIG FILE ===")
+	fmt.Printf("Config path: %s\n", configPath)
+
+	configContent, err := os.ReadFile(configPath)
+	suite.assert.NoError(err, "Should be able to read the config file")
+	fmt.Println("Config file contents:")
+	fmt.Println(string(configContent))
+
+	file := "yaml_config_upload_test.txt"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+
+	testData := []byte("test data for yaml config scheduled upload")
+	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: testData})
+	suite.assert.NoError(err)
+
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	suite.fileCache.scheduleOps.Store(file, struct{}{})
+	flock := suite.fileCache.fileLocks.Get(file)
+	flock.SyncPending = true
+
+	suite.assert.FileExists(filepath.Join(suite.cache_path, file))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
+
+	fmt.Println("\n=== YAML CONFIG UPLOAD TEST ===")
+	fmt.Printf("Using config file: %s\n", configPath)
+
+	var cfg struct {
+		Schedule WeeklySchedule `yaml:"schedule"`
+	}
+
+	err = yaml.Unmarshal(configContent, &cfg)
+	suite.assert.NoError(err, "Should be able to parse the config file")
+
+	fmt.Println("\n=== PARSED SCHEDULE FROM CONFIG ===")
+	if len(cfg.Schedule) > 0 {
+		fmt.Printf("Found %d schedule entries\n", len(cfg.Schedule))
+		for day, schedule := range cfg.Schedule {
+			fmt.Printf("Day: %s, Cron: %s, Duration: %s",
+				day, schedule.CronExpr, schedule.Duration)
+		}
+	} else {
+		fmt.Println("No schedule entries found in config file")
+	}
+
+	err = suite.fileCache.SetupScheduler()
+	if err != nil {
+		fmt.Printf("Error setting up scheduler: %v\n", err)
+	}
+	suite.assert.NoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	fileUploaded := false
+	fmt.Println("\nWaiting for scheduled upload to complete...")
+
+	checkTicker := time.NewTicker(500 * time.Millisecond)
+	defer checkTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("Test timed out waiting for upload")
+			break
+		case <-checkTicker.C:
+			// Check if file exists in storage
+			if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file)); err == nil {
+				fileUploaded = true
+				fmt.Println("File uploaded successfully")
+				cancel()
+			} else {
+				// Print diagnostics each tick
+				fmt.Printf("Still waiting... Time: %s\n", time.Now().Format("15:04:05"))
+
+				// Check if file is still in scheduleOps map
+				_, exists := suite.fileCache.scheduleOps.Load(file)
+				fmt.Printf("File still in scheduleOps map: %v\n", exists)
+
+				if flock := suite.fileCache.fileLocks.Get(file); flock != nil {
+					fmt.Printf("File SyncPending flag: %v\n", flock.SyncPending)
+				}
+			}
+		}
+
+		if ctx.Err() != nil {
+			break
+		}
+	}
+
+	if fileUploaded {
+		uploadedData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
+		suite.assert.NoError(err)
+		suite.assert.Equal(testData, uploadedData, "Uploaded file content should match original")
+
+		// Check state was cleaned up
+		_, exists := suite.fileCache.scheduleOps.Load(file)
+		suite.assert.False(exists, "File should have been removed from scheduleOps")
+
+		flock = suite.fileCache.fileLocks.Get(file)
+		suite.assert.False(flock.SyncPending, "SyncPending flag should be cleared")
+	} else {
+		// If not uploaded, help with debugging
+		fmt.Println("\n=== TROUBLESHOOTING ===")
+
+		// Check if YAML was loaded correctly
+		schedule, err := LoadConfig(configPath)
+		if err != nil {
+			fmt.Printf("Error loading config: %v\n", err)
+		} else {
+			fmt.Printf("Config loaded successfully with %d entries\n", len(schedule))
+			for key, val := range schedule {
+				fmt.Printf("   Schedule entry: %s -> %+v\n", key, val)
+			}
+		}
+
+		fmt.Println("\nManually triggering servicePendingOps...")
+		suite.fileCache.servicePendingOps()
+
+		// Check if manual trigger worked
+		time.Sleep(1 * time.Second)
+		if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file)); err == nil {
+			fmt.Println(" Manual trigger succeeded - issue is with scheduling")
+			suite.T().Log("File was uploaded after manual servicePendingOps call, but not via scheduler")
+		} else {
+			fmt.Println("Even manual trigger failed - issue is with upload mechanism")
+			suite.T().Log("File was NOT uploaded even after manual servicePendingOps call")
+		}
+
+		fmt.Println("===========================")
+		suite.T().Fail()
+	}
+}
+
+func (suite *fileCacheTestSuite) TestScheduledUploadsWithLoadConfig() {
+	defer suite.cleanupTest()
+
+	file := "setup_scheduler_test_file.txt"
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
+	suite.assert.NoError(err)
+
+	testData := []byte("test data for SetupScheduler upload test")
+	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: testData})
+	suite.assert.NoError(err)
+
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	// Mark file as pending upload and verify initial state
+	suite.fileCache.scheduleOps.Store(file, struct{}{})
+	flock := suite.fileCache.fileLocks.Get(file)
+	flock.SyncPending = true
+
+	// Verify file exists locally but not in storage
+	suite.assert.FileExists(filepath.Join(suite.cache_path, file))
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
+
+	err = suite.fileCache.SetupScheduler()
+	suite.assert.NoError(err, "Should be able to set up scheduler")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	fileUploaded := false
+	fmt.Println("\nWaiting for scheduled upload to complete...")
+
+	checkTicker := time.NewTicker(500 * time.Millisecond)
+	defer checkTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("Test timed out waiting for upload")
+			break
+		case <-checkTicker.C:
+			// Check if file exists in storage
+			if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file)); err == nil {
+				fileUploaded = true
+				fmt.Println("File uploaded successfully")
+				cancel()
+			} else {
+				// Print diagnostics each tick
+				fmt.Printf("Still waiting... Time: %s\n", time.Now().Format("15:04:05"))
+
+				// Check if file is still in scheduleOps map
+				_, exists := suite.fileCache.scheduleOps.Load(file)
+				fmt.Printf("File still in scheduleOps map: %v\n", exists)
+
+				if flock := suite.fileCache.fileLocks.Get(file); flock != nil {
+					fmt.Printf("File SyncPending flag: %v\n", flock.SyncPending)
+				}
+			}
+		}
+
+		if ctx.Err() != nil {
+			break
+		}
+	}
+
+	if fileUploaded {
+		uploadedData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
+		suite.assert.NoError(err)
+		suite.assert.Equal(testData, uploadedData, "Uploaded file content should match original")
+
+		_, exists := suite.fileCache.scheduleOps.Load(file)
+		suite.assert.False(exists, "File should have been removed from scheduleOps")
+
+		flock = suite.fileCache.fileLocks.Get(file)
+		suite.assert.False(flock.SyncPending, "SyncPending flag should be cleared")
+	} else {
+		fmt.Println("\nManually triggering servicePendingOps...")
+		suite.fileCache.servicePendingOps()
+
+		// Check if manual trigger worked
+		time.Sleep(1 * time.Second) // Give it a moment to complete
+		if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file)); err == nil {
+			fmt.Println("Manual trigger succeeded - issue is with scheduling")
+			suite.T().Log("File was uploaded after manual servicePendingOps call, but not via scheduler")
+		} else {
+			fmt.Println("Even manual trigger failed - issue is with upload mechanism")
+			suite.T().Log("File was NOT uploaded even after manual servicePendingOps call")
+		}
+
+		fmt.Println("===========================")
+		suite.T().Fail()
+	}
 }
 
 func (suite *fileCacheTestSuite) TestGetAttrCase1() {

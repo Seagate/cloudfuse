@@ -211,3 +211,17 @@ health_monitor:
     - cpu_profiler <Disable CPU monitoring on cloudfuse process>
     - memory_profiler <Disable memory monitoring on cloudfuse process>
     - network_profiler <Disable network monitoring on cloudfuse process>
+
+# Scheduler configuration
+schedule:
+  Day of the week:
+    cron: "0 * * * * *"
+        #  | | | | | |
+        #  | | | | | +---- Day of week (every day)
+        #  | | | | +------ Month (every month)
+        #  | | | +-------- Day of month (every day)
+        #  | | +---------- Hour (every hour)
+        #  | +------------ Minute (every minute)
+        #  +-------------- Second (0th second)
+    duration: <Length of time to run the scheduled upload session. Format is <number><unit>, Example:"5h" =  5 hours, "30m" = 30 minutes, "2s" = 2 seconds>
+  
