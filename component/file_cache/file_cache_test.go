@@ -1698,7 +1698,7 @@ func (suite *fileCacheTestSuite) TestServicePendingOpsAndUploadPendingFile() {
 	suite.assert.Equal(data, d)
 }
 
-func (suite *fileCacheTestSuite) TestScheduleUploadsCronIntegration2() {
+func (suite *fileCacheTestSuite) TestScheduleUploadsViaCronIntegration() {
 	defer suite.cleanupTest()
 
 	// Setup test config with a clean environment
@@ -1876,7 +1876,7 @@ func (suite *fileCacheTestSuite) TestSetupSchedulerAddsTasks() {
 
 // Test to verify that the correct tasks are added to the cron scheduler and perform uploads
 // Test to verify that multiple files are uploaded by the scheduler and track which files were uploaded
-func (suite *fileCacheTestSuite) TestMultipleFilesScheduleUploads() {
+func (suite *fileCacheTestSuite) TestMultipleFilesUploadViaCron() {
 	defer suite.cleanupTest()
 
 	// Create multiple files to upload
@@ -2385,7 +2385,7 @@ func (suite *fileCacheTestSuite) TestPrintScheduleFromYAML() {
 	fmt.Println("===================================")
 }
 
-func (suite *fileCacheTestSuite) TestSimpleScheduledUpload() {
+func (suite *fileCacheTestSuite) TestSimpleScheduledUploadViaCron() {
 	defer suite.cleanupTest()
 
 	// Create a file and mark it for pending upload
@@ -2474,7 +2474,7 @@ func (suite *fileCacheTestSuite) TestSimpleScheduledUpload() {
 	}
 }
 
-func (suite *fileCacheTestSuite) TestScheduledUploadsFromYamlConfig2() {
+func (suite *fileCacheTestSuite) TestScheduledUploadsFromYamlConfig() {
 	defer suite.cleanupTest()
 
 	configPath := filepath.Join(os.Getenv("HOME"), "cloudfuse", "config.yaml")
@@ -2615,7 +2615,7 @@ func (suite *fileCacheTestSuite) TestScheduledUploadsFromYamlConfig2() {
 	}
 }
 
-func (suite *fileCacheTestSuite) TestScheduledUploadsWithLoadConfig() {
+func (suite *fileCacheTestSuite) TestScheduledUploadsWithYAML() {
 	defer suite.cleanupTest()
 
 	file := "setup_scheduler_test_file.txt"
