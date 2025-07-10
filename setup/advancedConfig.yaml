@@ -221,7 +221,7 @@ health_monitor:
 
 # Scheduler configuration
 schedule:
-  Name: # <Name of Cron job, Example: "Mon,Tue,etc...", Weekends, Weekdays>: 
+  Name: # <Name of Cron job, Example: "Mon,Tue,etc...", Weekends, Weekdays>
     cron: <Cron configuration, Default "0 * * * * *">
             "0 * * * * *"
           #  | | | | | |
