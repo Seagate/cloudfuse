@@ -169,3 +169,8 @@ func sigusrHandler(pipeline *internal.Pipeline, ctx context.Context) daemon.Sign
 func createMountInstance(bool, bool) error {
 	return nil
 }
+
+// stub for compilation
+func readPassphraseFromPipe(pipeName string, timeout time.Duration) (string, error) {
+	return "", nil
+}

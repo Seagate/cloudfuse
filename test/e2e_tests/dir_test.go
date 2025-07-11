@@ -44,6 +44,11 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+const (
+    defaultPollTimeout  = 10 * time.Second
+    defaultPollInterval = 100 * time.Millisecond
+)
+
 type dirTestSuite struct {
 	suite.Suite
 	testPath      string
@@ -96,6 +101,44 @@ func (suite *dirTestSuite) dirTestCleanup(toRemove []string) {
 			fmt.Printf("dirTestCleanup : %s failed [%v]\n", path, err)
 		}
 	}
+}
+
+func formatMessage(msgAndArgs ...interface{}) string {
+    if len(msgAndArgs) == 0 {
+        return ""
+    }
+    if len(msgAndArgs) == 1 {
+        if msg, ok := msgAndArgs[0].(string); ok {
+            return msg
+        }
+        return fmt.Sprintf("%v", msgAndArgs[0])
+    }
+    if msgFormat, ok := msgAndArgs[0].(string); ok {
+        return fmt.Sprintf(msgFormat, msgAndArgs[1:]...)
+    }
+    return fmt.Sprintf("invalid message format: first argument not a string with multiple arguments. Args: %v", msgAndArgs)
+}
+
+// waitForCondition polls for a condition to be true, failing the test on timeout.
+func (suite *dirTestSuite) waitForCondition(timeout time.Duration, interval time.Duration, condition func() (bool, error), msgAndArgs ...interface{}) {
+    startTime := time.Now()
+    var lastErr error
+    for {
+        var met bool
+        met, lastErr = condition()
+        if met {
+            return
+        }
+        if time.Since(startTime) > timeout {
+            errMsg := fmt.Sprintf("Timeout waiting for condition: %s", formatMessage(msgAndArgs...))
+            if lastErr != nil {
+                errMsg = fmt.Sprintf("%s. Last error: %v", errMsg, lastErr)
+            }
+            suite.FailNow(errMsg) // Use FailNow to stop the current test immediately
+            return
+        }
+        time.Sleep(interval)
+    }
 }
 
 // -------------- Directory Tests -------------------
@@ -216,7 +259,6 @@ func (suite *dirTestSuite) TestDirMoveEmpty() {
 	suite.NoError(err)
 
 	err = os.Rename(dir2Name, filepath.Join(dir3Name, "test2"))
-	time.Sleep(1 * time.Second)
 	suite.NoError(err)
 
 	if suite.sizeTracker {
@@ -248,7 +290,6 @@ func (suite *dirTestSuite) TestDirMoveNonEmpty() {
 	suite.NoError(err)
 
 	err = os.Rename(dir2Name, filepath.Join(dir3Name, "test2"))
-	time.Sleep(1 * time.Second)
 	suite.NoError(err)
 
 	if suite.sizeTracker {
@@ -332,7 +373,6 @@ func (suite *dirTestSuite) TestDirGetStats() {
 	dirName := filepath.Join(suite.testPath, "test3")
 	err := os.Mkdir(dirName, 0777)
 	suite.NoError(err)
-	// time.Sleep(2 * time.Second)
 
 	stat, err := os.Stat(dirName)
 	suite.NoError(err)
@@ -717,31 +757,40 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.WriteFile(newFile, suite.minBuff, 0777)
 		suite.NoError(err)
 	}
-	time.Sleep(time.Second * 4)
-	// TODO: Fix this flaky test
+	// flaky test
 	// if suite.sizeTracker {
-	// 	suite.EqualValues(numberOfFiles*len(suite.minBuff), DiskSize(pathPtr))
-	// }
+	// 	expectedSize := numberOfFiles * len(suite.minBuff)
+    //     suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
+    //         currentSize := DiskSize(pathPtr)
+    //         return currentSize == numberOfFiles*len(suite.minBuff), fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+    //     }, "DiskSize to be %d after initial writes", expectedSize)
+    // }
 
 	for i := range numberOfFiles {
 		file := fileName + strconv.Itoa(i)
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)
 	}
-	time.Sleep(time.Second * 4)
 	if suite.sizeTracker {
-		suite.Equal(numberOfFiles*4096, DiskSize(pathPtr))
-	}
+		expectedSize := numberOfFiles * 4096
+        suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
+            currentSize := DiskSize(pathPtr)
+            return currentSize == expectedSize, fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+        }, "DiskSize to be %d after first truncate", expectedSize)
+    }
 
 	for i := range numberOfFiles {
 		file := fileName + strconv.Itoa(i)
 		err := os.WriteFile(file, suite.medBuff, 0777)
 		suite.NoError(err)
 	}
-	time.Sleep(time.Second * 4)
 	if suite.sizeTracker {
-		suite.Equal(numberOfFiles*len(suite.medBuff), DiskSize(pathPtr))
-	}
+		expectedSize := numberOfFiles * len(suite.medBuff)
+        suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
+            currentSize := DiskSize(pathPtr)
+            return currentSize == expectedSize, fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+        }, "DiskSize to be %d after first truncate", expectedSize)
+    }
 
 	renameFile := filepath.Join(dirName, "small_file_rename")
 	for i := range numberOfFiles {
@@ -750,20 +799,26 @@ func (suite *dirTestSuite) TestStatfs() {
 		err := os.Rename(oldFile, newFile)
 		suite.NoError(err)
 	}
-	time.Sleep(time.Second * 4)
 	if suite.sizeTracker {
-		suite.Equal(numberOfFiles*len(suite.medBuff), DiskSize(pathPtr))
-	}
+		expectedSize := numberOfFiles * len(suite.medBuff)
+        suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
+            currentSize := DiskSize(pathPtr)
+            return currentSize == expectedSize, fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+        }, "DiskSize to be %d after first truncate", expectedSize)
+    }
 
 	for i := range numberOfFiles {
 		file := renameFile + strconv.Itoa(i)
 		err := os.Truncate(file, 4096)
 		suite.NoError(err)
 	}
-	time.Sleep(time.Second * 4)
 	if suite.sizeTracker {
-		suite.Equal(numberOfFiles*4096, DiskSize(pathPtr))
-	}
+		expectedSize := numberOfFiles*4096
+        suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
+            currentSize := DiskSize(pathPtr)
+            return currentSize == expectedSize, fmt.Errorf("expected %d, got %d", expectedSize, currentSize)
+        }, "DiskSize to be %d after first truncate", expectedSize)
+    }
 
 	suite.dirTestCleanup([]string{dirName})
 }

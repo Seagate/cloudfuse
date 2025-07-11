@@ -83,6 +83,7 @@ type S3Connection interface {
 	UpdateConfig(cfg Config) error
 
 	ListBuckets() ([]string, error)
+	ListAuthorizedBuckets() ([]string, error)
 
 	// This is just for test, shall not be used otherwise
 	SetPrefixPath(string) error
