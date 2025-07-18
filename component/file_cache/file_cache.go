@@ -84,6 +84,12 @@ type FileCache struct {
 	stopAsyncUpload chan struct{}
 
 	scheduler *cron.Cron
+
+	schedule WeeklySchedule
+
+	uploadNotifyCh chan struct{}
+
+	alwaysOn bool
 }
 
 // Structure defining your config parameters
@@ -382,8 +388,37 @@ func (fc *FileCache) Configure(_ bool) error {
 		fc.diskHighWaterMark = (((conf.MaxSizeMB * MB) * float64(cacheConfig.highThreshold)) / 100)
 	}
 
+	if config.IsSet(compName + ".schedule") {
+		var rawSchedule []map[string]interface{}
+		err := config.UnmarshalKey(compName+".schedule", &rawSchedule)
+		if err != nil {
+			log.Err(
+				"FileCache::Configure : Failed to parse schedule configuration [%s]",
+				err.Error(),
+			)
+		} else {
+			// Convert raw schedule to WeeklySchedule
+			fc.schedule = make(WeeklySchedule, 0, len(rawSchedule))
+			for _, rawWindow := range rawSchedule {
+				window := UploadWindow{}
+				if name, ok := rawWindow["name"].(string); ok {
+					window.Name = name
+				}
+				if cronStr, ok := rawWindow["cron"].(string); ok {
+					window.CronExpr = cronStr
+				}
+				if durStr, ok := rawWindow["duration"].(string); ok {
+					window.Duration = durStr
+				}
+				fc.schedule = append(fc.schedule, window)
+				log.Info("FileCache::Configure : Parsed schedule %s: cron=%s, duration=%s",
+					window.Name, window.CronExpr, window.Duration)
+			}
+		}
+	}
+
 	log.Crit(
-		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
+		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, sync-to-flush %t, ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v, schedule-entries %d",
 		fc.createEmptyFile,
 		int(fc.cacheTimeout),
 		fc.tmpPath,
@@ -404,6 +439,7 @@ func (fc *FileCache) Configure(_ bool) error {
 		fc.diskHighWaterMark,
 		fc.maxCacheSize,
 		fc.mountPath,
+		len(fc.schedule),
 	)
 
 	return nil
@@ -1681,7 +1717,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		)
 		// Figure out if we should upload immediately or append to pending OPS
 		switch {
-		case options.ImmediateUpload || !notInCloud:
+		case options.ImmediateUpload || !notInCloud || fc.alwaysOn:
 			uploadHandle, err := common.Open(localPath)
 			if err != nil {
 				if os.IsPermission(err) {
@@ -1719,6 +1755,15 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 				// Clear dirty flag since file was successfully uploaded
 				options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
 			}
+
+			if err != nil {
+				log.Debug(
+					"FileCache::FlushFile : %s upload failed [%s]",
+					options.Handle.Path,
+					err.Error(),
+				)
+			}
+
 			if modeChanged {
 				err1 := os.Chmod(localPath, orgMode)
 				if err1 != nil {
@@ -1732,12 +1777,13 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		default:
 			//push to scheduleOps as default since we don't want to upload to the cloud
 			log.Info(
-				"FileCache::FlushFile : %s upload deferred (Offline Scheduling)",
+				"FileCache::FlushFile : %s upload deferred (Scheduled for upload)",
 				options.Handle.Path,
 			)
 			_, statErr := os.Stat(localPath)
 			if statErr == nil {
-				fc.scheduleOps.Store(options.Handle.Path, struct{}{})
+				// fc.scheduleOps.Store(options.Handle.Path, struct{}{})
+				fc.markFileForUpload(options.Handle.Path)
 				flock := fc.fileLocks.Get(options.Handle.Path)
 				flock.SyncPending = true
 			}

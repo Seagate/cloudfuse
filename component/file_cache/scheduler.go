@@ -3,89 +3,35 @@ package file_cache
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
-	"github.com/Seagate/cloudfuse/common/config"
 	"github.com/Seagate/cloudfuse/common/log"
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/robfig/cron/v3"
-	"gopkg.in/yaml.v2"
 )
 
 type UploadWindow struct {
+	Name     string `yaml:"name"`
 	CronExpr string `yaml:"cron"`
 	Duration string `yaml:"duration"`
 }
 
 type Config struct {
-	Schedule map[string]UploadWindow `yaml:"schedule"`
+	Schedule WeeklySchedule `yaml:"schedule"`
 }
 
-type WeeklySchedule map[string]UploadWindow
-
-func LoadConfig(path string) (WeeklySchedule, error) {
-	var cfg Config
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
-	}
-	return cfg.Schedule, nil
-}
+type WeeklySchedule []UploadWindow
 
 func (fc *FileCache) SetupScheduler() error {
-	// Check if schedule configuration exists
-	var schedule WeeklySchedule
-	if !config.IsSet("schedule") {
+	if len(fc.schedule) == 0 {
 		log.Info(
-			"FileCache::SetupScheduler : No schedule configuration found(Using default schedule)",
+			"FileCache::SetupScheduler : Empty schedule configuration, defaulting to always-on mode",
 		)
-		schedule = WeeklySchedule{
-			"Default": UploadWindow{
-				CronExpr: "0 * * * * *",
-				Duration: "59s",
-			},
-		}
-		log.Debug(
-			"FileCache::SetupScheduler : Using default schedule: %v",
-			schedule)
-	} else {
-		// Parse the schedule configuration
-		var rawSchedule map[string]map[string]interface{}
-		err := config.UnmarshalKey("schedule", &rawSchedule)
-		if err != nil {
-			log.Err(
-				"FileCache::SetupScheduler : Failed to parse schedule configuration [%s]",
-				err.Error(),
-			)
-			return fmt.Errorf("failed to parse scheduler config: %w", err)
-		}
-
-		// Convert raw schedule to WeeklySchedule
-		schedule = make(WeeklySchedule)
-		for day, rawWindow := range rawSchedule {
-			window := UploadWindow{}
-			if cronStr, ok := rawWindow["cron"].(string); ok {
-				window.CronExpr = cronStr
-			}
-			if durStr, ok := rawWindow["duration"].(string); ok {
-				window.Duration = durStr
-			}
-			schedule[day] = window
-			log.Info("FileCache::SetupScheduler : Parsed schedule %s: cron=%s, duration=%s",
-				day, window.CronExpr, window.Duration)
-		}
-	}
-
-	if len(schedule) == 0 {
-		log.Info("FileCache::SetupScheduler : Empty schedule configuration")
+		fc.alwaysOn = true
 		return nil
 	}
 
@@ -94,16 +40,12 @@ func (fc *FileCache) SetupScheduler() error {
 
 	startFunc := func() {
 		log.Info("FileCache::SetupScheduler : Starting scheduled upload window")
-		fc.servicePendingOps()
 	}
 
 	endFunc := func() {
 		log.Info("FileCache::SetupScheduler : Upload window ended")
-
 	}
-
-	fc.scheduleUploads(cronScheduler, schedule, startFunc, endFunc)
-	log.Info("FileCache::SetupScheduler : Scheduler entries: %v", cronScheduler.Entries())
+	fc.scheduleUploads(cronScheduler, fc.schedule, startFunc, endFunc)
 
 	cronScheduler.Start()
 
@@ -117,47 +59,73 @@ func (fc *FileCache) scheduleUploads(
 	startFunc func(),
 	endFunc func(),
 ) {
-	for day, config := range sched {
-		currentDay := day
+	for _, config := range sched {
+		windowName := config.Name
 
 		durationParsed, err := time.ParseDuration(config.Duration)
 		if err != nil {
-			log.Info("[%s] Invalid duration '%s': %v\n", day, config.Duration, err)
+			log.Info("[%s] Invalid duration '%s': %v\n", windowName, config.Duration, err)
 			continue
 		}
 
 		c.AddFunc(config.CronExpr, func() {
 			startFunc()
-			log.Info("[%s] Starting upload at %s\n", currentDay, time.Now().Format(time.Kitchen))
+			log.Info("[%s] Starting upload at %s\n", windowName, time.Now().Format(time.Kitchen))
+
+			fc.servicePendingOps()
 
 			// Create a context with timeout for the duration of the window
 			window, cancel := context.WithTimeout(context.Background(), durationParsed)
 			defer cancel()
 
-			ticker := time.NewTicker(30 * time.Second)
-			defer ticker.Stop()
+			// Set up the notification channel for upload window
+			fc.uploadNotifyCh = make(chan struct{}, 100)
+			defer func() {
+				close(fc.uploadNotifyCh)
+				fc.uploadNotifyCh = nil
+			}()
 
 			for {
 				select {
 				case <-window.Done():
-					// Call the endFunc callback to notify upload window is ending
 					endFunc()
 					log.Info(
 						"[%s] Upload window ended at %s\n",
-						currentDay,
+						windowName,
 						time.Now().Format(time.Kitchen),
 					)
 					return
-				case <-ticker.C:
+				case <-fc.uploadNotifyCh:
 					log.Debug(
-						"[%s] Checking for pending uploads at %s\n",
-						currentDay,
+						"[%s] File change detected, processing pending uploads at %s\n",
+						windowName,
 						time.Now().Format(time.Kitchen),
 					)
 					fc.servicePendingOps()
 				}
 			}
 		})
+	}
+}
+
+func (fc *FileCache) markFileForUpload(path string) {
+	fc.scheduleOps.Store(path, struct{}{})
+	if fc.uploadNotifyCh != nil {
+		select {
+		case fc.uploadNotifyCh <- struct{}{}:
+			// Successfully notified
+			log.Info(
+				"FileCache::markFileForUpload : Notified upload window about new file: %s",
+				path,
+			)
+		default:
+			// Channel buffer is full, which means notifications are already pending
+			// No need to block here as uploads will be processed soon
+			log.Info(
+				"FileCache::markFileForUpload : Upload window notification channel full, skipping notify for: %s",
+				path,
+			)
+		}
 	}
 }
 
