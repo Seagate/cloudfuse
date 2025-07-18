@@ -452,6 +452,20 @@ func (suite *fileCacheTestSuite) TestConfigZero() {
 	suite.assert.Equal(suite.fileCache.cleanupOnStart, cleanupOnStart)
 }
 
+func (suite *fileCacheTestSuite) TestDefaultFilePath() {
+	defer suite.cleanupTest()
+	suite.cleanupTest() // teardown the default file cache generated
+	config := "file_cache:\n  offload-io: true"
+	suite.setupTestHelper(
+		config,
+	)
+
+	suite.assert.Equal("file_cache", suite.fileCache.Name())
+	homeDir, err := os.UserHomeDir()
+	suite.assert.NoError(err)
+	suite.assert.Equal(filepath.Join(homeDir, ".cloudfuse", "file_cache"), suite.fileCache.tmpPath)
+}
+
 // Tests CreateDir
 func (suite *fileCacheTestSuite) TestCreateDir() {
 	defer suite.cleanupTest()

@@ -2511,7 +2511,7 @@ func (s *blockBlobTestSuite) TestGetAttrFileTime() {
 			s.assert.NoError(err)
 			s.assert.NotNil(before.Mtime)
 
-			time.Sleep(time.Second * 3) // Wait 3 seconds and then modify the file again
+			time.Sleep(1 * time.Second) // Ensure that the modification time will change
 
 			s.az.WriteFile(internal.WriteFileOptions{Handle: h, Offset: 0, Data: data})
 
