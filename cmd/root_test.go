@@ -29,6 +29,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	mathRand "math/rand"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -142,7 +143,8 @@ func (suite *rootCmdSuite) TestGetRemoteVersionValidURL() {
 	// setup
 	// GitHub has a rate limit of 60 requests per hour for unauthenticated requests.
 	// So we'll use a mock server to simulate the GitHub API response.
-	latestVersionPath := strings.TrimPrefix(common.CloudfuseReleaseURL, "https://api.github.com")
+	latestVersionUrl := common.CloudfuseReleaseURL + "/latest"
+	latestVersionPath := strings.TrimPrefix(latestVersionUrl, "https://api.github.com")
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != latestVersionPath {
 			http.NotFound(w, r)
@@ -152,25 +154,62 @@ func (suite *rootCmdSuite) TestGetRemoteVersionValidURL() {
 		fmt.Fprintln(w, `{"tag_name": "v1.2.3", "name": "v1.2.3"}`)
 	}))
 	defer testServer.Close()
-	dummyURL := testServer.URL + latestVersionPath
+	latestVersionUrl = testServer.URL + latestVersionPath
 	// test
-	out, err := getRemoteVersion(dummyURL)
+	out, err := getRemoteVersion(latestVersionUrl)
 	suite.assert.NotEmpty(out)
 	suite.assert.NoError(err)
 }
 
 func (suite *rootCmdSuite) TestGetRemoteVersionCurrentOlder() {
 	defer suite.cleanupTest()
+	// setup
+	// GitHub has a rate limit of 60 requests per hour for unauthenticated requests.
+	// So we'll use a mock server to simulate the GitHub API response.
+	latestVersionUrl := common.CloudfuseReleaseURL + "/latest"
+	latestVersionPath := strings.TrimPrefix(latestVersionUrl, "https://api.github.com")
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != latestVersionPath {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"tag_name": "v1.2.3", "name": "v1.2.3"}`)
+	}))
+	defer testServer.Close()
+	latestVersionUrl = testServer.URL + latestVersionPath
+	// test
 	common.CloudfuseVersion = getDummyVersion()
-	msg := <-beginDetectNewVersion()
+	msg := <-beginDetectNewVersion(latestVersionUrl)
 	suite.assert.NotEmpty(msg)
 	suite.assert.Contains(msg, "A new version of Cloudfuse is available")
 }
 
 func (suite *rootCmdSuite) TestGetRemoteVersionCurrentSame() {
 	defer suite.cleanupTest()
+	// setup
+	latestVersionUrl := common.CloudfuseReleaseURL + "/latest"
+	// GitHub has a rate limit of 60 requests per hour for unauthenticated requests.
+	// So 19 times out of 20, we'll use a mock server to simulate the GitHub API response.
+	if mathRand.Intn(20) == 0 {
+		latestVersionPath := strings.TrimPrefix(latestVersionUrl, "https://api.github.com")
+		currentVersion := common.CloudfuseVersion_()
+		testServer := httptest.NewServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != latestVersionPath {
+					http.NotFound(w, r)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				fmt.Fprintf(w, `{"tag_name": "v%s", "name": "v%s"}`, currentVersion, currentVersion)
+			}),
+		)
+		defer testServer.Close()
+		latestVersionUrl = testServer.URL + latestVersionPath
+	}
+	// test
 	common.CloudfuseVersion = common.CloudfuseVersion_()
-	msg := <-beginDetectNewVersion()
+	msg := <-beginDetectNewVersion(latestVersionUrl)
 	suite.assert.Nil(msg)
 }
 
