@@ -30,6 +30,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
+
+	"golang.org/x/sys/windows"
 
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/winservice"
@@ -55,4 +58,90 @@ func createMountInstance(enableRemountUser bool, enableRemountSystem bool) error
 		}
 	}
 	return nil
+}
+
+// readPassphraseFromPipe connects to a pipe and reads the passphrase.
+func readPassphraseFromPipe(pipeName string, timeout time.Duration) (string, error) {
+	pipeNameUTF16, err := windows.UTF16PtrFromString(pipeName)
+	if err != nil {
+		return "", fmt.Errorf("invalid pipe name: %w", err)
+	}
+
+	deadline := time.Now().Add(timeout)
+	var pipeHandle windows.Handle
+
+	// Loop to connect to the pipe
+	for {
+		pipeHandle, err = windows.CreateFile(
+			pipeNameUTF16,
+			windows.GENERIC_READ,
+			0,
+			nil,
+			windows.OPEN_EXISTING,
+			windows.FILE_FLAG_OVERLAPPED,
+			0,
+		)
+
+		if err == nil {
+			// Success
+			break
+		}
+
+		// If the pipe is busy, the named pipe is not available yet
+		// We will retry until the timeout expires.
+		if err == windows.ERROR_PIPE_BUSY {
+			if time.Now().After(deadline) {
+				return "", fmt.Errorf("timed out waiting for pipe '%s' to become available", pipeName)
+			}
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+
+		// Any other error is fatal.
+		return "", fmt.Errorf("could not connect to pipe '%s': %w", pipeName, err)
+	}
+	defer windows.CloseHandle(pipeHandle)
+
+	// Read from the pipe with a timeout using overlapped (asynchronous) I/O.
+	overlapped := &windows.Overlapped{}
+	event, err := windows.CreateEvent(nil, 1, 0, nil)
+	if err != nil {
+		return "", fmt.Errorf("ReadFile CreateEvent failed: %w", err)
+	}
+	defer windows.CloseHandle(event)
+	overlapped.HEvent = event
+
+	buffer := make([]byte, 4096)
+	var done uint32
+
+	err = windows.ReadFile(pipeHandle, buffer, &done, overlapped)
+	if err != nil && err != windows.ERROR_IO_PENDING {
+		return "", fmt.Errorf("ReadFile failed: %w", err)
+	}
+
+	// Wait for the read operation to complete or timeout.
+	readTimeout := time.Until(deadline)
+	if readTimeout < 0 {
+		readTimeout = 0
+	}
+	eventState, err := windows.WaitForSingleObject(event, uint32(readTimeout.Milliseconds()))
+	if err != nil {
+		return "", fmt.Errorf("ReadFile WaitForSingleObject failed: %w", err)
+	}
+
+	if eventState == uint32(windows.WAIT_TIMEOUT) {
+		return "", fmt.Errorf("timed out waiting for data from pipe '%s'", pipeName)
+	}
+
+	// Get the result of the overlapped operation to know how many bytes were read.
+	err = windows.GetOverlappedResult(pipeHandle, overlapped, &done, true)
+	if err != nil {
+		return "", fmt.Errorf("GetOverlappedResult failed: %w", err)
+	}
+
+	if done == 0 {
+		return "", fmt.Errorf("received empty passphrase from pipe")
+	}
+
+	return string(buffer[:done]), nil
 }
