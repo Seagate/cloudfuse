@@ -122,7 +122,8 @@ jobs:
         env:
           WINFSP: ${{ env.winfsp }}
         run: |
-          curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${WINFSP}
+          curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${{ env.winfsp }}
+      
       - name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
         uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
