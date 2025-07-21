@@ -89,10 +89,8 @@ jobs:
 
       - name: Set CGO
         shell: bash
-        env:
-          CGO: ${{ env.cgo }}
         run: |
-          if [[ "${CGO}" != "" ]]; then echo 'CGO_ENABLED=${CGO}' >> $GITHUB_ENV ; fi
+          echo 'CGO_ENABLED=0' >> $GITHUB_ENV
 
       - name: Build
         shell: bash
