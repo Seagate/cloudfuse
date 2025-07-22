@@ -43,7 +43,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var dumpPath string
+var outputPath string
 var logConfigFile string
 var gatherLogsCmd = &cobra.Command{
 	Use:               "gatherLogs",
@@ -53,9 +53,9 @@ var gatherLogsCmd = &cobra.Command{
 	Example:           "cloudfuse gatherLogs ",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := checkPath(dumpPath)
+		err := checkPath(outputPath)
 		if err != nil {
-			return fmt.Errorf("could not use the output path %s, [%s]", dumpPath, err)
+			return fmt.Errorf("could not use the output path %s, [%s]", outputPath, err)
 		}
 
 		if logConfigFile, err = filepath.Abs(logConfigFile); err != nil {
@@ -166,7 +166,7 @@ var gatherLogsCmd = &cobra.Command{
 func checkPath(outPath string) error {
 	var err error
 	if outPath == "" {
-		dumpPath, err = os.Getwd()
+		outputPath, err = os.Getwd()
 		if err != nil {
 			return err
 		}
@@ -182,7 +182,7 @@ func checkPath(outPath string) error {
 			return fmt.Errorf("the provided output path needs to be a directory")
 		}
 	}
-	dumpPath, err = filepath.Abs(dumpPath)
+	outputPath, err = filepath.Abs(outputPath)
 	if err != nil {
 		return fmt.Errorf("couldn't determine absolute path for logs [%s]", err.Error())
 	}
@@ -249,7 +249,7 @@ func createLinuxArchive(logPath string) error {
 		return err
 	}
 
-	outFile, err := os.Create(dumpPath + "/cloudfuse_logs.tar.gz")
+	outFile, err := os.Create(outputPath + "/cloudfuse_logs.tar.gz")
 	if err != nil {
 		return err
 	}
@@ -307,7 +307,7 @@ func createLinuxArchive(logPath string) error {
 // setupPreZip will create a temporary folder that will contain the logs and be the source path for creating the archive
 // This will only run on windows.
 func setupPreZip() (string, string, error) {
-	preArchPath, err := os.MkdirTemp(dumpPath, "tmpPreZip*")
+	preArchPath, err := os.MkdirTemp(outputPath, "tmpPreZip*")
 	if err != nil {
 		return "", "", fmt.Errorf(
 			"could not create temporary path, %s, to extract data",
@@ -371,7 +371,7 @@ func copyFiles(srcPath, dstPath string) error {
 }
 
 func createWindowsArchive(archPath string) error {
-	outFile, err := os.Create(dumpPath + "/cloudfuse_logs.zip")
+	outFile, err := os.Create(outputPath + "/cloudfuse_logs.zip")
 	if err != nil {
 		return nil
 	}
@@ -467,7 +467,7 @@ func createFilteredLog(logFile string) (string, error) {
 
 func init() {
 	rootCmd.AddCommand(gatherLogsCmd)
-	gatherLogsCmd.Flags().StringVar(&dumpPath, "output-path", "", "Input archive creation path")
+	gatherLogsCmd.Flags().StringVar(&outputPath, "output-path", "", "Input archive creation path")
 	gatherLogsCmd.Flags().
 		StringVar(&logConfigFile, "config-file", common.DefaultConfigFilePath, "config-file input path")
 }
