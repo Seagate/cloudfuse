@@ -82,14 +82,10 @@ type FileCache struct {
 	fileCloseOpt sync.WaitGroup
 
 	stopAsyncUpload chan struct{}
-
-	scheduler *cron.Cron
-
-	schedule WeeklySchedule
-
-	uploadNotifyCh chan struct{}
-
-	alwaysOn bool
+	scheduler       *cron.Cron
+	schedule        WeeklySchedule
+	uploadNotifyCh  chan struct{}
+	alwaysOn        bool
 }
 
 // Structure defining your config parameters
@@ -365,8 +361,6 @@ func (fc *FileCache) Configure(_ bool) error {
 	}
 
 	cacheConfig := fc.GetPolicyConfig(conf)
-	fc.policy = NewLRUPolicy(cacheConfig)
-
 	if fc.policy == nil {
 		log.Err("FileCache::Configure : failed to create cache eviction policy")
 		return fmt.Errorf("config error in %s [%s]", fc.Name(), "failed to create cache policy")
@@ -1470,7 +1464,6 @@ func (fc *FileCache) closeFileInternal(
 			internal.FlushFileOptions{
 				Handle:          options.Handle,
 				CloseInProgress: true,
-				ImmediateUpload: false,
 			},
 		) //nolint
 		if err != nil {
@@ -1722,8 +1715,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			options.Handle.Path,
 		)
 		// Figure out if we should upload immediately or append to pending OPS
-		switch {
-		case options.ImmediateUpload || !notInCloud || fc.alwaysOn:
+		if options.ImmediateUpload || !notInCloud || fc.alwaysOn {
 			uploadHandle, err := common.Open(localPath)
 			if err != nil {
 				if os.IsPermission(err) {
@@ -1768,6 +1760,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 					options.Handle.Path,
 					err.Error(),
 				)
+				return err
 			}
 
 			if modeChanged {
@@ -1780,7 +1773,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 					)
 				}
 			}
-		default:
+		} else {
 			//push to scheduleOps as default since we don't want to upload to the cloud
 			log.Info(
 				"FileCache::FlushFile : %s upload deferred (Scheduled for upload)",
@@ -1788,7 +1781,6 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			)
 			_, statErr := os.Stat(localPath)
 			if statErr == nil {
-				// fc.scheduleOps.Store(options.Handle.Path, struct{}{})
 				fc.markFileForUpload(options.Handle.Path)
 				flock := fc.fileLocks.Get(options.Handle.Path)
 				flock.SyncPending = true
@@ -1796,6 +1788,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
 
 		}
+
 		// If chmod was done on the file before it was uploaded to container then setting up mode would have been missed
 		// Such file names are added to this map and here post upload we try to set the mode correctly
 		// Delete the entry from map so that any further flush do not try to update the mode again

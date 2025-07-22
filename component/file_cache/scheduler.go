@@ -132,14 +132,6 @@ func (fc *FileCache) markFileForUpload(path string) {
 func (fc *FileCache) servicePendingOps() {
 	log.Info("FileCache::servicePendingOps : Servicing pending uploads")
 
-	// check if we're connected (keep this safety check)
-	if !fc.cloudConnected() {
-		log.Info(
-			"FileCache::servicePendingOps : Cloud storage not connected, skipping upload cycle",
-		)
-		return
-	}
-
 	// Process pending operations
 	fc.scheduleOps.Range(func(key, value interface{}) bool {
 		select {
@@ -203,7 +195,6 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 
 		err = fc.flushFileInternal(internal.FlushFileOptions{
 			Handle:          handle,
-			CloseInProgress: false,
 			ImmediateUpload: true,
 		})
 
@@ -223,11 +214,6 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 	return nil
 }
 
-func (fc *FileCache) cloudConnected() bool {
-	_, _, err := fc.NextComponent().StatFs()
-	return !isOffline(err)
-}
-
 func (fc *FileCache) notInCloud(name string) bool {
 	notInCloud, _ := fc.checkCloud(name)
 	return notInCloud
@@ -237,8 +223,4 @@ func (fc *FileCache) checkCloud(name string) (notInCloud bool, getAttrErr error)
 	_, getAttrErr = fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: name})
 	notInCloud = errors.Is(getAttrErr, os.ErrNotExist)
 	return notInCloud, getAttrErr
-}
-
-func isOffline(err error) bool {
-	return errors.Is(err, &common.CloudUnreachableError{})
 }

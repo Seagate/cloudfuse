@@ -131,55 +131,17 @@ func (suite *fileCacheTestSuite) SetupTest() {
 	suite.setupTestHelper(defaultConfig)
 }
 
-// func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
-// 	suite.assert = assert.New(suite.T())
-
-// 	config.ReadConfigFromReader(strings.NewReader(configuration))
-// 	suite.loopback = newLoopbackFS()
-// 	suite.fileCache = newTestFileCache(suite.loopback)
-// 	err := suite.loopback.Start(context.Background())
-// 	if err != nil {
-// 		panic(fmt.Sprintf("Unable to start loopback [%s]", err.Error()))
-// 	}
-// 	err = suite.fileCache.Start(context.Background())
-// 	if err != nil {
-// 		panic(fmt.Sprintf("Unable to start file cache [%s]", err.Error()))
-// 	}
-
-// }
-
-// func (suite *fileCacheTestSuite) cleanupTest() {
-// 	suite.loopback.Stop()
-// 	err := suite.fileCache.Stop()
-// 	if err != nil {
-// 		panic(fmt.Sprintf("Unable to stop file cache [%s]", err.Error()))
-// 	}
-
-//		// Delete the temp directories created
-//		err = os.RemoveAll(suite.cache_path)
-//		suite.assert.NoError(err)
-//		err = os.RemoveAll(suite.fake_storage_path)
-//		suite.assert.NoError(err)
-//	}
 func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 	suite.assert = assert.New(suite.T())
 
 	config.ReadConfigFromReader(strings.NewReader(configuration))
-	if suite.useMock {
-		suite.mockCtrl = gomock.NewController(suite.T())
-		suite.mock = internal.NewMockComponent(suite.mockCtrl)
-		suite.fileCache = newTestFileCache(suite.mock)
-		// always simulate being offline
-		suite.mock.EXPECT().StatFs().AnyTimes().Return(nil, false, &common.CloudUnreachableError{})
-	} else {
-		suite.loopback = newLoopbackFS()
-		suite.fileCache = newTestFileCache(suite.loopback)
-		err := suite.loopback.Start(context.Background())
-		if err != nil {
-			panic(fmt.Sprintf("Unable to start next component [%s]", err.Error()))
-		}
+	suite.loopback = newLoopbackFS()
+	suite.fileCache = newTestFileCache(suite.loopback)
+	err := suite.loopback.Start(context.Background())
+	if err != nil {
+		panic(fmt.Sprintf("Unable to start loopback [%s]", err.Error()))
 	}
-	err := suite.fileCache.Start(context.Background())
+	err = suite.fileCache.Start(context.Background())
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start file cache [%s]", err.Error()))
 	}
@@ -187,14 +149,10 @@ func (suite *fileCacheTestSuite) setupTestHelper(configuration string) {
 }
 
 func (suite *fileCacheTestSuite) cleanupTest() {
+	suite.loopback.Stop()
 	err := suite.fileCache.Stop()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to stop file cache [%s]", err.Error()))
-	}
-	if suite.useMock {
-		suite.mockCtrl.Finish()
-	} else {
-		suite.loopback.Stop()
 	}
 
 	// Delete the temp directories created
@@ -1517,8 +1475,20 @@ func (suite *fileCacheTestSuite) TestCronOffToONUpload() {
 	second := (now.Second() + 3) % 60
 	cronExpr := fmt.Sprintf("%d * * * * *", second)
 
-	configContent := fmt.Sprintf(
-		"file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: false\n  schedule:\n  - name: \"Weekday\"\n    cron: %s\n    duration: \"2h\"\n  - name: \"Weekend\"\n    cron: \"0 0 9 * * 0\"\n    duration: \"4h\"\n\nloopbackfs:\n  path: %s",
+	configContent := fmt.Sprintf(`file_cache:
+  path: %s
+  offload-io: true
+  create-empty-file: false
+  schedule:
+    - name: "Test"
+      cron: %s
+      duration: "2h"
+    - name: "TestWindow"
+      cron: "0 0 9 * * 0"
+      duration: "4h"
+
+loopbackfs:
+  path: %s`,
 		suite.cache_path,
 		cronExpr,
 		suite.fake_storage_path,
@@ -1526,13 +1496,8 @@ func (suite *fileCacheTestSuite) TestCronOffToONUpload() {
 
 	// Setup the file cache with this configuration
 	suite.setupTestHelper(configContent)
-	fmt.Println("Number of scheduler entries:", len(suite.fileCache.schedule))
-	for i, s := range suite.fileCache.schedule {
-		fmt.Printf("Schedule %d: name=%s, cron=%s, duration=%s\n",
-			i, s.Name, s.CronExpr, s.Duration)
-	}
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(4 * time.Second)
 	file := "simple_scheduledlol.txt"
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	suite.assert.NoError(err)
@@ -1547,70 +1512,29 @@ func (suite *fileCacheTestSuite) TestCronOffToONUpload() {
 	suite.assert.FileExists(filepath.Join(suite.cache_path, file))
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
 
-	// Wait for upload to complete
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-
 	fileUploaded := false
-	checkTicker := time.NewTicker(500 * time.Millisecond)
-	defer checkTicker.Stop()
+	time.Sleep(100 * time.Millisecond)
+	if _, err := os.Stat(filepath.Join(suite.fake_storage_path, handle.Path)); err == nil {
+		fileUploaded = true
+		fmt.Println("File successfully uploaded to storage")
+		time.Sleep(300 * time.Millisecond)
+	}
 
-	for !fileUploaded && ctx.Err() == nil {
-		select {
-		case <-ctx.Done():
-			fmt.Println("Test timed out waiting for file upload")
-			break
-		case <-checkTicker.C:
-			if _, err := os.Stat(filepath.Join(suite.fake_storage_path, handle.Path)); err == nil {
-				fileUploaded = true
-				fmt.Println("File successfully uploaded to storage")
+	suite.assert.True(fileUploaded, "File should have been uploaded")
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
 
-				time.Sleep(300 * time.Millisecond)
+	uploadedData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
+	suite.assert.NoError(err)
+	suite.assert.Equal(data, uploadedData, "Uploaded file content should match original")
 
-				_, exists := suite.fileCache.scheduleOps.Load(handle.Path)
-				flock := suite.fileCache.fileLocks.Get(handle.Path)
+	time.Sleep(500 * time.Millisecond)
 
-				fmt.Printf("After upload - File in scheduleOps map: %v\n", exists)
-				if flock != nil {
-					fmt.Printf("After upload - SyncPending flag: %v\n", flock.SyncPending)
-				}
+	_, exists := suite.fileCache.scheduleOps.Load(file)
+	suite.assert.False(exists, "File should have been removed from scheduleOps after upload")
 
-				fmt.Println("Breaking out of wait loop - upload complete")
-				cancel()
-				break
-			}
-		}
-
-		// If upload didn't happen, try manual upload for debugging
-		if !fileUploaded {
-			fmt.Println("\nAttempting manual upload via servicePendingOps...")
-			suite.fileCache.servicePendingOps()
-			time.Sleep(1 * time.Second)
-
-			if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file)); err == nil {
-				fmt.Println("Manual upload succeeded - scheduler might have issues")
-				fileUploaded = true
-			} else {
-				fmt.Println("Manual upload failed - issue with upload mechanism")
-			}
-		}
-
-		suite.assert.True(fileUploaded, "File should have been uploaded")
-		suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
-
-		uploadedData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
-		suite.assert.NoError(err)
-		suite.assert.Equal(data, uploadedData, "Uploaded file content should match original")
-
-		time.Sleep(500 * time.Millisecond)
-
-		_, exists := suite.fileCache.scheduleOps.Load(file)
-		suite.assert.False(exists, "File should have been removed from scheduleOps after upload")
-
-		flock := suite.fileCache.fileLocks.Get(file)
-		if flock != nil {
-			suite.assert.False(flock.SyncPending, "SyncPending flag should be cleared after upload")
-		}
+	flock := suite.fileCache.fileLocks.Get(file)
+	if flock != nil {
+		suite.assert.False(flock.SyncPending, "SyncPending flag should be cleared after upload")
 	}
 }
 
@@ -1621,8 +1545,20 @@ func (suite *fileCacheTestSuite) TestCronOnToOFFUpload() {
 	second := (now.Second() + 3) % 60
 	cronExpr := fmt.Sprintf("%d * * * * *", second)
 
-	configContent := fmt.Sprintf(
-		"file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: false\n  schedule:\n  - name: \"TestWindow\"\n    cron: %s\n    duration: \"5s\"\n\nloopbackfs:\n  path: %s",
+	configContent := fmt.Sprintf(`file_cache:
+  path: %s
+  offload-io: true
+  create-empty-file: false
+  schedule:
+    - name: "Test"
+      cron: %s
+      duration: "5s"
+    - name: "TestWindow"
+      cron: "0 0 9 * * 0"
+      duration: "5s"
+
+loopbackfs:
+  path: %s`,
 		suite.cache_path,
 		cronExpr,
 		suite.fake_storage_path,
@@ -1630,13 +1566,7 @@ func (suite *fileCacheTestSuite) TestCronOnToOFFUpload() {
 
 	// Setup the file cache with this configuration
 	suite.setupTestHelper(configContent)
-	fmt.Println("Number of scheduler entries:", len(suite.fileCache.schedule))
-	for i, s := range suite.fileCache.schedule {
-		fmt.Printf("Schedule %d: name=%s, cron=%s, duration=%s\n",
-			i, s.Name, s.CronExpr, s.Duration)
-	}
 
-	fmt.Println("Waiting for scheduler window to open...")
 	time.Sleep(4 * time.Second)
 
 	file1 := "scheduled_on_window.txt"
@@ -1651,25 +1581,13 @@ func (suite *fileCacheTestSuite) TestCronOnToOFFUpload() {
 	suite.assert.FileExists(filepath.Join(suite.cache_path, file1))
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file1))
 
-	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel1()
-
 	fileUploaded := false
-	checkTicker := time.NewTicker(500 * time.Millisecond)
-	defer checkTicker.Stop()
 
-	for !fileUploaded && ctx1.Err() == nil {
-		select {
-		case <-ctx1.Done():
-			fmt.Println("Timed out waiting for first file upload")
-			break
-		case <-checkTicker.C:
-			if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file1)); err == nil {
-				fileUploaded = true
-				fmt.Println("First file successfully uploaded during ON window")
-				break
-			}
-		}
+	time.Sleep(300 * time.Millisecond)
+
+	if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file1)); err == nil {
+		fileUploaded = true
+		fmt.Println("First file successfully uploaded during ON window")
 	}
 
 	suite.assert.True(fileUploaded, "First file should be uploaded when scheduler is ON")
@@ -1714,8 +1632,13 @@ func (suite *fileCacheTestSuite) TestCronOnToOFFUpload() {
 func (suite *fileCacheTestSuite) TestNoScheduleAlwaysOn() {
 	defer suite.cleanupTest()
 
-	configContent := fmt.Sprintf(
-		"file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: false\n\nloopbackfs:\n  path: %s",
+	configContent := fmt.Sprintf(`file_cache:
+  path: %s
+  offload-io: true
+  create-empty-file: false
+
+loopbackfs:
+  path: %s`,
 		suite.cache_path,
 		suite.fake_storage_path,
 	)
@@ -1762,8 +1685,20 @@ func (suite *fileCacheTestSuite) TestExistingCloudFileImmediateUpload() {
 	second := (now.Second() + 30) % 60
 	cronExpr := fmt.Sprintf("%d * * * * *", second)
 
-	configContent := fmt.Sprintf(
-		"file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: false\n  schedule:\n  - name: \"FutureSchedule\"\n    cron: %s\n    duration: \"5s\"\n\nloopbackfs:\n  path: %s",
+	configContent := fmt.Sprintf(`file_cache:
+  path: %s
+  offload-io: true
+  create-empty-file: false
+  schedule:
+    - name: "Test"
+      cron: %s
+      duration: "5s"
+    - name: "TestWindow"
+      cron: "0 0 9 * * 0"
+      duration: "5s"
+
+loopbackfs:
+  path: %s`,
 		suite.cache_path,
 		cronExpr,
 		suite.fake_storage_path,
@@ -1874,8 +1809,20 @@ func (suite *fileCacheTestSuite) TestMultipleFilesInScheduleOps() {
 	futureMinute := (now.Minute() + 30) % 60
 	cronExpr := fmt.Sprintf("0 %d * * * *", futureMinute)
 
-	configContent := fmt.Sprintf(
-		"file_cache:\n  path: %s\n  offload-io: true\n  create-empty-file: false\n  schedule:\n  - name: \"FutureWindow\"\n    cron: %s\n    duration: \"5s\"\n\nloopbackfs:\n  path: %s",
+	configContent := fmt.Sprintf(`file_cache:
+  path: %s
+  offload-io: true
+  create-empty-file: false
+  schedule:
+    - name: "Test"
+      cron: %s
+      duration: "5s"
+    - name: "TestWindow"
+      cron: "0 0 9 * * 0"
+      duration: "5s"
+
+loopbackfs:
+  path: %s`,
 		suite.cache_path,
 		cronExpr,
 		suite.fake_storage_path,
