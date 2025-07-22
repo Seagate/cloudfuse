@@ -203,7 +203,7 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 	var logFile *os.File
 	logFile, err = os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
 	suite.assert.NoError(err)
-	defer os.Remove(logFile.Name()) //TODO: this isn't working
+	defer os.Remove(logFile.Name())
 
 	//run gatherLogs command
 	_, err = executeCommandC(rootCmd, "gatherLogs")
