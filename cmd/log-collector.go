@@ -46,11 +46,11 @@ import (
 var outputPath string
 var logConfigFile string
 var gatherLogsCmd = &cobra.Command{
-	Use:               "gatherLogs",
+	Use:               "gather-logs",
 	Short:             "interface to gather and review cloudfuse logs",
 	Long:              "interface to gather and review cloudfuse logs",
-	SuggestFor:        []string{"gather", "gatherLog", "gatherLogs"},
-	Example:           "cloudfuse gatherLogs ",
+	SuggestFor:        []string{"gather", "gather-log", "gather-logs"},
+	Example:           "cloudfuse gather-logs ",
 	FlagErrorHandling: cobra.ExitOnError,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := checkPath(outputPath)
