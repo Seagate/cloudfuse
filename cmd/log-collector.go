@@ -172,13 +172,6 @@ func checkPath(outPath string) error {
 		}
 	} else {
 		if !common.DirectoryExists(outPath) {
-			return err
-		}
-		dumpInfo, err := os.Stat(outPath)
-		if err != nil {
-			return err
-		}
-		if !dumpInfo.IsDir() {
 			return fmt.Errorf("the provided output path needs to be a directory")
 		}
 	}
