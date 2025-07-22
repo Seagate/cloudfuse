@@ -89,10 +89,8 @@ jobs:
 
       - name: Set CGO
         shell: bash
-        env:
-          CGO: ${{ env.cgo }}
         run: |
-          if [[ "${CGO}" != "" ]]; then echo 'CGO_ENABLED=${CGO}' >> $GITHUB_ENV ; fi
+          echo 'CGO_ENABLED=0' >> $GITHUB_ENV
 
       - name: Build
         shell: bash
@@ -124,7 +122,8 @@ jobs:
         env:
           WINFSP: ${{ env.winfsp }}
         run: |
-          curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${WINFSP}
+          curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${{ env.winfsp }}
+      
       - name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
         uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
@@ -159,10 +158,8 @@ jobs:
           "C:/Program Files (x86)/Inno Setup 6/iscc.exe" windows_installer_build.iss
 
       - name: Rename installer
-        env:
-          VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
-          mv build/Output/cloudfuse.exe build/Output/cloudfuse_${VERSION}_windows_amd64.exe
+          mv build/Output/cloudfuse.exe build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
 
       - name: Run Inno Setup for No Gui
         working-directory: ./build
@@ -173,10 +170,8 @@ jobs:
           "C:/Program Files (x86)/Inno Setup 6/iscc.exe" windows_installer_build_no_gui.iss
 
       - name: Rename installer No Gui
-        env:
-          VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
-          mv build/Output/cloudfuse.exe build/Output/cloudfuse_no_gui_${VERSION}_windows_amd64.exe
+          mv build/Output/cloudfuse.exe build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
 
       - name: Cache windows installer
         uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
