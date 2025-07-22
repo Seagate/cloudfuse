@@ -70,10 +70,10 @@ var gatherLogsCmd = &cobra.Command{
 		case "silent":
 			return fmt.Errorf("no logs were generated due to log type being silent")
 		case "base":
-			logPath = filepath.Dir(logPath)
+			logPathDir := filepath.Dir(logPath)
 			switch runtime.GOOS {
 			case "linux":
-				err = createLinuxArchive(logPath)
+				err = createLinuxArchive(logPathDir)
 				if err != nil {
 					return fmt.Errorf("unable to create archive: [%s]", err.Error())
 				}
@@ -112,8 +112,8 @@ var gatherLogsCmd = &cobra.Command{
 						err.Error(),
 					)
 				}
-				logPath = common.ExpandPath(logPath)
-				logPath, err = filepath.Abs(logPath)
+				logPathDir = common.ExpandPath(logPathDir)
+				logPathDir, err = filepath.Abs(logPathDir)
 				if err != nil {
 					return fmt.Errorf(
 						"failed get absolute path for logs directory: [%s]",
