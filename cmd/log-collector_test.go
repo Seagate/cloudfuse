@@ -206,7 +206,7 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 	defer os.Remove(logFile.Name())
 
 	//run gatherLogs command
-	_, err = executeCommandC(rootCmd, "gatherLogs")
+	_, err = executeCommandC(rootCmd, "gather-logs")
 	suite.assert.NoError(err)
 
 	switch runtime.GOOS {
@@ -251,7 +251,7 @@ func (suite *logCollectTestSuite) TestValidBaseConfig() {
 	//run the log collector
 	_, err = executeCommandC(
 		rootCmd,
-		"gatherLogs",
+		"gather-logs",
 		fmt.Sprintf("--config-file=%s", configFile.Name()),
 	)
 	suite.assert.NoError(err)
@@ -279,7 +279,7 @@ func (suite *logCollectTestSuite) TestInvalidFilePathBaseConfig() {
 	//run the log collector
 	_, err = executeCommandC(
 		rootCmd,
-		"gatherLogs",
+		"gather-logs",
 		fmt.Sprintf("--config-file=%s", configFile.Name()),
 	)
 	suite.assert.Error(err)
@@ -298,7 +298,7 @@ func (suite *logCollectTestSuite) TestValidSyslogConfig() {
 	//run the log collector
 	_, err = executeCommandC(
 		rootCmd,
-		"gatherLogs",
+		"gather-logs",
 		fmt.Sprintf("--config-file=%s", configFile.Name()),
 	)
 	switch runtime.GOOS {
@@ -334,7 +334,7 @@ func (suite *logCollectTestSuite) TestInvalidConfig() {
 	//run the log collector
 	_, err = executeCommandC(
 		rootCmd,
-		"gatherLogs",
+		"gather-logs",
 		fmt.Sprintf("--config-file=%s", configFile.Name()),
 	)
 	suite.assert.Error(err)
@@ -354,7 +354,7 @@ func (suite *logCollectTestSuite) TestNoLogTypeConfig() {
 	//run the log collector
 	_, err := executeCommandC(
 		rootCmd,
-		"gatherLogs",
+		"gather-logs",
 		fmt.Sprintf("--config-file=%s", configFile.Name()),
 	)
 	suite.assert.Error(err)
@@ -371,7 +371,7 @@ func (suite *logCollectTestSuite) TestNoLogPathConfig() {
 	//run the log collector
 	_, err := executeCommandC(
 		rootCmd,
-		"gatherLogs",
+		"gather-logs",
 		fmt.Sprintf("--config-file=%s", configFile.Name()),
 	)
 
@@ -393,7 +393,7 @@ func (suite *logCollectTestSuite) TestSilentConfig() {
 	//run the log collector
 	_, err = executeCommandC(
 		rootCmd,
-		"gatherLogs",
+		"gather-logs",
 		fmt.Sprintf("--config-file=%s", configFile.Name()),
 	)
 	suite.assert.Error(err)
@@ -421,7 +421,7 @@ func (suite *logCollectTestSuite) TestOutputPath() {
 	defer os.Remove(logFile.Name())
 
 	// run gatherLogs command
-	_, err = executeCommandC(rootCmd, "gatherLogs", fmt.Sprintf("--output-path=%s", tempDir))
+	_, err = executeCommandC(rootCmd, "gather-logs", fmt.Sprintf("--output-path=%s", tempDir))
 	suite.assert.NoError(err)
 
 	switch runtime.GOOS {
