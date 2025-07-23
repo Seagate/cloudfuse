@@ -100,13 +100,13 @@ jobs:
         env:
           FUSELIB: ${{ matrix.fuselib }}
         run: |
-          sudo apt-get update && sudo apt-get upgrade && sudo apt-get install -y pkg-config fuse3 ${FUSELIB}
+          sudo apt-get update && sudo apt-get install -y pkg-config fuse3 ${FUSELIB}
 
       - name: Build
         env:
           JOB_NAME: ${{ matrix.job_name }}
         run: |
-          if [[ "${JOB_NAME}" == "linux-fuse2" ]] || "${JOB_NAME}" == "linux-fuse2-arm" ]]; then
+          if [[ "${JOB_NAME}" == "linux-fuse2" || "${JOB_NAME}" == "linux-fuse2-arm" ]]; then
             ./build.sh fuse2;
           else
             ./build.sh;
@@ -191,19 +191,11 @@ jobs:
             export CGO_LDFLAGS="-L$LIBDIR"
           fi
 
-          if [ "${JOB_NAME}" == "linux-fuse2" ] || "${JOB_NAME}" == "linux-fuse2-arm" ]]; then
+          if [[ "${JOB_NAME}" == "linux-fuse2" || "${JOB_NAME}" == "linux-fuse2-arm" ]]; then
             go test -v -timeout=1h ./... --tags=unittest,azurite
           else
             go test -v -timeout=1h ./... --tags=unittest,azurite,fuse3
           fi
-          echo "CGO environment variables set."
-          echo "--- Current CGO Environment ---"
-          echo "CGO_ENABLED=${CGO_ENABLED}"
-          echo "CC=${CC}"
-          echo "CXX=${CXX}"
-          echo "CGO_CFLAGS=${CGO_CFLAGS}"
-          echo "CGO_LDFLAGS=${CGO_LDFLAGS}"
-          echo "-------------------------------"
 
   test:
     name: Build and Test on Windows
