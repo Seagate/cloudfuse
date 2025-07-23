@@ -212,7 +212,7 @@ func getLogInfo(configFile string) (string, string, error) {
 					if err != nil {
 						return "", "", err
 					}
-					if strings.HasPrefix(logPath, "$HOME") {
+					if strings.HasPrefix(logPath, common.GetDefaultWorkDir()) {
 						logPath = common.ExpandPath(logPath)
 					}
 					logPath, err = filepath.Abs(logPath)
