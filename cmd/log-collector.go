@@ -360,7 +360,7 @@ func copyFiles(srcPath, dstPath string) error {
 		}
 
 	}
-	return err
+	return nil
 }
 
 func createWindowsArchive(archPath string) error {
