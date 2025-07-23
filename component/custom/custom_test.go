@@ -1,3 +1,5 @@
+//go:build !arm64
+
 /*
    Licensed under the MIT License <http://opensource.org/licenses/MIT>.
 
