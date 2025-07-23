@@ -184,8 +184,8 @@ func checkPath(outPath string) error {
 
 // getLogInfo returns the logType, and logPath values that are found in the config file.
 func getLogInfo(configFile string) (string, string, error) {
-	logPath := "$HOME/.cloudfuse/cloudfuse.log"
-	logPath = common.ExpandPath(logPath)
+	logPath := common.ExpandPath(common.GetDefaultWorkDir() + "/.cloudfuse/cloudfuse.log")
+
 	logType := "base"
 	_, err := os.Stat(configFile)
 	if errors.Is(err, fs.ErrNotExist) {
