@@ -360,9 +360,6 @@ func copyFiles(srcPath, dstPath string) error {
 func createWindowsArchive(archPath string) error {
 	outFile, err := os.Create(outputPath + "/cloudfuse_logs.zip")
 	if err != nil {
-		return nil
-	}
-	if err != nil {
 		return err
 	}
 	defer outFile.Close()
@@ -385,7 +382,6 @@ func createWindowsArchive(archPath string) error {
 			}
 			_, err := zipWriter.Create(relPath + "/")
 			if err != nil {
-				zipWriter.Close()
 				return err
 			}
 			return nil
@@ -402,12 +398,10 @@ func createWindowsArchive(archPath string) error {
 			var zipEntry io.Writer
 			zipEntry, err = zipWriter.Create(relPath)
 			if err != nil {
-				zipWriter.Close()
 				return err
 			}
 			_, err = io.Copy(zipEntry, file)
 			if err != nil {
-				zipWriter.Close()
 				return err
 			}
 			amountLogs++
