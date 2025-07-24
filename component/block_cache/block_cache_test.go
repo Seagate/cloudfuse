@@ -1351,7 +1351,7 @@ func (suite *blockCacheTestSuite) TestZZZZLazyWrite() {
 	suite.assert.True(handle.Dirty())
 
 	_ = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: handle})
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 	tobj.blockCache.lazyWrite = false
 
 	// As lazy write is enabled flush shall not upload the file
@@ -2945,19 +2945,20 @@ func (suite *blockCacheTestSuite) TestReadWriteBlockInParallel() {
 	suite.assert.Equal(fs.Size(), int64(62*_1MB))
 }
 
-func (suite *blockCacheTestSuite) TestZZZZZStreamToBlockCacheConfig() {
-	common.IsStream = true
-	config := "read-only: true\n\nstream:\n  block-size-mb: 2\n  max-buffers: 30\n  buffer-size-mb: 8\n"
-	tobj, err := setupPipeline(config)
-	defer tobj.cleanupPipeline()
+// TODO: Uncomment when stream is deprecated
+// func (suite *blockCacheTestSuite) TestZZZZZStreamToBlockCacheConfig() {
+// 	common.IsStream = true
+// 	config := "read-only: true\n\nstream:\n  block-size-mb: 2\n  max-buffers: 30\n  buffer-size-mb: 8\n"
+// 	tobj, err := setupPipeline(config)
+// 	defer tobj.cleanupPipeline()
 
-	suite.assert.NoError(err)
-	if err == nil {
-		suite.assert.Equal("block_cache", tobj.blockCache.Name())
-		suite.assert.EqualValues(2*_1MB, tobj.blockCache.blockSize)
-		suite.assert.EqualValues(8*_1MB*30, tobj.blockCache.memSize)
-	}
-}
+// 	suite.assert.NoError(err)
+// 	if err == nil {
+// 		suite.assert.Equal("block_cache", tobj.blockCache.Name())
+// 		suite.assert.EqualValues(2*_1MB, tobj.blockCache.blockSize)
+// 		suite.assert.EqualValues(8*_1MB*30, tobj.blockCache.memSize)
+// 	}
+// }
 
 func (suite *blockCacheTestSuite) TestSizeOfFileInOpen() {
 	if runtime.GOOS == "windows" {

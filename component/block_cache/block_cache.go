@@ -77,9 +77,9 @@ type BlockCache struct {
 	noPrefetch      bool            // Flag to indicate if prefetch is disabled
 	prefetchOnOpen  bool            // Start prefetching on file open call instead of waiting for first read
 	consistency     bool            // Flag to indicate if strong data consistency is enabled
-	stream          *Stream
-	lazyWrite       bool           // Flag to indicate if lazy write is enabled
-	fileCloseOpt    sync.WaitGroup // Wait group to wait for all async close operations to complete
+	// stream          *Stream // TODO: Replace when stream is deprecated
+	lazyWrite    bool           // Flag to indicate if lazy write is enabled
+	fileCloseOpt sync.WaitGroup // Wait group to wait for all async close operations to complete
 }
 
 // Structure defining your config parameters
@@ -214,13 +214,14 @@ func (bc *BlockCache) GenConfig() string {
 //	Return failure if any config is not valid to exit the process
 func (bc *BlockCache) Configure(_ bool) error {
 	log.Trace("BlockCache::Configure : %s", bc.Name())
-	if common.IsStream {
-		err := bc.stream.Configure(true)
-		if err != nil {
-			log.Err("BlockCache:Stream::Configure : config error [invalid config attributes]")
-			return fmt.Errorf("config error in %s [%s]", bc.Name(), err.Error())
-		}
-	}
+	// TODO: Replace when stream is deprecated
+	// if common.IsStream {
+	// 	err := bc.stream.Configure(true)
+	// 	if err != nil {
+	// 		log.Err("BlockCache:Stream::Configure : config error [invalid config attributes]")
+	// 		return fmt.Errorf("config error in %s [%s]", bc.Name(), err.Error())
+	// 	}
+	// }
 
 	conf := BlockCacheOptions{}
 	err := config.UnmarshalKey(bc.Name(), &conf)
@@ -403,6 +404,10 @@ func (bc *BlockCache) getDefaultMemSize() uint64 {
 func (bc *BlockCache) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	log.Trace("BlockCache::CreateFile : name=%s, mode=%d", options.Name, options.Mode)
 
+	flock := bc.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
 	f, err := bc.NextComponent().CreateFile(options)
 	if err != nil {
 		log.Err("BlockCache::CreateFile : Failed to create file %s", options.Name)
@@ -429,6 +434,10 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 		options.Flags,
 		options.Mode,
 	)
+
+	flock := bc.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
 
 	attr, err := bc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 	if err != nil {
@@ -545,6 +554,10 @@ func (bc *BlockCache) FlushFile(options internal.FlushFileOptions) error {
 		)
 		return nil
 	}
+
+	flock := bc.fileLocks.Get(options.Handle.Path)
+	flock.Lock()
+	defer flock.Unlock()
 
 	options.Handle.Lock()
 	defer options.Handle.Unlock()

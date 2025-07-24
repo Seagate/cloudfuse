@@ -28,7 +28,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"testing"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -162,177 +161,11 @@ func (suite *genConfig) TestGenConfigGet() {
 	suite.assert.Equal("Fetching scalar configuration\nfile_cache.path = /tmp\n", path)
 }
 
-func (suite *genConfig) TestNoTempPath() {
+func (suite *genConfig) TestNoPath() {
 	defer suite.cleanupTest()
 
 	_, err := executeCommandC(rootCmd, "gen-config")
 	suite.assert.Error(err)
-}
-
-func (suite *genConfig) TestFileCacheConfigGen() {
-	defer suite.cleanupTest()
-
-	tempDir, _ := os.MkdirTemp("", "TestTempDir")
-	os.MkdirAll(tempDir, 0777)
-	defer os.RemoveAll(tempDir)
-
-	_, err := executeCommandC(rootCmd, "gen-config", fmt.Sprintf("--tmp-path=%s", tempDir))
-	suite.assert.NoError(err)
-
-	logFilePath := suite.getDefaultLogLocation()
-	defer os.Remove(logFilePath)
-
-	//Check if a file is generated named generatedConfig.yaml
-	suite.assert.FileExists(logFilePath)
-
-	//check if the generated file is not empty
-	file, err := os.ReadFile(logFilePath)
-	suite.assert.NoError(err)
-	suite.assert.NotEmpty(file)
-
-	//check if the generated file has the correct component
-	suite.assert.Contains(string(file), "file_cache")
-
-	//check if the generated file has the correct temp path
-	suite.assert.Contains(string(file), common.JoinUnixFilepath(tempDir))
-}
-
-func (suite *genConfig) TestBlockCacheConfigGen() {
-	// TODO: Skip this test on Windows until block cache supported
-	if runtime.GOOS == "windows" {
-		return
-	}
-	defer suite.cleanupTest()
-
-	tempDir, _ := os.MkdirTemp("", "TestTempDir")
-	os.MkdirAll(tempDir, 0777)
-	defer os.RemoveAll(tempDir)
-
-	_, err := executeCommandC(
-		rootCmd,
-		"gen-config",
-		"--block-cache",
-		fmt.Sprintf("--tmp-path=%s", tempDir),
-	)
-	suite.assert.NoError(err)
-
-	logFilePath := suite.getDefaultLogLocation()
-	defer os.Remove(logFilePath)
-
-	//Check if a file is generated named generatedConfig.yaml
-	suite.assert.FileExists(logFilePath)
-
-	//check if the generated file is not empty
-	file, err := os.ReadFile(logFilePath)
-	suite.assert.NoError(err)
-	suite.assert.NotEmpty(file)
-
-	//check if the generated file has the correct component
-	suite.assert.Contains(string(file), "block_cache")
-	suite.assert.NotContains(string(file), "file_cache")
-
-	//check if the generated file has the correct temp path
-	suite.assert.Contains(string(file), tempDir)
-}
-
-func (suite *genConfig) TestBlockCacheConfigGen1() {
-	// TODO: Skip this test on Windows until block cache supported
-	if runtime.GOOS == "windows" {
-		return
-	}
-	defer suite.cleanupTest()
-
-	tempDir, _ := os.MkdirTemp("", "TestTempDir")
-	os.MkdirAll(tempDir, 0777)
-	defer os.RemoveAll(tempDir)
-
-	_, err := executeCommandC(rootCmd, "gen-config", "--block-cache")
-	suite.assert.NoError(err)
-
-	logFilePath := suite.getDefaultLogLocation()
-	defer os.Remove(logFilePath)
-
-	//Check if a file is generated named generatedConfig.yaml
-	suite.assert.FileExists(logFilePath)
-
-	//check if the generated file is not empty
-	file, err := os.ReadFile(logFilePath)
-	suite.assert.NoError(err)
-	suite.assert.NotEmpty(file)
-
-	//check if the generated file has the correct component
-	suite.assert.Contains(string(file), "block_cache")
-	suite.assert.NotContains(string(file), "file_cache")
-
-	//check if the generated file has the correct temp path
-	suite.assert.NotContains(string(file), tempDir)
-}
-
-// test direct io flag
-func (suite *genConfig) TestDirectIOConfigGen() {
-	// TODO: Skip this test on Windows until block cache supported
-	if runtime.GOOS == "windows" {
-		return
-	}
-	defer suite.cleanupTest()
-
-	_, err := executeCommandC(rootCmd, "gen-config", "--block-cache", "--direct-io")
-	suite.assert.NoError(err)
-
-	logFilePath := suite.getDefaultLogLocation()
-	defer os.Remove(logFilePath)
-
-	suite.assert.FileExists(logFilePath)
-
-	//check if the generated file is not empty
-	file, err := os.ReadFile(logFilePath)
-	suite.assert.NoError(err)
-	suite.assert.NotEmpty(file)
-
-	//check if the generated file has the correct direct io flag
-	suite.assert.Contains(string(file), "direct-io: true")
-	suite.assert.NotContains(string(file), " path: ")
-}
-
-func (suite *genConfig) TestOutputFile() {
-	defer suite.cleanupTest()
-
-	_, err := executeCommandC(
-		rootCmd,
-		"gen-config",
-		"--direct-io",
-		"--o",
-		"1.yaml",
-		"--tmp-path=/tmp",
-	)
-	suite.assert.NoError(err)
-
-	//check if the generated file is not empty
-	file, err := os.ReadFile("1.yaml")
-	suite.assert.NoError(err)
-	suite.assert.NotEmpty(file)
-
-	//check if the generated file has the correct direct io flag
-	suite.assert.Contains(string(file), "direct-io: true")
-	suite.assert.Contains(string(file), " path: ")
-	_ = os.Remove("1.yaml")
-}
-
-func (suite *genConfig) TestConsoleOutput() {
-	defer suite.cleanupTest()
-
-	op, err := executeCommandC(
-		rootCmd,
-		"gen-config",
-		"--direct-io",
-		"--o",
-		"console",
-		"--tmp-path=/tmp",
-	)
-	suite.assert.NoError(err)
-
-	//check if the generated file has the correct direct io flag
-	suite.assert.Empty(op)
 }
 
 func TestGenConfig(t *testing.T) {

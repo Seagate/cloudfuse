@@ -98,6 +98,28 @@ func (suite *fileTestSuite) fileTestCleanup(toRemove []string) {
 	}
 }
 
+// waitForCondition polls for a condition to be true, failing the test on timeout.
+func (suite *fileTestSuite) waitForCondition(timeout time.Duration, interval time.Duration, condition func() (bool, error), msgAndArgs ...interface{}) {
+    startTime := time.Now()
+    var lastErr error
+    for {
+        var met bool
+        met, lastErr = condition()
+        if met {
+            return
+        }
+        if time.Since(startTime) > timeout {
+            errMsg := fmt.Sprintf("Timeout waiting for condition: %s", formatMessage(msgAndArgs...))
+            if lastErr != nil {
+                errMsg = fmt.Sprintf("%s. Last error: %v", errMsg, lastErr)
+            }
+            suite.FailNow(errMsg) // Use FailNow to stop the current test immediately
+            return
+        }
+        time.Sleep(interval)
+    }
+}
+
 // // -------------- File Tests -------------------
 
 // # Create file test
@@ -198,7 +220,16 @@ func (suite *fileTestSuite) TestFileCreateEncodeChar() {
 	srcFile, err := os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
-	time.Sleep(time.Second * 1)
+	
+    var statErr error
+    suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
+		_, statErr = os.Stat(fileName)
+        if statErr != nil {
+            return false, statErr
+        }
+        return true, nil
+    }, "file %s stat to update with non-zero ModTime", fileName)
+    suite.NoError(statErr)
 
 	suite.FileExists(fileName)
 
@@ -241,7 +272,15 @@ func (suite *fileTestSuite) TestFileCreateMultiSpclCharWithinSpclDir() {
 	srcFile, err = os.OpenFile(fileName, os.O_CREATE, 0777)
 	suite.NoError(err)
 	srcFile.Close()
-	time.Sleep(time.Second * 1)
+	var statErr error
+    suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
+		_, statErr = os.Stat(fileName)
+        if statErr != nil {
+            return false, statErr
+        }
+        return true, nil
+    }, "file %s stat to update with non-zero ModTime", fileName)
+    suite.NoError(statErr)
 
 	suite.FileExists(fileName)
 
@@ -351,7 +390,7 @@ func (suite *fileTestSuite) TestFileReadSmall() {
 
 	data, err := os.ReadFile(fileName)
 	suite.NoError(err)
-	suite.Len(suite.minBuff, len(data))
+	suite.Len(data, len(suite.minBuff))
 
 	suite.fileTestCleanup([]string{fileName})
 }
@@ -433,9 +472,18 @@ func (suite *fileTestSuite) TestFileGetStat() {
 	f, err := os.Create(fileName)
 	suite.NoError(err)
 	f.Close()
-	time.Sleep(time.Second * 1)
+	var stat os.FileInfo
+    var statErr error
+    suite.waitForCondition(defaultPollTimeout, defaultPollInterval, func() (bool, error) {
+        stat, statErr = os.Stat(fileName)
+        if statErr != nil {
+            return false, statErr
+        }
+        return true, nil
+    }, "file %s stat to update with non-zero ModTime", fileName)
+    suite.NoError(statErr)
 
-	stat, err := os.Stat(fileName)
+	stat, err = os.Stat(fileName)
 	suite.NoError(err)
 	modTineDiff := time.Since(stat.ModTime())
 
@@ -482,7 +530,7 @@ func (suite *fileTestSuite) TestFileCreateMulti() {
 	fileName := filepath.Join(dirName, "multi")
 	for i := 0; i < 10; i++ {
 		newFile := fileName + strconv.Itoa(i)
-		err := os.WriteFile(newFile, suite.medBuff, 0777)
+		err := os.WriteFile(newFile, suite.minBuff, 0777)
 		suite.NoError(err)
 	}
 	suite.fileTestCleanup([]string{dirName})

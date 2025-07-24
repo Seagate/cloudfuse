@@ -141,11 +141,12 @@ func (s *pipelineTestSuite) TestStartStopCreateNewPipeline() {
 	s.assert.NoError(err)
 }
 
-func (s *pipelineTestSuite) TestStreamToBlockCacheConfig() {
-	p, err := NewPipeline([]string{"stream"}, false)
-	s.assert.NoError(err)
-	s.assert.Equal("block_cache", p.components[0].Name())
-}
+// TODO: Uncomment when stream is deprecated
+// func (s *pipelineTestSuite) TestStreamToBlockCacheConfig() {
+// 	p, err := NewPipeline([]string{"stream"}, false)
+// 	s.assert.NoError(err)
+// 	s.assert.Equal("block_cache", p.components[0].Name())
+// }
 
 func TestPipelineTestSuite(t *testing.T) {
 	suite.Run(t, new(pipelineTestSuite))
