@@ -70,10 +70,9 @@ var gatherLogsCmd = &cobra.Command{
 		case "silent":
 			return fmt.Errorf("no logs were generated due to log type being silent")
 		case "base":
-			logPathDir := filepath.Dir(logPath)
 			switch runtime.GOOS {
 			case "linux":
-				err = createLinuxArchive(logPathDir)
+				err = createLinuxArchive(logPath)
 				if err != nil {
 					return fmt.Errorf("unable to create archive: [%s]", err.Error())
 				}
@@ -109,14 +108,6 @@ var gatherLogsCmd = &cobra.Command{
 						"unable to copy files from source path %s to destination %s: [%s]",
 						srcSrvPath,
 						dstSysprofPath,
-						err.Error(),
-					)
-				}
-				logPathDir = common.ExpandPath(logPathDir)
-				logPathDir, err = filepath.Abs(logPathDir)
-				if err != nil {
-					return fmt.Errorf(
-						"failed get absolute path for logs directory: [%s]",
 						err.Error(),
 					)
 				}
@@ -184,8 +175,7 @@ func checkPath(outPath string) error {
 
 // getLogInfo returns the logType, and logPath values that are found in the config file.
 func getLogInfo(configFile string) (string, string, error) {
-	logPath := common.ExpandPath(common.GetDefaultWorkDir() + "/.cloudfuse/cloudfuse.log")
-
+	logPath := common.ExpandPath(common.GetDefaultWorkDir() + "/.cloudfuse/")
 	logType := "base"
 	_, err := os.Stat(configFile)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -219,9 +209,13 @@ func getLogInfo(configFile string) (string, string, error) {
 					if err != nil {
 						return "", "", err
 					}
-					_, err = os.Stat(logPath)
+					var leaf os.FileInfo
+					leaf, err = os.Stat(logPath)
 					if err != nil {
-						return logType, logPath, err
+						return "", "", err
+					}
+					if !leaf.IsDir() {
+						logPath = filepath.Dir(logPath)
 					}
 				} else {
 					return logType, logPath, fmt.Errorf("the logging file-path is not provided")
