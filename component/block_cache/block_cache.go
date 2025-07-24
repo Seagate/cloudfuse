@@ -404,6 +404,10 @@ func (bc *BlockCache) getDefaultMemSize() uint64 {
 func (bc *BlockCache) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	log.Trace("BlockCache::CreateFile : name=%s, mode=%d", options.Name, options.Mode)
 
+	flock := bc.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
 	f, err := bc.NextComponent().CreateFile(options)
 	if err != nil {
 		log.Err("BlockCache::CreateFile : Failed to create file %s", options.Name)
@@ -430,6 +434,10 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 		options.Flags,
 		options.Mode,
 	)
+
+	flock := bc.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
 
 	attr, err := bc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 	if err != nil {
@@ -546,6 +554,10 @@ func (bc *BlockCache) FlushFile(options internal.FlushFileOptions) error {
 		)
 		return nil
 	}
+
+	flock := bc.fileLocks.Get(options.Handle.Path)
+	flock.Lock()
+	defer flock.Unlock()
 
 	options.Handle.Lock()
 	defer options.Handle.Unlock()

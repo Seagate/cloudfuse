@@ -614,19 +614,22 @@ func (s *clientTestSuite) TestListBuckets() {
 	s.assert.Contains(buckets, storageTestConfigurationParameters.BucketName)
 }
 
-// TODO: Cannot run this test in current test account with buckets we don't have permission for
-// func (s *clientTestSuite) TestDefaultBucketName() {
-// 	defer s.cleanupTest()
-// 	// write config with no bucket name
-// 	config := fmt.Sprintf("s3storage:\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s\n  use-path-style: %t\n",
-// 		storageTestConfigurationParameters.KeyID, storageTestConfigurationParameters.SecretKey,
-// 		storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region,
-// 		storageTestConfigurationParameters.UsePathStyle)
-// 	err := s.setupTestHelper(config, false)
-// 	s.assert.NoError(err)
-// 	buckets, _ := s.client.ListBuckets()
-// 	s.assert.Contains(buckets, s.client.Config.authConfig.BucketName)
-// }
+func (s *clientTestSuite) TestDefaultBucketName() {
+	defer s.cleanupTest()
+	// write config with no bucket name
+	config := fmt.Sprintf(
+		"s3storage:\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s\n  use-path-style: %t\n",
+		storageTestConfigurationParameters.KeyID,
+		storageTestConfigurationParameters.SecretKey,
+		storageTestConfigurationParameters.Endpoint,
+		storageTestConfigurationParameters.Region,
+		storageTestConfigurationParameters.UsePathStyle,
+	)
+	err := s.setupTestHelper(config, false)
+	s.assert.NoError(err)
+	buckets, _ := s.client.ListBuckets()
+	s.assert.Contains(buckets, s.client.Config.authConfig.BucketName)
+}
 
 func (s *clientTestSuite) TestSetPrefixPath() {
 	defer s.cleanupTest()
@@ -1403,6 +1406,69 @@ func (s *clientTestSuite) TestWrite() {
 	s.assert.NoError(err)
 	s.assert.Equal(oldBody[:offset], output[:offset])
 	s.assert.Equal(newData, output[offset:])
+}
+
+func (s *clientTestSuite) TestGetCommittedBlockListSmallFile() {
+	defer s.cleanupTest()
+	name := generateFileName()
+	bodyLen := 1024
+	body := []byte(randomString(bodyLen))
+
+	err := s.client.WriteFromBuffer(name, nil, body)
+	s.assert.NoError(err)
+
+	blockList, err := s.client.GetCommittedBlockList(name)
+
+	s.assert.NoError(err)
+	s.assert.NotNil(blockList)
+	s.assert.Empty(*blockList)
+}
+
+func (s *clientTestSuite) TestGetCommittedBlockListMultipartFile() {
+	defer s.cleanupTest()
+	name := generateFileName()
+	partSize := s.client.Config.partSize
+	bodyLen := int(partSize*2 + partSize/2)
+	body := randomString(bodyLen)
+
+	err := s.client.WriteFromBuffer(name, nil, []byte(body))
+	s.assert.NoError(err)
+
+	blockList, err := s.client.GetCommittedBlockList(name)
+
+	s.assert.NoError(err)
+	s.assert.NotNil(blockList)
+
+	expectedParts := int(bodyLen / int(partSize))
+	if bodyLen%int(partSize) != 0 {
+		expectedParts++
+	}
+	s.assert.Len(*blockList, expectedParts)
+
+	var currentOffset int64 = 0
+	for i, block := range *blockList {
+		s.assert.Equal(currentOffset, block.Offset)
+
+		expectedSize := uint64(partSize)
+		if i == expectedParts-1 { // Last part might be smaller
+			expectedSize = uint64(bodyLen) - uint64(currentOffset)
+		}
+		s.assert.Equal(expectedSize, block.Size)
+
+		currentOffset += int64(block.Size)
+	}
+	s.assert.Equal(int64(bodyLen), currentOffset)
+}
+
+func (s *clientTestSuite) TestGetCommittedBlockListNonExistentFile() {
+	defer s.cleanupTest()
+	name := generateFileName()
+
+	blockList, err := s.client.GetCommittedBlockList(name)
+
+	s.assert.Error(err)
+	s.assert.Equal(syscall.ENOENT, err)
+	s.assert.Nil(blockList)
 }
 
 func TestClient(t *testing.T) {

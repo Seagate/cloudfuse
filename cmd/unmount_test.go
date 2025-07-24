@@ -32,7 +32,6 @@ import (
 	"os"
 	"os/exec"
 	"testing"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -79,7 +78,6 @@ func (suite *unmountTestSuite) cleanupTest() {
 	resetCLIFlags(*unmountCmd)
 	resetCLIFlags(*mountCmd)
 	resetCLIFlags(*rootCmd)
-	time.Sleep(1 * time.Second)
 }
 
 // mount failure test where the mount directory does not exist
@@ -102,8 +100,6 @@ func (suite *unmountTestSuite) TestUnmountCmd() {
 	if err != nil {
 		fmt.Printf("Mount failed with output: %s\n", mountOutput)
 	}
-
-	time.Sleep(2 * time.Second)
 
 	unmountOutput, err := executeCommandC(rootCmd, "unmount", mountDirectory1)
 	suite.assert.NoError(err)
@@ -140,7 +136,6 @@ func (suite *unmountTestSuite) TestUnmountCmdLazy() {
 			_, err := cmd.Output()
 			suite.assert.NoError(err)
 
-			time.Sleep(2 * time.Second)
 			// move into the mount directory to cause busy error on regular unmount
 			err = os.Chdir(mountDirectory6)
 			suite.assert.NoError(err)
@@ -188,7 +183,6 @@ func (suite *unmountTestSuite) TestUnmountCmdFail() {
 	_, err := cmd.Output()
 	suite.assert.NoError(err)
 
-	time.Sleep(2 * time.Second)
 	err = os.Chdir(mountDirectory2)
 	suite.assert.NoError(err)
 
@@ -217,7 +211,6 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcard() {
 	_, err := cmd.Output()
 	suite.assert.NoError(err)
 
-	time.Sleep(2 * time.Second)
 	_, err = executeCommandC(rootCmd, "unmount", mountDirectory3+"*")
 	suite.assert.NoError(err)
 }
@@ -238,7 +231,6 @@ func (suite *unmountTestSuite) TestUnmountCmdWildcardFail() {
 	_, err := cmd.Output()
 	suite.assert.NoError(err)
 
-	time.Sleep(2 * time.Second)
 	err = os.Chdir(mountDirectory4)
 	suite.assert.NoError(err)
 
@@ -271,7 +263,6 @@ func (suite *unmountTestSuite) TestUnmountCmdValidArg() {
 	_, err := cmd.Output()
 	suite.assert.NoError(err)
 
-	time.Sleep(2 * time.Second)
 	lst, _ := unmountCmd.ValidArgsFunction(nil, nil, "")
 	suite.assert.NotEmpty(lst)
 
