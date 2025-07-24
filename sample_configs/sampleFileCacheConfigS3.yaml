@@ -18,7 +18,7 @@ libfuse:
 file_cache:
   path: /<PATH>/<TO>/<CACHE_DIR>
   timeout-sec: 64000000
-  cleanup-on-start: true
+  allow-non-empty-temp: true
   ignore-sync: true
 
 attr_cache:

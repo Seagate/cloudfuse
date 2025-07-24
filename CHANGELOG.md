@@ -1,5 +1,16 @@
 # Cloudfuse Changelog #
 
+## **1.12.1** ##
+
+July 18th 2025
+This version is based on [blobfuse2 2.4.0](https://github.com/Azure/azure-storage-fuse/releases/tag/blobfuse2-2.4.0) (upstream).
+
+### Bug Fixes ###
+
+- [#601](https://github.com/Seagate/cloudfuse/pull/601) Allow use of persistent cache across reboots
+- [#598](https://github.com/Seagate/cloudfuse/pull/598) If no bucket name specified, default to first accessible bucket
+- [#583](https://github.com/Seagate/cloudfuse/pull/583) Move to latest version of WinFSP
+
 ## **1.12.0** ##
 
 June 6th 2025
