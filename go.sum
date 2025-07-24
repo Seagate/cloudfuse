@@ -151,6 +151,8 @@ github.com/tklauser/go-sysconf v0.3.12 h1:0QaGUFOdQaIVdPgfITYzaTegZvdCjmYO52cSFA
 github.com/tklauser/go-sysconf v0.3.12/go.mod h1:Ho14jnntGE1fpdOqQEEaiKRpvIavV0hSfmBq8nJbHYI=
 github.com/tklauser/numcpus v0.6.1 h1:ng9scYS7az0Bk4OZLvrNXNSAO2Pxr1XXRAPyjhIx+Fk=
 github.com/tklauser/numcpus v0.6.1/go.mod h1:1XfjsgE2zo8GVw7POkMbHENHzVg3GzmoZ9fESEdAacY=
+github.com/vibhansa-msft/blobfilter v0.0.0-20250115104552-d9d40722be3e h1:cwReArp3IJQj86DIFNcYO/0/RZjTwDzgFO7LqZ1ZK0o=
+github.com/vibhansa-msft/blobfilter v0.0.0-20250115104552-d9d40722be3e/go.mod h1:7qlJNGhIwS5VRsa7FzXgw7GhdKuVebVwbIRJduXl8Ms=
 github.com/vibhansa-msft/tlru v0.0.0-20240410102558-9e708419e21f h1:KmQFbsVFi45PtwEWIXugkW0X9VSJ+rZtee/WCPG5unc=
 github.com/vibhansa-msft/tlru v0.0.0-20240410102558-9e708419e21f/go.mod h1:7G2C64UXEWNr8oUzspzcrymxCjD9fKAKTGbL7zO2GW8=
 github.com/winfsp/cgofuse v1.6.0 h1:re3W+HTd0hj4fISPBqfsrwyvPFpzqhDu8doJ9nOPDB0=
