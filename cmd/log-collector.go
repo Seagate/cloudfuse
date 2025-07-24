@@ -303,7 +303,7 @@ func setupPreZip() (string, string, error) {
 	}
 
 	// create a sub folder for the service logs
-	sysProfDir := fmt.Sprintf("%s %csystemprofile", preArchPath, os.PathSeparator)
+	sysProfDir := fmt.Sprintf("%s%csystemprofile", preArchPath, os.PathSeparator)
 	err = os.Mkdir(sysProfDir, 0760)
 	if err != nil {
 		return "", "", fmt.Errorf("unable to create folder, %s: [%s]", sysProfDir, err.Error())
