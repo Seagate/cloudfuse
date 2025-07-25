@@ -1,0 +1,72 @@
+File_Cache Test Plan:
+
+OfftoOn
+1.Initialize variables and files / call setuptesthelper
+2. Check if file exists in cloud after closing the file, before the schduler starts(Should be false)
+3. Scheduler should be started 
+4. Check if file is uploaded
+5. Verify file information is the same locally and in the cloud(consistency)
+6. Check if file is still in scheduleOps(Should be False)
+7. Check if syncPending Flag is False
+
+OntoOFF
+1.Initialize variables and files/ call setuptesthelper
+2. Scheduler should be started 
+3. Wait until the schduler is setup and has enough time to upload file
+4. Check if file exists in cloud after close(File Uploaded = True)
+5. Sleep until schedule interval has ended
+6. Create another file(write and close)
+7. Check if file exists locally
+8. Check if file exists in cloud(Should be False)
+9. Check if file is in scheduleOps(syncPending == True)
+
+AlreadyInCloud(ImmediateUpload) 
+1. Initialize variables and files/ call setuptesthelper
+2. Scheduler should be started 
+3. Wait until the schduler is setup and has enough time to upload file
+5. Check if file exists in cloud after close before schedule(File Uploaded)
+6. Write to the file and close the file
+8. Confirm changes to file are accurate
+
+AlwaysOn
+1.Initialize variables and files/ call setuptesthelper(Create multiple files)
+2. Check if file exists in cloud after close before schedule (should be false)
+3. Check if file are in pending in scheduleOps
+4. Scheduler should be started(No schdule, should default to AlwaysOn == True)
+6. Check if file is uploaded
+7. Check if the file information is the same from local to cloud(consistency)
+8. Check if file is still in scheduleOps(False)
+
+CreateFileAndRename
+1. Initialize variables and files/ call setuptesthelper(Scheduler will be "OFF")(File will be local not in Cloud)
+2. Check if the file exists(local and Cloud)(Local == True, Cloud == False)
+3. Rename the file
+4. Check if the file has been renamed in scheduleOps
+
+DeleteFile
+1. Initialize variables and files/ call setuptesthelper(Scheduler will be "OFF")(File will be local not in Cloud)
+2. Check if the file exists(local and Cloud)(Local == True, Cloud == False)
+3. Delete the file
+4. Check if file has been deleted in local cache
+5. Check if the file has been deleted in scheduleOps 
+
+CreateEmptyFile==True
+1. Initialize variables and files/ call setuptesthelper
+2. Scheduler should be started 
+3. Wait until the schduler is setup and has enough time to upload file
+4. Check if file exists in the cloud(Should be True)
+
+Read/writeLocalFile
+1. Initialize variables and files/ call setuptesthelper(Schdule Time should be out of current time interval)
+2. Scheduler should be started 
+3. Check if file is already in file cache
+4. Write to file again
+5. Check schduleOps to verify changes 
+6. Check if file exists in cloud(False)
+
+
+Wrong schedule
+other possibilites for config schedule
+cron might filer it out
+
+
