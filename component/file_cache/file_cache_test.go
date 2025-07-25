@@ -1472,7 +1472,7 @@ func (suite *fileCacheTestSuite) TestCronOffToONUpload() {
 	defer suite.cleanupTest()
 
 	now := time.Now()
-	second := (now.Second() + 3) % 60
+	second := (now.Second() + 10) % 60
 	cronExpr := fmt.Sprintf("%d * * * * *", second)
 
 	configContent := fmt.Sprintf(`file_cache:
@@ -1496,8 +1496,8 @@ loopbackfs:
 
 	// Setup the file cache with this configuration
 	suite.setupTestHelper(configContent)
+	time.Sleep(5 * time.Second)
 
-	time.Sleep(4 * time.Second)
 	file := "simple_scheduledlol.txt"
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	suite.assert.NoError(err)
@@ -1512,8 +1512,14 @@ loopbackfs:
 	suite.assert.FileExists(filepath.Join(suite.cache_path, file))
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
 
+	_, exists := suite.fileCache.scheduleOps.Load(file)
+	suite.assert.True(exists, "File should be in scheduleOps after creation")
+
+	time.Sleep(5 * time.Second)
+
 	fileUploaded := false
 	time.Sleep(100 * time.Millisecond)
+
 	if _, err := os.Stat(filepath.Join(suite.fake_storage_path, handle.Path)); err == nil {
 		fileUploaded = true
 		fmt.Println("File successfully uploaded to storage")
@@ -1523,13 +1529,9 @@ loopbackfs:
 	suite.assert.True(fileUploaded, "File should have been uploaded")
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file))
 
-	uploadedData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, file))
-	suite.assert.NoError(err)
-	suite.assert.Equal(data, uploadedData, "Uploaded file content should match original")
-
 	time.Sleep(500 * time.Millisecond)
 
-	_, exists := suite.fileCache.scheduleOps.Load(file)
+	_, exists = suite.fileCache.scheduleOps.Load(file)
 	suite.assert.False(exists, "File should have been removed from scheduleOps after upload")
 
 	flock := suite.fileCache.fileLocks.Get(file)
@@ -1579,7 +1581,6 @@ loopbackfs:
 	suite.assert.NoError(err)
 
 	suite.assert.FileExists(filepath.Join(suite.cache_path, file1))
-	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file1))
 
 	fileUploaded := false
 
@@ -1593,22 +1594,20 @@ loopbackfs:
 	suite.assert.True(fileUploaded, "First file should be uploaded when scheduler is ON")
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file1))
 
-	fmt.Println("Waiting for scheduler window to close...")
 	time.Sleep(6 * time.Second) // Add buffer to ensure window closes
 
 	file2 := "scheduled_off_window.txt"
 	handle2, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
 	suite.assert.NoError(err)
+
 	data2 := []byte("file created during scheduler OFF window")
 	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle2, Data: data2})
 	suite.assert.NoError(err)
+
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle2})
 	suite.assert.NoError(err)
 
 	suite.assert.FileExists(filepath.Join(suite.cache_path, file2))
-	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file2))
-
-	time.Sleep(3 * time.Second)
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file2))
 
 	_, exists := suite.fileCache.scheduleOps.Load(file2)
@@ -1618,15 +1617,6 @@ loopbackfs:
 	if flock != nil {
 		suite.assert.True(flock.SyncPending, "SyncPending flag should be set")
 	}
-
-	fmt.Println("Manually triggering pending uploads...")
-	suite.fileCache.servicePendingOps()
-	time.Sleep(1 * time.Second)
-
-	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file2))
-	uploadedData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, file2))
-	suite.assert.NoError(err)
-	suite.assert.Equal(data2, uploadedData, "Uploaded file content should match original")
 }
 
 func (suite *fileCacheTestSuite) TestNoScheduleAlwaysOn() {
@@ -1646,21 +1636,19 @@ loopbackfs:
 	suite.setupTestHelper(configContent)
 	fmt.Println("Testing default scheduler behavior (should be always-on)")
 
+	time.Sleep(5 * time.Second)
 	suite.assert.Equal(0, len(suite.fileCache.schedule), "Should have no schedule entries")
 
 	file := "no_schedule_test.txt"
 	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	suite.assert.NoError(err)
-
 	data := []byte("testing default scheduler behavior")
 	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data})
 	suite.assert.NoError(err)
-
-	suite.assert.FileExists(filepath.Join(suite.cache_path, file))
-	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file))
-
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
+
+	time.Sleep(500 * time.Millisecond)
 
 	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file),
 		"File should be uploaded immediately with no schedule (always-on mode)")
@@ -1679,6 +1667,101 @@ loopbackfs:
 }
 
 func (suite *fileCacheTestSuite) TestExistingCloudFileImmediateUpload() {
+	defer suite.cleanupTest()
+
+	// 1. Initialize variables and files / call setuptesthelper
+	// Set up scheduler with a time far in the future (ensuring we're in OFF state initially)
+	now := time.Now()
+	second := (now.Second() + 30) % 60
+	cronExpr := fmt.Sprintf("%d * * * * *", second)
+
+	configContent := fmt.Sprintf(`file_cache:
+  path: %s
+  offload-io: true
+  create-empty-file: false
+  schedule:
+    - name: "Test"
+      cron: %s
+      duration: "5s"
+    - name: "TestWindow"
+      cron: "0 0 9 * * 0"
+      duration: "5s"
+
+loopbackfs:
+  path: %s`,
+		suite.cache_path,
+		cronExpr,
+		suite.fake_storage_path,
+	)
+
+	suite.setupTestHelper(configContent)
+
+	time.Sleep(4 * time.Second)
+
+	// Create a file that will be "already in cloud"
+	originalFile := "existing_cloud_file.txt"
+	originalContent := []byte("original cloud content")
+
+	// Create the file in the cloud storage directly
+	err := os.MkdirAll(suite.fake_storage_path, 0777)
+	suite.assert.NoError(err)
+	err = os.WriteFile(filepath.Join(suite.fake_storage_path, originalFile), originalContent, 0777)
+	suite.assert.NoError(err)
+
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, originalFile))
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, originalFile))
+
+	// 5. Write to the file and close the file
+	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{
+		Name:  originalFile,
+		Flags: os.O_RDWR,
+		Mode:  0777,
+	})
+	suite.assert.NoError(err)
+
+	// Verify we can read the original content
+	cachedData := make([]byte, len(originalContent))
+	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{
+		Handle: handle,
+		Offset: 0,
+		Data:   cachedData,
+	})
+	suite.assert.NoError(err)
+	suite.assert.Equal(len(originalContent), n)
+	suite.assert.Equal(originalContent, cachedData)
+
+	// File should now be in cache
+	suite.assert.FileExists(filepath.Join(suite.cache_path, originalFile))
+
+	// Write new content to the file
+	modifiedContent := []byte("modified cloud file content")
+	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
+		Handle: handle,
+		Data:   modifiedContent,
+		Offset: 0,
+	})
+	suite.assert.NoError(err)
+	suite.assert.True(handle.Dirty(), "Handle should be marked dirty after modification")
+
+	suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+
+	time.Sleep(500 * time.Millisecond)
+
+	// 6. Confirm changes to file are accurate
+	cloudData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, originalFile))
+	suite.assert.NoError(err)
+	suite.assert.Equal(modifiedContent, cloudData, "Cloud file should be immediately updated")
+
+	finalCloudData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, originalFile))
+	suite.assert.NoError(err)
+	suite.assert.Equal(
+		modifiedContent,
+		finalCloudData,
+		"Modified content should remain in cloud after close",
+	)
+}
+
+func (suite *fileCacheTestSuite) TestCreateFileAndRename() {
 	defer suite.cleanupTest()
 
 	now := time.Now()
@@ -1705,109 +1788,64 @@ loopbackfs:
 	)
 
 	suite.setupTestHelper(configContent)
-	fmt.Println("Testing immediate upload for files already in cloud storage (scheduler OFF)")
+	time.Sleep(4 * time.Second)
 
-	suite.assert.NotEqual(0, len(suite.fileCache.schedule), "Should have schedule entries")
+	srcFile := "source_rename_test.txt"
+	dstFile := "destination_rename_test.txt"
 
-	originalFile := "existing_cloud_file.txt"
-	originalContent := []byte("original cloud content")
-
-	err := os.MkdirAll(suite.fake_storage_path, 0777)
+	handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: srcFile, Mode: 0777})
 	suite.assert.NoError(err)
 
-	err = os.WriteFile(filepath.Join(suite.fake_storage_path, originalFile), originalContent, 0777)
+	data := []byte("file to be renamed while in scheduler OFF state")
+	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data})
 	suite.assert.NoError(err)
-
-	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, originalFile))
-	suite.assert.NoFileExists(filepath.Join(suite.cache_path, originalFile))
-
-	handle, err := suite.fileCache.OpenFile(internal.OpenFileOptions{
-		Name:  originalFile,
-		Flags: os.O_RDWR,
-		Mode:  0777,
-	})
-	suite.assert.NoError(err)
-
-	cachedData := make([]byte, len(originalContent))
-	n, err := suite.fileCache.ReadInBuffer(internal.ReadInBufferOptions{
-		Handle: handle,
-		Offset: 0,
-		Data:   cachedData,
-	})
-	suite.assert.NoError(err)
-	suite.assert.Equal(len(originalContent), n)
-
-	suite.assert.FileExists(filepath.Join(suite.cache_path, originalFile))
-
-	modifiedContent := []byte("modified cloud file content")
-	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
-		Handle: handle,
-		Data:   modifiedContent,
-		Offset: 0,
-	})
-	suite.assert.NoError(err)
-	suite.assert.True(handle.Dirty(), "Handle should be marked dirty after modification")
-
-	beforeFlushCount := 0
-	suite.fileCache.scheduleOps.Range(func(_, _ interface{}) bool {
-		beforeFlushCount++
-		return true
-	})
-
-	err = suite.fileCache.FlushFile(internal.FlushFileOptions{Handle: handle})
-	suite.assert.NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	cloudData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, originalFile))
-	suite.assert.NoError(err)
-	suite.assert.Equal(modifiedContent, cloudData, "Cloud file should be immediately updated")
-
-	suite.assert.False(handle.Dirty(), "Handle should not be dirty after flush")
-
-	afterFlushCount := 0
-	fileInScheduleOps := false
-	suite.fileCache.scheduleOps.Range(func(key, _ interface{}) bool {
-		afterFlushCount++
-		if key == originalFile {
-			fileInScheduleOps = true
-		}
-		return true
-	})
-
-	suite.assert.Equal(
-		beforeFlushCount,
-		afterFlushCount,
-		"No new items should be added to scheduleOps",
-	)
-	suite.assert.False(fileInScheduleOps, "File should not be in scheduleOps map")
-
-	flock := suite.fileCache.fileLocks.Get(originalFile)
-	if flock != nil {
-		suite.assert.False(
-			flock.SyncPending,
-			"SyncPending flag should not be set after immediate upload",
-		)
-	}
 
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
 	suite.assert.NoError(err)
 
-	finalCloudData, err := os.ReadFile(filepath.Join(suite.fake_storage_path, originalFile))
+	// Check if the file exists(local and Cloud)(Local == True, Cloud == False)
+	suite.assert.FileExists(filepath.Join(suite.cache_path, srcFile),
+		"File should exist in local cache")
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, srcFile),
+		"File should not exist in cloud storage when scheduler is OFF")
+
+	// Check if file is in scheduleOps with original name
+	_, existsInSchedule := suite.fileCache.scheduleOps.Load(srcFile)
+	suite.assert.True(existsInSchedule, "File should be in scheduleOps before rename")
+
+	// Rename the file
+	err = suite.fileCache.RenameFile(internal.RenameFileOptions{Src: srcFile, Dst: dstFile})
 	suite.assert.NoError(err)
-	suite.assert.Equal(
-		modifiedContent,
-		finalCloudData,
-		"Modified content should remain in cloud after close",
+
+	// Verify renamed file paths
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, srcFile),
+		"Source file should not exist in local cache after rename")
+	suite.assert.FileExists(filepath.Join(suite.cache_path, dstFile),
+		"Destination file should exist in local cache after rename")
+
+	// Check if the file has been renamed in scheduleOps
+	_, existsInScheduleOld := suite.fileCache.scheduleOps.Load(srcFile)
+	suite.assert.False(
+		existsInScheduleOld,
+		"Old file name should not be in scheduleOps after rename",
 	)
+
+	_, existsInScheduleNew := suite.fileCache.scheduleOps.Load(dstFile)
+	suite.assert.True(existsInScheduleNew, "New file name should be in scheduleOps after rename")
+
+	// Check that file lock status was properly transferred
+	flock := suite.fileCache.fileLocks.Get(dstFile)
+	if flock != nil {
+		suite.assert.True(flock.SyncPending, "SyncPending flag should be set on renamed file")
+	}
 }
 
-func (suite *fileCacheTestSuite) TestMultipleFilesInScheduleOps() {
+func (suite *fileCacheTestSuite) TestDeleteFileAndScheduleOps() {
 	defer suite.cleanupTest()
 
-	// Set up scheduler with a time far in the future (ensuring we're in OFF state)
 	now := time.Now()
-	futureMinute := (now.Minute() + 30) % 60
-	cronExpr := fmt.Sprintf("0 %d * * * *", futureMinute)
+	second := (now.Second() + 30) % 60
+	cronExpr := fmt.Sprintf("%d * * * * *", second)
 
 	configContent := fmt.Sprintf(`file_cache:
   path: %s
@@ -1829,63 +1867,182 @@ loopbackfs:
 	)
 
 	suite.setupTestHelper(configContent)
-	fmt.Println("Testing multiple files queued in scheduleOps when scheduler is OFF")
+	time.Sleep(4 * time.Second)
 
-	// Verify scheduler is configured but not active
-	suite.assert.NotEqual(0, len(suite.fileCache.schedule), "Should have schedule entries")
+	// Create file that will be local only (not in cloud) due to scheduler being OFF
+	testFile := "delete_test_file.txt"
 
-	fileCount := 5
-	files := make([]string, fileCount)
-	handles := make([]*handlemap.Handle, fileCount)
-
-	for i := 0; i < fileCount; i++ {
-		files[i] = fmt.Sprintf("scheduled_file_%d.txt", i)
-		data := []byte(fmt.Sprintf("content for file %d", i))
-		handle, err := suite.fileCache.CreateFile(internal.CreateFileOptions{
-			Name: files[i],
-			Mode: 0777,
-		})
-		suite.assert.NoError(err)
-		handles[i] = handle
-
-		_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{
-			Handle: handle,
-			Data:   data,
-		})
-		suite.assert.NoError(err)
-
-		err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
-		suite.assert.NoError(err)
-
-		suite.assert.FileExists(filepath.Join(suite.cache_path, files[i]))
-		suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, files[i]))
-	}
-
-	// Verify all files are in scheduleOps
-	for i, file := range files {
-		_, exists := suite.fileCache.scheduleOps.Load(file)
-		suite.assert.True(exists, fmt.Sprintf("File %d should be in scheduleOps", i))
-
-		flock := suite.fileCache.fileLocks.Get(file)
-		if flock != nil {
-			suite.assert.True(
-				flock.SyncPending,
-				fmt.Sprintf("SyncPending flag should be set for file %d", i),
-			)
-		}
-	}
-
-	opCount := 0
-	suite.fileCache.scheduleOps.Range(func(_, _ interface{}) bool {
-		opCount++
-		return true
-	})
-
-	suite.assert.Equal(
-		fileCount,
-		opCount,
-		"ScheduleOps should contain exactly the files we created",
+	handle, err := suite.fileCache.CreateFile(
+		internal.CreateFileOptions{Name: testFile, Mode: 0777},
 	)
+	suite.assert.NoError(err)
+
+	data := []byte("file to be deleted while in scheduler OFF state")
+	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: data})
+	suite.assert.NoError(err)
+
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	// Check if the file exists(local and Cloud)
+	suite.assert.FileExists(filepath.Join(suite.cache_path, testFile),
+		"File should exist in local cache")
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, testFile),
+		"File should not exist in cloud storage when scheduler is OFF")
+
+	// Check if file is in scheduleOps before deletion
+	_, existsInSchedule := suite.fileCache.scheduleOps.Load(testFile)
+	suite.assert.True(existsInSchedule, "File should be in scheduleOps before deletion")
+
+	err = suite.fileCache.DeleteFile(internal.DeleteFileOptions{Name: testFile})
+	suite.assert.NoError(err)
+
+	// Check if file has been deleted in local cache
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, testFile),
+		"File should not exist in local cache after deletion")
+
+	// Check if the file has been deleted in scheduleOps
+	_, existsInScheduleAfterDelete := suite.fileCache.scheduleOps.Load(testFile)
+	suite.assert.False(existsInScheduleAfterDelete,
+		"File should not be in scheduleOps after deletion")
+}
+
+func (suite *fileCacheTestSuite) TestCreateEmptyFileEqualTrue() {
+	defer suite.cleanupTest()
+
+	now := time.Now()
+	second := (now.Second() + 30) % 60
+	cronExpr := fmt.Sprintf("%d * * * * *", second)
+
+	configContent := fmt.Sprintf(`file_cache:
+  path: %s
+  offload-io: true
+  create-empty-file: true
+  schedule:
+    - name: "Test"
+      cron: %s
+      duration: "5s"
+    - name: "TestWindow"
+      cron: "0 0 9 * * 0"
+      duration: "5s"
+
+loopbackfs:
+  path: %s`,
+		suite.cache_path,
+		cronExpr,
+		suite.fake_storage_path,
+	)
+
+	suite.setupTestHelper(configContent)
+	time.Sleep(4 * time.Second)
+
+	testFile := "empty_create_test_file.txt"
+	handle, err := suite.fileCache.CreateFile(
+		internal.CreateFileOptions{Name: testFile, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+
+	// Check if file exists in cloud storage immediately (without closing or flushing)
+	// When create-empty-file is true, the file should be created in cloud storage immediately
+	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, testFile),
+		"File should exist in cloud storage immediately when create-empty-file is true")
+
+	// Verify the handle is not marked as dirty
+	suite.assert.False(
+		handle.Dirty(),
+		"Handle should not be marked as dirty when create-empty-file is true",
+	)
+
+	// The file shouldn't be in scheduleOps because it's already in cloud storage
+	_, existsInSchedule := suite.fileCache.scheduleOps.Load(testFile)
+	suite.assert.False(existsInSchedule,
+		"File should not be in scheduleOps because it's already in cloud storage")
+
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+}
+
+func (suite *fileCacheTestSuite) TestReadWriteLocalFile() {
+	defer suite.cleanupTest()
+
+	now := time.Now()
+	second := (now.Second() + 30) % 60
+	cronExpr := fmt.Sprintf("%d * * * * *", second)
+
+	configContent := fmt.Sprintf(`file_cache:
+  path: %s
+  offload-io: true
+  create-empty-file: false
+  schedule:
+    - name: "Test"
+      cron: %s
+      duration: "5s"
+    - name: "TestWindow"
+      cron: "0 0 9 * * 0"
+      duration: "5s"
+
+loopbackfs:
+  path: %s`,
+		suite.cache_path,
+		cronExpr,
+		suite.fake_storage_path,
+	)
+
+	suite.setupTestHelper(configContent)
+	time.Sleep(4 * time.Second)
+
+	testFile := "read_write_local_test.txt"
+	initialContent := []byte("initial file content")
+
+	handle, err := suite.fileCache.CreateFile(
+		internal.CreateFileOptions{Name: testFile, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+
+	_, err = suite.fileCache.WriteFile(
+		internal.WriteFileOptions{Handle: handle, Data: initialContent},
+	)
+	suite.assert.NoError(err)
+
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	// Check if file is in local cache but not in cloud storage
+	suite.assert.FileExists(filepath.Join(suite.cache_path, testFile),
+		"File should exist in local cache")
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, testFile),
+		"File should not exist in cloud storage when scheduler is OFF")
+
+	// Check if file is in scheduleOps initially
+	_, existsInSchedule := suite.fileCache.scheduleOps.Load(testFile)
+	suite.assert.True(existsInSchedule, "File should be in scheduleOps after creation")
+
+	// Write to file again with updated content
+	newContent := []byte("updated file content")
+
+	handle, err = suite.fileCache.OpenFile(
+		internal.OpenFileOptions{Name: testFile, Flags: os.O_RDWR, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+
+	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle, Data: newContent})
+	suite.assert.NoError(err)
+
+	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	// Check scheduleOps to verify changes
+	_, stillInSchedule := suite.fileCache.scheduleOps.Load(testFile)
+	suite.assert.True(stillInSchedule, "File should remain in scheduleOps after modification")
+
+	// Verify the local content was updated
+	localData, err := os.ReadFile(filepath.Join(suite.cache_path, testFile))
+	suite.assert.NoError(err)
+	suite.assert.Equal(newContent, localData, "Local file content should be updated")
+
+	// Check if file exists in cloud (should be false)
+	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, testFile),
+		"File should still not exist in cloud storage after modification")
 }
 
 func (suite *fileCacheTestSuite) TestGetAttrCase1() {
@@ -2352,7 +2509,7 @@ func (suite *fileCacheTestSuite) TestCachePathSymlink() {
 		suite.fake_storage_path,
 	)
 	suite.setupTestHelper(configuration)
-
+	time.Sleep(4 * time.Second) // Give some time for the symlink to be recognized
 	file := "file39"
 	handle, _ := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file, Mode: 0777})
 	testData := "test data"

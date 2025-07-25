@@ -361,6 +361,7 @@ func (fc *FileCache) Configure(_ bool) error {
 	}
 
 	cacheConfig := fc.GetPolicyConfig(conf)
+	fc.policy = NewLRUPolicy(cacheConfig)
 	if fc.policy == nil {
 		log.Err("FileCache::Configure : failed to create cache eviction policy")
 		return fmt.Errorf("config error in %s [%s]", fc.Name(), "failed to create cache policy")
@@ -1098,6 +1099,9 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 	localPath := filepath.Join(fc.tmpPath, options.Name)
 	fc.policy.CachePurge(localPath)
 
+	// Delete from scheduleOps if it exists
+	fc.scheduleOps.Delete(options.Name)
+
 	// update file state
 	flock.LazyOpen = false
 
@@ -1677,6 +1681,7 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 	return fc.flushFileInternal(options)
 }
 
+// file must be locked before calling this function
 func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error {
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
@@ -1926,6 +1931,15 @@ func (fc *FileCache) renameLocalFile(
 			localDstPath,
 		)
 		fc.policy.CacheValid(localDstPath)
+
+		// Transfer entry from scheduleOps if it exists
+		if _, found := fc.scheduleOps.Load(srcName); found {
+			fc.scheduleOps.Store(dstName, struct{}{})
+			fc.scheduleOps.Delete(srcName)
+
+			// Ensure SyncPending flag is set on destination
+			dflock.SyncPending = true
+		}
 	case os.IsNotExist(err):
 		if localOnly {
 			// neither cloud nor file cache has this file, so return ENOENT
