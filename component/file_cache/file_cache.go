@@ -45,7 +45,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 	"github.com/Seagate/cloudfuse/internal/stats_manager"
-	"github.com/robfig/cron/v3"
 
 	"github.com/spf13/cobra"
 )
@@ -81,11 +80,12 @@ type FileCache struct {
 	lazyWrite    bool
 	fileCloseOpt sync.WaitGroup
 
-	stopAsyncUpload chan struct{}
-	scheduler       *cron.Cron
-	schedule        WeeklySchedule
-	uploadNotifyCh  chan struct{}
-	alwaysOn        bool
+	stopAsyncUpload    chan struct{}
+	schedule           WeeklySchedule
+	uploadNotifyCh     chan struct{}
+	alwaysOn           bool
+	activeWindows      int
+	activeWindowsMutex *sync.Mutex
 }
 
 // Structure defining your config parameters
@@ -411,6 +411,20 @@ func (fc *FileCache) Configure(_ bool) error {
 				if durStr, ok := rawWindow["duration"].(string); ok {
 					window.Duration = durStr
 				}
+				if !isValidCronExpression(window.CronExpr) {
+					log.Err("FileCache::Configure : Invalid cron expression '%s' for schedule window '%s', skipping",
+						window.CronExpr, window.Name)
+					continue
+				}
+
+				// Validate duration
+				_, err := time.ParseDuration(window.Duration)
+				if err != nil {
+					log.Err("FileCache::Configure : Invalid duration '%s' for schedule window '%s': %v, skipping",
+						window.Duration, window.Name, err)
+					continue
+				}
+
 				fc.schedule = append(fc.schedule, window)
 				log.Info("FileCache::Configure : Parsed schedule %s: cron=%s, duration=%s",
 					window.Name, window.CronExpr, window.Duration)
@@ -1683,11 +1697,13 @@ func (fc *FileCache) FlushFile(options internal.FlushFileOptions) error {
 
 // file must be locked before calling this function
 func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error {
+	//defer exectime.StatTimeCurrentBlock("FileCache::FlushFile")()
 	log.Trace("FileCache::FlushFile : handle=%d, path=%s", options.Handle.ID, options.Handle.Path)
 
 	// The file should already be in the cache since CreateFile/OpenFile was called before and a shared lock was acquired.
 	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 	fc.policy.CacheValid(localPath)
+	// if our handle is dirty then that means we wrote to the file
 
 	if options.Handle.Dirty() {
 		if fc.lazyWrite && !options.CloseInProgress {
@@ -1709,11 +1725,30 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			return syscall.EBADF
 		}
 
+		// Flush all data to disk that has been buffered by the kernel.
+		// We cannot close the incoming handle since the user called flush, note close and flush can be called on the same handle multiple times.
+		// To ensure the data is flushed to disk before writing to storage, we duplicate the handle and close that handle.
+		// f.fsync() is another option but dup+close does it quickly compared to sync
+		// dupFd, err := syscall.Dup(int(f.Fd()))
+		// if err != nil {
+		// 	log.Err("FileCache::FlushFile : error [couldn't duplicate the fd] %s", options.Handle.Path)
+		// 	return syscall.EIO
+		// }
+		// err = syscall.Close(dupFd)
+		// if err != nil {
+		// 	log.Err("FileCache::FlushFile : error [unable to close duplicate fd] %s", options.Handle.Path)
+		// 	return syscall.EIO
+		// }
+		// Replace above with Sync since Dup is not supported on Windows
 		err := f.Sync()
 		if err != nil {
 			log.Err("FileCache::FlushFile : error [unable to sync file] %s", options.Handle.Path)
 			return syscall.EIO
 		}
+
+		// Write to storage
+		// Create a new handle for the SDK to use to upload (read local file)
+		// The local handle can still be used for read and write.
 		var orgMode fs.FileMode
 		modeChanged := false
 		notInCloud := fc.notInCloud(
@@ -1760,7 +1795,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			}
 
 			if err != nil {
-				log.Debug(
+				log.Err(
 					"FileCache::FlushFile : %s upload failed [%s]",
 					options.Handle.Path,
 					err.Error(),
@@ -2152,7 +2187,8 @@ func (fc *FileCache) FileUsed(name string) error {
 // << DO NOT DELETE ANY AUTO GENERATED CODE HERE >>
 func NewFileCacheComponent() internal.Component {
 	comp := &FileCache{
-		fileLocks: common.NewLockMap(),
+		fileLocks:          common.NewLockMap(),
+		activeWindowsMutex: &sync.Mutex{},
 	}
 	comp.SetName(compName)
 	config.AddConfigChangeEventListener(comp)

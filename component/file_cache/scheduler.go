@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -53,12 +54,27 @@ func (fc *FileCache) SetupScheduler() error {
 	return nil
 }
 
+func isValidCronExpression(expr string) bool {
+	parser := cron.NewParser(
+		cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor,
+	)
+	_, err := parser.Parse(expr)
+	return err == nil
+}
+
 func (fc *FileCache) scheduleUploads(
 	c *cron.Cron,
 	sched WeeklySchedule,
 	startFunc func(),
 	endFunc func(),
 ) {
+	// Add a mutex and counter to track active windows
+	fc.activeWindowsMutex.Lock()
+	if fc.activeWindowsMutex == nil {
+		fc.activeWindowsMutex = &sync.Mutex{}
+	}
+	fc.activeWindowsMutex.Unlock()
+
 	for _, config := range sched {
 		windowName := config.Name
 
@@ -68,9 +84,22 @@ func (fc *FileCache) scheduleUploads(
 			continue
 		}
 
-		c.AddFunc(config.CronExpr, func() {
-			startFunc()
-			log.Info("[%s] Starting upload at %s\n", windowName, time.Now().Format(time.Kitchen))
+		_, err = c.AddFunc(config.CronExpr, func() {
+			// Start a new window and track it
+			fc.activeWindowsMutex.Lock()
+			isFirstWindow := fc.activeWindows == 0
+			fc.activeWindows++
+			windowCount := fc.activeWindows
+			fc.activeWindowsMutex.Unlock()
+
+			if isFirstWindow {
+				startFunc()
+				// Only create notification channel for the first active window
+				fc.uploadNotifyCh = make(chan struct{}, 100)
+			}
+
+			log.Info("[%s] Starting upload at %s (active windows: %d)\n",
+				windowName, time.Now().Format(time.Kitchen), windowCount)
 
 			fc.servicePendingOps()
 
@@ -78,33 +107,39 @@ func (fc *FileCache) scheduleUploads(
 			window, cancel := context.WithTimeout(context.Background(), durationParsed)
 			defer cancel()
 
-			// Set up the notification channel for upload window
-			fc.uploadNotifyCh = make(chan struct{}, 100)
-			defer func() {
-				close(fc.uploadNotifyCh)
-				fc.uploadNotifyCh = nil
-			}()
-
 			for {
 				select {
 				case <-window.Done():
-					endFunc()
-					log.Info(
-						"[%s] Upload window ended at %s\n",
-						windowName,
-						time.Now().Format(time.Kitchen),
-					)
+					// Window has completed, update active window count
+					fc.activeWindowsMutex.Lock()
+					fc.activeWindows--
+					isLastWindow := fc.activeWindows == 0
+					windowCount := fc.activeWindows
+					fc.activeWindowsMutex.Unlock()
+
+					log.Info("[%s] Upload window ended at %s (remaining windows: %d)\n",
+						windowName, time.Now().Format(time.Kitchen), windowCount)
+
+					// Only close resources when the last window ends
+					if isLastWindow {
+						close(fc.uploadNotifyCh)
+						fc.uploadNotifyCh = nil
+						endFunc()
+					}
 					return
+
 				case <-fc.uploadNotifyCh:
-					log.Debug(
-						"[%s] File change detected, processing pending uploads at %s\n",
-						windowName,
-						time.Now().Format(time.Kitchen),
-					)
+					log.Debug("[%s] File change detected, processing pending uploads at %s\n",
+						windowName, time.Now().Format(time.Kitchen))
 					fc.servicePendingOps()
 				}
 			}
 		})
+		if err != nil {
+			log.Err("[%s] Failed to schedule cron job with expression '%s': %v\n",
+				windowName, config.CronExpr, err)
+			continue
+		}
 	}
 }
 
@@ -179,7 +214,7 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 		}
 	} else {
 		handle := handlemap.NewHandle(name)
-		f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
+		f, err := common.OpenFile(localPath, os.O_RDWR, fc.defaultPermission)
 		if err != nil {
 			log.Err("FileCache::uploadPendingFile : %s failed to open file. Here's why: %v", name, err)
 			return err
