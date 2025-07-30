@@ -977,7 +977,12 @@ func (cf *CgofuseFS) Rename(oldpath string, newpath string) int {
 		libfuseStatsCollector.UpdateStats(stats_manager.Increment, renameDir, (int64)(1))
 
 	} else {
-		err := fuseFS.NextComponent().RenameFile(internal.RenameFileOptions{Src: srcPath, Dst: dstPath})
+		err := fuseFS.NextComponent().RenameFile(internal.RenameFileOptions{
+			Src:     srcPath,
+			Dst:     dstPath,
+			SrcAttr: srcAttr,
+			DstAttr: dstAttr,
+		})
 		if err != nil {
 			log.Err("Libfuse::Rename : error renaming file %s -> %s [%s]", srcPath, dstPath, err.Error())
 			return -fuse.EIO
