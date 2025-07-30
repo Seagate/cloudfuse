@@ -164,17 +164,12 @@ var gatherLogsCmd = &cobra.Command{
 
 // checkPath makes sure the path for archive creation is valid.
 func checkPath(outPath string) error {
-	var err error
-	if outPath == "" {
-		gatherLogOps.outputPath, err = os.Getwd()
-		if err != nil {
-			return err
-		}
-	} else {
-		if !common.DirectoryExists(outPath) {
-			return fmt.Errorf("the provided output path needs to be a directory")
-		}
+
+	if !common.DirectoryExists(outPath) {
+		return fmt.Errorf("the provided output path needs to be a directory")
 	}
+
+	var err error
 	gatherLogOps.outputPath, err = filepath.Abs(gatherLogOps.outputPath)
 	if err != nil {
 		return fmt.Errorf("couldn't determine absolute path for logs [%s]", err.Error())
@@ -455,9 +450,11 @@ func createFilteredLog(logFile string) (string, error) {
 }
 
 func init() {
+
 	rootCmd.AddCommand(gatherLogsCmd)
+	curDir, _ := os.Getwd()
 	gatherLogsCmd.Flags().
-		StringVar(&gatherLogOps.outputPath, "output-path", "", "Input archive creation path")
+		StringVar(&gatherLogOps.outputPath, "output-path", curDir, "Input archive creation path")
 	gatherLogsCmd.Flags().
 		StringVar(&gatherLogOps.logConfigFile, "config-file", common.DefaultConfigFilePath, "config-file input path")
 }
