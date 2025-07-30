@@ -50,6 +50,11 @@ type gatherLogsParams struct {
 
 var gatherLogOps gatherLogsParams
 
+const (
+	windowsArchivePath = "cloudfuse_logs.zip"
+	linuxArchivePath   = "cloudfuse_logs.tar.gz"
+)
+
 var gatherLogsCmd = &cobra.Command{
 	Use:               "gather-logs",
 	Short:             "interface to gather and review cloudfuse logs",
@@ -240,7 +245,7 @@ func createLinuxArchive(logPath string) error {
 		return err
 	}
 
-	outFile, err := os.Create(filepath.Join(gatherLogOps.outputPath, "cloudfuse_logs.tar.gz"))
+	outFile, err := os.Create(filepath.Join(gatherLogOps.outputPath, linuxArchivePath))
 	if err != nil {
 		return err
 	}
@@ -362,7 +367,7 @@ func copyFiles(srcPath, dstPath string) error {
 }
 
 func createWindowsArchive(archPath string) error {
-	outFile, err := os.Create(filepath.Join(gatherLogOps.outputPath, "cloudfuse_logs.zip"))
+	outFile, err := os.Create(filepath.Join(gatherLogOps.outputPath, linuxArchivePath))
 	if err != nil {
 		return err
 	}
