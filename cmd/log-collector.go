@@ -179,7 +179,7 @@ func checkPath(outPath string) error {
 
 // getLogInfo returns the logType, and logPath values that are found in the config file.
 func getLogInfo(configFile string) (string, string, error) {
-	logPath := common.ExpandPath(common.GetDefaultWorkDir() + "/.cloudfuse/")
+	logPath := common.ExpandPath(filepath.Join(common.GetDefaultWorkDir(), ".cloudfuse/"))
 	logType := "base"
 	_, err := os.Stat(configFile)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -240,7 +240,7 @@ func createLinuxArchive(logPath string) error {
 		return err
 	}
 
-	outFile, err := os.Create(gatherLogOps.outputPath + "/cloudfuse_logs.tar.gz")
+	outFile, err := os.Create(filepath.Join(gatherLogOps.outputPath, "cloudfuse_logs.tar.gz"))
 	if err != nil {
 		return err
 	}
@@ -362,7 +362,7 @@ func copyFiles(srcPath, dstPath string) error {
 }
 
 func createWindowsArchive(archPath string) error {
-	outFile, err := os.Create(gatherLogOps.outputPath + "/cloudfuse_logs.zip")
+	outFile, err := os.Create(filepath.Join(gatherLogOps.outputPath, "cloudfuse_logs.zip"))
 	if err != nil {
 		return err
 	}
