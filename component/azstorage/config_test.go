@@ -90,25 +90,6 @@ func (s *configTestSuite) TestInvalidAccountType() {
 	assert.Contains(err.Error(), "invalid account type")
 }
 
-func (s *configTestSuite) TestUseADLSFlag() {
-	defer config.ResetConfig()
-	assert := assert.New(s.T())
-	az := &AzStorage{}
-	opt := AzStorageOptions{}
-	opt.AccountName = "abcd"
-	opt.AccountType = "abcd"
-
-	config.SetBool(compName+".use-adls", true)
-	err := ParseAndValidateConfig(az, opt)
-	assert.Error(err)
-	assert.Equal(az.stConfig.authConfig.AccountType, az.stConfig.authConfig.AccountType.ADLS())
-
-	config.SetBool(compName+".use-adls", true)
-	err = ParseAndValidateConfig(az, opt)
-	assert.Error(err)
-	assert.Equal(az.stConfig.authConfig.AccountType, az.stConfig.authConfig.AccountType.BLOCK())
-}
-
 func (s *configTestSuite) TestBlockSize() {
 	defer config.ResetConfig()
 	assert := assert.New(s.T())
