@@ -472,7 +472,8 @@ func ParseAndValidateConfig(az *AzStorage, opt AzStorageOptions) error {
 		az.stConfig.authConfig.ResourceID = opt.ResourceID
 	case EAuthType.SPN():
 		az.stConfig.authConfig.AuthMode = EAuthType.SPN()
-		if opt.ClientID == "" || (opt.ClientSecret == "" && opt.OAuthTokenFilePath == "") ||
+		if opt.ClientID == "" ||
+			(opt.ClientSecret == "" && opt.OAuthTokenFilePath == "" && opt.WorkloadIdentityToken == "") ||
 			opt.TenantID == "" {
 			//lint:ignore ST1005 ignore
 			return errors.New(
