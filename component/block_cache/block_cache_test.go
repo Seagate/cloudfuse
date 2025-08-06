@@ -3010,7 +3010,7 @@ func (suite *blockCacheTestSuite) TestSizeOfFileInOpen() {
 	//Open and close the file using the given flag in local and mountpoint and
 	// check the size is same or not.
 	check := func(flag int) int {
-		lfh, err := common.OpenFile(localPath, flag, 0666)
+		lfh, err := os.OpenFile(localPath, flag, 0666)
 		suite.assert.NoError(err)
 		suite.assert.NotNil(lfh)
 		err = lfh.Close()

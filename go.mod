@@ -9,14 +9,14 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake v1.4.1
 	github.com/JeffreyRichter/enum v0.0.0-20180725232043-2567042f9cda
 	github.com/awnumar/memguard v0.22.5
-	github.com/aws/aws-sdk-go-v2 v1.36.6
-	github.com/aws/aws-sdk-go-v2/config v1.29.18
-	github.com/aws/aws-sdk-go-v2/credentials v1.17.71
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.85
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.84.1
-	github.com/aws/smithy-go v1.22.4
+	github.com/aws/aws-sdk-go-v2 v1.37.0
+	github.com/aws/aws-sdk-go-v2/config v1.30.0
+	github.com/aws/aws-sdk-go-v2/credentials v1.18.0
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.18.0
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.85.0
+	github.com/aws/smithy-go v1.22.5
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/go-viper/mapstructure/v2 v2.3.0
+	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/golang/mock v1.6.0
 	github.com/montanaflynn/stats v0.7.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
@@ -40,19 +40,19 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.1 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.4.2 // indirect
 	github.com/awnumar/memcall v0.2.0 // indirect
-	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.11 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.33 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.37 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.37 // indirect
+	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.0 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.17.0 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.0 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.0 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.37 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.7.5 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.18 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.18 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.25.6 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.30.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.34.1 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.8.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.26.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.31.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.35.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
