@@ -395,8 +395,12 @@ func (s *blockBlobTestSuite) TestAccountType() {
 	defer s.cleanupTest()
 	// Setup
 	s.tearDownTestHelper(false) // Don't delete the generated container.
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.BlockKey, s.container)
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.BlockAccount,
+		storageTestConfigurationParameters.BlockKey,
+		s.container,
+	)
 	s.setupTestHelper(config, s.container, true)
 
 	val := s.az.storage.IsAccountADLS()
@@ -404,11 +408,19 @@ func (s *blockBlobTestSuite) TestAccountType() {
 }
 
 func (s *blockBlobTestSuite) TestContainerNotFound() {
+	// Skip test on Azurite
+	if storageTestConfigurationParameters.BlockAccount == "devstoreaccount1" {
+		return
+	}
 	defer s.cleanupTest()
 	// Setup
 	s.tearDownTestHelper(false) // Don't delete the generated container.
-	config := fmt.Sprintf("azstorage:\n  account-name: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
-		storageTestConfigurationParameters.BlockAccount, storageTestConfigurationParameters.BlockKey, "foo")
+	config := fmt.Sprintf(
+		"azstorage:\n  account-name: %s\n  type: block\n  account-key: %s\n  mode: key\n  container: %s\n  fail-unsupported-op: true",
+		storageTestConfigurationParameters.BlockAccount,
+		storageTestConfigurationParameters.BlockKey,
+		"foo",
+	)
 	s.setupTestHelper(config, "foo", false)
 
 	err := s.az.storage.TestPipeline()
