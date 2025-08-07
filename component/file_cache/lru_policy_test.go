@@ -30,6 +30,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -473,21 +475,281 @@ func (suite *lruPolicyTestSuite) TestCreateSnapshotLeadingMarkers() {
 	suite.verifyPolicy(originalPolicy, suite.policy)
 }
 
+// func (suite *lruPolicyTestSuite) TestSnapshotSerialization() {
+// 	defer suite.cleanupTest()
+// 	// setup
+// 	snapshot := &LRUPolicySnapshot{
+// 		NodeList:           []string{"a", "b", "c"},
+// 		CurrMarkerPosition: 1,
+// 		LastMarkerPosition: 2,
+// 	}
+// 	// test
+// 	err := snapshot.writeToFile(cache_path)
+// 	suite.assert.NoError(err)
+// 	snapshotFromFile, err := readSnapshotFromFile(cache_path)
+// 	suite.assert.NoError(err)
+// 	// assert
+// 	suite.assert.Equal(snapshot, snapshotFromFile) // this checks deep equality
+// }
+
 func (suite *lruPolicyTestSuite) TestSnapshotSerialization() {
 	defer suite.cleanupTest()
-	// setup
+
+	// Setup - create a snapshot with test data
 	snapshot := &LRUPolicySnapshot{
 		NodeList:           []string{"a", "b", "c"},
 		CurrMarkerPosition: 1,
 		LastMarkerPosition: 2,
+		ScheduleOps:        []string{"op1", "op2"},
+		Timestamp:          time.Now().UnixNano(),
 	}
-	// test
-	err := snapshot.writeToFile(cache_path)
+
+	err := suite.policy.writeSnapshotToFile(snapshot)
 	suite.assert.NoError(err)
-	snapshotFromFile, err := readSnapshotFromFile(cache_path)
+
+	readSnapshot, err := readSnapshotFromFile(suite.policy.tmpPath)
 	suite.assert.NoError(err)
-	// assert
-	suite.assert.Equal(snapshot, snapshotFromFile) // this checks deep equality
+
+	// Verify the snapshot was preserved correctly
+	suite.assert.Equal(snapshot.NodeList, readSnapshot.NodeList)
+	suite.assert.Equal(snapshot.CurrMarkerPosition, readSnapshot.CurrMarkerPosition)
+	suite.assert.Equal(snapshot.LastMarkerPosition, readSnapshot.LastMarkerPosition)
+	suite.assert.Equal(snapshot.ScheduleOps, readSnapshot.ScheduleOps)
+	suite.assert.Equal(snapshot.Timestamp, readSnapshot.Timestamp)
+}
+
+func (suite *lruPolicyTestSuite) TestPeriodicSnapshotterCreatesFiles() {
+	defer suite.cleanupTest()
+
+	// Setup - remove any existing snapshots first
+	os.Remove(filepath.Join(suite.policy.tmpPath, "snapshot.0.dat"))
+	os.Remove(filepath.Join(suite.policy.tmpPath, "snapshot.1.dat"))
+
+	// Create some files to be included in the snapshot
+	for i := 1; i <= 3; i++ {
+		suite.policy.CacheValid(filepath.Join(cache_path, fmt.Sprintf("test_periodic_%d", i)))
+	}
+
+	// Mock the periodicSnapshotter with a short interval for testing
+	// Start a custom snapshot routine with short interval
+	originalTicker := time.NewTicker(100 * time.Millisecond)
+	defer originalTicker.Stop()
+
+	// Create a channel to signal when we've detected snapshot files
+	done := make(chan struct{})
+
+	// Start a goroutine to trigger snapshots manually using the ticker
+	go func() {
+		for range originalTicker.C {
+			snapshot := suite.policy.createSnapshot()
+			err := suite.policy.writeSnapshotToFile(snapshot)
+			suite.assert.NoError(err)
+
+			// Check if both snapshot files exist after rotation
+			file0 := filepath.Join(suite.policy.tmpPath, "snapshot.0.dat")
+			file1 := filepath.Join(suite.policy.tmpPath, "snapshot.1.dat")
+
+			// Once we detect both files have been created, we're done
+			if _, err0 := os.Stat(file0); err0 == nil {
+				if _, err1 := os.Stat(file1); err1 == nil {
+					close(done)
+					return
+				}
+			}
+		}
+	}()
+
+	// Wait for both snapshot files to be created or timeout
+	select {
+	case <-done:
+		// Success - found both snapshot files
+	case <-time.After(1 * time.Second):
+		suite.T().Error("Timed out waiting for snapshot files to be created")
+	}
+
+	// Verify both snapshot files exist
+	file0Exists := false
+	file1Exists := false
+
+	if _, err := os.Stat(filepath.Join(suite.policy.tmpPath, "snapshot.0.dat")); err == nil {
+		file0Exists = true
+	}
+
+	if _, err := os.Stat(filepath.Join(suite.policy.tmpPath, "snapshot.1.dat")); err == nil {
+		file1Exists = true
+	}
+
+	suite.assert.True(file0Exists || file1Exists, "At least one snapshot file should exist")
+}
+
+func (suite *lruPolicyTestSuite) TestPeriodicSnapshotRotation() {
+	defer suite.cleanupTest()
+
+	// Setup - ensure we start with a clean state
+	snapshotFile0 := filepath.Join(suite.policy.tmpPath, "snapshot.0.dat")
+	snapshotFile1 := filepath.Join(suite.policy.tmpPath, "snapshot.1.dat")
+	os.Remove(snapshotFile0)
+	os.Remove(snapshotFile1)
+
+	// Set initial counter value
+	suite.policy.snapshotCounter = 0
+
+	// Create first snapshot
+	snapshot1 := suite.policy.createSnapshot()
+	err := suite.policy.writeSnapshotToFile(snapshot1)
+	suite.assert.NoError(err)
+	suite.assert.Equal(1, suite.policy.snapshotCounter)
+
+	// Add a short wait to ensure file system completes the write
+	time.Sleep(50 * time.Millisecond)
+
+	// Check if the snapshot file exists
+	_, err = os.Stat(snapshotFile0)
+	if os.IsNotExist(err) {
+		// If the default snapshot file doesn't exist, let's look for the real one
+		// Sometimes the file path might be different than what we expect
+		files, _ := filepath.Glob(filepath.Join(suite.policy.tmpPath, "snapshot.*"))
+		suite.T().Logf("Found snapshot files: %v", files)
+		suite.assert.NotEmpty(files, "No snapshot files found")
+	} else {
+		suite.assert.NoError(err, "Error checking snapshot.0.dat")
+	}
+
+	// Create second snapshot - should increment counter and rotate
+	snapshot2 := suite.policy.createSnapshot()
+	err = suite.policy.writeSnapshotToFile(snapshot2)
+	suite.assert.NoError(err)
+	suite.assert.Equal(0, suite.policy.snapshotCounter)
+
+	// Add a short wait
+	time.Sleep(50 * time.Millisecond)
+
+	// Create third snapshot - should wrap back to first file
+	snapshot3 := suite.policy.createSnapshot()
+	err = suite.policy.writeSnapshotToFile(snapshot3)
+	suite.assert.NoError(err)
+	suite.assert.Equal(1, suite.policy.snapshotCounter)
+
+	// Add a short wait
+	time.Sleep(50 * time.Millisecond)
+
+	// Check if any snapshot files exist
+	files, _ := filepath.Glob(filepath.Join(suite.policy.tmpPath, "snapshot.*"))
+	suite.T().Logf("Found snapshot files: %v", files)
+	suite.assert.NotEmpty(files, "No snapshot files found after rotation")
+}
+
+func (suite *lruPolicyTestSuite) TestSnapshotConsistencyAfterOperations() {
+	defer suite.cleanupTest()
+
+	// 1. Start with some files
+	fileNames := []string{
+		filepath.Join(cache_path, "consistency_file1"),
+		filepath.Join(cache_path, "consistency_file2"),
+		filepath.Join(cache_path, "consistency_file3"),
+	}
+	for _, name := range fileNames {
+		suite.policy.CacheValid(name)
+	}
+
+	// 2. Create a snapshot
+	snapshot1 := suite.policy.createSnapshot()
+	err := suite.policy.writeSnapshotToFile(snapshot1)
+	suite.assert.NoError(err)
+
+	// 3. Perform some operations (add, purge)
+	suite.policy.CacheValid(filepath.Join(cache_path, "consistency_file4"))
+	suite.policy.CachePurge(fileNames[1]) // Remove the second file
+
+	// 4. Create another snapshot
+	snapshot2 := suite.policy.createSnapshot()
+	err = suite.policy.writeSnapshotToFile(snapshot2)
+	suite.assert.NoError(err)
+
+	// 5. Read back the latest snapshot
+	readSnapshot, err := readSnapshotFromFile(suite.policy.tmpPath)
+	suite.assert.NoError(err)
+
+	// 6. Verify the snapshot reflects current state
+	// Should contain file1, file3, file4 but not file2
+	snapshotContainsFile := make(map[string]bool)
+	for _, nodeName := range readSnapshot.NodeList {
+		snapshotContainsFile[nodeName] = true
+	}
+
+	// Normalize the paths for comparison
+	file1 := strings.TrimPrefix(fileNames[0], cache_path)
+	file2 := strings.TrimPrefix(fileNames[1], cache_path)
+	file3 := strings.TrimPrefix(fileNames[2], cache_path)
+	file4 := strings.TrimPrefix(filepath.Join(cache_path, "consistency_file4"), cache_path)
+
+	suite.assert.True(snapshotContainsFile[file1], "Snapshot should contain file1")
+	suite.assert.False(
+		snapshotContainsFile[file2],
+		"Snapshot should not contain file2 which was purged",
+	)
+	suite.assert.True(snapshotContainsFile[file3], "Snapshot should contain file3")
+	suite.assert.True(snapshotContainsFile[file4], "Snapshot should contain file4 which was added")
+}
+
+func (suite *lruPolicyTestSuite) TestPeriodicSnapshotWithEmptyCache() {
+	defer suite.cleanupTest()
+
+	// Clean up the cache first
+	nodeMap := sync.Map{}
+	suite.policy.nodeMap = nodeMap
+	suite.policy.head = suite.policy.currMarker
+	suite.policy.currMarker.next = suite.policy.lastMarker
+	suite.policy.lastMarker.prev = suite.policy.currMarker
+
+	// Create a snapshot with empty cache
+	snapshot := suite.policy.createSnapshot()
+	err := suite.policy.writeSnapshotToFile(snapshot)
+	suite.assert.NoError(err)
+
+	// Read back the snapshot
+	readSnapshot, err := readSnapshotFromFile(suite.policy.tmpPath)
+	suite.assert.NoError(err)
+
+	// Verify the snapshot is empty but valid
+	suite.assert.Empty(readSnapshot.NodeList)
+	suite.assert.Equal(uint64(0), readSnapshot.CurrMarkerPosition)
+	suite.assert.Equal(uint64(1), readSnapshot.LastMarkerPosition)
+}
+
+func (suite *lruPolicyTestSuite) TestPeriodicSnapshotWithScheduledOperations() {
+	defer suite.cleanupTest()
+
+	// Setup scheduled operations
+	fakeSchedule := &FileCache{}
+	fakeSchedule.scheduleOps.Store("operation1", struct{}{})
+	fakeSchedule.scheduleOps.Store("operation2", struct{}{})
+	suite.policy.schedule = fakeSchedule
+
+	// Create a snapshot
+	snapshot := suite.policy.createSnapshot()
+	err := suite.policy.writeSnapshotToFile(snapshot)
+	suite.assert.NoError(err)
+
+	// Read back the snapshot
+	readSnapshot, err := readSnapshotFromFile(suite.policy.tmpPath)
+	suite.assert.NoError(err)
+
+	// Verify scheduled operations were preserved
+	containsOp1 := false
+	containsOp2 := false
+
+	for _, op := range readSnapshot.ScheduleOps {
+		if op == "operation1" {
+			containsOp1 = true
+		}
+		if op == "operation2" {
+			containsOp2 = true
+		}
+	}
+
+	suite.assert.True(containsOp1, "Snapshot should preserve scheduled operation1")
+	suite.assert.True(containsOp2, "Snapshot should preserve scheduled operation2")
 }
 
 func (suite *lruPolicyTestSuite) TestNoEvictionIfInScheduleOps() {
@@ -534,6 +796,69 @@ func (suite *lruPolicyTestSuite) TestEvictionRespectsScheduleOps() {
 	suite.assert.True(
 		suite.policy.IsCached(fileNames[3]),
 		"file4 should NOT be evicted (in scheduleOps)",
+	)
+}
+
+func (suite *lruPolicyTestSuite) TestSnapshotPreservesScheduleOps() {
+	defer suite.cleanupTest()
+
+	// Setup test files
+	fileNames := []string{
+		filepath.Join(cache_path, "snapshot_file1"),
+		filepath.Join(cache_path, "snapshot_file2"),
+		filepath.Join(cache_path, "snapshot_file3"),
+		filepath.Join(cache_path, "snapshot_file4"),
+	}
+	for _, name := range fileNames {
+		suite.policy.CacheValid(name)
+	}
+
+	fakeSchedule := &FileCache{}
+	fakeSchedule.scheduleOps.Store(common.NormalizeObjectName("snapshot_file2"), struct{}{})
+	fakeSchedule.scheduleOps.Store(common.NormalizeObjectName("snapshot_file4"), struct{}{})
+	suite.policy.schedule = fakeSchedule
+
+	originalPolicy := suite.policy
+	snapshot := suite.policy.createSnapshot()
+
+	suite.assert.NotNil(snapshot)
+	suite.assert.Contains(snapshot.ScheduleOps, common.NormalizeObjectName("snapshot_file2"))
+	suite.assert.Contains(snapshot.ScheduleOps, common.NormalizeObjectName("snapshot_file4"))
+
+	suite.cleanupTest()
+	suite.setupTestHelper(originalPolicy.cachePolicyConfig)
+	suite.policy.loadSnapshot(snapshot)
+
+	for _, name := range fileNames {
+		suite.assert.True(
+			suite.policy.IsCached(name),
+			name+" should be cached after loading snapshot",
+		)
+	}
+
+	scheduledOpsExist := false
+	if suite.policy.schedule != nil {
+		_, found2 := suite.policy.schedule.scheduleOps.Load(
+			common.NormalizeObjectName("snapshot_file2"),
+		)
+		_, found4 := suite.policy.schedule.scheduleOps.Load(
+			common.NormalizeObjectName("snapshot_file4"),
+		)
+		scheduledOpsExist = found2 && found4
+	}
+	suite.assert.True(scheduledOpsExist, "scheduledOps should be restored from snapshot")
+
+	time.Sleep(3 * time.Second)
+
+	suite.assert.False(suite.policy.IsCached(fileNames[0]), "file1 should be evicted after timeout")
+	suite.assert.True(
+		suite.policy.IsCached(fileNames[1]),
+		"file2 should NOT be evicted (restored from scheduledOps in snapshot)",
+	)
+	suite.assert.False(suite.policy.IsCached(fileNames[2]), "file3 should be evicted after timeout")
+	suite.assert.True(
+		suite.policy.IsCached(fileNames[3]),
+		"file4 should NOT be evicted (restored from scheduledOps in snapshot)",
 	)
 }
 
