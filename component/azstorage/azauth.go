@@ -56,6 +56,7 @@ type azAuthConfig struct {
 	ClientID                string
 	ClientSecret            *memguard.Enclave
 	OAuthTokenFilePath      string
+	WorkloadIdentityToken   string
 	ActiveDirectoryEndpoint string
 
 	Endpoint     string
