@@ -334,9 +334,9 @@ func (fc *FileCache) Configure(_ bool) error {
 			fc.Name(),
 			err.Error(),
 		)
-		fc.maxCacheSize = 4192 * MB
+		fc.maxCacheSize = 4192
 	} else {
-		fc.maxCacheSize = 0.8 * float64(avail)
+		fc.maxCacheSize = 0.8 * float64(avail) / (MB)
 	}
 
 	if config.IsSet(compName+".max-size-mb") && conf.MaxSizeMB != 0 {
@@ -1271,6 +1271,10 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 			err.Error(),
 		)
 		return err
+	}
+
+	if flags&os.O_TRUNC != 0 {
+		handle.Flags.Set(handlemap.HandleFlagDirty)
 	}
 
 	inf, err := f.Stat()

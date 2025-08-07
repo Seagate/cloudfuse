@@ -28,6 +28,7 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
+	github.com/vibhansa-msft/blobfilter v0.0.0-20250115104552-d9d40722be3e
 	github.com/vibhansa-msft/tlru v0.0.0-20240410102558-9e708419e21f
 	github.com/winfsp/cgofuse v1.6.0
 	go.uber.org/atomic v1.11.0
