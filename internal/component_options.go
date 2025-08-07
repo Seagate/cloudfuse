@@ -133,6 +133,7 @@ type CopyFromFileOptions struct {
 type FlushFileOptions struct {
 	Handle          *handlemap.Handle
 	CloseInProgress bool
+	ImmediateUpload bool
 }
 
 type SyncFileOptions struct {
