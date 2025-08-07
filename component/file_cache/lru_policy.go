@@ -212,69 +212,6 @@ func (p *lruPolicy) createSnapshot() *LRUPolicySnapshot {
 	return &snapshot
 }
 
-// func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
-// 	if snapshot == nil {
-// 		return
-// 	}
-// 	p.Lock()
-// 	defer p.Unlock()
-// 	// walk the slice and write the entries into the policy
-// 	// remember that the markers are actual nodes, with indices preceding the item at the same NodeList index
-// 	nodeIndex := 0
-// 	nextNode := p.head
-// 	tail := p.lastMarker
-// 	for _, v := range snapshot.NodeList {
-// 		// recreate the node
-// 		fullPath := filepath.Join(p.tmpPath, v)
-// 		newNode := &lruNode{
-// 			name:    fullPath,
-// 			next:    nil,
-// 			prev:    nil,
-// 			usage:   0,
-// 			deleted: false,
-// 		}
-// 		p.nodeMap.Store(fullPath, newNode)
-// 		// let markers stay in place
-// 		if nodeIndex == int(snapshot.CurrMarkerPosition) {
-// 			nextNode = nextNode.next
-// 			nodeIndex++
-// 		}
-// 		if nodeIndex == int(snapshot.LastMarkerPosition) {
-// 			nextNode = nextNode.next
-// 			nodeIndex++
-// 		}
-// 		// find prevNode
-// 		prevNode := tail
-// 		if nextNode != nil {
-// 			prevNode = nextNode.prev
-// 		}
-// 		// set newNode's pointers
-// 		newNode.prev = prevNode
-// 		newNode.next = nextNode
-// 		// set surrounding pointers
-// 		if nextNode != nil {
-// 			nextNode.prev = newNode
-// 		}
-// 		if prevNode != nil {
-// 			prevNode.next = newNode
-// 		}
-// 		// adjust the head and tail
-// 		if p.head == nextNode {
-// 			p.head = newNode
-// 		}
-// 		if tail == prevNode {
-// 			tail = newNode
-// 		}
-// 		nodeIndex++
-// 	}
-
-//		// Restore scheduledOps from snapshot
-//		if p.schedule != nil && snapshot.ScheduleOps != nil {
-//			for _, name := range snapshot.ScheduleOps {
-//				p.schedule.scheduleOps.Store(name, struct{}{})
-//			}
-//		}
-//	}
 func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
 	if snapshot == nil {
 		return
@@ -346,42 +283,6 @@ func (p *lruPolicy) loadSnapshot(snapshot *LRUPolicySnapshot) {
 	}
 }
 
-// func (ss *LRUPolicySnapshot) writeToFile(tmpPath string) error {
-// 	var buf bytes.Buffer
-// 	enc := gob.NewEncoder(&buf)
-// 	err := enc.Encode(ss)
-// 	if err != nil {
-// 		log.Crit("lruPolicy::ShutdownPolicy : Failed to encode policy snapshot")
-// 		return err
-// 	}
-// 	return os.WriteFile(filepath.Join(tmpPath, snapshotPath), buf.Bytes(), 0644)
-// }
-
-//	func readSnapshotFromFile(tmpPath string) (*LRUPolicySnapshot, error) {
-//		fullSnapshotPath := filepath.Join(tmpPath, snapshotPath)
-//		defer os.Remove(fullSnapshotPath)
-//		snapshotData, err := os.ReadFile(fullSnapshotPath)
-//		if err != nil {
-//			if !os.IsNotExist(err) {
-//				log.Crit(
-//					"lruPolicy::readSnapshotFromFile : Failed to read snapshot file. Here's why: %v",
-//					err,
-//				)
-//			}
-//			return nil, err
-//		}
-//		var snapshot LRUPolicySnapshot
-//		dec := gob.NewDecoder(bytes.NewReader(snapshotData))
-//		err = dec.Decode(&snapshot)
-//		if err != nil {
-//			log.Crit(
-//				"lruPolicy::readSnapshotFromFile : Failed to decode snapshot data. Here's why: %v",
-//				err,
-//			)
-//			return nil, err
-//		}
-//		return &snapshot, nil
-//	}
 func readSnapshotFromFile(tmpPath string) (*LRUPolicySnapshot, error) {
 	// Try both snapshot files and use the most recent valid one
 	snapshot0Path := filepath.Join(tmpPath, "snapshot.0.dat")
