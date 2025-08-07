@@ -108,6 +108,18 @@ file_cache:
   refresh-sec: <number of seconds after which compare lmt of file in local cache and container and refresh file if container has the latest copy>
   ignore-sync: true|false <sync call will be ignored and locally cached file will not be deleted>
   hard-limit: true|false <if set to true, file-cache will not allow read/writes to file which exceed the configured limits>
+  schedule:
+    - name: <Name of Cron job, Ex. - "Mon,Tue,etc...", Weekends, Weekdays>
+      cron: <Cron configuration>
+            "0 * * * * *"
+          #  | | | | | |
+          #  | | | | | +---- Day of week (every day)
+          #  | | | | +------ Month (every month)
+          #  | | | +-------- Day of month (every day)
+          #  | | +---------- Hour (every hour)
+          #  | +------------ Minute (every minute)
+          #  +-------------- Second (0th second)
+      duration: <Length of time to run the scheduled upload session. Format is <number><unit>, Example:"5h" =  5 hours, "30m" = 30 minutes, "2s" = 2 seconds>
 
 # Attribute cache related configuration
 attr_cache:
@@ -208,3 +220,5 @@ health_monitor:
     - cpu_profiler <Disable CPU monitoring on cloudfuse process>
     - memory_profiler <Disable memory monitoring on cloudfuse process>
     - network_profiler <Disable network monitoring on cloudfuse process>
+
+  
