@@ -62,6 +62,12 @@ func createFuseOptions(
 		options += ",nonempty"
 	}
 
+	// force the fuse library to always pass O_TRUNC flag on open call
+	// Not checking the options since we don't allow user to configure this flag.
+	// This is the default behaviour for the fuse3 hence we don't pass this flag there.
+	// ref: https://github.com/libfuse/libfuse/blob/7f86f3be7148b15b71b63357813c66dd32177cf6/lib/fuse_lowlevel.c#L2161C2-L2161C16
+	options += ",atomic_o_trunc"
+
 	if umask != 0 {
 		options += fmt.Sprintf(",umask=%04d", umask)
 	}
