@@ -94,8 +94,6 @@ type LRUPolicySnapshot struct {
 const (
 	// Check for disk usage in below number of minutes
 	DiskUsageCheckInterval = 1
-	// Cache snapshot relative filepath
-	snapshotPath = ".fileCacheSnapshot.gob"
 )
 
 var _ cachePolicy = &lruPolicy{}
@@ -288,36 +286,35 @@ func readSnapshotFromFile(tmpPath string) (*LRUPolicySnapshot, error) {
 	snapshot0Path := filepath.Join(tmpPath, "snapshot.0.dat")
 	snapshot1Path := filepath.Join(tmpPath, "snapshot.1.dat")
 
-	snapshot1, err1 := tryReadSnapshot(snapshot0Path)
+	snapshot0, err0 := tryReadSnapshot(snapshot0Path)
+	if err0 != nil && !os.IsNotExist(err0) {
+		log.Crit(
+			"lruPolicy::readSnapshotFromFile : Failed to read snapshot file %s. Here's why: %v",
+			snapshot0Path, err0,
+		)
+	}
+
+	snapshot1, err1 := tryReadSnapshot(snapshot1Path)
 	if err1 != nil && !os.IsNotExist(err1) {
 		log.Crit(
 			"lruPolicy::readSnapshotFromFile : Failed to read snapshot file %s. Here's why: %v",
-			snapshot0Path, err1,
+			snapshot1Path, err1,
 		)
 	}
 
-	snapshot2, err2 := tryReadSnapshot(snapshot1Path)
-	if err2 != nil && !os.IsNotExist(err2) {
-		log.Crit(
-			"lruPolicy::readSnapshotFromFile : Failed to read snapshot file %s. Here's why: %v",
-			snapshot1Path, err2,
-		)
-	}
-
-	if err1 == nil && err2 == nil {
+	if err0 == nil && err1 == nil {
 		// Both valid, compare timestamps and return the newer one
-		if snapshot1.Timestamp > snapshot2.Timestamp {
-			return snapshot1, nil
+		if snapshot0.Timestamp > snapshot1.Timestamp {
+			return snapshot0, nil
 		}
-		return snapshot2, nil
+		return snapshot1, nil
+	} else if err0 == nil {
+		return snapshot0, nil
 	} else if err1 == nil {
 		return snapshot1, nil
-	} else if err2 == nil {
-		return snapshot2, nil
 	}
-
 	// Only log as critical if neither file exists - otherwise it's normal for a fresh install
-	if !os.IsNotExist(err1) || !os.IsNotExist(err2) {
+	if !os.IsNotExist(err0) || !os.IsNotExist(err1) {
 		log.Crit("lruPolicy::readSnapshotFromFile : No valid snapshots found")
 	}
 	return nil, fmt.Errorf("no valid snapshots found")
