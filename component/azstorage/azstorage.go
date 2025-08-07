@@ -91,6 +91,8 @@ func (az *AzStorage) Configure(isParent bool) error {
 		return err
 	}
 
+reconfigure:
+
 	err = ParseAndValidateConfig(az, conf)
 	if err != nil {
 		log.Err("AzStorage::Configure : Config validation failed [%s]", err.Error())
@@ -101,6 +103,16 @@ func (az *AzStorage) Configure(isParent bool) error {
 	if err != nil {
 		log.Err("AzStorage::Configure : Failed to validate storage account [%s]", err.Error())
 		return err
+	}
+
+	// If user has not specified the account type then detect it's HNS or FNS
+	if conf.AccountType == "" && az.storage.IsAccountADLS() {
+		log.Crit(
+			"AzStorage::Configure : Auto detected account type as adls, reconfiguring storage connection.",
+		)
+		az.storage = nil
+		conf.AccountType = "adls"
+		goto reconfigure
 	}
 
 	return nil
@@ -163,7 +175,11 @@ func (az *AzStorage) configureAndTest(isParent bool) error {
 				"AzStorage::configureAndTest : Failed to validate credentials [%s]",
 				err.Error(),
 			)
-			return fmt.Errorf("failed to authenticate credentials for %s", az.Name())
+			return fmt.Errorf(
+				"failed to authenticate %s credentials with error [%s]",
+				az.Name(),
+				err.Error(),
+			)
 		}
 	}
 
