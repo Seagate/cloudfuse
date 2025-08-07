@@ -197,7 +197,10 @@ func (dl *Datalake) TestPipeline() error {
 	// we are just validating the auth mode used. So, no need to iterate over the pages
 	_, err := listPathPager.NextPage(context.Background())
 	if err != nil {
-		log.Err("Datalake::TestPipeline : Failed to validate account with given auth %s", err.Error())
+		log.Err(
+			"Datalake::TestPipeline : Failed to validate account with given auth %s",
+			err.Error(),
+		)
 		var respErr *azcore.ResponseError
 		errors.As(err, &respErr)
 		if respErr != nil {

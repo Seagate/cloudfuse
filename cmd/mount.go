@@ -41,7 +41,6 @@ import (
 	"runtime/pprof"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -632,29 +631,6 @@ var mountCmd = &cobra.Command{
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveDefault
 	},
-}
-
-func monitorChild(pid int, done chan struct{}) {
-	// Monitor the child process and if child terminates then exit
-	var wstatus syscall.WaitStatus
-
-	for {
-		// Wait for a signal from child
-		wpid, err := syscall.Wait4(pid, &wstatus, 0, nil)
-		if err != nil {
-			log.Err("Error retrieving child status [%s]", err.Error())
-			break
-		}
-
-		if wpid == pid {
-			// Exit only if child has exited
-			// Signal can be received on a state change of child as well
-			if wstatus.Exited() || wstatus.Signaled() || wstatus.Stopped() {
-				close(done)
-				return
-			}
-		}
-	}
 }
 
 func ignoreFuseOptions(opt string) bool {
