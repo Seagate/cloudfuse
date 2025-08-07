@@ -514,7 +514,6 @@ func (suite *lruPolicyTestSuite) TestPeriodicSnapshotterCreatesFiles() {
 	originalTicker := time.NewTicker(100 * time.Millisecond)
 	defer originalTicker.Stop()
 
-	// Create a channel to signal when we've detected snapshot files
 	done := make(chan struct{})
 
 	// Start a goroutine to trigger snapshots manually using the ticker
@@ -538,7 +537,6 @@ func (suite *lruPolicyTestSuite) TestPeriodicSnapshotterCreatesFiles() {
 		}
 	}()
 
-	// Wait for both snapshot files to be created or timeout
 	select {
 	case <-done:
 		// Success - found both snapshot files
@@ -564,7 +562,6 @@ func (suite *lruPolicyTestSuite) TestPeriodicSnapshotterCreatesFiles() {
 func (suite *lruPolicyTestSuite) TestPeriodicSnapshotRotation() {
 	defer suite.cleanupTest()
 
-	// Setup - ensure we start with a clean state
 	snapshotFile0 := filepath.Join(suite.policy.tmpPath, "snapshot.0.dat")
 	snapshotFile1 := filepath.Join(suite.policy.tmpPath, "snapshot.1.dat")
 	os.Remove(snapshotFile0)
@@ -579,7 +576,6 @@ func (suite *lruPolicyTestSuite) TestPeriodicSnapshotRotation() {
 
 	time.Sleep(50 * time.Millisecond)
 
-	// Check if the snapshot file exists
 	_, err = os.Stat(snapshotFile0)
 	if os.IsNotExist(err) {
 		// If the default snapshot file doesn't exist, let's look for the real one
