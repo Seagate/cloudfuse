@@ -76,10 +76,10 @@ type BlockCache struct {
 	noPrefetch      bool            // Flag to indicate if prefetch is disabled
 	prefetchOnOpen  bool            // Start prefetching on file open call instead of waiting for first read
 	consistency     bool            // Flag to indicate if strong data consistency is enabled
-	stream          *Stream
-	lazyWrite       bool           // Flag to indicate if lazy write is enabled
-	fileCloseOpt    sync.WaitGroup // Wait group to wait for all async close operations to complete
-	cleanupOnStart  bool           // Clear temp directory on startup
+	// stream          *Stream // TODO: Replace when stream is deprecated
+	lazyWrite      bool           // Flag to indicate if lazy write is enabled
+	fileCloseOpt   sync.WaitGroup // Wait group to wait for all async close operations to complete
+	cleanupOnStart bool           // Clear temp directory on startup
 }
 
 // Structure defining your config parameters
@@ -215,13 +215,14 @@ func (bc *BlockCache) GenConfig() string {
 //	Return failure if any config is not valid to exit the process
 func (bc *BlockCache) Configure(_ bool) error {
 	log.Trace("BlockCache::Configure : %s", bc.Name())
-	if common.IsStream {
-		err := bc.stream.Configure(true)
-		if err != nil {
-			log.Err("BlockCache:Stream::Configure : config error [invalid config attributes]")
-			return fmt.Errorf("config error in %s [%s]", bc.Name(), err.Error())
-		}
-	}
+	// TODO: Replace when stream is deprecated
+	// if common.IsStream {
+	// 	err := bc.stream.Configure(true)
+	// 	if err != nil {
+	// 		log.Err("BlockCache:Stream::Configure : config error [invalid config attributes]")
+	// 		return fmt.Errorf("config error in %s [%s]", bc.Name(), err.Error())
+	// 	}
+	// }
 
 	conf := BlockCacheOptions{}
 	err := config.UnmarshalKey(bc.Name(), &conf)
@@ -412,6 +413,10 @@ func (bc *BlockCache) getDefaultMemSize() uint64 {
 func (bc *BlockCache) CreateFile(options internal.CreateFileOptions) (*handlemap.Handle, error) {
 	log.Trace("BlockCache::CreateFile : name=%s, mode=%d", options.Name, options.Mode)
 
+	flock := bc.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
 	f, err := bc.NextComponent().CreateFile(options)
 	if err != nil {
 		log.Err("BlockCache::CreateFile : Failed to create file %s", options.Name)
@@ -439,6 +444,10 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 		options.Mode,
 	)
 
+	flock := bc.fileLocks.Get(options.Name)
+	flock.Lock()
+	defer flock.Unlock()
+
 	attr, err := bc.NextComponent().GetAttr(internal.GetAttrOptions{Name: options.Name})
 	if err != nil {
 		log.Err("BlockCache::OpenFile : Failed to get attr of %s [%s]", options.Name, err.Error())
@@ -456,11 +465,12 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 	log.Debug("BlockCache::OpenFile : Size of file handle.Size %v", handle.Size)
 	bc.prepareHandleForBlockCache(handle)
 
-	if options.Flags&os.O_TRUNC != 0 {
+	if options.Flags&os.O_TRUNC != 0 || options.Flags&os.O_WRONLY != 0 {
 		// If file is opened in truncate or wronly mode then we need to wipe out the data consider current file size as 0
 		log.Debug("BlockCache::OpenFile : Truncate %v to 0", options.Name)
 		handle.Size = 0
 		handle.Flags.Set(handlemap.HandleFlagDirty)
+		handle.RemoveValue("ETAG")
 	} else if handle.Size != 0 && (options.Flags&os.O_RDWR != 0 || options.Flags&os.O_APPEND != 0) {
 		// File is not opened in read-only mode so we need to get the list of blocks and validate the size
 		// As there can be a potential write on this file, currently configured block size and block size of the file in container
@@ -554,6 +564,10 @@ func (bc *BlockCache) FlushFile(options internal.FlushFileOptions) error {
 		)
 		return nil
 	}
+
+	flock := bc.fileLocks.Get(options.Handle.Path)
+	flock.Lock()
+	defer flock.Unlock()
 
 	options.Handle.Lock()
 	defer options.Handle.Unlock()

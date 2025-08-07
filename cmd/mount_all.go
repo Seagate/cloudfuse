@@ -263,7 +263,7 @@ func getBucketListS3() ([]string, error) {
 	}
 
 	// Get the list of containers from the component
-	containerList, err = s3Component.ListBuckets()
+	containerList, err = s3Component.ListAuthorizedBuckets()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bucket list from storage [%s]", err.Error())
 	}

@@ -183,6 +183,10 @@ func (s3 *S3Storage) ListBuckets() ([]string, error) {
 	return s3.storage.ListBuckets()
 }
 
+func (s3 *S3Storage) ListAuthorizedBuckets() ([]string, error) {
+	return s3.storage.ListAuthorizedBuckets()
+}
+
 // ------------------------- Core Operations -------------------------------------------
 
 // Directory operations
@@ -554,6 +558,18 @@ func (s3 *S3Storage) Chown(options internal.ChownOptions) error {
 func (s3 *S3Storage) FlushFile(options internal.FlushFileOptions) error {
 	log.Trace("S3Storage::FlushFile : Flush file %s", options.Handle.Path)
 	return s3.storage.StageAndCommit(options.Handle.Path, options.Handle.CacheObj.BlockOffsetList)
+}
+
+func (s3 *S3Storage) GetCommittedBlockList(name string) (*internal.CommittedBlockList, error) {
+	return s3.storage.GetCommittedBlockList(name)
+}
+
+func (s3 *S3Storage) StageData(opt internal.StageDataOptions) error {
+	return s3.storage.StageBlock(opt.Name, opt.Data, opt.Id)
+}
+
+func (s3 *S3Storage) CommitData(opt internal.CommitDataOptions) error {
+	return s3.storage.CommitBlocks(opt.Name, opt.List)
 }
 
 const blockSize = 4096

@@ -50,10 +50,12 @@ jobs:
       - name: Compile GUI
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
         shell: bash
+        env:
+          OS: ${{ runner.os }}
         run: |
           cd gui
           ./create_gui.sh
-          mv dist/cloudfuseGUI dist/cloudfuseGUI_${{ runner.os }}
+          mv dist/cloudfuseGUI dist/cloudfuseGUI_${OS}
 
       - name: Cache compiled GUI
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
@@ -71,7 +73,7 @@ jobs:
     env:
       go: "1.24"
       cgo: "0"
-      winfsp: winfsp-2.0.23075.msi
+      winfsp: winfsp-2.1.25156.msi
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -88,13 +90,15 @@ jobs:
       - name: Set CGO
         shell: bash
         run: |
-          if [[ "${{ env.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ env.cgo }}' >> $GITHUB_ENV ; fi
+          echo 'CGO_ENABLED=0' >> $GITHUB_ENV
 
       - name: Build
         shell: bash
+        env:
+          SHA: ${{ github.sha }}
         run: |
           commitDate=$(TZ=UTC0 git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)
-          ldflags="-s -w -X github.com/Seagate/cloudfuse/common.GitCommit=${{ github.sha }} -X github.com/Seagate/cloudfuse/common.CommitDate=$commitDate"
+          ldflags="-s -w -X github.com/Seagate/cloudfuse/common.GitCommit=${SHA} -X github.com/Seagate/cloudfuse/common.CommitDate=$commitDate"
           go build -trimpath -ldflags ''"$ldflags"'' -o cloudfuse.exe
           go build -trimpath -ldflags ''"$ldflags"'' -o cfusemon.exe ./tools/health-monitor/
           go build -trimpath -ldflags ''"$ldflags"'' -o windows-startup.exe ./tools/windows-startup/
@@ -115,9 +119,11 @@ jobs:
       - name: Download WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
         shell: bash
+        env:
+          WINFSP: ${{ env.winfsp }}
         run: |
-          curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.0/${{ env.winfsp }}
-
+          curl -LOf https://github.com/winfsp/winfsp/releases/download/v2.1/${{ env.winfsp }}
+      
       - name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
         uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
@@ -188,7 +194,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       go: "1.24"
-      zig: 0.14.0
+      zig: 0.14.1
     permissions:
       contents: write
       id-token: write
@@ -207,11 +213,13 @@ jobs:
           persist-credentials: false
 
       - name: Install Zig
+        env:
+          ZIG: ${{ env.zig }}
         run: |
-          curl -L https://ziglang.org/download/${{ env.zig }}/zig-linux-x86_64-${{ env.zig }}.tar.xz -o zig.tar.xz
+          curl -L https://ziglang.org/download/${ZIG}/zig-x86_64-linux-${ZIG}.tar.xz -o zig.tar.xz
           mkdir -p $HOME/.local/bin
           tar -xf zig.tar.xz -C $HOME/.local/bin
-          echo "$HOME/.local/bin/zig-linux-x86_64-${{ env.zig }}" >> $GITHUB_PATH
+          echo "$HOME/.local/bin/zig-x86_64-linux-${ZIG}" >> $GITHUB_PATH
           rm zig.tar.xz
 
       - name: Install Go
@@ -222,7 +230,7 @@ jobs:
           cache: false
 
       - name: Set up Cosign
-        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3.8.2
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
 
       - name: Set Version
         id: get_version
