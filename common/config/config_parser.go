@@ -30,7 +30,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -314,83 +313,6 @@ func AttachFlagCompletions(cmd *cobra.Command) {
 	for key, fn := range userOptions.completionFuncMap {
 		_ = cmd.RegisterFlagCompletionFunc(key, fn)
 	}
-}
-
-// ----------------------------------------------------------
-// Functions to add flags from a component
-func AddStringFlag(name string, value string, usage string) *pflag.Flag {
-	userOptions.flags.String(name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddIntFlag(name string, value int, usage string) *pflag.Flag {
-	userOptions.flags.Int(name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddInt8Flag(name string, value int8, usage string) *pflag.Flag {
-	userOptions.flags.Int8(name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddInt16Flag(name string, value int16, usage string) *pflag.Flag {
-	userOptions.flags.Int16(name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddInt32Flag(name string, value int32, usage string) *pflag.Flag {
-	userOptions.flags.Int32(name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddInt64Flag(name string, value int64, usage string) *pflag.Flag {
-	userOptions.flags.Int64(name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddBoolFlag(name string, value bool, usage string) *pflag.Flag {
-	userOptions.flags.Bool(name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddBoolPFlag(name string, value bool, usage string) *pflag.Flag {
-	userOptions.flags.BoolP(name, name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddFloat64Flag(name string, value float64, usage string) *pflag.Flag {
-	userOptions.flags.Float64(name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddUintFlag(name string, value uint, usage string) *pflag.Flag {
-	userOptions.flags.Uint(name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddUint8Flag(name string, value uint8, usage string) *pflag.Flag {
-	userOptions.flags.Uint8(name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddUint16Flag(name string, value uint16, usage string) *pflag.Flag {
-	userOptions.flags.Uint16(name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddUint32Flag(name string, value uint32, usage string) *pflag.Flag {
-	userOptions.flags.Uint32(name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddUint64Flag(name string, value uint64, usage string) *pflag.Flag {
-	userOptions.flags.Uint64(name, value, usage)
-	return userOptions.flags.Lookup(name)
-}
-
-func AddDurationFlag(name string, value time.Duration, usage string) *pflag.Flag {
-	userOptions.flags.Duration(name, value, usage)
-	return userOptions.flags.Lookup(name)
 }
 
 func RegisterFlagCompletionFunc(
