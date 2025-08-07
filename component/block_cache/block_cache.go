@@ -476,6 +476,8 @@ func (bc *BlockCache) OpenFile(options internal.OpenFileOptions) (*handlemap.Han
 		if !valid {
 			return nil, fmt.Errorf("block size mismatch for %s", options.Name)
 		}
+	} else if options.Flags&os.O_WRONLY != 0 {
+		handle.RemoveValue("ETAG")
 	}
 
 	if handle.Size > 0 {
