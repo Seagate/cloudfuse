@@ -347,12 +347,12 @@ func (suite *utilTestSuite) TestExpandPath() {
 	expandedPath = ExpandPath(path)
 	suite.assert.Equal(expandedPath, path)
 
-	path = "$HOME/.blobfuse2/config_$web.yaml"
+	path = "$HOME/.cloudfuse/config_$web.yaml"
 	expandedPath = ExpandPath(path)
 	suite.assert.NotEqual(expandedPath, path)
 	suite.assert.Contains(path, "$web")
 
-	path = "$HOME/.blobfuse2/$web"
+	path = "$HOME/.cloudfuse/$web"
 	expandedPath = ExpandPath(path)
 	suite.assert.NotEqual(expandedPath, path)
 	suite.assert.Contains(path, "$web")

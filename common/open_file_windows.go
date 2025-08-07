@@ -54,7 +54,11 @@ func OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
 			pathp, e1 := syscall.UTF16PtrFromString(path)
 			if e1 == nil {
 				var fa syscall.Win32FileAttributeData
-				e1 = syscall.GetFileAttributesEx(pathp, syscall.GetFileExInfoStandard, (*byte)(unsafe.Pointer(&fa)))
+				e1 = syscall.GetFileAttributesEx(
+					pathp,
+					syscall.GetFileExInfoStandard,
+					(*byte)(unsafe.Pointer(&fa)),
+				)
 				if e1 == nil && fa.FileAttributes&syscall.FILE_ATTRIBUTE_DIRECTORY != 0 {
 					e = syscall.EISDIR
 				}
@@ -100,7 +104,9 @@ func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 	}
 	// We add the FILE_SHARE_DELETE flag which allows the open file to be renamed and deleted before being closed.
 	// This is not enabled in Go.
-	sharemode := uint32(syscall.FILE_SHARE_READ | syscall.FILE_SHARE_WRITE | syscall.FILE_SHARE_DELETE)
+	sharemode := uint32(
+		syscall.FILE_SHARE_READ | syscall.FILE_SHARE_WRITE | syscall.FILE_SHARE_DELETE,
+	)
 	var sa *syscall.SecurityAttributes
 	if mode&syscall.O_CLOEXEC == 0 {
 		sa = makeInheritSa()
@@ -130,7 +136,15 @@ func open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {
 			// and the file already exists, CreateFile will
 			// change the file permissions.
 			// Avoid that to preserve the Unix semantics.
-			h, e := syscall.CreateFile(pathp, access, sharemode, sa, syscall.TRUNCATE_EXISTING, syscall.FILE_ATTRIBUTE_NORMAL, 0)
+			h, e := syscall.CreateFile(
+				pathp,
+				access,
+				sharemode,
+				sa,
+				syscall.TRUNCATE_EXISTING,
+				syscall.FILE_ATTRIBUTE_NORMAL,
+				0,
+			)
 			switch e {
 			case syscall.ERROR_FILE_NOT_FOUND, _ERROR_BAD_NETPATH, syscall.ERROR_PATH_NOT_FOUND:
 				// File does not exist. These are the same
