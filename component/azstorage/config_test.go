@@ -136,11 +136,12 @@ func (s *configTestSuite) TestProxyConfig() {
 	opt.Container = "abcd"
 
 	opt.HttpsProxyAddress = "127.0.0.1"
+	opt.UseHTTP = true
 	err := ParseAndValidateConfig(az, opt)
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpsProxyAddress, false),
+		formatEndpointProtocol(opt.HttpsProxyAddress, opt.UseHTTP),
 	)
 
 	opt.HttpsProxyAddress = "https://128.0.0.1:8080/"
@@ -148,7 +149,7 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpsProxyAddress, false),
+		formatEndpointProtocol(opt.HttpsProxyAddress, opt.UseHTTP),
 	)
 
 	opt.HttpsProxyAddress = "http://129.0.0.1:8080/"
@@ -156,7 +157,7 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpsProxyAddress, false),
+		formatEndpointProtocol(opt.HttpsProxyAddress, opt.UseHTTP),
 	)
 
 	opt.HttpProxyAddress = "130.0.0.1"
@@ -164,7 +165,7 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpProxyAddress, false),
+		formatEndpointProtocol(opt.HttpProxyAddress, opt.UseHTTP),
 	)
 
 	opt.HttpProxyAddress = "http://131.0.0.1:8080/"
@@ -172,10 +173,11 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpProxyAddress, false),
+		formatEndpointProtocol(opt.HttpProxyAddress, opt.UseHTTP),
 	)
 
 	opt.HttpsProxyAddress = ""
+	opt.UseHTTP = false
 
 	opt.HttpProxyAddress = "132.0.0.1"
 	err = ParseAndValidateConfig(az, opt)
@@ -187,7 +189,7 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpsProxyAddress, false),
+		formatEndpointProtocol(opt.HttpsProxyAddress, opt.UseHTTP),
 	)
 
 	opt.HttpsProxyAddress = "http://134.0.0.1:8080/"
@@ -195,7 +197,7 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpsProxyAddress, false),
+		formatEndpointProtocol(opt.HttpsProxyAddress, opt.UseHTTP),
 	)
 
 	opt.HttpsProxyAddress = "https://135.0.0.1:8080/"
@@ -203,7 +205,7 @@ func (s *configTestSuite) TestProxyConfig() {
 	assert.NoError(err)
 	assert.Equal(
 		az.stConfig.proxyAddress,
-		formatEndpointProtocol(opt.HttpsProxyAddress, false),
+		formatEndpointProtocol(opt.HttpsProxyAddress, opt.UseHTTP),
 	)
 }
 
