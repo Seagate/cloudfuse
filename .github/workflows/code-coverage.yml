@@ -39,7 +39,7 @@ jobs:
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
       cloudfuse_BLOCK_CFG: "./cloudfuse_block.yaml"
-      zig: 0.14.0
+      zig: 0.14.1
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -78,7 +78,7 @@ jobs:
             exit 1
           fi
 
-          ZIG_DIR="zig-linux-${ZIG_ARCH}-${ENV_ZIG}"
+          ZIG_DIR="zig-${ZIG_ARCH}-linux-${ENV_ZIG}"
           ZIG_TARBALL="${ZIG_DIR}.tar.xz"
           curl -L https://ziglang.org/download/${ENV_ZIG}/${ZIG_TARBALL} -o zig.tar.xz
           mkdir -p $HOME/.local/bin
@@ -1055,7 +1055,6 @@ jobs:
       cloudfuse_ADLS_CFG_HMON: "./cloudfuse.adls.hmon.yaml"
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
-      zig: 0.14.0
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -1073,20 +1072,6 @@ jobs:
           go-version: ${{ matrix.go }}
           check-latest: true
       - run: go version
-
-      - name: Install Zig
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          ENV_ZIG: ${{ env.zig }}
-        run: |
-          $zigVersion = "${ENV_ZIG}"
-          $zigUrl = "https://ziglang.org/download/$zigVersion/zig-windows-x86_64-$zigVersion.zip"
-          $zigZip = "$env:TEMP\zig.zip"
-          Invoke-WebRequest -Uri $zigUrl -OutFile $zigZip
-          Expand-Archive -Path $zigZip -DestinationPath $env:USERPROFILE\zig
-          echo "$env:USERPROFILE\zig\zig-windows-x86_64-$zigVersion" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          Remove-Item $zigZip
 
       # From rclone github repo under MIT license
       # https://github.com/rclone/rclone/blob/master/.github/workflows/build.yml
