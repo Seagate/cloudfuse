@@ -106,8 +106,8 @@ type FileCacheOptions struct {
 	EnablePolicyTrace bool `config:"policy-trace" yaml:"policy-trace,omitempty"`
 	OffloadIO         bool `config:"offload-io"   yaml:"offload-io,omitempty"`
 
-	SyncToFlush bool `config:"sync-to-flush"                 yaml:"sync-to-flush"`
-	SyncNoOp    bool `config:"ignore-sync"                   yaml:"ignore-sync,omitempty"`
+	SyncToFlush bool `config:"sync-to-flush" yaml:"sync-to-flush"`
+	SyncNoOp    bool `config:"ignore-sync"   yaml:"ignore-sync,omitempty"`
 
 	RefreshSec uint32 `config:"refresh-sec" yaml:"refresh-sec,omitempty"`
 	HardLimit  bool   `config:"hard-limit"  yaml:"hard-limit,omitempty"`
