@@ -60,7 +60,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
-          go-version: ${{ matrix.go }}
+          go-version: ${{ env.go }}
           check-latest: true
       - run: go version
 
@@ -70,19 +70,22 @@ jobs:
           python-version: "3.10"
 
       - name: Install Zig
+        env:
+          RUNNER_ARCH: ${{ runner.arch }}
+          ENV_ZIG: ${{ env.zig }}
         run: |
-          if [[ "${{ runner.arch }}" == "X64" ]]; then
+          if [[ "${RUNNER_ARCH}" == "X64" ]]; then
             ZIG_ARCH="x86_64"
-          elif [[ "${{ runner.arch }}" == "ARM64" ]]; then
+          elif [[ "${RUNNER_ARCH}" == "ARM64" ]]; then
             ZIG_ARCH="aarch64"
           else
-            echo "Unsupported architecture: ${{ runner.arch }}"
+            echo "Unsupported architecture: ${RUNNER_ARCH}"
             exit 1
           fi
 
-          ZIG_DIR="zig-linux-${ZIG_ARCH}-${{ env.zig }}"
+          ZIG_DIR="zig-linux-${ZIG_ARCH}-${ENV_ZIG}"
           ZIG_TARBALL="${ZIG_DIR}.tar.xz"
-          curl -L https://ziglang.org/download/${{ env.zig }}/${ZIG_TARBALL} -o zig.tar.xz
+          curl -L https://ziglang.org/download/${ENV_ZIG}/${ZIG_TARBALL} -o zig.tar.xz
           mkdir -p $HOME/.local/bin
           tar -xf zig.tar.xz -C $HOME/.local/bin
           echo "$HOME/.local/bin/${ZIG_DIR}" >> $GITHUB_PATH
@@ -174,13 +177,14 @@ jobs:
       - name: Run unit tests
         env:
           JOB_NAME: ${{ matrix.job_name }}
+          RUNNER_ARCH: ${{ runner.arch }}
         run: |
           if [[ "$OSTYPE" == "linux-gnu"* ]]; then
             # Set Zig as the C/C++ compiler for CGO during tests
-            if [[ "${{ runner.arch }}" == "X64" ]]; then
+            if [[ "${RUNNER_ARCH}" == "X64" ]]; then
               ZIG_TARGET="x86_64-linux-gnu"
               LIBDIR="/usr/lib/x86_64-linux-gnu"
-            elif [[ "${{ runner.arch }}" == "ARM64" ]]; then
+            elif [[ "${RUNNER_ARCH}" == "ARM64" ]]; then
               ZIG_TARGET="aarch64-linux-gnu"
               LIBDIR="/usr/lib/aarch64-linux-gnu"
             fi
@@ -226,8 +230,10 @@ jobs:
       - name: Install Zig
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          ENV_ZIG: ${{ env.zig }}
         run: |
-          $zigVersion = "${{ env.zig }}"
+          $zigVersion = "${ENV_ZIG}"
           $zigUrl = "https://ziglang.org/download/$zigVersion/zig-windows-x86_64-$zigVersion.zip"
           $zigZip = "$env:TEMP\zig.zip"
           Invoke-WebRequest -Uri $zigUrl -OutFile $zigZip
