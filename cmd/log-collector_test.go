@@ -200,6 +200,9 @@ func (suite *logCollectTestSuite) TestNoConfig() {
 
 	baseDefaultDir := common.GetDefaultWorkDir() + "/.cloudfuse/"
 	baseDefaultDir = common.ExpandPath(baseDefaultDir)
+	if !common.DirectoryExists(baseDefaultDir) {
+		os.Mkdir(baseDefaultDir, os.FileMode(0760))
+	}
 	var logFile *os.File
 	logFile, err = os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
 	suite.assert.NoError(err)
@@ -415,6 +418,9 @@ func (suite *logCollectTestSuite) TestOutputPath() {
 	// create temp files in default directory $HOME/.cloudfuse/cloudfuse.log
 	baseDefaultDir := common.GetDefaultWorkDir() + "/.cloudfuse/"
 	baseDefaultDir = common.ExpandPath(baseDefaultDir)
+	if !common.DirectoryExists(baseDefaultDir) {
+		os.Mkdir(baseDefaultDir, os.FileMode(0760))
+	}
 	var logFile *os.File
 	logFile, err = os.CreateTemp(baseDefaultDir, "cloudfuse*.log")
 	suite.assert.NoError(err)
