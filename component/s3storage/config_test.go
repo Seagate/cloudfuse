@@ -95,10 +95,10 @@ func (s *configTestSuite) TestConfigParse() {
 
 	// Then
 	s.assert.NoError(err)
-	s.assert.Equal(s.opt.BucketName, s.s3.stConfig.authConfig.BucketName)
-	s.assert.Equal(s.opt.Region, s.s3.stConfig.authConfig.Region)
-	s.assert.Equal(s.opt.Profile, s.s3.stConfig.authConfig.Profile)
-	s.assert.Equal(s.opt.Endpoint, s.s3.stConfig.authConfig.Endpoint)
+	s.assert.Equal(s.opt.BucketName, s.s3.stConfig.AuthConfig.BucketName)
+	s.assert.Equal(s.opt.Region, s.s3.stConfig.AuthConfig.Region)
+	s.assert.Equal(s.opt.Profile, s.s3.stConfig.AuthConfig.Profile)
+	s.assert.Equal(s.opt.Endpoint, s.s3.stConfig.AuthConfig.Endpoint)
 	s.assert.Equal(s.opt.RestrictedCharsWin, s.s3.stConfig.restrictedCharsWin)
 	s.assert.Equal(s.opt.PrefixPath, s.s3.stConfig.prefixPath)
 }
