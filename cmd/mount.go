@@ -85,6 +85,7 @@ type mountOptions struct {
 	EntryCacheTimeout   int            `config:"list-cache-timeout"`
 	EnableRemountUser   bool
 	EnableRemountSystem bool
+	ServiceUser         string
 	PassphrasePipe      string
 
 	LibfuseOptions    []string `config:"libfuse-options"`
@@ -547,13 +548,43 @@ var mountCmd = &cobra.Command{
 				return fmt.Errorf("mount: failed to remove pidFile [%v]", err.Error())
 			}
 
-			pid := os.Getpid()
-			fname := fmt.Sprintf("/tmp/cloudfuse.%v", pid)
+			if options.EnableRemountSystem {
+				// Check if the user exists
+				if options.ServiceUser == "" {
+					return fmt.Errorf(
+						"mount: service user is required when enabling remount as system on Linux. " +
+							"Pass --service-remount-user with the user the service will run as on remount",
+					)
+				}
 
-			ctx := context.Background()
-			err = createDaemon(pipeline, ctx, pidFileName, 0644, 022, fname)
-			if err != nil {
-				return fmt.Errorf("mount: failed to create daemon [%v]", err.Error())
+				serviceName, err := installRemountService(
+					options.ServiceUser,
+					options.MountPath,
+					options.ConfigFile,
+				)
+				if err != nil {
+					return fmt.Errorf(
+						"mount: failed to install service to remount on restart [%v]",
+						err.Error(),
+					)
+				}
+
+				err = startService(serviceName)
+				if err != nil {
+					return fmt.Errorf(
+						"mount: failed to start service using remount on restart [%v]",
+						err.Error(),
+					)
+				}
+			} else {
+				pid := os.Getpid()
+				fname := fmt.Sprintf("/tmp/cloudfuse.%v", pid)
+
+				ctx := context.Background()
+				err = createDaemon(pipeline, ctx, pidFileName, 0644, 022, fname)
+				if err != nil {
+					return fmt.Errorf("mount: failed to create daemon [%v]", err.Error())
+				}
 			}
 		} else {
 			if options.CPUProfile != "" {
@@ -717,7 +748,7 @@ func init() {
 		"Encrypt auto generated config file for each container")
 
 	mountCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
-		"Base64 encoded key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\n Decoded key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+		"Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.")
 
 	mountCmd.PersistentFlags().
 		String("log-type", "base", "Type of logger to be used by the system. Set to base by default. Allowed values are silent|syslog|base.")
@@ -790,11 +821,11 @@ func init() {
 	config.BindPFlag("basic-remount-check", mountCmd.Flags().Lookup("basic-remount-check"))
 	mountCmd.Flags().Lookup("basic-remount-check").Hidden = true
 
-	if runtime.GOOS == "windows" {
-		mountCmd.Flags().
-			BoolVar(&options.EnableRemountSystem, "enable-remount-system", false, "Remount container on server restart. Mount will restart on reboot.")
-		config.BindPFlag("enable-remount-system", mountCmd.Flags().Lookup("enable-remount-system"))
+	mountCmd.Flags().
+		BoolVar(&options.EnableRemountSystem, "enable-remount-system", false, "Remount container on server restart. Mount will restart on reboot.")
+	config.BindPFlag("enable-remount-system", mountCmd.Flags().Lookup("enable-remount-system"))
 
+	if runtime.GOOS == "windows" {
 		mountCmd.Flags().
 			BoolVar(&options.EnableRemountUser, "enable-remount-user", false, "Remount container on server restart for current user. Mount will restart on current user log in.")
 		config.BindPFlag("enable-remount-user", mountCmd.Flags().Lookup("enable-remount-user"))
@@ -802,6 +833,12 @@ func init() {
 		mountCmd.Flags().
 			StringVar(&options.PassphrasePipe, "passphrase-pipe", "", "Specifies a named pipe to read the passphrase from.")
 		config.BindPFlag("passphrase-pipe", mountCmd.Flags().Lookup("passphrase-pipe"))
+	}
+
+	if runtime.GOOS == "linux" {
+		mountCmd.Flags().
+			StringVar(&options.ServiceUser, "remount-system-user", "", "User that the service remount will run as.")
+		config.BindPFlag("remount-system-user", mountCmd.Flags().Lookup("remount-system-user"))
 	}
 
 	mountCmd.PersistentFlags().
