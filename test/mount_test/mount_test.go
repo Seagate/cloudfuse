@@ -50,8 +50,8 @@ var mntDir string = "mntdir"
 var configFile, tags string
 
 const (
-    pollTimeout  = 10 * time.Second
-    pollInterval = 100 * time.Millisecond
+	pollTimeout  = 10 * time.Second
+	pollInterval = 100 * time.Millisecond
 )
 
 type mountSuite struct {
@@ -86,14 +86,14 @@ func cloudfuseUnmount(suite *mountSuite, unmountOutput string) {
 
 	// wait after unmount
 	unmountVerified := false
-    for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
-        currentMountsList := listCloudfuseMounts(suite)
-        if len(bytes.TrimSpace(currentMountsList)) == 0 {
-            unmountVerified = true
-            break
-        }
-        time.Sleep(pollInterval)
-    }
+	for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
+		currentMountsList := listCloudfuseMounts(suite)
+		if len(bytes.TrimSpace(currentMountsList)) == 0 {
+			unmountVerified = true
+			break
+		}
+		time.Sleep(pollInterval)
+	}
 	suite.True(unmountVerified)
 }
 
@@ -114,15 +114,15 @@ func (suite *mountSuite) TestMountCmd() {
 
 	// wait for mount
 	mounted := false
-    var listOutput []byte
-    for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
-        listOutput = listCloudfuseMounts(suite)
-        if strings.Contains(string(listOutput), mntDir) {
-            mounted = true
-            break
-        }
-        time.Sleep(pollInterval)
-    }
+	var listOutput []byte
+	for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
+		listOutput = listCloudfuseMounts(suite)
+		if strings.Contains(string(listOutput), mntDir) {
+			mounted = true
+			break
+		}
+		time.Sleep(pollInterval)
+	}
 	suite.True(mounted)
 
 	// validate mount
@@ -226,15 +226,15 @@ func (suite *mountSuite) TestMountDirNotEmptySuccess() {
 
 	// wait for mount
 	mounted := false
-    var listOutput []byte
-    for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
-        listOutput = listCloudfuseMounts(suite)
-        if strings.Contains(string(listOutput), mntDir) {
-            mounted = true
-            break
-        }
-        time.Sleep(pollInterval)
-    }
+	var listOutput []byte
+	for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
+		listOutput = listCloudfuseMounts(suite)
+		if strings.Contains(string(listOutput), mntDir) {
+			mounted = true
+			break
+		}
+		time.Sleep(pollInterval)
+	}
 	suite.True(mounted)
 
 	// validate mount
@@ -353,15 +353,15 @@ func (suite *mountSuite) TestEnvVarMount() {
 
 	// wait for mount
 	mounted := false
-    var listOutput []byte
-    for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
-        listOutput = listCloudfuseMounts(suite)
-        if strings.Contains(string(listOutput), mntDir) {
-            mounted = true
-            break
-        }
-        time.Sleep(pollInterval)
-    }
+	var listOutput []byte
+	for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
+		listOutput = listCloudfuseMounts(suite)
+		if strings.Contains(string(listOutput), mntDir) {
+			mounted = true
+			break
+		}
+		time.Sleep(pollInterval)
+	}
 	suite.True(mounted)
 
 	// list cloudfuse mounted directories
@@ -468,15 +468,15 @@ func mountAndValidate(suite *mountSuite, args ...string) {
 
 	// wait for mount
 	mounted := false
-    var listOutput []byte
-    for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
-        listOutput = listCloudfuseMounts(suite)
-        if strings.Contains(string(listOutput), mntDir) {
-            mounted = true
-            break
-        }
-        time.Sleep(pollInterval)
-    }
+	var listOutput []byte
+	for startTime := time.Now(); time.Since(startTime) < pollTimeout; {
+		listOutput = listCloudfuseMounts(suite)
+		if strings.Contains(string(listOutput), mntDir) {
+			mounted = true
+			break
+		}
+		time.Sleep(pollInterval)
+	}
 	suite.True(mounted)
 
 	// validate mount

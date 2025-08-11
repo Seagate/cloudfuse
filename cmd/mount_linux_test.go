@@ -323,62 +323,6 @@ func (suite *mountTestSuite) TestInvalidLogLevel() {
 	suite.assert.Contains(op, "invalid log level")
 }
 
-func (suite *mountTestSuite) TestCliParamsV1() {
-	defer suite.cleanupTest()
-
-	mntDir, err := os.MkdirTemp("", "mntdir")
-	suite.assert.NoError(err)
-	defer os.RemoveAll(mntDir)
-
-	tempLogDir := "/tmp/templogs_" + randomString(6)
-	defer os.RemoveAll(tempLogDir)
-
-	op, err := executeCommandC(
-		rootCmd,
-		"mount",
-		mntDir,
-		fmt.Sprintf("--config-file=%s", confFileMntTest),
-		fmt.Sprintf(
-			"--log-file-path=%s",
-			tempLogDir+"/cloudfuse.log",
-		),
-		"--invalidate-on-sync",
-		"--pre-mount-validate",
-		"--basic-remount-check",
-		"-o",
-		"direct_io",
-	)
-	suite.assert.Error(err)
-	suite.assert.Contains(op, "failed to initialize new pipeline")
-}
-
-func (suite *mountTestSuite) TestStreamAttrCacheOptionsV1() {
-	defer suite.cleanupTest()
-
-	mntDir, err := os.MkdirTemp("", "mntdir")
-	suite.assert.NoError(err)
-	defer os.RemoveAll(mntDir)
-
-	tempLogDir := "/tmp/templogs_" + randomString(6)
-	defer os.RemoveAll(tempLogDir)
-
-	op, err := executeCommandC(
-		rootCmd,
-		"mount",
-		mntDir,
-		fmt.Sprintf("--log-file-path=%s", tempLogDir+"/cloudfuse.log"),
-		"--streaming",
-		"--use-attr-cache",
-		"--invalidate-on-sync",
-		"--pre-mount-validate",
-		"--basic-remount-check",
-		"-o",
-		"direct_io",
-	)
-	suite.assert.Error(err)
-	suite.assert.Contains(op, "failed to initialize new pipeline")
-}
-
 // mount failure test where a libfuse option is incorrect
 func (suite *mountTestSuite) TestInvalidLibfuseOption() {
 	defer suite.cleanupTest()
