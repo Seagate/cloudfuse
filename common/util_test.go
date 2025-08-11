@@ -501,3 +501,13 @@ func (suite *utilTestSuite) TestWriteToFile() {
 	suite.assert.NoError(err)
 	suite.assert.Equal(content, string(data))
 }
+
+func (suite *utilTestSuite) TestCRC64() {
+	data := []byte("Hello World")
+	crc := GetCRC64(data, len(data))
+
+	data = []byte("Hello World!")
+	crc1 := GetCRC64(data, len(data))
+
+	suite.assert.NotEqual(crc, crc1)
+}

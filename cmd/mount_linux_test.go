@@ -116,7 +116,7 @@ func (suite *mountTestSuite) cleanupTest() {
 	common.DefaultLogFilePath = filepath.Join(common.DefaultWorkDir, "cloudfuse.log")
 }
 
-// mount failure test where the mount directory does not exists
+// mount failure test where the mount directory does not exist
 func (suite *mountTestSuite) TestMountDirNotExists() {
 	defer suite.cleanupTest()
 
