@@ -88,7 +88,7 @@ type mountOptions struct {
 	ServiceUser         string
 	PassphrasePipe      string
 
-	LibfuseOptions    []string `config:"libfuse-options"`
+	LibfuseOptions []string `config:"libfuse-options"`
 }
 
 var options mountOptions
@@ -845,7 +845,7 @@ func init() {
 		StringSliceVarP(&options.LibfuseOptions, "o", "o", []string{}, "FUSE options.")
 	config.BindPFlag("libfuse-options", mountCmd.PersistentFlags().ShorthandLookup("o"))
 	mountCmd.PersistentFlags().ShorthandLookup("o").Hidden = true
-	
+
 	mountCmd.PersistentFlags().
 		DurationVar(&options.WaitForMount, "wait-for-mount", 5*time.Second, "Let parent process wait for given timeout before exit")
 
