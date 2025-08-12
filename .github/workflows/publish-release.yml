@@ -16,13 +16,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           persist-credentials: false
 
       - name: Fetch cached compiled GUI
         id: restore-compiled-gui
-        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           # enableCrossOsArchive always needs to be set on cached items in Windows jobs
           # see cache documentation: https://github.com/actions/cache#inputs
@@ -59,7 +59,7 @@ jobs:
 
       - name: Cache compiled GUI
         if: ${{ ! steps.restore-compiled-gui.outputs.cache-hit }}
-        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           enableCrossOsArchive: true
           path: gui/dist/cloudfuseGUI_${{ runner.os }}
@@ -76,7 +76,7 @@ jobs:
       winfsp: winfsp-2.1.25156.msi
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           persist-credentials: false
 
@@ -111,7 +111,7 @@ jobs:
         # Get the WinFSP installer (from cache or download)
       - name: Get cached WinFSP installer
         id: restore-winfsp-installer
-        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
@@ -126,13 +126,13 @@ jobs:
       
       - name: Cache WinFSP installer
         if: ${{ ! steps.restore-winfsp-installer.outputs.cache-hit }}
-        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           path: ${{ env.winfsp }}
           key: ${{ env.winfsp }}
 
       - name: Fetch cached compiled GUI
-        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           enableCrossOsArchive: true
           path: gui/dist/cloudfuseGUI_${{ runner.os }}
@@ -174,14 +174,14 @@ jobs:
           mv build/Output/cloudfuse.exe build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
 
       - name: Cache windows installer
-        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
           key: windows-cloudfuse-installer-${{ github.sha }}
 
       - name: Cache windows installer No GUi
-        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -207,7 +207,7 @@ jobs:
           sudo apt-get install -y gcc-aarch64-linux-gnu libfuse-dev
       # Get code and Go ready
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -240,7 +240,7 @@ jobs:
 
         # Get cached intermediate build products
       - name: Restore cached Windows installer
-        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -249,7 +249,7 @@ jobs:
 
         # Get cached intermediate build products
       - name: Restore cached Windows installer No Gui
-        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           enableCrossOsArchive: true
           path: build/Output/cloudfuse_no_gui_${{ steps.get_version.outputs.VERSION }}_windows_amd64.exe
@@ -257,7 +257,7 @@ jobs:
           fail-on-cache-miss: true
 
       - name: Restore Linux compiled GUI
-        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           path: gui/dist/cloudfuseGUI_Linux
           key: Linux-compiled-gui-${{ hashFiles('gui/*.ui', 'gui/*.py') }}
@@ -265,7 +265,7 @@ jobs:
         continue-on-error: false
 
       - name: Restore Windows compiled GUI
-        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           enableCrossOsArchive: true
           path: gui/dist/cloudfuseGUI_Windows
