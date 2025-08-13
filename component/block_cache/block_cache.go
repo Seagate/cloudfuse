@@ -1303,6 +1303,7 @@ func (bc *BlockCache) download(item *workItem) {
 			)
 		}
 
+		// Dump this block to local disk cache
 		f, err := root.Create(fileName)
 		if err == nil {
 			_, err := f.Write(item.block.data[:n])
@@ -1798,6 +1799,16 @@ func (bc *BlockCache) upload(item *workItem) {
 			goto return_safe
 		}
 		defer root.Close()
+
+		// Create directory structure if not exists
+		err = os.MkdirAll(filepath.Dir(localPath), 0755)
+		if err != nil {
+			log.Err(
+				"BlockCache::upload : Failed to create directory structure for file %s [%s]",
+				localPath,
+				err.Error(),
+			)
+		}
 
 		// Dump this block to local disk cache
 		f, err := root.Create(fileName)
