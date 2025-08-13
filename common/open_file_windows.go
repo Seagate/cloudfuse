@@ -22,7 +22,6 @@ import (
 // Windows.
 
 const (
-	_ERROR_BAD_NETPATH = syscall.Errno(53)
 	_FILE_WRITE_EA        = 0x00000010
 )
 
@@ -71,7 +70,7 @@ func openFileNolog(name string, flag int, perm os.FileMode) (*os.File, error) {
 		return nil, &os.PathError{Op: "open", Path: name, Err: syscall.ENOENT}
 	}
 	path := fixLongPath(name)
-	r, err := syscall.Open(path, flag|syscall.O_CLOEXEC, syscallMode(perm))
+	r, err := open(path, flag|syscall.O_CLOEXEC, syscallMode(perm))
 	if err != nil {
 		return nil, &os.PathError{Op: "open", Path: name, Err: err}
 	}
@@ -79,7 +78,7 @@ func openFileNolog(name string, flag int, perm os.FileMode) (*os.File, error) {
 	return os.NewFile(uintptr(r), name), nil
 }
 
-// copied from https://cs.opensource.google/go/go/+/master:src/syscall/syscall_windows.go;drc=964985362b4d8702a16bce08c7a825488ccb9601;l=324
+// copied from https://cs.opensource.google/go/go/+/refs/tags/go1.25.0:src/syscall/syscall_windows.go;l=365
 func open(name string, flag int, perm uint32) (fd syscall.Handle, err error) {
 	if len(name) == 0 {
 		return syscall.InvalidHandle, syscall.ERROR_FILE_NOT_FOUND
@@ -111,6 +110,8 @@ func open(name string, flag int, perm uint32) (fd syscall.Handle, err error) {
 		// Set all access rights granted by GENERIC_WRITE except for FILE_WRITE_DATA.
 		access |= syscall.FILE_APPEND_DATA | syscall.FILE_WRITE_ATTRIBUTES | _FILE_WRITE_EA | syscall.STANDARD_RIGHTS_WRITE | syscall.SYNCHRONIZE
 	}
+    // We add the FILE_SHARE_DELETE flag which allows the open file to be renamed and deleted before being closed.
+	// This is not enabled in Go.
 	sharemode := uint32(syscall.FILE_SHARE_READ | syscall.FILE_SHARE_WRITE | syscall.FILE_SHARE_DELETE)
 	var sa *syscall.SecurityAttributes
 	if flag&syscall.O_CLOEXEC == 0 {
@@ -174,7 +175,7 @@ func open(name string, flag int, perm uint32) (fd syscall.Handle, err error) {
 	return h, nil
 }
 
-// Coped from https://cs.opensource.google/go/go/+/master:src/syscall/syscall_windows.go;drc=964985362b4d8702a16bce08c7a825488ccb9601;l=317
+// Copied from https://cs.opensource.google/go/go/+/master:src/syscall/syscall_windows.go;drc=964985362b4d8702a16bce08c7a825488ccb9601;l=317
 func makeInheritSa() *syscall.SecurityAttributes {
 	var sa syscall.SecurityAttributes
 	sa.Length = uint32(unsafe.Sizeof(sa))
@@ -191,6 +192,7 @@ func makeInheritSa() *syscall.SecurityAttributes {
 // the absolute path with the extended-length prefix.
 //
 // See https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#maximum-path-length-limitation
+// Copied from https://cs.opensource.google/go/go/+/refs/tags/go1.25.0:src/os/path_windows.go;l=100
 func fixLongPath(path string) string {
 	// TODO: Apparently in later version of Windows we don't need to call this function
 	// as it can use longer path names. See this issue https://groups.google.com/g/golang-checkins/c/2Lv2xYuo_h0
@@ -201,6 +203,7 @@ func fixLongPath(path string) string {
 }
 
 // addExtendedPrefix adds the extended path prefix (\\?\) to path.
+// Copied from https://cs.opensource.google/go/go/+/refs/tags/go1.25.0:src/os/path_windows.go;l=108
 func addExtendedPrefix(path string) string {
 	if len(path) >= 4 {
 		if path[:4] == `\??\` {
@@ -298,6 +301,7 @@ func addExtendedPrefix(path string) string {
 }
 
 // IsAbs reports whether the path is absolute.
+// Copied from https://cs.opensource.google/go/go/+/refs/tags/go1.25.0:src/internal/filepathlite/path_windows.go;l=184
 func IsAbs(path string) (b bool) {
 	l := volumeNameLen(path)
 	if l == 0 {
@@ -320,6 +324,7 @@ func IsAbs(path string) (b bool) {
 // See:
 // https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats
 // https://googleprojectzero.blogspot.com/2016/02/the-definitive-guide-on-win32-to-nt.html
+// Copied from https://cs.opensource.google/go/go/+/refs/tags/go1.25.0:src/internal/filepathlite/path_windows.go;l=206
 func volumeNameLen(path string) int {
 	switch {
 	case len(path) >= 2 && path[1] == ':':
@@ -371,6 +376,7 @@ func volumeNameLen(path string) int {
 // pathHasPrefixFold tests whether the path s begins with prefix,
 // ignoring case and treating all path separators as equivalent.
 // If s is longer than prefix, then s[len(prefix)] must be a path separator.
+// Copied from https://cs.opensource.google/go/go/+/refs/tags/go1.25.0:src/internal/filepathlite/path_windows.go;l=257
 func pathHasPrefixFold(s, prefix string) bool {
 	if len(s) < len(prefix) {
 		return false
@@ -393,6 +399,7 @@ func pathHasPrefixFold(s, prefix string) bool {
 // uncLen returns the length of the volume prefix of a UNC path.
 // prefixLen is the prefix prior to the start of the UNC host;
 // for example, for "//host/share", the prefixLen is len("//")==2.
+// Copied from https://cs.opensource.google/go/go/+/refs/tags/go1.25.0:src/internal/filepathlite/path_windows.go;l=279
 func uncLen(path string, prefixLen int) int {
 	count := 0
 	for i := prefixLen; i < len(path); i++ {
@@ -407,6 +414,7 @@ func uncLen(path string, prefixLen int) int {
 }
 
 // cutPath slices path around the first path separator.
+// Copied from https://cs.opensource.google/go/go/+/refs/tags/go1.25.0:src/internal/filepathlite/path_windows.go;l=293
 func cutPath(path string) (before, after string, found bool) {
 	for i := range path {
 		if os.IsPathSeparator(path[i]) {
@@ -416,6 +424,7 @@ func cutPath(path string) (before, after string, found bool) {
 	return path, "", false
 }
 
+// Copied from https://cs.opensource.google/go/go/+/refs/tags/go1.25.0:src/internal/filepathlite/path_windows.go;l=176
 func toUpper(c byte) byte {
 	if 'a' <= c && c <= 'z' {
 		return c - ('a' - 'A')
@@ -424,6 +433,7 @@ func toUpper(c byte) byte {
 }
 
 // syscallMode returns the syscall-specific mode bits from Go's portable mode bits.
+// Copied from https://cs.opensource.google/go/go/+/refs/tags/go1.25.0:src/os/file_posix.go;l=60
 func syscallMode(i os.FileMode) (o uint32) {
 	o |= uint32(i.Perm())
 	if i&os.ModeSetuid != 0 {
