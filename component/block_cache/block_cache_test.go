@@ -166,7 +166,7 @@ func (tobj *testObj) cleanupPipeline() error {
 // Tests the default configuration of block cache
 func (suite *blockCacheTestSuite) TestEmpty() {
 	if runtime.GOOS == "windows" {
-		return
+		suite.T().Skip("Skipping test on Windows")
 	}
 	emptyConfig := "read-only: true"
 	tobj, err := setupPipeline(emptyConfig)
@@ -196,7 +196,7 @@ func (suite *blockCacheTestSuite) TestEmpty() {
 
 func (suite *blockCacheTestSuite) TestMemory() {
 	if runtime.GOOS == "windows" {
-		return
+		suite.T().Skip("Skipping test on Windows")
 	}
 	emptyConfig := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n"
 	tobj, err := setupPipeline(emptyConfig)
@@ -252,6 +252,72 @@ func (suite *blockCacheTestSuite) TestFreeDiskSpace() {
 	suite.assert.LessOrEqual(difference, tolerance)
 }
 
+func (suite *blockCacheTestSuite) TestStatfsMemory() {
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("Skipping test on Windows")
+	}
+	emptyConfig := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n"
+	tobj, err := setupPipeline(emptyConfig)
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.Equal("block_cache", tobj.blockCache.Name())
+	cmd := exec.Command("bash", "-c", "free -b | grep Mem | awk '{print $4}'")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err = cmd.Run()
+	suite.assert.NoError(err)
+	free, err := strconv.Atoi(strings.TrimSpace(out.String()))
+	suite.assert.NoError(err)
+	expected := uint64(0.8 * float64(free))
+	stat, ret, err := tobj.blockCache.StatFs()
+	suite.assert.True(ret)
+	suite.assert.NoError(err)
+	suite.assert.NotEqual(&common.Statfs_t{}, stat)
+	actual := tobj.blockCache.memSize
+	difference := math.Abs(float64(actual) - float64(expected))
+	tolerance := 0.10 * float64(math.Max(float64(actual), float64(expected)))
+	suite.assert.LessOrEqual(difference, tolerance)
+}
+
+func (suite *blockCacheTestSuite) TestStatfsDisk() {
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("Skipping test on Windows")
+	}
+
+	disk_cache_path := getFakeStoragePath("fake_storage")
+	config := fmt.Sprintf(
+		"read-only: true\n\nblock_cache:\n  block-size-mb: 1\n  path: %s",
+		disk_cache_path,
+	)
+	tobj, err := setupPipeline(config)
+	defer tobj.cleanupPipeline()
+
+	suite.assert.NoError(err)
+	suite.assert.Equal("block_cache", tobj.blockCache.Name())
+
+	cmd := exec.Command(
+		"bash",
+		"-c",
+		fmt.Sprintf("df -B1 %s | awk 'NR==2{print $4}'", disk_cache_path),
+	)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err = cmd.Run()
+	suite.assert.NoError(err)
+	freeDisk, err := strconv.Atoi(strings.TrimSpace(out.String()))
+	suite.assert.NoError(err)
+	expected := uint64(0.8 * float64(freeDisk))
+	stat, ret, err := tobj.blockCache.StatFs()
+	suite.assert.True(ret)
+	suite.assert.NoError(err)
+	suite.assert.NotEqual(&common.Statfs_t{}, stat)
+	actual := tobj.blockCache.diskSize
+	difference := math.Abs(float64(actual) - float64(expected))
+	tolerance := 0.10 * float64(math.Max(float64(actual), float64(expected)))
+	suite.assert.LessOrEqual(difference, tolerance)
+}
+
 func (suite *blockCacheTestSuite) TestInvalidPrefetchCount() {
 	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n  mem-size-mb: 500\n  prefetch: 8\n  parallelism: 10\n  path: abcd\n  disk-size-mb: 100\n  disk-timeout-sec: 5"
 	tobj, err := setupPipeline(cfg)
@@ -282,8 +348,7 @@ func (suite *blockCacheTestSuite) TestNoPrefetchConfig() {
 
 func (suite *blockCacheTestSuite) TestInvalidDiskPath() {
 	if runtime.GOOS == "windows" {
-		// Skip this test on Windows
-		return
+		suite.T().Skip("Skipping test on Windows")
 	}
 
 	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 16\n  mem-size-mb: 500\n  prefetch: 12\n  parallelism: 10\n  path: /abcd\n  disk-size-mb: 100\n  disk-timeout-sec: 5"
@@ -298,12 +363,12 @@ func (suite *blockCacheTestSuite) TestSomeInvalidConfigs() {
 	cfg := "read-only: true\n\nblock_cache:\n  block-size-mb: 8\n  mem-size-mb: 800\n  prefetch: 12\n  parallelism: 0\n"
 	_, err := setupPipeline(cfg)
 	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "fail to init thread pool")
+	suite.assert.Contains(err.Error(), "failed to init thread pool")
 
 	cfg = "read-only: true\n\nblock_cache:\n  block-size-mb: 1024000\n  mem-size-mb: 20240000\n  prefetch: 12\n  parallelism: 1\n"
 	_, err = setupPipeline(cfg)
 	suite.assert.Error(err)
-	suite.assert.Contains(err.Error(), "fail to init block pool")
+	suite.assert.Contains(err.Error(), "failed to init block pool")
 
 	cfg = "read-only: true\n\nblock_cache:\n  block-size-mb: 8\n  mem-size-mb: 800\n  prefetch: 12\n  parallelism: 5\n  path: ./bctemp \n  disk-size-mb: 100\n  disk-timeout-sec: 0"
 	_, err = setupPipeline(cfg)
@@ -2885,18 +2950,97 @@ func (suite *blockCacheTestSuite) TestReadWriteBlockInParallel() {
 	suite.assert.Equal(fs.Size(), int64(62*_1MB))
 }
 
-func (suite *blockCacheTestSuite) TestZZZZZStreamToBlockCacheConfig() {
-	common.IsStream = true
-	config := "read-only: true\n\nstream:\n  block-size-mb: 2\n  max-buffers: 30\n  buffer-size-mb: 8\n"
+// TODO: Uncomment when stream is deprecated
+// func (suite *blockCacheTestSuite) TestZZZZZStreamToBlockCacheConfig() {
+// 	common.IsStream = true
+// 	config := "read-only: true\n\nstream:\n  block-size-mb: 2\n  max-buffers: 30\n  buffer-size-mb: 8\n"
+// 	tobj, err := setupPipeline(config)
+// 	defer tobj.cleanupPipeline()
+
+// 	suite.assert.NoError(err)
+// 	if err == nil {
+// 		suite.assert.Equal("block_cache", tobj.blockCache.Name())
+// 		suite.assert.EqualValues(2*_1MB, tobj.blockCache.blockSize)
+// 		suite.assert.EqualValues(8*_1MB*30, tobj.blockCache.memSize)
+// 	}
+// }
+
+func (suite *blockCacheTestSuite) TestSizeOfFileInOpen() {
+	if runtime.GOOS == "windows" {
+		suite.T().Skip("Skipping test on Windows")
+	}
+	// Write-back cache is turned on by default while mounting.
+	config := "block_cache:\n  block-size-mb: 1\n  mem-size-mb: 20\n  prefetch: 12\n  parallelism: 1"
 	tobj, err := setupPipeline(config)
+	suite.assert.NoError(err)
 	defer tobj.cleanupPipeline()
 
+	path := getTestFileName(suite.T().Name())
+	storagePath := filepath.Join(tobj.fake_storage_path, path)
+	localPath := filepath.Join(tobj.disk_cache_path, path)
+
+	// ------------------------------------------------------------------
+	// Create a local file
+	fh, err := os.Create(localPath)
 	suite.assert.NoError(err)
-	if err == nil {
-		suite.assert.Equal("block_cache", tobj.blockCache.Name())
-		suite.assert.EqualValues(2*_1MB, tobj.blockCache.blockSize)
-		suite.assert.EqualValues(8*_1MB*30, tobj.blockCache.memSize)
+
+	// write 1MB data at offset 0
+	n, err := fh.WriteAt(dataBuff[:_1MB], 0)
+	suite.assert.NoError(err)
+	suite.assert.Equal(n, int(_1MB))
+
+	err = fh.Close()
+	suite.assert.NoError(err)
+	// ------------------------------------------------------------------
+	// Create a file using Mountpoint
+	options := internal.CreateFileOptions{Name: path, Mode: 0777}
+	h, err := tobj.blockCache.CreateFile(options)
+	suite.assert.NoError(err)
+	suite.assert.NotNil(h)
+	suite.assert.Equal(int64(0), h.Size)
+	suite.assert.False(h.Dirty())
+
+	// write 1MB data at offset 0
+	n, err = tobj.blockCache.WriteFile(
+		internal.WriteFileOptions{Handle: h, Offset: 0, Data: dataBuff[:_1MB]},
+	)
+	suite.assert.NoError(err)
+	suite.assert.Equal(n, int(_1MB))
+	suite.assert.True(h.Dirty())
+
+	err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: h})
+	suite.assert.NoError(err)
+	//---------------------------------------------------------------------
+
+	//Open and close the file using the given flag in local and mountpoint and
+	// check the size is same or not.
+	check := func(flag int) int {
+		lfh, err := os.OpenFile(localPath, flag, 0666)
+		suite.assert.NoError(err)
+		suite.assert.NotNil(lfh)
+		err = lfh.Close()
+		suite.assert.NoError(err)
+
+		openFileOptions := internal.OpenFileOptions{Name: path, Flags: flag, Mode: 0777}
+		rfh, err := tobj.blockCache.OpenFile(openFileOptions)
+		suite.assert.NoError(err)
+		err = tobj.blockCache.CloseFile(internal.CloseFileOptions{Handle: rfh})
+		suite.assert.NoError(err)
+
+		statInfoLocal, err := os.Stat(localPath)
+		suite.assert.NoError(err)
+		sizeInLocal := statInfoLocal.Size()
+
+		statInfoMount, err := os.Stat(storagePath)
+		suite.assert.NoError(err)
+		sizeInMount := statInfoMount.Size()
+		suite.assert.Equal(sizeInLocal, sizeInMount)
+		return int(sizeInLocal)
 	}
+	size := check(os.O_WRONLY) // size of the file would be 1MB
+	suite.assert.Equal(size, int(_1MB))
+	size = check(os.O_TRUNC) // size of the file would be zero here.
+	suite.assert.Equal(int(0), size)
 }
 
 // In order for 'go test' to run this suite, we need to create
