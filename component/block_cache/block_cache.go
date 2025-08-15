@@ -1272,7 +1272,7 @@ func (bc *BlockCache) download(item *workItem) {
 		root, err := os.OpenRoot(bc.tmpPath)
 		localPath := filepath.Join(bc.tmpPath, fileName)
 		if err != nil {
-			err := os.Mkdir(bc.tmpPath, 0755)
+			err := os.MkdirAll(bc.tmpPath, 0755)
 			if err != nil {
 				log.Err(
 					"BlockCache::download : error creating directory structure for file %s [%s]",
@@ -1292,6 +1292,16 @@ func (bc *BlockCache) download(item *workItem) {
 			}
 		}
 		defer root.Close()
+
+		// Create directory structure if not exists
+		err = os.MkdirAll(filepath.Dir(localPath), 0755)
+		if err != nil {
+			log.Err(
+				"BlockCache::download : Failed to create directory structure for file %s [%s]",
+				localPath,
+				err.Error(),
+			)
+		}
 
 		// Dump this block to local disk cache
 		f, err := root.Create(fileName)
@@ -1789,6 +1799,16 @@ func (bc *BlockCache) upload(item *workItem) {
 			goto return_safe
 		}
 		defer root.Close()
+
+		// Create directory structure if not exists
+		err = os.MkdirAll(filepath.Dir(localPath), 0755)
+		if err != nil {
+			log.Err(
+				"BlockCache::upload : Failed to create directory structure for file %s [%s]",
+				localPath,
+				err.Error(),
+			)
+		}
 
 		// Dump this block to local disk cache
 		f, err := root.Create(fileName)
