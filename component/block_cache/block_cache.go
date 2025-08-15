@@ -1269,7 +1269,7 @@ func (bc *BlockCache) download(item *workItem) {
 	}
 
 	if bc.tmpPath != "" {
-		root, err := os.OpenRoot(filepath.Clean(bc.tmpPath))
+		root, err := os.OpenRoot(bc.tmpPath)
 		localPath := filepath.Join(bc.tmpPath, fileName)
 		if err != nil {
 			err := os.MkdirAll(bc.tmpPath, 0755)
