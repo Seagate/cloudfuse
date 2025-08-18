@@ -33,7 +33,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -43,13 +42,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-/*
-	Constants and global variables used throughout the TUI application.
-	These include default values, colors, widget configurations, and storage settings.
-*/
+// Constants and global variables used throughout the TUI application.
+// These include default values, colors, widget configurations, and storage settings.
 var (
-	tuiVersion string = common.CloudfuseVersion
-	configFilePath string				// Sets file_cache.path
+	tuiVersion string = common.CloudfuseVersion // Mirrors the current version of cloudfuse. 
+	configFilePath string 				// Sets file_cache.path
 	accountName string					// Sets azstorage.account-name
 	accountKey string					// Sets azstorage.account-key
 	accessKey string					// Sets s3storage.key-id
@@ -57,7 +54,7 @@ var (
 	containerName string				// Sets azstorage.container-name
 	bucketName string 					// Sets s3storage.bucket-name
 	endpointURL string 					// Sets s3storage.endpoint
-	containerList = []string {}			// Holds list of available buckets retrieved from cloud provider
+	bucketList = []string {}			// Holds list of available buckets retrieved from cloud provider (for s3 only).
 	storageProtocol string 				// Sets 's3storage' or 'azstorage' based on selected provider
 	storageProvider string 				// Options: 'LyveCloud', 'Microsoft', 'AWS', or 'Other (s3)'. Used to set certain UI elements.
 	cacheMode string 					// Sets 'components' to include 'file_cache' or 'block_cache'
@@ -91,24 +88,24 @@ var (
 	navigationWidgetHeight int = 3
 )
 
-type Config struct {
+type configuration struct {
     Components []string            `yaml:"components,omitempty"`
-    Libfuse    LibfuseConfig       `yaml:"libfuse,omitempty"`
-	FileCache  FileCacheConfig     `yaml:"file_cache,omitempty"`
-    AttrCache  AttrCacheConfig     `yaml:"attr_cache,omitempty"`
-    S3Storage  S3StorageConfig 	   `yaml:"s3storage,omitempty"`
-	AzStorage  AzureStorageConfig  `yaml:"azstorage,omitempty"` 
+    Libfuse    libfuseConfig       `yaml:"libfuse,omitempty"`
+	FileCache  fileCacheConfig     `yaml:"file_cache,omitempty"`
+    AttrCache  attrCacheConfig     `yaml:"attr_cache,omitempty"`
+    S3Storage  s3StorageConfig 	   `yaml:"s3storage,omitempty"`
+	AzStorage  azureStorageConfig  `yaml:"azstorage,omitempty"` 
 }
 
-type LibfuseConfig struct {
+type libfuseConfig struct {
     NetworkShare bool `yaml:"network-share"`
 }
 
-type AttrCacheConfig struct {
+type attrCacheConfig struct {
     TimeoutSec int `yaml:"timeout-sec"`
 }
 
-type FileCacheConfig struct {
+type fileCacheConfig struct {
 	Path 			  string `yaml:"path"`
 	TimeOutSec 		  int 	 `yaml:"timeout-sec"`
 	AllowNonEmptyTemp bool 	 `yaml:"allow-non-empty-temp"`
@@ -116,7 +113,7 @@ type FileCacheConfig struct {
 	MaxSizeMB 	  	  int    `yaml:"max-size-mb,omitempty"` 
 }
 
-type S3StorageConfig struct {
+type s3StorageConfig struct {
     BucketName       string `yaml:"bucket-name,omitempty"`
     KeyID            string `yaml:"key-id"`
     SecretKey        string `yaml:"secret-key"`
@@ -124,7 +121,7 @@ type S3StorageConfig struct {
     EnableDirMarker  bool   `yaml:"enable-dir-marker"`
 }
 
-type AzureStorageConfig struct {
+type azureStorageConfig struct {
 	Type 			 string `yaml:"type"`
     AccountName      string `yaml:"account-name"`
     AccountKey       string `yaml:"account-key"`
@@ -134,10 +131,8 @@ type AzureStorageConfig struct {
 }
 
 
-/*
-	Main function to run the TUI application.
-	It initializes the tview application, builds the TUI application, and runs it.
-*/
+// Main function to run the TUI application. 
+// Initializes the tview application, builds the TUI application, and runs it.
 func runTUI() error{
 	app := tview.NewApplication()
 	app.EnableMouse(true)
@@ -154,10 +149,7 @@ func runTUI() error{
 }
 
 
-/*
-	Function to build the TUI application.
-	It initializes the main pages and adds them to the page stack.
-*/
+// Function to build the TUI application. Initializes the pages and adds them to the page stack.
 func buildTUI(app *tview.Application) {
 	pages := tview.NewPages()
 
@@ -166,7 +158,7 @@ func buildTUI(app *tview.Application) {
 	page1 := buildStorageProviderPage(app, pages) // --- Page 1: Storage Provider Selection ---
 	page2 := buildEndpointURLPage(app, pages)  	  // --- Page 2: Endpoint URL Entry ---
 	page3 := buildCredentialsPage(app, pages) 	  // --- Page 3: Credentials Entry ---
-	page4 := buildContainerSelectPage(app, pages) // --- Page 4: Bucket Selection ---
+	page4 := buildBucketSelectionPage(app, pages) // --- Page 4: Bucket Selection ---
 	page5 := buildCachingPage(app, pages) 		  // --- Page 5: Caching Settings ---
 
 	// Add pages to the page stack 
@@ -181,11 +173,9 @@ func buildTUI(app *tview.Application) {
 }
 
 
-/*	
-						--- Page 0: Home Page ---
-	Displays a welcome banner, instructions, and buttons to start or quit the application.
-	It also includes an "About" section with information about the tool.
-*/
+// 						--- Page 0: Home Page ---
+// Function to build the home page of the TUI application. Displays a 
+// welcome banner, instructions, and buttons to start or quit the application. 
 func buildHomePage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 	bannerText := "[#6EBE49::b]░█▀▀░█░░░█▀█░█░█░█▀▄░█▀▀░█░█░█▀▀░█▀▀\n" +
 							  "░█░░░█░░░█░█░█░█░█░█░█▀▀░█░█░▀▀█░█▀▀\n" +
@@ -258,11 +248,9 @@ func buildHomePage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 }
 
 
-/* 
-					--- Page 1: Storage Provider Selection ---
-	This page allows users to select their cloud storage provider from a dropdown list.
-	It provides options for LyveCloud, Microsoft, AWS, and Other S3.
-*/
+// 						--- Page 1: Storage Provider Selection ---
+// Function to build the storage provider selection page. Allows users to select their cloud storage provider 
+// from a dropdown list. The options are: LyveCloud, Microsoft, AWS, and Other S3.
 func buildStorageProviderPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 	instructionsText := "[#6EBE49::b] Select Your Cloud Storage Provider[-::-]\n" +
 			  			"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n\n" + 
@@ -352,11 +340,9 @@ func buildStorageProviderPage(app *tview.Application, pages *tview.Pages) tview.
 }
 
 
-/*
-					--- Page 2: Endpoint and Region Page ---
-	This page allows users to enter the endpoint URL for their cloud storage provider.
-	It validates the endpoint URL format and provides help text based on the selected provider.
-*/
+// 						--- Page 2: Endpoint and Region Page ---
+// Function to build the endpoint URL page. Allows users to enter the endpoint URL for their cloud storage provider.
+// It validates the endpoint URL format and provides help text based on the selected provider.
 func buildEndpointURLPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 	var urlRegionHelpText string
 
@@ -450,12 +436,10 @@ func buildEndpointURLPage(app *tview.Application, pages *tview.Pages) tview.Prim
 }
 
 
-/*
-						--- Page 3: Credentials Page ---
-	This page allows users to enter their cloud storage credentials.
-	If the storage protocol is "s3", it provides input fields for access key, secret key.
-	If the storage protocol is "azure", it provides input fields for account name, account key, and container name.
-*/
+// 						--- Page 3: Credentials Page ---
+// Function to build the credentials page. Allows users to enter their cloud storage credentials.
+// If the storage protocol is "s3", it provides input fields for access key, secret key.
+// If the storage protocol is "azure", it provides input fields for account name, account key, and container name.
 func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 	layout := tview.NewFlex()
 	layout.Clear()
@@ -495,9 +479,9 @@ func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Prim
 		SetLabel(accessLabel).
 		SetText(accessKey). 
 		SetFieldWidth(50).
-		SetChangedFunc(func(text string) {
-			accessKey = text
-			accountName = text
+		SetChangedFunc(func(key string) {
+			accessKey = key
+			accountName = key
 		}).
 		SetPlaceholder("\t\t\t\t<ENTER KEY HERE>").
 		SetLabelColor(widgetLabelColor).
@@ -507,11 +491,11 @@ func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Prim
 	// Secret key field widget with masked input
 	secretKeyFieldWidget := tview.NewInputField().
 		SetLabel(secretLabel).
-		SetText(secretKey). 
+		SetText(string(secretKey)). 
 		SetFieldWidth(50).
-		SetChangedFunc(func(text string) {
-			secretKey = text
-			accountKey = text
+		SetChangedFunc(func(key string) {
+			secretKey = key
+			accountKey = key
 		}).
 		SetPlaceholder("\t\t\t\t<ENTER KEY HERE>").
 		SetMaskCharacter('*').
@@ -540,9 +524,7 @@ func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Prim
 		AddButton(navigationNextLabel, func() {
 			// TODO: Add validation for access key and secret key HERE 
 			// For now, just check that they are not empty
-			// TODO: Add check to make sure containerName is not empty if storageProvider is Microsoft
-			if (storageProtocol == "s3storage" && (accessKey == "" || secretKey == "")) || (storageProtocol == "azstorage" && (accountName == "" || accountKey == "" || containerName == "")) {
-			// if accessKey == "" || accountName == "" || secretKey == ""  || accountKey == "" {
+			if (storageProtocol == "s3storage" && (len(accessKey) == 0 || len(secretKey) == 0)) || (storageProtocol == "azstorage" && (len(accountName) == 0 || len(accountKey) == 0 || len(containerName) == 0)) {
 				showErrorModal(app, pages, "[red::b]ERROR: Credential fields cannot be empty.\nPlease try again.[-::-]", func() {
 					pages.SwitchToPage("page3")
 				})
@@ -565,7 +547,7 @@ func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Prim
 				pages.RemovePage("page4") // Remove previous page if it exists
 				pages.SwitchToPage("page5")
 			} else {
-				page4 := buildContainerSelectPage(app, pages)
+				page4 := buildBucketSelectionPage(app, pages)
 				pages.AddPage("page4", page4, true, false)
 				pages.SwitchToPage("page4")
 			}
@@ -619,13 +601,10 @@ func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Prim
 }
 
 
-/*
-					--- Page 4: Container Name Selection ---
-	This page allows users to select a bucket name from a dropdown list.
-	It retrieves the list of available buckets from the cloud storage provider based on the 
-	credentials provided in the previous step.
-*/
-func buildContainerSelectPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
+// 						--- Page 4: Bucket Name Selection ---
+// Function to build the bucket selection page. Allows users to select a bucket from a dropdown list
+// of retrieved buckets based on provided s3 credentials. For s3 storage users only. Azure storage users will skip this page.
+func buildBucketSelectionPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 	instructionsText := "[#6EBE49::b] Select Your Bucket Name[-::-]\n" +
 						"[#FFD700]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[-]\n\n" +
 						"[white::b] Select the name of your storage bucket from the dropdown below.[-::-]\n\n" +
@@ -640,9 +619,9 @@ func buildContainerSelectPage(app *tview.Application, pages *tview.Pages) tview.
 		SetText(instructionsText)
 
 	// Dropdown widget for selecting bucket name
-	containerSelectionWidget := tview.NewDropDown().
+	bucketSelectionWidget := tview.NewDropDown().
 		SetLabel(" 🪣 Bucket Name: ").
-		SetOptions(containerList, func(text string, index int) {
+		SetOptions(bucketList, func(text string, index int) {
 			bucketName = text
 		}).
 		SetCurrentOption(0).
@@ -679,7 +658,7 @@ func buildContainerSelectPage(app *tview.Application, pages *tview.Pages) tview.
 		SetDirection(tview.FlexRow).
 		AddItem(instructionsTextWidget, getTextHeight(instructionsText), 0, false).
 		AddItem(nil, 2, 0, false).
-		AddItem(containerSelectionWidget, 2, 0, false).
+		AddItem(bucketSelectionWidget, 2, 0, false).
 		AddItem(navigationButtonsWidget, navigationWidgetHeight, 0, false).
 		AddItem(nil, 1, 0, false)
 
@@ -689,11 +668,9 @@ func buildContainerSelectPage(app *tview.Application, pages *tview.Pages) tview.
 }
 
 
-/*
-						--- Page 5: Caching Settings ---
-	Function to build the caching page that allows users to configure caching settings.
-	This page includes options for cache location, size, and retention settings.
-*/
+// 						--- Page 5: Caching Settings ---
+// Function to build the caching page that allows users to configure caching settings.
+// Includes options for enabling/disabling caching, specifying cache location, size, and retention settings.
 func buildCachingPage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 	// Main layout container. Must be instantiated first to allow nested items.
 	layout := tview.NewFlex().SetDirection(tview.FlexRow)
@@ -881,7 +858,7 @@ func buildCachingPage(app *tview.Application, pages *tview.Pages) tview.Primitiv
             if storageProtocol == "azstorage" {
                 pages.SwitchToPage("page3")
             } else {
-                page4 := buildContainerSelectPage(app, pages)
+                page4 := buildBucketSelectionPage(app, pages)
                 pages.AddPage("page4", page4, true, false)
                 pages.SwitchToPage("page4")
             }
@@ -943,12 +920,10 @@ func buildCachingPage(app *tview.Application, pages *tview.Pages) tview.Primitiv
 }
 
 
-/*
-								--- Summary Page ---
-	Function to build the summary page that displays the configuration summary.
-	This function creates a text view with the summary information and a return button.
-	It takes an application instance, pages instance, and the preview page name as parameters.
-*/
+// 								--- Summary Page ---
+// Function to build the summary page that displays the configuration summary.
+// This function creates a text view with the summary information and a return button.
+// The preview page parameter allows switching back to the previous page when the user clicks "Return".
 func buildPreviewPage(app *tview.Application, pages *tview.Pages, previewPage string) tview.Primitive {
 	summaryText := 
 			"[#6EBE49::b] CloudFuse Summary Configuration:[-]\n"+
@@ -1009,12 +984,9 @@ func buildPreviewPage(app *tview.Application, pages *tview.Pages, previewPage st
 }
 
 
-/*
-	Function to show a modal dialog with a message and an "OK" button.
-	This function is used to display error messages or confirmations.
-	It takes an application instance, pages instance, message string,
-	and a callback function to execute when the modal is closed.
-*/
+// Function to show a modal dialog with a message and an "OK" button.
+// This function is used to display error messages or confirmations.
+// May specify a callback function to execute when the modal is closed.
 func showErrorModal(app *tview.Application, pages *tview.Pages, message string, onClose func()) {
 	modal := tview.NewModal().
 		SetText(message).
@@ -1033,11 +1005,8 @@ func showErrorModal(app *tview.Application, pages *tview.Pages, message string, 
 }
 
 
-/*	
-	Function to show a confirmation modal dialog with "Finish" and "Return" buttons.
-	Used to confirm cache size before proceeding. It takes an application instance, 
-	pages instance, message string, and two callback functions for the "Finish" and "Return" actions.
-*/	
+// Function to show a confirmation modal dialog with "Finish" and "Return" buttons.
+// Used to confirm cache size before proceeding. Must specify two callback functions for the "Finish" and "Return" actions.
 func showCacheConfirmationModal(app *tview.Application, pages *tview.Pages, message string, onFinish func(), onReturn func()) {
 	modal := tview.NewModal().
 		SetText(message).
@@ -1060,12 +1029,9 @@ func showCacheConfirmationModal(app *tview.Application, pages *tview.Pages, mess
 }
 
 
-/* 
-	Function to show final exit modal when configuration is complete.
-	This function is called when the user clicks "Finish" on the caching page.
-	It informs the user that the configuration is complete and they can exit.
-	It also creates a small processing emoji animation then shows the path to the config file.
-*/
+// Function to show final exit modal when configuration is complete.
+// Informs the user that the configuration is complete and they can exit.
+// This function is called when the user clicks "Finish" on the caching page.
 func showExitModal(app *tview.Application, pages *tview.Pages, onConfirm func()) {
 
 	processingEmojis := []string{"🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "✅"}
@@ -1109,12 +1075,8 @@ func showExitModal(app *tview.Application, pages *tview.Pages, onConfirm func())
 }
 
 
-/*
-	Helper function to center lines of text within a specified width.
-	This function handles color tags and ensures that the text is centered
-	even if it contains ANSI escape codes or other formatting.
-	It is used to format text views and other UI elements in the TUI.
-*/
+// Helper function to center lines of text within a specified width.
+// It is used to format text views and other UI elements in the TUI.
 func centerText(text string, width int) string {
 	var centeredLines []string
 	lines := strings.Split(text, "\n")
@@ -1131,12 +1093,8 @@ func centerText(text string, width int) string {
 }
 
 
-/*
-	Helper function to get the length of the longest line in a string.
-	It splits the string by newline characters and finds the maximum length of the lines.
-	It returns 0 if the string is empty.
-	It is used to determine the width of text views and other UI elements.
-*/
+// Helper function to get the length of the longest line in a string.
+// It is used to determine the width of text views and other UI elements.
 func getTextWidth(s string) int {
 	if s == "" {
 		return 0
@@ -1152,12 +1110,8 @@ func getTextWidth(s string) int {
 }
 
 
-/* 
-	Helper function to count the number of lines in a string.
-	It splits the string by newline characters and returns the length of the resulting slice.
-	It returns 0 if the string is empty.
-	It is used to determine the height of text views and other UI elements.
-*/
+// Helper function to count the number of lines in a string.
+// It is used to determine the height of text views and other UI elements.
 func getTextHeight(s string) int {
 	if s == "" {
 		return 0
@@ -1166,40 +1120,41 @@ func getTextHeight(s string) int {
 }
 
 
-/*
-	Helper function to get the default cache path.
-	It retrieves the user's home directory and constructs a default cache path:
-						`~/.cloudfuse/file_cache`
-	If the directory does not exist, it attempts to create it.
-	If it fails to retrieve the home directory or create the path, it returns a fallback path.
-	It returns the full path to the cache directory.
-*/
-func getDefaultCachePath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		// TODO: Handle error if home directory cannot be retrieved.
-		// TODO: Choose a fallback path for cache directory.
-		return "/tmp/cloudfuse/cloudfuse.log"
-	}
-	filepath := filepath.Join(home, ".cloudfuse", "file_cache")
-	// If the directory doesn't exist, create it
-	if _, err := os.Stat(filepath); os.IsNotExist(err) {
-		if err := os.MkdirAll(filepath, 0755); err != nil {
-			fmt.Printf("Failed to create cache directory: %v\n", err)
-			// TODO: Handle error if cache directory cannot be created
-			return "/tmp/cloudfuse/cloudfuse.log" // fallback path
-		}
-	}
-	// Return the full path to the cache directory
-	return filepath
+// Helper function to get a fallback cache path if the home directory cannot be determined.
+func getFallbackCachePath() string {
+    user := os.Getenv("USER")
+    if user == "" {
+        uid := os.Getuid()
+        user = fmt.Sprintf("uid_%d", uid)
+    }
+    return filepath.Join(os.TempDir(), "cloudfuse", user)
 }
 
 
-/* 
-	Helper function to validate the entered cache path. It checks if the 
-	path is not empty, does not contain invalid characters, and if it exists.
-	It returns an error if any validation fails.
-*/ 
+// Helper function to get the default cache path.
+// It retrieves the user's home directory and constructs a default cache path:
+// 	`~/.cloudfuse/file_cache`. If it fails to retrieve the home directory or create the path, it returns a fallback path.
+func getDefaultCachePath() string {
+	// TODO: Add logic to return OS-specific cache paths
+	home, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Printf("[red::b]ERROR: Failed to get home directory: %v\nUsing fallback path for cache directory.\n", err)
+		return getFallbackCachePath()
+	}
+	cachePath := filepath.Join(home, ".cloudfuse", "file_cache")
+	// If the directory doesn't exist, create it
+	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+		if err := os.MkdirAll(cachePath, 0700); err != nil {
+			fmt.Printf("[red::b]ERROR: Failed to create cache directory: %v\nUsing fallback path for cache directory.\n", err)
+			return getFallbackCachePath()
+		}
+	}
+	// Return the full path to the cache directory
+	return cachePath
+}
+
+
+// Helper function to validate the entered cache path.
 func validateCachePath() error {
 	// Validate that the path is not empty
 	if strings.TrimSpace(cacheLocation) == "" {
@@ -1219,32 +1174,30 @@ func validateCachePath() error {
 }
 
 
-/* 
-	Helper function to get the available cache size.
-	It retrieves the available space in the cache location and calculates
-	the available cache size in GB based on the user-defined cache size percentage.
-	It sets the global variable `availableCacheSizeGB` and calculates the current cache size.
-	If it fails to retrieve the available space, it returns an error.
-*/
+// Helper function to get the available disk space at the cache location and calculates
+// the cache size in GB based on the user-defined cache size percentage.
 func getAvailableCacheSize() (error) {
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(cacheLocation, &stat); err != nil {
-		return fmt.Errorf("[red::b]ERROR: Failed to get available cache size[-::-]: %v", err)
+	availableBlocks, _, err := common.GetAvailFree(cacheLocation)
+	if err != nil {
+		// If we fail to get the available cache size, we default to 80% of the available disk space
+		cacheSize = "80"
+		returnMsg := fmt.Errorf("[red::b]WARNING: Failed to get available cache size at '%s': %v\n\n"+
+			"Defaulting cache size to 80%% of available disk space.\n\n"+
+			"Please manually verify you have enough disk space available for caching.[-::-]", cacheLocation, err)
+		return returnMsg
 	}
-	availableCacheSizeBytes := stat.Bavail * uint64(stat.Bsize) // Available space in bytes
+
+	const blockSize = 4096 
+	availableCacheSizeBytes := availableBlocks * blockSize // Convert blocks to bytes
 	availableCacheSizeGB = int(availableCacheSizeBytes / (1024 * 1024 * 1024)) // Convert to GB
 	cacheSizeInt, _ := strconv.Atoi(cacheSize)
 	currentCacheSizeGB = int(availableCacheSizeGB) * cacheSizeInt / 100
+
 	return nil
 }
 
 
-/*
-	Helper function to normalize and validate the endpoint URL. 
-	It checks if the URL starts with "http://" or "https://", and if not, it prepends "https://".
-	It also parses the URL to ensure it is valid.
-	It returns the normalized URL or an error if the URL is invalid.
-*/
+// Helper function to normalize and validate the user-defined endpoint URL.
 func validateEndpointURL(rawURL string) (error) {
 	rawURL = strings.TrimSpace(rawURL)
 
@@ -1268,20 +1221,17 @@ func validateEndpointURL(rawURL string) (error) {
 }
 
 
-/*
-	Function to create a temporary YAML configuration file based on user inputs
-	This function is called when the user clicks "Next" on the endpoint/region page
-	It creates a temporary config file that can be used for testing credentials
-	and then removed after the credentials are verified.
-*/
+// Function to create a temporary YAML configuration file based on user inputs. 
+// Used for testing credentials and then removed after the check.
+// Called when the user clicks "Next" on the credentials page.
 func createTmpConfigFile() error {
-	config := Config{
-		
+	config := configuration{
+
 		Components: []string{storageProtocol},
 	}
 
 	if storageProtocol == "azstorage" {
-		config.AzStorage = AzureStorageConfig{
+		config.AzStorage = azureStorageConfig{
 			Type:        "block",
 			AccountName: accountName,
 			AccountKey:  accountKey,
@@ -1289,7 +1239,7 @@ func createTmpConfigFile() error {
 			Container:   containerName,
 		}
 	} else {
-		config.S3Storage = S3StorageConfig{
+		config.S3Storage = s3StorageConfig{
 			KeyID:      accessKey,
 			SecretKey:  secretKey,
 			Endpoint:   endpointURL,
@@ -1303,7 +1253,7 @@ func createTmpConfigFile() error {
 	}
 
 	tmpFile := "config-tmp.yaml"
-	if err := os.WriteFile(tmpFile, yamlData, 0644); err != nil {
+	if err := os.WriteFile(tmpFile, yamlData, 0600); err != nil {
 		return fmt.Errorf("failed to write YAML to file: %v", err)
 	}
 
@@ -1313,74 +1263,67 @@ func createTmpConfigFile() error {
 }
 
 
-/* 	
-	Function to check the credentials entered by the user
-	This function is called when the user clicks "Next" on the credentials page
-	It tries to connect to the storage backend and fetch the container/bucket list
-	If successful, it removes the temporary config file and returns the container/bucket list
-	If it fails, it returns the error 
-*/
+// Function to check the credentials entered by the user.
+// Attempts to connect to the storage backend and fetch the bucket list.
+// If successful, populates the global `bucketList` variable with the list of available buckets (for s3 providers only).
+// Called when the user clicks "Next" on the credentials page.
 func checkCredentials(app *tview.Application, pages *tview.Pages) error {
-	// Step 1: Create a temporary config file
-	createTmpConfigFile()
-
-	// Step 2: Parse the config
-	err := parseConfig()
-	if err != nil {
-		return err
+	// Create a temporary config file for testing credentials
+	if err := createTmpConfigFile(); err != nil {
+		return fmt.Errorf("Failed to create temporary config file: %v", err)
 	}
 
-	err = config.Unmarshal(&options)
-	if err != nil {
-		return err
+	// Delete the temporary config file regardless of success or failure of the credential check
+    defer func() {
+        _ = os.Remove("config-tmp.yaml")
+    }()
+
+	// Parse and unmarshal the temporary config file
+	if err := parseConfig(); err != nil {
+		return fmt.Errorf("Failed to parse config: %v", err)
 	}
 
-	// Step 3: Try to fetch container/bucket list
+	if err := config.Unmarshal(&options); err != nil {
+		return fmt.Errorf("Failed to unmarshal config: %v", err)
+	}
+
+	// Try to fetch bucket list
+	var err error
 	if slices.Contains(options.Components, "azstorage") {
-		containerList, err = getContainerListAzure()
+		bucketList, err = getContainerListAzure()
 
 	} else if slices.Contains(options.Components, "s3storage") {
-		containerList, err = getBucketListS3()
-		
+		bucketList, err = getBucketListS3()
+
 	} else {
 		err = fmt.Errorf("Unsupported storage backend")
 	}
 
 	if err != nil {
-		return err
-	}
-
-	// Step 4: Remove temporary config file
-	if err := os.Remove("config-tmp.yaml"); err != nil {
-		return err
+		return fmt.Errorf("Failed to get bucket list: %v", err)
 	}
 
 	return nil
 }
 
 
-/* 	
-	Function to create a YAML configuration file based on user inputs
-	This function is called when the user clicks "Finish" on the caching page
-	It creates a config.yaml file that can be used by CloudFuse.
-	Returns an error if the YAML creation fails or if the file cannot be written.
-*/
+// Function to create the YAML configuration file based on user inputs once all forms are completed.
+// Called when the user clicks "Finish" on the caching page.
 func createYAMLConfig() error {
-	
-	config := Config{
+	config := configuration{
 		Components: []string{"libfuse", cacheMode, "attr_cache", storageProtocol},
 
-		Libfuse: LibfuseConfig{
+		Libfuse: libfuseConfig{
 			NetworkShare: true,
 		},
 
-		AttrCache: AttrCacheConfig{
+		AttrCache: attrCacheConfig{
 			TimeoutSec: 7200,
 		},	
 	}
 
 	if cacheMode == "file_cache" {
-			config.FileCache = FileCacheConfig{
+			config.FileCache = fileCacheConfig{
 				Path:              cacheLocation,
 				TimeOutSec:        cacheRetentionDurationSec,
 				AllowNonEmptyTemp: !clearCacheOnStart,
@@ -1393,7 +1336,7 @@ func createYAMLConfig() error {
 	} 
 
 	if storageProtocol == "s3storage" {
-		config.S3Storage = S3StorageConfig{
+		config.S3Storage = s3StorageConfig{
 			BucketName:      bucketName, 
 			KeyID:           accessKey, 
 			SecretKey:       secretKey, 
@@ -1401,10 +1344,10 @@ func createYAMLConfig() error {
 			EnableDirMarker: true, 
 		}
 	} else {
-		config.AzStorage = AzureStorageConfig{
+		config.AzStorage = azureStorageConfig{
 			Type:        "block",
 			AccountName: accountName,
-			AccountKey:  secretKey,
+			AccountKey:  accountKey,
 			Mode:        "key",
 			Container:   containerName,
 		}
@@ -1417,7 +1360,7 @@ func createYAMLConfig() error {
     }
 
     // Write the YAML to a file
-    if err := os.WriteFile("config.yaml", yamlData, 0644); err != nil {
+    if err := os.WriteFile("config.yaml", yamlData, 0600); err != nil {
         return fmt.Errorf("Failed to write YAML to file: %v", err)
     }
 
@@ -1426,6 +1369,7 @@ func createYAMLConfig() error {
 	if err != nil {
         return fmt.Errorf("Error: %v", err)
     }
+
 	configFilePath = filepath.Join(currDir, "config.yaml")
 
 	return nil
