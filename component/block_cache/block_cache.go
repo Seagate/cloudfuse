@@ -1321,7 +1321,7 @@ func (bc *BlockCache) download(item *workItem) {
 
 			// If user has enabled consistency check then compute the md5sum and save it in xattr
 			if bc.consistency {
-				err = setBlockChecksum(localPath, item.block.data, n)
+				err = setBlockChecksum(localPath, item.block.data, int(blockSize))
 				if err != nil {
 					log.Err(
 						"BlockCache::download : Failed to set md5sum for file %s [%v]",
@@ -2083,6 +2083,17 @@ func (bc *BlockCache) diskEvict(node *list.Element) {
 
 	localPath := filepath.Join(bc.tmpPath, cacheKey)
 	_ = os.Remove(localPath)
+
+	// Remove empty parent directories up to tmpPath
+	dir := filepath.Dir(localPath)
+	for dir != bc.tmpPath && dir != "/" {
+		empty := common.IsDirectoryEmpty(dir)
+		if !empty {
+			break
+		}
+		_ = os.Remove(dir)
+		dir = filepath.Dir(dir)
+	}
 }
 
 // checkDiskUsage : Callback to check usage of disk and decide whether eviction is needed
@@ -2117,6 +2128,17 @@ func (bc *BlockCache) invalidateDirectory(name string) {
 
 	localPath := filepath.Join(bc.tmpPath, name)
 	_ = os.RemoveAll(localPath)
+
+	// Remove empty parent directories up to tmpPath
+	dir := filepath.Dir(localPath)
+	for dir != bc.tmpPath && dir != "/" {
+		empty := common.IsDirectoryEmpty(dir)
+		if !empty {
+			break
+		}
+		_ = os.Remove(dir)
+		dir = filepath.Dir(dir)
+	}
 }
 
 // DeleteDir: Recursively invalidate the directory and its children
