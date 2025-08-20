@@ -1321,7 +1321,7 @@ func (bc *BlockCache) download(item *workItem) {
 
 			// If user has enabled consistency check then compute the md5sum and save it in xattr
 			if bc.consistency {
-				err = setBlockChecksum(localPath, item.block.data, int(blockSize))
+				err = setBlockChecksum(localPath, item.block.data, n)
 				if err != nil {
 					log.Err(
 						"BlockCache::download : Failed to set md5sum for file %s [%v]",
