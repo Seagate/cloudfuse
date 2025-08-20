@@ -186,56 +186,65 @@ func checkPath(outPath string) error {
 func getLogInfo(configFile string) (string, string, error) {
 	logPath := common.ExpandPath(filepath.Join(common.GetDefaultWorkDir(), ".cloudfuse/"))
 	logType := "base"
-	_, err := os.Stat(configFile)
-	if errors.Is(err, fs.ErrNotExist) {
-		fmt.Printf("Warning, the config file was not found. Defaults will be used\n")
-	} else {
-		config.SetConfigFile(configFile)
-		err = config.ReadFromConfigFile(configFile)
+	var err error
+	if _, err = os.Stat(configFile); errors.Is(err, fs.ErrNotExist) {
+		fmt.Println("Warning, the config file was not found. Defaults will be used")
+		return logType, logPath, nil
+	}
+
+	config.SetConfigFile(configFile)
+	if err = config.ReadFromConfigFile(configFile); err != nil {
+		return "", "", err
+	}
+
+	if !config.IsSet("logging") {
+		fmt.Printf(
+			"Warning, the config file does not have a logging section. Defaults will be used\n",
+		)
+		return logType, logPath, nil
+	}
+	if !config.IsSet("logging.type") {
+		return "", "", fmt.Errorf("the logging type is not provided")
+	}
+
+	if err = config.UnmarshalKey("logging.type", &logType); err != nil {
+		return "", "", err
+	}
+	switch logType {
+	case "silent":
+		return logType, logPath, nil
+	case "syslog":
+		logPath = "/var/log/syslog"
+		return logType, logPath, nil
+	case "base":
+		if !config.IsSet("logging.file-path") {
+			return logType, logPath, fmt.Errorf("the logging file-path is not provided")
+		}
+		if err = config.UnmarshalKey("logging.file-path", &logPath); err != nil {
+			return "", "", err
+		}
+		if strings.HasPrefix(logPath, common.GetDefaultWorkDir()) {
+			logPath = common.ExpandPath(logPath)
+		}
+		logPath, err = filepath.Abs(logPath)
 		if err != nil {
 			return "", "", err
 		}
-		if config.IsSet("logging.type") {
-			err := config.UnmarshalKey("logging.type", &logType)
-			if err != nil {
-				return "", "", err
-			}
-			switch logType {
-			case "silent":
-				return logType, logPath, nil
-			case "syslog":
-				logPath = "/var/log/syslog"
-			case "base":
-				if config.IsSet("logging.file-path") {
-					err = config.UnmarshalKey("logging.file-path", &logPath)
-					if err != nil {
-						return "", "", err
-					}
-					if strings.HasPrefix(logPath, common.GetDefaultWorkDir()) {
-						logPath = common.ExpandPath(logPath)
-					}
-					logPath, err = filepath.Abs(logPath)
-					if err != nil {
-						return "", "", err
-					}
-					var leaf os.FileInfo
-					leaf, err = os.Stat(logPath)
-					if err != nil {
-						return "", "", err
-					}
-					if !leaf.IsDir() {
-						logPath = filepath.Dir(logPath)
-					}
-				} else {
-					return logType, logPath, fmt.Errorf("the logging file-path is not provided")
-				}
-			default:
-				return logType, logPath, fmt.Errorf("the logging type is not valid. Must be 'base', or 'syslog'.")
-			}
-		} else {
-			return "", "", fmt.Errorf("the logging type is not provided")
+
+		var leaf os.FileInfo
+		leaf, err = os.Stat(logPath)
+		if err != nil {
+			return "", "", err
 		}
+		if !leaf.IsDir() {
+			logPath = filepath.Dir(logPath)
+		}
+	default:
+		return logType, logPath, fmt.Errorf(
+			"the logging type is not valid. Must be 'base', or 'syslog'.",
+		)
 	}
+
 	return logType, logPath, nil
 }
 
