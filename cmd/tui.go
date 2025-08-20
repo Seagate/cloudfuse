@@ -37,6 +37,10 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
+	"github.com/Seagate/cloudfuse/component/attr_cache"
+	"github.com/Seagate/cloudfuse/component/azstorage"
+	"github.com/Seagate/cloudfuse/component/file_cache"
+	"github.com/Seagate/cloudfuse/component/libfuse"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"gopkg.in/yaml.v3"
@@ -88,28 +92,12 @@ var (
 )
 
 type configuration struct {
-	Components []string           `yaml:"components,omitempty"`
-	Libfuse    libfuseConfig      `yaml:"libfuse,omitempty"`
-	FileCache  fileCacheConfig    `yaml:"file_cache,omitempty"`
-	AttrCache  attrCacheConfig    `yaml:"attr_cache,omitempty"`
-	S3Storage  s3StorageConfig    `yaml:"s3storage,omitempty"`
-	AzStorage  azureStorageConfig `yaml:"azstorage,omitempty"`
-}
-
-type libfuseConfig struct {
-	NetworkShare bool `yaml:"network-share"`
-}
-
-type attrCacheConfig struct {
-	TimeoutSec int `yaml:"timeout-sec"`
-}
-
-type fileCacheConfig struct {
-	Path              string `yaml:"path"`
-	TimeOutSec        int    `yaml:"timeout-sec"`
-	AllowNonEmptyTemp bool   `yaml:"allow-non-empty-temp"`
-	IgnoreSync        bool   `yaml:"ignore-sync"`
-	MaxSizeMB         int    `yaml:"max-size-mb,omitempty"`
+	Components []string                    `yaml:"components,omitempty"`
+	Libfuse    libfuse.LibfuseOptions      `yaml:"libfuse,omitempty"`
+	FileCache  file_cache.FileCacheOptions `yaml:"file_cache,omitempty"`
+	AttrCache  attr_cache.AttrCacheOptions `yaml:"attr_cache,omitempty"`
+	S3Storage  s3StorageConfig             `yaml:"s3storage,omitempty"`
+	AzStorage  azstorage.AzStorageOptions  `yaml:"azstorage,omitempty"`
 }
 
 type s3StorageConfig struct {
@@ -118,15 +106,6 @@ type s3StorageConfig struct {
 	SecretKey       string `yaml:"secret-key"`
 	Endpoint        string `yaml:"endpoint"`
 	EnableDirMarker bool   `yaml:"enable-dir-marker"`
-}
-
-type azureStorageConfig struct {
-	Type        string `yaml:"type"`
-	AccountName string `yaml:"account-name"`
-	AccountKey  string `yaml:"account-key"`
-	Endpoint    string `yaml:"endpoint,omitempty"`
-	Mode        string `yaml:"mode,omitempty"`
-	Container   string `yaml:"container"`
 }
 
 // Main function to run the TUI application.
@@ -1282,11 +1261,11 @@ func createTmpConfigFile() error {
 	}
 
 	if storageProtocol == "azstorage" {
-		config.AzStorage = azureStorageConfig{
-			Type:        "block",
+		config.AzStorage = azstorage.AzStorageOptions{
+			AccountType: "block",
 			AccountName: accountName,
 			AccountKey:  accountKey,
-			Mode:        "key",
+			AuthMode:    "key",
 			Container:   containerName,
 		}
 	} else {
@@ -1296,6 +1275,7 @@ func createTmpConfigFile() error {
 			Endpoint:        endpointURL,
 			EnableDirMarker: true,
 		}
+
 	}
 
 	yamlData, err := yaml.Marshal(&config)
@@ -1362,25 +1342,25 @@ func createYAMLConfig() error {
 	config := configuration{
 		Components: []string{"libfuse", cacheMode, "attr_cache", storageProtocol},
 
-		Libfuse: libfuseConfig{
+		Libfuse: libfuse.LibfuseOptions{
 			NetworkShare: true,
 		},
 
-		AttrCache: attrCacheConfig{
-			TimeoutSec: 7200,
+		AttrCache: attr_cache.AttrCacheOptions{
+			Timeout: uint32(7200),
 		},
 	}
 
 	if cacheMode == "file_cache" {
-		config.FileCache = fileCacheConfig{
-			Path:              cacheLocation,
-			TimeOutSec:        cacheRetentionDurationSec,
-			AllowNonEmptyTemp: !clearCacheOnStart,
-			IgnoreSync:        true,
+		config.FileCache = file_cache.FileCacheOptions{
+			TmpPath:       cacheLocation,
+			Timeout:       uint32(cacheRetentionDurationSec),
+			AllowNonEmpty: !clearCacheOnStart,
+			SyncToFlush:   true,
 		}
 		// If cache size is not set to 80%, convert currentCacheSizeGB to MB and set file_cache.max-size-mb to it
 		if cacheSize != "80" {
-			config.FileCache.MaxSizeMB = currentCacheSizeGB * 1024 // Convert GB to MB
+			config.FileCache.MaxSizeMB = float64(currentCacheSizeGB * 1024) // Convert GB to MB
 		}
 	}
 
@@ -1393,11 +1373,11 @@ func createYAMLConfig() error {
 			EnableDirMarker: true,
 		}
 	} else {
-		config.AzStorage = azureStorageConfig{
-			Type:        "block",
+		config.AzStorage = azstorage.AzStorageOptions{
+			AccountType: "block",
 			AccountName: accountName,
 			AccountKey:  accountKey,
-			Mode:        "key",
+			AuthMode:    "key",
 			Container:   containerName,
 		}
 	}
