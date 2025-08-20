@@ -1008,7 +1008,7 @@ func (suite *blockCacheTestSuite) TestWriteFileDiskCachePresenceInDir() {
 	suite.assert.Equal(n, len(data))
 	tobj.blockCache.FlushFile(internal.FlushFileOptions{Handle: h})
 
-	// Check file exists in disk_cache_path (block 0)
+	// Check file exists in disk_cache_path
 	diskCachePath := filepath.Join(tobj.disk_cache_path, dirName, fileName+"_0")
 	_, err = os.Stat(diskCachePath)
 	suite.assert.NoError(err)
