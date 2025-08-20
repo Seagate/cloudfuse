@@ -38,13 +38,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 )
 
-/* NOTES:
-   - Component shall have a structure which inherits "internal.BaseComponent" to participate in pipeline
-   - Component shall register a name and its constructor to participate in pipeline  (add by default by generator)
-   - Order of calls : Constructor -> Configure -> Start ..... -> Stop
-   - To read any new setting from config file follow the Configure method default comments
-*/
-
 // Common structure for Component
 type SizeTracker struct {
 	internal.BaseComponent
@@ -52,7 +45,6 @@ type SizeTracker struct {
 	totalBucketCapacity uint64
 }
 
-// Structure defining your config parameters
 type SizeTrackerOptions struct {
 	JournalName         string `config:"journal-name"             yaml:"journal-name,omitempty"`
 	TotalBucketCapacity uint64 `config:"bucket-capacity-fallback" yaml:"bucket-capacity-fallback,omitempty"`
@@ -63,7 +55,6 @@ const blockSize = int64(4096)
 const defaultJournalName = "mount_size.dat"
 const evictionThreshold = 0.95
 
-// Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &SizeTracker{}
 
 func (st *SizeTracker) Name() string {
