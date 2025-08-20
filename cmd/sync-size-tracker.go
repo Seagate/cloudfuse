@@ -42,7 +42,7 @@ import (
 
 // syncCmd represents the sync command
 var syncCmd = &cobra.Command{
-	Use:    "sync",
+	Use:    "sync-size-tracker",
 	Hidden: true,
 	Short:  "Update the size tracker journal with the size of the configured S3 subdirectory",
 	Long:   "Reads s3storage.subdirectory from the provided config file, calculates the total size of all objects under it, and updates the size tracker journal.",

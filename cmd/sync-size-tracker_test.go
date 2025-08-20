@@ -84,7 +84,7 @@ func (suite *syncCmdSuite) TestSyncMissingConfigFile() {
 	defer os.RemoveAll(td)
 	_ = os.Chdir(td)
 
-	out, err := executeCommandC(rootCmd, "sync")
+	out, err := executeCommandC(rootCmd, "sync-size-tracker")
 	suite.assert.Error(err)
 	suite.assert.Contains(out, "config file not provided")
 }
@@ -100,7 +100,11 @@ func (suite *syncCmdSuite) TestSyncMissingSubdirectory() {
 	_ = cfgFile.Close()
 	defer os.Remove(cfgPath)
 
-	out, err := executeCommandC(rootCmd, "sync", fmt.Sprintf("--config-file=%s", cfgPath))
+	out, err := executeCommandC(
+		rootCmd,
+		"sync-size-tracker",
+		fmt.Sprintf("--config-file=%s", cfgPath),
+	)
 	suite.assert.Error(err)
 	suite.assert.Contains(out, "s3storage.subdirectory must be set")
 }
@@ -116,7 +120,11 @@ func (suite *syncCmdSuite) TestSyncNoS3Credentials() {
 	_ = cfgFile.Close()
 	defer os.Remove(cfgPath)
 
-	out, err := executeCommandC(rootCmd, "sync", fmt.Sprintf("--config-file=%s", cfgPath))
+	out, err := executeCommandC(
+		rootCmd,
+		"sync-size-tracker",
+		fmt.Sprintf("--config-file=%s", cfgPath),
+	)
 	suite.assert.Error(err)
 	suite.assert.Contains(out, "s3storage configure failed")
 }
