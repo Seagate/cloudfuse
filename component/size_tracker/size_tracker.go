@@ -38,13 +38,6 @@ import (
 	"github.com/Seagate/cloudfuse/internal/handlemap"
 )
 
-/* NOTES:
-   - Component shall have a structure which inherits "internal.BaseComponent" to participate in pipeline
-   - Component shall register a name and its constructor to participate in pipeline  (add by default by generator)
-   - Order of calls : Constructor -> Configure -> Start ..... -> Stop
-   - To read any new setting from config file follow the Configure method default comments
-*/
-
 // Common structure for Component
 type SizeTracker struct {
 	internal.BaseComponent
@@ -52,7 +45,6 @@ type SizeTracker struct {
 	totalBucketCapacity uint64
 }
 
-// Structure defining your config parameters
 type SizeTrackerOptions struct {
 	JournalName         string `config:"journal-name"             yaml:"journal-name,omitempty"`
 	TotalBucketCapacity uint64 `config:"bucket-capacity-fallback" yaml:"bucket-capacity-fallback,omitempty"`
@@ -63,7 +55,6 @@ const blockSize = int64(4096)
 const defaultJournalName = "mount_size.dat"
 const evictionThreshold = 0.95
 
-// Verification to check satisfaction criteria with Component Interface
 var _ internal.Component = &SizeTracker{}
 
 func (st *SizeTracker) Name() string {
@@ -230,16 +221,12 @@ func (st *SizeTracker) WriteFile(options internal.WriteFileOptions) (int, error)
 
 	diff := newSize - oldSize
 
-	var journalErr error
 	// File already exists and WriteFile succeeded subtract difference in file size
 	if diff < 0 {
 		// diff is negative, so change it back to positive before converting to a uint64
 		st.mountSize.Subtract(uint64(-diff))
 	} else {
 		st.mountSize.Add(uint64(diff))
-	}
-	if journalErr != nil {
-		log.Err("SizeTracker::WriteFile : Unable to journal size. Error: %v", journalErr)
 	}
 
 	return bytesWritten, nil
@@ -255,15 +242,11 @@ func (st *SizeTracker) TruncateFile(options internal.TruncateFileOptions) error 
 	err := st.NextComponent().TruncateFile(options)
 	newSize := options.Size - origSize
 
-	var journalErr error
 	// File already exists and truncate succeeded subtract difference in file size
 	if err == nil && getAttrErr == nil && newSize < 0 {
 		st.mountSize.Subtract(uint64(-newSize))
 	} else if err == nil && getAttrErr == nil && newSize >= 0 {
 		st.mountSize.Add(uint64(newSize))
-	}
-	if journalErr != nil {
-		log.Err("SizeTracker::TruncateFile : Unable to journal size. Error: %v", journalErr)
 	}
 
 	return err
@@ -286,59 +269,11 @@ func (st *SizeTracker) CopyFromFile(options internal.CopyFromFileOptions) error 
 	}
 	newSize := fileInfo.Size() - origSize
 
-	var journalErr error
 	// File already exists and CopyFromFile succeeded subtract difference in file size
 	if newSize < 0 {
 		st.mountSize.Subtract(uint64(-newSize))
 	} else {
 		st.mountSize.Add(uint64(newSize))
-	}
-	if journalErr != nil {
-		log.Err("SizeTracker::CopyFromFile : Unable to journal size. Error: %v", journalErr)
-	}
-
-	return nil
-}
-
-func (st *SizeTracker) FlushFile(options internal.FlushFileOptions) error {
-	var origSize int64
-	attr, getAttrErr1 := st.NextComponent().
-		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
-	if getAttrErr1 == nil {
-		origSize = attr.Size
-	} else {
-		log.Err("SizeTracker::FlushFile : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v", options.Handle.Path, getAttrErr1)
-	}
-
-	err := st.NextComponent().FlushFile(options)
-	if err != nil {
-		return err
-	}
-
-	var newSize int64
-	attr, getAttrErr2 := st.NextComponent().
-		GetAttr(internal.GetAttrOptions{Name: options.Handle.Path})
-	if getAttrErr2 == nil {
-		newSize = attr.Size
-	} else {
-		log.Err("SizeTracker::FlushFile : Unable to get attr for file %s. Current tracked size is invalid. Error: : %v", options.Handle.Path, getAttrErr2)
-	}
-
-	if getAttrErr1 != nil || getAttrErr2 != nil {
-		return nil
-	}
-
-	diff := newSize - origSize
-
-	var journalErr error
-	// File already exists and FlushFile succeeded subtract difference in file size
-	if diff < 0 {
-		st.mountSize.Subtract(uint64(-diff))
-	} else {
-		st.mountSize.Add(uint64(diff))
-	}
-	if journalErr != nil {
-		log.Err("SizeTracker::FlushFile : Unable to journal size. Error: %v", journalErr)
 	}
 
 	return nil
@@ -420,15 +355,11 @@ func (st *SizeTracker) CommitData(opt internal.CommitDataOptions) error {
 
 	diff := newSize - origSize
 
-	var journalErr error
 	// File already exists and CommitData succeeded subtract difference in file size
 	if diff < 0 {
 		st.mountSize.Subtract(uint64(-diff))
 	} else {
 		st.mountSize.Add(uint64(diff))
-	}
-	if journalErr != nil {
-		log.Err("SizeTracker::CommitData : Unable to journal size. Error: %v", journalErr)
 	}
 
 	return nil

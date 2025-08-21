@@ -317,7 +317,7 @@ nfpms:
     overrides:
       deb:
         dependencies:
-          - libfuse3-3
+          - fuse3
           - libc6 (>= 2.24)
 
       rpm:
@@ -381,7 +381,7 @@ nfpms:
     overrides:
       deb:
         dependencies:
-          - libfuse2
+          - fuse
           - libc6 (>= 2.24)
 
       rpm:

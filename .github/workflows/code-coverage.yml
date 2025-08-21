@@ -16,7 +16,7 @@ jobs:
   BuildAndTest-Coverage:
     strategy:
       matrix:
-        go: ["1.24"]
+        go: ["1.25"]
         job_name: ["linux-fuse3", "linux-fuse2"]
 
         include:
@@ -1014,7 +1014,7 @@ jobs:
   BuildAndTest-Coverage-Windows:
     strategy:
       matrix:
-        go: ["1.24"]
+        go: ["1.25"]
         job_name: ["windows"]
 
         include:
@@ -1537,6 +1537,8 @@ jobs:
         run: |-
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${BLOCK_TEMP_DIR}/*
+          rm -rf ${BLOCK_TEMP_DIR}
+          mkdir -p ${BLOCK_TEMP_DIR}
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
           CFL_PID=$!
 
@@ -1934,7 +1936,7 @@ jobs:
       - BuildAndTest-Coverage-Windows
     strategy:
       matrix:
-        go: ["1.24"]
+        go: ["1.25"]
         job_name: ["linux"]
 
         include:
