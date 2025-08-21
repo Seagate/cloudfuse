@@ -1537,6 +1537,8 @@ jobs:
         run: |-
           rm -rf ${MOUNT_DIR}/*
           rm -rf ${BLOCK_TEMP_DIR}/*
+          rm -rf ${BLOCK_TEMP_DIR}
+          mkdir -p ${BLOCK_TEMP_DIR}
           ./cloudfuse.test -test.v -test.coverprofile=${WORK_DIR}/cloudfuse_s3_block_cache.cov mount ${MOUNT_DIR} --config-file=${cloudfuse_CFG} --foreground=true &
           CFL_PID=$!
 
