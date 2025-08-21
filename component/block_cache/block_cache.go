@@ -1272,7 +1272,7 @@ func (bc *BlockCache) download(item *workItem) {
 		root, err := os.OpenRoot(bc.tmpPath)
 		localPath := filepath.Join(bc.tmpPath, fileName)
 		if err != nil {
-			err := os.Mkdir(bc.tmpPath, 0755)
+			err := os.MkdirAll(bc.tmpPath, 0755)
 			if err != nil {
 				log.Err(
 					"BlockCache::download : error creating directory structure for file %s [%s]",
@@ -1292,6 +1292,16 @@ func (bc *BlockCache) download(item *workItem) {
 			}
 		}
 		defer root.Close()
+
+		// Create directory structure if not exists
+		err = os.MkdirAll(filepath.Dir(localPath), 0755)
+		if err != nil {
+			log.Err(
+				"BlockCache::download : Failed to create directory structure for file %s [%s]",
+				localPath,
+				err.Error(),
+			)
+		}
 
 		// Dump this block to local disk cache
 		f, err := root.Create(fileName)
@@ -1790,6 +1800,16 @@ func (bc *BlockCache) upload(item *workItem) {
 		}
 		defer root.Close()
 
+		// Create directory structure if not exists
+		err = os.MkdirAll(filepath.Dir(localPath), 0755)
+		if err != nil {
+			log.Err(
+				"BlockCache::upload : Failed to create directory structure for file %s [%s]",
+				localPath,
+				err.Error(),
+			)
+		}
+
 		// Dump this block to local disk cache
 		f, err := root.Create(fileName)
 		if err == nil {
@@ -2063,6 +2083,17 @@ func (bc *BlockCache) diskEvict(node *list.Element) {
 
 	localPath := filepath.Join(bc.tmpPath, cacheKey)
 	_ = os.Remove(localPath)
+
+	// Remove empty parent directories up to tmpPath
+	dir := filepath.Dir(localPath)
+	for dir != bc.tmpPath && dir != "/" {
+		empty := common.IsDirectoryEmpty(dir)
+		if !empty {
+			break
+		}
+		_ = os.Remove(dir)
+		dir = filepath.Dir(dir)
+	}
 }
 
 // checkDiskUsage : Callback to check usage of disk and decide whether eviction is needed
@@ -2097,6 +2128,17 @@ func (bc *BlockCache) invalidateDirectory(name string) {
 
 	localPath := filepath.Join(bc.tmpPath, name)
 	_ = os.RemoveAll(localPath)
+
+	// Remove empty parent directories up to tmpPath
+	dir := filepath.Dir(localPath)
+	for dir != bc.tmpPath && dir != "/" {
+		empty := common.IsDirectoryEmpty(dir)
+		if !empty {
+			break
+		}
+		_ = os.Remove(dir)
+		dir = filepath.Dir(dir)
+	}
 }
 
 // DeleteDir: Recursively invalidate the directory and its children
