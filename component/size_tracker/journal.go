@@ -37,11 +37,12 @@ import (
 )
 
 type MountSize struct {
-	size        atomic.Uint64
-	file        *os.File
-	flushTicker *time.Ticker
-	stopCh      chan struct{}
-	wg          sync.WaitGroup
+	size              atomic.Uint64
+	lastJournaledSize atomic.Uint64
+	file              *os.File
+	flushTicker       *time.Ticker
+	stopCh            chan struct{}
+	wg                sync.WaitGroup
 }
 
 func CreateSizeJournal(filename string) (*MountSize, error) {
@@ -71,6 +72,7 @@ func CreateSizeJournal(filename string) (*MountSize, error) {
 	if fileInfo.Size() >= 8 {
 		buf := make([]byte, 8)
 		if _, err := f.ReadAt(buf, 0); err != nil {
+			_ = f.Close()
 			return nil, err
 		}
 
@@ -142,13 +144,24 @@ func (ms *MountSize) CloseFile() error {
 }
 
 func (ms *MountSize) writeSizeToFile() error {
-	buf := make([]byte, 8)
+	old_size := ms.lastJournaledSize.Load()
 	currentSize := ms.size.Load()
-	binary.BigEndian.PutUint64(buf, currentSize)
+	if old_size == currentSize {
+		// No change in size, no need to write
+		return nil
+	}
 
-	if _, err := ms.file.WriteAt(buf, 0); err != nil {
+	var buf [8]byte
+	binary.BigEndian.PutUint64(buf[:], currentSize)
+
+	if _, err := ms.file.WriteAt(buf[:], 0); err != nil {
 		return err
 	}
 
-	return ms.file.Sync()
+	if err := ms.file.Sync(); err != nil {
+		return err
+	}
+	ms.lastJournaledSize.Store(currentSize)
+
+	return nil
 }
