@@ -39,6 +39,7 @@ jobs:
       cloudfuse_CFG: "./cloudfuse.yaml"
       cloudfuse_STREAM_CFG: "./cloudfuse_stream.yaml"
       cloudfuse_BLOCK_CFG: "./cloudfuse_block.yaml"
+      zig: 0.14.1
 
     # Skip for dependabot updates
     if: ${{ github.triggering_actor != 'dependabot[bot]' }}
@@ -62,6 +63,28 @@ jobs:
           FUSELIB: ${{ matrix.fuselib }}
         run: |-
           sudo apt-get install fuse3 ${FUSELIB} -y
+
+      - name: Install Zig
+        env:
+          RUNNER_ARCH: ${{ runner.arch }}
+          ENV_ZIG: ${{ env.zig }}
+        run: |
+          if [[ "${RUNNER_ARCH}" == "X64" ]]; then
+            ZIG_ARCH="x86_64"
+          elif [[ "${RUNNER_ARCH}" == "ARM64" ]]; then
+            ZIG_ARCH="aarch64"
+          else
+            echo "Unsupported architecture: ${RUNNER_ARCH}"
+            exit 1
+          fi
+
+          ZIG_DIR="zig-${ZIG_ARCH}-linux-${ENV_ZIG}"
+          ZIG_TARBALL="${ZIG_DIR}.tar.xz"
+          curl -L https://ziglang.org/download/${ENV_ZIG}/${ZIG_TARBALL} -o zig.tar.xz
+          mkdir -p $HOME/.local/bin
+          tar -xf zig.tar.xz -C $HOME/.local/bin
+          echo "$HOME/.local/bin/${ZIG_DIR}" >> $GITHUB_PATH
+          rm zig.tar.xz
 
       - name: Create Directory Structure
         env:
