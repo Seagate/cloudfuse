@@ -277,9 +277,8 @@ func buildStorageProviderPage(app *tview.Application, pages *tview.Pages) tview.
 			pages.SwitchToPage("home")
 		}).
 		AddButton(navigationNextLabel, func() {
-			// If Microsoft or AWS is selected, switch to page 3 and skip endpoint/region entry.
-			// These providers handle endpoint and region internally.
-			if storageProvider == "Microsoft" || storageProvider == "AWS" {
+			// If Microsoft is selected, switch to page 3 and skip endpoint entry, handled internally by Azure SDK.
+			if storageProvider == "Microsoft" {
 				page3 := buildCredentialsPage(app, pages)
 				pages.AddPage("page3", page3, true, false)
 				pages.SwitchToPage("page3")
@@ -315,7 +314,7 @@ func buildStorageProviderPage(app *tview.Application, pages *tview.Pages) tview.
 	return layout
 }
 
-//	--- Page 2: Endpoint and Region Page ---
+//	--- Page 2: Endpoint URL Entry Page ---
 //
 // Function to build the endpoint URL page. Allows users to enter the endpoint URL for their cloud storage provider.
 // It validates the endpoint URL format and provides help text based on the selected provider.
@@ -325,10 +324,19 @@ func buildEndpointURLPage(app *tview.Application, pages *tview.Pages) tview.Prim
 	// Determine URL help text based on selected provider
 	switch storageProvider {
 	case "LyveCloud":
-		urlRegionHelpText = "[::b]For LyveCloud, the endpoint URL format is generally:[-]\n" +
+		urlRegionHelpText = "[::b]You selected LyveCloud as your storage provider.[::-]\n\n" +
+			"For LyveCloud, the endpoint URL format is generally:\n" +
 			"[darkmagenta::b]https://s3.<[darkcyan::b]region[darkmagenta::b]>.<[darkcyan::b]identifier[darkmagenta::b]>.lyve.seagate.com[-]\n\n" +
 			"Example:\n[darkmagenta::b]https://s3.us-east-1.sv15.lyve.seagate.com[-]\n\n" +
 			"[grey::i]Find more info in your LyveCloud portal.\nAvailable regions are listed below in the dropdown.[-::-]"
+		urlRegionHelpText = centerText(urlRegionHelpText, 65)
+
+	case "AWS":
+		urlRegionHelpText = "[::b]You selected AWS as your storage provider.[::-]\n\n" +
+			"The endpoint URL format is generally:\n" +
+			"[darkmagenta::b]https://s3.<[darkcyan::b]region[darkmagenta::b]>.amazonaws.com[-]\n\n" +
+			"Example:\n[darkmagenta::b]https://s3.us-east-1.amazonaws.com[-]\n\n" +
+			"[grey::i]Refer to AWS documentation for valid formats and available regions.[-::-]"
 		urlRegionHelpText = centerText(urlRegionHelpText, 65)
 
 	case "Other":
@@ -352,8 +360,8 @@ func buildEndpointURLPage(app *tview.Application, pages *tview.Pages) tview.Prim
 		SetLabel("🔗 Endpoint URL: ").
 		SetText(endpointURL).
 		SetFieldWidth(50).
-		SetChangedFunc(func(text string) {
-			endpointURL = text
+		SetChangedFunc(func(url string) {
+			endpointURL = url
 		}).
 		SetPlaceholder("\t\t\t\t<ENTER URL HERE>").
 		SetPlaceholderTextColor(tcell.ColorGray).
@@ -489,8 +497,9 @@ func buildCredentialsPage(app *tview.Application, pages *tview.Pages) tview.Prim
 		SetLabel("🪣 Container Name: ").
 		SetText(containerName).
 		SetPlaceholder("\t\t\t\t<ENTER NAME HERE>").
-		SetChangedFunc(func(text string) {
-			containerName = text
+		SetChangedFunc(func(name string) {
+			containerName = name
+			bucketName = name
 		}).
 		SetFieldWidth(50).
 		SetLabelColor(widgetLabelColor).
@@ -608,8 +617,8 @@ func buildBucketSelectionPage(app *tview.Application, pages *tview.Pages) tview.
 	// Dropdown widget for selecting bucket name
 	bucketSelectionWidget := tview.NewDropDown().
 		SetLabel(" 🪣 Bucket Name: ").
-		SetOptions(bucketList, func(text string, index int) {
-			bucketName = text
+		SetOptions(bucketList, func(name string, index int) {
+			bucketName = name
 		}).
 		SetCurrentOption(0).
 		SetLabelColor(widgetLabelColor).
@@ -1270,6 +1279,7 @@ func createTmpConfigFile() error {
 		}
 	} else {
 		config.S3Storage = s3StorageConfig{
+			BucketName:      bucketName,
 			KeyID:           accessKey,
 			SecretKey:       secretKey,
 			Endpoint:        endpointURL,
