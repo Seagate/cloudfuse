@@ -126,12 +126,6 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledUnderThreshold()
 	suite.assert.NoError(err)
 
 	// Flush File
-	suite.mock.EXPECT().
-		GetAttr(internal.GetAttrOptions{Name: handle.Path}).
-		Return(&internal.ObjAttr{Path: file, Size: int64(len(data))}, nil)
-	suite.mock.EXPECT().
-		GetAttr(internal.GetAttrOptions{Name: handle.Path}).
-		Return(&internal.ObjAttr{Path: file, Size: int64(len(data))}, nil)
 	suite.mock.EXPECT().FlushFile(internal.FlushFileOptions{Handle: handle}).Return(nil)
 	err = suite.sizeTracker.FlushFile(internal.FlushFileOptions{Handle: handle})
 	suite.assert.NoError(err)
@@ -189,12 +183,6 @@ func (suite *sizeTrackerMockTestSuite) TestStatFSFallBackEnabledOverThreshold() 
 	suite.assert.NoError(err)
 
 	// Flush File
-	suite.mock.EXPECT().
-		GetAttr(internal.GetAttrOptions{Name: handle.Path}).
-		Return(&internal.ObjAttr{Path: file, Size: int64(len(data))}, nil)
-	suite.mock.EXPECT().
-		GetAttr(internal.GetAttrOptions{Name: handle.Path}).
-		Return(&internal.ObjAttr{Path: file, Size: int64(len(data))}, nil)
 	suite.mock.EXPECT().FlushFile(internal.FlushFileOptions{Handle: handle}).Return(nil)
 	err = suite.sizeTracker.FlushFile(internal.FlushFileOptions{Handle: handle})
 	suite.assert.NoError(err)
