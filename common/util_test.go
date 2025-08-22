@@ -160,11 +160,9 @@ func (suite *typesTestSuite) TestDirectoryDoesNotExist() {
 func (suite *typesTestSuite) TestDecryptBadKey() {
 	// Generate a random key
 	key := make([]byte, 20)
-	encodedKey := make([]byte, 28)
 	rand.Read(key)
-	base64.StdEncoding.Encode(encodedKey, key)
 
-	encryptedPassphrase := memguard.NewEnclave(encodedKey)
+	encryptedPassphrase := memguard.NewEnclave(key)
 
 	data := make([]byte, 1024)
 	rand.Read(data)
