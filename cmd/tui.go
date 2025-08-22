@@ -49,28 +49,27 @@ import (
 // Constants and global variables used throughout the TUI application.
 // These include default values, colors, widget configurations, and storage settings.
 var (
-	tuiVersion                string       = common.CloudfuseVersion // Mirrors the current version of cloudfuse.
-	configFilePath            string                                 // Sets file_cache.path
-	accountName               string                                 // Sets azstorage.account-name
-	accountKey                string                                 // Sets azstorage.account-key
-	accessKey                 string                                 // Sets s3storage.key-id
-	secretKey                 string                                 // Sets s3storage.secret-key
-	containerName             string                                 // Sets azstorage.container-name
-	bucketName                string                                 // Sets s3storage.bucket-name
-	endpointURL               string                                 // Sets s3storage.endpoint
-	bucketList                = []string{}                           // Holds list of available buckets retrieved from cloud provider (for s3 only).
-	storageProtocol           string                                 // Sets 's3storage' or 'azstorage' based on selected provider
-	storageProvider           string                                 // Options: 'LyveCloud', 'Microsoft', 'AWS', or 'Other (s3)'. Used to set certain UI elements.
-	cacheMode                 string                                 // Sets 'components' to include 'file_cache' or 'block_cache'
-	enableCaching             bool         = true                    // If true, sets cacheMode to file_cache. If false, block_cache
-	cacheLocation             string       = getDefaultCachePath()   // Sets file_cache.path @ startup to default: $HOME/.cloudfuse/cache
-	cacheSize                 string       = "80"                    // User-defined cache size as %
-	availableCacheSizeGB      int                                    // Total available cache size in GB @ the cache location
-	currentCacheSizeGB        int                                    // Current cache size in GB based on 'cacheSize' percentage
-	clearCacheOnStart         bool         = false                   // If false, sets 'allow-non-empty-temp' to true
-	cacheRetentionDuration    int          = 2                       // User-defined cache retention duration. Default is '2'
-	cacheRetentionUnit        string                                 // User-defined cache retention unit (sec, min, hours, days). Default is 'days'
-	cacheRetentionDurationSec int                                    // Sets 'file_cache.timeout-sec' from 'cacheRetentionDuration'
+	configFilePath            string                               // Sets file_cache.path
+	accountName               string                               // Sets azstorage.account-name
+	accountKey                string                               // Sets azstorage.account-key
+	accessKey                 string                               // Sets s3storage.key-id
+	secretKey                 string                               // Sets s3storage.secret-key
+	containerName             string                               // Sets azstorage.container-name
+	bucketName                string                               // Sets s3storage.bucket-name
+	endpointURL               string                               // Sets s3storage.endpoint
+	bucketList                = []string{}                         // Holds list of available buckets retrieved from cloud provider (for s3 only).
+	storageProtocol           string                               // Sets 's3storage' or 'azstorage' based on selected provider
+	storageProvider           string                               // Options: 'LyveCloud', 'Microsoft', 'AWS', or 'Other (s3)'. Used to set certain UI elements.
+	cacheMode                 string                               // Sets 'components' to include 'file_cache' or 'block_cache'
+	enableCaching             bool         = true                  // If true, sets cacheMode to file_cache. If false, block_cache
+	cacheLocation             string       = getDefaultCachePath() // Sets file_cache.path @ startup to default: $HOME/.cloudfuse/cache
+	cacheSize                 string       = "80"                  // User-defined cache size as %
+	availableCacheSizeGB      int                                  // Total available cache size in GB @ the cache location
+	currentCacheSizeGB        int                                  // Current cache size in GB based on 'cacheSize' percentage
+	clearCacheOnStart         bool         = false                 // If false, sets 'allow-non-empty-temp' to true
+	cacheRetentionDuration    int          = 2                     // User-defined cache retention duration. Default is '2'
+	cacheRetentionUnit        string                               // User-defined cache retention unit (sec, min, hours, days). Default is 'days'
+	cacheRetentionDurationSec int                                  // Sets 'file_cache.timeout-sec' from 'cacheRetentionDuration'
 
 	// Global variables for UI elements
 	tuiAlignment                           = tview.AlignLeft
@@ -153,7 +152,8 @@ func buildTUI(app *tview.Application) {
 // Function to build the home page of the TUI application. Displays a
 // welcome banner, instructions, and buttons to start or quit the application.
 func buildHomePage(app *tview.Application, pages *tview.Pages) tview.Primitive {
-	bannerText := "[#6EBE49::b]░█▀▀░█░░░█▀█░█░█░█▀▄░█▀▀░█░█░█▀▀░█▀▀\n" +
+	bannerText := "[#6EBE49::b]" +
+		" █▀▀░█░░░█▀█░█░█░█▀▄░█▀▀░█░█░█▀▀░█▀▀\n" +
 		"░█░░░█░░░█░█░█░█░█░█░█▀▀░█░█░▀▀█░█▀▀\n" +
 		"░▀▀▀░▀▀▀░▀▀▀░▀▀▀░▀▀░░▀░░░▀▀▀░▀▀▀░▀▀▀[-]\n\n" +
 		"[white::b]Welcome to the CloudFuse Configuration Tool\n" +
@@ -197,7 +197,7 @@ func buildHomePage(app *tview.Application, pages *tview.Pages) tview.Primitive {
 		"[grey::i]CloudFuse TUI Configuration Tool\n" +
 		"Seagate Technology, LLC\n" +
 		"cloudfuse@seagate.com\n" +
-		fmt.Sprintf("Version: %s", tuiVersion)
+		fmt.Sprintf("Version: %s", common.CloudfuseVersion)
 
 	// About text widget
 	aboutTextWidget := tview.NewTextView().
