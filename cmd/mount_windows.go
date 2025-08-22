@@ -60,6 +60,16 @@ func createMountInstance(enableRemountUser bool, enableRemountSystem bool) error
 	return nil
 }
 
+// stub
+func installRemountService(string, string, string) (string, error) {
+	return "", nil
+}
+
+// stub
+func startService(string) error {
+	return nil
+}
+
 // readPassphraseFromPipe connects to a pipe and reads the passphrase.
 func readPassphraseFromPipe(pipeName string, timeout time.Duration) (string, error) {
 	pipeNameUTF16, err := windows.UTF16PtrFromString(pipeName)

@@ -82,16 +82,13 @@ type mountOptions struct {
 	MonitorOpt          monitorOptions `config:"health_monitor"`
 	WaitForMount        time.Duration  `config:"wait-for-mount"`
 	LazyWrite           bool           `config:"lazy-write"`
+	EntryCacheTimeout   int            `config:"list-cache-timeout"`
 	EnableRemountUser   bool
 	EnableRemountSystem bool
+	ServiceUser         string
 	PassphrasePipe      string
 
-	// v1 support
-	Streaming         bool     `config:"streaming"`
-	AttrCache         bool     `config:"use-attr-cache"`
-	LibfuseOptions    []string `config:"libfuse-options"`
-	BlockCache        bool     `config:"block-cache"`
-	EntryCacheTimeout int      `config:"list-cache-timeout"`
+	LibfuseOptions []string `config:"libfuse-options"`
 }
 
 var options mountOptions
@@ -353,21 +350,7 @@ var mountCmd = &cobra.Command{
 		}
 
 		if len(options.Components) == 0 {
-			pipeline := []string{"libfuse"}
-
-			if config.IsSet("streaming") && options.Streaming {
-				pipeline = append(pipeline, "stream")
-			} else if config.IsSet("block-cache") && options.BlockCache {
-				pipeline = append(pipeline, "block_cache")
-			} else {
-				pipeline = append(pipeline, "file_cache")
-			}
-
-			// by default attr-cache is enable in v2
-			// only way to disable is to pass cli param and set it to false
-			if options.AttrCache {
-				pipeline = append(pipeline, "attr_cache")
-			}
+			pipeline := []string{"libfuse", "file_cache", "attr_cache"}
 
 			if containers, err := getBucketListS3(); len(containers) != 0 && err == nil {
 				pipeline = append(pipeline, "s3storage")
@@ -478,23 +461,6 @@ var mountCmd = &cobra.Command{
 			}
 		}
 
-		// TODO: remove v1 switches, which were never used as part of cloudfuse.
-		if config.IsSet("invalidate-on-sync") {
-			log.Warn(
-				"mount: unsupported v1 CLI parameter: invalidate-on-sync is always true in cloudfuse.",
-			)
-		}
-		if config.IsSet("pre-mount-validate") {
-			log.Warn(
-				"mount: unsupported v1 CLI parameter: pre-mount-validate is always true in cloudfuse.",
-			)
-		}
-		if config.IsSet("basic-remount-check") {
-			log.Warn(
-				"mount: unsupported v1 CLI parameter: basic-remount-check is always true in cloudfuse.",
-			)
-		}
-
 		common.EnableMonitoring = options.MonitorOpt.EnableMon
 
 		// check if cloudfuse stats monitor is added in the disable list
@@ -582,13 +548,43 @@ var mountCmd = &cobra.Command{
 				return fmt.Errorf("mount: failed to remove pidFile [%v]", err.Error())
 			}
 
-			pid := os.Getpid()
-			fname := fmt.Sprintf("/tmp/cloudfuse.%v", pid)
+			if options.EnableRemountSystem {
+				// Check if the user exists
+				if options.ServiceUser == "" {
+					return fmt.Errorf(
+						"mount: service user is required when enabling remount as system on Linux. " +
+							"Pass --service-remount-user with the user the service will run as on remount",
+					)
+				}
 
-			ctx := context.Background()
-			err = createDaemon(pipeline, ctx, pidFileName, 0644, 022, fname)
-			if err != nil {
-				return fmt.Errorf("mount: failed to create daemon [%v]", err.Error())
+				serviceName, err := installRemountService(
+					options.ServiceUser,
+					options.MountPath,
+					options.ConfigFile,
+				)
+				if err != nil {
+					return fmt.Errorf(
+						"mount: failed to install service to remount on restart [%v]",
+						err.Error(),
+					)
+				}
+
+				err = startService(serviceName)
+				if err != nil {
+					return fmt.Errorf(
+						"mount: failed to start service using remount on restart [%v]",
+						err.Error(),
+					)
+				}
+			} else {
+				pid := os.Getpid()
+				fname := fmt.Sprintf("/tmp/cloudfuse.%v", pid)
+
+				ctx := context.Background()
+				err = createDaemon(pipeline, ctx, pidFileName, 0644, 022, fname)
+				if err != nil {
+					return fmt.Errorf("mount: failed to create daemon [%v]", err.Error())
+				}
 			}
 		} else {
 			if options.CPUProfile != "" {
@@ -752,7 +748,7 @@ func init() {
 		"Encrypt auto generated config file for each container")
 
 	mountCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
-		"Base64 encoded key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\n Decoded key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
+		"Password to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.")
 
 	mountCmd.PersistentFlags().
 		String("log-type", "base", "Type of logger to be used by the system. Set to base by default. Allowed values are silent|syslog|base.")
@@ -812,18 +808,6 @@ func init() {
 	)
 	_ = mountCmd.MarkPersistentFlagDirname("default-working-dir")
 
-	mountCmd.Flags().BoolVar(&options.Streaming, "streaming", false, "Enable Streaming.")
-	config.BindPFlag("streaming", mountCmd.Flags().Lookup("streaming"))
-	mountCmd.Flags().Lookup("streaming").Hidden = true
-
-	mountCmd.Flags().BoolVar(&options.BlockCache, "block-cache", false, "Enable Block-Cache.")
-	config.BindPFlag("block-cache", mountCmd.Flags().Lookup("block-cache"))
-	mountCmd.Flags().Lookup("block-cache").Hidden = true
-
-	mountCmd.Flags().BoolVar(&options.AttrCache, "use-attr-cache", true, "Use attribute caching.")
-	config.BindPFlag("use-attr-cache", mountCmd.Flags().Lookup("use-attr-cache"))
-	mountCmd.Flags().Lookup("use-attr-cache").Hidden = true
-
 	mountCmd.Flags().Bool("invalidate-on-sync", true, "Invalidate file/dir on sync/fsync.")
 	config.BindPFlag("invalidate-on-sync", mountCmd.Flags().Lookup("invalidate-on-sync"))
 	mountCmd.Flags().Lookup("invalidate-on-sync").Hidden = true
@@ -837,11 +821,11 @@ func init() {
 	config.BindPFlag("basic-remount-check", mountCmd.Flags().Lookup("basic-remount-check"))
 	mountCmd.Flags().Lookup("basic-remount-check").Hidden = true
 
-	if runtime.GOOS == "windows" {
-		mountCmd.Flags().
-			BoolVar(&options.EnableRemountSystem, "enable-remount-system", false, "Remount container on server restart. Mount will restart on reboot.")
-		config.BindPFlag("enable-remount-system", mountCmd.Flags().Lookup("enable-remount-system"))
+	mountCmd.Flags().
+		BoolVar(&options.EnableRemountSystem, "enable-remount-system", false, "Remount container on server restart. Mount will restart on reboot.")
+	config.BindPFlag("enable-remount-system", mountCmd.Flags().Lookup("enable-remount-system"))
 
+	if runtime.GOOS == "windows" {
 		mountCmd.Flags().
 			BoolVar(&options.EnableRemountUser, "enable-remount-user", false, "Remount container on server restart for current user. Mount will restart on current user log in.")
 		config.BindPFlag("enable-remount-user", mountCmd.Flags().Lookup("enable-remount-user"))
@@ -849,6 +833,12 @@ func init() {
 		mountCmd.Flags().
 			StringVar(&options.PassphrasePipe, "passphrase-pipe", "", "Specifies a named pipe to read the passphrase from.")
 		config.BindPFlag("passphrase-pipe", mountCmd.Flags().Lookup("passphrase-pipe"))
+	}
+
+	if runtime.GOOS == "linux" {
+		mountCmd.Flags().
+			StringVar(&options.ServiceUser, "remount-system-user", "", "User that the service remount will run as.")
+		config.BindPFlag("remount-system-user", mountCmd.Flags().Lookup("remount-system-user"))
 	}
 
 	mountCmd.PersistentFlags().
