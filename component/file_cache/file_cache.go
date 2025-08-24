@@ -67,7 +67,7 @@ type FileCache struct {
 	offlineOps      sync.Map      // uses object name (common.JoinUnixFilepath)
 	offlineOpAdded  chan struct{} // signals when an offline operation is queued
 	mountPath       string        // uses os.Separator (filepath.Join)
-	scheduleOps     sync.Map // uses object name (common.JoinUnixFilepath)
+	scheduleOps     sync.Map      // uses object name (common.JoinUnixFilepath)
 	allowOther      bool
 	offloadIO       bool
 	offlineAccess   bool
@@ -90,6 +90,7 @@ type FileCache struct {
 	alwaysOn           bool
 	activeWindows      int
 	activeWindowsMutex *sync.Mutex
+	closeWindowCh      chan struct{}
 }
 
 // Structure defining your config parameters
@@ -204,6 +205,7 @@ func (fc *FileCache) Start(ctx context.Context) error {
 	fileCacheStatsCollector = stats_manager.NewStatsCollector(fc.Name())
 	log.Debug("Starting file cache stats collector")
 
+	fc.uploadNotifyCh = make(chan struct{}, 1)
 	err = fc.SetupScheduler()
 	if err != nil {
 		log.Warn("FileCache::Start : Failed to setup scheduler [%s]", err.Error())
@@ -302,6 +304,11 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 	flock.Lock()
 	defer flock.Unlock()
 
+	// don't double upload
+	if !flock.SyncPending {
+		return nil
+	}
+
 	// look up file (or folder!)
 	localPath := filepath.Join(fc.tmpPath, name)
 	info, err := os.Stat(localPath)
@@ -336,11 +343,7 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 		handle.Flags.Set(handlemap.HandleFlagDirty)
 
 		// upload the file
-		err = fc.flushFileInternal(internal.FlushFileOptions{
-			Handle:          handle,
-			ImmediateUpload: true,
-			CloseInProgress: true,
-		})
+		err = fc.flushFileInternal(internal.FlushFileOptions{Handle: handle, ImmediateUpload: true, CloseInProgress: true})
 		f.Close()
 		if err != nil {
 			log.Err("FileCache::uploadPendingFile : %s Upload failed. Here's why: %v", name, err)
@@ -1821,10 +1824,7 @@ func (fc *FileCache) closeFileInternal(
 	if !noCachedHandle {
 		// flock is already locked, as required by flushFileInternal
 		err := fc.flushFileInternal(
-			internal.FlushFileOptions{
-				Handle:          options.Handle,
-				CloseInProgress: true,
-			},
+			internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true},
 		) //nolint
 		if err != nil {
 			log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
@@ -2046,7 +2046,6 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 	fc.policy.CacheValid(localPath)
 	// if our handle is dirty then that means we wrote to the file
-
 	if options.Handle.Dirty() {
 		if fc.lazyWrite && !options.CloseInProgress {
 			// As lazy-write is enable, upload will be scheduled when file is closed.
@@ -2076,11 +2075,13 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		// 	log.Err("FileCache::FlushFile : error [couldn't duplicate the fd] %s", options.Handle.Path)
 		// 	return syscall.EIO
 		// }
+
 		// err = syscall.Close(dupFd)
 		// if err != nil {
 		// 	log.Err("FileCache::FlushFile : error [unable to close duplicate fd] %s", options.Handle.Path)
 		// 	return syscall.EIO
 		// }
+
 		// Replace above with Sync since Dup is not supported on Windows
 		err := f.Sync()
 		if err != nil {
@@ -2200,6 +2201,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			}
 		}
 	}
+
 	return nil
 }
 
