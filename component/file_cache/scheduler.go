@@ -37,15 +37,7 @@ func (fc *FileCache) SetupScheduler() error {
 
 	// Setup the cron scheduler
 	cronScheduler := cron.New(cron.WithSeconds())
-	startFunc := func() {
-		log.Info("FileCache::SetupScheduler : Starting scheduled upload window")
-		fc.closeWindowCh = make(chan struct{})
-	}
-	endFunc := func() {
-		log.Info("FileCache::SetupScheduler : Upload window ended")
-		close(fc.closeWindowCh)
-	}
-	fc.scheduleUploads(cronScheduler, fc.schedule, startFunc, endFunc)
+	fc.scheduleUploads(cronScheduler, fc.schedule)
 	cronScheduler.Start()
 
 	log.Info("FileCache::SetupScheduler : Scheduler started successfully")
@@ -60,12 +52,17 @@ func isValidCronExpression(expr string) bool {
 	return err == nil
 }
 
-func (fc *FileCache) scheduleUploads(
-	c *cron.Cron,
-	sched WeeklySchedule,
-	startFunc func(),
-	endFunc func(),
-) {
+func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
+	// define callbacks to activate and disable uploads
+	startFunc := func() {
+		log.Info("FileCache::SetupScheduler : Starting scheduled upload window")
+		fc.closeWindowCh = make(chan struct{})
+	}
+	endFunc := func() {
+		log.Info("FileCache::SetupScheduler : Upload window ended")
+		close(fc.closeWindowCh)
+	}
+	// start up the schedules
 	for _, config := range sched {
 		windowName := config.Name
 
