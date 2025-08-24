@@ -65,14 +65,14 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 	// start up the schedules
 	for _, config := range sched {
 		windowName := config.Name
-
-		durationParsed, err := time.ParseDuration(config.Duration)
+		duration, err := time.ParseDuration(config.Duration)
 		if err != nil {
 			log.Info("[%s] Invalid duration '%s': %v\n", windowName, config.Duration, err)
 			continue
 		}
+		var initialWindowEndTime time.Time
 
-		_, err = c.AddFunc(config.CronExpr, func() {
+		cronEntryId, err := c.AddFunc(config.CronExpr, func() {
 			// Start a new window and track it
 			fc.activeWindowsMutex.Lock()
 			isFirstWindow := fc.activeWindows == 0
@@ -80,18 +80,23 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 			windowCount := fc.activeWindows
 			fc.activeWindowsMutex.Unlock()
 
+			// activate uploads
 			if isFirstWindow {
 				// open the window
 				startFunc()
 			}
 
-			log.Info("[%s] Starting upload at %s (active windows: %d)\n",
-				windowName, time.Now().Format(time.Kitchen), windowCount)
-
+			log.Info("schedule [%s] starting (active windows=%d)", windowName, windowCount)
 			fc.servicePendingOps()
 
-			// Create a context with timeout for the duration of the window
-			window, cancel := context.WithTimeout(context.Background(), durationParsed)
+			// When should the window close?
+			remainingDuration := duration
+			currentTime := time.Now()
+			if initialWindowEndTime.After(currentTime) {
+				remainingDuration = initialWindowEndTime.Sub(currentTime)
+			}
+			// Create a context to end the window
+			window, cancel := context.WithTimeout(context.Background(), remainingDuration)
 			defer cancel()
 
 			for {
@@ -126,6 +131,16 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 			log.Err("[%s] Failed to schedule cron job with expression '%s': %v\n",
 				windowName, config.CronExpr, err)
 			continue
+		}
+
+		// check if this schedule should already be active
+		// did this schedule have a start time within the last duration?
+		schedule := c.Entry(cronEntryId)
+		currentTime := time.Now()
+		currentWindowStartTime := schedule.Schedule.Next(currentTime.Add(-duration))
+		if currentTime.After(currentWindowStartTime) {
+			initialWindowEndTime = currentWindowStartTime.Add(duration)
+			go schedule.Job.Run()
 		}
 	}
 }
