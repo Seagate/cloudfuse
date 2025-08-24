@@ -1544,7 +1544,7 @@ func (suite *fileCacheTestSuite) TestCronOnToOFFUpload() {
 	defer suite.cleanupTest()
 
 	now := time.Now()
-	second := (now.Second() + 3) % 60
+	second := now.Second() % 60
 	cronExpr := fmt.Sprintf("%d * * * * *", second)
 
 	configContent := fmt.Sprintf(`file_cache:
@@ -1554,7 +1554,7 @@ func (suite *fileCacheTestSuite) TestCronOnToOFFUpload() {
   schedule:
     - name: "Test"
       cron: %s
-      duration: "3s"
+      duration: "2s"
     - name: "TestWindow"
       cron: "0 0 9 * * 0"
       duration: "5s"
@@ -1569,8 +1569,6 @@ loopbackfs:
 	// Setup the file cache with this configuration
 	suite.setupTestHelper(configContent)
 
-	time.Sleep(4 * time.Second)
-
 	file1 := "scheduled_on_window.txt"
 	handle1, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file1, Mode: 0777})
 	suite.assert.NoError(err)
@@ -1579,44 +1577,35 @@ loopbackfs:
 	suite.assert.NoError(err)
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle1})
 	suite.assert.NoError(err)
-
 	suite.assert.FileExists(filepath.Join(suite.cache_path, file1))
 
-	fileUploaded := false
-
-	time.Sleep(300 * time.Millisecond)
-
-	if _, err := os.Stat(filepath.Join(suite.fake_storage_path, file1)); err == nil {
-		fileUploaded = true
-		fmt.Println("First file successfully uploaded during ON window")
+	_, err = os.Stat(filepath.Join(suite.fake_storage_path, file1))
+	for i := 0; i < 200 && os.IsNotExist(err); i++ {
+		time.Sleep(10 * time.Millisecond)
+		_, err = os.Stat(filepath.Join(suite.cache_path, file1))
 	}
+	suite.FileExists(
+		filepath.Join(suite.fake_storage_path, file1),
+		"First file should be uploaded when scheduler is ON",
+	)
 
-	suite.assert.True(fileUploaded, "First file should be uploaded when scheduler is ON")
-	suite.assert.FileExists(filepath.Join(suite.fake_storage_path, file1))
-
-	time.Sleep(4 * time.Second) // Add buffer to ensure window closes
+	// wait for window to close
+	time.Sleep(2 * time.Second)
 
 	file2 := "scheduled_off_window.txt"
 	handle2, err := suite.fileCache.CreateFile(internal.CreateFileOptions{Name: file2, Mode: 0777})
 	suite.assert.NoError(err)
-
 	data2 := []byte("file created during scheduler OFF window")
 	_, err = suite.fileCache.WriteFile(internal.WriteFileOptions{Handle: handle2, Data: data2})
 	suite.assert.NoError(err)
-
 	err = suite.fileCache.CloseFile(internal.CloseFileOptions{Handle: handle2})
 	suite.assert.NoError(err)
-
 	suite.assert.FileExists(filepath.Join(suite.cache_path, file2))
 	suite.assert.NoFileExists(filepath.Join(suite.fake_storage_path, file2))
-
 	_, exists := suite.fileCache.scheduleOps.Load(file2)
 	suite.assert.True(exists, "File should be added to scheduleOps when scheduler is OFF")
-
 	flock := suite.fileCache.fileLocks.Get(file2)
-	if flock != nil {
-		suite.assert.True(flock.SyncPending, "SyncPending flag should be set")
-	}
+	suite.assert.True(flock.SyncPending, "SyncPending flag should be set")
 }
 
 func (suite *fileCacheTestSuite) TestNoScheduleAlwaysOn() {
