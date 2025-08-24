@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/Seagate/cloudfuse/common"
@@ -38,16 +37,15 @@ func (fc *FileCache) SetupScheduler() error {
 
 	// Setup the cron scheduler
 	cronScheduler := cron.New(cron.WithSeconds())
-
 	startFunc := func() {
 		log.Info("FileCache::SetupScheduler : Starting scheduled upload window")
+		fc.closeWindowCh = make(chan struct{})
 	}
-
 	endFunc := func() {
 		log.Info("FileCache::SetupScheduler : Upload window ended")
+		close(fc.closeWindowCh)
 	}
 	fc.scheduleUploads(cronScheduler, fc.schedule, startFunc, endFunc)
-
 	cronScheduler.Start()
 
 	log.Info("FileCache::SetupScheduler : Scheduler started successfully")
@@ -68,13 +66,6 @@ func (fc *FileCache) scheduleUploads(
 	startFunc func(),
 	endFunc func(),
 ) {
-	// Add a mutex and counter to track active windows
-	fc.activeWindowsMutex.Lock()
-	if fc.activeWindowsMutex == nil {
-		fc.activeWindowsMutex = &sync.Mutex{}
-	}
-	fc.activeWindowsMutex.Unlock()
-
 	for _, config := range sched {
 		windowName := config.Name
 
@@ -93,9 +84,8 @@ func (fc *FileCache) scheduleUploads(
 			fc.activeWindowsMutex.Unlock()
 
 			if isFirstWindow {
+				// open the window
 				startFunc()
-				// Only create notification channel for the first active window
-				fc.uploadNotifyCh = make(chan struct{}, 100)
 			}
 
 			log.Info("[%s] Starting upload at %s (active windows: %d)\n",
@@ -109,6 +99,9 @@ func (fc *FileCache) scheduleUploads(
 
 			for {
 				select {
+				case <-fc.stopAsyncUpload:
+					log.Info("Shutting down upload scheduler")
+					return
 				case <-window.Done():
 					// Window has completed, update active window count
 					fc.activeWindowsMutex.Lock()
@@ -122,12 +115,9 @@ func (fc *FileCache) scheduleUploads(
 
 					// Only close resources when the last window ends
 					if isLastWindow {
-						close(fc.uploadNotifyCh)
-						fc.uploadNotifyCh = nil
 						endFunc()
 					}
 					return
-
 				case <-fc.uploadNotifyCh:
 					log.Debug("[%s] File change detected, processing pending uploads at %s\n",
 						windowName, time.Now().Format(time.Kitchen))
@@ -145,22 +135,20 @@ func (fc *FileCache) scheduleUploads(
 
 func (fc *FileCache) markFileForUpload(path string) {
 	fc.scheduleOps.Store(path, struct{}{})
-	if fc.uploadNotifyCh != nil {
-		select {
-		case fc.uploadNotifyCh <- struct{}{}:
-			// Successfully notified
-			log.Info(
-				"FileCache::markFileForUpload : Notified upload window about new file: %s",
-				path,
-			)
-		default:
-			// Channel buffer is full, which means notifications are already pending
-			// No need to block here as uploads will be processed soon
-			log.Info(
-				"FileCache::markFileForUpload : Upload window notification channel full, skipping notify for: %s",
-				path,
-			)
-		}
+	select {
+	case fc.uploadNotifyCh <- struct{}{}:
+		// Successfully notified
+		log.Info(
+			"FileCache::markFileForUpload : Notified upload window about new file: %s",
+			path,
+		)
+	default:
+		// Channel buffer is full, which means notifications are already pending
+		// No need to block here as uploads will be processed soon
+		log.Info(
+			"FileCache::markFileForUpload : Upload window notification channel full, skipping notify for: %s",
+			path,
+		)
 	}
 }
 
@@ -172,6 +160,8 @@ func (fc *FileCache) servicePendingOps() {
 		select {
 		case <-fc.stopAsyncUpload:
 			log.Info("FileCache::servicePendingOps : Upload processing interrupted")
+			return false
+		case <-fc.closeWindowCh:
 			return false
 		default:
 			path := key.(string)
@@ -198,6 +188,11 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 	flock.Lock()
 	defer flock.Unlock()
 
+	// don't double upload
+	if !flock.SyncPending {
+		return nil
+	}
+
 	// look up file (or folder!)
 	localPath := filepath.Join(fc.tmpPath, name)
 	info, err := os.Stat(localPath)
@@ -213,8 +208,11 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 			return err
 		}
 	} else {
+		// this is a file
+		// prepare a handle
 		handle := handlemap.NewHandle(name)
-		f, err := common.OpenFile(localPath, os.O_RDWR, fc.defaultPermission)
+		// open the cached file
+		f, err := common.OpenFile(localPath, os.O_RDONLY, fc.defaultPermission)
 		if err != nil {
 			log.Err("FileCache::uploadPendingFile : %s failed to open file. Here's why: %v", name, err)
 			return err
@@ -228,13 +226,9 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 		handle.SetFileObject(f)
 		handle.Flags.Set(handlemap.HandleFlagDirty)
 
-		err = fc.flushFileInternal(internal.FlushFileOptions{
-			Handle:          handle,
-			ImmediateUpload: true,
-		})
-
+		// upload the file
+		err = fc.flushFileInternal(internal.FlushFileOptions{Handle: handle, CloseInProgress: true, ImmediateUpload: true})
 		f.Close()
-
 		if err != nil {
 			log.Err("FileCache::uploadPendingFile : %s Upload failed. Cause: %v", name, err)
 			return err
@@ -242,9 +236,8 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 	}
 	// update state
 	flock.SyncPending = false
-	// Successfully uploaded, removing from scheduleOps
-	log.Info("FileCache::uploadPendingFile : File uploaded: %s", name)
 	fc.scheduleOps.Delete(name)
+	log.Info("FileCache::uploadPendingFile : File uploaded: %s", name)
 
 	return nil
 }
