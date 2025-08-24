@@ -30,8 +30,9 @@
 package internal
 
 import (
-	context "context"
-	reflect "reflect"
+	"context"
+	"reflect"
+	"time"
 
 	common "github.com/Seagate/cloudfuse/common"
 	handlemap "github.com/Seagate/cloudfuse/internal/handlemap"
@@ -518,6 +519,11 @@ func (mr *MockComponentMockRecorder) RenameDir(arg0 interface{}) *gomock.Call {
 func (m *MockComponent) RenameFile(arg0 RenameFileOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RenameFile", arg0)
+	if arg0.DstAttr != nil {
+		arg0.DstAttr.Atime = time.Now()
+		arg0.DstAttr.Mtime = time.Now()
+		arg0.DstAttr.Ctime = time.Now()
+	}
 	ret0, _ := ret[0].(error)
 	return ret0
 }

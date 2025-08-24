@@ -301,6 +301,7 @@ func (ac *AttrCache) moveCachedItem(
 		cachedAt: srcItem.cachedAt,
 	})
 	// copy the inCloud flag
+	dstItem.attr.Mode = srcItem.attr.Mode
 	dstItem.markInCloud(srcItem.isInCloud())
 	// recurse over any children
 	for _, srcChildItm := range srcItem.children {
@@ -837,7 +838,6 @@ func (ac *AttrCache) updateAncestorsInCloud(dirPath string, time time.Time) {
 // RenameFile : Move item in cache
 func (ac *AttrCache) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("AttrCache::RenameFile : %s -> %s", options.Src, options.Dst)
-
 	err := ac.NextComponent().RenameFile(options)
 	if err == nil {
 		renameTime := time.Now()
@@ -942,6 +942,14 @@ func (ac *AttrCache) CopyToFile(options internal.CopyToFileOptions) error {
 		entry, found := ac.cache.get(options.Name)
 		if found {
 			entry.markDeleted(time.Now())
+		}
+		// todo: invalidating path here rather than updating with etag
+		// due to some changes that are required in az storage comp which
+		// were not necessarily required. Once they were done invalidation
+		// of the attribute can be removed.
+		value, found := ac.cache.get(internal.TruncateDirName(options.Name))
+		if found {
+			value.invalidate()
 		}
 	}
 	return err

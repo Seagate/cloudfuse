@@ -548,7 +548,7 @@ func (az *AzStorage) DeleteFile(options internal.DeleteFileOptions) error {
 func (az *AzStorage) RenameFile(options internal.RenameFileOptions) error {
 	log.Trace("AzStorage::RenameFile : %s to %s", options.Src, options.Dst)
 
-	err := az.storage.RenameFile(az.ctx, options.Src, options.Dst)
+	err := az.storage.RenameFile(az.ctx, options.Src, options.Dst, options.SrcAttr)
 	az.updateConnectionState(err)
 
 	if err == nil {
@@ -584,6 +584,7 @@ func (az *AzStorage) ReadInBuffer(options internal.ReadInBufferOptions) (length 
 		options.Offset,
 		dataLen,
 		options.Data,
+		options.Etag,
 	)
 	az.updateConnectionState(err)
 	if err != nil {
@@ -746,7 +747,7 @@ func (az *AzStorage) StageData(opt internal.StageDataOptions) error {
 }
 
 func (az *AzStorage) CommitData(opt internal.CommitDataOptions) error {
-	err := az.storage.CommitBlocks(az.ctx, opt.Name, opt.List)
+	err := az.storage.CommitBlocks(az.ctx, opt.Name, opt.List, opt.NewETag)
 	az.updateConnectionState(err)
 	return err
 }
@@ -925,6 +926,9 @@ func init() {
 		"Preserve ACL and Permissions set on file during updates",
 	)
 	config.BindPFlag(compName+".preserve-acl", preserveACL)
+
+	blobFilter := config.AddStringFlag("filter", "", "Filter string to match blobs")
+	config.BindPFlag(compName+".filter", blobFilter)
 
 	config.RegisterFlagCompletionFunc(
 		"container-name",

@@ -28,14 +28,12 @@ package azstorage
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/log"
@@ -48,6 +46,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake/file"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake/filesystem"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake/service"
+	"github.com/vibhansa-msft/blobfilter"
 )
 
 type Datalake struct {
@@ -97,7 +96,13 @@ func (dl *Datalake) Configure(cfg AzStorageConfig) error {
 			EncryptionAlgorithm: to.Ptr(directory.EncryptionAlgorithmTypeAES256),
 		}
 	}
-	return dl.BlockBlob.Configure(transformConfig(cfg))
+
+	err := dl.BlockBlob.Configure(transformConfig(cfg))
+
+	// List call shall always retrieved permissions for HNS accounts
+	dl.BlockBlob.listDetails.Permissions = true
+
+	return err
 }
 
 // For dynamic config update the config here
@@ -338,12 +343,14 @@ func (dl *Datalake) DeleteDirectory(ctx context.Context, name string) (err error
 }
 
 // RenameFile : Rename the file
-func (dl *Datalake) RenameFile(ctx context.Context, source string, target string) error {
+// While renaming the file, Creation time is preserved but LMT is changed for the destination blob.
+// and also Etag of the destination blob changes
+func (dl *Datalake) RenameFile(ctx context.Context, source string, target string, srcAttr *internal.ObjAttr) error {
 	log.Trace("Datalake::RenameFile : %s -> %s", source, target)
 
 	fileClient := dl.getFileClientPathEscape(source)
 
-	_, err := fileClient.Rename(
+	renameResponse, err := fileClient.Rename(
 		ctx,
 		dl.getFormattedPath(target),
 		&file.RenameOptions{
@@ -360,7 +367,7 @@ func (dl *Datalake) RenameFile(ctx context.Context, source string, target string
 			return err
 		}
 	}
-
+	modifyLMTandEtag(srcAttr, renameResponse.LastModified, sanitizeEtag(renameResponse.ETag))
 	return nil
 }
 
@@ -391,7 +398,7 @@ func (dl *Datalake) RenameDirectory(ctx context.Context, source string, target s
 }
 
 // GetAttr : Retrieve attributes of the path
-func (dl *Datalake) GetAttr(ctx context.Context, name string) (attr *internal.ObjAttr, err error) {
+func (dl *Datalake) GetAttr(ctx context.Context, name string) (blobAttr *internal.ObjAttr, err error) {
 	log.Trace("Datalake::GetAttr : name %s", name)
 
 	fileClient := dl.getFileClient(name)
@@ -402,27 +409,27 @@ func (dl *Datalake) GetAttr(ctx context.Context, name string) (attr *internal.Ob
 		e := storeDatalakeErrToErr(err)
 		switch e {
 		case ErrFileNotFound:
-			return attr, syscall.ENOENT
+			return blobAttr, syscall.ENOENT
 		case InvalidPermission:
 			log.Err("Datalake::GetAttr : Insufficient permissions for %s [%s]", name, err.Error())
-			return attr, syscall.EACCES
+			return blobAttr, syscall.EACCES
 		default:
 			log.Err(
 				"Datalake::GetAttr : Failed to get path properties for %s [%s]",
 				name,
 				err.Error(),
 			)
-			return attr, err
+			return blobAttr, err
 		}
 	}
 
 	mode, err := getFileMode(*prop.Permissions)
 	if err != nil {
 		log.Err("Datalake::GetAttr : Failed to get file mode for %s [%s]", name, err.Error())
-		return attr, err
+		return blobAttr, err
 	}
 
-	attr = &internal.ObjAttr{
+	blobAttr = &internal.ObjAttr{
 		Path:   name,
 		Name:   filepath.Base(name),
 		Size:   *prop.ContentLength,
@@ -432,12 +439,13 @@ func (dl *Datalake) GetAttr(ctx context.Context, name string) (attr *internal.Ob
 		Ctime:  *prop.LastModified,
 		Crtime: *prop.LastModified,
 		Flags:  internal.NewFileBitMap(),
+		ETag:   sanitizeEtag(prop.ETag),
 	}
-	parseMetadata(attr, prop.Metadata)
+	parseMetadata(blobAttr, prop.Metadata)
 
 	if *prop.ResourceType == "directory" {
-		attr.Flags = internal.NewDirBitMap()
-		attr.Mode = attr.Mode | os.ModeDir
+		blobAttr.Flags = internal.NewDirBitMap()
+		blobAttr.Mode = blobAttr.Mode | os.ModeDir
 	}
 
 	if dl.Config.honourACL && dl.Config.authConfig.ObjectID != "" {
@@ -450,12 +458,23 @@ func (dl *Datalake) GetAttr(ctx context.Context, name string) (attr *internal.Ob
 			if err != nil {
 				log.Err("Datalake::GetAttr : Failed to get file mode from ACL for %s [%s]", name, err.Error())
 			} else {
-				attr.Mode = mode
+				blobAttr.Mode = mode
 			}
 		}
 	}
 
-	return attr, nil
+	if dl.Config.filter != nil {
+		if !dl.Config.filter.IsAcceptable(&blobfilter.BlobAttr{
+			Name:  blobAttr.Name,
+			Mtime: blobAttr.Mtime,
+			Size:  blobAttr.Size,
+		}) {
+			log.Debug("Datalake::GetAttr : Filtered out %s", name)
+			return nil, syscall.ENOENT
+		}
+	}
+
+	return blobAttr, nil
 }
 
 // List : Get a list of path matching the given prefix
@@ -467,129 +486,7 @@ func (dl *Datalake) List(
 	marker *string,
 	count int32,
 ) ([]*internal.ObjAttr, *string, error) {
-	log.Trace("Datalake::List : prefix %s, marker %s", prefix, func(marker *string) string {
-		if marker != nil {
-			return *marker
-		} else {
-			return ""
-		}
-	}(marker))
-
-	pathList := make([]*internal.ObjAttr, 0)
-
-	if count == 0 {
-		count = common.MaxDirListCount
-	}
-
-	prefixPath := dl.getFormattedPath(prefix)
-	if prefix != "" && prefix[len(prefix)-1] == '/' {
-		prefixPath += "/"
-	}
-
-	// Get a result segment starting with the path indicated by the current Marker.
-	pager := dl.Filesystem.NewListPathsPager(false, &filesystem.ListPathsOptions{
-		Marker:     marker,
-		MaxResults: &count,
-		Prefix:     &prefixPath,
-	})
-
-	// Process the paths returned in this result segment (if the segment is empty, the loop body won't execute)
-	listPath, err := pager.NextPage(ctx)
-	if err != nil {
-		log.Err("Datalake::List : Failed to validate account with given auth %s", err.Error())
-		m := ""
-		e := storeDatalakeErrToErr(err)
-		switch e {
-		case ErrFileNotFound: // TODO: should this be checked for list calls
-			return pathList, &m, syscall.ENOENT
-		case InvalidPermission:
-			return pathList, &m, syscall.EACCES
-		default:
-			return pathList, &m, err
-		}
-	}
-
-	// Process the paths returned in this result segment (if the segment is empty, the loop body won't execute)
-	for _, pathInfo := range listPath.Paths {
-		// convert path name
-		conv_name := dl.getFileName(*pathInfo.Name)
-		pathInfo.Name = &conv_name
-
-		var attr *internal.ObjAttr
-		var lastModifiedTime time.Time
-		if dl.Config.disableSymlink {
-			var mode fs.FileMode
-			if pathInfo.Permissions != nil {
-				mode, err = getFileMode(*pathInfo.Permissions)
-				if err != nil {
-					log.Err(
-						"Datalake::List : Failed to get file mode for %s [%s]",
-						*pathInfo.Name,
-						err.Error(),
-					)
-					m := ""
-					return pathList, &m, err
-				}
-			} else {
-				// This happens when a blob account is mounted with type:adls
-				log.Err("Datalake::List : Failed to get file permissions for %s", *pathInfo.Name)
-			}
-
-			var contentLength int64 = 0
-			if pathInfo.ContentLength != nil {
-				contentLength = *pathInfo.ContentLength
-			} else {
-				// This happens when a blob account is mounted with type:adls
-				log.Err("Datalake::List : Failed to get file length for %s", *pathInfo.Name)
-			}
-
-			if pathInfo.LastModified != nil {
-				lastModifiedTime, err = time.Parse(time.RFC1123, *pathInfo.LastModified)
-				if err != nil {
-					log.Err(
-						"Datalake::List : Failed to get last modified time for %s [%s]",
-						*pathInfo.Name,
-						err.Error(),
-					)
-				}
-			}
-			attr = &internal.ObjAttr{
-				Path:   *pathInfo.Name,
-				Name:   filepath.Base(*pathInfo.Name),
-				Size:   contentLength,
-				Mode:   mode,
-				Mtime:  lastModifiedTime,
-				Atime:  lastModifiedTime,
-				Ctime:  lastModifiedTime,
-				Crtime: lastModifiedTime,
-				Flags:  internal.NewFileBitMap(),
-			}
-			if pathInfo.IsDirectory != nil && *pathInfo.IsDirectory {
-				attr.Flags = internal.NewDirBitMap()
-				attr.Mode = attr.Mode | os.ModeDir
-			}
-		} else {
-			attr, err = dl.GetAttr(ctx, *pathInfo.Name)
-			if err != nil {
-				log.Err("Datalake::List : Failed to get properties for %s [%s]", *pathInfo.Name, err.Error())
-				m := ""
-				return pathList, &m, err
-			}
-		}
-
-		// Note: Datalake list paths does not return metadata/properties.
-		// To account for this and accurately return attributes when needed,
-		// we have a flag for whether or not metadata has been retrieved.
-		// If this flag is not set the attribute cache will call get attributes
-		// to fetch metadata properties.
-		// Any method that populates the metadata should set the attribute flag.
-		// Alternatively, if you want Datalake list paths to return metadata/properties as well.
-		// pass CLI parameter --enable-symlinks=true in the mount command.
-		pathList = append(pathList, attr)
-
-	}
-
-	return pathList, listPath.Continuation, nil
+	return dl.BlockBlob.List(ctx, prefix, marker, count)
 }
 
 // ReadToFile : Download a file to a local file
@@ -620,8 +517,9 @@ func (dl *Datalake) ReadInBuffer(
 	offset int64,
 	length int64,
 	data []byte,
+	etag *string,
 ) error {
-	return dl.BlockBlob.ReadInBuffer(ctx, name, offset, length, data)
+	return dl.BlockBlob.ReadInBuffer(ctx, name, offset, length, data, etag)
 }
 
 // WriteFromFile : Upload local file to file
@@ -785,8 +683,22 @@ func (dl *Datalake) StageBlock(ctx context.Context, name string, data []byte, id
 }
 
 // CommitBlocks : persists the block list
-func (dl *Datalake) CommitBlocks(ctx context.Context, name string, blockList []string) error {
-	return dl.BlockBlob.CommitBlocks(ctx, name, blockList)
+func (dl *Datalake) CommitBlocks(ctx context.Context, name string, blockList []string, newEtag *string) error {
+	return dl.BlockBlob.CommitBlocks(ctx, name, blockList, newEtag)
+}
+
+func (dl *Datalake) SetFilter(filter string) error {
+	if filter == "" {
+		dl.Config.filter = nil
+	} else {
+		dl.Config.filter = &blobfilter.BlobFilter{}
+		err := dl.Config.filter.Configure(filter)
+		if err != nil {
+			return err
+		}
+	}
+
+	return dl.BlockBlob.SetFilter(filter)
 }
 
 // getDirectoryClient returns a new directory url. On Windows this will also convert special characters.
@@ -809,15 +721,6 @@ func (dl *Datalake) getFileClient(name string) *file.Client {
 // special characters.
 func (dl *Datalake) getFileClientPathEscape(name string) *file.Client {
 	return dl.Filesystem.NewFileClient(url.PathEscape(dl.getFormattedPath(name)))
-}
-
-// getFileName takes a blob name and will convert the special characters into similar unicode characters
-// on Windows.
-func (dl *Datalake) getFileName(name string) string {
-	if runtime.GOOS == "windows" && dl.Config.restrictedCharsWin {
-		name = convertname.WindowsCloudToFile(name)
-	}
-	return name
 }
 
 // getFormattedPath takes a file name and converts special characters to the original ASCII

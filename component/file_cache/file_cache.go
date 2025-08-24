@@ -67,6 +67,7 @@ type FileCache struct {
 	offlineOps      sync.Map      // uses object name (common.JoinUnixFilepath)
 	offlineOpAdded  chan struct{} // signals when an offline operation is queued
 	mountPath       string        // uses os.Separator (filepath.Join)
+	scheduleOps     sync.Map // uses object name (common.JoinUnixFilepath)
 	allowOther      bool
 	offloadIO       bool
 	offlineAccess   bool
@@ -83,7 +84,12 @@ type FileCache struct {
 	lazyWrite    bool
 	fileCloseOpt sync.WaitGroup
 
-	stopAsyncUpload chan struct{}
+	stopAsyncUpload    chan struct{}
+	schedule           WeeklySchedule
+	uploadNotifyCh     chan struct{}
+	alwaysOn           bool
+	activeWindows      int
+	activeWindowsMutex *sync.Mutex
 }
 
 // Structure defining your config parameters
@@ -191,12 +197,17 @@ func (fc *FileCache) Start(ctx context.Context) error {
 		// since the channel will simply be closed in Stop(), it doesn't need a value type
 		fc.stopAsyncUpload = make(chan struct{})
 		fc.offlineOpAdded = make(chan struct{}, 1)
-		go fc.servicePendingOps()
+		go fc.serviceOfflineOps()
 	}
 
 	// create stats collector for file cache
 	fileCacheStatsCollector = stats_manager.NewStatsCollector(fc.Name())
 	log.Debug("Starting file cache stats collector")
+
+	err = fc.SetupScheduler()
+	if err != nil {
+		log.Warn("FileCache::Start : Failed to setup scheduler [%s]", err.Error())
+	}
 
 	return nil
 }
@@ -231,11 +242,11 @@ func (fc *FileCache) addOfflineOp(name string, flock *common.LockMapItem) {
 	}
 }
 
-func (fc *FileCache) servicePendingOps() {
+func (fc *FileCache) serviceOfflineOps() {
 	for {
 		select {
 		case <-fc.stopAsyncUpload:
-			log.Crit("FileCache::servicePendingOps : Stopping")
+			log.Crit("FileCache::serviceOfflineOps : Stopping")
 			// TODO: Persist pending ops
 			return
 		default:
@@ -263,7 +274,7 @@ func (fc *FileCache) servicePendingOps() {
 					}
 					if err != nil {
 						log.Err(
-							"FileCache::servicePendingOps : %s upload failed. Here's why: %v",
+							"FileCache::serviceOfflineOps : %s upload failed. Here's why: %v",
 							key.(string),
 							err,
 						)
@@ -325,7 +336,12 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 		handle.Flags.Set(handlemap.HandleFlagDirty)
 
 		// upload the file
-		err = fc.flushFileInternal(internal.FlushFileOptions{Handle: handle, CloseInProgress: true})
+		err = fc.flushFileInternal(internal.FlushFileOptions{
+			Handle:          handle,
+			ImmediateUpload: true,
+			CloseInProgress: true,
+		})
+		f.Close()
 		if err != nil {
 			log.Err("FileCache::uploadPendingFile : %s Upload failed. Here's why: %v", name, err)
 			return err
@@ -333,6 +349,8 @@ func (fc *FileCache) uploadPendingFile(name string) error {
 	}
 	// update state
 	flock.SyncPending = false
+	log.Info("FileCache::uploadPendingFile : File uploaded: %s", name)
+	fc.scheduleOps.Delete(name)
 	fc.offlineOps.Delete(name)
 
 	return nil
@@ -453,9 +471,9 @@ func (fc *FileCache) Configure(_ bool) error {
 			fc.Name(),
 			err.Error(),
 		)
-		fc.maxCacheSize = 4192 * MB
+		fc.maxCacheSize = 4192
 	} else {
-		fc.maxCacheSize = 0.8 * float64(avail)
+		fc.maxCacheSize = 0.8 * float64(avail) / (MB)
 	}
 
 	if config.IsSet(compName+".max-size-mb") && conf.MaxSizeMB != 0 {
@@ -481,7 +499,6 @@ func (fc *FileCache) Configure(_ bool) error {
 
 	cacheConfig := fc.GetPolicyConfig(conf)
 	fc.policy = NewLRUPolicy(cacheConfig)
-
 	if fc.policy == nil {
 		log.Err("FileCache::Configure : failed to create cache eviction policy")
 		return fmt.Errorf("config error in %s [%s]", fc.Name(), "failed to create cache policy")
@@ -509,8 +526,51 @@ func (fc *FileCache) Configure(_ bool) error {
 		fc.diskHighWaterMark = (((conf.MaxSizeMB * MB) * float64(cacheConfig.highThreshold)) / 100)
 	}
 
+	if config.IsSet(compName + ".schedule") {
+		var rawSchedule []map[string]interface{}
+		err := config.UnmarshalKey(compName+".schedule", &rawSchedule)
+		if err != nil {
+			log.Err(
+				"FileCache::Configure : Failed to parse schedule configuration [%s]",
+				err.Error(),
+			)
+		} else {
+			// Convert raw schedule to WeeklySchedule
+			fc.schedule = make(WeeklySchedule, 0, len(rawSchedule))
+			for _, rawWindow := range rawSchedule {
+				window := UploadWindow{}
+				if name, ok := rawWindow["name"].(string); ok {
+					window.Name = name
+				}
+				if cronStr, ok := rawWindow["cron"].(string); ok {
+					window.CronExpr = cronStr
+				}
+				if durStr, ok := rawWindow["duration"].(string); ok {
+					window.Duration = durStr
+				}
+				if !isValidCronExpression(window.CronExpr) {
+					log.Err("FileCache::Configure : Invalid cron expression '%s' for schedule window '%s', skipping",
+						window.CronExpr, window.Name)
+					continue
+				}
+
+				// Validate duration
+				_, err := time.ParseDuration(window.Duration)
+				if err != nil {
+					log.Err("FileCache::Configure : Invalid duration '%s' for schedule window '%s': %v, skipping",
+						window.Duration, window.Name, err)
+					continue
+				}
+
+				fc.schedule = append(fc.schedule, window)
+				log.Info("FileCache::Configure : Parsed schedule %s: cron=%s, duration=%s",
+					window.Name, window.CronExpr, window.Duration)
+			}
+		}
+	}
+
 	log.Crit(
-		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, !block-offline-access %t, sync-to-flush %t, !ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v",
+		"FileCache::Configure : create-empty %t, cache-timeout %d, tmp-path %s, max-size-mb %d, high-mark %d, low-mark %d, refresh-sec %v, max-eviction %v, hard-limit %v, policy %s, allow-non-empty-temp %t, cleanup-on-start %t, policy-trace %t, offload-io %t, !block-offline-access %t, sync-to-flush %t, !ignore-sync %t, defaultPermission %v, diskHighWaterMark %v, maxCacheSize %v, mountPath %v, schedule-entries %d",
 		fc.createEmptyFile,
 		int(fc.cacheTimeout),
 		fc.tmpPath,
@@ -532,6 +592,7 @@ func (fc *FileCache) Configure(_ bool) error {
 		fc.diskHighWaterMark,
 		fc.maxCacheSize,
 		fc.mountPath,
+		len(fc.schedule),
 	)
 
 	return nil
@@ -1356,6 +1417,9 @@ func (fc *FileCache) DeleteFile(options internal.DeleteFileOptions) error {
 
 	// delete file from cache
 	fc.policy.CachePurge(localPath)
+
+	// Delete from scheduleOps if it exists
+	fc.scheduleOps.Delete(options.Name)
 	// update file state
 	flock.LazyOpen = false
 	flock.SyncPending = false
@@ -1545,6 +1609,10 @@ func (fc *FileCache) openFileInternal(handle *handlemap.Handle, flock *common.Lo
 			err.Error(),
 		)
 		return err
+	}
+
+	if flags&os.O_TRUNC != 0 {
+		handle.Flags.Set(handlemap.HandleFlagDirty)
 	}
 
 	inf, err := f.Stat()
@@ -1753,7 +1821,10 @@ func (fc *FileCache) closeFileInternal(
 	if !noCachedHandle {
 		// flock is already locked, as required by flushFileInternal
 		err := fc.flushFileInternal(
-			internal.FlushFileOptions{Handle: options.Handle, CloseInProgress: true},
+			internal.FlushFileOptions{
+				Handle:          options.Handle,
+				CloseInProgress: true,
+			},
 		) //nolint
 		if err != nil {
 			log.Err("FileCache::closeFileInternal : failed to flush file %s", options.Handle.Path)
@@ -1975,6 +2046,7 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 	localPath := filepath.Join(fc.tmpPath, options.Handle.Path)
 	fc.policy.CacheValid(localPath)
 	// if our handle is dirty then that means we wrote to the file
+
 	if options.Handle.Dirty() {
 		if fc.lazyWrite && !options.CloseInProgress {
 			// As lazy-write is enable, upload will be scheduled when file is closed.
@@ -2004,13 +2076,11 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		// 	log.Err("FileCache::FlushFile : error [couldn't duplicate the fd] %s", options.Handle.Path)
 		// 	return syscall.EIO
 		// }
-
 		// err = syscall.Close(dupFd)
 		// if err != nil {
 		// 	log.Err("FileCache::FlushFile : error [unable to close duplicate fd] %s", options.Handle.Path)
 		// 	return syscall.EIO
 		// }
-
 		// Replace above with Sync since Dup is not supported on Windows
 		err := f.Sync()
 		if err != nil {
@@ -2023,66 +2093,84 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 		// The local handle can still be used for read and write.
 		var orgMode fs.FileMode
 		modeChanged := false
+		notInCloud := fc.notInCloud(
+			options.Handle.Path,
+		)
+		// Figure out if we should upload immediately or append to pending OPS
+		if options.ImmediateUpload || !notInCloud || fc.alwaysOn {
+			uploadHandle, err := common.Open(localPath)
+			if err != nil {
+				if os.IsPermission(err) {
+					info, _ := os.Stat(localPath)
+					orgMode = info.Mode()
+					newMode := orgMode | 0444
+					err = os.Chmod(localPath, newMode)
+					if err == nil {
+						modeChanged = true
+						uploadHandle, err = common.Open(localPath)
+						log.Info(
+							"FileCache::FlushFile : read mode added to file %s",
+							options.Handle.Path,
+						)
+					}
+				}
 
-		uploadHandle, err := common.Open(localPath)
-		if err != nil {
-			if os.IsPermission(err) {
-				info, _ := os.Stat(localPath)
-				orgMode = info.Mode()
-				newMode := orgMode | 0444
-				err = os.Chmod(localPath, newMode)
-				if err == nil {
-					modeChanged = true
-					uploadHandle, err = common.Open(localPath)
-					log.Info(
-						"FileCache::FlushFile : read mode added to file %s",
+				if err != nil {
+					log.Err(
+						"FileCache::FlushFile : error [unable to open upload handle] %s [%s]",
 						options.Handle.Path,
+						err.Error(),
+					)
+					return err
+				}
+			}
+			err = fc.NextComponent().CopyFromFile(
+				internal.CopyFromFileOptions{
+					Name: options.Handle.Path,
+					File: uploadHandle,
+				})
+
+			uploadHandle.Close()
+
+			if modeChanged {
+				err1 := os.Chmod(localPath, orgMode)
+				if err1 != nil {
+					log.Err(
+						"FileCache::FlushFile : Failed to remove read mode from file %s [%s]",
+						options.Handle.Path,
+						err1.Error(),
 					)
 				}
 			}
 
-			if err != nil {
-				log.Err(
-					"FileCache::FlushFile : error [unable to open upload handle] %s [%s]",
-					options.Handle.Path,
-					err.Error(),
-				)
+			switch {
+			case err == nil:
+				options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
+			case isOffline(err) && fc.offlineAccess:
+				log.Warn("FileCache::FlushFile : %s upload delayed (offline)", options.Handle.Path)
+				// add file to upload queue
+				_, err := os.Stat(localPath)
+				if err == nil {
+					flock := fc.fileLocks.Get(options.Handle.Path)
+					fc.addOfflineOp(options.Handle.Path, flock)
+				}
+			default:
+				log.Err("FileCache::FlushFile : %s upload failed [%v]", options.Handle.Path, err)
 				return err
 			}
-		}
-		err = fc.NextComponent().CopyFromFile(
-			internal.CopyFromFileOptions{
-				Name: options.Handle.Path,
-				File: uploadHandle,
-			})
-
-		uploadHandle.Close()
-
-		if modeChanged {
-			err1 := os.Chmod(localPath, orgMode)
-			if err1 != nil {
-				log.Err(
-					"FileCache::FlushFile : Failed to remove read mode from file %s [%s]",
-					options.Handle.Path,
-					err1.Error(),
-				)
-			}
-		}
-
-		switch {
-		case err == nil:
-			options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
-		case isOffline(err) && fc.offlineAccess:
-			log.Warn("FileCache::FlushFile : %s upload delayed (offline)", options.Handle.Path)
-			// add file to upload queue
-			_, err := os.Stat(localPath)
-			if err == nil {
+		} else {
+			//push to scheduleOps as default since we don't want to upload to the cloud
+			log.Info(
+				"FileCache::FlushFile : %s upload deferred (Scheduled for upload)",
+				options.Handle.Path,
+			)
+			_, statErr := os.Stat(localPath)
+			if statErr == nil {
+				fc.markFileForUpload(options.Handle.Path)
 				flock := fc.fileLocks.Get(options.Handle.Path)
-				fc.addOfflineOp(options.Handle.Path, flock)
+				flock.SyncPending = true
 			}
-		default:
-			log.Err("FileCache::FlushFile : %s upload failed [%v]", options.Handle.Path, err)
-			return err
+			options.Handle.Flags.Clear(handlemap.HandleFlagDirty)
 		}
 
 		// If chmod was done on the file before it was uploaded to container then setting up mode would have been missed
@@ -2112,7 +2200,6 @@ func (fc *FileCache) flushFileInternal(options internal.FlushFileOptions) error 
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -2228,6 +2315,15 @@ func (fc *FileCache) renameLocalFile(
 			localDstPath,
 		)
 		fc.policy.CacheValid(localDstPath)
+
+		// Transfer entry from scheduleOps if it exists
+		if _, found := fc.scheduleOps.Load(srcName); found {
+			fc.scheduleOps.Store(dstName, struct{}{})
+			fc.scheduleOps.Delete(srcName)
+
+			// Ensure SyncPending flag is set on destination
+			dflock.SyncPending = true
+		}
 	case os.IsNotExist(err):
 		if localOnly {
 			// neither cloud nor file cache has this file, so return ENOENT
@@ -2475,7 +2571,8 @@ func (fc *FileCache) FileUsed(name string) error {
 // << DO NOT DELETE ANY AUTO GENERATED CODE HERE >>
 func NewFileCacheComponent() internal.Component {
 	comp := &FileCache{
-		fileLocks: common.NewLockMap(),
+		fileLocks:          common.NewLockMap(),
+		activeWindowsMutex: &sync.Mutex{},
 	}
 	comp.SetName(compName)
 	config.AddConfigChangeEventListener(comp)

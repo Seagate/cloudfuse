@@ -291,11 +291,11 @@ func (cl *Client) headObject(
 }
 
 // Wrapper for awsS3Client.HeadBucket
-func (cl *Client) headBucket(ctx context.Context) (*s3.HeadBucketOutput, error) {
+func (cl *Client) headBucket(ctx context.Context, bucketName string) (*s3.HeadBucketOutput, error) {
 	headBucketOutput, err := cl.awsS3Client.HeadBucket(ctx, &s3.HeadBucketInput{
-		Bucket: aws.String(cl.Config.authConfig.BucketName),
+		Bucket: aws.String(bucketName),
 	})
-	return headBucketOutput, parseS3Err(err, "HeadBucket "+cl.Config.authConfig.BucketName)
+	return headBucketOutput, parseS3Err(err, "HeadBucket "+bucketName)
 }
 
 // Wrapper for awsS3Client.CopyObject

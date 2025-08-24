@@ -34,6 +34,7 @@ import (
 	"github.com/Seagate/cloudfuse/internal"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
+	"github.com/vibhansa-msft/blobfilter"
 )
 
 // Example for azblob usage : https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/storage/azblob#pkg-examples
@@ -77,6 +78,9 @@ type AzStorageConfig struct {
 	cpkEnabled             bool
 	cpkEncryptionKey       string
 	cpkEncryptionKeySha256 string
+
+	// Blob filters
+	filter *blobfilter.BlobFilter
 }
 
 type AzStorageConnection struct {
@@ -103,7 +107,7 @@ type AzConnection interface {
 	DeleteFile(ctx context.Context, name string) error
 	DeleteDirectory(ctx context.Context, name string) error
 
-	RenameFile(context.Context, string, string) error
+	RenameFile(context.Context, string, string, *internal.ObjAttr) error
 	RenameDirectory(context.Context, string, string) error
 
 	GetAttr(ctx context.Context, name string) (attr *internal.ObjAttr, err error)
@@ -118,7 +122,7 @@ type AzConnection interface {
 
 	ReadToFile(ctx context.Context, name string, offset int64, count int64, fi *os.File) error
 	ReadBuffer(ctx context.Context, name string, offset int64, length int64) ([]byte, error)
-	ReadInBuffer(ctx context.Context, name string, offset int64, length int64, data []byte) error
+	ReadInBuffer(ctx context.Context, name string, offset int64, length int64, data []byte, etag *string) error
 
 	WriteFromFile(ctx context.Context, name string, metadata map[string]*string, fi *os.File) error
 	WriteFromBuffer(
@@ -137,9 +141,11 @@ type AzConnection interface {
 
 	GetCommittedBlockList(context.Context, string) (*internal.CommittedBlockList, error)
 	StageBlock(context.Context, string, []byte, string) error
-	CommitBlocks(context.Context, string, []string) error
+	CommitBlocks(context.Context, string, []string, *string) error
 
 	UpdateServiceClient(_, _ string) error
+
+	SetFilter(string) error
 }
 
 // NewAzStorageConnection : Based on account type create respective AzConnection Object

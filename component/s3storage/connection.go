@@ -87,6 +87,7 @@ type S3Connection interface {
 
 	ConnectionOkay(ctx context.Context) error
 	ListBuckets(ctx context.Context) ([]string, error)
+	ListAuthorizedBuckets(ctx context.Context) ([]string, error)
 
 	// This is just for test, shall not be used otherwise
 	SetPrefixPath(string) error

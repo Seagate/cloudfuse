@@ -614,19 +614,22 @@ func (s *clientTestSuite) TestListBuckets() {
 	s.assert.Contains(buckets, storageTestConfigurationParameters.BucketName)
 }
 
-// TODO: Cannot run this test in current test account with buckets we don't have permission for
-// func (s *clientTestSuite) TestDefaultBucketName() {
-// 	defer s.cleanupTest()
-// 	// write config with no bucket name
-// 	config := fmt.Sprintf("s3storage:\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s\n  use-path-style: %t\n",
-// 		storageTestConfigurationParameters.KeyID, storageTestConfigurationParameters.SecretKey,
-// 		storageTestConfigurationParameters.Endpoint, storageTestConfigurationParameters.Region,
-// 		storageTestConfigurationParameters.UsePathStyle)
-// 	err := s.setupTestHelper(config, false)
-// 	s.assert.NoError(err)
-// 	buckets, _ := s.client.ListBuckets()
-// 	s.assert.Contains(buckets, s.client.Config.authConfig.BucketName)
-// }
+func (s *clientTestSuite) TestDefaultBucketName() {
+	defer s.cleanupTest()
+	// write config with no bucket name
+	config := fmt.Sprintf(
+		"s3storage:\n  key-id: %s\n  secret-key: %s\n  endpoint: %s\n  region: %s\n  use-path-style: %t\n",
+		storageTestConfigurationParameters.KeyID,
+		storageTestConfigurationParameters.SecretKey,
+		storageTestConfigurationParameters.Endpoint,
+		storageTestConfigurationParameters.Region,
+		storageTestConfigurationParameters.UsePathStyle,
+	)
+	err := s.setupTestHelper(config, false)
+	s.assert.NoError(err)
+	buckets, _ := s.client.ListBuckets(ctx)
+	s.assert.Contains(buckets, s.client.Config.authConfig.BucketName)
+}
 
 func (s *clientTestSuite) TestSetPrefixPath() {
 	defer s.cleanupTest()

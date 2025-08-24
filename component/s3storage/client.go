@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -222,22 +223,35 @@ func (cl *Client) Configure(cfg Config) error {
 		return err
 	}
 
-	// if no bucket-name was set, default to the first bucket in the list
+	// if no bucket-name was set, default to the first authorized bucket in the list
 	if cl.Config.authConfig.BucketName == "" {
-		if len(bucketList) > 0 {
+		// which buckets does the user have access to?
+		authorizedBucketList := cl.filterAuthorizedBuckets(ctx, bucketList)
+		switch len(authorizedBucketList) {
+		case 0:
+			// if there are none, return an error
+			log.Err("Client::Configure : Error no authorized bucket exists in account: %v", err)
+			return errNoBucketInAccount
+		case 1:
 			cl.Config.authConfig.BucketName = bucketList[0]
 			log.Warn(
-				"Client::Configure : Bucket defaulted to first listed bucket: %s",
-				bucketList[0],
+				"Client::Configure : Bucket defaulted to the only authorized one: %s",
+				cl.Config.authConfig.BucketName,
 			)
-		} else {
-			log.Err("Client::Configure : Error no bucket exists in account: %v", err)
-			return errNoBucketInAccount
+		default:
+			// multiple authorized buckets were found, choose the first one, alphabetically
+			slices.Sort(bucketList)
+			cl.Config.authConfig.BucketName = bucketList[0]
+			log.Warn(
+				"Client::Configure : Bucket defaulted to the first authorized one, alphabetically: %s",
+				cl.Config.authConfig.BucketName,
+			)
 		}
+		return nil
 	}
 
 	// Check that the provided bucket exists and that user has access to bucket
-	_, err = cl.headBucket(ctx)
+	_, err = cl.headBucket(ctx, cl.Config.authConfig.BucketName)
 	if err != nil {
 		// From the aws-sdk-go-v2 documentation
 		// If the bucket does not exist or you do not have permission to access it,
@@ -255,6 +269,47 @@ func (cl *Client) Configure(cfg Config) error {
 	}
 
 	return nil
+}
+
+// Use ListBuckets and filterAuthorizedBuckets to get a list of buckets that the user has access to
+func (cl *Client) ListAuthorizedBuckets(ctx context.Context) ([]string, error) {
+	log.Trace("Client::ListAuthorizedBuckets")
+	allBuckets, err := cl.ListBuckets(ctx)
+	if err != nil {
+		log.Err("Client::ListAuthorizedBuckets : Failed to list buckets. Here's why: %v", err)
+		return allBuckets, err
+	}
+	authorizedBuckets := cl.filterAuthorizedBuckets(ctx, allBuckets)
+	return authorizedBuckets, nil
+}
+
+// filter out buckets for which we do not have permissions
+func (cl *Client) filterAuthorizedBuckets(ctx context.Context, bucketList []string) (authorizedBucketList []string) {
+	if len(bucketList) == 0 {
+		return bucketList
+	}
+	// use parallel requests
+	var wg sync.WaitGroup
+	authorizedBuckets := make(chan string, len(bucketList))
+	for _, bucketName := range bucketList {
+		wg.Add(1)
+		go func(bucketName string) {
+			defer wg.Done()
+			if _, err := cl.headBucket(ctx, bucketName); err == nil {
+				authorizedBuckets <- bucketName
+			}
+		}(bucketName)
+	}
+	// use a go routine to close the channel after all workers finish
+	go func() {
+		wg.Wait()
+		close(authorizedBuckets)
+	}()
+	// get the authorized buckets from the channel
+	for bucketName := range authorizedBuckets {
+		authorizedBucketList = append(authorizedBucketList, bucketName)
+	}
+	return authorizedBucketList
 }
 
 func getRegionFromEndpoint(endpoint string) (string, error) {
@@ -1338,7 +1393,7 @@ func (cl *Client) combineSmallBlocks(
 }
 
 func (cl *Client) GetUsedSize(ctx context.Context) (uint64, error) {
-	headBucketOutput, err := cl.headBucket(ctx)
+	headBucketOutput, err := cl.headBucket(ctx, cl.Config.authConfig.BucketName)
 	if err != nil {
 		return 0, err
 	}

@@ -426,6 +426,13 @@ func (lfs *LoopbackFS) CommitData(options internal.CommitDataOptions) error {
 		return err
 	}
 
+	if len(options.List) == 0 {
+		err = blob.Truncate(0)
+		if err != nil {
+			return err
+		}
+	}
+
 	for idx, id := range options.List {
 		path := fmt.Sprintf(
 			"%s_%s",
