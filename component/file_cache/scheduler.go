@@ -168,7 +168,9 @@ func (fc *FileCache) servicePendingOps() {
 	log.Info("FileCache::servicePendingOps : Servicing pending uploads")
 
 	// Process pending operations
+	numFilesProcessed := 0
 	fc.scheduleOps.Range(func(key, value interface{}) bool {
+		numFilesProcessed++
 		select {
 		case <-fc.stopAsyncUpload:
 			log.Info("FileCache::servicePendingOps : Upload processing interrupted")
@@ -189,7 +191,10 @@ func (fc *FileCache) servicePendingOps() {
 		return true
 	})
 
-	log.Info("FileCache::servicePendingOps : Completed upload cycle, processed %d files")
+	log.Info(
+		"FileCache::servicePendingOps : Completed upload cycle, processed %d files",
+		numFilesProcessed,
+	)
 }
 
 func (fc *FileCache) uploadPendingFile(name string) error {
