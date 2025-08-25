@@ -1398,7 +1398,7 @@ func (fc *FileCache) isDownloadRequired(
 
 	// check if the file is due for a refresh from cloud storage
 	refreshTimerExpired := fc.refreshSec != 0 &&
-		time.Since(flock.DownloadTime()).Seconds() > float64(fc.refreshSec)
+		time.Since(flock.DownloadTime()) > time.Duration(fc.refreshSec)*time.Second
 
 	// get cloud attributes
 	cloudAttr, err := fc.NextComponent().GetAttr(internal.GetAttrOptions{Name: objectPath})
