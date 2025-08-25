@@ -32,6 +32,8 @@ import (
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
+	"github.com/Seagate/cloudfuse/common/log"
+	"github.com/Seagate/cloudfuse/component/azstorage"
 	"github.com/Seagate/cloudfuse/component/s3storage"
 	"github.com/Seagate/cloudfuse/component/size_tracker"
 	"github.com/Seagate/cloudfuse/internal"
@@ -70,6 +72,9 @@ var syncCmd = &cobra.Command{
 		}
 		dir = strings.TrimPrefix(dir, "/")
 
+		// Silence logging so it does not print in console
+		_ = log.SetDefaultLogger("silent", common.LogConfig{Level: common.ELogLevel.LOG_DEBUG()})
+
 		// Build and start s3storage component
 		comp := s3storage.News3storageComponent()
 		if err := comp.Configure(true); err != nil {
@@ -94,11 +99,22 @@ var syncCmd = &cobra.Command{
 		// Determine journal file name (use config override if present)
 		journalName := "mount_size.dat"
 		if config.IsSet("size_tracker.journal-name") {
-			var jn string
-			_ = config.UnmarshalKey("size_tracker.journal-name", &jn)
-			jn = strings.TrimSpace(jn)
-			if jn != "" {
-				journalName = jn
+			_ = config.UnmarshalKey("size_tracker.journal-name", &journalName)
+		} else {
+			s3conf := s3storage.Options{}
+			if err := config.UnmarshalKey("s3storage", &s3conf); err == nil {
+				sanitizedName := common.SanitizeName(s3conf.BucketName + "-" + s3conf.PrefixPath)
+				if sanitizedName != "" {
+					journalName = sanitizedName + ".dat"
+				}
+			} else {
+				azconf := azstorage.AzStorageOptions{}
+				if err := config.UnmarshalKey("azstorage", &azconf); err == nil {
+					sanitizedName := common.SanitizeName(azconf.Container + "-" + azconf.PrefixPath)
+					if sanitizedName != "" {
+						journalName = sanitizedName + ".dat"
+					}
+				}
 			}
 		}
 
