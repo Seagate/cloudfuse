@@ -86,7 +86,7 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 				startFunc()
 			}
 
-			log.Info("schedule [%s] starting (active windows=%d)", windowName, windowCount)
+			log.Info("schedule [%s] (%s) starting (active windows=%d)", windowName, config.CronExpr, windowCount)
 			fc.servicePendingOps()
 
 			// When should the window close?

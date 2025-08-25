@@ -1515,7 +1515,7 @@ loopbackfs:
 	suite.assert.True(exists, "File should be in scheduleOps after creation")
 
 	// wait for uploads to start
-	time.Sleep(testStartTime.Add(2 * time.Second).Truncate(time.Second).Sub(time.Now()))
+	time.Sleep(time.Until(testStartTime.Add(2 * time.Second).Truncate(time.Second)))
 	_, err = os.Stat(filepath.Join(suite.fake_storage_path, file))
 	for i := 0; i < 200 && os.IsNotExist(err); i++ {
 		time.Sleep(10 * time.Millisecond)
