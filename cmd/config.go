@@ -36,7 +36,8 @@ var configCmd = &cobra.Command{
 	Short: "Launch the interactive configuration tool.",
 	Long:  "Starts an interactive terminal-based UI to generate your Cloudfuse configuration file.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := runTUI(); err != nil {
+		ctx := newAppContext()
+		if err := ctx.runTUI(); err != nil {
 			return fmt.Errorf("Failed to run TUI: %v", err)
 		}
 		return nil
