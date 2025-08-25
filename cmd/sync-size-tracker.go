@@ -146,6 +146,8 @@ func init() {
 	// Removed --directory; we read the subdirectory from config instead.
 	syncCmd.PersistentFlags().
 		StringVar(&options.ConfigFile, "config-file", "", "Path to cloudfuse config file (default: ./config.yaml)")
+	syncCmd.PersistentFlags().StringVar(&options.PassPhrase, "passphrase", "",
+		"Base64 encoded key to decrypt config file. Can also be specified by env-variable CLOUDFUSE_SECURE_CONFIG_PASSPHRASE.\n Decoded key length shall be 16 (AES-128), 24 (AES-192), or 32 (AES-256) bytes in length.")
 }
 
 // sumS3PrefixRecursive walks a prefix recursively and sums file sizes.
