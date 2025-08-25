@@ -136,10 +136,11 @@ func (fc *FileCache) scheduleUploads(c *cron.Cron, sched WeeklySchedule) {
 		// check if this schedule should already be active
 		// did this schedule have a start time within the last duration?
 		schedule := c.Entry(cronEntryId)
-		currentTime := time.Now()
-		currentWindowStartTime := schedule.Schedule.Next(currentTime.Add(-duration))
-		if currentTime.After(currentWindowStartTime) {
-			initialWindowEndTime = currentWindowStartTime.Add(duration)
+		now := time.Now()
+		for t := schedule.Schedule.Next(now.Add(-duration)); now.After(t); t = schedule.Schedule.Next(t) {
+			initialWindowEndTime = t.Add(duration)
+		}
+		if !initialWindowEndTime.IsZero() {
 			go schedule.Job.Run()
 		}
 	}
