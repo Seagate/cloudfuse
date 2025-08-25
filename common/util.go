@@ -469,3 +469,27 @@ func GetCRC64(data []byte, length int) []byte {
 
 	return checksumBytes
 }
+
+func SanitizeName(name string) string {
+	replacer := strings.NewReplacer(
+		"\\",
+		"_",
+		"/",
+		"_",
+		":",
+		"_",
+		"*",
+		"_",
+		"?",
+		"_",
+		"\"",
+		"_",
+		"<",
+		"_",
+		">",
+		"_",
+		"|",
+		"_",
+	)
+	return replacer.Replace(name)
+}

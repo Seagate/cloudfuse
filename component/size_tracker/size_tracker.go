@@ -27,7 +27,6 @@ package size_tracker
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/Seagate/cloudfuse/common"
 	"github.com/Seagate/cloudfuse/common/config"
@@ -106,14 +105,14 @@ func (st *SizeTracker) Configure(_ bool) error {
 	} else {
 		s3conf := s3storage.Options{}
 		if err := config.UnmarshalKey("s3storage", &s3conf); err == nil {
-			sanitizedName := sanitizeFileName(s3conf.BucketName + "-" + s3conf.PrefixPath)
+			sanitizedName := common.SanitizeName(s3conf.BucketName + "-" + s3conf.PrefixPath)
 			if sanitizedName != "" {
 				journalName = sanitizedName + ".dat"
 			}
 		} else {
 			azconf := azstorage.AzStorageOptions{}
 			if err := config.UnmarshalKey("azstorage", &azconf); err == nil {
-				sanitizedName := sanitizeFileName(azconf.Container + "-" + azconf.PrefixPath)
+				sanitizedName := common.SanitizeName(azconf.Container + "-" + azconf.PrefixPath)
 				if sanitizedName != "" {
 					journalName = sanitizedName + ".dat"
 				}
@@ -123,30 +122,6 @@ func (st *SizeTracker) Configure(_ bool) error {
 
 	st.mountSize, err = CreateSizeJournal(journalName)
 	return err
-}
-
-func sanitizeFileName(filename string) string {
-	replacer := strings.NewReplacer(
-		"\\",
-		"_",
-		"/",
-		"_",
-		":",
-		"_",
-		"*",
-		"_",
-		"?",
-		"_",
-		"\"",
-		"_",
-		"<",
-		"_",
-		">",
-		"_",
-		"|",
-		"_",
-	)
-	return replacer.Replace(filename)
 }
 
 func (st *SizeTracker) Priority() internal.ComponentPriority {

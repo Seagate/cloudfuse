@@ -104,7 +104,7 @@ func newTestClient(configuration string) (*Client, error) {
 
 	// now push Options data into an Config
 	configForS3Client := Config{
-		authConfig: s3AuthConfig{
+		AuthConfig: s3AuthConfig{
 			BucketName: conf.BucketName,
 			KeyID:      encryptedKeyID,
 			SecretKey:  encryptedSecretKey,
@@ -191,7 +191,7 @@ func (s *clientTestSuite) setupTestHelper(configuration string, create bool) err
 
 	var err error
 	s.client, err = newTestClient(configuration)
-	s.awsS3Client = s.client.awsS3Client
+	s.awsS3Client = s.client.AwsS3Client
 	return err
 }
 
@@ -422,9 +422,9 @@ func (s *clientTestSuite) TestDefaultConfig() {
 
 	s.assert.Equal(
 		"https://s3.us-east-1.sv15.lyve.seagate.com",
-		s.client.Config.authConfig.Endpoint,
+		s.client.Config.AuthConfig.Endpoint,
 	)
-	s.assert.Equal("us-east-1", s.client.Config.authConfig.Region)
+	s.assert.Equal("us-east-1", s.client.Config.AuthConfig.Region)
 
 	os.Unsetenv("AWS_ACCESS_KEY_ID")
 	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
@@ -445,7 +445,7 @@ func (s *clientTestSuite) TestCredentialPrecedenceEnvOverConfig() {
 	config := fmt.Sprintf(
 		"s3storage:\n  bucket-name: %s\n  endpoint: %s\n  key-id: %s\n  secret-key: %s",
 		storageTestConfigurationParameters.BucketName,
-		s.client.Config.authConfig.Endpoint,
+		s.client.Config.AuthConfig.Endpoint,
 		storageTestConfigurationParameters.KeyID,
 		"WRONGSECRETKEY",
 	)
@@ -471,7 +471,7 @@ func (s *clientTestSuite) TestCredentialPrecedenceEnvOverProfile() {
 	config := fmt.Sprintf(
 		"s3storage:\n  bucket-name: %s\n  endpoint: %s\n  profile: %s",
 		storageTestConfigurationParameters.BucketName,
-		s.client.Config.authConfig.Endpoint,
+		s.client.Config.AuthConfig.Endpoint,
 		"NoProfile",
 	)
 	// Invalid profile, but environment variables should take precedence
@@ -544,7 +544,7 @@ func (s *clientTestSuite) TestSetEndpointFromRegion() {
 	s.assert.Error(err)
 	s.assert.Equal(
 		"https://s3.us-west-2.sv15.lyve.seagate.com",
-		s.client.Config.authConfig.Endpoint,
+		s.client.Config.AuthConfig.Endpoint,
 	)
 }
 
@@ -567,7 +567,7 @@ func (s *clientTestSuite) TestSetRegionFromEndpoint() {
 	// Should set region automatically from endpoint
 	err := s.setupTestHelper(config, false)
 	s.assert.NoError(err)
-	s.assert.NotNil(s.client.Config.authConfig.Region)
+	s.assert.NotNil(s.client.Config.AuthConfig.Region)
 }
 
 func (s *clientTestSuite) TestGetRegionEndpoint() {
@@ -628,7 +628,7 @@ func (s *clientTestSuite) TestDefaultBucketName() {
 	err := s.setupTestHelper(config, false)
 	s.assert.NoError(err)
 	buckets, _ := s.client.ListBuckets()
-	s.assert.Contains(buckets, s.client.Config.authConfig.BucketName)
+	s.assert.Contains(buckets, s.client.Config.AuthConfig.BucketName)
 }
 
 func (s *clientTestSuite) TestSetPrefixPath() {
@@ -644,7 +644,7 @@ func (s *clientTestSuite) TestSetPrefixPath() {
 
 	// object should be at prefix
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(path.Join(prefix, fileName)),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
@@ -660,7 +660,7 @@ func (s *clientTestSuite) TestCreateFile() {
 
 	// file should be in bucket
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(name),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
@@ -680,7 +680,7 @@ func (s *clientTestSuite) TestCreateLink() {
 	target := generateFileName()
 
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(target),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
 	})
@@ -694,7 +694,7 @@ func (s *clientTestSuite) TestCreateLink() {
 	source = s.client.getKey(source, true, false)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(source),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
@@ -720,7 +720,7 @@ func (s *clientTestSuite) TestReadLink() {
 	source = s.client.getKey(source, true, false)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(source),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
@@ -748,13 +748,13 @@ func (s *clientTestSuite) TestDeleteLink() {
 	source = s.client.getKey(source, true, false)
 
 	_, err = s.awsS3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
-		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Bucket: aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:    aws.String(source),
 	})
 	s.assert.NoError(err)
 
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(source),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
@@ -786,7 +786,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 
 		// make sure the links are there
 		result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-			Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+			Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 			Key:          aws.String(folder + sources[i]),
 			ChecksumMode: types.ChecksumModeEnabled,
 		})
@@ -810,7 +810,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 	}
 	// send keyList for deletion
 	_, err := s.awsS3Client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
-		Bucket: aws.String(s.client.Config.authConfig.BucketName),
+		Bucket: aws.String(s.client.Config.AuthConfig.BucketName),
 		Delete: &types.Delete{
 			Objects: keyList,
 			Quiet:   aws.Bool(true),
@@ -821,7 +821,7 @@ func (s *clientTestSuite) TestDeleteLinks() {
 	// make sure the links aren't there
 	for i := range sources {
 		_, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-			Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+			Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 			Key:          aws.String(folder + sources[i]),
 			ChecksumMode: types.ChecksumModeEnabled,
 		})
@@ -835,7 +835,7 @@ func (s *clientTestSuite) TestDeleteFile() {
 	// Setup
 	name := generateFileName()
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(name),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
 	})
@@ -848,7 +848,7 @@ func (s *clientTestSuite) TestDeleteFile() {
 	//_, err = s.s3.GetAttr(internal.GetAttrOptions{name, false})
 	// File should not be in the account
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(name),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
@@ -861,7 +861,7 @@ func (s *clientTestSuite) TestDeleteDirectory() {
 	dirName := generateDirectoryName()
 	fileName := generateFileName() // can't have empty directory
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(path.Join(dirName, fileName)),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
 	})
@@ -872,7 +872,7 @@ func (s *clientTestSuite) TestDeleteDirectory() {
 
 	// file in directory should no longer be there
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(path.Join(dirName, fileName)),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
@@ -884,7 +884,7 @@ func (s *clientTestSuite) TestRenameFile() {
 
 	src := generateFileName()
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(src),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
 	})
@@ -896,14 +896,14 @@ func (s *clientTestSuite) TestRenameFile() {
 
 	// Src should not be in the account
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(src),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.Error(err)
 	// Dst should be in the account
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(dst),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
@@ -921,14 +921,14 @@ func (s *clientTestSuite) TestRenameFileError() {
 
 	// Src should not be in the account
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(src),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.Error(err)
 	// Dst should not be in the account
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(dst),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
@@ -940,7 +940,7 @@ func (s *clientTestSuite) TestRenameDirectory() {
 	srcDir := generateDirectoryName()
 	fileName := generateFileName() // can't have empty directory
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(path.Join(srcDir, fileName)),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
 	})
@@ -952,14 +952,14 @@ func (s *clientTestSuite) TestRenameDirectory() {
 
 	// file in srcDir should no longer be there
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(path.Join(srcDir, fileName)),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
 	s.assert.Error(err)
 	// file in dstDir should be there
 	_, err = s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(path.Join(dstDir, fileName)),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
@@ -971,7 +971,7 @@ func (s *clientTestSuite) TestGetAttrDir() {
 	dirName := generateDirectoryName()
 
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(dirName + "/"),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
 	})
@@ -989,7 +989,7 @@ func (s *clientTestSuite) TestGetAttrDirWithOnlyFile() {
 	filename := dirName + "/" + generateFileName()
 
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(filename),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
 	})
@@ -1009,7 +1009,7 @@ func (s *clientTestSuite) TestGetAttrFile() {
 	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(name),
 		Body:              bytes.NewReader(body),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
@@ -1033,7 +1033,7 @@ func (s *clientTestSuite) TestGetAttrFile() {
 	time.Sleep(1 * time.Second) // Wait and then modify the file again
 
 	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(name),
 		Body:              bytes.NewReader(body),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
@@ -1064,7 +1064,7 @@ func (s *clientTestSuite) TestList() {
 	// a/c1/gc1
 	gc1 := base + "/c1" + "/gc1"
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(gc1),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
 	})
@@ -1072,7 +1072,7 @@ func (s *clientTestSuite) TestList() {
 	// a/c2
 	c2 := base + "/c2"
 	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(c2),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
 	})
@@ -1080,7 +1080,7 @@ func (s *clientTestSuite) TestList() {
 	// ab/c1
 	abc1 := base + "b/c1"
 	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(abc1),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
 	})
@@ -1088,7 +1088,7 @@ func (s *clientTestSuite) TestList() {
 	// ac
 	ac := base + "c"
 	_, err = s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(ac),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
 	})
@@ -1133,7 +1133,7 @@ func (s *clientTestSuite) TestReadToFile() {
 	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(name),
 		Body:              bytes.NewReader(body),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
@@ -1167,7 +1167,7 @@ func (s *clientTestSuite) TestReadToFileRanged() {
 	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(name),
 		Body:              bytes.NewReader(body),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
@@ -1204,7 +1204,7 @@ func (s *clientTestSuite) TestReadToFileNoMultipart() {
 	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(name),
 		Body:              bytes.NewReader(body),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
@@ -1238,7 +1238,7 @@ func (s *clientTestSuite) TestReadBuffer() {
 	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(name),
 		Body:              bytes.NewReader(body),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
@@ -1260,7 +1260,7 @@ func (s *clientTestSuite) TestReadInBuffer() {
 	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(name),
 		Body:              bytes.NewReader(body),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
@@ -1299,7 +1299,7 @@ func (s *clientTestSuite) TestWriteFromFile() {
 	// this checks the integration between attr cache and s3storage for metadata.make sure the flag passed down is
 	// respected.
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(name),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
@@ -1326,7 +1326,7 @@ func (s *clientTestSuite) TestWriteFromBuffer() {
 	s.assert.NoError(err)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(name),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
@@ -1347,7 +1347,7 @@ func (s *clientTestSuite) TestTruncateFile() {
 	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	body := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(name),
 		Body:              bytes.NewReader(body),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
@@ -1359,7 +1359,7 @@ func (s *clientTestSuite) TestTruncateFile() {
 	s.assert.NoError(err)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(name),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
@@ -1380,7 +1380,7 @@ func (s *clientTestSuite) TestWrite() {
 	bodyLen := rand.IntN(maxBodyLen-minBodyLen) + minBodyLen
 	oldBody := []byte(randomString(bodyLen))
 	_, err := s.awsS3Client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket:            aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:            aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:               aws.String(name),
 		Body:              bytes.NewReader(oldBody),
 		ChecksumAlgorithm: s.client.Config.checksumAlgorithm,
@@ -1394,7 +1394,7 @@ func (s *clientTestSuite) TestWrite() {
 	s.assert.NoError(err)
 
 	result, err := s.awsS3Client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket:       aws.String(s.client.Config.authConfig.BucketName),
+		Bucket:       aws.String(s.client.Config.AuthConfig.BucketName),
 		Key:          aws.String(name),
 		ChecksumMode: types.ChecksumModeEnabled,
 	})
