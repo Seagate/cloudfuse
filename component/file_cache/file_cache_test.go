@@ -1471,8 +1471,8 @@ func (suite *fileCacheTestSuite) TestFlushFileErrorBadFd() {
 func (suite *fileCacheTestSuite) TestCronOffToONUpload() {
 	defer suite.cleanupTest()
 
-	now := time.Now()
-	second := (now.Second() + 2) % 60
+	testStartTime := time.Now()
+	second := (testStartTime.Second() + 2) % 60
 	cronExpr := fmt.Sprintf("%d * * * * *", second)
 
 	configContent := fmt.Sprintf(`file_cache:
@@ -1515,7 +1515,7 @@ loopbackfs:
 	suite.assert.True(exists, "File should be in scheduleOps after creation")
 
 	// wait for uploads to start
-	time.Sleep(time.Now().Sub(now.Add(2 * time.Second).Truncate(time.Second)))
+	time.Sleep(testStartTime.Add(2 * time.Second).Truncate(time.Second).Sub(time.Now()))
 	_, err = os.Stat(filepath.Join(suite.fake_storage_path, file))
 	for i := 0; i < 200 && os.IsNotExist(err); i++ {
 		time.Sleep(10 * time.Millisecond)
