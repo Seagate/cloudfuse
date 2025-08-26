@@ -325,14 +325,14 @@ func setupPreZip() (string, string, error) {
 
 	// create a sub folder for the service logs
 	sysProfDir := fmt.Sprintf("%s%csystemprofile", preArchPath, os.PathSeparator)
-	err = os.Mkdir(sysProfDir, 0760)
+	err = os.Mkdir(sysProfDir, 0740)
 	if err != nil {
 		return "", "", fmt.Errorf("unable to create folder, %s: [%s]", sysProfDir, err.Error())
 	}
 
 	// create a sub folder for the user logs
 	userDir := fmt.Sprintf("%s%cuser", preArchPath, os.PathSeparator)
-	err = os.Mkdir(userDir, 0760)
+	err = os.Mkdir(userDir, 0740)
 	if err != nil {
 		return "", "", fmt.Errorf("unable to create folder, %s: [%s]", userDir, err.Error())
 	}
