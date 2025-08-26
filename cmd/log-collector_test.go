@@ -403,7 +403,7 @@ func (suite *logCollectTestSuite) TestSilentConfig() {
 }
 
 // Log collection test using --output-path flag
-func (suite *logCollectTestSuite) TestOutputPath() {
+func (suite *logCollectTestSuite) TestArchivePath() {
 
 	// create temp folder for output Path
 	outputPath := common.GetDefaultWorkDir()
