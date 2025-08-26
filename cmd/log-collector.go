@@ -379,7 +379,7 @@ func copyFiles(srcPath, dstPath string) error {
 }
 
 func createWindowsArchive(archPath string) error {
-	outFile, err := os.Create(filepath.Join(gatherLogOpts.outputPath, linuxArchivePath))
+	outFile, err := os.Create(filepath.Join(gatherLogOpts.outputPath, windowsArchivePath))
 	if err != nil {
 		return err
 	}
