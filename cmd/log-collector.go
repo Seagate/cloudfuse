@@ -119,7 +119,7 @@ var gatherLogsCmd = &cobra.Command{
 				)
 
 				if _, err = os.Stat(srcSrvPath); !errors.Is(err, os.ErrNotExist) {
-					if copyFiles(srcSrvPath, dstSysprofPath); err != nil {
+					if err = copyFiles(srcSrvPath, dstSysprofPath); err != nil {
 						return fmt.Errorf(
 							"unable to copy files from source path %s to destination %s: [%s]",
 							srcSrvPath,
