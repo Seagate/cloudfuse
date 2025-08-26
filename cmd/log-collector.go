@@ -104,6 +104,7 @@ var gatherLogsCmd = &cobra.Command{
 				defer os.RemoveAll(preArchPath)
 
 				// get the service logs
+
 				systemRoot := os.Getenv("SystemRoot")
 				if systemRoot == "" {
 					return errors.New("Could not find system root")
@@ -116,14 +117,16 @@ var gatherLogsCmd = &cobra.Command{
 					"systemprofile",
 					".cloudfuse",
 				)
-				err = copyFiles(srcSrvPath, dstSysprofPath)
-				if err != nil {
-					return fmt.Errorf(
-						"unable to copy files from source path %s to destination %s: [%s]",
-						srcSrvPath,
-						dstSysprofPath,
-						err.Error(),
-					)
+
+				if _, err = os.Stat(srcSrvPath); !errors.Is(err, os.ErrNotExist) {
+					if copyFiles(srcSrvPath, dstSysprofPath); err != nil {
+						return fmt.Errorf(
+							"unable to copy files from source path %s to destination %s: [%s]",
+							srcSrvPath,
+							dstSysprofPath,
+							err.Error(),
+						)
+					}
 				}
 				err = copyFiles(logPath, dstUserPath)
 				if err != nil {
